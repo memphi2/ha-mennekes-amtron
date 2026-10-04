@@ -1,0 +1,247 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, for example v0.1"
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  RELEASE_ZIP: .release/ha-mennekes-amtron.zip
+  RELEASE_SHA256SUMS: .release/SHA256SUMS
+  RELEASE_METADATA: .release/build-metadata.json
+  RELEASE_SBOM: .release/sbom.spdx.json
+
+jobs:
+  validate:
+    name: release validate (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: min-ha
+            python-version: "3.14"
+            homeassistant: "2026.5.0"
+            requirements-lock: requirements-dev-min-ha.txt
+          - name: current-ha
+            python-version: "3.14"
+            homeassistant: "2026.9.4"
+            requirements-lock: requirements-dev.txt
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Python validation tools
+        run: |
+          python -m pip install "homeassistant==${{ matrix.homeassistant }}"
+          python -m pip install -r "${{ matrix.requirements-lock }}"
+          python -m pip check
+      - name: Validation gates
+        run: python scripts/check_validate.py
+
+  hacs:
+    name: release hacs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - name: HACS validation
+        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main
+        with:
+          category: integration
+          ignore: hacsjson integration_manifest
+
+  hassfest:
+    name: release hassfest
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - name: Hassfest
+        uses: home-assistant/actions/hassfest@06749dd8c0b54f350bc69c8752456cee498808a3 # master
+
+  main-validation:
+    name: main validation gate
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - name: Require the tag to be the validated main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          tag_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+          git fetch --no-tags origin main
+          main_sha="$(git rev-parse origin/main)"
+          if [ "$tag_sha" != "$main_sha" ]; then
+            echo "::error::Release tag $RELEASE_TAG points to $tag_sha, but origin/main is $main_sha"
+            exit 1
+          fi
+
+          for attempt in $(seq 1 90); do
+            conclusion="$(gh api \
+              --method GET \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${REPOSITORY}/actions/workflows/validate.yml/runs" \
+              -f branch=main -f event=push -f head_sha="$tag_sha" -f per_page=1 \
+              --jq '.workflow_runs[0] | "\(.status):\(.conclusion)"' || true)"
+            case "$conclusion" in
+              completed:success)
+                echo "Canonical main Validate workflow succeeded for $tag_sha"
+                exit 0
+                ;;
+              completed:*)
+                echo "::error::Validate workflow on main concluded $conclusion"
+                exit 1
+                ;;
+              *)
+                echo "Waiting for Validate on main for $tag_sha ($attempt/90): $conclusion"
+                sleep 10
+                ;;
+            esac
+          done
+          echo "::error::Timed out waiting for Validate on main for $tag_sha"
+          exit 1
+
+  publish:
+    runs-on: ubuntu-24.04
+    needs:
+      - validate
+      - hacs
+      - hassfest
+      - main-validation
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install release validation tools
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pip check
+      - name: Resolve release tag
+        id: release-tag
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          python scripts/check_release_tag.py "$RELEASE_TAG" --attestation-context
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "ref=refs/tags/$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Release validation gates
+        run: python scripts/check_repo.py
+      - name: Build HACS release zip
+        run: python scripts/build_hacs_release.py
+      - name: Generate release metadata
+        run: |
+          python scripts/write_release_assets.py \
+            --zip "$RELEASE_ZIP" \
+            --tag "${{ steps.release-tag.outputs.tag }}" \
+            --repository "$GITHUB_REPOSITORY" \
+            --sha256sums "$RELEASE_SHA256SUMS" \
+            --metadata "$RELEASE_METADATA" \
+            --sbom "$RELEASE_SBOM"
+      - name: Validate SPDX SBOM
+        run: pyspdxtools -i "$RELEASE_SBOM"
+      - name: Verify release assets
+        run: |
+          test -s "$RELEASE_ZIP"
+          test -s "$RELEASE_SHA256SUMS"
+          test -s "$RELEASE_METADATA"
+          test -s "$RELEASE_SBOM"
+          (cd .release && sha256sum -c SHA256SUMS)
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ha-mennekes-amtron-release
+          path: |
+            ${{ env.RELEASE_ZIP }}
+            ${{ env.RELEASE_SHA256SUMS }}
+            ${{ env.RELEASE_METADATA }}
+            ${{ env.RELEASE_SBOM }}
+          if-no-files-found: error
+      - name: Generate artifact attestation
+        id: provenance_attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ env.RELEASE_ZIP }}
+      - name: Generate SBOM attestation
+        id: sbom_attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ env.RELEASE_ZIP }}
+          sbom-path: ${{ env.RELEASE_SBOM }}
+      - name: Verify generated attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REF: ${{ steps.release-tag.outputs.ref }}
+          RELEASE_COMMIT: ${{ steps.release-tag.outputs.commit }}
+        run: |
+          gh attestation verify "$RELEASE_ZIP" \
+            --repo "$GITHUB_REPOSITORY" \
+            --bundle "${{ steps.provenance_attestation.outputs.bundle-path }}" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --source-ref "$RELEASE_REF" \
+            --source-digest "$RELEASE_COMMIT"
+          gh attestation verify "$RELEASE_ZIP" \
+            --repo "$GITHUB_REPOSITORY" \
+            --bundle "${{ steps.sbom_attestation.outputs.bundle-path }}" \
+            --predicate-type "https://spdx.dev/Document/v2.3" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --source-ref "$RELEASE_REF" \
+            --source-digest "$RELEASE_COMMIT"
+      - name: Publish GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release-tag.outputs.tag }}
+        run: |
+          assets=(
+            "$RELEASE_ZIP"
+            "$RELEASE_SHA256SUMS"
+            "$RELEASE_METADATA"
+            "$RELEASE_SBOM"
+          )
+          notes_file=".github/release-notes/${RELEASE_TAG}.md"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "${assets[@]}" \
+              --title "$RELEASE_TAG" \
+              --notes-file "$notes_file" \
+              --verify-tag
+          fi

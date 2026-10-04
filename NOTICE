@@ -1,0 +1,21 @@
+MENNEKES AMTRON Home Assistant Integration
+Copyright 2026 MENNEKES AMTRON Home Assistant Integration contributors
+
+This product includes software developed for the MENNEKES AMTRON Home Assistant
+Integration project.
+
+This project is an independent community project. It is not affiliated with,
+endorsed by, sponsored by, or certified by MENNEKES Elektrotechnik GmbH & Co.
+KG, Home Assistant, Nabu Casa, HACS, or other referenced projects.
+
+MENNEKES, AMTRON, Home Assistant, HACS, Nabu Casa, Modbus, and other referenced
+names are trademarks or names of their respective owners. They are used only
+for compatibility, attribution, and descriptive reference.
+
+Modbus is a registered trademark of Schneider Electric USA, Inc., licensed to
+the Modbus Organization, Inc.
+
+This repository must not contain MENNEKES firmware images, MENNEKES
+configuration-tool payloads, vendor documentation PDFs, local device backups,
+or local secrets. Vendor documentation is referenced by document revision and
+public URL only.

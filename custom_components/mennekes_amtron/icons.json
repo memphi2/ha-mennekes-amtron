@@ -1,0 +1,175 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "authorization_enabled": {
+        "default": "mdi:card-account-details"
+      },
+      "cable_lock_enabled": {
+        "default": "mdi:lock-check"
+      },
+      "charging": {
+        "default": "mdi:battery-charging"
+      },
+      "downgrade_active": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "error": {
+        "default": "mdi:alert-circle"
+      },
+      "grid_imbalance_enabled": {
+        "default": "mdi:scale-balance"
+      },
+      "master_lost_fallback": {
+        "default": "mdi:lan-disconnect"
+      },
+      "phase_switch_capable": {
+        "default": "mdi:swap-horizontal"
+      },
+      "vehicle_connected": {
+        "default": "mdi:ev-plug-type2"
+      }
+    },
+    "button": {
+      "recover_from_error": {
+        "default": "mdi:restore-alert"
+      },
+      "restart": {
+        "default": "mdi:restart"
+      }
+    },
+    "number": {
+      "charging_current_limit": {
+        "default": "mdi:current-ac"
+      }
+    },
+    "select": {
+      "requested_phases": {
+        "default": "mdi:swap-horizontal"
+      },
+      "solar_charging_mode": {
+        "default": "mdi:solar-power-variant"
+      }
+    },
+    "sensor": {
+      "authorization_status": {
+        "default": "mdi:card-account-details"
+      },
+      "cable_lock_status": {
+        "default": "mdi:lock"
+      },
+      "cp_state": {
+        "default": "mdi:sine-wave"
+      },
+      "current_l1": {
+        "default": "mdi:current-ac"
+      },
+      "current_l2": {
+        "default": "mdi:current-ac"
+      },
+      "current_l3": {
+        "default": "mdi:current-ac"
+      },
+      "detected_ev_phases": {
+        "default": "mdi:numeric"
+      },
+      "downgrade_current": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "ems_fallback_current": {
+        "default": "mdi:current-ac"
+      },
+      "energy_total": {
+        "default": "mdi:counter"
+      },
+      "error_code": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "evse_state": {
+        "default": "mdi:ev-station"
+      },
+      "grid_imbalance_threshold": {
+        "default": "mdi:scale-balance"
+      },
+      "grid_phases_connected": {
+        "default": "mdi:transmission-tower"
+      },
+      "max_current_house": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "max_evse_current": {
+        "default": "mdi:ev-station"
+      },
+      "modbus_layout_version": {
+        "default": "mdi:tag-text-outline"
+      },
+      "phase_rotation": {
+        "default": "mdi:rotate-right"
+      },
+      "phase_switching_mode": {
+        "default": "mdi:swap-horizontal"
+      },
+      "phase_switching_pause": {
+        "default": "mdi:timer-pause-outline"
+      },
+      "power_l1": {
+        "default": "mdi:flash"
+      },
+      "power_l2": {
+        "default": "mdi:flash"
+      },
+      "power_l3": {
+        "default": "mdi:flash"
+      },
+      "power_total": {
+        "default": "mdi:flash"
+      },
+      "session_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "session_energy": {
+        "default": "mdi:lightning-bolt"
+      },
+      "session_max_current": {
+        "default": "mdi:current-ac"
+      },
+      "sessions_total": {
+        "default": "mdi:counter"
+      },
+      "signaled_current": {
+        "default": "mdi:sine-wave"
+      },
+      "solar_min_current": {
+        "default": "mdi:solar-power-variant"
+      },
+      "switched_phases": {
+        "default": "mdi:swap-horizontal"
+      },
+      "temperature": {
+        "default": "mdi:thermometer"
+      },
+      "voltage_l1": {
+        "default": "mdi:flash-triangle-outline"
+      },
+      "voltage_l2": {
+        "default": "mdi:flash-triangle-outline"
+      },
+      "voltage_l3": {
+        "default": "mdi:flash-triangle-outline"
+      }
+    },
+    "switch": {
+      "charging_paused": {
+        "default": "mdi:pause-circle"
+      },
+      "charging_release": {
+        "default": "mdi:electric-switch"
+      },
+      "lock_evse": {
+        "default": "mdi:lock"
+      }
+    }
+  },
+  "services": {
+    "set_charging_current": "mdi:current-ac"
+  }
+}

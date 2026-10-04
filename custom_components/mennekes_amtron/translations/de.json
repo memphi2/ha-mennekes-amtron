@@ -1,0 +1,400 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Diese Wallbox ist bereits konfiguriert.",
+      "reconfigure_successful": "Die Busparameter wurden aktualisiert.",
+      "unique_id_mismatch": "Dieser Port gehört zu einer anderen Wallbox."
+    },
+    "error": {
+      "cannot_connect": "Der serielle Port konnte nicht geöffnet werden oder die Wallbox hat nicht geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -), den Port und die Busparameter.",
+      "invalid_response": "Das Gerät hat geantwortet, aber keine Modbus-Layout-Version gemeldet. Prüfe die Geräteadresse und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen."
+    },
+    "step": {
+      "reconfigure": {
+        "data": {
+          "baudrate": "Baudrate",
+          "bytesize": "Datenbits",
+          "device_id": "Modbus-Geräteadresse",
+          "parity": "Parität",
+          "port": "Serieller Port",
+          "stopbits": "Stoppbits"
+        },
+        "data_description": {
+          "baudrate": "Werkseinstellung ist 57600.",
+          "bytesize": "Werkseinstellung ist 8.",
+          "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
+          "parity": "Werkseinstellung ist keine.",
+          "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
+          "stopbits": "Werkseinstellung sind 2 Stoppbits ohne Parität."
+        },
+        "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
+        "title": "MENNEKES AMTRON"
+      },
+      "user": {
+        "data": {
+          "baudrate": "Baudrate",
+          "bytesize": "Datenbits",
+          "device_id": "Modbus-Geräteadresse",
+          "parity": "Parität",
+          "port": "Serieller Port",
+          "stopbits": "Stoppbits"
+        },
+        "data_description": {
+          "baudrate": "Werkseinstellung ist 57600.",
+          "bytesize": "Werkseinstellung ist 8.",
+          "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
+          "parity": "Werkseinstellung ist keine.",
+          "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
+          "stopbits": "Werkseinstellung sind 2 Stoppbits ohne Parität."
+        },
+        "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
+        "title": "MENNEKES AMTRON"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "authorization_enabled": {
+        "name": "Autorisierung aktiviert"
+      },
+      "cable_lock_enabled": {
+        "name": "Dauerhafte Kabelverriegelung"
+      },
+      "charging": {
+        "name": "Lädt"
+      },
+      "downgrade_active": {
+        "name": "Downgrade aktiv"
+      },
+      "error": {
+        "name": "Fehler"
+      },
+      "grid_imbalance_enabled": {
+        "name": "Schieflast-Überwachung"
+      },
+      "master_lost_fallback": {
+        "name": "Energiemanager-Fallback aktiv"
+      },
+      "phase_switch_capable": {
+        "name": "Phasenumschaltung möglich"
+      },
+      "vehicle_connected": {
+        "name": "Fahrzeug verbunden"
+      }
+    },
+    "button": {
+      "recover_from_error": {
+        "name": "Fehler zurücksetzen"
+      },
+      "restart": {
+        "name": "Neu starten"
+      }
+    },
+    "number": {
+      "charging_current_limit": {
+        "name": "Ladestrom-Begrenzung"
+      }
+    },
+    "select": {
+      "requested_phases": {
+        "name": "Angeforderte Phasen",
+        "state": {
+          "all_available": "Alle verfügbaren Phasen",
+          "single_phase": "Nur eine Phase"
+        }
+      },
+      "solar_charging_mode": {
+        "name": "Solar-Lademodus",
+        "state": {
+          "fast": "Schnellladen",
+          "not_active": "Nicht aktiv",
+          "sunshine": "Sunshine",
+          "sunshine_plus": "Sunshine+"
+        }
+      }
+    },
+    "sensor": {
+      "authorization_status": {
+        "name": "Autorisierung",
+        "state": {
+          "authorized": "Autorisiert",
+          "not_authorized": "Nicht autorisiert",
+          "not_used": "Nicht verwendet"
+        }
+      },
+      "cable_lock_status": {
+        "name": "Kabelverriegelung",
+        "state": {
+          "fixed_cable": "Fest angeschlagenes Kabel",
+          "locked": "Verriegelt",
+          "undetermined": "Unbestimmt",
+          "unlocked": "Entriegelt"
+        }
+      },
+      "cp_state": {
+        "name": "CP-Status",
+        "state": {
+          "a1": "A1 (kein Fahrzeug)",
+          "a2": "A2 (Fahrzeug getrennt)",
+          "b1": "B1 (Fahrzeug verbunden)",
+          "b2": "B2 (bereit, Strom angeboten)",
+          "c1": "C1 (Fahrzeug ladebereit)",
+          "c2": "C2 (lädt)",
+          "d1": "D1",
+          "d2": "D2",
+          "e": "E (Fehler)",
+          "f": "F (Fehler)",
+          "init": "Initialisierung"
+        }
+      },
+      "current_l1": {
+        "name": "Strom L1"
+      },
+      "current_l2": {
+        "name": "Strom L2"
+      },
+      "current_l3": {
+        "name": "Strom L3"
+      },
+      "detected_ev_phases": {
+        "name": "Erkannte Fahrzeugphasen",
+        "state": {
+          "not_initialized": "Nicht initialisiert",
+          "one_phase": "1 Phase",
+          "three_phases": "3 Phasen",
+          "two_phases": "2 Phasen"
+        }
+      },
+      "downgrade_current": {
+        "name": "Downgrade-Strom"
+      },
+      "ems_fallback_current": {
+        "name": "Fallback-Strom des Energiemanagers"
+      },
+      "energy_total": {
+        "name": "Energie insgesamt"
+      },
+      "error_code": {
+        "name": "Fehlercode",
+        "state": {
+          "connected_phases_mismatch": "Phasenanzahl stimmt nicht",
+          "energy_manager_unavailable": "Energiemanager nicht erreichbar",
+          "ev_overcurrent": "Überstrom am Fahrzeug",
+          "no_error": "Kein Fehler",
+          "other": "Anderer Fehler",
+          "voltage_out_of_range": "Spannung außerhalb des Bereichs"
+        }
+      },
+      "evse_state": {
+        "name": "Ladestation-Status",
+        "state": {
+          "charging": "Lädt",
+          "error": "Fehler",
+          "ev_connected": "Fahrzeug verbunden",
+          "idle": "Bereit",
+          "not_initialized": "Nicht initialisiert",
+          "preconditions_valid": "Voraussetzungen erfüllt",
+          "ready_to_charge": "Ladebereit",
+          "service_mode": "Servicemodus"
+        }
+      },
+      "grid_imbalance_threshold": {
+        "name": "Schieflast-Schwelle"
+      },
+      "grid_phases_connected": {
+        "name": "Angeschlossene Netzphasen",
+        "state": {
+          "l1": "L1",
+          "l1_l2_l3": "L1, L2, L3"
+        }
+      },
+      "max_current_house": {
+        "name": "Maximaler Strom des Hausanschlusses"
+      },
+      "max_evse_current": {
+        "name": "Maximaler Strom der Wallbox"
+      },
+      "modbus_layout_version": {
+        "name": "Modbus-Layout-Version"
+      },
+      "phase_rotation": {
+        "name": "Phasenrotation",
+        "state": {
+          "l1_l2_l3": "L1-L2-L3",
+          "l2_l3_l1": "L2-L3-L1",
+          "l3_l1_l2": "L3-L1-L2"
+        }
+      },
+      "phase_switching_mode": {
+        "name": "Phasen-Umschaltmodus",
+        "state": {
+          "solar_dynamic": "Solar, 1 oder 3 Phasen",
+          "solar_one_phase": "Solar, nur 1 Phase",
+          "solar_three_phases": "Solar, nur 3 Phasen"
+        }
+      },
+      "phase_switching_pause": {
+        "name": "Pause beim Phasenwechsel"
+      },
+      "power_l1": {
+        "name": "Leistung L1"
+      },
+      "power_l2": {
+        "name": "Leistung L2"
+      },
+      "power_l3": {
+        "name": "Leistung L3"
+      },
+      "power_total": {
+        "name": "Gesamtleistung"
+      },
+      "session_duration": {
+        "name": "Dauer der Sitzung"
+      },
+      "session_energy": {
+        "name": "Energie der Sitzung"
+      },
+      "session_max_current": {
+        "name": "Maximaler Strom der Sitzung"
+      },
+      "sessions_total": {
+        "name": "Ladevorgänge insgesamt"
+      },
+      "signaled_current": {
+        "name": "Signalisierter Strom"
+      },
+      "solar_min_current": {
+        "name": "Sunshine+ Mindeststrom"
+      },
+      "switched_phases": {
+        "name": "Geschaltete Phasen",
+        "state": {
+          "all_available": "Alle verfügbaren Phasen",
+          "single_phase": "Eine Phase"
+        }
+      },
+      "temperature": {
+        "name": "Temperatur"
+      },
+      "voltage_l1": {
+        "name": "Spannung L1"
+      },
+      "voltage_l2": {
+        "name": "Spannung L2"
+      },
+      "voltage_l3": {
+        "name": "Spannung L3"
+      }
+    },
+    "switch": {
+      "charging_paused": {
+        "name": "Laden pausiert"
+      },
+      "charging_release": {
+        "name": "Ladefreigabe"
+      },
+      "lock_evse": {
+        "name": "Wallbox gesperrt"
+      }
+    }
+  },
+  "exceptions": {
+    "charging_current_invalid": {
+      "message": "{value} A ist keine gültige Ladestrom-Begrenzung. Die Wallbox akzeptiert 0 A (keine Begrenzung) oder mindestens {minimum} A; Werte dazwischen führen dazu, dass sie dem Fahrzeug 0 A signalisiert."
+    },
+    "charging_current_zero": {
+      "message": "0 A beendet das Laden an dieser Wallbox nicht: Der Wert hebt die Begrenzung auf und die Wallbox signalisiert ihren Maximalstrom. Nutze zum Pausieren den Schalter \"Laden pausiert\" oder die Aktion \"Ladestrom setzen\" mit \"Unbegrenzt erlauben\", wenn du wirklich keine Begrenzung willst."
+    },
+    "entry_not_loaded": {
+      "message": "Der Wallbox-Eintrag für das Gerät {device} ist nicht geladen."
+    },
+    "no_wallbox_target": {
+      "message": "Die Aktion benötigt mindestens ein MENNEKES-AMTRON-Gerät als Ziel."
+    },
+    "phase_switch_unsupported": {
+      "message": "Diese Wallbox kann nicht zwischen einer und drei Phasen umschalten. Die dynamische Phasenumschaltung setzt ein 11-kW-Gerät voraus, das Phasenoption 2 meldet."
+    },
+    "read_only_mode": {
+      "message": "Diese Wallbox ist im Nur-Lesen-Modus eingerichtet. Stelle den Steuermodus in den Integrationsoptionen auf \"Modbus-Master\", um sie zu steuern."
+    },
+    "restart_requires_idle": {
+      "message": "Die Wallbox darf nur im Zustand \"Bereit\" neu gestartet werden. Trenne zuerst das Fahrzeug."
+    },
+    "unknown_device": {
+      "message": "Das Gerät {device} ist Home Assistant nicht bekannt."
+    },
+    "write_failed": {
+      "message": "Das Schreiben von {register} an die Wallbox ist fehlgeschlagen: {error}"
+    },
+    "write_rate_limited": {
+      "message": "Die Wallbox akzeptiert diese Änderung erst in {seconds} s wieder. Der Hersteller verlangt für Pause, Fortsetzen und Phasenwechsel eine Hysterese und Abstände von mehr als fünf Minuten."
+    }
+  },
+  "issues": {
+    "ems_fallback_not_configured": {
+      "description": "Register 0x030E steht auf 0. Die Wallbox lädt damit mit den letzten empfangenen Werten weiter, wenn Home Assistant keinen Heartbeat mehr sendet. Konfiguriere mit dem MENNEKES-Konfigurationstool ein Fallback-Verhalten oder einen Fallback-Strom, damit bei einem Ausfall ein definierter Zustand gilt.",
+      "title": "Kein Energiemanager-Fallback konfiguriert"
+    },
+    "ems_heartbeat_lost": {
+      "description": "Die Wallbox meldet Fehler 200: Sie hat nicht rechtzeitig einen Heartbeat des Energiemanagers erhalten und startet keinen Ladevorgang. Das Beheben schreibt die dokumentierte Wiederherstellungssequenz (Heartbeat, Ladefreigabe, Ladestrom).",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "description": "Home Assistant schreibt Heartbeat, Ladefreigabe und Ladestrom-Begrenzung, um die Wallbox zurück in den Zustand \"Bereit\" zu bringen.",
+            "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
+          }
+        }
+      },
+      "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
+    },
+    "unsupported_modbus_layout": {
+      "description": "Die Wallbox meldet das Register-Layout {layout}; diese Integration ist gegen {validated_layout} validiert. Entitäten für Register, die deine Firmware nicht hat, werden nicht angelegt. Ein Firmware-Update über das MENNEKES-Konfigurationstool schaltet sie frei.",
+      "title": "Wallbox nutzt ein älteres Modbus-Register-Layout"
+    },
+    "write_rejected": {
+      "description": "Die Wallbox hat einen Schreibzugriff abgelehnt. Prüfe, ob sie als Modbus-Satellite konfiguriert ist: Die DIP-Schalter 4 und 5 auf Bank S1 müssen auf ON stehen und die Wallbox muss danach neu gestartet werden.",
+      "title": "Wallbox hat einen Schreibzugriff abgelehnt"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "control_mode": "Steuermodus",
+          "current_limit": "Obergrenze des Ladestroms",
+          "scan_interval_seconds": "Abfrageintervall"
+        },
+        "data_description": {
+          "control_mode": "Nur lesen schreibt nie auf den Bus. Modbus-Master sendet den nötigen Heartbeat und aktiviert die Steuer-Entitäten. Nutze Nur lesen, wenn bereits ein anderer Modbus-Master diesen RS-485-Bus betreibt.",
+          "current_limit": "Obergrenze der Ladestrom-Entität, zusätzlich zur Begrenzung, die die Wallbox selbst erzwingt.",
+          "scan_interval_seconds": "Wie oft die Registerblöcke gelesen werden. Der Heartbeat läuft unabhängig von diesem Intervall."
+        },
+        "title": "Optionen"
+      }
+    }
+  },
+  "selector": {
+    "control_mode": {
+      "options": {
+        "master": "Modbus-Master",
+        "read_only": "Nur lesen"
+      }
+    }
+  },
+  "services": {
+    "set_charging_current": {
+      "description": "Schreibt die Ladestrom-Begrenzung des Energiemanagers einer Wallbox. 0 A bedeutet keine Begrenzung und nicht Ladestopp und benötigt daher die ausdrückliche Freigabe unten.",
+      "fields": {
+        "allow_unlimited": {
+          "description": "Erlaubt das Schreiben von 0 A. Das hebt die Begrenzung auf und lässt die Wallbox ihren Maximalstrom signalisieren.",
+          "name": "Unbegrenzt erlauben"
+        },
+        "current": {
+          "description": "Ladestrom-Begrenzung in Ampere. Nutze 0 A nur zusammen mit \"Unbegrenzt erlauben\"; Werte zwischen 0,01 A und 5,99 A werden abgelehnt, weil die Wallbox dann 0 A signalisieren würde.",
+          "name": "Ladestrom"
+        }
+      },
+      "name": "Ladestrom setzen"
+    }
+  }
+}

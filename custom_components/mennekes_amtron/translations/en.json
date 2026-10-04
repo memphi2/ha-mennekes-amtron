@@ -1,0 +1,400 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This wallbox is already configured.",
+      "reconfigure_successful": "The bus parameters were updated.",
+      "unique_id_mismatch": "This port belongs to a different wallbox."
+    },
+    "error": {
+      "cannot_connect": "Could not open the serial port or the wallbox did not answer. Check the cabling (Modbus A is +, B is -), the port and the bus parameters.",
+      "invalid_response": "The device answered but did not report a Modbus layout version. Check the device address and whether DIP 4 and DIP 5 on bank S1 are on."
+    },
+    "step": {
+      "reconfigure": {
+        "data": {
+          "baudrate": "Baud rate",
+          "bytesize": "Data bits",
+          "device_id": "Modbus device address",
+          "parity": "Parity",
+          "port": "Serial port",
+          "stopbits": "Stop bits"
+        },
+        "data_description": {
+          "baudrate": "Factory default is 57600.",
+          "bytesize": "Factory default is 8.",
+          "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
+          "parity": "Factory default is none.",
+          "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
+          "stopbits": "Factory default is 2 stop bits with no parity."
+        },
+        "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
+        "title": "MENNEKES AMTRON"
+      },
+      "user": {
+        "data": {
+          "baudrate": "Baud rate",
+          "bytesize": "Data bits",
+          "device_id": "Modbus device address",
+          "parity": "Parity",
+          "port": "Serial port",
+          "stopbits": "Stop bits"
+        },
+        "data_description": {
+          "baudrate": "Factory default is 57600.",
+          "bytesize": "Factory default is 8.",
+          "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
+          "parity": "Factory default is none.",
+          "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
+          "stopbits": "Factory default is 2 stop bits with no parity."
+        },
+        "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
+        "title": "MENNEKES AMTRON"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "authorization_enabled": {
+        "name": "Authorization enabled"
+      },
+      "cable_lock_enabled": {
+        "name": "Permanent cable lock"
+      },
+      "charging": {
+        "name": "Charging"
+      },
+      "downgrade_active": {
+        "name": "Downgrade active"
+      },
+      "error": {
+        "name": "Error"
+      },
+      "grid_imbalance_enabled": {
+        "name": "Grid imbalance monitoring"
+      },
+      "master_lost_fallback": {
+        "name": "Energy manager fallback active"
+      },
+      "phase_switch_capable": {
+        "name": "Phase switching supported"
+      },
+      "vehicle_connected": {
+        "name": "Vehicle connected"
+      }
+    },
+    "button": {
+      "recover_from_error": {
+        "name": "Recover from error"
+      },
+      "restart": {
+        "name": "Restart"
+      }
+    },
+    "number": {
+      "charging_current_limit": {
+        "name": "Charging current limit"
+      }
+    },
+    "select": {
+      "requested_phases": {
+        "name": "Requested phases",
+        "state": {
+          "all_available": "All available phases",
+          "single_phase": "Single phase only"
+        }
+      },
+      "solar_charging_mode": {
+        "name": "Solar charging mode",
+        "state": {
+          "fast": "Fast charging",
+          "not_active": "Not active",
+          "sunshine": "Sunshine",
+          "sunshine_plus": "Sunshine+"
+        }
+      }
+    },
+    "sensor": {
+      "authorization_status": {
+        "name": "Authorization",
+        "state": {
+          "authorized": "Authorized",
+          "not_authorized": "Not authorized",
+          "not_used": "Not used"
+        }
+      },
+      "cable_lock_status": {
+        "name": "Cable lock",
+        "state": {
+          "fixed_cable": "Fixed cable",
+          "locked": "Locked",
+          "undetermined": "Undetermined",
+          "unlocked": "Unlocked"
+        }
+      },
+      "cp_state": {
+        "name": "CP state",
+        "state": {
+          "a1": "A1 (no vehicle)",
+          "a2": "A2 (vehicle disconnected)",
+          "b1": "B1 (vehicle connected)",
+          "b2": "B2 (ready, current offered)",
+          "c1": "C1 (vehicle ready to charge)",
+          "c2": "C2 (charging)",
+          "d1": "D1",
+          "d2": "D2",
+          "e": "E (error)",
+          "f": "F (error)",
+          "init": "Init"
+        }
+      },
+      "current_l1": {
+        "name": "Current L1"
+      },
+      "current_l2": {
+        "name": "Current L2"
+      },
+      "current_l3": {
+        "name": "Current L3"
+      },
+      "detected_ev_phases": {
+        "name": "Detected vehicle phases",
+        "state": {
+          "not_initialized": "Not initialized",
+          "one_phase": "1 phase",
+          "three_phases": "3 phases",
+          "two_phases": "2 phases"
+        }
+      },
+      "downgrade_current": {
+        "name": "Downgrade current"
+      },
+      "ems_fallback_current": {
+        "name": "Energy manager fallback current"
+      },
+      "energy_total": {
+        "name": "Total energy"
+      },
+      "error_code": {
+        "name": "Error code",
+        "state": {
+          "connected_phases_mismatch": "Connected phases mismatch",
+          "energy_manager_unavailable": "Energy manager unavailable",
+          "ev_overcurrent": "Vehicle overcurrent",
+          "no_error": "No error",
+          "other": "Other error",
+          "voltage_out_of_range": "Voltage out of range"
+        }
+      },
+      "evse_state": {
+        "name": "EVSE state",
+        "state": {
+          "charging": "Charging",
+          "error": "Error",
+          "ev_connected": "Vehicle connected",
+          "idle": "Idle",
+          "not_initialized": "Not initialized",
+          "preconditions_valid": "Preconditions valid",
+          "ready_to_charge": "Ready to charge",
+          "service_mode": "Service mode"
+        }
+      },
+      "grid_imbalance_threshold": {
+        "name": "Grid imbalance threshold"
+      },
+      "grid_phases_connected": {
+        "name": "Connected grid phases",
+        "state": {
+          "l1": "L1",
+          "l1_l2_l3": "L1, L2, L3"
+        }
+      },
+      "max_current_house": {
+        "name": "Maximum house current"
+      },
+      "max_evse_current": {
+        "name": "Maximum wallbox current"
+      },
+      "modbus_layout_version": {
+        "name": "Modbus layout version"
+      },
+      "phase_rotation": {
+        "name": "Phase rotation",
+        "state": {
+          "l1_l2_l3": "L1-L2-L3",
+          "l2_l3_l1": "L2-L3-L1",
+          "l3_l1_l2": "L3-L1-L2"
+        }
+      },
+      "phase_switching_mode": {
+        "name": "Phase switching mode",
+        "state": {
+          "solar_dynamic": "Solar, 1 or 3 phases",
+          "solar_one_phase": "Solar, 1 phase only",
+          "solar_three_phases": "Solar, 3 phases only"
+        }
+      },
+      "phase_switching_pause": {
+        "name": "Phase switching pause"
+      },
+      "power_l1": {
+        "name": "Power L1"
+      },
+      "power_l2": {
+        "name": "Power L2"
+      },
+      "power_l3": {
+        "name": "Power L3"
+      },
+      "power_total": {
+        "name": "Total power"
+      },
+      "session_duration": {
+        "name": "Session duration"
+      },
+      "session_energy": {
+        "name": "Session energy"
+      },
+      "session_max_current": {
+        "name": "Session maximum current"
+      },
+      "sessions_total": {
+        "name": "Charging sessions"
+      },
+      "signaled_current": {
+        "name": "Signaled current"
+      },
+      "solar_min_current": {
+        "name": "Sunshine+ minimum current"
+      },
+      "switched_phases": {
+        "name": "Switched phases",
+        "state": {
+          "all_available": "All available phases",
+          "single_phase": "Single phase"
+        }
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "voltage_l1": {
+        "name": "Voltage L1"
+      },
+      "voltage_l2": {
+        "name": "Voltage L2"
+      },
+      "voltage_l3": {
+        "name": "Voltage L3"
+      }
+    },
+    "switch": {
+      "charging_paused": {
+        "name": "Charging paused"
+      },
+      "charging_release": {
+        "name": "Charging release"
+      },
+      "lock_evse": {
+        "name": "Wallbox locked"
+      }
+    }
+  },
+  "exceptions": {
+    "charging_current_invalid": {
+      "message": "{value} A is not a valid charging-current limit. The wallbox accepts 0 A (no limit) or at least {minimum} A; anything in between makes it signal 0 A to the vehicle."
+    },
+    "charging_current_zero": {
+      "message": "0 A does not stop charging on this wallbox: it removes the limit and the wallbox signals its maximum current. Use the charging-pause switch to pause, or call the \"Set charging current\" action with \"allow unlimited\" if you really want no limit."
+    },
+    "entry_not_loaded": {
+      "message": "The wallbox entry for device {device} is not loaded."
+    },
+    "no_wallbox_target": {
+      "message": "The action needs at least one MENNEKES AMTRON device as its target."
+    },
+    "phase_switch_unsupported": {
+      "message": "This wallbox cannot switch between one and three phases. Dynamic phase switching needs an 11 kW device that reports phase option 2."
+    },
+    "read_only_mode": {
+      "message": "This wallbox is set up in read-only mode. Switch the control mode to \"Modbus master\" in the integration options before controlling it."
+    },
+    "restart_requires_idle": {
+      "message": "The wallbox may only be restarted while it is idle. Unplug the vehicle first."
+    },
+    "unknown_device": {
+      "message": "Device {device} is not known to Home Assistant."
+    },
+    "write_failed": {
+      "message": "Writing {register} to the wallbox failed: {error}"
+    },
+    "write_rate_limited": {
+      "message": "The wallbox accepts this change again in {seconds} s. The manufacturer asks for hysteresis and intervals of more than five minutes for pausing, resuming and phase switching."
+    }
+  },
+  "issues": {
+    "ems_fallback_not_configured": {
+      "description": "Register 0x030E is 0, so the wallbox keeps charging with the last values it received when Home Assistant stops sending a heartbeat. Configure a fallback behaviour or a fallback current with the MENNEKES configuration tool to get a defined state during an outage.",
+      "title": "No energy-manager fallback configured"
+    },
+    "ems_heartbeat_lost": {
+      "description": "The wallbox reports error 200: it did not receive an energy-manager heartbeat in time and will not start a charging session. Fixing this issue writes the documented recovery sequence (heartbeat, charging release, charging current).",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "description": "Home Assistant will write the heartbeat, the charging release and the charging-current limit to bring the wallbox back to idle.",
+            "title": "Wallbox lost the energy-manager heartbeat"
+          }
+        }
+      },
+      "title": "Wallbox lost the energy-manager heartbeat"
+    },
+    "unsupported_modbus_layout": {
+      "description": "The wallbox reports register layout {layout}; this integration is validated against {validated_layout}. Entities for registers your firmware does not have are not created. A firmware update through the MENNEKES configuration tool enables them.",
+      "title": "Wallbox uses an older Modbus register layout"
+    },
+    "write_rejected": {
+      "description": "The wallbox rejected a write. Check that it is configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 have to be on, and the wallbox has to be restarted afterwards.",
+      "title": "Wallbox refused a write"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "control_mode": "Control mode",
+          "current_limit": "Charging current cap",
+          "scan_interval_seconds": "Polling interval"
+        },
+        "data_description": {
+          "control_mode": "Read only never writes to the bus. Modbus master sends the required heartbeat and enables the control entities. Use read only if another Modbus master already drives this RS-485 bus.",
+          "current_limit": "Upper bound of the charging-current entity, in addition to the limit the wallbox itself enforces.",
+          "scan_interval_seconds": "How often the register blocks are read. The heartbeat runs independently of this interval."
+        },
+        "title": "Options"
+      }
+    }
+  },
+  "selector": {
+    "control_mode": {
+      "options": {
+        "master": "Modbus master",
+        "read_only": "Read only"
+      }
+    }
+  },
+  "services": {
+    "set_charging_current": {
+      "description": "Writes the energy-manager charging-current limit of a wallbox. 0 A means no limit, not a charging stop, so it needs the explicit opt-in below.",
+      "fields": {
+        "allow_unlimited": {
+          "description": "Allows writing 0 A, which removes the limit and makes the wallbox signal its maximum current.",
+          "name": "Allow unlimited"
+        },
+        "current": {
+          "description": "Charging-current limit in ampere. Use 0 A only together with \"allow unlimited\"; values between 0.01 A and 5.99 A are rejected because the wallbox would signal 0 A.",
+          "name": "Charging current"
+        }
+      },
+      "name": "Set charging current"
+    }
+  }
+}

@@ -1,0 +1,132 @@
+rules:
+  action-setup:
+    status: done
+    comment: The single action is registered in async_setup, not per entry.
+  appropriate-polling:
+    status: done
+    comment: >-
+      The device has no push channel. The coordinator polls the supported
+      register blocks every five seconds by default, and the heartbeat runs in
+      its own task so a slow poll cannot starve it.
+  brands:
+    status: todo
+    comment: Prepare Home Assistant Brands assets before a core submission.
+  common-modules: done
+  config-flow-test-coverage:
+    status: done
+    comment: >-
+      Tests cover the happy path, a failing port, a device without a layout
+      version, reconfigure and the options flow.
+  config-flow: done
+  dependency-transparency:
+    status: done
+    comment: >-
+      pymodbus is published on PyPI, pinned to the version Home Assistant Core
+      pins for its own modbus integration, and checked by a dedicated gate.
+  docs-actions: done
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup:
+    status: exempt
+    comment: >-
+      Entities derive from the coordinator; there is no device-side event
+      stream to subscribe to.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure:
+    status: done
+    comment: >-
+      The config flow opens the port and reads the Modbus layout version and
+      serial number before an entry is created.
+  test-before-setup:
+    status: done
+    comment: A failed connect or identity read raises ConfigEntryNotReady.
+  unique-config-entry:
+    status: done
+    comment: The entry is unique by device serial number, or by port path.
+
+  action-exceptions: done
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable:
+    status: done
+    comment: >-
+      Entities go unavailable when the poll fails and when their own register
+      is missing from the snapshot.
+  integration-owner:
+    status: exempt
+    comment: >-
+      The repository deliberately ships no personal metadata, so
+      manifest.json keeps an empty codeowners list. Maintenance scope is
+      documented in SUPPORT.md instead.
+  log-when-unavailable:
+    status: done
+    comment: >-
+      The connection is held open, so the coordinator logs a loss and a
+      recovery once per state change.
+  parallel-updates:
+    status: done
+    comment: >-
+      Read platforms use the coordinator; command platforms set
+      PARALLEL_UPDATES to 1 because RS-485 is a single-master bus.
+  reauthentication-flow:
+    status: exempt
+    comment: The serial bus has no credentials.
+  test-coverage:
+    status: todo
+    comment: >-
+      The local coverage ratchet is 95 percent; keep this open until the full
+      suite consistently exceeds the Platinum target.
+
+  devices:
+    status: done
+    comment: Every entity belongs to the one wallbox of its entry.
+  diagnostics: done
+  discovery-update-info:
+    status: exempt
+    comment: There is no discovery to update an entry from.
+  discovery:
+    status: exempt
+    comment: >-
+      A USB RS-485 adapter cannot be identified as this wallbox, so the config
+      flow offers a port list instead of claiming discovery.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: One entry models exactly one wallbox.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default:
+    status: done
+    comment: The Modbus layout version sensor is disabled by default.
+  entity-translations: done
+  exception-translations: done
+  icon-translations: done
+  reconfiguration-flow:
+    status: done
+    comment: The bus parameters can be changed without removing the entry.
+  repair-issues: done
+  stale-devices:
+    status: exempt
+    comment: One entry models exactly one wallbox.
+
+  async-dependency:
+    status: done
+    comment: pymodbus AsyncModbusSerialClient is used throughout.
+  inject-websession:
+    status: exempt
+    comment: The integration speaks serial Modbus RTU and makes no HTTP calls.
+  strict-typing:
+    status: done
+    comment: >-
+      scripts/check_typing.py runs mypy --strict over the whole integration
+      and the validation scripts.

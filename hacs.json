@@ -1,0 +1,7 @@
+{
+  "name": "MENNEKES AMTRON (Unofficial)",
+  "homeassistant": "2026.5.0",
+  "zip_release": true,
+  "filename": "ha-mennekes-amtron.zip",
+  "render_readme": true
+}

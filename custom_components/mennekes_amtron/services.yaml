@@ -1,0 +1,20 @@
+set_charging_current:
+  target:
+    device:
+      integration: mennekes_amtron
+  fields:
+    current:
+      required: true
+      example: 10
+      selector:
+        number:
+          min: 0
+          max: 32
+          step: 0.1
+          unit_of_measurement: A
+          mode: box
+    allow_unlimited:
+      required: false
+      default: false
+      selector:
+        boolean:

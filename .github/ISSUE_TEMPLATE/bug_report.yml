@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in the integration behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please download the diagnostics of the config entry and attach them.
+        They contain no serial port path and no wallbox serial number.
+  - type: input
+    id: integration-version
+    attributes:
+      label: Integration version
+      placeholder: "0.1"
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.9.4"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Wallbox model and article number
+      placeholder: "AMTRON 4You 310 11 C2, 1313201205"
+    validations:
+      required: true
+  - type: input
+    id: layout
+    attributes:
+      label: Modbus layout version
+      description: From the diagnostics, or the disabled layout-version sensor.
+      placeholder: "v01.03"
+    validations:
+      required: true
+  - type: dropdown
+    id: control-mode
+    attributes:
+      label: Control mode
+      options:
+        - Read only
+        - Modbus master
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant Home Assistant log lines.
+      render: text
+  - type: checkboxes
+    id: bus
+    attributes:
+      label: Bus
+      options:
+        - label: No other Modbus master is connected to the same RS-485 bus.
+          required: true

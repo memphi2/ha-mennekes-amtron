@@ -1,0 +1,53 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    # Dependabot updates requirements-dev.txt. The minimum-HA validation lock
+    # is curated manually; Home Assistant transitive dependencies come from the
+    # selected Home Assistant matrix version instead of being committed here.
+    exclude-paths:
+      - "requirements-dev-min-ha.txt"
+    schedule:
+      interval: "monthly"
+      time: "05:30"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 3
+    groups:
+      python-patch-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "deps"
+    ignore:
+      # Python majors are compatibility work, not routine maintenance.
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+      # Home Assistant compatibility is bumped manually after a min/current CI
+      # matrix proof.
+      - dependency-name: "homeassistant"
+        versions:
+          - ">=0"
+      # pymodbus has to stay equal to the pin of Home Assistant Core's own
+      # modbus integration; scripts/check_pymodbus_pin.py enforces that.
+      - dependency-name: "pymodbus"
+        versions:
+          - ">=0"

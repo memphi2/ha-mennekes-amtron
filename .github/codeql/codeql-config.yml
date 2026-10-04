@@ -1,0 +1,4 @@
+name: "MENNEKES AMTRON CodeQL config"
+
+paths-ignore:
+  - "docs/**"

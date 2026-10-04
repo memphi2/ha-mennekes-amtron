@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Home Assistant Community
+    url: https://community.home-assistant.io/
+    about: General Home Assistant questions that are not about this integration.
+  - name: MENNEKES support
+    url: https://www.mennekes.de/emobility/services/
+    about: Wallbox hardware, firmware and error codes shown on the device.

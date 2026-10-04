@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: registers
+    attributes:
+      label: Registers involved
+      description: >-
+        If the request needs device registers, name them. Requests that would
+        need an undocumented register cannot be implemented safely.

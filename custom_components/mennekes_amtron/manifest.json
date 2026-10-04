@@ -1,0 +1,15 @@
+{
+  "domain": "mennekes_amtron",
+  "name": "MENNEKES AMTRON",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/memphi2/ha-mennekes-amtron",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/memphi2/ha-mennekes-amtron/issues",
+  "loggers": ["pymodbus"],
+  "quality_scale": "platinum",
+  "requirements": ["pymodbus[serial]==3.13.1"],
+  "version": "0.1"
+}
