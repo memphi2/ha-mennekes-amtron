@@ -1,8 +1,11 @@
 set_charging_current:
-  target:
-    device:
-      integration: mennekes_amtron
   fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: mennekes_amtron
+          multiple: true
     current:
       required: true
       example: 10

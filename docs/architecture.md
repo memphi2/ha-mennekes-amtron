@@ -115,5 +115,5 @@ verification in `docs/quickstart.md`.
 ## Validation
 
 `scripts/check_validate.py` runs the same gates as CI, in the same order:
-repository, legal/provenance, quality scale, register map, pymodbus pin, ruff,
+repository, legal/provenance, quality scale, register map, pymodbus requirement, ruff,
 pytest, the 95 percent coverage ratchet and `mypy --strict`.

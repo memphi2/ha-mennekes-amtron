@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import uuid
@@ -97,7 +98,7 @@ def _sbom(
         }
     ]
     for index, requirement in enumerate(manifest.get("requirements", [])):
-        name, _, requirement_version = str(requirement).partition("==")
+        name, requirement_version = _split_requirement(str(requirement))
         spdx_id = f"SPDXRef-Package-Requirement-{index}"
         packages.append(
             {
@@ -133,6 +134,15 @@ def _sbom(
         "packages": packages,
         "relationships": relationships,
     }
+
+
+def _split_requirement(requirement: str) -> tuple[str, str]:
+    """Split a requirement into its name and its version constraint."""
+
+    match = re.split(r"(==|>=|~=|>|<)", requirement, maxsplit=1)
+    if len(match) == 3:
+        return match[0], f"{match[1]}{match[2]}"
+    return requirement, "NOASSERTION"
 
 
 def _zip_entries(path: Path) -> int:

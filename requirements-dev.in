@@ -3,9 +3,9 @@
 # requirements-dev-min-ha.txt is curated manually for the minimum matrix.
 # Home Assistant itself is locked per CI matrix.
 #
-# pymodbus is the integration's runtime requirement. It is listed here so the
-# local validation environment matches the pin in manifest.json; Home Assistant
-# resolves it from the manifest at install time.
+# pymodbus is the integration's runtime requirement. manifest.json declares a
+# minimum so Home Assistant keeps owning the resolved version; the locks here
+# pin the exact version of their Home Assistant matrix entry.
 mypy==2.3.1
 pymodbus[serial]==3.13.1
 pytest==9.1.1

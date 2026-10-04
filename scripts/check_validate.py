@@ -39,7 +39,7 @@ def steps() -> list[ValidationStep]:
             (sys.executable, "scripts/check_register_map.py"),
         ),
         ValidationStep(
-            "pymodbus pin check",
+            "pymodbus requirement check",
             (sys.executable, "scripts/check_pymodbus_pin.py"),
         ),
         ValidationStep("Ruff", (sys.executable, "-m", "ruff", "check", ".")),

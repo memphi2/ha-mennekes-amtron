@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Keep the pymodbus pin aligned with Home Assistant Core.
+"""Keep the pymodbus requirement compatible with Home Assistant Core.
 
-Home Assistant installs one pymodbus version for the whole instance. If this
-integration pins a different one than Core's own modbus integration, the two
-fight over the same package and one of them loses at install time. The gate
-compares the manifest pin with the pin of the installed Home Assistant and
-with project-versions.json.
+Home Assistant installs one pymodbus for the whole instance and Core's own
+``modbus`` integration pins an exact version, which moves between Home
+Assistant releases: 3.11.2 in the oldest supported release, 3.13.1 in the
+newest validated one. An exact pin here would therefore fight Core on one of
+them, so ``manifest.json`` declares a *minimum* and lets Home Assistant own
+the resolved version.
+
+The gate checks that the minimum is really a minimum, that it matches
+``project-versions.json``, and that the installed Home Assistant resolves to a
+version at or above it.
 """
 
 from __future__ import annotations
@@ -20,51 +25,63 @@ from check_reporting import report_failures
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "custom_components" / "mennekes_amtron" / "manifest.json"
 VERSIONS = ROOT / "project-versions.json"
-REQUIREMENT_RE = re.compile(r"^pymodbus(?:\[[a-z,]+\])?==(?P<version>[0-9.]+)$")
+REQUIREMENT_RE = re.compile(
+    r"^pymodbus(?:\[[a-z,]+\])?(?P<operator>[><=]=)(?P<version>[0-9.]+)$"
+)
 
 
 def main() -> int:
     """Compare every place the pymodbus version is recorded."""
 
-    return report_failures(check_pin(), "pymodbus pin validation passed")
+    return report_failures(check_pin(), "pymodbus requirement validation passed")
 
 
 def check_pin() -> list[str]:
-    """Return every disagreement about the pinned pymodbus version."""
+    """Return every problem with the declared pymodbus requirement."""
 
     failures: list[str] = []
-    manifest_pin = manifest_version()
-    if manifest_pin is None:
-        return ["manifest.json does not pin pymodbus with =="]
+    requirement = manifest_requirement()
+    if requirement is None:
+        return ["manifest.json does not declare a pymodbus requirement"]
+    operator, minimum = requirement
 
-    declared = json.loads(VERSIONS.read_text(encoding="utf-8")).get("pymodbus")
-    if declared != manifest_pin:
+    if operator != ">=":
         failures.append(
-            f"project-versions.json says pymodbus {declared}, "
-            f"manifest.json pins {manifest_pin}"
+            "manifest.json must declare a pymodbus minimum with '>=', not "
+            f"'{operator}': an exact pin fights the pin of Home Assistant "
+            "Core's own modbus integration"
         )
 
-    core_pin = core_version()
-    if core_pin is None:
+    declared = json.loads(VERSIONS.read_text(encoding="utf-8")).get(
+        "pymodbus_minimum"
+    )
+    if declared != minimum:
+        failures.append(
+            f"project-versions.json says pymodbus_minimum {declared}, "
+            f"manifest.json declares {minimum}"
+        )
+
+    core = core_version()
+    if core is None:
         sys.stdout.write(
-            "Home Assistant is not installed; skipping the Core pin comparison\n"
+            "Home Assistant is not installed; skipping the Core comparison\n"
         )
-    elif core_pin != manifest_pin:
+    elif _as_tuple(core) < _as_tuple(minimum):
         failures.append(
-            f"Home Assistant Core pins pymodbus {core_pin}, "
-            f"manifest.json pins {manifest_pin}"
+            f"Home Assistant Core resolves pymodbus {core}, which is below the "
+            f"declared minimum {minimum}"
         )
     return failures
 
 
-def manifest_version() -> str | None:
-    """Return the pymodbus version pinned in the integration manifest."""
+def manifest_requirement() -> tuple[str, str] | None:
+    """Return the operator and version of the pymodbus requirement."""
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     for requirement in manifest.get("requirements", []):
         match = REQUIREMENT_RE.match(str(requirement))
         if match:
-            return match.group("version")
+            return match.group("operator"), match.group("version")
     return None
 
 
@@ -78,8 +95,7 @@ def core_version() -> str | None:
         import homeassistant.components as core_components
     except ImportError:
         return None
-    package = Path(str(core_components.__file__)).parent / "modbus"
-    manifest_path = package / "manifest.json"
+    manifest_path = Path(str(core_components.__file__)).parent / "modbus" / "manifest.json"
     if not manifest_path.is_file():
         return None
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -88,6 +104,10 @@ def core_version() -> str | None:
         if match:
             return match.group("version")
     return None
+
+
+def _as_tuple(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split(".") if part.isdigit())
 
 
 if __name__ == "__main__":

@@ -336,11 +336,10 @@
       "title": "No energy-manager fallback configured"
     },
     "ems_heartbeat_lost": {
-      "description": "The wallbox reports error 200: it did not receive an energy-manager heartbeat in time and will not start a charging session. Fixing this issue writes the documented recovery sequence (heartbeat, charging release, charging current).",
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Home Assistant will write the heartbeat, the charging release and the charging-current limit to bring the wallbox back to idle.",
+            "description": "The wallbox reports error 200: it did not receive an energy-manager heartbeat in time and will not start a charging session. Fixing this issue writes the documented recovery sequence (heartbeat, charging release, charging current). Confirming writes the heartbeat, the charging release and the charging-current limit, in that order.",
             "title": "Wallbox lost the energy-manager heartbeat"
           }
         }
@@ -392,6 +391,10 @@
         "current": {
           "description": "Charging-current limit in ampere. Use 0 A only together with \"allow unlimited\"; values between 0.01 A and 5.99 A are rejected because the wallbox would signal 0 A.",
           "name": "Charging current"
+        },
+        "device_id": {
+          "description": "The wallbox device whose charging-current limit is written.",
+          "name": "Wallbox"
         }
       },
       "name": "Set charging current"

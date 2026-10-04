@@ -336,11 +336,10 @@
       "title": "Kein Energiemanager-Fallback konfiguriert"
     },
     "ems_heartbeat_lost": {
-      "description": "Die Wallbox meldet Fehler 200: Sie hat nicht rechtzeitig einen Heartbeat des Energiemanagers erhalten und startet keinen Ladevorgang. Das Beheben schreibt die dokumentierte Wiederherstellungssequenz (Heartbeat, Ladefreigabe, Ladestrom).",
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Home Assistant schreibt Heartbeat, Ladefreigabe und Ladestrom-Begrenzung, um die Wallbox zurück in den Zustand \"Bereit\" zu bringen.",
+            "description": "Die Wallbox meldet Fehler 200: Sie hat nicht rechtzeitig einen Heartbeat des Energiemanagers erhalten und startet keinen Ladevorgang. Das Beheben schreibt die dokumentierte Wiederherstellungssequenz (Heartbeat, Ladefreigabe, Ladestrom). Mit dem Bestätigen werden Heartbeat, Ladefreigabe und Ladestrom-Begrenzung in dieser Reihenfolge geschrieben.",
             "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
           }
         }
@@ -392,6 +391,10 @@
         "current": {
           "description": "Ladestrom-Begrenzung in Ampere. Nutze 0 A nur zusammen mit \"Unbegrenzt erlauben\"; Werte zwischen 0,01 A und 5,99 A werden abgelehnt, weil die Wallbox dann 0 A signalisieren würde.",
           "name": "Ladestrom"
+        },
+        "device_id": {
+          "description": "Das Wallbox-Gerät, dessen Ladestrom-Begrenzung geschrieben wird.",
+          "name": "Wallbox"
         }
       },
       "name": "Ladestrom setzen"

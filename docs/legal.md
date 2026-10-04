@@ -75,10 +75,11 @@ The legal gate fails if either hash changes without review.
 
 ## Runtime dependencies
 
-`manifest.json` requests exactly one runtime dependency, `pymodbus`, pinned to
-the version Home Assistant Core pins for its own `modbus` integration.
-`scripts/check_pymodbus_pin.py` enforces that. pymodbus is published on PyPI
-under the BSD-3-Clause license; it is not vendored into this repository.
+`manifest.json` requests exactly one runtime dependency, `pymodbus`, and
+declares it as a minimum rather than an exact pin so Home Assistant keeps
+owning the resolved version. `scripts/check_pymodbus_pin.py` enforces that.
+pymodbus is published on PyPI under the BSD-3-Clause license; it is not
+vendored into this repository.
 
 ## Repository gate
 

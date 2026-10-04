@@ -75,7 +75,7 @@ def _load_version_config() -> dict[str, str]:
         "min_homeassistant",
         "current_homeassistant",
         "python",
-        "pymodbus",
+        "pymodbus_minimum",
         "amtron_modbus_layout",
         "integration_version",
     }
@@ -184,24 +184,47 @@ def check_hacs_metadata() -> list[str]:
 
 
 def check_requirement_pins() -> list[str]:
-    """The dev locks have to pin the same pymodbus as the manifest."""
+    """The dev locks pin exactly; the manifest declares a minimum.
+
+    Home Assistant Core pins pymodbus itself and moves that pin between
+    releases, so the manifest may only declare a floor. Each validation lock
+    pins the version of its own Home Assistant matrix entry, and the minimum
+    lock is what the manifest floor has to match.
+    """
 
     manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
-    pinned = next(
+    requirement = next(
         (
-            requirement
-            for requirement in manifest.get("requirements", [])
-            if str(requirement).startswith("pymodbus")
+            str(item)
+            for item in manifest.get("requirements", [])
+            if str(item).startswith("pymodbus")
         ),
         None,
     )
+    if requirement is None:
+        return ["manifest.json must declare a pymodbus requirement"]
+    if "==" in requirement:
+        return [
+            "manifest.json must declare a pymodbus minimum, not an exact pin: "
+            "Home Assistant Core pins pymodbus for the whole instance"
+        ]
+
+    minimum = VERSION_CONFIG["pymodbus_minimum"]
     failures: list[str] = []
-    if pinned is None:
-        return ["manifest.json must pin pymodbus"]
-    for rel in ("requirements-dev.in", "requirements-dev.txt", "requirements-dev-min-ha.txt"):
+    if f">={minimum}" not in requirement:
+        failures.append(
+            f"manifest.json must declare pymodbus >={minimum}, got {requirement}"
+        )
+    locks = {
+        "requirements-dev-min-ha.txt": minimum,
+        "requirements-dev.txt": None,
+    }
+    for rel, expected in locks.items():
         text = (ROOT / rel).read_text(encoding="utf-8")
-        if pinned not in text:
-            failures.append(f"{rel} must pin {pinned}")
+        if "pymodbus" not in text:
+            failures.append(f"{rel} must pin pymodbus")
+        elif expected and f"pymodbus[serial]=={expected}" not in text:
+            failures.append(f"{rel} must pin pymodbus[serial]=={expected}")
     return failures
 
 

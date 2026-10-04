@@ -47,7 +47,7 @@ def test_the_validation_sequence_matches_the_documented_order() -> None:
         "Legal/provenance audit",
         "Quality scale checks",
         "Register map checks",
-        "pymodbus pin check",
+        "pymodbus requirement check",
         "Ruff",
         "Python tests",
         "Python coverage ratchet",
@@ -100,13 +100,50 @@ def test_the_quality_scale_gate_requires_its_document_phrases() -> None:
     assert len(failures) == 3
 
 
-def test_the_pin_gate_reads_both_pins() -> None:
+def test_the_requirement_gate_accepts_a_minimum_below_the_core_pin() -> None:
     import check_pymodbus_pin
 
-    manifest_pin = check_pymodbus_pin.manifest_version()
-    assert manifest_pin == "3.13.1"
-    assert check_pymodbus_pin.core_version() == manifest_pin
+    operator, minimum = check_pymodbus_pin.manifest_requirement()
+    assert operator == ">="
+    core = check_pymodbus_pin.core_version()
+    assert core is not None
+    assert check_pymodbus_pin._as_tuple(core) >= check_pymodbus_pin._as_tuple(minimum)
     assert check_pymodbus_pin.check_pin() == []
+
+
+def test_the_requirement_gate_rejects_an_exact_pin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import check_pymodbus_pin
+
+    monkeypatch.setattr(
+        check_pymodbus_pin, "manifest_requirement", lambda: ("==", "3.13.1")
+    )
+    failures = check_pymodbus_pin.check_pin()
+    assert any("not an exact pin" in failure or "'>='" in failure for failure in failures)
+
+
+def test_the_requirement_gate_rejects_a_minimum_above_core(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import check_pymodbus_pin
+
+    monkeypatch.setattr(
+        check_pymodbus_pin, "manifest_requirement", lambda: (">=", "99.0.0")
+    )
+    failures = check_pymodbus_pin.check_pin()
+    assert any("below the declared minimum" in failure for failure in failures)
+
+
+def test_the_requirement_gate_needs_a_pymodbus_requirement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import check_pymodbus_pin
+
+    monkeypatch.setattr(check_pymodbus_pin, "manifest_requirement", lambda: None)
+    assert check_pymodbus_pin.check_pin() == [
+        "manifest.json does not declare a pymodbus requirement"
+    ]
 
 
 def test_the_release_tag_gate_compares_against_the_manifest() -> None:

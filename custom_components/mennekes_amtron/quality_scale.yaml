@@ -21,8 +21,9 @@ rules:
   dependency-transparency:
     status: done
     comment: >-
-      pymodbus is published on PyPI, pinned to the version Home Assistant Core
-      pins for its own modbus integration, and checked by a dedicated gate.
+      pymodbus is published on PyPI and declared as a minimum so Home
+      Assistant Core keeps owning the resolved version; a dedicated gate
+      checks that the minimum stays below what Core resolves.
   docs-actions: done
   docs-high-level-description: done
   docs-installation-instructions: done

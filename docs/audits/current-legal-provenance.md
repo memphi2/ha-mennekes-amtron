@@ -60,8 +60,9 @@ project's own wording. The specification's explanatory prose is not
 reproduced.
 
 The pymodbus API used in `client.py`, `_client_read.py`, `_client_write.py`
-and `decode.py` was verified against the installed pymodbus 3.13.1 source, not
-from memory: the keyword-only `count=` and `device_id=` parameters, the
+and `decode.py` was verified against the pymodbus 3.11.2 and 3.13.1 sources --
+the versions Home Assistant Core resolves for the minimum and the current
+validation matrix -- not from memory: the keyword-only `count=` and `device_id=` parameters, the
 `FramerType.RTU` framer and the `convert_from_registers` /
 `convert_to_registers` signatures.
 
@@ -76,9 +77,10 @@ from memory: the keyword-only `count=` and `device_id=` parameters, the
 - `LICENSE` is the unmodified Apache License, Version 2.0. `NOTICE` carries
   the project notice, the non-affiliation statement and the trademark notice.
 - `manifest.json` requests exactly one runtime requirement,
-  `pymodbus[serial]==3.13.1`, which matches the pin of Home Assistant Core's
-  own `modbus` integration in the validated Home Assistant version.
-  `codeowners` is empty, so no personal metadata ships in the package.
+  `pymodbus[serial]>=3.11.2`. It is a minimum, not a pin: Home Assistant Core
+  pins pymodbus for the whole instance and moves that pin between releases, so
+  an exact pin here would conflict with Core. `codeowners` is empty, so no
+  personal metadata ships in the package.
 - `README.md` marks the project as unofficial in its title and repeats the
   non-affiliation statement.
 

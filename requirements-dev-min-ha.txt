@@ -2,7 +2,7 @@
 # installs Home Assistant separately, so this file intentionally does not pin
 # Home Assistant transitive dependencies.
 mypy==2.1.0
-pymodbus[serial]==3.13.1
+pymodbus[serial]==3.11.2
 pytest==9.1.1
 pytest-cov==7.1.0
 ruff==0.15.20

@@ -11,16 +11,22 @@
 - Python: `3.14`
 - Modbus register layout: `v01.03` (validated), `v01.00`–`v01.02` supported
   with capability gating and untested
-- pymodbus: `3.13.1`, matching the pin of Home Assistant Core's own `modbus`
-  integration
+- pymodbus: minimum `3.11.2`, declared as `pymodbus[serial]>=3.11.2`
 
-Home Assistant Core currently ships `pymodbus`, `tmodbus` and
-`modbus-connection` side by side for its built-in `modbus` integration, so
-Core may be migrating away from pymodbus. That does not change anything for
-this integration today: the pin is explicit and the API is verified against
-`3.13.1`. If Core drops pymodbus, Home Assistant will simply install it for
-this integration alone, and `scripts/check_pymodbus_pin.py` then checks an
-upper bound instead of equality with Core.
+Home Assistant Core pins pymodbus exactly for the whole instance, and that pin
+moves between releases: `3.11.2` in `2026.5.0`, `3.13.1` in `2026.9.4`. An
+exact pin here would fight Core on one of them, so `manifest.json` declares a
+minimum and lets Home Assistant own the resolved version. The floor is the
+oldest version any supported Home Assistant resolves to, and the API this
+integration uses -- keyword-only `count=` and `device_id=`, `FramerType.RTU`,
+`convert_from_registers` -- is identical in `3.11.2` and `3.13.1`.
+`scripts/check_pymodbus_pin.py` enforces that the declared minimum stays a
+minimum and stays at or below what the installed Home Assistant resolves to.
+
+Core also ships `tmodbus` and `modbus-connection` next to pymodbus for its own
+`modbus` integration, so Core may be migrating away from pymodbus. That does
+not change anything here: if Core drops pymodbus, Home Assistant installs it
+for this integration alone.
 
 ## Validated Hardware
 

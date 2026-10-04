@@ -39,5 +39,5 @@ First release.
 - An end-to-end test over a virtual serial link: a real Modbus RTU server at
   57600 baud, 8N2, device address 50, driven by the integration's own client.
 - Validation gates: repository, legal/provenance, quality scale, register map,
-  pymodbus pin, ruff, pytest, a 95 percent coverage ratchet and `mypy
+  pymodbus requirement, ruff, pytest, a 95 percent coverage ratchet and `mypy
   --strict`.
