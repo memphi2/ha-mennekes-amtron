@@ -208,3 +208,42 @@ def test_the_typing_gate_covers_every_module() -> None:
     assert "custom_components/mennekes_amtron/control.py" in targets
     assert "custom_components/mennekes_amtron/registers.py" in targets
     assert "scripts/check_repo.py" in targets
+
+
+def test_the_repository_gate_requires_usable_issue_forms(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import check_repo
+
+    assert check_repo.check_issue_templates() == []
+
+    directory = tmp_path / ".github" / "ISSUE_TEMPLATE"
+    directory.mkdir(parents=True)
+    (directory / "config.yml").write_text("blank_issues_enabled: true\n", encoding="utf-8")
+    for name in check_repo.ISSUE_FORMS:
+        (directory / name).write_text("name: x\nbody: []\n", encoding="utf-8")
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+
+    failures = check_repo.check_issue_templates()
+    assert any("must disable blank issues" in failure for failure in failures)
+    assert any("must ask for control_mode" in failure for failure in failures)
+    assert any("must ask for registers" in failure for failure in failures)
+
+
+def test_the_repository_gate_rejects_a_non_form_template(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import check_repo
+
+    directory = tmp_path / ".github" / "ISSUE_TEMPLATE"
+    directory.mkdir(parents=True)
+    (directory / "config.yml").write_text(
+        "blank_issues_enabled: false\n", encoding="utf-8"
+    )
+    for name in check_repo.ISSUE_FORMS:
+        (directory / name).write_text("free text\n", encoding="utf-8")
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+
+    failures = check_repo.check_issue_templates()
+    assert len(failures) == len(check_repo.ISSUE_FORMS)
+    assert all("is not an issue form" in failure for failure in failures)

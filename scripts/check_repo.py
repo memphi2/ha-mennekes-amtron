@@ -48,6 +48,15 @@ REQUIRED_PATHS = (
     ".github/workflows/release.yml",
     ".github/workflows/codeql.yml",
     ".github/dependabot.yml",
+    ".github/ISSUE_TEMPLATE/config.yml",
+    ".github/ISSUE_TEMPLATE/bug_report.yml",
+    ".github/ISSUE_TEMPLATE/feature_request.yml",
+    ".github/ISSUE_TEMPLATE/support_question.yml",
+)
+ISSUE_FORMS = (
+    "bug_report.yml",
+    "feature_request.yml",
+    "support_question.yml",
 )
 
 FORBIDDEN_TRACKED_DIRS = ("__pycache__", ".venv", ".release", "htmlcov")
@@ -101,6 +110,7 @@ def main() -> int:
     failures.extend(check_hacs_metadata())
     failures.extend(check_requirement_pins())
     failures.extend(check_github_automation())
+    failures.extend(check_issue_templates())
     failures.extend(check_secrets())
     failures.extend(check_python_compile())
     return report_failures(failures, "Repository checks passed")
@@ -257,6 +267,45 @@ def check_github_automation() -> list[str]:
     for ecosystem in ("github-actions", "pip"):
         if f'package-ecosystem: "{ecosystem}"' not in dependabot:
             failures.append(f"dependabot.yml does not cover {ecosystem}")
+    return failures
+
+
+def check_issue_templates() -> list[str]:
+    """Issue reports have to ask for what an analysis actually needs.
+
+    Without the control mode, the register layout and the state of the bus,
+    a report about this integration cannot be acted on, so the forms are
+    checked for those fields instead of only for their existence.
+    """
+
+    directory = ROOT / ".github" / "ISSUE_TEMPLATE"
+    failures: list[str] = []
+
+    config = (directory / "config.yml").read_text(encoding="utf-8")
+    if "blank_issues_enabled: false" not in config:
+        failures.append(".github/ISSUE_TEMPLATE/config.yml must disable blank issues")
+
+    required_fields = {
+        "bug_report.yml": (
+            "integration_version",
+            "home_assistant_version",
+            "modbus_layout",
+            "control_mode",
+            "diagnostics",
+        ),
+        "support_question.yml": ("integration_version", "control_mode"),
+        "feature_request.yml": ("registers",),
+    }
+    for name in ISSUE_FORMS:
+        text = (directory / name).read_text(encoding="utf-8")
+        if "name:" not in text or "body:" not in text:
+            failures.append(f".github/ISSUE_TEMPLATE/{name} is not an issue form")
+            continue
+        for field in required_fields[name]:
+            if f"id: {field}" not in text:
+                failures.append(
+                    f".github/ISSUE_TEMPLATE/{name} must ask for {field}"
+                )
     return failures
 
 

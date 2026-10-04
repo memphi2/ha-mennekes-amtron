@@ -1,67 +1,187 @@
 name: Bug report
-description: Something in the integration behaves incorrectly.
-labels: ["bug"]
+description: Report a reproducible problem with the integration.
+title: "[Bug]: "
+labels:
+  - bug
 body:
   - type: markdown
     attributes:
       value: |
-        Please download the diagnostics of the config entry and attach them.
-        They contain no serial port path and no wallbox serial number.
+        Thanks for reporting a problem. Please fill in the fields below so the issue can be analyzed without repeated back-and-forth.
+
+        The diagnostics download is safe to attach: it contains no serial port path and no wallbox serial number, only a hash of it. Do not paste anything else that identifies your installation.
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected area
+      description: Select every area that is affected.
+      multiple: true
+      options:
+        - Install / update
+        - Config flow / options
+        - Sensor values
+        - Charging current control
+        - Pause / resume / charging release
+        - Phase switching
+        - Heartbeat / error 200
+        - Repairs / diagnostics
+        - Energy dashboard
+        - Other
+    validations:
+      required: true
+
   - type: input
-    id: integration-version
+    id: integration_version
     attributes:
       label: Integration version
+      description: "Example: 0.1"
       placeholder: "0.1"
     validations:
       required: true
+
   - type: input
-    id: ha-version
+    id: home_assistant_version
     attributes:
       label: Home Assistant version
+      description: "Example: 2026.9.4"
       placeholder: "2026.9.4"
     validations:
       required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Installation method
+      options:
+        - HACS
+        - Manual custom_components copy
+        - Development checkout
+        - Other
+    validations:
+      required: true
+
   - type: input
     id: model
     attributes:
       label: Wallbox model and article number
+      description: The article number is on the type plate and in diagnostics.
       placeholder: "AMTRON 4You 310 11 C2, 1313201205"
     validations:
       required: true
+
   - type: input
-    id: layout
+    id: modbus_layout
     attributes:
-      label: Modbus layout version
-      description: From the diagnostics, or the disabled layout-version sensor.
+      label: Modbus register layout version
+      description: From diagnostics, or from the Modbus layout version sensor (disabled by default).
       placeholder: "v01.03"
     validations:
       required: true
+
   - type: dropdown
-    id: control-mode
+    id: control_mode
     attributes:
       label: Control mode
+      description: Found in the config entry options.
       options:
         - Read only
         - Modbus master
     validations:
       required: true
-  - type: textarea
-    id: what-happened
+
+  - type: input
+    id: bus_parameters
     attributes:
-      label: What happened
-      description: What you expected, and what happened instead.
+      label: Bus parameters
+      description: Baud rate, frame and Modbus device address as configured in the entry.
+      placeholder: "57600, 8N2, device address 50"
     validations:
       required: true
-  - type: textarea
-    id: logs
-    attributes:
-      label: Logs
-      description: Relevant Home Assistant log lines.
-      render: text
+
   - type: checkboxes
-    id: bus
+    id: prechecks
     attributes:
-      label: Bus
+      label: Pre-checks
+      description: Please complete these before submitting.
       options:
         - label: No other Modbus master is connected to the same RS-485 bus.
           required: true
+        - label: DIP switches 4 and 5 on bank S1 are on and the wallbox was restarted afterwards.
+          required: true
+        - label: I restarted Home Assistant after installing or updating the integration.
+          required: true
+        - label: I searched existing issues and the release notes.
+          required: true
+        - label: I ran scripts/smoke_modbus.py and it reached the wallbox.
+          required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen?
+      placeholder: Setting the charging current limit to 10 A should make the wallbox signal 10 A...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happens instead?
+      placeholder: The signaled current stays at 6 A...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact entity, action or option used, and the state of the wallbox at the time.
+      placeholder: |
+        1. Plug in the vehicle, EVSE state goes to "Charging"
+        2. Set number.<name>_charging_current_limit to 10
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: evse_state
+    attributes:
+      label: EVSE state and CP state when the problem occurs
+      description: Use "not applicable" when the problem is not related to a charging session.
+      placeholder: "evse_state: charging, cp_state: c2"
+    validations:
+      required: true
+
+  - type: input
+    id: error_code
+    attributes:
+      label: Active error code
+      description: The error code sensor, including its raw code attribute. Use "no error" when there is none.
+      placeholder: "energy_manager_unavailable (code 200)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste only the relevant Home Assistant log excerpt. Enable debug logging for custom_components.mennekes_amtron and pymodbus if the problem is on the bus.
+      render: text
+      placeholder: |
+        Logger: custom_components.mennekes_amtron...
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Attach the config entry diagnostics. They carry the full raw register image, which is usually what decides the question.
+      placeholder: Drag and drop the diagnostics file here, or explain why it is not available.
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Adapter model, cable length and termination, other devices on the bus, a 14a control box, or anything else that helps.

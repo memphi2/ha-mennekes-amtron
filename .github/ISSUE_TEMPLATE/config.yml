@@ -1,8 +1,17 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Home Assistant Community
-    url: https://community.home-assistant.io/
-    about: General Home Assistant questions that are not about this integration.
+  - name: Quickstart
+    url: https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/quickstart.md
+    about: Wiring, DIP switches, the read-only bus smoke test and the first charge.
+  - name: Safety and limitations
+    url: https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/safety.md
+    about: Read this before enabling control. Single-master bus, the 0 A trap, rate limits and phase switching.
+  - name: Troubleshooting
+    url: https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/user-guide.md#troubleshooting
+    about: Connection failures, refused writes, error 200 and missing entities.
+  - name: Releases and update notes
+    url: https://github.com/memphi2/ha-mennekes-amtron/releases
+    about: Current release notes, update instructions and migration notes.
   - name: MENNEKES support
     url: https://www.mennekes.de/emobility/services/
-    about: Wallbox hardware, firmware and error codes shown on the device.
+    about: Wallbox hardware, firmware, DIP configuration and error codes shown on the device itself.

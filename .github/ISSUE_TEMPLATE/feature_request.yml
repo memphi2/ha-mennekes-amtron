@@ -1,23 +1,77 @@
 name: Feature request
-description: Suggest an improvement.
-labels: ["enhancement"]
+description: Suggest an improvement to the integration.
+title: "[Feature]: "
+labels:
+  - enhancement
 body:
+  - type: markdown
+    attributes:
+      value: |
+        The integration can only expose what the wallbox's Modbus register map actually contains. A request that would need an undocumented register, or that would work around a limit the wallbox enforces in hardware, cannot be implemented safely.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New entity or sensor
+        - Charging control
+        - Config flow / options
+        - Diagnostics / repairs
+        - Documentation
+        - Other
+    validations:
+      required: true
+
   - type: textarea
     id: problem
     attributes:
       label: What problem would this solve
+      description: Describe the situation you are in, not the solution you have in mind.
+      placeholder: I want my automation to know whether the wallbox is waiting for authorization...
     validations:
       required: true
+
   - type: textarea
     id: proposal
     attributes:
-      label: Proposed behaviour
+      label: Proposed behavior
+      description: What should the integration do, and where would it appear?
     validations:
       required: true
-  - type: textarea
+
+  - type: input
     id: registers
     attributes:
       label: Registers involved
       description: >-
-        If the request needs device registers, name them. Requests that would
-        need an undocumented register cannot be implemented safely.
+        If the request needs device registers, name them. docs/modbus-registers.md
+        lists every register this integration knows. Use "none" for a
+        documentation or usability request.
+      placeholder: "0x0101 Authorization Status"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: safety
+    attributes:
+      label: Does this change what the integration writes to the wallbox?
+      description: Write paths are reviewed against the manufacturer's rules before anything is added.
+      options:
+        - "No, it only reads"
+        - "Yes, it writes"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Templates, automations or other integrations you tried first.
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Wallbox model, firmware, screenshots or links to vendor documentation.

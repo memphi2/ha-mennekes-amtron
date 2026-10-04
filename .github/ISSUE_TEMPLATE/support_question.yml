@@ -1,0 +1,103 @@
+name: Setup or support question
+description: Ask for help with wiring, DIP switches, setup or configuration.
+title: "[Support]: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when you are stuck during setup or configuration and do not yet have a confirmed bug.
+
+        Read [docs/safety.md](https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/safety.md) first if your question is about controlling the wallbox. RS-485 allows exactly one master, and the charging-current register has three different meanings depending on the value written.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: Describe the setup or action you are trying to complete.
+      placeholder: I am trying to add the wallbox from Settings -> Devices & services...
+    validations:
+      required: true
+
+  - type: textarea
+    id: stuck
+    attributes:
+      label: Where are you stuck?
+      description: Include the exact screen, step, repair issue or error message.
+      placeholder: The config flow says it cannot connect...
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      placeholder: "0.1"
+    validations:
+      required: true
+
+  - type: input
+    id: home_assistant_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.9.4"
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Wallbox model and article number
+      placeholder: "AMTRON 4You 310 11 C2, 1313201205"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: control_mode
+    attributes:
+      label: Control mode
+      options:
+        - Read only
+        - Modbus master
+        - No entry created yet
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Setup checks
+      options:
+        - label: I read the Quickstart.
+          required: true
+        - label: DIP switches 4 and 5 on bank S1 are on and the wallbox was restarted afterwards.
+          required: true
+        - label: No other Modbus master is connected to the same RS-485 bus.
+          required: true
+        - label: I am using a /dev/serial/by-id path, not /dev/ttyUSB0.
+          required: false
+
+  - type: textarea
+    id: smoke_test
+    attributes:
+      label: Output of scripts/smoke_modbus.py
+      description: >-
+        The read-only bus smoke test separates wiring and bus parameters from
+        Home Assistant. Paste its output, or the error it printed.
+      render: text
+      placeholder: |
+        python scripts/smoke_modbus.py /dev/serial/by-id/...
+
+  - type: input
+    id: adapter
+    attributes:
+      label: USB RS-485 adapter
+      description: Chipset or product name, and how A/B/GND are wired.
+      placeholder: "FTDI FT232, A -> +, B -> -, GND connected"
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Cable length, termination, other bus devices, a 14a control box, screenshots or anything else that helps.
