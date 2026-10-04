@@ -20,6 +20,14 @@ document.
   the full suite consistently exceeds the Platinum target rather than just
   meeting the ratchet.
 
+## Repository status
+
+The repository is private while the integration waits for its on-device
+verification. Two consequences are visible in CI: the CodeQL workflow only
+runs once the repository is public, because code-scanning uploads need GitHub
+Advanced Security on a private repository, and the `brands` blocker cannot be
+closed before a public submission either.
+
 ## Rules that are exempt, and why
 
 - `entity-event-setup`: all entities derive from the coordinator. There is no
