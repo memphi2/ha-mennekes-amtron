@@ -31,35 +31,7 @@ Byte and word order: big endian
 All of them can be changed with the MENNEKES configuration tool; the config
 flow asks for whatever you actually use.
 
-## 3. Find the adapter
-
-```bash
-ls -l /dev/serial/by-id/
-```
-
-Use the `/dev/serial/by-id/...` path, not `/dev/ttyUSB0`: the `ttyUSB` number
-changes when devices are re-enumerated, the `by-id` path does not.
-
-## 4. Prove the bus before writing anything
-
-```bash
-python scripts/smoke_modbus.py /dev/serial/by-id/<your-adapter>
-```
-
-The script is read-only and sends no heartbeat, so it cannot put the wallbox
-into the energy-manager error state. A good run prints:
-
-```text
-modbus layout    v01.03
-serial number    <your serial>
-article number   1313201205
-max EVSE current 16.0
-```
-
-If it fails, the cause is wiring, bus parameters or the device address — not
-Home Assistant.
-
-## 5. Install
+## 3. Install
 
 **HACS (recommended)**
 
@@ -74,6 +46,69 @@ your Home Assistant configuration directory, then restart. Do not use
 `ha-mennekes-amtron.zip` for this: that one is the HACS asset and has no
 wrapping folder, because HACS extracts it directly into the integration
 directory.
+
+## 4. Find the adapter
+
+The adapter is plugged into the machine Home Assistant runs on, so this has to
+run there too:
+
+| Installation | Command |
+|---|---|
+| Home Assistant OS / Supervised | `docker exec homeassistant ls -l /dev/serial/by-id/` |
+| Home Assistant Container | `docker exec homeassistant ls -l /dev/serial/by-id/` |
+| Home Assistant Core | `ls -l /dev/serial/by-id/` |
+
+On Home Assistant OS, open a shell with the *Advanced SSH & Web Terminal*
+add-on and turn its protection mode off, otherwise the add-on cannot reach
+`docker`.
+
+Use the `/dev/serial/by-id/...` path, not `/dev/ttyUSB0`: the `ttyUSB` number
+changes when devices are re-enumerated, the `by-id` path does not.
+
+## 5. Prove the bus before writing anything
+
+The integration ships the check, so after step 3 it is already on the machine
+with the adapter, at
+`/config/custom_components/mennekes_amtron/smoke_modbus.py`. Home Assistant's
+own Python already has pymodbus, so nothing has to be installed:
+
+| Installation | Command |
+|---|---|
+| Home Assistant OS / Supervised / Container | `docker exec -it homeassistant python /config/custom_components/mennekes_amtron/smoke_modbus.py <port>` |
+| Home Assistant Core | `/srv/homeassistant/bin/python /config/custom_components/mennekes_amtron/smoke_modbus.py <port>` |
+
+The check is read-only and sends no heartbeat, so it cannot put the wallbox
+into the energy-manager error state. A good run prints:
+
+```text
+port             /dev/serial/by-id/usb-...
+bus              57600 baud, 8N2
+device address   50
+modbus layout    v01.03
+firmware         2023.21.11024
+serial number    <your serial>
+article number   1313201205
+evse state       1 (idle, no vehicle connected)
+max EVSE current 16.0 A
+
+The bus is fine. Add the integration with these values.
+```
+
+If you do not know the device address, or somebody changed the bus parameters
+with the MENNEKES configuration tool, let it search:
+
+```bash
+docker exec -it homeassistant \
+  python /config/custom_components/mennekes_amtron/smoke_modbus.py \
+  /dev/serial/by-id/<your-adapter> --scan --scan-baudrate
+```
+
+`--scan` tries every documented device address from 10 to 50, and
+`--scan-baudrate` every documented baud rate as well. It prints how long that
+will take before it starts.
+
+If it fails, the cause is wiring, bus parameters or the device address — not
+Home Assistant.
 
 ## 6. Add the wallbox
 

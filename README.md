@@ -41,12 +41,21 @@ they mean. This one does:
 2. Set the wallbox to satellite mode: **DIP bank S1, DIP 4 and DIP 5 to ON**,
    then restart the wallbox.
 3. Find the adapter: `ls -l /dev/serial/by-id/`.
-4. Prove the bus **before** anything writes:
-   `python scripts/smoke_modbus.py /dev/serial/by-id/<your-adapter>`
-5. Install this repository as a HACS custom repository (category
-   *Integration*), restart Home Assistant, then add **MENNEKES AMTRON** from
-   *Settings → Devices & services*.
-6. The entry starts in **read-only** mode. Check the sensors, then switch the
+4. Install this repository as a HACS custom repository (category
+   *Integration*) and restart Home Assistant.
+5. Prove the bus **before** anything writes, on the machine the adapter is
+   plugged into — the integration ships the check, so it is already there:
+
+   ```bash
+   docker exec -it homeassistant \
+     python /config/custom_components/mennekes_amtron/smoke_modbus.py \
+     /dev/serial/by-id/<your-adapter>
+   ```
+
+   Add `--scan` if you do not know the device address or the baud rate. See
+   [docs/quickstart.md](docs/quickstart.md) for the other installation types.
+6. Add **MENNEKES AMTRON** from *Settings → Devices & services*.
+7. The entry starts in **read-only** mode. Check the sensors, then switch the
    control mode to *Modbus master* in the entry options when you are ready.
 
 Full instructions: [docs/quickstart.md](docs/quickstart.md).

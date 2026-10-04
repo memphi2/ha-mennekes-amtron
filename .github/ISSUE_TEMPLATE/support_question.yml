@@ -33,7 +33,7 @@ body:
     id: integration_version
     attributes:
       label: Integration version
-      placeholder: "0.1.2"
+      placeholder: "0.1.3"
     validations:
       required: true
 
@@ -81,13 +81,14 @@ body:
   - type: textarea
     id: smoke_test
     attributes:
-      label: Output of scripts/smoke_modbus.py
+      label: Output of the shipped bus check
       description: >-
         The read-only bus smoke test separates wiring and bus parameters from
         Home Assistant. Paste its output, or the error it printed.
       render: text
       placeholder: |
-        python scripts/smoke_modbus.py /dev/serial/by-id/...
+        docker exec -it homeassistant python \
+          /config/custom_components/mennekes_amtron/smoke_modbus.py /dev/serial/by-id/...
 
   - type: input
     id: adapter

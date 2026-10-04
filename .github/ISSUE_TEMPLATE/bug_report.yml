@@ -35,8 +35,8 @@ body:
     id: integration_version
     attributes:
       label: Integration version
-      description: "Example: 0.1.2"
-      placeholder: "0.1.2"
+      description: "Example: 0.1.3"
+      placeholder: "0.1.3"
     validations:
       required: true
 
@@ -113,7 +113,7 @@ body:
           required: true
         - label: I searched existing issues and the release notes.
           required: true
-        - label: I ran scripts/smoke_modbus.py and it reached the wallbox.
+        - label: I ran the shipped smoke_modbus.py check and it reached the wallbox.
           required: false
 
   - type: textarea

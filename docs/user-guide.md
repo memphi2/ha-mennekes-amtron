@@ -178,7 +178,8 @@ entity. Everything else is an entity.
 
 **The config flow says it cannot connect.** Check the wiring (Modbus `A` is
 `+`, `B` is `−`), that the adapter path is right, and the bus parameters.
-`python scripts/smoke_modbus.py <port>` isolates this from Home Assistant.
+The shipped bus check isolates this from Home Assistant; see the
+[quickstart](quickstart.md) for the command on your installation type.
 
 **The config flow says the device gave no layout version.** Something answered
 on the bus but not with a layout version. Check the Modbus device address and

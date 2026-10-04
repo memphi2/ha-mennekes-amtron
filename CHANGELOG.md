@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.1.3
+
+### Fixed
+
+- The bus check could not be run where it is needed. It lived in `scripts/`,
+  so it only existed on a checkout of this repository — while the USB RS-485
+  adapter is plugged into the machine Home Assistant runs on. It now ships
+  with the integration, at
+  `/config/custom_components/mennekes_amtron/smoke_modbus.py`, and imports
+  nothing from the integration, so it runs as a plain script with Home
+  Assistant's own Python, which already has pymodbus.
+
+### Added
+
+- `--scan` tries every documented device address from 10 to 50, and
+  `--scan-baudrate` every documented baud rate as well, for a wallbox whose
+  configuration somebody changed with the MENNEKES configuration tool. The
+  check prints how long a scan will take before it starts.
+- The check now also reports the EVSE state in words, and says which values to
+  enter in the config flow when the bus is fine.
+
+### Changed
+
+- The quickstart gives the exact command per installation type — Home
+  Assistant OS, Supervised, Container and Core — for both finding the adapter
+  and running the check.
+
 ## 0.1.2
 
 ### Changed
@@ -92,8 +119,7 @@ First release.
 - Four repair issues: lost energy-manager heartbeat (fixable, runs the
   documented recovery sequence), missing fallback configuration, an older
   register layout and a refused write.
-- `scripts/smoke_modbus.py`, a read-only bus smoke test to run before the
-  first write.
+- A read-only bus check to run before the first write.
 - An end-to-end test over a virtual serial link: a real Modbus RTU server at
   57600 baud, 8N2, device address 50, driven by the integration's own client.
 - Four issue forms that ask for the register layout version, the control mode,
