@@ -39,8 +39,11 @@ Out of scope:
   validity, release metadata, HACS metadata, requirement pins, CI pinning,
   secret and identifying-path patterns, Python compilation.
 - `scripts/check_legal_audit.py`: forbidden payload suffixes and directories,
+  content-based detection of a tracked copy of the vendor specification,
   required legal documents, required wording in `README.md`, `NOTICE` and
   `docs/legal.md`, bounded runtime requirements, brand-asset hashes.
+- A verbatim-overlap measurement between the specification's text and every
+  tracked document and source file, reported under "Verbatim overlap" below.
 - `scripts/check_register_map.py`: register map against entities,
   translations and icons.
 - `scripts/check_pymodbus_pin.py`: manifest pin against Home Assistant Core's
@@ -65,6 +68,33 @@ the versions Home Assistant Core resolves for the minimum and the current
 validation matrix -- not from memory: the keyword-only `count=` and `device_id=` parameters, the
 `FramerType.RTU` framer and the `convert_from_registers` /
 `convert_to_registers` signatures.
+
+## Verbatim overlap with the specification
+
+Every tracked Markdown, Python, JSON and YAML file was compared against the
+text of the specification for shared word sequences of seven words or more,
+after normalising case and punctuation. The result is that nothing of the
+document's prose was reproduced:
+
+- The longest shared sequences, at 19 and 11 words, are lists of **register
+  names** in `registers.py` and `register_blocks.py` -- `current_l1`,
+  `voltage_l1`, `power_l1` and so on. They are identifiers of an interface,
+  not expression, and an implementation cannot differ from them and still
+  interoperate.
+- In `docs/modbus-registers.md` the longest matches are eight and nine words
+  and are all **enumerated values with their short labels**, for example
+  `5 charging 6 error 7 service mode`. They are the facts an implementer
+  needs, restated in a table of the project's own design.
+- The remaining matches are **numbers and hardware references**: the list of
+  supported baud rates, `8 data bits 2 stop bits no parity`, `bank S1 DIP 4
+  and DIP 5`, and the statement that addresses from 10 to 50 can be set.
+- `docs/safety.md` contains one nine-word sequence of the document's prose,
+  `are automatically limited by the configuration of the wallbox`, as an
+  attributed quotation introduced with "The specification states that". It is
+  a short, purposeful and sourced citation.
+
+No sentence, paragraph or explanatory passage of the specification appears in
+this repository.
 
 ## Result
 

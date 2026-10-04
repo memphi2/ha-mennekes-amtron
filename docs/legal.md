@@ -42,6 +42,12 @@ reproduced; it is rewritten.
 The document is identified by publisher, title, revision and date so that any
 reader can obtain it from MENNEKES directly.
 
+`scripts/check_legal_audit.py` enforces this by content, not only by file
+extension: a tracked text file that carries two or more structural phrases of
+the specification is rejected, because a text extraction of the document is a
+copy of it whatever the file is called. A citation of its title carries none
+of those phrases and passes.
+
 ## No firmware or configuration-tool payloads
 
 The repository must not contain:

@@ -310,3 +310,42 @@ def test_the_settings_script_sends_nothing_without_apply(
     assert exit_code == 0
     assert "would apply: Branch protection for main" in output
     assert "Nothing was sent" in output
+
+
+def test_the_legal_gate_rejects_a_copy_of_the_vendor_specification(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A text extraction of the manufacturer's PDF is still the PDF."""
+
+    import check_legal_audit
+
+    extraction = "\n".join(
+        (
+            "AMTRON 4You 300",
+            "Modbus RTU Specification",
+            "Doc. Revision:  2.5",
+            "Modbus-Version:  v 01.03",
+            "Release information",
+            "The following functional codes can be used",
+        )
+    )
+    (tmp_path / "notes.txt").write_text(extraction, encoding="utf-8")
+    (tmp_path / "citation.md").write_text(
+        'See MENNEKES, "Modbus RTU Specification", revision 2.5.\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(check_legal_audit, "ROOT", tmp_path)
+
+    failures = check_legal_audit._check_vendor_documents(
+        [Path("notes.txt"), Path("citation.md")]
+    )
+    assert len(failures) == 1
+    assert "notes.txt" in failures[0]
+
+
+def test_the_legal_gate_allows_a_citation_of_the_specification() -> None:
+    import check_legal_audit
+
+    assert check_legal_audit._check_vendor_documents(
+        [Path("docs/modbus-registers.md"), Path("docs/legal.md")]
+    ) == []

@@ -25,6 +25,8 @@ FORBIDDEN_DIRS = {
 }
 FORBIDDEN_SUFFIXES = {
     ".7z",
+    ".docx",
+    ".epub",
     ".a",
     ".apk",
     ".bin",
@@ -54,6 +56,38 @@ NOTICE_PHRASES = (
     "not affiliated with, endorsed by, sponsored by, or certified by",
     "trademarks or names of their respective owners",
 )
+# Structural phrases of the manufacturer's Modbus RTU specification. A
+# citation of its title carries none of them; a text extraction of the
+# document carries all of them. Two are enough to call it a copy.
+VENDOR_DOCUMENT_MARKERS = (
+    "Release information",
+    "Doc. Revision",
+    "Modbus-Version:",
+    "Internal Modbus Register Layout Version",
+    "The following functional codes can be used",
+    "Reading out this part will return basic information",
+    "Minimum requirements for charging with an EMS",
+    "Helpful information for implementing the wallbox into an energy",
+)
+VENDOR_DOCUMENT_MARKER_LIMIT = 2
+# The files that define or exercise the markers necessarily contain them.
+VENDOR_MARKER_SOURCES = {
+    "scripts/check_legal_audit.py",
+    "tests/test_gates.py",
+}
+TEXT_SUFFIXES = {
+    ".csv",
+    ".in",
+    ".json",
+    ".md",
+    ".py",
+    ".rst",
+    ".toml",
+    ".txt",
+    ".yaml",
+    ".yml",
+}
+
 PROJECT_OWNED_BRAND_HASH = (
     "1ec09c77821817d235eb180da6ca006ab305074ffdcda0e2a44b7b85a4897c63"
 )
@@ -84,6 +118,7 @@ def main() -> int:
         return 1
 
     failures.extend(_check_tracked_payloads(tracked))
+    failures.extend(_check_vendor_documents(tracked))
     failures.extend(_check_required_documents())
     failures.extend(_check_runtime_requirements())
     failures.extend(_check_brand_assets())
@@ -124,6 +159,34 @@ def _check_tracked_payloads(paths: list[Path]) -> list[str]:
             failures.append(
                 f"forbidden binary/archive/document payload must not be "
                 f"tracked: {rel}"
+            )
+    return failures
+
+
+def _check_vendor_documents(paths: list[Path]) -> list[str]:
+    """Reject a tracked copy of the manufacturer's documentation.
+
+    The register addresses and values this integration implements are facts
+    and are restated in the project's own words. The specification's prose is
+    not, and a text extraction of the document is a copy of it whatever the
+    file is called -- which the suffix list alone would not notice.
+    """
+
+    failures: list[str] = []
+    for rel in paths:
+        if rel.suffix.lower() not in TEXT_SUFFIXES:
+            continue
+        if str(rel) in VENDOR_MARKER_SOURCES:
+            continue
+        path = ROOT / rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        found = [marker for marker in VENDOR_DOCUMENT_MARKERS if marker in text]
+        if len(found) >= VENDOR_DOCUMENT_MARKER_LIMIT:
+            failures.append(
+                f"tracked file looks like a copy of the vendor specification "
+                f"({', '.join(found[:3])}): {rel}"
             )
     return failures
 
