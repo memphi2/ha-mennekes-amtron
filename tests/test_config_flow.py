@@ -7,6 +7,7 @@ import pytest
 
 from custom_components.mennekes_amtron import config_flow
 from custom_components.mennekes_amtron._flow_connect import async_test_connection
+from custom_components.mennekes_amtron._flow_search import SearchResult
 from custom_components.mennekes_amtron.client import SerialConfig
 from custom_components.mennekes_amtron.client_errors import (
     AmtronBusError,
@@ -23,6 +24,7 @@ from custom_components.mennekes_amtron.const import (
     CONF_DEVICE_ID,
     CONF_PARITY,
     CONF_PORT,
+    CONF_SEARCH,
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
 )
@@ -259,3 +261,125 @@ def test_the_connection_test_reads_the_device_and_closes_the_port() -> None:
         assert transport.close_calls == 1
 
     asyncio.run(run())
+
+
+class SearchFlow(Flow):
+    """A flow whose progress and menu results are inspectable."""
+
+    def __init__(self, hass: FakeHass) -> None:
+        MennekesAmtronConfigFlow.__init__(self)
+        Flow.__init__(self, hass)
+
+    def async_show_progress(self, **kwargs: Any) -> dict[str, Any]:
+        return {"type": "progress", **kwargs}
+
+    def async_show_progress_done(self, **kwargs: Any) -> dict[str, Any]:
+        return {"type": "progress_done", **kwargs}
+
+
+async def _drive_search(flow: SearchFlow, user_input: dict[str, Any]) -> Any:
+    """Run the search the way Home Assistant drives a progress step."""
+
+    result = await flow.async_step_user(user_input)
+    assert result["type"] == "progress"
+    assert result["progress_action"] == "searching"
+    assert int(result["description_placeholders"]["candidates"]) > 0
+    await asyncio.sleep(0)
+    while True:
+        result = await flow.async_step_search()
+        if result["type"] != "progress":
+            break
+        await asyncio.sleep(0)
+    assert result["type"] == "progress_done"
+    return await flow.async_step_search_result()
+
+
+def test_a_failed_test_searches_the_bus_and_offers_what_it_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        _patch_connection(monkeypatch, AmtronConnectionError("wrong address"))
+        monkeypatch.setattr(
+            config_flow,
+            "async_search",
+            _fake_search(
+                SearchResult(
+                    config=SerialConfig(
+                        port="/dev/fake", baudrate=19200, device_id=23
+                    ),
+                    identity=IDENTITY,
+                    attempts=14,
+                )
+            ),
+        )
+        flow = SearchFlow(FakeHass())
+        result = await _drive_search(flow, {**USER_INPUT, CONF_SEARCH: "addresses"})
+
+        assert result["step_id"] == "search_result"
+        placeholders = result["description_placeholders"]
+        assert placeholders["device_id"] == "23"
+        assert placeholders["baudrate"] == "19200"
+        assert placeholders["attempts"] == "14"
+        assert placeholders["serial_number"] == "ABC123456789"
+
+        created = await flow.async_step_search_result({})
+        assert created["type"] == "create_entry"
+        assert created["data"][CONF_DEVICE_ID] == 23
+        assert created["data"][CONF_BAUDRATE] == 19200
+        assert CONF_SEARCH not in created["data"]
+
+    asyncio.run(run())
+
+
+def test_an_empty_bus_comes_back_to_the_form(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        _patch_connection(monkeypatch, AmtronConnectionError("nothing"))
+        monkeypatch.setattr(config_flow, "async_search", _fake_search(None))
+        flow = SearchFlow(FakeHass())
+        result = await _drive_search(flow, {**USER_INPUT, CONF_SEARCH: "full"})
+
+        assert result["type"] == "form"
+        assert result["errors"] == {"base": "not_found"}
+
+    asyncio.run(run())
+
+
+def test_an_unusable_port_comes_back_to_the_form(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        _patch_connection(monkeypatch, AmtronConnectionError("no port"))
+
+        async def failing(*_args: Any, **_kwargs: Any) -> None:
+            raise AmtronConnectionError("cannot open /dev/fake")
+
+        monkeypatch.setattr(config_flow, "async_search", failing)
+        flow = SearchFlow(FakeHass())
+        result = await _drive_search(flow, {**USER_INPUT, CONF_SEARCH: "addresses"})
+
+        assert result["errors"] == {"base": "not_found"}
+
+    asyncio.run(run())
+
+
+def test_searching_is_skipped_when_it_is_switched_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        _patch_connection(monkeypatch, AmtronConnectionError("no port"))
+        flow = SearchFlow(FakeHass())
+        result = await flow.async_step_user({**USER_INPUT, CONF_SEARCH: "off"})
+        assert result["type"] == "form"
+        assert result["errors"] == {"base": "cannot_connect"}
+
+    asyncio.run(run())
+
+
+def _fake_search(result: SearchResult | None) -> Any:
+    async def search(*_args: Any, **_kwargs: Any) -> SearchResult | None:
+        await asyncio.sleep(0)
+        return result
+
+    return search

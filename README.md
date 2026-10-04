@@ -43,8 +43,12 @@ they mean. This one does:
 3. Find the adapter: `ls -l /dev/serial/by-id/`.
 4. Install this repository as a HACS custom repository (category
    *Integration*) and restart Home Assistant.
-5. Prove the bus **before** anything writes, on the machine the adapter is
-   plugged into — the integration ships the check, so it is already there:
+5. Add **MENNEKES AMTRON** from *Settings → Devices & services*. If the
+   device address or the bus parameters are not the factory ones, the setup
+   form can **search the bus for you** — it only reads, so it cannot disturb
+   the wallbox.
+6. If the bus itself is suspect, the integration also ships a read-only check
+   you can run on the server:
 
    ```bash
    docker exec -it homeassistant \
@@ -52,9 +56,8 @@ they mean. This one does:
      /dev/serial/by-id/<your-adapter>
    ```
 
-   Add `--scan` if you do not know the device address or the baud rate. See
-   [docs/quickstart.md](docs/quickstart.md) for the other installation types.
-6. Add **MENNEKES AMTRON** from *Settings → Devices & services*.
+   See [docs/quickstart.md](docs/quickstart.md) for the other installation
+   types.
 7. The entry starts in **read-only** mode. Check the sensors, then switch the
    control mode to *Modbus master* in the entry options when you are ready.
 
@@ -86,14 +89,18 @@ leave this integration in read-only mode: RS-485 has exactly one master. See
 
 ## Documentation
 
-- [Quick start](docs/quickstart.md)
-- [User guide](docs/user-guide.md)
-- [Safety and limitations](docs/safety.md)
-- [Modbus register map](docs/modbus-registers.md)
-- [Architecture](docs/architecture.md)
-- [Quality scale](docs/quality-scale.md)
-- [Repository settings](docs/repository-settings.md)
-- [Legal notes](docs/legal.md)
+Everything is indexed in **[docs/README.md](docs/README.md)**. The short list:
+
+| | |
+|---|---|
+| [Quick start](docs/quickstart.md) | Wiring, DIP switches, installation, the first charge |
+| [Entity reference](docs/entities.md) | Every entity, what it means, when it exists |
+| [Automations](docs/automations.md) | PV surplus, load management, phase switching, §14a |
+| [User guide](docs/user-guide.md) | Options, actions, how data is updated |
+| [Troubleshooting](docs/troubleshooting.md) | When it does not work |
+| [Safety and limitations](docs/safety.md) | Read before enabling control |
+| [Modbus register map](docs/modbus-registers.md) | The device contract |
+| [Architecture](docs/architecture.md) · [Quality scale](docs/quality-scale.md) · [Repository settings](docs/repository-settings.md) · [Legal notes](docs/legal.md) | For maintainers |
 
 ## Legal Notes
 

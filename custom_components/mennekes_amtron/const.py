@@ -58,6 +58,13 @@ CONF_CONTROL_MODE: Final = "control_mode"
 CONF_SCAN_INTERVAL_SECONDS: Final = "scan_interval_seconds"
 CONF_CURRENT_LIMIT: Final = "current_limit"
 CONF_SERIAL_NUMBER: Final = "serial_number"
+CONF_SEARCH: Final = "search"
+
+SEARCH_OFF: Final = "off"
+SEARCH_ADDRESSES: Final = "addresses"
+SEARCH_FULL: Final = "full"
+SEARCH_MODES: Final = (SEARCH_ADDRESSES, SEARCH_FULL, SEARCH_OFF)
+DEFAULT_SEARCH: Final = SEARCH_ADDRESSES
 
 CONTROL_MODE_READ_ONLY: Final = "read_only"
 CONTROL_MODE_MASTER: Final = "master"

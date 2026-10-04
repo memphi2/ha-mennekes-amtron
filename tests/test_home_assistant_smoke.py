@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 
 from custom_components.mennekes_amtron import registers as R
 from custom_components.mennekes_amtron.const import (
@@ -30,9 +31,12 @@ from custom_components.mennekes_amtron.const import (
     CONF_PARITY,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
+    CONF_SEARCH,
     CONF_STOPBITS,
     CONTROL_MODE_MASTER,
     DOMAIN,
+    SEARCH_ADDRESSES,
+    SEARCH_OFF,
 )
 from tests.fakes import device_bank
 from tests.test_serial_loopback import (
@@ -71,13 +75,15 @@ async def _boot(config_dir: Path) -> Any:
     return hass
 
 
-async def _start_wallbox(port: str, bank: dict[int, int]) -> Any:
+async def _start_wallbox(
+    port: str, bank: dict[int, int], *, device_id: int = 50
+) -> Any:
     from pymodbus import FramerType
     from pymodbus.server import ModbusSerialServer
 
     words = [_signed(bank.get(address, 0)) for address in range(REGISTER_COUNT)]
     server = ModbusSerialServer(
-        _server_context(words),
+        _server_context(words, device_id),
         framer=FramerType.RTU,
         port=port,
         baudrate=57600,
@@ -128,6 +134,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
                     CONF_BYTESIZE: 8,
                     CONF_PARITY: "N",
                     CONF_STOPBITS: 2,
+                    CONF_SEARCH: SEARCH_OFF,
                 },
             )
             assert result["type"] == "create_entry", result
@@ -216,6 +223,71 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             serving.cancel()
 
     asyncio.run(asyncio.wait_for(run(), timeout=180))
+
+
+def test_the_flow_finds_a_wallbox_on_an_unknown_address(tmp_path: Path) -> None:
+    """The user gives the wrong address; the flow searches and finds it."""
+
+    async def run() -> None:
+        bank = device_bank()
+        device_port, client_port = _virtual_serial_link()
+        server, serving = await _start_wallbox(device_port, bank, device_id=23)
+        try:
+            hass = await _boot(tmp_path / "config")
+        except (AttributeError, ImportError) as err:  # pragma: no cover
+            await server.shutdown()
+            serving.cancel()
+            pytest.skip(f"Home Assistant bootstrap is not usable here: {err}")
+
+        try:
+            flow = await hass.config_entries.flow.async_init(
+                DOMAIN, context={"source": "user"}
+            )
+            result = await hass.config_entries.flow.async_configure(
+                flow["flow_id"],
+                {
+                    CONF_PORT: client_port,
+                    CONF_DEVICE_ID: 50,
+                    CONF_BAUDRATE: 57600,
+                    CONF_BYTESIZE: 8,
+                    CONF_PARITY: "N",
+                    CONF_STOPBITS: 2,
+                    CONF_SEARCH: SEARCH_ADDRESSES,
+                },
+            )
+            assert result["type"] == "progress"
+            assert result["progress_action"] == "searching"
+
+            for _ in range(600):
+                await asyncio.sleep(0.05)
+                result = await hass.config_entries.flow.async_configure(
+                    flow["flow_id"]
+                )
+                if result["type"] != "progress":
+                    break
+            assert result["type"] == "form", result
+            assert result["step_id"] == "search_result"
+            placeholders = result["description_placeholders"]
+            assert placeholders["device_id"] == "23"
+            assert placeholders["serial_number"] == SERIAL_NUMBER
+
+            result = await hass.config_entries.flow.async_configure(
+                flow["flow_id"], {}
+            )
+            assert result["type"] == "create_entry", result
+            assert result["data"][CONF_DEVICE_ID] == 23
+            await hass.async_block_till_done()
+            entry = hass.config_entries.async_entries(DOMAIN)[0]
+            assert entry.state is ConfigEntryState.LOADED
+            assert entry.data[CONF_DEVICE_ID] == 23
+            assert entry.unique_id == SERIAL_NUMBER
+            await hass.config_entries.async_unload(entry.entry_id)
+        finally:
+            await hass.async_stop()
+            await server.shutdown()
+            serving.cancel()
+
+    asyncio.run(asyncio.wait_for(run(), timeout=300))
 
 
 def test_the_integration_manifest_matches_what_home_assistant_loads() -> None:

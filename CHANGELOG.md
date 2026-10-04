@@ -5,6 +5,32 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.2.0
+
+### Added
+
+- The setup form can **search the bus**. When the values entered do not work,
+  the flow tries every documented device address at those bus parameters, or
+  every documented combination of address, baud rate and frame, and offers
+  what it found with its layout version and serial number. It runs as a
+  progress step with an estimate, tries the user's own values first, and only
+  reads, so it cannot disturb a wallbox. The device address and the bus
+  parameters are configurable with the MENNEKES configuration tool, so an
+  inherited installation rarely uses the factory values -- and guessing them
+  by hand was the first thing this integration asked of a user.
+- `docs/entities.md`, a reference for every entity: what it means, its unit
+  and class, what the wallbox has to support for it to exist, and the
+  enumerated states automations will see. It is generated from the entity
+  descriptions, and `scripts/check_register_map.py` fails the build when an
+  entity is missing from it.
+- `docs/automations.md` with working recipes: PV surplus charging, pause and
+  resume with the manufacturer's hysteresis, dynamic load management, cheap
+  tariff windows, single-phase switching, noticing a §14a downgrade, and
+  recovering from a lost heartbeat.
+- `docs/troubleshooting.md`, worked through in the order a fault actually
+  presents itself.
+- `docs/README.md`, an index with reading paths.
+
 ## 0.1.3
 
 ### Fixed

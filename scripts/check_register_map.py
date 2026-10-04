@@ -18,6 +18,7 @@ from check_reporting import report_failures
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "mennekes_amtron"
+ENTITY_REFERENCE = ROOT / "docs" / "entities.md"
 LANGUAGES = ("en", "de")
 
 sys.path.insert(0, str(ROOT))
@@ -32,6 +33,7 @@ def main() -> int:
     failures.extend(check_blocks())
     failures.extend(check_entity_translations())
     failures.extend(check_entity_icons())
+    failures.extend(check_entity_reference())
     failures.extend(check_enum_states())
     return report_failures(failures, "Register map validation passed")
 
@@ -118,6 +120,22 @@ def check_entity_icons() -> list[str]:
             if key not in platform_icons:
                 failures.append(f"entity {platform}.{key} has no icon")
     return failures
+
+
+def check_entity_reference() -> list[str]:
+    """Every entity has to be described in docs/entities.md.
+
+    The reference is what a user reads to find out what an entity means; an
+    entity that is not in it is an entity nobody can use on purpose.
+    """
+
+    reference = ENTITY_REFERENCE.read_text(encoding="utf-8")
+    return [
+        f"docs/entities.md does not describe {platform}.{key}"
+        for platform, keys in _entity_keys().items()
+        for key in sorted(keys)
+        if f"`{platform}.*_{key}`" not in reference
+    ]
 
 
 def check_enum_states() -> list[str]:

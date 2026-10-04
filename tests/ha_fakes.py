@@ -99,6 +99,11 @@ class FakeHass:
         except RuntimeError:
             self.loop = asyncio.new_event_loop()
 
+    def async_create_task(self, target: Any, name: str | None = None) -> Any:
+        """Create a task the way Home Assistant does."""
+
+        return asyncio.get_running_loop().create_task(target, name=name)
+
     async def async_add_executor_job(
         self, target: Callable[..., Any], *args: Any
     ) -> Any:

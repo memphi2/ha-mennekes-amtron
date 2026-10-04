@@ -7,7 +7,11 @@
     },
     "error": {
       "cannot_connect": "Could not open the serial port or the wallbox did not answer. Check the cabling (Modbus A is +, B is -), the port and the bus parameters.",
-      "invalid_response": "The device answered but did not report a Modbus layout version. Check the device address and whether DIP 4 and DIP 5 on bank S1 are on."
+      "invalid_response": "The device answered but did not report a Modbus layout version. Check the device address and whether DIP 4 and DIP 5 on bank S1 are on.",
+      "not_found": "No wallbox answered on this port. Check the wiring (Modbus A is +, B is -, GND connected) and that DIP 4 and DIP 5 on bank S1 are on, with the wallbox restarted afterwards."
+    },
+    "progress": {
+      "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes. Nothing is written."
     },
     "step": {
       "reconfigure": {
@@ -17,6 +21,7 @@
           "device_id": "Modbus device address",
           "parity": "Parity",
           "port": "Serial port",
+          "search": "If these values do not work",
           "stopbits": "Stop bits"
         },
         "data_description": {
@@ -25,10 +30,15 @@
           "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
           "parity": "Factory default is none.",
           "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
+          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox.",
           "stopbits": "Factory default is 2 stop bits with no parity."
         },
         "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
         "title": "MENNEKES AMTRON"
+      },
+      "search_result": {
+        "description": "A wallbox answered after {attempts} attempts:\n\n- Device address: **{device_id}**\n- Bus: **{baudrate} baud, {frame}**\n- Modbus layout: **{layout}**\n- Serial number: **{serial_number}**\n\nSubmit to set the wallbox up with these values.",
+        "title": "Wallbox found"
       },
       "user": {
         "data": {
@@ -37,6 +47,7 @@
           "device_id": "Modbus device address",
           "parity": "Parity",
           "port": "Serial port",
+          "search": "If these values do not work",
           "stopbits": "Stop bits"
         },
         "data_description": {
@@ -45,6 +56,7 @@
           "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
           "parity": "Factory default is none.",
           "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
+          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox.",
           "stopbits": "Factory default is 2 stop bits with no parity."
         },
         "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
@@ -385,6 +397,13 @@
       "options": {
         "master": "Modbus master",
         "read_only": "Read only"
+      }
+    },
+    "search": {
+      "options": {
+        "addresses": "Search every device address, about 20 seconds",
+        "full": "Search every address, baud rate and frame, several minutes",
+        "off": "Do not search, just report the error"
       }
     }
   },

@@ -118,6 +118,14 @@ Pick the port, confirm the device address and the bus parameters. The flow
 opens the port and reads the device before it creates the entry, so a wrong
 value fails here instead of producing an empty device.
 
+**If you do not know the address or the parameters**, leave the last field at
+*Search every device address*. When the values you entered do not work, the
+flow tries every documented device address at your bus parameters — about
+twenty seconds — and offers what it found. *Search every address, baud rate
+and frame* widens that to every documented combination and takes several
+minutes. Both only read registers, so neither can disturb a wallbox or put it
+into the energy-manager error state.
+
 ## 7. Start in read-only mode
 
 A new entry is **read-only**: it polls and creates sensors, but it never

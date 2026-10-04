@@ -176,38 +176,10 @@ entity. Everything else is an entity.
 
 ## Troubleshooting
 
-**The config flow says it cannot connect.** Check the wiring (Modbus `A` is
-`+`, `B` is `−`), that the adapter path is right, and the bus parameters.
-The shipped bus check isolates this from Home Assistant; see the
-[quickstart](quickstart.md) for the command on your installation type.
-
-**The config flow says the device gave no layout version.** Something answered
-on the bus but not with a layout version. Check the Modbus device address and
-whether DIP 4 and DIP 5 on bank S1 are on — the wallbox needs a restart after
-changing them.
-
-**Writes are refused.** Same cause: a wallbox that is not in satellite mode
-answers reads but refuses writes. The integration raises a repair issue for
-this.
-
-**Error 200 / "Energy manager unavailable".** The wallbox did not get a
-heartbeat in time. Use the repair issue's *Fix* button, or press
-`button.<name>_recover_from_error`; both write the documented recovery
-sequence. If it keeps happening, the serial link is dropping frames — check
-the cabling, the termination and the ground connection.
-
-**Some entities are missing.** The device's register layout is older than
-v01.03 and does not have those registers, or the hardware cannot switch
-phases. `sensor.<name>_modbus_layout_version` (disabled by default) shows the
-layout; a repair issue appears for anything older than v01.03.
-
-**The charging current does not follow immediately.** The manufacturer allows
-one change every five seconds. A faster change is remembered and written when
-the interval has passed, so the last value you set always wins.
-
-**The slider jumps back.** While charging is paused the register holds the
-pause value, which is below the entity's minimum. The entity then shows the
-stored setpoint. Turn off `switch.<name>_charging_paused` to resume.
+See [troubleshooting.md](troubleshooting.md). The short version: the setup
+form can search the bus for you, the diagnostics download carries the full raw
+register image, and four repair issues explain the four ways this device gets
+stuck.
 
 ## Known limitations
 

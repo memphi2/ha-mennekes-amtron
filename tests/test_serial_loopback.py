@@ -72,13 +72,13 @@ def _signed(word: int) -> int:
     return word - 0x10000 if word > 0x7FFF else word
 
 
-def _server_context(words: list[int]) -> object:
+def _server_context(words: list[int], device_id: int = DEVICE_ID) -> object:
     """Return a Modbus server context holding the wallbox register image."""
 
     from pymodbus.simulator import SimData, SimDevice
 
     registers = SimData(0, values=words, datatype=_simdata.DataType.REGISTERS)
-    return [SimDevice(DEVICE_ID, simdata=[registers])]
+    return [SimDevice(device_id, simdata=[registers])]
 
 
 def test_the_integration_drives_a_real_modbus_rtu_server() -> None:
