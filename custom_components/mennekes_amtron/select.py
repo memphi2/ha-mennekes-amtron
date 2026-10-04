@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
@@ -49,7 +49,9 @@ class AmtronSolarModeSelect(MennekesAmtronEntity, SelectEntity):
     """
 
     _attr_translation_key = "solar_charging_mode"
-    _attr_options: ClassVar[list[str]] = list(enum_options(SolarChargingMode))
+    # Home Assistant declares _attr_options as an instance attribute, so
+    # annotating it ClassVar does not type-check. The list is never mutated.
+    _attr_options = list(enum_options(SolarChargingMode))  # noqa: RUF012
 
     def __init__(
         self, entry: MennekesAmtronConfigEntry, coordinator: Any
@@ -85,7 +87,7 @@ class AmtronRequestedPhasesSelect(MennekesAmtronEntity, SelectEntity):
     """
 
     _attr_translation_key = "requested_phases"
-    _attr_options: ClassVar[list[str]] = list(enum_options(RequestedPhases))
+    _attr_options = list(enum_options(RequestedPhases))  # noqa: RUF012
 
     def __init__(
         self, entry: MennekesAmtronConfigEntry, coordinator: Any
