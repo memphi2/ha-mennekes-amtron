@@ -96,6 +96,7 @@ Everything is indexed in **[docs/README.md](docs/README.md)**. The short list:
 | [Hardware installation](docs/hardware.md) | Cabling, DIP switches, the §14a input, USB passthrough |
 | [Quick start](docs/quickstart.md) | Installation in Home Assistant and the first charge |
 | [Entity reference](docs/entities.md) | Every entity, what it means, when it exists |
+| [Blueprints](docs/blueprints.md) | Four ready-made automations, installed with the integration |
 | [Automations](docs/automations.md) | PV surplus, load management, phase switching, §14a |
 | [User guide](docs/user-guide.md) | Options, actions, how data is updated |
 | [Troubleshooting](docs/troubleshooting.md) | When it does not work |

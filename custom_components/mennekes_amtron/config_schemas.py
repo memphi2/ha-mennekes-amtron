@@ -19,30 +19,27 @@ from homeassistant.helpers.selector import (
 from ._flow_serial import PortOption
 from .const import (
     CONF_BAUDRATE,
-    CONF_BYTESIZE,
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_DEVICE_ID,
-    CONF_PARITY,
+    CONF_FRAME,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SEARCH,
-    CONF_STOPBITS,
     CONTROL_MODES,
     DEFAULT_BAUDRATE,
-    DEFAULT_BYTESIZE,
     DEFAULT_CONTROL_MODE,
     DEFAULT_DEVICE_ID,
-    DEFAULT_PARITY,
+    DEFAULT_FRAME,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_SEARCH,
-    DEFAULT_STOPBITS,
     DEVICE_ID_MAX,
     DEVICE_ID_MIN,
     MAX_SCAN_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
     SEARCH_MODES,
     SUPPORTED_BAUDRATES,
+    SUPPORTED_FRAMES,
 )
 
 
@@ -52,16 +49,29 @@ def user_schema(ports: list[PortOption]) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_PORT): _port_selector(ports),
+            # A bare integer with a range renders as a slider, which is the
+            # wrong control for a bus address somebody reads off a tool.
             vol.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): vol.All(
-                cv.positive_int,
-                vol.Range(min=DEVICE_ID_MIN, max=DEVICE_ID_MAX),
+                NumberSelector(
+                    NumberSelectorConfig(
+                        min=DEVICE_ID_MIN,
+                        max=DEVICE_ID_MAX,
+                        step=1,
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Coerce(int),
             ),
             vol.Required(CONF_BAUDRATE, default=DEFAULT_BAUDRATE): vol.In(
                 SUPPORTED_BAUDRATES
             ),
-            vol.Required(CONF_BYTESIZE, default=DEFAULT_BYTESIZE): vol.In((7, 8)),
-            vol.Required(CONF_PARITY, default=DEFAULT_PARITY): vol.In(("N", "E", "O")),
-            vol.Required(CONF_STOPBITS, default=DEFAULT_STOPBITS): vol.In((1, 2)),
+            vol.Required(CONF_FRAME, default=DEFAULT_FRAME): SelectSelector(
+                SelectSelectorConfig(
+                    options=list(SUPPORTED_FRAMES),
+                    translation_key="frame",
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
             vol.Required(CONF_SEARCH, default=DEFAULT_SEARCH): SelectSelector(
                 SelectSelectorConfig(
                     options=list(SEARCH_MODES),

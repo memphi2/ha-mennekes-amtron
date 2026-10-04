@@ -22,6 +22,7 @@ from custom_components.mennekes_amtron.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_DEVICE_ID,
+    CONF_FRAME,
     CONF_PARITY,
     CONF_PORT,
     CONF_SEARCH,
@@ -37,9 +38,7 @@ USER_INPUT = {
     CONF_PORT: " /dev/fake ",
     CONF_DEVICE_ID: 50,
     CONF_BAUDRATE: 57600,
-    CONF_BYTESIZE: 8,
-    CONF_PARITY: "N",
-    CONF_STOPBITS: 2,
+    CONF_FRAME: "8N2",
 }
 IDENTITY = DeviceIdentity(
     layout_version=0x0103,
@@ -96,7 +95,50 @@ def test_serial_input_becomes_a_trimmed_serial_config() -> None:
     config = _serial_config(USER_INPUT)
     assert config.port == "/dev/fake"
     assert config.device_id == 50
+    assert config.bytesize == 8
+    assert config.parity == "N"
     assert config.stopbits == 2
+
+
+def test_a_stored_entry_still_describes_its_bus() -> None:
+    """Entries created before the frame field keep their three keys."""
+
+    config = _serial_config(
+        {
+            CONF_PORT: "/dev/fake",
+            CONF_DEVICE_ID: 23,
+            CONF_BAUDRATE: 19200,
+            CONF_BYTESIZE: 8,
+            CONF_PARITY: "E",
+            CONF_STOPBITS: 1,
+        }
+    )
+    assert (config.bytesize, config.parity, config.stopbits) == (8, "E", 1)
+
+
+def test_every_offered_frame_round_trips() -> None:
+    from custom_components.mennekes_amtron.const import (
+        SUPPORTED_FRAMES,
+        frame_label,
+        frame_parts,
+    )
+
+    for frame in SUPPORTED_FRAMES:
+        assert frame_label(*frame_parts(frame)) == frame
+        config = _serial_config({**USER_INPUT, CONF_FRAME: frame})
+        assert frame_label(config.bytesize, config.parity, config.stopbits) == frame
+
+
+def test_the_offered_frames_are_the_ones_the_device_documents() -> None:
+    from custom_components.mennekes_amtron.const import (
+        SUPPORTED_FRAMES,
+        SUPPORTED_PARITY_STOPBITS,
+        frame_parts,
+    )
+
+    assert {frame_parts(frame)[1:] for frame in SUPPORTED_FRAMES} == set(
+        SUPPORTED_PARITY_STOPBITS
+    )
 
 
 def test_the_entry_title_carries_no_serial_number() -> None:
@@ -167,9 +209,7 @@ def test_a_failed_attempt_keeps_what_the_user_typed(
             CONF_PORT: " /dev/fake ",
             CONF_DEVICE_ID: 23,
             CONF_BAUDRATE: 19200,
-            CONF_BYTESIZE: 8,
-            CONF_PARITY: "N",
-            CONF_STOPBITS: 2,
+            CONF_FRAME: "8N2",
         }
 
     asyncio.run(run())
@@ -192,7 +232,8 @@ def test_reconfigure_starts_from_the_entry_not_the_factory_defaults() -> None:
         suggested = _suggested(result)
         assert suggested[CONF_DEVICE_ID] == 23
         assert suggested[CONF_BAUDRATE] == 19200
-        assert suggested[CONF_PARITY] == "E"
+        # the entry stores the parts, the form asks for the frame
+        assert suggested[CONF_FRAME] == "8E1"
         assert suggested[CONF_PORT] == "/dev/serial/by-id/adapter"
 
     asyncio.run(run())
@@ -326,7 +367,9 @@ def test_a_failed_test_searches_the_bus_and_offers_what_it_found(
         assert created["type"] == "create_entry"
         assert created["data"][CONF_DEVICE_ID] == 23
         assert created["data"][CONF_BAUDRATE] == 19200
+        assert created["data"][CONF_STOPBITS] == 2
         assert CONF_SEARCH not in created["data"]
+        assert CONF_FRAME not in created["data"]
 
     asyncio.run(run())
 

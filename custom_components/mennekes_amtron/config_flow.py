@@ -17,6 +17,7 @@ from .const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_DEVICE_ID,
+    CONF_FRAME,
     CONF_PARITY,
     CONF_PORT,
     CONF_SEARCH,
@@ -25,6 +26,7 @@ from .const import (
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
+    DEFAULT_FRAME,
     DEFAULT_MODEL,
     DEFAULT_PARITY,
     DEFAULT_STOPBITS,
@@ -32,6 +34,8 @@ from .const import (
     MANUFACTURER,
     SEARCH_FULL,
     SEARCH_OFF,
+    frame_label,
+    frame_parts,
 )
 from .data import DeviceIdentity
 from .entry_types import MennekesAmtronConfigEntry
@@ -243,8 +247,15 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             return dict(user_input)
         if step_id == "reconfigure":
-            return dict(self._get_reconfigure_entry().data)
-        return {}
+            data = dict(self._get_reconfigure_entry().data)
+            config = _serial_config(data)
+            return {
+                **data,
+                CONF_FRAME: frame_label(
+                    config.bytesize, config.parity, config.stopbits
+                ),
+            }
+        return {CONF_FRAME: DEFAULT_FRAME}
 
     async def _async_port_options(self) -> list[Any]:
         by_id = await self.hass.async_add_executor_job(list_by_id_ports)
@@ -261,12 +272,25 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 def _serial_config(user_input: dict[str, Any]) -> SerialConfig:
+    """Return the bus configuration a form or an entry describes.
+
+    The form asks for one frame, because the device documents exactly three.
+    A stored entry keeps the data bits, parity and stop bits separately, so
+    both shapes are accepted and no entry needs migrating.
+    """
+
+    if CONF_FRAME in user_input:
+        bytesize, parity, stopbits = frame_parts(str(user_input[CONF_FRAME]))
+    else:
+        bytesize = int(user_input.get(CONF_BYTESIZE, DEFAULT_BYTESIZE))
+        parity = str(user_input.get(CONF_PARITY, DEFAULT_PARITY))
+        stopbits = int(user_input.get(CONF_STOPBITS, DEFAULT_STOPBITS))
     return SerialConfig(
         port=str(user_input.get(CONF_PORT, "")).strip(),
         baudrate=int(user_input.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)),
-        bytesize=int(user_input.get(CONF_BYTESIZE, DEFAULT_BYTESIZE)),
-        parity=str(user_input.get(CONF_PARITY, DEFAULT_PARITY)),
-        stopbits=int(user_input.get(CONF_STOPBITS, DEFAULT_STOPBITS)),
+        bytesize=bytesize,
+        parity=parity,
+        stopbits=stopbits,
         device_id=int(user_input.get(CONF_DEVICE_ID, DEFAULT_DEVICE_ID)),
     )
 
@@ -285,7 +309,7 @@ def _serial_input(config: SerialConfig) -> dict[str, Any]:
 
 
 def _frame(config: SerialConfig) -> str:
-    return f"{config.bytesize}{config.parity}{config.stopbits}"
+    return frame_label(config.bytesize, config.parity, config.stopbits)
 
 
 def _entry_title(identity: DeviceIdentity) -> str:

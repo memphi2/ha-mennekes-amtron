@@ -1,0 +1,56 @@
+blueprint:
+  name: MENNEKES AMTRON - recover from a lost heartbeat
+  description: >-
+    Presses the recovery button when the wallbox reports that the energy
+    manager is unavailable.
+
+    The wallbox enters that state when it does not receive a heartbeat in time,
+    and it will not start a charging session until the heartbeat, the charging
+    release and the charging current have been written again. The recovery
+    button writes exactly that sequence.
+
+    If this fires regularly, the serial link is dropping frames. Fix the bus
+    instead of papering over it: see docs/troubleshooting.md.
+  domain: automation
+  homeassistant:
+    min_version: "2026.5.0"
+  input:
+    error_code:
+      name: Error code
+      description: The wallbox error-code sensor.
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron
+              domain: sensor
+    recover_button:
+      name: Recover from error
+      description: The wallbox recovery button.
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron
+              domain: button
+    settle_time:
+      name: Settle time
+      description: How long the error has to persist before recovering.
+      default:
+        minutes: 1
+      selector:
+        duration:
+
+mode: single
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input error_code
+    to: energy_manager_unavailable
+    for: !input settle_time
+
+conditions: []
+
+actions:
+  - action: button.press
+    target:
+      entity_id: !input recover_button

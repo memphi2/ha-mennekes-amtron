@@ -1,0 +1,119 @@
+blueprint:
+  name: MENNEKES AMTRON - charge from PV surplus
+  description: >-
+    Follows the photovoltaic surplus with the wallbox charging current.
+
+    The current is recomputed whenever the surplus sensor changes, divided by
+    the number of phases the wallbox will actually use, and clamped to the
+    range the wallbox accepts. It is only written while a vehicle is
+    connected.
+
+    The manufacturer asks for at most one current change every five seconds.
+    The integration enforces that by deferring a faster change and writing the
+    newest value, so this automation does not need a rate limit of its own.
+
+    Pausing when the surplus disappears needs hysteresis and is a separate
+    concern; use the "pause and resume on PV surplus" blueprint for it.
+  domain: automation
+  homeassistant:
+    min_version: "2026.5.0"
+  input:
+    surplus_power:
+      name: PV surplus
+      description: A sensor reporting the surplus power available for charging.
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: power
+    charging_current:
+      name: Charging current limit
+      description: The wallbox charging-current limit.
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron
+              domain: number
+    vehicle_connected:
+      name: Vehicle connected
+      description: The wallbox vehicle-connected binary sensor.
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron
+              domain: binary_sensor
+    switched_phases:
+      name: Switched phases
+      description: >-
+        The wallbox switched-phases sensor, used to divide the surplus by the
+        number of phases the wallbox will really use.
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron
+              domain: sensor
+    grid_voltage:
+      name: Grid voltage
+      description: The voltage used to convert watts into amps.
+      default: 230
+      selector:
+        number:
+          min: 100
+          max: 250
+          step: 1
+          unit_of_measurement: V
+          mode: box
+    minimum_current:
+      name: Minimum current
+      description: >-
+        Never ask for less than this. The wallbox refuses anything below 6 A:
+        on this device, values from 0.01 A to 5.99 A mean "signal 0 A to the
+        vehicle".
+      default: 6
+      selector:
+        number:
+          min: 6
+          max: 32
+          step: 0.1
+          unit_of_measurement: A
+          mode: box
+    maximum_current:
+      name: Maximum current
+      description: Never ask for more than this. The wallbox clamps it again anyway.
+      default: 16
+      selector:
+        number:
+          min: 6
+          max: 32
+          step: 0.1
+          unit_of_measurement: A
+          mode: box
+
+mode: single
+max_exceeded: silent
+
+variables:
+  surplus_entity: !input surplus_power
+  phases_entity: !input switched_phases
+  volts: !input grid_voltage
+  minimum: !input minimum_current
+  maximum: !input maximum_current
+
+triggers:
+  - trigger: state
+    entity_id: !input surplus_power
+
+conditions:
+  - condition: state
+    entity_id: !input vehicle_connected
+    state: "on"
+
+actions:
+  - action: number.set_value
+    target:
+      entity_id: !input charging_current
+    data:
+      value: >-
+        {% set phases = 1 if is_state(phases_entity, 'single_phase') else 3 %}
+        {% set amps = states(surplus_entity) | float(0) / (volts | float(230)) / phases %}
+        {{ [[ amps | round(1), minimum | float(6)] | max, maximum | float(16)] | min }}

@@ -13,6 +13,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
+from .blueprint_installer import async_install_blueprints
 from .client import MennekesModbusClient, SerialConfig
 from .client_errors import AmtronBusError
 from .const import (
@@ -62,6 +63,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the integration's actions."""
 
     async_setup_services(hass)
+    await async_install_blueprints(hass)
     return True
 
 

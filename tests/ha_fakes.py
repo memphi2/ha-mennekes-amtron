@@ -8,7 +8,10 @@ Home Assistant runtime around them is faked.
 from __future__ import annotations
 
 import asyncio
+import tempfile
 from collections.abc import Callable, Iterable
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
@@ -90,7 +93,12 @@ class FakeServices:
 class FakeHass:
     """Everything the integration touches on ``hass``."""
 
-    def __init__(self) -> None:
+    def __init__(self, config_dir: str | None = None) -> None:
+        self.config_dir = config_dir or tempfile.mkdtemp(prefix="mennekes-hass-")
+        self.config = SimpleNamespace(
+            config_dir=self.config_dir,
+            path=lambda *parts: str(Path(self.config_dir, *parts)),
+        )
         self.data: dict[str, Any] = {}
         self.config_entries = FakeConfigEntries()
         self.services = FakeServices()

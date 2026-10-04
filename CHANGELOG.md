@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- Four automation blueprints, installed into
+  `config/blueprints/automation/mennekes_amtron/` when the integration is set
+  up: charge from PV surplus, pause and resume on PV surplus, recover from a
+  lost heartbeat, and notify on a grid-operator downgrade. Every entity picker
+  is filtered to this integration. The installer records a digest of what it
+  writes and never replaces a file that was edited, so a customised blueprint
+  stays customised.
+
 ### Changed
 
 - Configuration registers are no longer read on every poll. Eight of the
@@ -23,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The setup form asked for data bits, parity and stop bits separately, which
+  allowed combinations this wallbox never speaks — the specification documents
+  exactly three frames. It is now one *Frame* field with those three choices,
+  which also takes the form from seven fields to five. Stored entries keep
+  their separate keys and need no migration.
+- The Modbus device address rendered as a slider, because a bare integer with
+  a range is what Home Assistant turns into one. It is a number box now, and
+  every field in the form uses an explicit selector.
 - Repair issues were written to the issue registry on every coordinator
   update, roughly seventeen thousand times a day, even when nothing had
   changed. They are now written only when the issue or its placeholders

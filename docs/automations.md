@@ -3,6 +3,10 @@
 Working recipes. Replace `amtron` with your device's entity prefix, and read
 [safety.md](safety.md) before you automate anything that writes.
 
+Four of these ship as **blueprints** and need no YAML at all; see
+[blueprints.md](blueprints.md). Use this page when you want to understand what
+they do, or to adapt them.
+
 Two rules the manufacturer sets, which every recipe below respects:
 
 - change the charging current at most once every **5 seconds**,

@@ -97,40 +97,32 @@ def test_submitting_normalises_the_values() -> None:
     asyncio.run(run())
 
 
+BUS = {"port": "/dev/a", "device_id": 50, "baudrate": 57600, "frame": "8N2"}
+
+
 def test_the_user_schema_bounds_the_device_address() -> None:
     schema = user_schema([PortOption(value="/dev/a", label="a")])
-    valid = schema(
-        {
-            "port": "/dev/a",
-            "device_id": 50,
-            "baudrate": 57600,
-            "bytesize": 8,
-            "parity": "N",
-            "stopbits": 2,
-        }
-    )
-    assert valid["device_id"] == 50
+    assert schema(dict(BUS))["device_id"] == 50
     try:
-        schema(
-            {
-                "port": "/dev/a",
-                "device_id": 9,
-                "baudrate": 57600,
-                "bytesize": 8,
-                "parity": "N",
-                "stopbits": 2,
-            }
-        )
+        schema({**BUS, "device_id": 9})
     except vol.Invalid:
         pass
     else:  # pragma: no cover - the schema must reject this
         raise AssertionError("device id 9 must be rejected")
 
 
+def test_the_setup_form_asks_for_five_things() -> None:
+    """The device documents three frames, so it is one field, not three."""
+
+    fields = {str(marker.schema) for marker in user_schema([]).schema}
+    assert fields == {"port", "device_id", "baudrate", "frame", "search"}
+    assert "bytesize" not in fields
+    assert "parity" not in fields
+    assert "stopbits" not in fields
+
+
 def test_the_user_schema_falls_back_to_free_text_without_ports() -> None:
-    assert user_schema([])({"port": "/dev/custom", "device_id": 50,
-                           "baudrate": 57600, "bytesize": 8,
-                           "parity": "N", "stopbits": 2})["port"] == "/dev/custom"
+    assert user_schema([])({**BUS, "port": "/dev/custom"})["port"] == "/dev/custom"
 
 
 def test_the_options_schema_never_offers_less_than_six_ampere() -> None:

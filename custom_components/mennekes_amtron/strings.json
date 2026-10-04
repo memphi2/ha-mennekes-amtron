@@ -17,21 +17,17 @@
       "reconfigure": {
         "data": {
           "baudrate": "Baud rate",
-          "bytesize": "Data bits",
           "device_id": "Modbus device address",
-          "parity": "Parity",
+          "frame": "Frame",
           "port": "Serial port",
-          "search": "If these values do not work",
-          "stopbits": "Stop bits"
+          "search": "If these values do not work"
         },
         "data_description": {
           "baudrate": "Factory default is 57600.",
-          "bytesize": "Factory default is 8.",
           "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
-          "parity": "Factory default is none.",
+          "frame": "The wallbox documents exactly these three. Factory default is 8 data bits, no parity, 2 stop bits.",
           "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
-          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox.",
-          "stopbits": "Factory default is 2 stop bits with no parity."
+          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox."
         },
         "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
         "title": "MENNEKES AMTRON"
@@ -43,21 +39,17 @@
       "user": {
         "data": {
           "baudrate": "Baud rate",
-          "bytesize": "Data bits",
           "device_id": "Modbus device address",
-          "parity": "Parity",
+          "frame": "Frame",
           "port": "Serial port",
-          "search": "If these values do not work",
-          "stopbits": "Stop bits"
+          "search": "If these values do not work"
         },
         "data_description": {
           "baudrate": "Factory default is 57600.",
-          "bytesize": "Factory default is 8.",
           "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
-          "parity": "Factory default is none.",
+          "frame": "The wallbox documents exactly these three. Factory default is 8 data bits, no parity, 2 stop bits.",
           "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
-          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox.",
-          "stopbits": "Factory default is 2 stop bits with no parity."
+          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox."
         },
         "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
         "title": "MENNEKES AMTRON"
@@ -397,6 +389,13 @@
       "options": {
         "master": "Modbus master",
         "read_only": "Read only"
+      }
+    },
+    "frame": {
+      "options": {
+        "8E1": "8E1 - 8 data bits, even parity, 1 stop bit",
+        "8N2": "8N2 - 8 data bits, no parity, 2 stop bits (default)",
+        "8O1": "8O1 - 8 data bits, odd parity, 1 stop bit"
       }
     },
     "search": {

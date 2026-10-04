@@ -17,21 +17,17 @@
       "reconfigure": {
         "data": {
           "baudrate": "Baudrate",
-          "bytesize": "Datenbits",
           "device_id": "Modbus-Geräteadresse",
-          "parity": "Parität",
+          "frame": "Frame",
           "port": "Serieller Port",
-          "search": "Wenn diese Werte nicht funktionieren",
-          "stopbits": "Stoppbits"
+          "search": "Wenn diese Werte nicht funktionieren"
         },
         "data_description": {
           "baudrate": "Werkseinstellung ist 57600.",
-          "bytesize": "Werkseinstellung ist 8.",
           "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
-          "parity": "Werkseinstellung ist keine.",
+          "frame": "Die Wallbox dokumentiert genau diese drei. Werkseinstellung sind 8 Datenbits, keine Parität, 2 Stoppbits.",
           "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
-          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Das Suchen liest nur und kann die Wallbox nicht stören.",
-          "stopbits": "Werkseinstellung sind 2 Stoppbits ohne Parität."
+          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Das Suchen liest nur und kann die Wallbox nicht stören."
         },
         "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
         "title": "MENNEKES AMTRON"
@@ -43,21 +39,17 @@
       "user": {
         "data": {
           "baudrate": "Baudrate",
-          "bytesize": "Datenbits",
           "device_id": "Modbus-Geräteadresse",
-          "parity": "Parität",
+          "frame": "Frame",
           "port": "Serieller Port",
-          "search": "Wenn diese Werte nicht funktionieren",
-          "stopbits": "Stoppbits"
+          "search": "Wenn diese Werte nicht funktionieren"
         },
         "data_description": {
           "baudrate": "Werkseinstellung ist 57600.",
-          "bytesize": "Werkseinstellung ist 8.",
           "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
-          "parity": "Werkseinstellung ist keine.",
+          "frame": "Die Wallbox dokumentiert genau diese drei. Werkseinstellung sind 8 Datenbits, keine Parität, 2 Stoppbits.",
           "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
-          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Das Suchen liest nur und kann die Wallbox nicht stören.",
-          "stopbits": "Werkseinstellung sind 2 Stoppbits ohne Parität."
+          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Das Suchen liest nur und kann die Wallbox nicht stören."
         },
         "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
         "title": "MENNEKES AMTRON"
@@ -397,6 +389,13 @@
       "options": {
         "master": "Modbus-Master",
         "read_only": "Nur lesen"
+      }
+    },
+    "frame": {
+      "options": {
+        "8E1": "8E1 - 8 Datenbits, gerade Parität, 1 Stoppbit",
+        "8N2": "8N2 - 8 Datenbits, keine Parität, 2 Stoppbits (Standard)",
+        "8O1": "8O1 - 8 Datenbits, ungerade Parität, 1 Stoppbit"
       }
     },
     "search": {

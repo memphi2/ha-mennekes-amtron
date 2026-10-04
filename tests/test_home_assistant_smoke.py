@@ -25,14 +25,12 @@ from homeassistant.config_entries import ConfigEntryState
 from custom_components.mennekes_amtron import registers as R
 from custom_components.mennekes_amtron.const import (
     CONF_BAUDRATE,
-    CONF_BYTESIZE,
     CONF_CONTROL_MODE,
     CONF_DEVICE_ID,
-    CONF_PARITY,
+    CONF_FRAME,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SEARCH,
-    CONF_STOPBITS,
     CONTROL_MODE_MASTER,
     DOMAIN,
     SEARCH_ADDRESSES,
@@ -131,9 +129,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
                     CONF_PORT: client_port,
                     CONF_DEVICE_ID: 50,
                     CONF_BAUDRATE: 57600,
-                    CONF_BYTESIZE: 8,
-                    CONF_PARITY: "N",
-                    CONF_STOPBITS: 2,
+                    CONF_FRAME: "8N2",
                     CONF_SEARCH: SEARCH_OFF,
                 },
             )
@@ -213,6 +209,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             }
             assert suggested[CONF_PORT] == client_port
             assert suggested[CONF_DEVICE_ID] == 50
+            assert suggested[CONF_FRAME] == "8N2"
 
             heartbeat = entry.runtime_data.heartbeat
             assert await hass.config_entries.async_unload(entry.entry_id)
@@ -249,9 +246,7 @@ def test_the_flow_finds_a_wallbox_on_an_unknown_address(tmp_path: Path) -> None:
                     CONF_PORT: client_port,
                     CONF_DEVICE_ID: 50,
                     CONF_BAUDRATE: 57600,
-                    CONF_BYTESIZE: 8,
-                    CONF_PARITY: "N",
-                    CONF_STOPBITS: 2,
+                    CONF_FRAME: "8N2",
                     CONF_SEARCH: SEARCH_ADDRESSES,
                 },
             )
@@ -281,6 +276,151 @@ def test_the_flow_finds_a_wallbox_on_an_unknown_address(tmp_path: Path) -> None:
             assert entry.state is ConfigEntryState.LOADED
             assert entry.data[CONF_DEVICE_ID] == 23
             assert entry.unique_id == SERIAL_NUMBER
+            await hass.config_entries.async_unload(entry.entry_id)
+        finally:
+            await hass.async_stop()
+            await server.shutdown()
+            serving.cancel()
+
+    asyncio.run(asyncio.wait_for(run(), timeout=300))
+
+
+def test_the_bundled_blueprints_run_as_automations(tmp_path: Path) -> None:
+    """Schema-valid is not the same as working: these are really run."""
+
+    async def run() -> None:
+        bank = device_bank(evse_state=5)
+        device_port, client_port = _virtual_serial_link()
+        server, serving = await _start_wallbox(device_port, bank)
+        try:
+            hass = await _boot(tmp_path / "config")
+        except (AttributeError, ImportError) as err:  # pragma: no cover
+            await server.shutdown()
+            serving.cancel()
+            pytest.skip(f"Home Assistant bootstrap is not usable here: {err}")
+
+        from homeassistant.helpers import entity_registry as er
+        from homeassistant.setup import async_setup_component
+
+        try:
+            flow = await hass.config_entries.flow.async_init(
+                DOMAIN, context={"source": "user"}
+            )
+            await hass.config_entries.flow.async_configure(
+                flow["flow_id"],
+                {
+                    CONF_PORT: client_port,
+                    CONF_DEVICE_ID: 50,
+                    CONF_BAUDRATE: 57600,
+                    CONF_FRAME: "8N2",
+                    CONF_SEARCH: SEARCH_OFF,
+                },
+            )
+            await hass.async_block_till_done()
+            entry = hass.config_entries.async_entries(DOMAIN)[0]
+            options = await hass.config_entries.options.async_init(entry.entry_id)
+            await hass.config_entries.options.async_configure(
+                options["flow_id"],
+                {
+                    CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
+                    CONF_SCAN_INTERVAL_SECONDS: 5,
+                    "current_limit": 16.0,
+                },
+            )
+            await hass.async_block_till_done()
+            entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+            # setting the integration up installed them
+            folder = tmp_path / "config" / "blueprints" / "automation" / DOMAIN
+            assert {path.name for path in folder.glob("*.yaml")} == {
+                "solar_surplus_charging.yaml",
+                "pause_and_resume_on_surplus.yaml",
+                "recover_from_lost_heartbeat.yaml",
+                "downgrade_notification.yaml",
+            }
+
+            entities = sorted(
+                entity.entity_id
+                for entity in er.async_entries_for_config_entry(
+                    er.async_get(hass), entry.entry_id
+                )
+            )
+
+            def pick(suffix: str) -> str:
+                return next(item for item in entities if item.endswith(suffix))
+
+            surplus = "sensor.pv_surplus_for_the_test"
+            hass.states.async_set(
+                surplus,
+                "5000",
+                {"device_class": "power", "unit_of_measurement": "W"},
+            )
+            number = pick("_charging_current_limit")
+            config = {
+                "automation": [
+                    {
+                        "alias": "surplus",
+                        "use_blueprint": {
+                            "path": f"{DOMAIN}/solar_surplus_charging.yaml",
+                            "input": {
+                                "surplus_power": surplus,
+                                "charging_current": number,
+                                "vehicle_connected": pick("_vehicle_connected"),
+                                "switched_phases": pick("_switched_phases"),
+                            },
+                        },
+                    },
+                    {
+                        "alias": "pause",
+                        "use_blueprint": {
+                            "path": f"{DOMAIN}/pause_and_resume_on_surplus.yaml",
+                            "input": {
+                                "surplus_power": surplus,
+                                "charging_paused": pick("_charging_paused"),
+                            },
+                        },
+                    },
+                    {
+                        "alias": "recover",
+                        "use_blueprint": {
+                            "path": f"{DOMAIN}/recover_from_lost_heartbeat.yaml",
+                            "input": {
+                                "error_code": pick("_error_code"),
+                                "recover_button": pick("_recover_from_error"),
+                            },
+                        },
+                    },
+                    {
+                        "alias": "downgrade",
+                        "use_blueprint": {
+                            "path": f"{DOMAIN}/downgrade_notification.yaml",
+                            "input": {
+                                "downgrade_active": pick("_downgrade_active"),
+                                "downgrade_current": pick("_downgrade_current"),
+                            },
+                        },
+                    },
+                ]
+            }
+            assert await async_setup_component(hass, "automation", config)
+            await hass.async_block_till_done()
+            automations = hass.states.async_all("automation")
+            assert len(automations) == 4
+            assert all(state.state == "on" for state in automations)
+
+            # and the surplus one really drives the wallbox
+            assert hass.states.get(number).state == "16.0"
+            hass.states.async_set(
+                surplus,
+                "5000.0",
+                {"device_class": "power", "unit_of_measurement": "W"},
+            )
+            await hass.async_block_till_done()
+            await asyncio.sleep(0.5)
+            await hass.async_block_till_done()
+            # 5000 W / 230 V / 3 phases, through a float32 register
+            assert float(hass.states.get(number).state) == pytest.approx(7.2)
+
             await hass.config_entries.async_unload(entry.entry_id)
         finally:
             await hass.async_stop()

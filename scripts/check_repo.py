@@ -34,6 +34,8 @@ REQUIRED_PATHS = (
     "custom_components/mennekes_amtron/strings.json",
     "custom_components/mennekes_amtron/icons.json",
     "custom_components/mennekes_amtron/services.yaml",
+    "custom_components/mennekes_amtron/blueprints/automation/mennekes_amtron",
+    "docs/blueprints.md",
     "custom_components/mennekes_amtron/translations/en.json",
     "custom_components/mennekes_amtron/translations/de.json",
     "docs/README.md",

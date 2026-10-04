@@ -10,7 +10,8 @@ local Modbus RTU.
 | wire it up: cabling, DIP switches, USB passthrough | [Hardware installation](hardware.md) |
 | get it running in Home Assistant | [Quick start](quickstart.md) |
 | know what every entity means | [Entity reference](entities.md) |
-| build automations | [Automations](automations.md) |
+| use a ready-made automation | [Blueprints](blueprints.md) |
+| write my own automations | [Automations](automations.md) |
 | understand the options and the daily use | [User guide](user-guide.md) |
 | fix something that is broken | [Troubleshooting](troubleshooting.md) |
 | know what can go wrong with a wallbox | [Safety and limitations](safety.md) |

@@ -1,0 +1,73 @@
+blueprint:
+  name: MENNEKES AMTRON - notify on a grid-operator downgrade
+  description: >-
+    Sends a notification when the grid operator limits the wallbox, and
+    another when the limit is released.
+
+    The downgrade is enforced inside the wallbox over its own hardware input.
+    Nothing on the Modbus side can prevent or raise it; this automation only
+    makes it visible, which is the point.
+  domain: automation
+  homeassistant:
+    min_version: "2026.5.0"
+  input:
+    downgrade_active:
+      name: Downgrade active
+      description: The wallbox downgrade binary sensor.
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron
+              domain: binary_sensor
+    downgrade_current:
+      name: Downgrade current
+      description: The wallbox downgrade-current sensor.
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron
+              domain: sensor
+    notify_action:
+      name: Notification action
+      description: The notify action to call, for example notify.persistent_notification.
+      default: notify.persistent_notification
+      selector:
+        text:
+
+mode: queued
+max: 5
+
+variables:
+  current_entity: !input downgrade_current
+  notify_service: !input notify_action
+
+triggers:
+  - trigger: state
+    entity_id: !input downgrade_active
+    to: "on"
+    id: downgraded
+  - trigger: state
+    entity_id: !input downgrade_active
+    to: "off"
+    id: released
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: downgraded
+        sequence:
+          - action: "{{ notify_service }}"
+            data:
+              title: Wallbox downgraded
+              message: >-
+                The grid operator limited the wallbox to
+                {{ states(current_entity) }} A.
+      - conditions:
+          - condition: trigger
+            id: released
+        sequence:
+          - action: "{{ notify_service }}"
+            data:
+              title: Wallbox downgrade released
+              message: The grid operator released the wallbox limit.
