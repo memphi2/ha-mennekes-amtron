@@ -4,5 +4,5 @@
   "python": "3.14",
   "pymodbus_minimum": "3.11.2",
   "amtron_modbus_layout": "v01.03",
-  "integration_version": "0.2.0"
+  "integration_version": "0.2.1"
 }

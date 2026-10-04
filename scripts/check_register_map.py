@@ -109,17 +109,58 @@ def check_entity_translations() -> list[str]:
 
 
 def check_entity_icons() -> list[str]:
-    """Every entity key needs an icon, so no entity falls back to a blank."""
+    """An icon belongs where the device class does not already give one.
+
+    Home Assistant derives an icon from the device class, and for several of
+    them a state-dependent one: a plug shows connected or not, a problem shows
+    alert or ok. Declaring an icon overrides that. The enum device class has
+    no icon of its own, so those entities do need one.
+    """
 
     icons = json.loads((COMPONENT / "icons.json").read_text(encoding="utf-8"))
     section = icons.get("entity", {})
     failures: list[str] = []
     for platform, keys in _entity_keys().items():
         platform_icons = section.get(platform, {})
+        with_icon_class = _device_classes_with_icon()[platform]
         for key in sorted(keys):
-            if key not in platform_icons:
+            declared = key in platform_icons
+            if key in with_icon_class and declared:
+                failures.append(
+                    f"entity {platform}.{key} declares an icon although its "
+                    f"device class {with_icon_class[key]!r} provides one"
+                )
+            elif key not in with_icon_class and not declared:
                 failures.append(f"entity {platform}.{key} has no icon")
     return failures
+
+
+def _device_classes_with_icon() -> dict[str, dict[str, str]]:
+    """Return every entity whose device class already carries an icon."""
+
+    from custom_components.mennekes_amtron.binary_sensor_descriptions import (
+        BINARY_SENSOR_DESCRIPTIONS,
+    )
+    from custom_components.mennekes_amtron.sensor_descriptions import (
+        SENSOR_DESCRIPTIONS,
+    )
+
+    classes: dict[str, dict[str, str]] = {
+        platform: {} for platform in _entity_keys()
+    }
+    for platform, descriptions in (
+        ("sensor", SENSOR_DESCRIPTIONS),
+        ("binary_sensor", BINARY_SENSOR_DESCRIPTIONS),
+    ):
+        for description in descriptions:
+            device_class = description.device_class
+            # The enum device class has no icon of its own.
+            if device_class is not None and device_class.value != "enum":
+                classes[platform][description.key] = str(device_class.value)
+    classes["number"]["charging_current_limit"] = "current"
+    classes["switch"]["charging_release"] = "switch"
+    classes["button"]["restart"] = "restart"
+    return classes
 
 
 def check_entity_reference() -> list[str]:

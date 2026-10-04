@@ -2,34 +2,16 @@
 
 ## 1. Hardware
 
-You need a USB RS-485 adapter on the Home Assistant host and three wires to
-the wallbox.
+Cabling, DIP switches, the §14a downgrade input and USB passthrough are in
+**[hardware.md](hardware.md)**. The two things you cannot skip:
 
-| Wallbox | Meaning | Adapter |
-|---|---|---|
-| Modbus `A` | `+` | `A` / `D+` |
-| Modbus `B` | `−` | `B` / `D−` |
-| `GND` | reference | `GND` |
+- Modbus `A` is `+`, `B` is `−`, and `GND` has to be connected.
+- The wallbox has to be in **Modbus satellite mode**: bank S1, DIP 4 and
+  DIP 5 to ON, then restart it. Without that it answers nothing.
 
 RS-485 is a **single-master** bus. If another energy manager or a §14a control
-box already drives this bus, do not add a second master — keep this
-integration in read-only mode. See [safety.md](safety.md).
-
-## 2. Enable the Modbus satellite mode
-
-On the wallbox, set **DIP bank S1, DIP 4 and DIP 5 to ON** and restart it.
-Without that the wallbox answers nothing and rejects every write.
-
-The factory bus parameters are:
-
-```text
-57600 baud, 8 data bits, 2 stop bits, no parity
-Modbus device address 50 (10-50 configurable)
-Byte and word order: big endian
-```
-
-All of them can be changed with the MENNEKES configuration tool; the config
-flow asks for whatever you actually use.
+box already drives it, do not add a second master — keep this integration in
+read-only mode. See [safety.md](safety.md).
 
 ## 3. Install
 

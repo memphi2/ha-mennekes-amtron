@@ -9,6 +9,8 @@ for grid compliance or for protecting a vehicle.
 Installation, wiring and DIP-switch changes on the wallbox are work on a fixed
 electrical installation. Have them done by a qualified electrician, following
 the manufacturer's installation manual and local regulations.
+[hardware.md](hardware.md) describes the Modbus side of an installation that
+somebody qualified has already made safe.
 
 ## RS-485 is a single-master bus
 

@@ -38,6 +38,7 @@ REQUIRED_PATHS = (
     "custom_components/mennekes_amtron/translations/de.json",
     "docs/README.md",
     "docs/quickstart.md",
+    "docs/hardware.md",
     "docs/user-guide.md",
     "docs/entities.md",
     "docs/troubleshooting.md",
@@ -118,6 +119,7 @@ def main() -> int:
     failures.extend(check_github_automation())
     failures.extend(check_issue_templates())
     failures.extend(check_branch_protection_contexts())
+    failures.extend(check_hardware_document())
     failures.extend(check_secrets())
     failures.extend(check_python_compile())
     return report_failures(failures, "Repository checks passed")
@@ -314,6 +316,32 @@ def check_branch_protection_contexts() -> list[str]:
                 f"branch protection requires the check {context!r}, but "
                 f"validate.yml has no matrix entry {matrix_entry.rstrip(')')!r}"
             )
+    return failures
+
+
+def check_hardware_document() -> list[str]:
+    """The hardware guide states facts that have to stay sourced.
+
+    It mixes what the Modbus specification says with what the installation
+    manual says, and this project does not have the manual. The markers are
+    what keeps a later edit from quietly turning a guess into a claim.
+    """
+
+    text = (ROOT / "docs" / "hardware.md").read_text(encoding="utf-8")
+    failures: list[str] = []
+    for phrase in (
+        "**(Spec)**",
+        "**(Manual)**",
+        "Have an electrician do the work",
+        "bank S1, DIP 4 and DIP 5",
+        "RS-485 allows exactly one master",
+    ):
+        if phrase not in text:
+            failures.append(f"docs/hardware.md must keep {phrase!r}")
+    if "XG1" not in text:
+        failures.append(
+            "docs/hardware.md must document the XG1 downgrade input"
+        )
     return failures
 
 

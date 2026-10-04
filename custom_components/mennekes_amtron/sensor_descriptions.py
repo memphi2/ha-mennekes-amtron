@@ -285,6 +285,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         register_key="phase_switching_pause",
         native_unit_of_measurement=UnitOfTime.SECONDS,
         device_class=SensorDeviceClass.DURATION,
+        suggested_display_precision=0,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     _enum("phase_rotation", PhaseRotation, entity_category=EntityCategory.DIAGNOSTIC),

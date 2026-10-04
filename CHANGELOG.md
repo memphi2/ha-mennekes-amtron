@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.2.1
+
+### Fixed
+
+- 38 entities declared an icon although their device class already provides
+  one, and for several of those the device class provides a *state-dependent*
+  one: a `plug` shows connected or disconnected, a `problem` shows alert or
+  ok, a `battery_charging` shows the charge state. Declaring an icon
+  overrode all of that with a static picture. Icons are now declared only
+  where no device class gives one — which means no device class at all, or
+  the `enum` device class, which has none. `scripts/check_register_map.py`
+  enforces the rule in both directions: an entity without a device-class icon
+  must declare one, an entity with one must not.
+- The phase-switching pause sensor had no display precision, so a whole
+  number of seconds could render with decimals.
+
+### Added
+
+- `docs/hardware.md`: cabling and RS-485 practice, the DIP switches (satellite
+  mode, installation current, the §14a downgrade percentage, solar mode), the
+  XG1 downgrade input, USB passthrough for every Home Assistant installation
+  type, and how to read the DIP-configured values back from the diagnostic
+  sensors. Every statement is marked as coming from the Modbus specification
+  or from the installation manual, and where a detail depends on a DIP
+  numbering this project cannot verify, it says so instead of guessing. A
+  repository check keeps those markers in place.
+
 ## 0.2.0
 
 ### Added

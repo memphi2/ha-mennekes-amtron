@@ -93,7 +93,8 @@ Everything is indexed in **[docs/README.md](docs/README.md)**. The short list:
 
 | | |
 |---|---|
-| [Quick start](docs/quickstart.md) | Wiring, DIP switches, installation, the first charge |
+| [Hardware installation](docs/hardware.md) | Cabling, DIP switches, the §14a input, USB passthrough |
+| [Quick start](docs/quickstart.md) | Installation in Home Assistant and the first charge |
 | [Entity reference](docs/entities.md) | Every entity, what it means, when it exists |
 | [Automations](docs/automations.md) | PV surplus, load management, phase switching, §14a |
 | [User guide](docs/user-guide.md) | Options, actions, how data is updated |

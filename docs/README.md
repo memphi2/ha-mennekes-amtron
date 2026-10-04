@@ -7,7 +7,8 @@ local Modbus RTU.
 
 | I want to… | Read |
 |---|---|
-| wire it up and get it running | [Quick start](quickstart.md) |
+| wire it up: cabling, DIP switches, USB passthrough | [Hardware installation](hardware.md) |
+| get it running in Home Assistant | [Quick start](quickstart.md) |
 | know what every entity means | [Entity reference](entities.md) |
 | build automations | [Automations](automations.md) |
 | understand the options and the daily use | [User guide](user-guide.md) |

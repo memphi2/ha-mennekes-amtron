@@ -382,3 +382,67 @@ def test_the_repository_gate_keeps_the_integration_marked_unofficial(
     failures = check_repo.check_hacs_metadata()
     assert any("disagree" in failure for failure in failures)
     assert any("unofficial" in failure for failure in failures)
+
+
+def test_the_register_gate_rejects_an_icon_that_hides_a_device_class(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A device class carries its own, often state-dependent, icon."""
+
+    import check_register_map
+
+    assert check_register_map.check_entity_icons() == []
+
+    icons = json.loads(
+        (check_register_map.COMPONENT / "icons.json").read_text(encoding="utf-8")
+    )
+    icons["entity"]["sensor"]["temperature"] = {"default": "mdi:thermometer"}
+    icons["entity"]["sensor"].pop("evse_state")
+    path = check_register_map.COMPONENT / "icons.json"
+    original = path.read_text(encoding="utf-8")
+    try:
+        path.write_text(json.dumps(icons), encoding="utf-8")
+        failures = check_register_map.check_entity_icons()
+    finally:
+        path.write_text(original, encoding="utf-8")
+
+    assert any("temperature declares an icon" in failure for failure in failures)
+    assert any("evse_state has no icon" in failure for failure in failures)
+
+
+def test_numeric_sensors_declare_a_display_precision() -> None:
+    """Otherwise a float32 register shows as 230.10000610351562."""
+
+    from custom_components.mennekes_amtron.sensor_descriptions import (
+        SENSOR_DESCRIPTIONS,
+    )
+
+    missing = [
+        description.key
+        for description in SENSOR_DESCRIPTIONS
+        if description.native_unit_of_measurement
+        and description.suggested_display_precision is None
+    ]
+    assert missing == []
+
+
+def test_the_hardware_document_keeps_its_sources_marked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """It mixes the Modbus specification with the installation manual."""
+
+    import check_repo
+
+    assert check_repo.check_hardware_document() == []
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "hardware.md").write_text("Just connect the wires.\n", encoding="utf-8")
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+
+    failures = check_repo.check_hardware_document()
+    assert any("(Spec)" in failure for failure in failures)
+    assert any("(Manual)" in failure for failure in failures)
+    assert any("electrician" in failure for failure in failures)
+    assert any("XG1" in failure for failure in failures)
+    assert any("exactly one master" in failure for failure in failures)
