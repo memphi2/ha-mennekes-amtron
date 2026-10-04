@@ -48,6 +48,8 @@ REQUIRED_PATHS = (
     ".github/workflows/release.yml",
     ".github/workflows/codeql.yml",
     ".github/dependabot.yml",
+    "docs/repository-settings.md",
+    "scripts/apply_repo_settings.py",
     ".github/ISSUE_TEMPLATE/config.yml",
     ".github/ISSUE_TEMPLATE/bug_report.yml",
     ".github/ISSUE_TEMPLATE/feature_request.yml",
@@ -111,6 +113,7 @@ def main() -> int:
     failures.extend(check_requirement_pins())
     failures.extend(check_github_automation())
     failures.extend(check_issue_templates())
+    failures.extend(check_branch_protection_contexts())
     failures.extend(check_secrets())
     failures.extend(check_python_compile())
     return report_failures(failures, "Repository checks passed")
@@ -267,6 +270,35 @@ def check_github_automation() -> list[str]:
     for ecosystem in ("github-actions", "pip"):
         if f'package-ecosystem: "{ecosystem}"' not in dependabot:
             failures.append(f"dependabot.yml does not cover {ecosystem}")
+    return failures
+
+
+def check_branch_protection_contexts() -> list[str]:
+    """The protected status checks have to be jobs that really exist.
+
+    Branch protection silently protects nothing when a required check is
+    named after a job that was renamed or removed.
+    """
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from apply_repo_settings import REQUIRED_CHECKS
+
+    workflow = (ROOT / ".github" / "workflows" / "validate.yml").read_text(
+        encoding="utf-8"
+    )
+    failures: list[str] = []
+    for context in REQUIRED_CHECKS:
+        job, _, matrix_entry = context.partition(" (")
+        if f"  {job}:" not in workflow:
+            failures.append(
+                f"branch protection requires the check {context!r}, but "
+                f"validate.yml has no job {job!r}"
+            )
+        elif matrix_entry and f"name: {matrix_entry.rstrip(')')}" not in workflow:
+            failures.append(
+                f"branch protection requires the check {context!r}, but "
+                f"validate.yml has no matrix entry {matrix_entry.rstrip(')')!r}"
+            )
     return failures
 
 

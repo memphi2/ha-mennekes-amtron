@@ -83,6 +83,7 @@ leave this integration in read-only mode: RS-485 has exactly one master. See
 - [Modbus register map](docs/modbus-registers.md)
 - [Architecture](docs/architecture.md)
 - [Quality scale](docs/quality-scale.md)
+- [Repository settings](docs/repository-settings.md)
 - [Legal notes](docs/legal.md)
 
 ## Legal Notes

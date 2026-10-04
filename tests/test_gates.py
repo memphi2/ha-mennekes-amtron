@@ -247,3 +247,53 @@ def test_the_repository_gate_rejects_a_non_form_template(
     failures = check_repo.check_issue_templates()
     assert len(failures) == len(check_repo.ISSUE_FORMS)
     assert all("is not an issue form" in failure for failure in failures)
+
+
+def test_the_protected_checks_match_the_ci_jobs() -> None:
+    import check_repo
+    from apply_repo_settings import REQUIRED_CHECKS, steps
+
+    assert check_repo.check_branch_protection_contexts() == []
+    assert set(REQUIRED_CHECKS) == {
+        "dependabot",
+        "hacs",
+        "hassfest",
+        "validate (min-ha)",
+        "validate (current-ha)",
+    }
+    names = [step.name for step in steps("owner/repo")]
+    assert names[0] == "Repository settings"
+    assert any(step.needs_public_or_pro for step in steps("owner/repo"))
+
+
+def test_a_renamed_ci_job_breaks_branch_protection(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import check_repo
+
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "validate.yml").write_text(
+        "jobs:\n"
+        "  hacs:\n    runs-on: ubuntu-24.04\n"
+        "  hassfest:\n    runs-on: ubuntu-24.04\n"
+        "  validate:\n    runs-on: ubuntu-24.04\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+
+    failures = check_repo.check_branch_protection_contexts()
+    assert any("no job 'dependabot'" in failure for failure in failures)
+    assert any("no matrix entry 'min-ha'" in failure for failure in failures)
+
+
+def test_the_settings_script_sends_nothing_without_apply(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import apply_repo_settings
+
+    exit_code = apply_repo_settings.main([])
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "would apply: Branch protection for main" in output
+    assert "Nothing was sent" in output

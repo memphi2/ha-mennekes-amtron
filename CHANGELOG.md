@@ -38,6 +38,12 @@ First release.
   first write.
 - An end-to-end test over a virtual serial link: a real Modbus RTU server at
   57600 baud, 8N2, device address 50, driven by the integration's own client.
+- Four issue forms that ask for the register layout version, the control mode,
+  the bus parameters and the diagnostics, so a report can be analysed without
+  a round trip.
+- `scripts/apply_repo_settings.py`, which declares the GitHub repository
+  settings, the security options and the branch protection of `main` instead
+  of leaving them undiffable in a web interface.
 - Validation gates: repository, legal/provenance, quality scale, register map,
   pymodbus requirement, ruff, pytest, a 95 percent coverage ratchet and `mypy
   --strict`.
