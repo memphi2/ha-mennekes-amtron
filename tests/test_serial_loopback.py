@@ -27,7 +27,18 @@ from custom_components.mennekes_amtron.const import HEARTBEAT_VALUE
 from custom_components.mennekes_amtron.identity import async_read_identity
 from tests.fakes import device_bank
 
-pytest.importorskip("pymodbus.simulator")
+# Only the server-side API differs between pymodbus releases; the client API
+# this test exercises is identical in every version the supported Home
+# Assistant range resolves, and the unit tests cover it on all of them.
+_simdata = pytest.importorskip(
+    "pymodbus.simulator.simdata",
+    reason="this pymodbus build ships no simulator to run a server from",
+)
+if not hasattr(_simdata, "DataType"):
+    pytest.skip(
+        "pymodbus older than 3.13 has a different server-side simulator API",
+        allow_module_level=True,
+    )
 
 DEVICE_ID = 50
 REGISTER_COUNT = 0x1010
@@ -61,23 +72,26 @@ def _signed(word: int) -> int:
     return word - 0x10000 if word > 0x7FFF else word
 
 
+def _server_context(words: list[int]) -> object:
+    """Return a Modbus server context holding the wallbox register image."""
+
+    from pymodbus.simulator import SimData, SimDevice
+
+    registers = SimData(0, values=words, datatype=_simdata.DataType.REGISTERS)
+    return [SimDevice(DEVICE_ID, simdata=[registers])]
+
+
 def test_the_integration_drives_a_real_modbus_rtu_server() -> None:
     from pymodbus import FramerType
     from pymodbus.server import ModbusSerialServer
-    from pymodbus.simulator import SimData, SimDevice
-    from pymodbus.simulator.simdata import DataType
 
     bank = device_bank()
     device_port, client_port = _virtual_serial_link()
 
     async def run() -> None:
-        registers = SimData(
-            0,
-            values=[_signed(bank.get(address, 0)) for address in range(REGISTER_COUNT)],
-            datatype=DataType.REGISTERS,
-        )
+        words = [_signed(bank.get(address, 0)) for address in range(REGISTER_COUNT)]
         server = ModbusSerialServer(
-            [SimDevice(DEVICE_ID, simdata=[registers])],
+            _server_context(words),
             framer=FramerType.RTU,
             port=device_port,
             baudrate=57600,
@@ -86,7 +100,7 @@ def test_the_integration_drives_a_real_modbus_rtu_server() -> None:
             stopbits=2,
         )
         serving = asyncio.get_running_loop().create_task(server.serve_forever())
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1.0)
 
         client = MennekesModbusClient(
             SerialConfig(

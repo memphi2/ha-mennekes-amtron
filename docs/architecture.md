@@ -112,6 +112,13 @@ codes are proven there rather than assumed. It is as close to the device as
 this repository gets without hardware; everything beyond it is the on-device
 verification in `docs/quickstart.md`.
 
+That test skips itself on pymodbus builds older than 3.13, because the
+*server-side* simulator API changed there. The client API this integration
+uses -- keyword-only `count=` and `device_id=`, `FramerType.RTU`,
+`convert_from_registers` -- is identical across the whole supported range and
+is covered by the unit tests on every matrix entry, so the skip costs
+coverage of the test harness, not of the integration.
+
 ## Validation
 
 `scripts/check_validate.py` runs the same gates as CI, in the same order:
