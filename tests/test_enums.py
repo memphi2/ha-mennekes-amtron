@@ -24,7 +24,7 @@ def test_evse_states_match_the_specification() -> None:
 def test_cp_states_keep_the_documented_gaps() -> None:
     assert CpState.A1 == 10
     assert CpState.C2 == 28
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="20 is not a valid CpState"):
         CpState(20)
 
 

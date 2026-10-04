@@ -13,6 +13,7 @@ read path falls back to single-register reads for that block.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Final
 
 from .registers import (
@@ -27,6 +28,25 @@ from .registers import (
 )
 
 
+class BlockCadence(StrEnum):
+    """How often a block is worth reading.
+
+    Half of the register map is configuration: the serial number, the article
+    number, the DIP-configured limits, the hardware phase option. Those change
+    when somebody reconfigures the wallbox, not while it charges. Reading them
+    at the charging cadence spends a large part of the bus on values that are
+    already known.
+    """
+
+    FAST = "fast"
+    SLOW = "slow"
+
+
+# How long a slow block may go unread. Short enough that a reconfiguration
+# shows up on its own, long enough to stay out of the way.
+SLOW_BLOCK_INTERVAL_SECONDS: Final = 60.0
+
+
 @dataclass(frozen=True, slots=True)
 class RegisterBlock:
     """One contiguous range of readable registers."""
@@ -36,6 +56,7 @@ class RegisterBlock:
     count: int
     min_layout: int
     keys: tuple[str, ...]
+    cadence: BlockCadence = BlockCadence.FAST
 
     @property
     def specs(self) -> tuple[RegisterSpec, ...]:
@@ -51,6 +72,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=9,
         min_layout=LAYOUT_V01_00,
         keys=("modbus_layout_version", "firmware_version"),
+        cadence=BlockCadence.SLOW,
     ),
     RegisterBlock(
         name="serial_number",
@@ -58,6 +80,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=8,
         min_layout=LAYOUT_V01_02,
         keys=("serial_number",),
+        cadence=BlockCadence.SLOW,
     ),
     RegisterBlock(
         name="article_number",
@@ -65,6 +88,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=8,
         min_layout=LAYOUT_V01_03,
         keys=("article_number",),
+        cadence=BlockCadence.SLOW,
     ),
     RegisterBlock(
         name="status",
@@ -110,6 +134,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=1,
         min_layout=LAYOUT_V01_00,
         keys=("phase_switching_mode",),
+        cadence=BlockCadence.SLOW,
     ),
     RegisterBlock(
         name="phase_options_hw",
@@ -117,6 +142,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=1,
         min_layout=LAYOUT_V01_01,
         keys=("phase_options_hw",),
+        cadence=BlockCadence.SLOW,
     ),
     RegisterBlock(
         name="configuration",
@@ -133,6 +159,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
             "solar_min_current",
             "phase_switching_pause",
         ),
+        cadence=BlockCadence.SLOW,
     ),
     RegisterBlock(
         name="measurements",
@@ -158,6 +185,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=2,
         min_layout=LAYOUT_V01_02,
         keys=("temperature",),
+        cadence=BlockCadence.SLOW,
     ),
     RegisterBlock(
         name="session",
@@ -206,6 +234,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=4,
         min_layout=LAYOUT_V01_02,
         keys=("energy_total", "sessions_total"),
+        cadence=BlockCadence.SLOW,
     ),
 )
 
@@ -220,6 +249,11 @@ def block_consistency_failures() -> list[str]:
     failures: list[str] = []
     covered: dict[str, str] = {}
     for block in REGISTER_BLOCKS:
+        if block.cadence not in tuple(BlockCadence):
+            failures.append(
+                f"block {block.name} declares the unknown cadence "
+                f"{block.cadence!r}"
+            )
         if not block.keys:
             failures.append(f"block {block.name} covers no register")
             continue

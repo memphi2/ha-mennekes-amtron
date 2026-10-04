@@ -113,7 +113,9 @@ class MennekesModbusClient:
             self._client = client
             try:
                 connected = await client.connect()
-            except Exception as err:  # noqa: BLE001 - pyserial raises OSError subclasses
+            # pyserial raises many unrelated OSError subclasses; all of them
+            # mean the same thing here, and all of them are re-raised as one.
+            except Exception as err:
                 raise AmtronConnectionError(
                     f"cannot open {self._config.port}: {err}"
                 ) from err

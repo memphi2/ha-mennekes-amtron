@@ -319,15 +319,13 @@ def test_the_legal_gate_rejects_a_copy_of_the_vendor_specification(
 
     import check_legal_audit
 
-    extraction = "\n".join(
-        (
-            "AMTRON 4You 300",
-            "Modbus RTU Specification",
-            "Doc. Revision:  2.5",
-            "Modbus-Version:  v 01.03",
-            "Release information",
-            "The following functional codes can be used",
-        )
+    extraction = (
+        "AMTRON 4You 300\n"
+        "Modbus RTU Specification\n"
+        "Doc. Revision:  2.5\n"
+        "Modbus-Version:  v 01.03\n"
+        "Release information\n"
+        "The following functional codes can be used\n"
     )
     (tmp_path / "notes.txt").write_text(extraction, encoding="utf-8")
     (tmp_path / "citation.md").write_text(

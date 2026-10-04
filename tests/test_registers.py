@@ -47,7 +47,8 @@ def test_access_flags_match_the_specification() -> None:
 
     current = register("charging_current_ems")
     assert current.access is RegisterAccess.READ_WRITE
-    assert current.readable and current.writable
+    assert current.readable
+    assert current.writable
     assert current.datatype is RegisterDataType.FLOAT32
     assert current.count == 2
 

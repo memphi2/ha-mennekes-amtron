@@ -63,6 +63,19 @@ resume and phase switches are rejected instead, because the manufacturer asks
 for minutes of hysteresis there and silently queueing those would hide a bad
 automation.
 
+### Two polling cadences
+
+`register_blocks.py` marks each block `FAST` or `SLOW`. Ten blocks carry
+values that move while a car charges; eight carry configuration that changes
+when somebody reconfigures the wallbox. Reading all eighteen every few seconds
+spends most of the bus re-reading a serial number.
+
+The coordinator reads the slow blocks once a minute and carries their values
+forward in the snapshot in between. That halves the bus traffic without
+hiding a reconfiguration for longer than a minute, and it keeps the registers
+that matter — state, signalled current, measurements — on the interval the
+user chose.
+
 ### Capability gating instead of optimism
 
 `0x0000` reports the register layout version, and registers appeared across

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 from pymodbus.exceptions import ConnectionException, ModbusException
 from pymodbus.pdu import ExceptionResponse
@@ -24,7 +24,7 @@ class FakeResponse:
 
     registers: list[int] = field(default_factory=list)
 
-    def isError(self) -> bool:  # noqa: N802 - pymodbus API name
+    def isError(self) -> bool:  # noqa: N802
         """Return false: this response carries data."""
 
         return False
@@ -116,9 +116,9 @@ def _raise_or_return(failure: Any, address: int, function: int) -> Any:
 class _ErrorResponse:
     """A response whose ``isError`` is true without an exception code."""
 
-    registers: list[int] = []
+    registers: ClassVar[list[int]] = []
 
-    def isError(self) -> bool:  # noqa: N802 - pymodbus API name
+    def isError(self) -> bool:  # noqa: N802
         """Return true: this response is an error."""
 
         return True

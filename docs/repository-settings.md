@@ -38,7 +38,11 @@ reports them as unavailable instead of failing:
 
 The CodeQL workflow is in the same position: its analysis runs, but uploading
 the result needs code scanning, so the job is conditional on the repository
-being public.
+being public. Until then the Python security rules run in every CI job
+instead: `ruff` selects the bandit ruleset `S`, which fails the build on the
+same class of findings CodeQL would report for Python. CodeQL adds the
+GitHub Actions analysis and cross-file data flow on top, which is why the job
+stays in place rather than being deleted.
 
 Run the script again after publishing the repository; everything else is
 already applied and will stay as it is.

@@ -136,6 +136,14 @@ def _set_issue(
     is_fixable: bool = False,
     placeholders: dict[str, str] | None = None,
 ) -> None:
+    # The coordinator fires every few seconds. Writing an unchanged issue to
+    # the issue registry each time is thousands of pointless writes a day.
+    state = dict(placeholders or {}) if active else None
+    remembered = entry.runtime_data.repair_state
+    if issue in remembered and remembered[issue] == state:
+        return
+    remembered[issue] = state
+
     issue_id = _issue_id(entry, issue)
     if not active:
         ir.async_delete_issue(hass, DOMAIN, issue_id)

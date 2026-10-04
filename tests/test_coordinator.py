@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
@@ -10,6 +11,11 @@ from custom_components.mennekes_amtron import registers as R
 from custom_components.mennekes_amtron.client import MennekesModbusClient, SerialConfig
 from custom_components.mennekes_amtron.coordinator import MennekesAmtronCoordinator
 from custom_components.mennekes_amtron.data import ConnectionState, DeviceIdentity
+from custom_components.mennekes_amtron.register_blocks import (
+    REGISTER_BLOCKS,
+    SLOW_BLOCK_INTERVAL_SECONDS,
+    BlockCadence,
+)
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 
@@ -19,6 +25,7 @@ async def _coordinator(
     *,
     layout: int = R.LAYOUT_V01_03,
     connection_state: ConnectionState | None = None,
+    monotonic: Any = None,
 ) -> MennekesAmtronCoordinator:
     client = MennekesModbusClient(
         SerialConfig(port="/dev/fake"), client_factory=lambda _config: transport
@@ -31,6 +38,7 @@ async def _coordinator(
         identity=DeviceIdentity(layout_version=layout),
         connection_state=connection_state or ConnectionState(),
         scan_interval=5,
+        **({"monotonic": monotonic} if monotonic else {}),
     )
 
 
@@ -74,7 +82,7 @@ def test_a_single_failing_block_does_not_lose_the_snapshot() -> None:
 def test_a_lost_connection_fails_the_update() -> None:
     async def run() -> None:
         transport = FakeModbusClient(device_bank())
-        transport.read_exceptions[0x0000] = raise_connection_error()
+        transport.read_exceptions[0x0100] = raise_connection_error()
         coordinator = await _coordinator(transport)
         with pytest.raises(UpdateFailed):
             await coordinator._async_update_data()
@@ -122,7 +130,8 @@ def test_availability_is_logged_once_per_change(
         coordinator = await _coordinator(transport, connection_state=state)
         await coordinator._async_update_data()
 
-        transport.read_exceptions[0x0000] = raise_connection_error()
+        # a block read on every poll, not one of the slow configuration ones
+        transport.read_exceptions[0x0100] = raise_connection_error()
         with caplog.at_level(logging.INFO):
             for _ in range(3):
                 with pytest.raises(UpdateFailed):
@@ -141,5 +150,58 @@ def test_current_data_is_empty_before_the_first_poll() -> None:
     async def run() -> None:
         coordinator = await _coordinator(FakeModbusClient(device_bank()))
         assert coordinator.current_data().values == {}
+
+    asyncio.run(run())
+
+
+def test_configuration_blocks_are_not_read_on_every_poll() -> None:
+    """They change when somebody reconfigures the wallbox, not while charging."""
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank())
+        clock = [1000.0]
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+
+        await coordinator.async_refresh()
+        first = len(transport.reads)
+        assert first == len(REGISTER_BLOCKS)
+
+        transport.reads.clear()
+        await coordinator.async_refresh()
+        fast = {
+            block.address
+            for block in REGISTER_BLOCKS
+            if block.cadence is BlockCadence.FAST
+        }
+        assert {address for address, _ in transport.reads} == fast
+        assert len(transport.reads) < first
+
+        # the configuration values survive a poll that did not read them
+        assert coordinator.data.get("serial_number") == "ABC123456789"
+        assert coordinator.data.get("ems_fallback_current") == 6
+
+        clock[0] += SLOW_BLOCK_INTERVAL_SECONDS
+        transport.reads.clear()
+        await coordinator.async_refresh()
+        assert len(transport.reads) == len(REGISTER_BLOCKS)
+
+    asyncio.run(run())
+
+
+def test_a_configuration_change_is_picked_up_at_the_slow_cadence() -> None:
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank())
+        clock = [1000.0]
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+        await coordinator.async_refresh()
+        assert coordinator.data.get("ems_fallback_current") == 6
+
+        transport.bank[R.EMS_FALLBACK_CURRENT.address] = 16
+        await coordinator.async_refresh()
+        assert coordinator.data.get("ems_fallback_current") == 6
+
+        clock[0] += SLOW_BLOCK_INTERVAL_SECONDS
+        await coordinator.async_refresh()
+        assert coordinator.data.get("ems_fallback_current") == 16
 
     asyncio.run(run())

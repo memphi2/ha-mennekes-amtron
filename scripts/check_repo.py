@@ -90,6 +90,7 @@ def _load_version_config() -> dict[str, str]:
     required_keys = {
         "min_homeassistant",
         "current_homeassistant",
+        "next_homeassistant",
         "python",
         "pymodbus_minimum",
         "amtron_modbus_layout",
@@ -235,8 +236,10 @@ def check_requirement_pins() -> list[str]:
         return ["manifest.json must declare a pymodbus requirement"]
     if "==" in requirement:
         return [
-            "manifest.json must declare a pymodbus minimum, not an exact pin: "
-            "Home Assistant Core pins pymodbus for the whole instance"
+            (
+                "manifest.json must declare a pymodbus minimum, not an exact "
+                "pin: Home Assistant Core pins pymodbus for the whole instance"
+            )
         ]
 
     minimum = VERSION_CONFIG["pymodbus_minimum"]
@@ -279,14 +282,21 @@ def check_github_automation() -> list[str]:
     validate = (ROOT / ".github" / "workflows" / "validate.yml").read_text(
         encoding="utf-8"
     )
-    for key in ("min_homeassistant", "current_homeassistant", "python"):
+    for key in (
+        "min_homeassistant",
+        "current_homeassistant",
+        "next_homeassistant",
+        "python",
+    ):
         value = VERSION_CONFIG[key]
-        if f'"{value}"' not in validate:
+        if value not in validate:
             failures.append(f"validate.yml does not pin {key} {value}")
     dependabot = (ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
-    for ecosystem in ("github-actions", "pip"):
-        if f'package-ecosystem: "{ecosystem}"' not in dependabot:
-            failures.append(f"dependabot.yml does not cover {ecosystem}")
+    failures.extend(
+        f"dependabot.yml does not cover {ecosystem}"
+        for ecosystem in ("github-actions", "pip")
+        if f'package-ecosystem: "{ecosystem}"' not in dependabot
+    )
     return failures
 
 
@@ -328,16 +338,17 @@ def check_hardware_document() -> list[str]:
     """
 
     text = (ROOT / "docs" / "hardware.md").read_text(encoding="utf-8")
-    failures: list[str] = []
-    for phrase in (
-        "**(Spec)**",
-        "**(Manual)**",
-        "Have an electrician do the work",
-        "bank S1, DIP 4 and DIP 5",
-        "RS-485 allows exactly one master",
-    ):
-        if phrase not in text:
-            failures.append(f"docs/hardware.md must keep {phrase!r}")
+    failures: list[str] = [
+        f"docs/hardware.md must keep {phrase!r}"
+        for phrase in (
+            "**(Spec)**",
+            "**(Manual)**",
+            "Have an electrician do the work",
+            "bank S1, DIP 4 and DIP 5",
+            "RS-485 allows exactly one master",
+        )
+        if phrase not in text
+    ]
     if "XG1" not in text:
         failures.append(
             "docs/hardware.md must document the XG1 downgrade input"
@@ -376,11 +387,11 @@ def check_issue_templates() -> list[str]:
         if "name:" not in text or "body:" not in text:
             failures.append(f".github/ISSUE_TEMPLATE/{name} is not an issue form")
             continue
-        for field in required_fields[name]:
-            if f"id: {field}" not in text:
-                failures.append(
-                    f".github/ISSUE_TEMPLATE/{name} must ask for {field}"
-                )
+        failures.extend(
+            f".github/ISSUE_TEMPLATE/{name} must ask for {field}"
+            for field in required_fields[name]
+            if f"id: {field}" not in text
+        )
     return failures
 
 

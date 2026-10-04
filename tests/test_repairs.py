@@ -88,9 +88,57 @@ def test_setup_subscribes_to_the_coordinator(
         )
         repairs.async_setup_repairs(hass, entry)
         assert entry.unloads
+        assert "entry-1_ems_heartbeat_lost" in registry.created
+
+    asyncio.run(run())
+
+
+def test_an_unchanged_issue_is_not_written_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The coordinator fires every few seconds; the registry must not."""
+
+    async def run() -> None:
+        registry = _patch(monkeypatch)
+        hass, entry, _transport = await build_runtime(
+            bank=device_bank(error_code=200)
+        )
+        repairs.async_setup_repairs(hass, entry)
         registry.created.clear()
+        registry.deleted.clear()
+
+        for _ in range(5):
+            entry.runtime_data.coordinator.async_update_listeners()
+        assert registry.created == {}
+        assert registry.deleted == []
+
+        # but a real change still reaches the registry
+        entry.runtime_data.coordinator.data.values["error_code"] = 0
+        entry.runtime_data.coordinator.async_update_listeners()
+        assert "entry-1_ems_heartbeat_lost" in registry.deleted
+
+        entry.runtime_data.coordinator.data.values["error_code"] = 200
         entry.runtime_data.coordinator.async_update_listeners()
         assert "entry-1_ems_heartbeat_lost" in registry.created
+
+    asyncio.run(run())
+
+
+def test_changed_placeholders_are_written_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        registry = _patch(monkeypatch)
+        hass, entry, _transport = await build_runtime(
+            bank=device_bank(layout=R.LAYOUT_V01_02), layout=R.LAYOUT_V01_02
+        )
+        repairs.async_check_repairs(hass, entry)
+        registry.created.clear()
+
+        entry.runtime_data.identity.layout_version = R.LAYOUT_V01_01
+        repairs.async_check_repairs(hass, entry)
+        issue = registry.created["entry-1_unsupported_modbus_layout"]
+        assert issue["translation_placeholders"]["layout"] == "v01.01"
 
     asyncio.run(run())
 

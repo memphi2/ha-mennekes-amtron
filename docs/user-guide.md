@@ -69,10 +69,19 @@ Changing an option reloads the entry.
 ## How data is updated
 
 The wallbox has no push channel, so the integration polls. Every interval it
-reads the register blocks the device supports — eighteen contiguous ranges
-rather than fifty single registers. A block the device rejects is retried
-register by register, and a block that keeps failing is reported in
-diagnostics without taking the rest of the snapshot with it.
+reads the register blocks the device supports — contiguous ranges rather than
+fifty single registers. A block the device rejects is retried register by
+register, and a block that keeps failing is reported in diagnostics without
+taking the rest of the snapshot with it.
+
+Not every block is read every time. Half of the register map is
+configuration — the serial number, the article number, the DIP-configured
+limits, the hardware phase option, the lifetime counters — and those change
+when somebody reconfigures the wallbox, not while it charges. They are read
+once a minute and carried forward in between, which leaves the bus to the ten
+blocks that actually move: state, control pilot, signalled current, the
+current limits, the measurements, the session, the functions and the error
+registers. A reconfiguration still shows up on its own, within a minute.
 
 The heartbeat is **not** part of the poll. It runs in its own background task
 on a fixed five-second interval, because a slow or failing poll must never be

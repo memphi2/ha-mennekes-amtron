@@ -48,6 +48,29 @@ jobs:
       - name: Validation gates
         run: python scripts/check_validate.py
 
+  # Early warning for the next Home Assistant release. It is allowed to fail:
+  # a pre-release breaking is information, not a reason to block a merge. When
+  # it goes stable, it moves into the matrix above and this job follows the
+  # one after it.
+  next-ha:
+    name: next-ha (early warning)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install the next Home Assistant
+        run: |
+          python -m pip install --pre "homeassistant==2026.10.0b0"
+          python -m pip install -r requirements-dev.txt
+          python -m pip check
+      - name: Validation gates
+        run: python scripts/check_validate.py
+
   dependabot:
     runs-on: ubuntu-24.04
     steps:

@@ -8,6 +8,9 @@
 
 - Minimum Home Assistant: `2026.5.0`
 - Validated Home Assistant: `2026.5.x` and `2026.9.x`
+- Early warning: every push is also validated against the next Home Assistant
+  pre-release in a job that is allowed to fail, so a breaking change in Core
+  is noticed before it ships rather than after
 - Python: `3.14`
 - Modbus register layout: `v01.03` (validated), `v01.00`–`v01.02` supported
   with capability gating and untested
@@ -36,6 +39,19 @@ Other AMTRON models covered by the same Modbus specification (4You 300,
 Compact 2.0s, Start 2.0s) are expected to work through capability gating but
 are **untested**. Issues from those models are welcome and will be labelled as
 unvalidated hardware.
+
+## Why the minimum is where it is
+
+The minimum is the oldest Home Assistant the CI matrix really runs, not the
+oldest one the code might import successfully. Older versions are not claimed
+because they are not tested.
+
+The features that set the floor are the reconfigure-flow helpers
+(`_get_reconfigure_entry`, `_abort_if_unique_id_mismatch`,
+`async_update_reload_and_abort` with `data_updates`), the progress step with a
+`progress_task` that the bus search uses, and typed `runtime_data` on the
+config entry. Lowering the minimum means adding that version to the matrix
+first.
 
 ## Maintenance Scope
 

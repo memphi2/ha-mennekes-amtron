@@ -65,6 +65,25 @@ script, and pymodbus' async serial client is used throughout.
 - `log-when-unavailable`: the serial connection is held open, so a loss and a
   recovery are each logged once.
 
+## Static analysis
+
+`ruff` runs with 38 rulesets selected, every one of them a ruleset the
+integration passes completely — including `S`, the bandit security rules,
+`BLE` for blind excepts, `ASYNC` for blocking calls in async code, `SLF` for
+private-member access and `PTH` for `os.path` use. They are selected rather
+than left off so that a regression fails the build instead of being a matter
+of taste. `tests/` and `scripts/` carry narrow, documented exceptions:
+tests assert and reach into private helpers on purpose, and the gate scripts
+run fixed developer commands as subprocesses.
+
+That is also the answer to the CodeQL job being skipped. Code scanning uploads
+need a public repository, so CodeQL cannot report while this one is private.
+The Python security rules run in every CI job instead, on every matrix entry,
+and CodeQL switches itself on when the repository is published. See
+[repository-settings.md](repository-settings.md).
+
+`mypy --strict` covers all 52 modules, the integration and the tooling alike.
+
 ## Coverage
 
 The ratchet is 99 percent, above the Platinum target of 95. The suite leaves

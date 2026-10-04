@@ -183,7 +183,7 @@ async def _probe_once(
             _write(f"max EVSE current {maximum:.1f} A")
         _write("\nThe bus is fine. Add the integration with these values.")
         return 0
-    except Exception as err:  # noqa: BLE001 - a probe reports, it does not raise
+    except Exception as err:  # noqa: BLE001 - a probe reports every failure, it does not raise
         if verbose:
             _fail(str(err) or err.__class__.__name__)
         return 1

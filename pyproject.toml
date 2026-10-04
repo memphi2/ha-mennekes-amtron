@@ -8,8 +8,60 @@ target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["ASYNC", "B", "C4", "E", "F", "I", "SIM", "T20", "UP"]
+# Every ruleset below is one the integration passes completely, security
+# linting included. They are selected rather than left off so that a
+# regression is a build failure instead of a style opinion.
+select = [
+  "A",      # shadowed builtins
+  "ASYNC",  # blocking calls in async code
+  "B",      # bugbear
+  "BLE",    # blind except
+  "C4",     # comprehensions
+  "DTZ",    # naive datetimes
+  "E",      # pycodestyle errors
+  "F",      # pyflakes
+  "FA",     # future annotations
+  "FLY",    # static string joins
+  "FURB",   # modernisation
+  "G",      # logging format
+  "I",      # import order
+  "ICN",    # import conventions
+  "INP",    # implicit namespace packages
+  "INT",    # gettext
+  "ISC",    # implicit string concatenation
+  "LOG",    # logging misuse
+  "N",      # naming
+  "PERF",   # obvious performance mistakes
+  "PGH",    # blanket noqa and type ignores
+  "PIE",    # misc lints
+  "PT",     # pytest style
+  "PTH",    # pathlib over os.path
+  "PYI",    # stub conventions
+  "Q",      # quote consistency
+  "RET",    # return simplification
+  "RSE",    # raise statements
+  "RUF",    # ruff-specific
+  "S",      # bandit: security
+  "SIM",    # simplification
+  "SLF",    # private member access
+  "SLOT",   # __slots__ correctness
+  "T10",    # leftover debugger
+  "T20",    # leftover print
+  "TID",    # banned relative imports
+  "UP",     # pyupgrade
+  "W",      # pycodestyle warnings
+  "YTT",    # sys.version misuse
+]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, reach into private helpers on purpose, run the gate scripts as
+# subprocesses, import the register table as `R` for density, and are not a
+# package.
+"tests/*" = ["S101", "SLF001", "INP001", "S603", "N812"]
+# The gates and release tooling run fixed developer commands -- git, gh,
+# python, pyspdxtools -- with no input from anywhere but this repository.
+"scripts/*" = ["S603", "S607", "INP001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components.mennekes_amtron"]

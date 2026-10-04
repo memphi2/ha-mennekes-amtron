@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- Configuration registers are no longer read on every poll. Eight of the
+  eighteen read blocks carry values that change when somebody reconfigures the
+  wallbox, not while it charges — the serial number, the article number, the
+  DIP-configured limits, the hardware phase option, the lifetime counters. The
+  coordinator now reads those once a minute and carries them forward, which
+  leaves the bus to the ten blocks that actually move. A reconfiguration still
+  shows up within a minute.
+- `ruff` now selects 38 rulesets instead of nine, every one of them a ruleset
+  the integration already passes completely, including the bandit security
+  rules `S`, `BLE`, `ASYNC`, `SLF` and `PTH`. A regression in any of them now
+  fails the build.
+
+### Fixed
+
+- Repair issues were written to the issue registry on every coordinator
+  update, roughly seventeen thousand times a day, even when nothing had
+  changed. They are now written only when the issue or its placeholders
+  actually change.
+
+### Added
+
+- CI validates every push against the next Home Assistant pre-release in a job
+  that is allowed to fail, so a breaking change in Core is noticed before it
+  ships.
+- `SUPPORT.md` records why the minimum Home Assistant version is where it is,
+  and which features set that floor.
+
 ## 0.2.1
 
 ### Fixed

@@ -192,10 +192,11 @@ def _check_vendor_documents(paths: list[Path]) -> list[str]:
 
 
 def _check_required_documents() -> list[str]:
-    failures: list[str] = []
-    for rel in REQUIRED_DOCUMENTS:
-        if not (ROOT / rel).is_file():
-            failures.append(f"missing legal/provenance document: {rel}")
+    failures: list[str] = [
+        f"missing legal/provenance document: {rel}"
+        for rel in REQUIRED_DOCUMENTS
+        if not (ROOT / rel).is_file()
+    ]
     audit_files = sorted(path.name for path in (ROOT / "docs" / "audits").glob("*.md"))
     if audit_files != ["current-legal-provenance.md"]:
         failures.append(
@@ -205,15 +206,19 @@ def _check_required_documents() -> list[str]:
     legal_path = ROOT / "docs" / "legal.md"
     if legal_path.is_file():
         legal = _normalized_text(legal_path)
-        for phrase in LEGAL_PHRASES:
-            if phrase not in legal:
-                failures.append(f"docs/legal.md must mention {phrase!r}")
+        failures.extend(
+            f"docs/legal.md must mention {phrase!r}"
+            for phrase in LEGAL_PHRASES
+            if phrase not in legal
+        )
     notice_path = ROOT / "NOTICE"
     if notice_path.is_file():
         notice = _normalized_text(notice_path)
-        for phrase in NOTICE_PHRASES:
-            if phrase not in notice:
-                failures.append(f"NOTICE must mention {phrase!r}")
+        failures.extend(
+            f"NOTICE must mention {phrase!r}"
+            for phrase in NOTICE_PHRASES
+            if phrase not in notice
+        )
     readme_path = ROOT / "README.md"
     if readme_path.is_file():
         first_line = readme_path.read_text(encoding="utf-8").splitlines()[0]
@@ -242,8 +247,10 @@ def _check_runtime_requirements() -> list[str]:
     ]
     if unexpected:
         return [
-            "manifest.json runtime requirements must stay limited to pymodbus, "
-            f"got {unexpected!r}"
+            (
+                "manifest.json runtime requirements must stay limited to "
+                f"pymodbus, got {unexpected!r}"
+            )
         ]
     return []
 

@@ -83,7 +83,7 @@ def test_the_repair_issues_are_translated() -> None:
 
 
 def test_the_action_fields_match_the_service_description() -> None:
-    import yaml  # noqa: PLC0415 - only needed for this meta test
+    import yaml
 
     services = yaml.safe_load(
         (COMPONENT / "services.yaml").read_text(encoding="utf-8")

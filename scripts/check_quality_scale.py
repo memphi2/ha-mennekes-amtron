@@ -179,27 +179,27 @@ def validate_blockers(statuses: dict[str, str], docs: str) -> list[str]:
             "Platinum blocker set: " + ", ".join(sorted(blockers) or ["none"])
         )
 
-    for blocker in sorted(EXPECTED_PLATINUM_BLOCKERS):
-        if f"`{blocker}`" not in docs:
-            failures.append(
-                f"docs/quality-scale.md does not document blocker `{blocker}`"
-            )
+    failures.extend(
+        f"docs/quality-scale.md does not document blocker `{blocker}`"
+        for blocker in sorted(EXPECTED_PLATINUM_BLOCKERS)
+        if f"`{blocker}`" not in docs
+    )
     return failures
 
 
 def validate_documentation(docs: str) -> list[str]:
     """Reject a quality-scale document that lost its required statements."""
 
-    failures: list[str] = []
     required_phrases = (
         "Target: Platinum",
         "Current status: Platinum",
         "Open rules: none",
     )
-    for phrase in required_phrases:
-        if phrase not in docs:
-            failures.append(f"docs/quality-scale.md missing phrase: {phrase}")
-    return failures
+    return [
+        f"docs/quality-scale.md missing phrase: {phrase}"
+        for phrase in required_phrases
+        if phrase not in docs
+    ]
 
 
 if __name__ == "__main__":
