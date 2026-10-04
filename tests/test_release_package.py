@@ -59,7 +59,7 @@ def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
             "--zip",
             str(zip_path),
             "--tag",
-            "v0.1",
+            "v0.1.0",
             "--repository",
             "example/ha-mennekes-amtron",
             "--sha256sums",
@@ -77,8 +77,10 @@ def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
 
     payload = json.loads(metadata.read_text(encoding="utf-8"))
-    assert payload["release_tag"] == "v0.1"
-    assert payload["integration_version"] == "0.1"
+    from manifest_version import read_integration_version
+
+    assert payload["release_tag"] == "v0.1.0"
+    assert payload["integration_version"] == read_integration_version()
     assert payload["zip_entries"] > 10
 
     document = json.loads(sbom.read_text(encoding="utf-8"))

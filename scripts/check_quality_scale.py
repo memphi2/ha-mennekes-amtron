@@ -72,10 +72,9 @@ OFFICIAL_RULES = (
     "strict-typing",
 )
 
-EXPECTED_PLATINUM_BLOCKERS = {
-    "brands",
-    "test-coverage",
-}
+# Every official rule is answered. A rule that goes back to "todo" has to be
+# documented as a blocker here and in docs/quality-scale.md, deliberately.
+EXPECTED_PLATINUM_BLOCKERS: set[str] = set()
 
 VALID_STATUSES = {"done", "todo", "exempt"}
 SCALAR_RULE_RE = re.compile(r"^  (?P<rule>[a-z0-9-]+): (?P<status>[a-z]+)$")
@@ -177,7 +176,7 @@ def validate_blockers(statuses: dict[str, str], docs: str) -> list[str]:
     if blockers != EXPECTED_PLATINUM_BLOCKERS:
         failures.append(
             "quality_scale.yaml TODO blockers drifted from the audited "
-            "Platinum blocker set: " + ", ".join(sorted(blockers))
+            "Platinum blocker set: " + ", ".join(sorted(blockers) or ["none"])
         )
 
     for blocker in sorted(EXPECTED_PLATINUM_BLOCKERS):
@@ -194,8 +193,8 @@ def validate_documentation(docs: str) -> list[str]:
     failures: list[str] = []
     required_phrases = (
         "Target: Platinum",
-        "Current status: Not Platinum yet",
-        "Platinum Blockers",
+        "Current status: Platinum",
+        "Open rules: none",
     )
     for phrase in required_phrases:
         if phrase not in docs:

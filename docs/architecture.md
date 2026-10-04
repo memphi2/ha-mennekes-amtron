@@ -123,4 +123,4 @@ coverage of the test harness, not of the integration.
 
 `scripts/check_validate.py` runs the same gates as CI, in the same order:
 repository, legal/provenance, quality scale, register map, pymodbus requirement, ruff,
-pytest, the 95 percent coverage ratchet and `mypy --strict`.
+pytest, the 99 percent coverage ratchet and `mypy --strict`.

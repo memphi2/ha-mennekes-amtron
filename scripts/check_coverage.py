@@ -9,7 +9,10 @@ from __future__ import annotations
 import subprocess
 import sys
 
-MINIMUM_COVERAGE = 95
+# Above the Platinum target of 95. The suite leaves no statement uncovered, so
+# the ratchet sits just under the measured value and catches a real regression
+# instead of tolerating one.
+MINIMUM_COVERAGE = 99
 
 
 def main() -> int:

@@ -9,8 +9,13 @@ rules:
       register blocks every five seconds by default, and the heartbeat runs in
       its own task so a slow poll cannot starve it.
   brands:
-    status: todo
-    comment: Prepare Home Assistant Brands assets before a core submission.
+    status: exempt
+    comment: >-
+      The Home Assistant Brands repository serves core integrations. This is a
+      custom integration installed through HACS, which serves the
+      project-owned brand assets from custom_components/mennekes_amtron/brand/
+      instead. docs/legal.md pins their hash and the legal gate fails if it
+      changes. The rule becomes relevant again with a core submission.
   common-modules: done
   config-flow-test-coverage:
     status: done
@@ -77,10 +82,12 @@ rules:
     status: exempt
     comment: The serial bus has no credentials.
   test-coverage:
-    status: todo
+    status: done
     comment: >-
-      The local coverage ratchet is 95 percent; keep this open until the full
-      suite consistently exceeds the Platinum target.
+      The ratchet is 99 percent, above the Platinum target of 95. The suite
+      leaves no statement of the integration uncovered, and the config flow,
+      the options flow and every platform are covered by behaviour tests
+      rather than by import-time execution.
 
   devices:
     status: done

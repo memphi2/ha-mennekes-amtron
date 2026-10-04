@@ -75,22 +75,28 @@ def test_the_quality_scale_gate_rejects_an_invalid_status() -> None:
     assert any("invalid status" in failure for failure in failures)
 
 
-def test_the_quality_scale_gate_rejects_undocumented_blockers() -> None:
+def test_the_quality_scale_gate_rejects_any_open_rule() -> None:
     import check_quality_scale
+
+    assert not check_quality_scale.EXPECTED_PLATINUM_BLOCKERS
 
     statuses = dict.fromkeys(check_quality_scale.OFFICIAL_RULES, "done")
     statuses["diagnostics"] = "todo"
-    failures = check_quality_scale.validate_rules(statuses)
-    assert any("undocumented TODO blocker" in failure for failure in failures)
+    assert any(
+        "undocumented TODO blocker" in failure
+        for failure in check_quality_scale.validate_rules(statuses)
+    )
+    assert any(
+        "blockers drifted" in failure
+        for failure in check_quality_scale.validate_blockers(statuses, "")
+    )
 
 
-def test_the_quality_scale_gate_notices_blocker_drift() -> None:
+def test_the_quality_scale_gate_accepts_a_fully_answered_scale() -> None:
     import check_quality_scale
 
     statuses = dict.fromkeys(check_quality_scale.OFFICIAL_RULES, "done")
-    failures = check_quality_scale.validate_blockers(statuses, "")
-    assert any("blockers drifted" in failure for failure in failures)
-    assert any("`brands`" in failure for failure in failures)
+    assert check_quality_scale.validate_blockers(statuses, "") == []
 
 
 def test_the_quality_scale_gate_requires_its_document_phrases() -> None:
@@ -98,6 +104,13 @@ def test_the_quality_scale_gate_requires_its_document_phrases() -> None:
 
     failures = check_quality_scale.validate_documentation("nothing here")
     assert len(failures) == 3
+    assert any("Open rules: none" in failure for failure in failures)
+
+
+def test_the_coverage_ratchet_stays_above_the_platinum_target() -> None:
+    import check_coverage
+
+    assert check_coverage.MINIMUM_COVERAGE >= 95
 
 
 def test_the_requirement_gate_accepts_a_minimum_below_the_core_pin() -> None:

@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.1
+## 0.1.0
 
 First release.
 
@@ -45,5 +45,8 @@ First release.
   settings, the security options and the branch protection of `main` instead
   of leaving them undiffable in a web interface.
 - Validation gates: repository, legal/provenance, quality scale, register map,
-  pymodbus requirement, ruff, pytest, a 95 percent coverage ratchet and `mypy
+  pymodbus requirement, ruff, pytest, a 99 percent coverage ratchet and `mypy
   --strict`.
+- All 52 official Home Assistant quality-scale rules answered, 43 `done` and
+  9 `exempt`, with no rule left open. The gate rejects any rule going back to
+  `todo` without being documented as a blocker.

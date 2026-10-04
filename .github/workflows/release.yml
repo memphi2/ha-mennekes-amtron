@@ -195,18 +195,25 @@ jobs:
             ${{ env.RELEASE_METADATA }}
             ${{ env.RELEASE_SBOM }}
           if-no-files-found: error
+      # Artifact attestations need a public repository or a paid plan. The
+      # release is still reproducible from the committed SHA256SUMS and SBOM
+      # without them, and the steps start working by themselves once the
+      # repository is published.
       - name: Generate artifact attestation
         id: provenance_attestation
+        if: github.event.repository.private == false
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ${{ env.RELEASE_ZIP }}
       - name: Generate SBOM attestation
         id: sbom_attestation
+        if: github.event.repository.private == false
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ${{ env.RELEASE_ZIP }}
           sbom-path: ${{ env.RELEASE_SBOM }}
       - name: Verify generated attestations
+        if: github.event.repository.private == false
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_REF: ${{ steps.release-tag.outputs.ref }}
