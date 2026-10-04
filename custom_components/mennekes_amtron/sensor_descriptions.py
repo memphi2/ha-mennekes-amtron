@@ -27,12 +27,15 @@ from .enums import (
     CableLockStatus,
     CpState,
     DetectedEvPhases,
+    EmsFallbackBehaviour,
     ErrorCategory,
     EvseState,
     GridPhasesConnected,
     PhaseRotation,
     PhaseSwitchingMode,
     SwitchedPhases,
+    ems_fallback_behaviour,
+    ems_fallback_current,
     enum_option,
     enum_options,
     error_category,
@@ -67,6 +70,21 @@ def _enum(
         entity_category=entity_category,
         value_fn=value_fn,
     )
+
+
+def _fallback_behaviour_option(value: RegisterValue) -> str | None:
+    """Map 0x030E onto what it asks the wallbox to do."""
+
+    if not isinstance(value, int):
+        return None
+    behaviour = ems_fallback_behaviour(value)
+    return enum_option(behaviour) if behaviour is not None else None
+
+
+def _fallback_current(value: RegisterValue) -> float | None:
+    """Return 0x030E only when it really holds a charging current."""
+
+    return ems_fallback_current(value) if isinstance(value, int) else None
 
 
 def _error_category_option(value: RegisterValue) -> str | None:
@@ -234,10 +252,22 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         state_class=None,
     ),
-    _current(
-        "ems_fallback_current",
+    _enum(
+        "ems_fallback_behaviour",
+        EmsFallbackBehaviour,
+        register_key="ems_fallback_current",
         entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=None,
+        value_fn=_fallback_behaviour_option,
+    ),
+    AmtronSensorEntityDescription(
+        key="ems_fallback_current",
+        translation_key="ems_fallback_current",
+        register_key="ems_fallback_current",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        suggested_display_precision=0,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=_fallback_current,
     ),
     _current(
         "grid_imbalance_threshold",

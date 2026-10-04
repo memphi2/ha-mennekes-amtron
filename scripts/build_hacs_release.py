@@ -1,8 +1,21 @@
 #!/usr/bin/env python3
-"""Build the HACS release zip.
+"""Build the release archives.
 
-The zip holds the integration package plus the legal metadata, with fixed
-timestamps so two builds of the same commit produce the same bytes.
+Two archives, because two install paths want different shapes:
+
+``ha-mennekes-amtron.zip``
+    What HACS downloads. ``zip_release`` extracts the archive *into*
+    ``config/custom_components/mennekes_amtron/``, so its contents have to sit
+    at the archive root with no wrapping directory.
+
+``ha-mennekes-amtron-manual.zip``
+    What a human downloads. It carries the full
+    ``custom_components/mennekes_amtron/`` path, so unpacking it over a Home
+    Assistant configuration directory puts every file where it belongs
+    instead of scattering fifty files into the download folder.
+
+Both are built with fixed timestamps and permissions, so two builds of the
+same commit produce the same bytes.
 """
 
 from __future__ import annotations
@@ -20,35 +33,40 @@ DOMAIN = "mennekes_amtron"
 COMPONENT_SRC = ROOT / "custom_components" / DOMAIN
 RELEASE_ROOT = ROOT / ".release"
 PACKAGE_ROOT = RELEASE_ROOT / "package"
+HACS_ZIP_NAME = "ha-mennekes-amtron.zip"
+MANUAL_ZIP_NAME = "ha-mennekes-amtron-manual.zip"
+COMPONENT_PREFIX = f"custom_components/{DOMAIN}"
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
-PACKAGE_METADATA = (
-    "LICENSE",
-    "NOTICE",
-    "PRIVACY.md",
-    "SECURITY.md",
-    "docs/legal.md",
-    "docs/safety.md",
-)
+
+# Apache-2.0 asks for the licence and the notice to travel with the work.
+# Nothing else belongs in a user's custom_components directory: the remaining
+# documents live in the repository, where their links resolve.
+PACKAGE_METADATA = ("LICENSE", "NOTICE")
 
 
 def main() -> int:
-    """Build the release zip."""
+    """Build both release archives."""
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--output",
+        "--output-dir",
         type=Path,
         default=None,
-        help="Output zip path. Defaults to .release/ha-mennekes-amtron.zip.",
+        help="Directory for the archives. Defaults to .release.",
     )
     args = parser.parse_args()
 
     version = read_integration_version()
     _prepare_package()
-    output = args.output or RELEASE_ROOT / "ha-mennekes-amtron.zip"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    _write_zip(output)
-    sys.stdout.write(f"Built {output} for version {version}\n")
+    output_dir = args.output_dir or RELEASE_ROOT
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    hacs_zip = output_dir / HACS_ZIP_NAME
+    manual_zip = output_dir / MANUAL_ZIP_NAME
+    _write_zip(hacs_zip, prefix="")
+    _write_zip(manual_zip, prefix=COMPONENT_PREFIX)
+    sys.stdout.write(f"Built {hacs_zip} for version {version}\n")
+    sys.stdout.write(f"Built {manual_zip} for version {version}\n")
     return 0
 
 
@@ -60,24 +78,21 @@ def _prepare_package() -> None:
         PACKAGE_ROOT,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
-    for rel in PACKAGE_METADATA:
-        source = ROOT / rel
-        target = PACKAGE_ROOT / Path(rel).name
-        shutil.copyfile(source, target)
+    for name in PACKAGE_METADATA:
+        shutil.copyfile(ROOT / name, PACKAGE_ROOT / name)
 
 
-def _write_zip(output: Path) -> None:
+def _write_zip(output: Path, *, prefix: str) -> None:
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(PACKAGE_ROOT.rglob("*")):
-            if path.is_file():
-                archive.writestr(_zip_info(path), path.read_bytes())
+            if not path.is_file():
+                continue
+            name = str(path.relative_to(PACKAGE_ROOT))
+            archive.writestr(_zip_info(f"{prefix}/{name}" if prefix else name), path.read_bytes())
 
 
-def _zip_info(path: Path) -> zipfile.ZipInfo:
-    info = zipfile.ZipInfo(
-        filename=str(path.relative_to(PACKAGE_ROOT)),
-        date_time=ZIP_TIMESTAMP,
-    )
+def _zip_info(name: str) -> zipfile.ZipInfo:
+    info = zipfile.ZipInfo(filename=name, date_time=ZIP_TIMESTAMP)
     info.compress_type = zipfile.ZIP_DEFLATED
     info.external_attr = 0o644 << 16
     return info

@@ -64,3 +64,23 @@ def test_error_codes_map_to_documented_categories(
     code: int, category: ErrorCategory
 ) -> None:
     assert error_category(code) is category
+
+
+def test_the_fallback_register_separates_modes_from_currents() -> None:
+    from custom_components.mennekes_amtron.enums import (
+        EmsFallbackBehaviour,
+        ems_fallback_behaviour,
+        ems_fallback_current,
+    )
+
+    assert ems_fallback_behaviour(0) is EmsFallbackBehaviour.DISABLED
+    assert ems_fallback_behaviour(1) is EmsFallbackBehaviour.PAUSE_ON_TIMEOUT
+    assert ems_fallback_behaviour(6) is EmsFallbackBehaviour.FALLBACK_CURRENT
+    assert ems_fallback_behaviour(32) is EmsFallbackBehaviour.FALLBACK_CURRENT
+    assert ems_fallback_behaviour(3) is None
+    assert ems_fallback_behaviour(33) is None
+
+    assert ems_fallback_current(0) is None
+    assert ems_fallback_current(1) is None
+    assert ems_fallback_current(16) == 16
+    assert ems_fallback_current(99) is None

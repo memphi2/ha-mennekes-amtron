@@ -69,14 +69,35 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return await self._async_finish(step_id, user_input, identity)
 
+        schema = user_schema(await self._async_port_options())
         return self.async_show_form(
             step_id=step_id,
-            data_schema=user_schema(await self._async_port_options()),
+            data_schema=self.add_suggested_values_to_schema(
+                schema, self._suggested_values(step_id, user_input)
+            ),
             errors=errors,
             description_placeholders={
                 "validated_layout": layout_label(VALIDATED_LAYOUT)
             },
         )
+
+    def _suggested_values(
+        self,
+        step_id: str,
+        user_input: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Return what the form should already contain.
+
+        A failed connection test must not throw away what the user typed, and
+        reconfiguring must start from the entry's current bus parameters
+        rather than from the factory defaults.
+        """
+
+        if user_input is not None:
+            return dict(user_input)
+        if step_id == "reconfigure":
+            return dict(self._get_reconfigure_entry().data)
+        return {}
 
     async def _async_finish(
         self,
@@ -129,9 +150,13 @@ def _serial_config(user_input: dict[str, Any]) -> SerialConfig:
 
 
 def _entry_title(identity: Any) -> str:
-    title = f"{MANUFACTURER} {DEFAULT_MODEL}"
-    if identity.article_number:
-        title = f"{title} {identity.article_number}"
-    if identity.serial_number:
-        return f"{title} ({identity.serial_number})"
-    return title
+    """Return the entry title, which also becomes the device name.
+
+    The device name is prefixed to every entity name and every entity id, so
+    it stays short and carries no serial number. The article number and the
+    serial are shown on the device page through ``device_info`` instead, and
+    the serial is what makes the entry unique.
+    """
+
+    del identity
+    return f"{MANUFACTURER} {DEFAULT_MODEL}"

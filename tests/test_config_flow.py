@@ -97,9 +97,13 @@ def test_serial_input_becomes_a_trimmed_serial_config() -> None:
     assert config.stopbits == 2
 
 
-def test_the_entry_title_uses_what_the_device_reports() -> None:
-    assert _entry_title(IDENTITY) == "MENNEKES AMTRON 1313201205 (ABC123456789)"
+def test_the_entry_title_carries_no_serial_number() -> None:
+    """The title becomes the device name, and that prefixes every entity id."""
+
+    assert _entry_title(IDENTITY) == "MENNEKES AMTRON"
     assert _entry_title(DeviceIdentity()) == "MENNEKES AMTRON"
+    assert IDENTITY.serial_number not in _entry_title(IDENTITY)
+    assert IDENTITY.article_number not in _entry_title(IDENTITY)
 
 
 def test_the_first_step_shows_a_form() -> None:
@@ -146,6 +150,60 @@ def test_a_dead_port_shows_cannot_connect(monkeypatch: pytest.MonkeyPatch) -> No
         assert result["errors"] == {"base": "cannot_connect"}
 
     asyncio.run(run())
+
+
+def test_a_failed_attempt_keeps_what_the_user_typed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A wrong baud rate must not throw the whole form away."""
+
+    async def run() -> None:
+        _patch_connection(monkeypatch, AmtronConnectionError("no port"))
+        typed = {**USER_INPUT, CONF_DEVICE_ID: 23, CONF_BAUDRATE: 19200}
+        result = await Flow(FakeHass()).async_step_user(dict(typed))
+        assert _suggested(result) == {
+            CONF_PORT: " /dev/fake ",
+            CONF_DEVICE_ID: 23,
+            CONF_BAUDRATE: 19200,
+            CONF_BYTESIZE: 8,
+            CONF_PARITY: "N",
+            CONF_STOPBITS: 2,
+        }
+
+    asyncio.run(run())
+
+
+def test_reconfigure_starts_from_the_entry_not_the_factory_defaults() -> None:
+    async def run() -> None:
+        flow = Flow(FakeHass())
+        flow.reconfigure_entry = FakeConfigEntry(
+            data={
+                CONF_PORT: "/dev/serial/by-id/adapter",
+                CONF_DEVICE_ID: 23,
+                CONF_BAUDRATE: 19200,
+                CONF_BYTESIZE: 8,
+                CONF_PARITY: "E",
+                CONF_STOPBITS: 1,
+            }
+        )
+        result = await flow.async_step_reconfigure()
+        suggested = _suggested(result)
+        assert suggested[CONF_DEVICE_ID] == 23
+        assert suggested[CONF_BAUDRATE] == 19200
+        assert suggested[CONF_PARITY] == "E"
+        assert suggested[CONF_PORT] == "/dev/serial/by-id/adapter"
+
+    asyncio.run(run())
+
+
+def _suggested(result: dict[str, Any]) -> dict[str, Any]:
+    """Return the values a form is pre-filled with."""
+
+    return {
+        str(marker): marker.description["suggested_value"]
+        for marker in result["data_schema"].schema
+        if marker.description and "suggested_value" in marker.description
+    }
 
 
 def test_a_silent_device_shows_invalid_response(

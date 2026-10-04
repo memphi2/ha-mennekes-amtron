@@ -24,6 +24,7 @@ def main() -> int:
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--zip", type=Path, required=True)
+    parser.add_argument("--manual-zip", type=Path, required=True)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--sha256sums", type=Path, required=True)
@@ -44,6 +45,8 @@ def main() -> int:
                 "git_commit": commit,
                 "zip_sha256": zip_digest,
                 "zip_entries": _zip_entries(args.zip),
+                "manual_zip_sha256": _sha256(args.manual_zip),
+                "manual_zip_entries": _zip_entries(args.manual_zip),
                 "built_at": datetime.now(UTC).isoformat(),
             },
             indent=2,
@@ -64,7 +67,7 @@ def main() -> int:
 def _write_sha256sums(args: argparse.Namespace) -> None:
     lines = [
         f"{_sha256(path)}  {path.name}"
-        for path in (args.zip, args.metadata, args.sbom)
+        for path in (args.zip, args.manual_zip, args.metadata, args.sbom)
     ]
     args.sha256sums.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

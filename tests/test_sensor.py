@@ -87,3 +87,21 @@ def test_an_undocumented_enum_value_yields_no_state() -> None:
         assert added["evse_state"].native_value is None
 
     asyncio.run(run())
+
+
+def test_the_fallback_register_is_not_reported_as_an_ampere_value() -> None:
+    """0x030E holds a mode for 0 and 1 and a current only for 6 to 32."""
+
+    async def run() -> None:
+        for raw, behaviour, current in (
+            (0, "disabled", None),
+            (1, "pause_on_timeout", None),
+            (6, "fallback_current", 6),
+            (16, "fallback_current", 16),
+            (3, None, None),
+        ):
+            sensors = await _sensors(bank=device_bank(fallback_current=raw))
+            assert sensors["ems_fallback_behaviour"].native_value == behaviour
+            assert sensors["ems_fallback_current"].native_value == current
+
+    asyncio.run(run())

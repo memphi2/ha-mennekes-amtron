@@ -17,6 +17,7 @@ permissions:
 
 env:
   RELEASE_ZIP: .release/ha-mennekes-amtron.zip
+  RELEASE_MANUAL_ZIP: .release/ha-mennekes-amtron-manual.zip
   RELEASE_SHA256SUMS: .release/SHA256SUMS
   RELEASE_METADATA: .release/build-metadata.json
   RELEASE_SBOM: .release/sbom.spdx.json
@@ -171,6 +172,7 @@ jobs:
         run: |
           python scripts/write_release_assets.py \
             --zip "$RELEASE_ZIP" \
+            --manual-zip "$RELEASE_MANUAL_ZIP" \
             --tag "${{ steps.release-tag.outputs.tag }}" \
             --repository "$GITHUB_REPOSITORY" \
             --sha256sums "$RELEASE_SHA256SUMS" \
@@ -181,6 +183,7 @@ jobs:
       - name: Verify release assets
         run: |
           test -s "$RELEASE_ZIP"
+          test -s "$RELEASE_MANUAL_ZIP"
           test -s "$RELEASE_SHA256SUMS"
           test -s "$RELEASE_METADATA"
           test -s "$RELEASE_SBOM"
@@ -191,6 +194,7 @@ jobs:
           name: ha-mennekes-amtron-release
           path: |
             ${{ env.RELEASE_ZIP }}
+            ${{ env.RELEASE_MANUAL_ZIP }}
             ${{ env.RELEASE_SHA256SUMS }}
             ${{ env.RELEASE_METADATA }}
             ${{ env.RELEASE_SBOM }}
@@ -239,6 +243,7 @@ jobs:
         run: |
           assets=(
             "$RELEASE_ZIP"
+            "$RELEASE_MANUAL_ZIP"
             "$RELEASE_SHA256SUMS"
             "$RELEASE_METADATA"
             "$RELEASE_SBOM"

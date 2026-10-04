@@ -13,42 +13,89 @@ SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 
-def _build(tmp_path: Path) -> Path:
-    output = tmp_path / "ha-mennekes-amtron.zip"
+def _build(tmp_path: Path) -> tuple[Path, Path]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
-        [sys.executable, str(SCRIPTS / "build_hacs_release.py"), "--output", str(output)],
+        [
+            sys.executable,
+            str(SCRIPTS / "build_hacs_release.py"),
+            "--output-dir",
+            str(tmp_path),
+        ],
         capture_output=True,
         check=False,
         text=True,
         cwd=ROOT,
     )
     assert result.returncode == 0, result.stderr
-    return output
+    return (
+        tmp_path / "ha-mennekes-amtron.zip",
+        tmp_path / "ha-mennekes-amtron-manual.zip",
+    )
 
 
-def test_the_zip_carries_the_integration_and_its_legal_metadata(
-    tmp_path: Path,
-) -> None:
-    with zipfile.ZipFile(_build(tmp_path)) as archive:
+def test_the_hacs_zip_has_no_wrapping_directory(tmp_path: Path) -> None:
+    """HACS extracts the archive into custom_components/mennekes_amtron."""
+
+    hacs_zip, _manual = _build(tmp_path)
+    with zipfile.ZipFile(hacs_zip) as archive:
         names = set(archive.namelist())
     assert "manifest.json" in names
     assert "strings.json" in names
     assert "translations/de.json" in names
     assert "brand/icon.png" in names
-    assert {"LICENSE", "NOTICE", "PRIVACY.md", "SECURITY.md"} <= names
-    assert "legal.md" in names
-    assert "safety.md" in names
+    assert not any(name.startswith("custom_components/") for name in names)
     assert not any(name.endswith(".pyc") for name in names)
 
 
+def test_the_manual_zip_unpacks_onto_a_configuration_directory(
+    tmp_path: Path,
+) -> None:
+    """A human unpacks this one over config/, so it carries the full path."""
+
+    _hacs, manual_zip = _build(tmp_path / "build")
+    target = tmp_path / "config"
+    target.mkdir()
+    with zipfile.ZipFile(manual_zip) as archive:
+        archive.extractall(target)
+    component = target / "custom_components" / "mennekes_amtron"
+    assert (component / "manifest.json").is_file()
+    assert (component / "translations" / "de.json").is_file()
+    assert (component / "brand" / "icon.png").is_file()
+
+
+def test_both_archives_carry_the_same_files(tmp_path: Path) -> None:
+    hacs_zip, manual_zip = _build(tmp_path)
+    with zipfile.ZipFile(hacs_zip) as archive:
+        flat = set(archive.namelist())
+    with zipfile.ZipFile(manual_zip) as archive:
+        nested = {
+            name.removeprefix("custom_components/mennekes_amtron/")
+            for name in archive.namelist()
+        }
+    assert flat == nested
+
+
+def test_only_the_licence_and_notice_travel_with_the_integration(
+    tmp_path: Path,
+) -> None:
+    """Everything else would land in the user's custom_components directory."""
+
+    hacs_zip, _manual = _build(tmp_path)
+    with zipfile.ZipFile(hacs_zip) as archive:
+        names = set(archive.namelist())
+    assert {"LICENSE", "NOTICE"} <= names
+    assert not {"PRIVACY.md", "SECURITY.md", "legal.md", "safety.md"} & names
+
+
 def test_the_build_is_reproducible(tmp_path: Path) -> None:
-    first = _build(tmp_path / "a").read_bytes()
-    second = _build(tmp_path / "b").read_bytes()
+    first = [path.read_bytes() for path in _build(tmp_path / "a")]
+    second = [path.read_bytes() for path in _build(tmp_path / "b")]
     assert first == second
 
 
 def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
-    zip_path = _build(tmp_path)
+    zip_path, manual_zip = _build(tmp_path)
     sums = tmp_path / "SHA256SUMS"
     metadata = tmp_path / "build-metadata.json"
     sbom = tmp_path / "sbom.spdx.json"
@@ -58,6 +105,8 @@ def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
             str(SCRIPTS / "write_release_assets.py"),
             "--zip",
             str(zip_path),
+            "--manual-zip",
+            str(manual_zip),
             "--tag",
             "v0.1.0",
             "--repository",
@@ -82,6 +131,8 @@ def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
     assert payload["release_tag"] == "v0.1.0"
     assert payload["integration_version"] == read_integration_version()
     assert payload["zip_entries"] > 10
+    assert payload["manual_zip_entries"] == payload["zip_entries"]
+    assert payload["manual_zip_sha256"] != payload["zip_sha256"]
 
     document = json.loads(sbom.read_text(encoding="utf-8"))
     assert document["spdxVersion"] == "SPDX-2.3"
@@ -93,7 +144,7 @@ def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
     assert len(document["relationships"]) == 2
 
     lines = sums.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == 3
+    assert len(lines) == 4
     assert all(len(line.split("  ")[0]) == 64 for line in lines)
 
 

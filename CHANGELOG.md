@@ -5,6 +5,50 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.1.1
+
+### Fixed
+
+- The release carried a single archive with no wrapping directory. That is
+  what HACS needs, because it extracts the archive *into*
+  `custom_components/mennekes_amtron/`, but unpacking it by hand scattered
+  fifty files instead of installing an integration. The release now carries
+  two archives: `ha-mennekes-amtron.zip` for HACS, unchanged in shape, and
+  `ha-mennekes-amtron-manual.zip`, which carries the full
+  `custom_components/mennekes_amtron/` path and unpacks straight onto a
+  configuration directory.
+- The archive no longer installs `PRIVACY.md`, `SECURITY.md`, `legal.md` and
+  `safety.md` into the user's `custom_components` directory. Only the licence
+  and the notice travel with the integration, as Apache-2.0 asks; the rest
+  stays in the repository, where their links resolve.
+
+- The config entry title no longer carries the wallbox serial number. The
+  title becomes the device name, and Home Assistant prefixes the device name
+  to every entity name and every entity id, so entities were called
+  `sensor.mennekes_amtron_1313201205_abc123456789_voltage_l1` and the serial
+  number ended up in entity ids, history and any shared dashboard. The serial
+  stays where it belongs: as the entry's unique id and on the device page.
+- The config flow keeps what was typed when a connection test fails, instead
+  of resetting the form to the factory defaults.
+- Reconfiguring an entry starts from that entry's bus parameters instead of
+  the factory defaults.
+
+### Changed
+
+- `0x030E` is no longer reported as an ampere value for every reading. The
+  register holds a mode for 0 and 1 and a charging current only for 6 to 32,
+  so a new diagnostic sensor reports the behaviour (disabled, pauses on
+  heartbeat timeout, charges with the fallback current) and the current sensor
+  reports a value only when the register really holds one.
+
+### Added
+
+- A smoke test that boots a real Home Assistant, drives the real config and
+  options flows against a real Modbus RTU server and checks the entity
+  registry, the device registry, the repair issues and the write path. The
+  three defects above were invisible to the rest of the suite because it
+  replaces Home Assistant's runtime with fakes.
+
 ## 0.1.0
 
 First release.
@@ -25,7 +69,7 @@ First release.
 - Charging control through one choke point: minimum 6 A, explicit opt-in for
   the "no limitation" value 0 A, the documented pause value, vendor write
   rate limits, and a deferred write so a dragged slider is not rejected.
-- 35 sensors, 9 binary sensors, 1 number, 3 switches, 2 selects and 2 buttons,
+- 36 sensors, 9 binary sensors, 1 number, 3 switches, 2 selects and 2 buttons,
   all translated to English and German including every enumerated state.
 - `mennekes_amtron.set_charging_current` action with an `allow_unlimited`
   opt-in for the "no limitation" value.

@@ -75,6 +75,9 @@
       "downgrade_current": {
         "default": "mdi:transmission-tower-export"
       },
+      "ems_fallback_behaviour": {
+        "default": "mdi:lan-disconnect"
+      },
       "ems_fallback_current": {
         "default": "mdi:current-ac"
       },

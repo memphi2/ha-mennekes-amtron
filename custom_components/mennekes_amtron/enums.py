@@ -95,6 +95,18 @@ class DetectedEvPhases(IntEnum):
     THREE_PHASES = 3
 
 
+class EmsFallbackBehaviour(IntEnum):
+    """Interpretation of the energy-manager fallback register 0x030E.
+
+    The register holds a mode for 0 and 1 and a charging current for 6 to 32,
+    so the number alone cannot be shown as an ampere value.
+    """
+
+    DISABLED = 0
+    PAUSE_ON_TIMEOUT = 1
+    FALLBACK_CURRENT = 2
+
+
 class CableLockStatus(IntEnum):
     """Cable locking status reported in 0x0D02.
 
@@ -169,6 +181,31 @@ def enum_map(enum_class: type[IntEnum]) -> dict[int, str]:
     """Return the register-value to state-option mapping of an enum."""
 
     return {int(member): member.name.lower() for member in enum_class}
+
+
+FALLBACK_CURRENT_MINIMUM = 6
+FALLBACK_CURRENT_MAXIMUM = 32
+
+
+def ems_fallback_behaviour(value: int) -> EmsFallbackBehaviour | None:
+    """Return what the energy-manager fallback register asks the wallbox to do."""
+
+    if value == 0:
+        return EmsFallbackBehaviour.DISABLED
+    if value == 1:
+        return EmsFallbackBehaviour.PAUSE_ON_TIMEOUT
+    if FALLBACK_CURRENT_MINIMUM <= value <= FALLBACK_CURRENT_MAXIMUM:
+        return EmsFallbackBehaviour.FALLBACK_CURRENT
+    return None
+
+
+def ems_fallback_current(value: int) -> int | None:
+    """Return the fallback current, or ``None`` when the register holds a mode."""
+
+    behaviour = ems_fallback_behaviour(value)
+    if behaviour is EmsFallbackBehaviour.FALLBACK_CURRENT:
+        return value
+    return None
 
 
 def error_category(code: int) -> ErrorCategory:

@@ -168,6 +168,14 @@
       "downgrade_current": {
         "name": "Downgrade-Strom"
       },
+      "ems_fallback_behaviour": {
+        "name": "Energiemanager-Fallback",
+        "state": {
+          "disabled": "Deaktiviert, behält die letzten Werte",
+          "fallback_current": "Lädt mit dem Fallback-Strom",
+          "pause_on_timeout": "Pausiert bei Heartbeat-Timeout"
+        }
+      },
       "ems_fallback_current": {
         "name": "Fallback-Strom des Energiemanagers"
       },

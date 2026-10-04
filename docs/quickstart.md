@@ -69,8 +69,11 @@ Home Assistant.
 
 **Manual**
 
-Copy `custom_components/mennekes_amtron` into your Home Assistant
-`config/custom_components/` directory and restart.
+Download `ha-mennekes-amtron-manual.zip` from the release and unpack it over
+your Home Assistant configuration directory, then restart. Do not use
+`ha-mennekes-amtron.zip` for this: that one is the HACS asset and has no
+wrapping folder, because HACS extracts it directly into the integration
+directory.
 
 ## 6. Add the wallbox
 
