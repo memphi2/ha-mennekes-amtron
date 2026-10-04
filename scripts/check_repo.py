@@ -189,6 +189,17 @@ def check_hacs_metadata() -> list[str]:
             "hacs.json homeassistant must match project-versions.json "
             f"{VERSION_CONFIG['min_homeassistant']}"
         )
+    manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
+    if hacs.get("name") != manifest.get("name"):
+        failures.append(
+            f"hacs.json name {hacs.get('name')!r} and manifest.json name "
+            f"{manifest.get('name')!r} disagree; both are shown to users"
+        )
+    if "(Unofficial)" not in str(manifest.get("name", "")):
+        failures.append(
+            "manifest.json name must mark the integration as unofficial: it is "
+            "what Home Assistant shows in the integration list"
+        )
     if hacs.get("filename") != "ha-mennekes-amtron.zip":
         failures.append("hacs.json filename must stay ha-mennekes-amtron.zip")
     if not hacs.get("zip_release"):

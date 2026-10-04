@@ -349,3 +349,36 @@ def test_the_legal_gate_allows_a_citation_of_the_specification() -> None:
     assert check_legal_audit._check_vendor_documents(
         [Path("docs/modbus-registers.md"), Path("docs/legal.md")]
     ) == []
+
+
+def test_the_repository_gate_keeps_the_integration_marked_unofficial(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The manifest name is what Home Assistant shows in the install list."""
+
+    import check_repo
+
+    assert check_repo.check_hacs_metadata() == []
+
+    component = tmp_path / "custom_components" / "mennekes_amtron"
+    component.mkdir(parents=True)
+    (component / "manifest.json").write_text(
+        json.dumps({"name": "MENNEKES AMTRON"}), encoding="utf-8"
+    )
+    (tmp_path / "hacs.json").write_text(
+        json.dumps(
+            {
+                "name": "MENNEKES AMTRON (Unofficial)",
+                "homeassistant": check_repo.VERSION_CONFIG["min_homeassistant"],
+                "filename": "ha-mennekes-amtron.zip",
+                "zip_release": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+    monkeypatch.setattr(check_repo, "COMPONENT", component)
+
+    failures = check_repo.check_hacs_metadata()
+    assert any("disagree" in failure for failure in failures)
+    assert any("unofficial" in failure for failure in failures)

@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.1.2
+
+### Changed
+
+- The integration is now called `MENNEKES AMTRON (Unofficial)` in Home
+  Assistant's integration list, which is where somebody decides what they are
+  installing. `hacs.json` already said that; `manifest.json` did not, and the
+  manifest is the one Home Assistant shows. A repository check now fails when
+  the two names disagree or when the manifest drops the marker.
+
+  The config entry title stays `MENNEKES AMTRON`. It becomes the device name
+  and is prefixed to every entity id, so the marker belongs in the list, not
+  in `sensor.mennekes_amtron_unofficial_voltage_l1`.
+
 ## 0.1.1
 
 ### Fixed
