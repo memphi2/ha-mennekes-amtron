@@ -22,23 +22,31 @@ SUPPORTED_BAUDRATES: Final = (9600, 14400, 19200, 28800, 38400, 56000, 57600)
 # The device documents exactly three frames, and the data bits never change.
 # Offering parity and stop bits separately would let a user pick 8N1 or 8E2,
 # which this wallbox never speaks.
-SUPPORTED_FRAMES: Final = ("8N2", "8E1", "8O1")
-DEFAULT_FRAME: Final = "8N2"
+# Lowercase, because a Home Assistant selector option is an identifier and
+# has to match [a-z0-9-_]+. The translations spell them out in capitals.
+SUPPORTED_FRAMES: Final = ("8n2", "8e1", "8o1")
+DEFAULT_FRAME: Final = "8n2"
 SUPPORTED_PARITY_STOPBITS: Final = (("N", 2), ("E", 1), ("O", 1))
 
 CONF_FRAME: Final = "frame"
 
 
 def frame_label(bytesize: int, parity: str, stopbits: int) -> str:
-    """Return the frame a serial configuration uses, as 8N2 and friends."""
+    """Return the selector option a serial configuration corresponds to."""
 
-    return f"{bytesize}{parity}{stopbits}"
+    return f"{bytesize}{parity}{stopbits}".lower()
 
 
 def frame_parts(frame: str) -> tuple[int, str, int]:
-    """Return the data bits, parity and stop bits of a frame label."""
+    """Return the data bits, parity and stop bits of a frame option."""
 
-    return int(frame[0]), frame[1], int(frame[2])
+    return int(frame[0]), frame[1].upper(), int(frame[2])
+
+
+def frame_display(bytesize: int, parity: str, stopbits: int) -> str:
+    """Return the frame the way the manufacturer writes it, as 8N2."""
+
+    return f"{bytesize}{parity}{stopbits}".upper()
 
 DEFAULT_TIMEOUT: Final = 1.0
 DEFAULT_RETRIES: Final = 2

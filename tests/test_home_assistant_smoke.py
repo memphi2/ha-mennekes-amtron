@@ -129,7 +129,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
                     CONF_PORT: client_port,
                     CONF_DEVICE_ID: 50,
                     CONF_BAUDRATE: 57600,
-                    CONF_FRAME: "8N2",
+                    CONF_FRAME: "8n2",
                     CONF_SEARCH: SEARCH_OFF,
                 },
             )
@@ -209,7 +209,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             }
             assert suggested[CONF_PORT] == client_port
             assert suggested[CONF_DEVICE_ID] == 50
-            assert suggested[CONF_FRAME] == "8N2"
+            assert suggested[CONF_FRAME] == "8n2"
 
             heartbeat = entry.runtime_data.heartbeat
             assert await hass.config_entries.async_unload(entry.entry_id)
@@ -246,7 +246,7 @@ def test_the_flow_finds_a_wallbox_on_an_unknown_address(tmp_path: Path) -> None:
                     CONF_PORT: client_port,
                     CONF_DEVICE_ID: 50,
                     CONF_BAUDRATE: 57600,
-                    CONF_FRAME: "8N2",
+                    CONF_FRAME: "8n2",
                     CONF_SEARCH: SEARCH_ADDRESSES,
                 },
             )
@@ -312,7 +312,7 @@ def test_the_bundled_blueprints_run_as_automations(tmp_path: Path) -> None:
                     CONF_PORT: client_port,
                     CONF_DEVICE_ID: 50,
                     CONF_BAUDRATE: 57600,
-                    CONF_FRAME: "8N2",
+                    CONF_FRAME: "8n2",
                     CONF_SEARCH: SEARCH_OFF,
                 },
             )

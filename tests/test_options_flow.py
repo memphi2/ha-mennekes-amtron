@@ -97,7 +97,7 @@ def test_submitting_normalises_the_values() -> None:
     asyncio.run(run())
 
 
-BUS = {"port": "/dev/a", "device_id": 50, "baudrate": 57600, "frame": "8N2"}
+BUS = {"port": "/dev/a", "device_id": 50, "baudrate": 57600, "frame": "8n2"}
 
 
 def test_the_user_schema_bounds_the_device_address() -> None:

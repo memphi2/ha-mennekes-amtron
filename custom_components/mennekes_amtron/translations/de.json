@@ -393,9 +393,9 @@
     },
     "frame": {
       "options": {
-        "8E1": "8E1 - 8 Datenbits, gerade Parität, 1 Stoppbit",
-        "8N2": "8N2 - 8 Datenbits, keine Parität, 2 Stoppbits (Standard)",
-        "8O1": "8O1 - 8 Datenbits, ungerade Parität, 1 Stoppbit"
+        "8e1": "8E1 - 8 Datenbits, gerade Parität, 1 Stoppbit",
+        "8n2": "8N2 - 8 Datenbits, keine Parität, 2 Stoppbits (Standard)",
+        "8o1": "8O1 - 8 Datenbits, ungerade Parität, 1 Stoppbit"
       }
     },
     "search": {

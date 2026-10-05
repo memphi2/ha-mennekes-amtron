@@ -34,6 +34,7 @@ from .const import (
     MANUFACTURER,
     SEARCH_FULL,
     SEARCH_OFF,
+    frame_display,
     frame_label,
     frame_parts,
 )
@@ -309,7 +310,9 @@ def _serial_input(config: SerialConfig) -> dict[str, Any]:
 
 
 def _frame(config: SerialConfig) -> str:
-    return frame_label(config.bytesize, config.parity, config.stopbits)
+    """Return the frame for the user to read, not the selector option."""
+
+    return frame_display(config.bytesize, config.parity, config.stopbits)
 
 
 def _entry_title(identity: DeviceIdentity) -> str:

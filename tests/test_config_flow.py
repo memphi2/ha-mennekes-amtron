@@ -38,7 +38,7 @@ USER_INPUT = {
     CONF_PORT: " /dev/fake ",
     CONF_DEVICE_ID: 50,
     CONF_BAUDRATE: 57600,
-    CONF_FRAME: "8N2",
+    CONF_FRAME: "8n2",
 }
 IDENTITY = DeviceIdentity(
     layout_version=0x0103,
@@ -209,7 +209,7 @@ def test_a_failed_attempt_keeps_what_the_user_typed(
             CONF_PORT: " /dev/fake ",
             CONF_DEVICE_ID: 23,
             CONF_BAUDRATE: 19200,
-            CONF_FRAME: "8N2",
+            CONF_FRAME: "8n2",
         }
 
     asyncio.run(run())
@@ -233,7 +233,7 @@ def test_reconfigure_starts_from_the_entry_not_the_factory_defaults() -> None:
         assert suggested[CONF_DEVICE_ID] == 23
         assert suggested[CONF_BAUDRATE] == 19200
         # the entry stores the parts, the form asks for the frame
-        assert suggested[CONF_FRAME] == "8E1"
+        assert suggested[CONF_FRAME] == "8e1"
         assert suggested[CONF_PORT] == "/dev/serial/by-id/adapter"
 
     asyncio.run(run())
