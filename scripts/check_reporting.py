@@ -13,6 +13,8 @@ def report_failures(failures: list[str], success_message: str | None = None) -> 
     with multi-line success output pass None and print it themselves.
     """
 
+    # Failures name a file, a rule or a version -- never the content a gate
+    # matched on. The secret scan in check_repo.py reports the path only.
     if failures:
         for failure in failures:
             sys.stderr.write(f"FAIL: {failure}\n")

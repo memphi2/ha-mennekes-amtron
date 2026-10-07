@@ -410,7 +410,10 @@ def check_secrets() -> list[str]:
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         for pattern in SECRET_PATTERNS:
-            if pattern.search(text):
+            # Only the truthiness of the match is used. The match itself is
+            # never captured, stored or reported: a gate that prints the
+            # secret it found would be the leak it is meant to prevent.
+            if pattern.search(text) is not None:
                 failures.append(
                     f"{_relative(path)} contains a secret or identifying value"
                 )
