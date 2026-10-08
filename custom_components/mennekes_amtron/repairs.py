@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.repairs import RepairsFlow
+from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
@@ -102,14 +101,14 @@ class HeartbeatRecoveryRepairFlow(RepairsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         """Show the confirmation step."""
 
         return await self.async_step_confirm()
 
     async def async_step_confirm(
         self, user_input: dict[str, str] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         """Write the recovery sequence once the user confirms."""
 
         if user_input is None:

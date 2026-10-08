@@ -1,7 +1,7 @@
 # MENNEKES AMTRON for Home Assistant (Unofficial)
 
 [![HACS: Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.5%2B-41BDF5.svg)](https://www.home-assistant.io/)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.9%2B-41BDF5.svg)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 A local Home Assistant integration for MENNEKES AMTRON wallboxes that speak

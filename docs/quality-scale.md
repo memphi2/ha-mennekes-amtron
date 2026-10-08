@@ -76,13 +76,17 @@ of taste. `tests/` and `scripts/` carry narrow, documented exceptions:
 tests assert and reach into private helpers on purpose, and the gate scripts
 run fixed developer commands as subprocesses.
 
-That is also the answer to the CodeQL job being skipped. Code scanning uploads
-need a public repository, so CodeQL cannot report while this one is private.
-The Python security rules run in every CI job instead, on every matrix entry,
-and CodeQL switches itself on when the repository is published. See
+CodeQL runs as well, now that the repository is public: code scanning uploads
+need a public repository, and the Python security rules above run in every CI
+job regardless, on every matrix entry. See
 [repository-settings.md](repository-settings.md).
 
-`mypy --strict` covers all 52 modules, the integration and the tooling alike.
+`mypy --strict` covers all 53 modules, the integration and the tooling alike.
+It runs against `current_homeassistant` only. Home Assistant moved its own
+config-flow and action annotations from voluptuous to `probatio` in 2026.10,
+so no single source file can satisfy `--strict` against both ends of the
+supported range; the minimum matrix entry runs the whole test suite instead
+and proves the integration works there. See [SUPPORT.md](../SUPPORT.md).
 
 ## Coverage
 
@@ -102,8 +106,9 @@ its three registers in the documented order.
 Nothing in the quality scale. What is open is the device: no value in this
 integration has been measured against real hardware yet. The verification
 steps in [quickstart.md](quickstart.md) and [safety.md](safety.md) are what
-close that gap, and until they are done the repository stays private.
+close that gap.
 
-The CodeQL workflow and branch protection are in the same position: both need
-a public repository, and both switch themselves on when it is published. See
+Everything that needed a public repository is in place: CodeQL, branch
+protection on `main`, secret scanning with push protection, and build
+provenance attestations on the release assets. See
 [repository-settings.md](repository-settings.md).

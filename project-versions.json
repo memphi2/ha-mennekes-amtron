@@ -1,9 +1,8 @@
 {
-  "min_homeassistant": "2026.5.0",
-  "current_homeassistant": "2026.9.4",
-  "next_homeassistant": "2026.10.0b0",
+  "min_homeassistant": "2026.9.0",
+  "current_homeassistant": "2026.10.0",
   "python": "3.14",
-  "pymodbus_minimum": "3.11.2",
+  "pymodbus_minimum": "3.13.1",
   "amtron_modbus_layout": "v01.03",
   "integration_version": "0.1.0"
 }

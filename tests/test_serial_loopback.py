@@ -27,18 +27,14 @@ from custom_components.mennekes_amtron.const import HEARTBEAT_VALUE
 from custom_components.mennekes_amtron.identity import async_read_identity
 from tests.fakes import device_bank
 
-# Only the server-side API differs between pymodbus releases; the client API
-# this test exercises is identical in every version the supported Home
-# Assistant range resolves, and the unit tests cover it on all of them.
+# The simulator is what lets this test answer its own requests. Every Home
+# Assistant release in the supported range pins pymodbus 3.13.1, which ships
+# it, so the skip only covers a stripped-down build rather than a version the
+# integration claims to support.
 _simdata = pytest.importorskip(
     "pymodbus.simulator.simdata",
     reason="this pymodbus build ships no simulator to run a server from",
 )
-if not hasattr(_simdata, "DataType"):
-    pytest.skip(
-        "pymodbus older than 3.13 has a different server-side simulator API",
-        allow_module_level=True,
-    )
 
 DEVICE_ID = 50
 REGISTER_COUNT = 0x1010

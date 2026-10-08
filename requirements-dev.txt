@@ -1,10 +1,9 @@
-# Direct validation dependencies. CI installs the selected Home Assistant
-# matrix version separately, so Home Assistant's transitive pins remain owned
-# by Home Assistant instead of this repository's dev lock.
+# Direct validation dependencies for the current Home Assistant matrix. CI
+# installs Home Assistant separately, so this file intentionally does not pin
+# Home Assistant transitive dependencies.
 mypy==2.3.1
 pymodbus[serial]==3.13.1
 pytest==9.1.1
 pytest-cov==7.1.0
 ruff==0.16.9
 spdx-tools==0.8.5
-voluptuous-serialize==2.7.0

@@ -64,7 +64,7 @@ def test_the_manifest_ships_no_personal_metadata() -> None:
 
 def test_the_manifest_requests_only_pymodbus_and_only_as_a_minimum() -> None:
     manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["requirements"] == ["pymodbus[serial]>=3.11.2"]
+    assert manifest["requirements"] == ["pymodbus[serial]>=3.13.1"]
 
 
 def test_diagnostics_never_report_the_port_or_the_serial_number() -> None:

@@ -84,6 +84,7 @@ SECRET_PATTERN_SOURCES = {
     "tests/test_flow_serial.py",
 }
 SHA_PINNED_USES = re.compile(r"uses: [^@\s]+@(?P<ref>[^\s]+)")
+VOLUPTUOUS_IMPORT = re.compile(r"^(?:import voluptuous|from voluptuous)\b")
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -92,7 +93,6 @@ def _load_version_config() -> dict[str, str]:
     required_keys = {
         "min_homeassistant",
         "current_homeassistant",
-        "next_homeassistant",
         "python",
         "pymodbus_minimum",
         "amtron_modbus_layout",
@@ -119,6 +119,7 @@ def main() -> int:
     failures.extend(check_release_metadata())
     failures.extend(check_hacs_metadata())
     failures.extend(check_requirement_pins())
+    failures.extend(check_schema_library())
     failures.extend(check_github_automation())
     failures.extend(check_issue_templates())
     failures.extend(check_branch_protection_contexts())
@@ -263,6 +264,33 @@ def check_requirement_pins() -> list[str]:
     return failures
 
 
+def check_schema_library() -> list[str]:
+    """The integration validates with probatio, not with voluptuous.
+
+    Home Assistant replaced voluptuous with probatio in 2026.9 and types its
+    own flow and service signatures against probatio from 2026.10. It still
+    aliases ``voluptuous`` onto probatio for compatibility, so importing the
+    old name happens to work -- but only because Home Assistant is imported
+    first, and it leaves ``mypy --strict`` unable to see that the two are the
+    same class. Importing probatio directly is what Core itself does.
+    """
+
+    failures: list[str] = []
+    for path in sorted(ROOT.rglob("*.py")):
+        if _is_ignored(path):
+            continue
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if VOLUPTUOUS_IMPORT.match(line.strip()):
+                failures.append(
+                    f"{_relative(path)}:{number} imports voluptuous; Home "
+                    "Assistant's own API is typed against probatio, which it "
+                    "installs itself"
+                )
+    return failures
+
+
 def check_github_automation() -> list[str]:
     """CI has to stay pinned, reproducible and aligned with the versions."""
 
@@ -284,15 +312,28 @@ def check_github_automation() -> list[str]:
     validate = (ROOT / ".github" / "workflows" / "validate.yml").read_text(
         encoding="utf-8"
     )
-    for key in (
-        "min_homeassistant",
-        "current_homeassistant",
-        "next_homeassistant",
-        "python",
-    ):
+    for key in ("min_homeassistant", "current_homeassistant", "python"):
         value = VERSION_CONFIG[key]
         if value not in validate:
             failures.append(f"validate.yml does not pin {key} {value}")
+    # The early-warning job deliberately resolves the newest pre-release
+    # instead of pinning one, so that it never ends up testing a beta that a
+    # later release has already superseded.
+    if "--pre --upgrade homeassistant" not in validate:
+        failures.append(
+            "validate.yml must let the next-ha job resolve the newest "
+            "pre-release with 'pip install --pre --upgrade homeassistant' "
+            "rather than pinning a version that goes stale"
+        )
+    # The typing gate only matches the annotations of one Home Assistant, so
+    # the minimum entry has to say so explicitly rather than drift into
+    # skipping it by accident.
+    if "--skip-typing" not in validate:
+        failures.append(
+            "validate.yml must run the minimum matrix entry with "
+            "--skip-typing: Home Assistant's own annotations moved from "
+            "voluptuous to probatio and cannot both be satisfied"
+        )
     dependabot = (ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
     failures.extend(
         f"dependabot.yml does not cover {ecosystem}"

@@ -107,7 +107,7 @@ this repository.
 - `LICENSE` is the unmodified Apache License, Version 2.0. `NOTICE` carries
   the project notice, the non-affiliation statement and the trademark notice.
 - `manifest.json` requests exactly one runtime requirement,
-  `pymodbus[serial]>=3.11.2`. It is a minimum, not a pin: Home Assistant Core
+  `pymodbus[serial]>=3.13.1`. It is a minimum, not a pin: Home Assistant Core
   pins pymodbus for the whole instance and moves that pin between releases, so
   an exact pin here would conflict with Core. `codeowners` is empty, so no
   personal metadata ships in the package.

@@ -3,10 +3,10 @@
 
 Home Assistant installs one pymodbus for the whole instance and Core's own
 ``modbus`` integration pins an exact version, which moves between Home
-Assistant releases: 3.11.2 in the oldest supported release, 3.13.1 in the
-newest validated one. An exact pin here would therefore fight Core on one of
-them, so ``manifest.json`` declares a *minimum* and lets Home Assistant own
-the resolved version.
+Assistant releases; every release in the supported range currently resolves
+3.13.1. An exact pin here would fight Core the moment that moves again, so
+``manifest.json`` declares a *minimum* and lets Home Assistant own the
+resolved version.
 
 The gate checks that the minimum is really a minimum, that it matches
 ``project-versions.json``, and that the installed Home Assistant resolves to a

@@ -9,7 +9,7 @@ explicitly here.
 
 from __future__ import annotations
 
-import voluptuous as vol
+import probatio
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
@@ -24,13 +24,13 @@ from .const import (
 from .control import AmtronControl
 from .exceptions import service_validation_error
 
-SET_CHARGING_CURRENT_SCHEMA = vol.Schema(
+SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_DEVICE_ID): vol.All(cv.ensure_list, [cv.string]),
-        vol.Required(ATTR_CURRENT): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=32)
+        probatio.Required(ATTR_DEVICE_ID): probatio.All(cv.ensure_list, [cv.string]),
+        probatio.Required(ATTR_CURRENT): probatio.All(
+            probatio.Coerce(float), probatio.Range(min=0, max=32)
         ),
-        vol.Optional(ATTR_ALLOW_UNLIMITED, default=False): cv.boolean,
+        probatio.Optional(ATTR_ALLOW_UNLIMITED, default=False): cv.boolean,
     }
 )
 

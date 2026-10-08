@@ -6,10 +6,18 @@
 # pymodbus is the integration's runtime requirement. manifest.json declares a
 # minimum so Home Assistant keeps owning the resolved version; the locks here
 # pin the exact version of their Home Assistant matrix entry.
+#
+# The schema library is deliberately absent: Home Assistant replaced
+# voluptuous with probatio in 2026.9 and installs it itself, so listing
+# either one here would mean validating against a version Home Assistant
+# does not resolve.
+#
+# mypy is pinned only in this lock. Home Assistant's own annotations moved
+# from voluptuous to probatio in 2026.10, so the typing gate runs against
+# current_homeassistant alone; see .github/workflows/validate.yml.
 mypy==2.3.1
 pymodbus[serial]==3.13.1
 pytest==9.1.1
 pytest-cov==7.1.0
 ruff==0.16.9
 spdx-tools==0.8.5
-voluptuous-serialize==2.7.0

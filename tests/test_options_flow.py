@@ -4,7 +4,7 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any
 
-import voluptuous as vol
+import probatio
 
 from custom_components.mennekes_amtron._flow_serial import PortOption
 from custom_components.mennekes_amtron.config_schemas import (
@@ -105,7 +105,7 @@ def test_the_user_schema_bounds_the_device_address() -> None:
     assert schema(dict(BUS))["device_id"] == 50
     try:
         schema({**BUS, "device_id": 9})
-    except vol.Invalid:
+    except probatio.Invalid:
         pass
     else:  # pragma: no cover - the schema must reject this
         raise AssertionError("device id 9 must be rejected")

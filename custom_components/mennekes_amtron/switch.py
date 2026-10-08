@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
+# Core re-exports the device-class enums with ``noqa`` instead of ``__all__``
+# (2026.10), so mypy cannot see the re-export; see docs/architecture.md.
+# ``--strict`` flags the ignore as unused once Core exports the name itself.
+from homeassistant.components.switch import (  # type: ignore[attr-defined]
+    SwitchDeviceClass,
+    SwitchEntity,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 

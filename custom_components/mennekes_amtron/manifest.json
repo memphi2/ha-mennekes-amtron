@@ -13,7 +13,7 @@
   ],
   "quality_scale": "platinum",
   "requirements": [
-    "pymodbus[serial]>=3.11.2"
+    "pymodbus[serial]>=3.13.1"
   ],
   "version": "0.1.0"
 }

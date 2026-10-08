@@ -15,6 +15,8 @@ from custom_components.mennekes_amtron.blueprint_installer import (
     install_blueprints,
 )
 
+ROOT = Path(__file__).resolve().parents[1]
+
 EXPECTED = {
     "solar_surplus_charging.yaml",
     "pause_and_resume_on_surplus.yaml",
@@ -46,7 +48,9 @@ def test_every_blueprint_passes_the_home_assistant_schema(path: Path) -> None:
     assert blueprint.name.startswith("MENNEKES AMTRON")
     assert blueprint.inputs
     assert blueprint.metadata["description"].strip()
-    assert blueprint.metadata["homeassistant"]["min_version"]
+    # A blueprint that claims an older Home Assistant than the integration
+    # supports would install into a version the integration refuses to run on.
+    assert blueprint.metadata["homeassistant"]["min_version"] == _minimum_ha()
 
 
 @pytest.mark.parametrize("path", _shipped(), ids=lambda path: path.name)
@@ -184,3 +188,12 @@ def test_setup_installs_them_through_the_executor() -> None:
         assert (target / "solar_surplus_charging.yaml").is_file()
 
     asyncio.run(run())
+
+
+def _minimum_ha() -> str:
+    """Return the oldest Home Assistant the project supports."""
+
+    versions = json.loads(
+        (ROOT / "project-versions.json").read_text(encoding="utf-8")
+    )
+    return str(versions["min_homeassistant"])

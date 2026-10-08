@@ -1,10 +1,10 @@
-"""Voluptuous schemas for the config and options flows."""
+"""Schemas for the config and options flows."""
 
 from __future__ import annotations
 
 from typing import Any
 
-import voluptuous as vol
+import probatio
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.selector import (
     NumberSelector,
@@ -43,15 +43,15 @@ from .const import (
 )
 
 
-def user_schema(ports: list[PortOption]) -> vol.Schema:
+def user_schema(ports: list[PortOption]) -> probatio.Schema:
     """Return the schema of the first config-flow step."""
 
-    return vol.Schema(
+    return probatio.Schema(
         {
-            vol.Required(CONF_PORT): _port_selector(ports),
+            probatio.Required(CONF_PORT): _port_selector(ports),
             # A bare integer with a range renders as a slider, which is the
             # wrong control for a bus address somebody reads off a tool.
-            vol.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): vol.All(
+            probatio.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): probatio.All(
                 NumberSelector(
                     NumberSelectorConfig(
                         min=DEVICE_ID_MIN,
@@ -60,19 +60,19 @@ def user_schema(ports: list[PortOption]) -> vol.Schema:
                         mode=NumberSelectorMode.BOX,
                     )
                 ),
-                vol.Coerce(int),
+                probatio.Coerce(int),
             ),
-            vol.Required(CONF_BAUDRATE, default=DEFAULT_BAUDRATE): vol.In(
+            probatio.Required(CONF_BAUDRATE, default=DEFAULT_BAUDRATE): probatio.In(
                 SUPPORTED_BAUDRATES
             ),
-            vol.Required(CONF_FRAME, default=DEFAULT_FRAME): SelectSelector(
+            probatio.Required(CONF_FRAME, default=DEFAULT_FRAME): SelectSelector(
                 SelectSelectorConfig(
                     options=list(SUPPORTED_FRAMES),
                     translation_key="frame",
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             ),
-            vol.Required(CONF_SEARCH, default=DEFAULT_SEARCH): SelectSelector(
+            probatio.Required(CONF_SEARCH, default=DEFAULT_SEARCH): SelectSelector(
                 SelectSelectorConfig(
                     options=list(SEARCH_MODES),
                     translation_key="search",
@@ -87,12 +87,12 @@ def options_schema(
     current: dict[str, Any],
     *,
     max_current: float,
-) -> vol.Schema:
+) -> probatio.Schema:
     """Return the options schema, bounded by what the device allows."""
 
-    return vol.Schema(
+    return probatio.Schema(
         {
-            vol.Required(
+            probatio.Required(
                 CONF_CONTROL_MODE,
                 default=current.get(CONF_CONTROL_MODE, DEFAULT_CONTROL_MODE),
             ): SelectSelector(
@@ -102,7 +102,7 @@ def options_schema(
                     mode=SelectSelectorMode.LIST,
                 )
             ),
-            vol.Required(
+            probatio.Required(
                 CONF_SCAN_INTERVAL_SECONDS,
                 default=current.get(
                     CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS
@@ -116,7 +116,7 @@ def options_schema(
                     mode=NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required(
+            probatio.Required(
                 CONF_CURRENT_LIMIT,
                 default=current.get(CONF_CURRENT_LIMIT, max_current),
             ): NumberSelector(

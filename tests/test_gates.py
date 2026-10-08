@@ -444,3 +444,46 @@ def test_the_hardware_document_keeps_its_sources_marked(
     assert any("electrician" in failure for failure in failures)
     assert any("XG1" in failure for failure in failures)
     assert any("exactly one master" in failure for failure in failures)
+
+
+def test_the_schema_gate_rejects_a_voluptuous_import(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Home Assistant aliases the old name, so only a gate catches a relapse."""
+
+    import check_repo
+
+    assert check_repo.check_schema_library() == []
+
+    (tmp_path / "flow.py").write_text(
+        "import voluptuous as vol\n\nSCHEMA = vol.Schema({})\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+
+    failures = check_repo.check_schema_library()
+    assert len(failures) == 1
+    assert "flow.py:1 imports voluptuous" in failures[0]
+
+
+def test_the_schema_gate_allows_naming_voluptuous_in_prose() -> None:
+    """The comments explaining the migration must not trip the gate."""
+
+    import check_repo
+
+    assert check_repo.VOLUPTUOUS_IMPORT.match("# voluptuous was replaced") is None
+    assert check_repo.VOLUPTUOUS_IMPORT.match("import voluptuous_serialize") is None
+    assert check_repo.VOLUPTUOUS_IMPORT.match("import voluptuous as vol") is not None
+    assert check_repo.VOLUPTUOUS_IMPORT.match("from voluptuous import Schema")
+
+
+def test_skipping_the_typing_gate_leaves_every_other_step() -> None:
+    """The minimum matrix entry runs everything the annotations allow."""
+
+    import check_validate
+
+    full = [step.name for step in check_validate.steps()]
+    reduced = [step.name for step in check_validate.steps(skip_typing=True)]
+
+    assert check_validate.TYPING_STEP in full
+    assert reduced == [name for name in full if name != check_validate.TYPING_STEP]
+    assert len(reduced) == len(full) - 1

@@ -6,30 +6,47 @@
 
 ## Compatibility Baseline
 
-- Minimum Home Assistant: `2026.5.0`
-- Validated Home Assistant: `2026.5.x` and `2026.9.x`
-- Early warning: every push is also validated against the next Home Assistant
-  pre-release in a job that is allowed to fail, so a breaking change in Core
-  is noticed before it ships rather than after
+- Minimum Home Assistant: `2026.9.0`
+- Validated Home Assistant: `2026.9.x` and `2026.10.x`
+- Early warning: every push is also validated against the newest Home
+  Assistant pre-release in a job that is allowed to fail, so a breaking change
+  in Core is noticed before it ships rather than after. The version is
+  resolved, not pinned, so the job never tests a superseded beta
 - Python: `3.14`
 - Modbus register layout: `v01.03` (validated), `v01.00`–`v01.02` supported
   with capability gating and untested
-- pymodbus: minimum `3.11.2`, declared as `pymodbus[serial]>=3.11.2`
+- pymodbus: minimum `3.13.1`, declared as `pymodbus[serial]>=3.13.1`
 
 Home Assistant Core pins pymodbus exactly for the whole instance, and that pin
-moves between releases: `3.11.2` in `2026.5.0`, `3.13.1` in `2026.9.4`. An
-exact pin here would fight Core on one of them, so `manifest.json` declares a
-minimum and lets Home Assistant own the resolved version. The floor is the
-oldest version any supported Home Assistant resolves to, and the API this
-integration uses -- keyword-only `count=` and `device_id=`, `FramerType.RTU`,
-`convert_from_registers` -- is identical in `3.11.2` and `3.13.1`.
-`scripts/check_pymodbus_pin.py` enforces that the declared minimum stays a
-minimum and stays at or below what the installed Home Assistant resolves to.
+moves between releases: every release in the supported range resolves
+`3.13.1`. An exact pin here would fight Core the moment that changes, so
+`manifest.json` declares a minimum and lets Home Assistant own the resolved
+version. The floor is the oldest version any supported Home Assistant
+resolves to. `scripts/check_pymodbus_pin.py` enforces that the declared
+minimum stays a minimum and stays at or below what the installed Home
+Assistant resolves to.
 
 Core also ships `tmodbus` and `modbus-connection` next to pymodbus for its own
 `modbus` integration, so Core may be migrating away from pymodbus. That does
 not change anything here: if Core drops pymodbus, Home Assistant installs it
 for this integration alone.
+
+
+## Schema Validation
+
+Home Assistant replaced voluptuous with `probatio` in `2026.9` and, from
+`2026.10`, types its own config-flow and action signatures against it. It
+still aliases the name `voluptuous` onto `probatio` for compatibility, so the
+old import keeps working -- but only because Home Assistant is imported
+first, and `mypy --strict` cannot see that the two names are the same class.
+This integration therefore imports `probatio` directly, as Core itself does,
+and `scripts/check_repo.py` fails the build if a voluptuous import returns.
+
+Because Core's annotations differ between the two ends of the supported
+range, one source file cannot satisfy `mypy --strict` against both. The
+minimum matrix entry runs the full test suite and proves the integration
+works there; the current entry additionally runs the typing gate. Neither
+entry skips a runtime check.
 
 ## Validated Hardware
 

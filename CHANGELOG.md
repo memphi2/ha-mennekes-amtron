@@ -5,6 +5,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- **Minimum Home Assistant is now `2026.9.0`, and `2026.10.0` is the validated
+  current release.** Home Assistant replaced voluptuous with `probatio` in
+  2026.9 and, from 2026.10, types its own config-flow and action signatures
+  against it. The integration now imports `probatio` directly, as Home
+  Assistant Core itself does, instead of relying on the compatibility alias
+  that makes the old import work only because Home Assistant is imported
+  first. Releases older than 2026.9 do not ship `probatio` and are no longer
+  supported.
+- The repair flow is typed with `RepairsFlowResult`, which 2026.10 narrowed to
+  its own flow context.
+- pymodbus minimum raised to `3.13.1`, the version every Home Assistant
+  release in the supported range resolves. The serial loopback test no longer
+  skips itself on older pymodbus builds, so it runs on every matrix entry.
+- The early-warning CI job resolves the newest Home Assistant pre-release
+  instead of pinning one, so it can no longer end up testing a beta that a
+  later release has already superseded.
+- The typing gate runs against the current Home Assistant only, because no
+  single source file can satisfy `mypy --strict` against both ends of the
+  supported range. The minimum entry runs every other gate, including the full
+  test suite. `scripts/check_validate.py --skip-typing` does the same locally.
+
+### Added
+
+- A repository gate that fails the build if a voluptuous import returns, since
+  Home Assistant's alias would otherwise let one pass unnoticed.
+
+### Fixed
+
+- Dropped the unused `voluptuous-serialize` development dependency. It was the
+  only reason the real voluptuous was installed in the validation environment,
+  which masked how the integration actually resolves its schema library.
+
 ## 0.1.0
 
 Initial release.

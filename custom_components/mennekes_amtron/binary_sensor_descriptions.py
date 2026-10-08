@@ -5,7 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from homeassistant.components.binary_sensor import (
+# Core re-exports the device-class enums with ``noqa`` instead of ``__all__``
+# (2026.10), so mypy cannot see the re-export; see docs/architecture.md.
+# ``--strict`` flags the ignore as unused once Core exports the name itself.
+from homeassistant.components.binary_sensor import (  # type: ignore[attr-defined]
     BinarySensorDeviceClass,
     BinarySensorEntityDescription,
 )

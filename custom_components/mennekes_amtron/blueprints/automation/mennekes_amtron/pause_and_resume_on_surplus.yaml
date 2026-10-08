@@ -13,7 +13,7 @@ blueprint:
     the wallbox relay and wears it out.
   domain: automation
   homeassistant:
-    min_version: "2026.5.0"
+    min_version: "2026.9.0"
   input:
     surplus_power:
       name: PV surplus

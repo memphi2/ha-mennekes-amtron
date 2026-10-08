@@ -125,15 +125,41 @@ codes are proven there rather than assumed. It is as close to the device as
 this repository gets without hardware; everything beyond it is the on-device
 verification in `docs/quickstart.md`.
 
-That test skips itself on pymodbus builds older than 3.13, because the
-*server-side* simulator API changed there. The client API this integration
-uses -- keyword-only `count=` and `device_id=`, `FramerType.RTU`,
-`convert_from_registers` -- is identical across the whole supported range and
-is covered by the unit tests on every matrix entry, so the skip costs
-coverage of the test harness, not of the integration.
+That test skips itself only on a pymodbus build that ships no simulator at
+all. Every Home Assistant release in the supported range resolves pymodbus
+3.13.1, which ships one, so the skip no longer covers any version the
+integration claims to support.
 
 ## Validation
 
 `scripts/check_validate.py` runs the same gates as CI, in the same order:
 repository, legal/provenance, quality scale, register map, pymodbus requirement, ruff,
-pytest, the 99 percent coverage ratchet and `mypy --strict`.
+pytest, the 99 percent coverage ratchet and `mypy --strict`. `--skip-typing`
+drops the last one, which is what the minimum matrix entry uses: Home
+Assistant's own schema annotations differ between the ends of the supported
+range, so the typing gate is run against the current release and the minimum
+release is held to the runtime gates. See [SUPPORT.md](../SUPPORT.md).
+
+## Schema validation
+
+The config flow, the options flow and the action schema are built with
+`probatio`, which is what Home Assistant installs and, since 2026.10, what it
+types its own signatures against. Home Assistant still aliases the name
+`voluptuous` onto it, so the old import works by accident of import order;
+`scripts/check_repo.py` fails the build if one returns.
+
+## Importing device-class enums
+
+`switch.py`, `button.py` and `binary_sensor_descriptions.py` import their
+device-class enum with a `type: ignore[attr-defined]`. In 2026.10 Home
+Assistant moved those enums into each platform's `const` submodule and
+re-exports them from the package with a `# noqa: F401`, which satisfies ruff
+but is not an explicit re-export, so `mypy --strict` refuses to see it.
+
+The package stays the public path: Core's own integrations import
+`BinarySensorDeviceClass` from `homeassistant.components.binary_sensor` in 317
+places and from the `const` submodule in none, and that submodule does not
+exist at all on the oldest supported release. Importing the private module to
+satisfy the type checker would therefore trade a correct import for a fragile
+one. The ignores remove themselves: `--strict` reports an unused ignore as an
+error the moment Core exports the names properly.

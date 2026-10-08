@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
-"""Run the same validation gates as the main CI job."""
+"""Run the same validation gates as the main CI job.
+
+``--skip-typing`` leaves the strict typing gate out. Home Assistant moved
+its own flow and service annotations from voluptuous to probatio in 2026.10,
+so one source file cannot satisfy ``mypy --strict`` against both ends of the
+supported range. CI therefore type-checks against ``current_homeassistant``
+and uses the minimum matrix entry to prove the integration still runs.
+"""
 
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -10,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+TYPING_STEP = "Python typing ratchet"
 
 
 @dataclass(frozen=True)
@@ -21,10 +30,10 @@ class ValidationStep:
     cwd: Path = ROOT
 
 
-def steps() -> list[ValidationStep]:
+def steps(*, skip_typing: bool = False) -> list[ValidationStep]:
     """Return the validation sequence, in the order CI runs it."""
 
-    return [
+    sequence: list[ValidationStep] = [
         ValidationStep("Repository checks", (sys.executable, "scripts/check_repo.py")),
         ValidationStep(
             "Legal/provenance audit",
@@ -49,21 +58,38 @@ def steps() -> list[ValidationStep]:
             (sys.executable, "scripts/check_coverage.py"),
         ),
         ValidationStep(
-            "Python typing ratchet",
+            TYPING_STEP,
             (sys.executable, "scripts/check_typing.py"),
         ),
     ]
+    if skip_typing:
+        return [step for step in sequence if step.name != TYPING_STEP]
+    return sequence
 
 
 def main() -> int:
     """Run the full local validation sequence."""
 
-    for step in steps():
+    arguments = _parse_arguments()
+    for step in steps(skip_typing=arguments.skip_typing):
         returncode = _run_step(step)
         if returncode:
             return returncode
     _write("Validation passed")
     return 0
+
+
+def _parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--skip-typing",
+        action="store_true",
+        help=(
+            "leave out the strict typing gate, which only matches the "
+            "annotations of the current Home Assistant"
+        ),
+    )
+    return parser.parse_args()
 
 
 def _run_step(step: ValidationStep) -> int:

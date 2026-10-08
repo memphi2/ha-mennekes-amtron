@@ -140,7 +140,7 @@ def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
     assert "ha-mennekes-amtron" in packages
     assert "pymodbus[serial]" in packages
     versions = {package["name"]: package["versionInfo"] for package in document["packages"]}
-    assert versions["pymodbus[serial]"] == ">=3.11.2"
+    assert versions["pymodbus[serial]"] == ">=3.13.1"
     assert len(document["relationships"]) == 2
 
     lines = sums.read_text(encoding="utf-8").strip().splitlines()

@@ -30,14 +30,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The minimum entry proves the integration runs on the oldest
+          # supported release; the current entry additionally type-checks it,
+          # because Home Assistant's own annotations moved from voluptuous to
+          # probatio in 2026.10 and cannot both be satisfied at once.
           - name: min-ha
             python-version: "3.14"
-            homeassistant: "2026.5.0"
+            homeassistant: "2026.9.0"
             requirements-lock: requirements-dev-min-ha.txt
+            validate-arguments: "--skip-typing"
           - name: current-ha
             python-version: "3.14"
-            homeassistant: "2026.9.4"
+            homeassistant: "2026.10.0"
             requirements-lock: requirements-dev.txt
+            validate-arguments: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -52,7 +58,7 @@ jobs:
           python -m pip install -r "${{ matrix.requirements-lock }}"
           python -m pip check
       - name: Validation gates
-        run: python scripts/check_validate.py
+        run: python scripts/check_validate.py ${{ matrix.validate-arguments }}
 
   hacs:
     name: release hacs
