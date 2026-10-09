@@ -1,9 +1,31 @@
 # Direct validation dependencies for the current Home Assistant matrix. CI
 # installs Home Assistant separately, so this file intentionally does not pin
 # Home Assistant transitive dependencies.
-mypy==2.3.1
+ast-serialize==0.12.1
+beartype==0.22.9
+boolean-py==5.0
+click==8.5.0
+coverage[toml]==7.16.2
+iniconfig==2.3.1
+librt==0.16.0
+license-expression==30.4.4
+mypy==2.4.0
+mypy-extensions==1.1.0
+packaging==26.3
+pathspec==1.1.1
+pluggy==1.6.0
+ply==3.11
+pygments==2.21.0
 pymodbus[serial]==3.13.1
+pyparsing==3.3.3
+pyserial==3.5
 pytest==9.1.1
 pytest-cov==7.1.0
-ruff==0.16.9
+pyyaml==6.0.3
+rdflib==7.6.0
+ruff==0.16.10
+semantic-version==2.10.0
 spdx-tools==0.8.5
+typing-extensions==4.16.0
+uritools==6.1.3
+xmltodict==1.0.4
