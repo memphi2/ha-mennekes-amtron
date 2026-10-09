@@ -107,9 +107,6 @@ jobs:
         uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main
         with:
           category: integration
-          # The integration uses zip_release; these checks need the release
-          # asset, so branch/PR validation covers the remaining HACS gates.
-          ignore: hacsjson integration_manifest
 
   hassfest:
     runs-on: ubuntu-24.04
