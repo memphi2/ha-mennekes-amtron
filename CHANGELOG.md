@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+
+- Development tooling moved to `mypy` 2.4.0 and `ruff` 0.16.10, proven against
+  both matrix entries. Nothing the integration ships changed.
+
+### Added
+
+- A repository gate that keeps the validation locks to direct dependencies.
+  CI installs the Home Assistant of its matrix entry separately and Home
+  Assistant owns every version underneath it, so a lock that also pinned
+  those would either fight that resolution or freeze it at whatever one
+  release happened to want. Dependabot reads the locks as pip-compile output
+  and offers to expand them into a full transitive lock every month; the
+  offer looks harmless because the versions it adds are the ones already
+  installed. The gate is what says no.
+
 ## 0.1.0
 
 Initial release.

@@ -20,6 +20,10 @@ updates:
     # Dependabot updates requirements-dev.txt. The minimum-HA validation lock
     # is curated manually; Home Assistant transitive dependencies come from the
     # selected Home Assistant matrix version instead of being committed here.
+    #
+    # Dependabot reads these files as pip-compile output and will offer to
+    # expand them into a full transitive lock. Take the version bumps, leave
+    # the expansion: scripts/check_repo.py fails the build on it.
     exclude-paths:
       - "requirements-dev-min-ha.txt"
     schedule:

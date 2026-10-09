@@ -583,3 +583,66 @@ def test_the_register_document_gate_notices_a_missing_register(
     )
     assert any("lists 50 registers" in failure for failure in failures)
     assert any("signaled_current is missing" in failure for failure in failures)
+
+
+# --- the validation locks stay direct-only ---------------------------------
+
+
+def test_the_lock_gate_passes_on_this_repository() -> None:
+    import check_repo
+
+    assert check_repo.check_direct_dependency_locks() == []
+
+
+def test_the_lock_gate_rejects_a_transitive_pin(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """This is the shape a monthly Dependabot run offers.
+
+    It expands the lock into pip-compile output, pinning the versions Home
+    Assistant happens to resolve today. CI passes, and the next Home Assistant
+    release has to fight the pin.
+    """
+
+    import check_repo
+
+    (tmp_path / "requirements-dev.in").write_text(
+        "mypy==2.4.0\nruff==0.16.10\n", encoding="utf-8"
+    )
+    (tmp_path / "requirements-dev.txt").write_text(
+        "mypy==2.4.0\nmypy-extensions==1.1.0\nruff==0.16.10\n"
+        "typing-extensions==4.16.0\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "requirements-dev-min-ha.txt").write_text(
+        "ruff==0.16.10\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+
+    failures = check_repo.check_direct_dependency_locks()
+    assert len(failures) == 1
+    assert "mypy-extensions" in failures[0]
+    assert "typing-extensions" in failures[0]
+    assert "requirements-dev.txt" in failures[0]
+
+
+def test_the_lock_gate_allows_extras_and_comments(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """``pymodbus[serial]`` is the same package as ``pymodbus``."""
+
+    import check_repo
+
+    (tmp_path / "requirements-dev.in").write_text(
+        "# a comment\npymodbus[serial]==3.13.1\nruff==0.16.10\n", encoding="utf-8"
+    )
+    (tmp_path / "requirements-dev.txt").write_text(
+        "pymodbus==3.13.1  # resolved without the extra\nruff==0.16.10\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "requirements-dev-min-ha.txt").write_text(
+        "pymodbus[serial]==3.13.1\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+
+    assert check_repo.check_direct_dependency_locks() == []
