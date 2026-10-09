@@ -15,9 +15,9 @@
 # mypy is pinned only in this lock. Home Assistant's own annotations moved
 # from voluptuous to probatio in 2026.10, so the typing gate runs against
 # current_homeassistant alone; see .github/workflows/validate.yml.
-mypy==2.3.1
+mypy==2.4.0
 pymodbus[serial]==3.13.1
 pytest==9.1.1
 pytest-cov==7.1.0
-ruff==0.16.9
+ruff==0.16.10
 spdx-tools==0.8.5

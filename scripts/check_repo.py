@@ -85,6 +85,11 @@ SECRET_PATTERN_SOURCES = {
 }
 SHA_PINNED_USES = re.compile(r"uses: [^@\s]+@(?P<ref>[^\s]+)")
 VOLUPTUOUS_IMPORT = re.compile(r"^(?:import voluptuous|from voluptuous)\b")
+
+# The declaration of what the validation environment may contain, and the
+# locks that have to stay within it.
+REQUIREMENTS_DECLARATION = "requirements-dev.in"
+REQUIREMENTS_LOCKS = ("requirements-dev.txt", "requirements-dev-min-ha.txt")
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -119,6 +124,7 @@ def main() -> int:
     failures.extend(check_release_metadata())
     failures.extend(check_hacs_metadata())
     failures.extend(check_requirement_pins())
+    failures.extend(check_direct_dependency_locks())
     failures.extend(check_schema_library())
     failures.extend(check_github_automation())
     failures.extend(check_issue_templates())
@@ -262,6 +268,53 @@ def check_requirement_pins() -> list[str]:
         elif expected and f"pymodbus[serial]=={expected}" not in text:
             failures.append(f"{rel} must pin pymodbus[serial]=={expected}")
     return failures
+
+
+def check_direct_dependency_locks() -> list[str]:
+    """The validation locks list direct dependencies, never transitive ones.
+
+    CI installs the Home Assistant of its matrix entry separately, and Home
+    Assistant owns the versions of everything underneath it. A lock that also
+    pinned those would either fight that resolution or silently freeze it at
+    whatever one Home Assistant release happened to want.
+
+    Dependabot cannot know that: a monthly run reads these files as pip-compile
+    output and offers to expand them into a full transitive lock. The offer
+    looks harmless, because the versions it adds are exactly the ones already
+    installed. This is the check that says no.
+    """
+
+    declared = _pinned_packages(REQUIREMENTS_DECLARATION)
+    if not declared:
+        return [f"{REQUIREMENTS_DECLARATION} declares no dependencies"]
+
+    failures: list[str] = []
+    for rel in REQUIREMENTS_LOCKS:
+        pinned = _pinned_packages(rel)
+        if not pinned:
+            failures.append(f"{rel} pins no dependencies")
+            continue
+        if extra := sorted(pinned - declared):
+            failures.append(
+                f"{rel} pins {', '.join(extra)}, which "
+                f"{REQUIREMENTS_DECLARATION} does not declare. The locks carry "
+                f"direct dependencies only; Home Assistant resolves the rest."
+            )
+    return failures
+
+
+def _pinned_packages(relative: str) -> set[str]:
+    """Return the package names a requirements file pins, without extras."""
+
+    names: set[str] = set()
+    for line in (ROOT / relative).read_text(encoding="utf-8").splitlines():
+        requirement = line.split("#", 1)[0].strip()
+        if not requirement:
+            continue
+        name = re.split(r"[=<>!~\[]", requirement, maxsplit=1)[0].strip()
+        if name:
+            names.add(name.lower().replace("_", "-"))
+    return names
 
 
 def check_schema_library() -> list[str]:
