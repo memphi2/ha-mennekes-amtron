@@ -5,77 +5,6 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
-
-### Changed
-
-- **Minimum Home Assistant is now `2026.9.0`, and `2026.10.0` is the validated
-  current release.** Home Assistant replaced voluptuous with `probatio` in
-  2026.9 and, from 2026.10, types its own config-flow and action signatures
-  against it. The integration now imports `probatio` directly, as Home
-  Assistant Core itself does, instead of relying on the compatibility alias
-  that makes the old import work only because Home Assistant is imported
-  first. Releases older than 2026.9 do not ship `probatio` and are no longer
-  supported.
-- The repair flow is typed with `RepairsFlowResult`, which 2026.10 narrowed to
-  its own flow context.
-- pymodbus minimum raised to `3.13.1`, the version every Home Assistant
-  release in the supported range resolves. The serial loopback test no longer
-  skips itself on older pymodbus builds, so it runs on every matrix entry.
-- The early-warning CI job resolves the newest Home Assistant pre-release
-  instead of pinning one, so it can no longer end up testing a beta that a
-  later release has already superseded.
-- The typing gate runs against the current Home Assistant only, because no
-  single source file can satisfy `mypy --strict` against both ends of the
-  supported range. The minimum entry runs every other gate, including the full
-  test suite. `scripts/check_validate.py --skip-typing` does the same locally.
-
-### Added
-
-- A repository gate that fails the build if a voluptuous import returns, since
-  Home Assistant's alias would otherwise let one pass unnoticed.
-- The register-map gate now also checks `docs/modbus-registers.md` against the
-  code: every address, span, data type, access mode, layout version, unit,
-  read block and enumerated value. That document is what a reviewer holds next
-  to the manufacturer's specification, and nothing compared the two before.
-- `heartbeats_late` in the diagnostics, counting the times the wallbox was
-  left waiting longer than the ten seconds it allows. Such a gap is also
-  logged as a warning, because the device reports the resulting fault without
-  saying what caused it.
-
-### Fixed
-
-- **A failing register block no longer leaves a frozen value behind.** Values
-  were carried forward between polls for the slow blocks, which was right, but
-  a block that was read and failed kept its last reading too, and its entities
-  went on reporting it as available. An automation acting on surplus power
-  could not tell that measurement from a live one. The keys of a failed block
-  are now dropped and its entities go unavailable.
-- **The heartbeat no longer walks past the wallbox's ten-second deadline.**
-  Two things pushed it there: the task slept a full interval *after* the
-  write, so time spent waiting for the shared bus was added to the period
-  rather than absorbed, and the heartbeat queued behind every other bus user
-  on a fair lock. Against a device that answers nothing, the gap between two
-  heartbeats measured 12 s with two bus users and 15 s with three. Readers now
-  pass a queue gate the heartbeat skips, and the task sleeps only the
-  remainder of its interval; the worst case measures 6 s regardless of load.
-- **Pausing and changing the charging current no longer block each other
-  wrongly.** Both rules were keyed on `0x0302`, so moving the slider made the
-  pause switch refuse for the next five minutes, while a pause could be undone
-  by a slider move six seconds later. The register's five-second floor stays
-  in the client; the five-minute pause hysteresis moved to the control layer,
-  where the operation is known. Writing a real limit while the pause value is
-  active now counts as a resume.
-- **A single failed port open no longer ends the bus search.** The search gave
-  up at the first candidate whose port would not open and reported "no wallbox
-  answered", although a momentarily busy adapter — or a baud rate the driver
-  cannot set — says nothing about the remaining candidates. It now gives up
-  after five failed opens in a row, and reports that the port could not be
-  used rather than blaming the wiring.
-- Dropped the unused `voluptuous-serialize` development dependency. It was the
-  only reason the real voluptuous was installed in the validation environment,
-  which masked how the integration actually resolves its schema library.
-
 ## 0.1.0
 
 Initial release.
@@ -90,6 +19,16 @@ RTU, built against the manufacturer's Modbus RTU specification revision 2.5
 > wallbox. Start in read-only mode and work through the verification steps in
 > `docs/quickstart.md`.
 
+### Requirements
+
+- **Home Assistant 2026.9.0 or newer**, validated against 2026.9.x and
+  2026.10.x. Home Assistant replaced voluptuous with `probatio` in 2026.9 and
+  types its own config-flow and action signatures against it from 2026.10.
+  This integration imports `probatio` directly, as Home Assistant Core does.
+  Releases older than 2026.9 ship no `probatio` and are not supported.
+- **pymodbus 3.13.1 or newer**, the version every Home Assistant release in
+  that range resolves.
+
 ### Setup
 
 - Config flow that opens the serial port and reads the Modbus layout version
@@ -98,7 +37,9 @@ RTU, built against the manufacturer's Modbus RTU specification revision 2.5
 - The form **searches the bus** when the values entered do not work: every
   documented device address at those bus parameters, or every documented
   combination of address, baud rate and frame. It runs as a progress step with
-  an estimate, tries the user's own values first, and only reads.
+  an estimate, tries the user's own values first, and only reads. A single
+  candidate whose port will not open is skipped rather than ending the
+  search; five failures in a row report the port, not the wiring.
 - Five fields, not seven: the device address is a number box, and the frame is
   one choice of the three the specification documents, so impossible
   combinations like 8N1 are unreachable.
@@ -120,7 +61,9 @@ RTU, built against the manufacturer's Modbus RTU specification revision 2.5
 - 18 declared contiguous read blocks with a single-register fallback when a
   device rejects a range read. Eight of them carry configuration and are read
   once a minute instead of every poll, which keeps the bus for the ten that
-  move.
+  move. A block that was read and failed takes its entities unavailable
+  instead of leaving the last reading in place, so a frozen measurement can
+  never pass for a live one.
 - `sensor.*_energy_total` feeds the Energy dashboard. The manufacturer marks
   that register as not usable for billing, and the entity says so.
 
@@ -133,13 +76,19 @@ RTU, built against the manufacturer's Modbus RTU specification revision 2.5
   limitation" needs an explicit opt-in on the action.
 - A dedicated heartbeat task writes `0x0D00 = 0x55AA` every five seconds in
   master mode, decoupled from the data poll, because a slow poll must never be
-  able to starve it.
+  able to starve it. It sleeps only the remainder of its interval, so time
+  spent waiting for the shared bus is absorbed rather than added, and a gap
+  the wallbox would not tolerate is logged and counted.
 - One `asyncio` lock for every transaction, because RS-485 is a single-master
-  bus.
-- The manufacturer's rate limits are enforced: a charging-current change
-  faster than five seconds is deferred and the newest value written; a pause,
-  resume or phase switch faster than five minutes is refused with an
-  explanatory error.
+  bus — and a queue gate in front of it that only the heartbeat may skip, so
+  a stalling device cannot push the heartbeat behind every other bus user.
+- The manufacturer's rate limits are enforced, and the two that meet on
+  `0x0302` are kept apart: every write to it keeps five seconds from the one
+  before, which belongs to the register, while pausing and resuming keep five
+  minutes, which belongs to the operation. A charging-current change that
+  comes too fast is deferred and the newest value written; a pause or resume
+  is refused with the remaining time. While the pause value is active, any
+  accepted current counts as a resume.
 - A phase switch pauses a running charge first, as the manufacturer's own
   sequence does. Restarting the wallbox is refused unless it is idle.
 - The §14a EnWG downgrade is enforced in the wallbox hardware. The integration
@@ -172,7 +121,7 @@ RTU, built against the manufacturer's Modbus RTU specification revision 2.5
 
 - All 52 official Home Assistant quality-scale rules answered: 43 `done`,
   9 `exempt`, none open.
-- 338 tests and a 99 percent coverage ratchet. The suite includes an
+- 368 tests and a 99 percent coverage ratchet. The suite includes an
   end-to-end test over a virtual serial link against a real Modbus RTU server,
   and a smoke test that boots Home Assistant, drives the real config and
   options flows, and runs the blueprints as real automations.
@@ -181,4 +130,13 @@ RTU, built against the manufacturer's Modbus RTU specification revision 2.5
 - Validation gates for the repository, legal provenance, the quality scale,
   the register map and the pymodbus requirement, run identically locally and
   in CI against the minimum and current Home Assistant, plus an early-warning
-  job against the next pre-release.
+  job that resolves the next Home Assistant pre-release rather than pinning
+  one.
+- The register-map gate also checks `docs/modbus-registers.md` against the
+  code — every address, span, data type, access mode, layout version, unit,
+  read block and enumerated value. That document is what a reviewer holds
+  next to the manufacturer's specification.
+- The typing gate runs against the current Home Assistant, because no single
+  source file can satisfy `mypy --strict` against both ends of the supported
+  range; the minimum entry runs every other gate including the full suite.
+  `scripts/check_validate.py --skip-typing` does the same locally.
