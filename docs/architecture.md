@@ -92,18 +92,49 @@ pause switch refuse for five minutes after any slider move, and let a pause
 be undone by a slider move six seconds later. A real limit written while the
 pause value is active counts as a resume, whatever the caller meant by it.
 
-### Two polling cadences
+### Three polling cadences, and one of them is about the database
 
-`register_blocks.py` marks each block `FAST` or `SLOW`. Ten blocks carry
-values that move while a car charges; eight carry configuration that changes
-when somebody reconfigures the wallbox. Reading all eighteen every few seconds
-spends most of the bus re-reading a serial number.
+`register_blocks.py` marks each block `FAST`, `ACTIVE` or `SLOW`.
 
-The coordinator reads the slow blocks once a minute and carries their values
-forward in the snapshot in between. That halves the bus traffic without
-hiding a reconfiguration for longer than a minute, and it keeps the registers
-that matter — state, signalled current, measurements — on the interval the
-user chose.
+`SLOW` is about the bus. Eight blocks carry configuration that changes when
+somebody reconfigures the wallbox, not while it charges — the serial number,
+the article number, the DIP-configured limits. The coordinator reads them once
+a minute and carries their values forward in between, which halves the bus
+traffic without hiding a reconfiguration for longer than a minute.
+
+`ACTIVE` is about the recorder. Four blocks describe a vehicle: the
+measurements, the signalled current, the session and the detected phases. A
+wallbox spends most of its life with nothing plugged into it, and in that
+state the currents and powers are zero while the mains voltage keeps drifting.
+Home Assistant records the native value, so three voltages polled every five
+seconds are three database rows every five seconds describing a wallbox that
+is doing nothing — around 43 000 rows a day before anybody charges anything.
+Those blocks therefore run at the user's interval while a vehicle is connected
+and at the slow interval otherwise. The entities keep their values and stay
+available; they simply stop being rewritten.
+
+The rule is deliberately lopsided: only `evse_state` reading exactly *idle*
+demotes them. An unknown or unreadable state counts as connected, because
+being wrong that way costs bus traffic, while being wrong the other way would
+hide a running charge.
+
+Measured on one wallbox at a five-second interval, with the mains jittering by
+0.2 V and charging power by 20 W, over twenty idle hours and four charging
+hours:
+
+| | rows/day | bus while idle |
+|---|---|---|
+| raw floats, measurements always fast | 77 770 | 1.22 % |
+| rounded to the displayed precision | 68 551 | 1.22 % |
+| measurements demoted while idle | **34 626** | **0.74 %** |
+
+The rounding is the other half. `suggested_display_precision` only tells the
+frontend how to render a state; what Home Assistant records and builds
+statistics from is the native value. Decoding a float32 carries the conversion
+artefact along, so 230.1 V arrives as `230.10000610351562` and is stored that
+way — and the device's last bits move whenever its meter recomputes, which on
+its own is enough to write a row on every poll. `sensor.py` therefore rounds
+every numeric state to the precision the entity says it will display.
 
 Carrying a value forward is only right while the block was not due. A block
 that *was* read and failed has no current value, so its keys are dropped from

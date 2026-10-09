@@ -71,6 +71,10 @@ CHARGING_CURRENT_MINIMUM: Final = 6.0
 CHARGING_CURRENT_UNLIMITED: Final = 0.0
 CHARGING_PAUSE_CURRENT: Final = 1.0
 CHARGING_CURRENT_STEP: Final = 0.1
+# Decimals the charging-current entity may report. The register is a float32,
+# so anything beyond its own step is a conversion artefact that would be
+# recorded on every poll.
+CHARGING_CURRENT_DECIMALS: Final = 1
 
 HEARTBEAT_VALUE: Final = 0x55AA
 SYSTEM_RESTART_VALUE: Final = 0xBB

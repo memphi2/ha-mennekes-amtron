@@ -20,7 +20,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import CHARGING_CURRENT_MINIMUM, CHARGING_CURRENT_STEP
+from .const import (
+    CHARGING_CURRENT_DECIMALS,
+    CHARGING_CURRENT_MINIMUM,
+    CHARGING_CURRENT_STEP,
+)
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .registers import CHARGING_CURRENT_EMS
@@ -77,7 +81,10 @@ class AmtronChargingCurrentNumber(MennekesAmtronEntity, NumberEntity, RestoreEnt
 
         value = self.register_value
         if isinstance(value, (int, float)) and value >= CHARGING_CURRENT_MINIMUM:
-            return float(value)
+            # The register is a float32, so a 10 A limit comes back as
+            # 9.999999... The entity cannot offer more resolution than its own
+            # step, and recording more of it only costs database rows.
+            return round(float(value), CHARGING_CURRENT_DECIMALS)
         return self.runtime_data.control.charging_setpoint
 
     async def async_added_to_hass(self) -> None:
