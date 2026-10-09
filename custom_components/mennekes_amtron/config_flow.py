@@ -63,6 +63,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._search_task: Any = None
         self._search_result: SearchResult | None = None
+        self._search_error = "not_found"
         self._pending_input: dict[str, Any] | None = None
         self._pending_step: str = "user"
 
@@ -168,11 +169,15 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             return self._async_show_search_progress(base, all_parameters)
 
         self._search_result = None
+        self._search_error = "not_found"
         if task is not None:
             try:
                 self._search_result = task.result()
             except AmtronConnectionError as err:
+                # The search gave up on the port itself, not on the
+                # candidates, so say that rather than "nothing answered".
                 _LOGGER.debug("Search could not use the port: %s", err)
+                self._search_error = "cannot_connect"
             except AmtronBusError as err:  # pragma: no cover - defensive
                 _LOGGER.debug("Search failed: %s", err)
         self._search_task = None
@@ -186,7 +191,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         result = self._search_result
         if result is None:
             return await self._async_show_bus_form(
-                self._pending_step, self._pending_input, {"base": "not_found"}
+                self._pending_step, self._pending_input, {"base": self._search_error}
             )
 
         if user_input is None:

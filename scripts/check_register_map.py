@@ -10,6 +10,7 @@ log.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,34 @@ from check_reporting import report_failures
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "mennekes_amtron"
 ENTITY_REFERENCE = ROOT / "docs" / "entities.md"
+REGISTER_REFERENCE = ROOT / "docs" / "modbus-registers.md"
 LANGUAGES = ("en", "de")
+
+# Rows of the three tables in docs/modbus-registers.md. The row patterns are
+# anchored at both ends so a table with a different column count cannot match
+# the wrong one.
+_REGISTER_ROW = re.compile(
+    r"^\|\s*`(0x[0-9A-F]{4})`(?:-`(0x[0-9A-F]{4})`)?"
+    r"\s*\|\s*(\w+)\s*\|\s*(R/W|R|W)\s*\|\s*(v\d+\.\d+)"
+    r"\s*\|\s*`([a-z0-9_]+)`\s*\|\s*([^|]*?)\s*\|\s*$",
+    re.MULTILINE,
+)
+_BLOCK_ROW = re.compile(
+    r"^\|\s*`([a-z_]+)`\s*\|\s*`(0x[0-9A-F]{4})`\s*\|\s*(\d+)"
+    r"\s*\|\s*(v\d+\.\d+)\s*\|\s*$",
+    re.MULTILINE,
+)
+_ENUM_ROW = re.compile(
+    r"^\|\s*(?:`([a-z0-9_]+)`)?\s*\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|\s*$",
+    re.MULTILINE,
+)
+_DOCUMENT_DATATYPES = {
+    "uint16": "uint16",
+    "uint32": "uint32",
+    "float32": "float32",
+    "ascii": "string",
+}
+_DOCUMENT_ACCESS = {"R": "read", "W": "write", "R/W": "read_write"}
 
 sys.path.insert(0, str(ROOT))
 
@@ -31,6 +59,7 @@ def main() -> int:
     failures.extend(check_addresses())
     failures.extend(check_layouts())
     failures.extend(check_blocks())
+    failures.extend(check_register_document())
     failures.extend(check_entity_translations())
     failures.extend(check_entity_icons())
     failures.extend(check_entity_reference())
@@ -85,6 +114,144 @@ def check_blocks() -> list[str]:
     )
 
     return block_consistency_failures()
+
+
+def check_register_document() -> list[str]:
+    """Prove docs/modbus-registers.md still describes the code.
+
+    That document is what a reviewer holds next to the manufacturer's
+    specification; the code is what the wallbox actually sees. Nothing else
+    compares the two, so a corrected address in one of them could sit next to
+    the old one in the other indefinitely.
+    """
+
+    from custom_components.mennekes_amtron.register_blocks import REGISTER_BLOCKS
+    from custom_components.mennekes_amtron.registers import (
+        REGISTERS,
+        REGISTERS_BY_KEY,
+        layout_label,
+    )
+
+    text = REGISTER_REFERENCE.read_text(encoding="utf-8")
+    failures: list[str] = []
+
+    # An empty parse would make every check below pass by saying nothing.
+    rows = _REGISTER_ROW.findall(text)
+    blocks = _BLOCK_ROW.findall(text)
+    if len(rows) != len(REGISTERS):
+        failures.append(
+            f"docs/modbus-registers.md lists {len(rows)} registers, "
+            f"the code has {len(REGISTERS)}"
+        )
+    if len(blocks) != len(REGISTER_BLOCKS):
+        failures.append(
+            f"docs/modbus-registers.md lists {len(blocks)} read blocks, "
+            f"the code has {len(REGISTER_BLOCKS)}"
+        )
+
+    documented: set[str] = set()
+    for start, end, datatype, access, layout, key, unit in rows:
+        documented.add(key)
+        spec = REGISTERS_BY_KEY.get(key)
+        if spec is None:
+            failures.append(f"docs/modbus-registers.md documents unknown register {key}")
+            continue
+        last = int(end or start, 16)
+        expected = (
+            f"0x{spec.address:04X}"
+            if spec.count == 1
+            else f"0x{spec.address:04X}-0x{spec.end_address - 1:04X}"
+        )
+        found = start if not end else f"{start}-{end}"
+        if int(start, 16) != spec.address or last != spec.end_address - 1:
+            failures.append(f"{key}: document says {found}, code says {expected}")
+        if _DOCUMENT_DATATYPES.get(datatype) != str(spec.datatype):
+            failures.append(
+                f"{key}: document says {datatype}, code says {spec.datatype}"
+            )
+        if _DOCUMENT_ACCESS.get(access) != str(spec.access):
+            failures.append(f"{key}: document says {access}, code says {spec.access}")
+        if layout != layout_label(spec.min_layout):
+            failures.append(
+                f"{key}: document says {layout}, code says "
+                f"{layout_label(spec.min_layout)}"
+            )
+        unit_in_document = None if unit in ("-", "") else unit
+        if unit_in_document != spec.unit:
+            failures.append(
+                f"{key}: document says unit {unit_in_document!r}, code says "
+                f"{spec.unit!r}"
+            )
+    failures.extend(
+        f"register {spec.key} is missing from docs/modbus-registers.md"
+        for spec in REGISTERS
+        if spec.key not in documented
+    )
+
+    by_name = {block.name: block for block in REGISTER_BLOCKS}
+    documented_blocks = {name for name, *_rest in blocks}
+    for name, address, count, layout in blocks:
+        block = by_name.get(name)
+        if block is None:
+            failures.append(f"docs/modbus-registers.md documents unknown block {name}")
+            continue
+        if int(address, 16) != block.address:
+            failures.append(
+                f"block {name}: document says {address}, code says "
+                f"0x{block.address:04X}"
+            )
+        if int(count) != block.count:
+            failures.append(
+                f"block {name}: document reads {count} registers, code reads "
+                f"{block.count}"
+            )
+        if layout != layout_label(block.min_layout):
+            failures.append(
+                f"block {name}: document says {layout}, code says "
+                f"{layout_label(block.min_layout)}"
+            )
+    failures.extend(
+        f"read block {block.name} is missing from docs/modbus-registers.md"
+        for block in REGISTER_BLOCKS
+        if block.name not in documented_blocks
+    )
+
+    failures.extend(_enum_table_failures(text, REGISTERS_BY_KEY))
+    return failures
+
+
+def _enum_table_failures(text: str, registers: Any) -> list[str]:
+    """Compare the document's enumerated values with the register map.
+
+    Two registers hold ranges rather than options and are documented with
+    spans such as ``6-32``; those have no mapping in the code, so only the
+    register name is checked for them.
+    """
+
+    documented: dict[str, set[str]] = {}
+    current: str | None = None
+    for register, value, _meaning in _ENUM_ROW.findall(text):
+        current = register or current
+        if current is not None:
+            documented.setdefault(current, set()).add(value)
+
+    failures: list[str] = []
+    for key, values in sorted(documented.items()):
+        spec = registers.get(key)
+        if spec is None:
+            failures.append(
+                f"docs/modbus-registers.md documents values for unknown register {key}"
+            )
+            continue
+        if spec.enum_map is None:
+            continue
+        in_document = {int(value) for value in values if value.isdigit()}
+        in_code = set(spec.enum_map)
+        if missing := sorted(in_code - in_document):
+            failures.append(f"enum {key}: {missing} missing from the document")
+        if extra := sorted(in_document - in_code):
+            failures.append(f"enum {key}: {extra} documented but not in the code")
+    return failures
 
 
 def check_entity_translations() -> list[str]:

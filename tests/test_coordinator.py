@@ -205,3 +205,72 @@ def test_a_configuration_change_is_picked_up_at_the_slow_cadence() -> None:
         assert coordinator.data.get("ems_fallback_current") == 16
 
     asyncio.run(run())
+
+
+def test_a_failing_block_drops_its_values_instead_of_freezing_them() -> None:
+    """A block that was read and failed has no current value.
+
+    Carrying the last one forward made the entities report a frozen
+    measurement as a live one, which an automation cannot tell apart from a
+    real reading.
+    """
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank())
+        coordinator = await _coordinator(transport)
+        first = await coordinator._async_update_data()
+        assert first.has("voltage_l1")
+        coordinator.data = first
+
+        transport.read_exceptions[0x0500] = 0x04
+        second = await coordinator._async_update_data()
+        assert second.failed_blocks == ("measurements",)
+        assert not second.has("voltage_l1")
+        assert second.get("voltage_l1") is None
+        # The blocks that did answer are untouched.
+        assert second.get("evse_state") == 1
+
+    asyncio.run(run())
+
+
+def test_a_slow_block_that_is_not_due_keeps_its_values() -> None:
+    """Dropping stale values must not drop the ones carried on purpose."""
+
+    clock = [0.0]
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank())
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+        coordinator.data = await coordinator._async_update_data()
+        assert coordinator.data.has("energy_total")
+
+        clock[0] += 1
+        later = await coordinator._async_update_data()
+        slow = [
+            block
+            for block in REGISTER_BLOCKS
+            if block.cadence is BlockCadence.SLOW
+        ]
+        assert slow
+        assert later.failed_blocks == ()
+        assert later.has("energy_total")
+
+    asyncio.run(run())
+
+
+def test_a_failing_slow_block_drops_its_values_when_it_was_due() -> None:
+    clock = [0.0]
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank())
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+        coordinator.data = await coordinator._async_update_data()
+        assert coordinator.data.has("energy_total")
+
+        transport.read_exceptions[0x1000] = 0x04
+        clock[0] += SLOW_BLOCK_INTERVAL_SECONDS + 1
+        later = await coordinator._async_update_data()
+        assert later.failed_blocks == ("statistics",)
+        assert not later.has("energy_total")
+
+    asyncio.run(run())

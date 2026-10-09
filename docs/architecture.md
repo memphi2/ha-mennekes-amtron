@@ -32,7 +32,7 @@ diagnostics.py        allowlist dump + raw register image
 repairs.py            + repair_issues.py
 ```
 
-## Four decisions worth explaining
+## Six decisions worth explaining
 
 ### One lock, because RS-485 has one master
 
@@ -41,6 +41,18 @@ Every transaction — poll, heartbeat and write — goes through a single
 transactions are not slow, they are corrupt. Nothing outside `client.py`
 touches pymodbus.
 
+One lock alone is not enough, though, because `asyncio.Lock` is fair: a
+waiter is served in arrival order. With a stalling device every wait is a
+full `timeout` plus its `retries`, so a heartbeat arriving behind the poll
+and a diagnostics dump waits for both of them. Measured against a device
+that answers nothing, the gap between two heartbeats grew to 12 s with two
+bus users and 15 s with three — past the 10 s the wallbox allows.
+
+Bulk users therefore pass a second gate before they reach the bus, so only
+one of them is ever queued in front of a heartbeat, and the heartbeat write
+skips that gate. The worst case is then one transfer in flight plus its own,
+independent of how many readers compete: measured 6 s, whatever the load.
+
 ### The heartbeat is not part of the poll
 
 The wallbox needs `0x0D00 = 0x55AA` at least every ten seconds. If that write
@@ -48,6 +60,14 @@ were a step in the poll, a slow or failing poll would delay it — and a missing
 heartbeat is exactly how the device reaches error state 200. So it is an
 entry-owned background task on its own five-second interval, started only in
 master mode and cancelled on unload.
+
+The task *spends* the interval rather than adding it: it sleeps whatever is
+left of the five seconds after the write returned. Sleeping the full interval
+on top of a write that waited for the bus is the other half of how the gap
+grew past the deadline. What the device actually saw is also measured — only
+a delivered beat closes a gap, and a gap past the deadline raises a warning
+and increments `heartbeats_late` in the diagnostics, because the wallbox
+reports the resulting fault without saying why.
 
 ### One choke point for writes
 
@@ -63,6 +83,15 @@ resume and phase switches are rejected instead, because the manufacturer asks
 for minutes of hysteresis there and silently queueing those would hide a bad
 automation.
 
+Two different rules meet on `0x0302`, and they are deliberately kept apart.
+Every write to it has to keep five seconds from the write before; that is a
+property of the register and lives in the client's rate limiter. Pausing and
+resuming need five minutes between them; that is a property of the
+*operation* and lives in `control.py`. Keying both on the register made the
+pause switch refuse for five minutes after any slider move, and let a pause
+be undone by a slider move six seconds later. A real limit written while the
+pause value is active counts as a resume, whatever the caller meant by it.
+
 ### Two polling cadences
 
 `register_blocks.py` marks each block `FAST` or `SLOW`. Ten blocks carry
@@ -75,6 +104,23 @@ forward in the snapshot in between. That halves the bus traffic without
 hiding a reconfiguration for longer than a minute, and it keeps the registers
 that matter — state, signalled current, measurements — on the interval the
 user chose.
+
+Carrying a value forward is only right while the block was not due. A block
+that *was* read and failed has no current value, so its keys are dropped from
+the snapshot and its entities go unavailable. Keeping the last reading made a
+frozen measurement indistinguishable from a live one, which is exactly the
+distinction an automation acting on surplus power depends on.
+
+### Giving up on a port, not on a candidate
+
+The bus search tries up to 861 configurations, and each one opens the serial
+port. A single failed open proves nothing: the adapter can be busy for a
+moment, and a baud rate the driver cannot set fails at the open rather than
+at the read. Treating the first failure as proof that the port is unusable
+ended the whole search and reported "no wallbox answered" for a device that
+sat later in the search space. The search therefore gives up only after five
+failed opens in a row, and then says the port could not be used rather than
+blaming the wiring.
 
 ### Capability gating instead of optimism
 
@@ -134,7 +180,15 @@ integration claims to support.
 
 `scripts/check_validate.py` runs the same gates as CI, in the same order:
 repository, legal/provenance, quality scale, register map, pymodbus requirement, ruff,
-pytest, the 99 percent coverage ratchet and `mypy --strict`. `--skip-typing`
+pytest, the 99 percent coverage ratchet and `mypy --strict`.
+
+The register-map gate also compares
+[docs/modbus-registers.md](modbus-registers.md) with `registers.py` and
+`register_blocks.py` — every address, span, data type, access mode, layout
+version, unit, read block and enumerated value. That document is what a
+reviewer holds next to the manufacturer's specification while the code is
+what the wallbox sees, so the two drifting apart is the one error that would
+survive every other check. `--skip-typing`
 drops the last one, which is what the minimum matrix entry uses: Home
 Assistant's own schema annotations differ between the ends of the supported
 range, so the typing gate is run against the current release and the minimum

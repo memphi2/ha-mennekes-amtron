@@ -35,6 +35,13 @@ PROBE_TIMEOUT = 0.5
 PROBE_RETRIES = 1
 DEVICE_IDS = range(DEVICE_ID_MIN, DEVICE_ID_MAX + 1)
 
+# How many candidates in a row may fail to open the port before the search
+# gives up on it. One failure is not enough to conclude anything: the adapter
+# can be busy for a moment, and a baud rate the driver cannot set fails here
+# too, while the next candidate would have opened fine. A run of failures is
+# what a genuinely unusable port looks like.
+CONNECT_FAILURE_LIMIT = 5
+
 
 @dataclass(frozen=True, slots=True)
 class SearchResult:
@@ -98,8 +105,23 @@ async def async_search(
     attempt = probe or async_probe
     space = search_space(base, all_parameters=all_parameters)
     _LOGGER.debug("Searching %s with %d candidates", base.port, len(space))
+    failures = 0
     for index, candidate in enumerate(space, start=1):
-        identity = await attempt(candidate)
+        try:
+            identity = await attempt(candidate)
+        except AmtronConnectionError as err:
+            failures += 1
+            _LOGGER.debug(
+                "Candidate %d of %d could not open %s: %s",
+                index,
+                len(space),
+                candidate.port,
+                err,
+            )
+            if failures >= CONNECT_FAILURE_LIMIT:
+                raise
+            continue
+        failures = 0
         if identity is not None:
             _LOGGER.debug(
                 "Found a wallbox at address %d, %d baud after %d probes",
@@ -118,7 +140,8 @@ async def async_probe(config: SerialConfig) -> DeviceIdentity | None:
     try:
         await client.async_connect()
     except AmtronConnectionError:
-        # The port itself is unusable; no candidate will work.
+        # Raised on to the search, which decides whether this was one bad
+        # candidate or a port that cannot be used at all.
         raise
     try:
         layout = await client.async_read_register(MODBUS_LAYOUT_VERSION)

@@ -7,6 +7,7 @@ import asyncio
 import pytest
 
 from custom_components.mennekes_amtron._flow_search import (
+    CONNECT_FAILURE_LIMIT,
     DEVICE_IDS,
     PROBE_RETRIES,
     PROBE_TIMEOUT,
@@ -129,8 +130,10 @@ def test_a_probe_on_a_rejecting_address_returns_nothing(
     assert asyncio.run(async_probe(BASE)) is None
 
 
-def test_an_unusable_port_stops_the_search(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every candidate would fail the same way, so the port error is raised."""
+def test_a_port_that_will_not_open_makes_the_probe_raise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The probe reports it; the search decides what it means."""
 
     transport = FakeModbusClient({})
     transport.connect_result = False
@@ -146,3 +149,60 @@ def _client(config: SerialConfig, transport: FakeModbusClient) -> object:
     from custom_components.mennekes_amtron.client import MennekesModbusClient
 
     return MennekesModbusClient(config, client_factory=lambda _c: transport)
+
+
+# --- a failed port open is not the end of the search -----------------------
+
+
+def test_one_candidate_that_cannot_open_the_port_is_skipped() -> None:
+    """A single failure proves nothing about the remaining candidates.
+
+    The adapter can be busy for a moment, and a baud rate the driver cannot
+    set fails at the open too. Giving up there reported "not found" for a
+    wallbox that sits later in the search space.
+    """
+
+    attempts: list[SerialConfig] = []
+    target = search_space(BASE, all_parameters=True)[20]
+
+    async def probe(config: SerialConfig) -> DeviceIdentity | None:
+        attempts.append(config)
+        if len(attempts) == 1:
+            raise AmtronConnectionError("device or resource busy")
+        if config.device_id == target.device_id:
+            return DeviceIdentity(layout_version=0x0103)
+        return None
+
+    result = asyncio.run(async_search(BASE, all_parameters=True, probe=probe))
+    assert result is not None
+    assert result.config.device_id == target.device_id
+    assert len(attempts) == 21
+
+
+def test_a_run_of_failed_opens_gives_up_on_the_port() -> None:
+    """A port that is really unusable must not cost the full search."""
+
+    attempts: list[SerialConfig] = []
+
+    async def probe(config: SerialConfig) -> DeviceIdentity | None:
+        attempts.append(config)
+        raise AmtronConnectionError("no such device")
+
+    with pytest.raises(AmtronConnectionError):
+        asyncio.run(async_search(BASE, all_parameters=True, probe=probe))
+    assert len(attempts) == CONNECT_FAILURE_LIMIT
+
+
+def test_scattered_failures_do_not_add_up_to_an_unusable_port() -> None:
+    """The limit counts failures in a row, not failures in total."""
+
+    attempts: list[SerialConfig] = []
+
+    async def probe(config: SerialConfig) -> DeviceIdentity | None:
+        attempts.append(config)
+        if len(attempts) % 2 == 1:
+            raise AmtronConnectionError("device or resource busy")
+        return None
+
+    assert asyncio.run(async_search(BASE, all_parameters=False, probe=probe)) is None
+    assert len(attempts) == len(DEVICE_IDS)

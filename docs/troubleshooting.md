@@ -13,6 +13,11 @@ bus parameters and takes about twenty seconds. *Search every address, baud
 rate and frame* tries every documented combination and takes several minutes.
 Both only read, so neither can disturb a wallbox.
 
+If the search reports that the port could not be used, stop at the last two
+points below: it never got far enough to ask a wallbox anything. A momentary
+failure is tolerated, so this message means five candidates in a row could
+not open the port.
+
 If the search finds nothing, the problem is below the protocol:
 
 - **Wiring.** Modbus `A` is `+`, `B` is `−`, and `GND` has to be connected.
@@ -56,9 +61,26 @@ If it comes back, the serial link is dropping frames:
   tool,
 - make sure nothing else transmits on the bus.
 
+The log says whether the integration was late or the frames were lost. A
+warning naming a gap "more than the 10 s the wallbox allows", together with
+`heartbeats_late` in the diagnostics, means the heartbeat did not go out in
+time — usually a device that stops answering, which makes every transaction
+cost the full timeout and its retries. `heartbeats_failed` without
+`heartbeats_late` means the writes went out on schedule and the device did
+not take them.
+
 Configure an energy-manager fallback with the configuration tool so a Home
 Assistant restart has a defined outcome. The integration raises a repair issue
 when none is configured.
+
+## Some sensors went unavailable
+
+A register block the wallbox refused or did not answer takes its own entities
+with it until the next successful read, rather than leaving the last reading
+in place. `failed_blocks` in the diagnostics names the blocks concerned. A
+single block failing while the rest keep working points at a firmware that
+does not implement that range; the raw register image in the diagnostics
+shows which.
 
 ## Entities are missing
 
@@ -88,6 +110,10 @@ number, switches, selects and buttons appear.
 - **A downgrade is active.** `binary_sensor.*_downgrade_active` on means the
   grid operator is limiting the wallbox in hardware. Nothing on the Modbus
   side can raise it.
+- **Charging is paused.** A real limit written while the pause value is
+  active resumes the charge, so it waits for the same five minutes the
+  manufacturer asks between a pause and a resume. The error names the
+  remaining seconds. Turn the **Charging paused** switch off instead.
 
 ## The slider jumps back
 

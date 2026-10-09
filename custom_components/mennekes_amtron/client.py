@@ -4,6 +4,11 @@ RS-485 is a single-master bus and this integration shares it between the data
 poll, the heartbeat task and user-triggered writes. Every transaction
 therefore passes through one lock in this module; nothing else may talk to
 pymodbus.
+
+One lock alone is not enough, because it is fair: a heartbeat queues behind
+everything already waiting, and a stalling device makes every wait a full
+timeout plus its retries. Bulk users therefore pass a second gate first, so
+only one of them can ever sit in front of the heartbeat.
 """
 
 from __future__ import annotations
@@ -87,6 +92,11 @@ class MennekesModbusClient:
         self._monotonic = monotonic
         self._client: Any | None = None
         self._lock = asyncio.Lock()
+        # Bulk users queue behind this gate before they reach the bus, so at
+        # most one of them is ever waiting on the bus itself. The heartbeat
+        # skips the gate: it is the one transaction with a deadline, and
+        # queueing it behind every reader is how it misses that deadline.
+        self._queue = asyncio.Lock()
         self._rate_limiter = _client_write.WriteRateLimiter()
 
     @property
@@ -141,7 +151,7 @@ class MennekesModbusClient:
     async def async_read_block(self, block: RegisterBlock) -> dict[str, RegisterValue]:
         """Read one register block."""
 
-        async with self._lock:
+        async with self._queue, self._lock:
             client = self._require_client()
             return await _client_read.read_block(
                 client, block=block, device_id=self._config.device_id
@@ -150,7 +160,7 @@ class MennekesModbusClient:
     async def async_read_register(self, spec: RegisterSpec) -> RegisterValue:
         """Read one register range."""
 
-        async with self._lock:
+        async with self._queue, self._lock:
             client = self._require_client()
             words = await _client_read.read_words(
                 client,
@@ -163,7 +173,7 @@ class MennekesModbusClient:
     async def async_read_words(self, *, address: int, count: int) -> list[int]:
         """Read raw register words, used by diagnostics."""
 
-        async with self._lock:
+        async with self._queue, self._lock:
             client = self._require_client()
             return await _client_read.read_words(
                 client,
@@ -178,9 +188,28 @@ class MennekesModbusClient:
         value: float,
         *,
         min_interval: float = 0.0,
+        priority: bool = False,
     ) -> None:
-        """Write one register range, honouring its minimum write interval."""
+        """Write one register range, honouring its minimum write interval.
 
+        A priority write skips the queue the readers share. Only the
+        heartbeat uses it, because only the heartbeat has a deadline the
+        device enforces by faulting.
+        """
+
+        if priority:
+            await self._async_write_locked(spec, value, min_interval=min_interval)
+            return
+        async with self._queue:
+            await self._async_write_locked(spec, value, min_interval=min_interval)
+
+    async def _async_write_locked(
+        self,
+        spec: RegisterSpec,
+        value: float,
+        *,
+        min_interval: float,
+    ) -> None:
         async with self._lock:
             now = self._monotonic()
             remaining = self._rate_limiter.remaining(

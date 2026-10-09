@@ -487,3 +487,99 @@ def test_skipping_the_typing_gate_leaves_every_other_step() -> None:
     assert check_validate.TYPING_STEP in full
     assert reduced == [name for name in full if name != check_validate.TYPING_STEP]
     assert len(reduced) == len(full) - 1
+
+
+# --- the register document gate --------------------------------------------
+
+
+def _register_document_gate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, replacement: tuple[str, str]
+) -> list[str]:
+    """Run the document gate against a deliberately drifted copy."""
+
+    import check_register_map
+
+    original = check_register_map.REGISTER_REFERENCE.read_text(encoding="utf-8")
+    needle, value = replacement
+    assert needle in original, needle
+    drifted = tmp_path / "modbus-registers.md"
+    drifted.write_text(original.replace(needle, value, 1), encoding="utf-8")
+    monkeypatch.setattr(check_register_map, "REGISTER_REFERENCE", drifted)
+    return check_register_map.check_register_document()
+
+
+def test_the_register_document_gate_passes_on_this_repository() -> None:
+    import check_register_map
+
+    assert check_register_map.check_register_document() == []
+
+
+@pytest.mark.parametrize(
+    ("needle", "value", "expected"),
+    [
+        (
+            "| `0x0302`-`0x0303` | float32 | R/W | v01.00 | `charging_current_ems` | A |",
+            "| `0x0303`-`0x0304` | float32 | R/W | v01.00 | `charging_current_ems` | A |",
+            "charging_current_ems",
+        ),
+        (
+            "| `0x0D05` | uint16 | R/W | v01.00 | `charging_release` | - |",
+            "| `0x0D05` | uint16 | R | v01.00 | `charging_release` | - |",
+            "charging_release",
+        ),
+        (
+            "| `0x0512`-`0x0513` | float32 | R | v01.00 | `power_total` | W |",
+            "| `0x0512`-`0x0513` | uint32 | R | v01.00 | `power_total` | W |",
+            "power_total",
+        ),
+        (
+            "| `0x0900`-`0x0901` | float32 | R | v01.02 | `temperature` | degC |",
+            "| `0x0900`-`0x0901` | float32 | R | v01.00 | `temperature` | degC |",
+            "temperature",
+        ),
+        (
+            "| `0x0B02`-`0x0B03` | float32 | R | v01.00 | `session_energy` | kWh |",
+            "| `0x0B02`-`0x0B03` | float32 | R | v01.00 | `session_energy` | Wh |",
+            "session_energy",
+        ),
+        (
+            "| `measurements` | `0x0500` | 20 | v01.00 |",
+            "| `measurements` | `0x0500` | 18 | v01.00 |",
+            "measurements",
+        ),
+        (
+            "|  | `7` | Service mode |\n",
+            "",
+            "evse_state",
+        ),
+    ],
+)
+def test_the_register_document_gate_catches_drift(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    needle: str,
+    value: str,
+    expected: str,
+) -> None:
+    """The document is the only artefact checkable against the manual."""
+
+    failures = _register_document_gate(monkeypatch, tmp_path, (needle, value))
+    assert failures
+    assert any(expected in failure for failure in failures)
+
+
+def test_the_register_document_gate_notices_a_missing_register(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An empty parse must fail loudly rather than agree with everything."""
+
+    failures = _register_document_gate(
+        monkeypatch,
+        tmp_path,
+        (
+            "| `0x0114`-`0x0115` | float32 | R | v01.03 | `signaled_current` | A |\n",
+            "",
+        ),
+    )
+    assert any("lists 50 registers" in failure for failure in failures)
+    assert any("signaled_current is missing" in failure for failure in failures)

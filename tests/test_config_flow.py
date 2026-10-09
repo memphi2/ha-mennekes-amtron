@@ -389,9 +389,15 @@ def test_an_empty_bus_comes_back_to_the_form(
     asyncio.run(run())
 
 
-def test_an_unusable_port_comes_back_to_the_form(
+def test_a_port_the_search_gave_up_on_reports_a_connection_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The search only raises once the port itself looks unusable.
+
+    Saying "no wallbox answered" would send the user looking at DIP switches
+    and wiring, when the port never opened in the first place.
+    """
+
     async def run() -> None:
         _patch_connection(monkeypatch, AmtronConnectionError("no port"))
 
@@ -402,7 +408,7 @@ def test_an_unusable_port_comes_back_to_the_form(
         flow = SearchFlow(FakeHass())
         result = await _drive_search(flow, {**USER_INPUT, CONF_SEARCH: "addresses"})
 
-        assert result["errors"] == {"base": "not_found"}
+        assert result["errors"] == {"base": "cannot_connect"}
 
     asyncio.run(run())
 

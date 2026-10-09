@@ -51,6 +51,7 @@ class WriteDiagnostics:
 
     heartbeats_sent: int = 0
     heartbeats_failed: int = 0
+    heartbeats_late: int = 0
     writes_sent: int = 0
     writes_rejected: int = 0
     writes_rate_limited: int = 0

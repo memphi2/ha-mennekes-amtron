@@ -82,6 +82,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         values: dict[str, RegisterValue] = dict(self.current_data().values)
         read: dict[str, RegisterValue] = {}
         failed: list[str] = []
+        stale: list[str] = []
         for block in supported_blocks(self._identity.layout_version):
             if block.cadence is BlockCadence.SLOW and not slow_due:
                 continue
@@ -92,11 +93,18 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
                 raise UpdateFailed(str(err)) from err
             except AmtronBusError as err:
                 failed.append(block.name)
+                # Carrying a block forward is only right while it was not due.
+                # A block that was read and failed has no current value, and a
+                # frozen measurement an automation still believes is worse than
+                # an entity that admits it knows nothing.
+                stale.extend(block.keys)
                 _LOGGER.debug("Block %s failed: %s", block.name, err)
         if not read:
             raise UpdateFailed("no register block could be read")
         if slow_due:
             self._slow_read_at = self._monotonic()
+        for key in stale:
+            values.pop(key, None)
         values.update(read)
         self._log_available()
         return WallboxData(values=values, failed_blocks=tuple(failed))

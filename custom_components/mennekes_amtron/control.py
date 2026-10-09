@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -72,6 +73,7 @@ class AmtronControl:
         state: Callable[[], WallboxData],
         request_refresh: Callable[[], Awaitable[None]] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self._client = client
         self._diagnostics = diagnostics
@@ -80,8 +82,10 @@ class AmtronControl:
         self._state = state
         self._request_refresh = request_refresh
         self._sleep = sleep
+        self._monotonic = monotonic
         self._pending_current: float | None = None
         self._flush_task: asyncio.Task[None] | None = None
+        self._mode_change_at: float | None = None
         self.charging_setpoint: float | None = None
 
     @property
@@ -160,7 +164,11 @@ class AmtronControl:
         else:
             current = min(current, self.max_charging_current)
             self.charging_setpoint = current
-        await self._async_request_current(current)
+        # Every value this method accepts is either a real limit or the
+        # explicit 0 A, and while the pause value is active both of them
+        # resume the charge, whatever the caller meant by it. So they answer
+        # to the same hysteresis the pause switch does.
+        await self._async_request_current(current, mode_change=self.is_paused)
 
     async def async_pause_charging(self) -> None:
         """Pause charging the documented way, by signalling 0 A to the EV."""
@@ -263,30 +271,53 @@ class AmtronControl:
     ) -> None:
         """Write 0x0302, deferring the write when it comes too fast.
 
-        The vendor asks for at most one charging-current change every five
-        seconds. Rejecting the write would make a dragged slider fail, so the
-        newest value is remembered and written once the interval has passed.
+        Two different rules meet on this one register. Every write has to keep
+        the vendor's five-second distance; that is a property of the register
+        and lives in the client's rate limiter. Pausing and resuming need
+        minutes between them; that is a property of the operation and lives
+        here. Keying both on the register made a dragged slider block the
+        pause switch for five minutes, and let a pause be undone six seconds
+        later by a slider move.
+
+        Rejecting a plain setpoint write would make a dragged slider fail, so
+        the newest value is remembered and written once the interval passed. A
+        mode change is reported back instead: it is a deliberate act, and
+        quietly performing it minutes later is worse than refusing it.
         """
 
-        interval = (
-            MIN_MODE_CHANGE_INTERVAL_SECONDS
-            if mode_change
-            else MIN_CURRENT_WRITE_INTERVAL_SECONDS
-        )
+        if mode_change:
+            remaining = self._mode_change_remaining()
+            if remaining > 0:
+                self._diagnostics.writes_rate_limited += 1
+                raise service_validation_error(
+                    "write_rate_limited", {"seconds": f"{remaining:.0f}"}
+                )
         try:
             await self._async_write(
-                CHARGING_CURRENT_EMS, value, min_interval=interval
+                CHARGING_CURRENT_EMS,
+                value,
+                min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
             )
         except AmtronRateLimitedError as err:
+            self._diagnostics.writes_rate_limited += 1
             if mode_change:
-                self._diagnostics.writes_rate_limited += 1
                 raise service_validation_error(
                     "write_rate_limited",
                     {"seconds": f"{err.retry_after:.0f}"},
                 ) from err
             self._pending_current = value
-            self._diagnostics.writes_rate_limited += 1
             self._ensure_flush_task()
+            return
+        if mode_change:
+            self._mode_change_at = self._monotonic()
+
+    def _mode_change_remaining(self) -> float:
+        """Return the seconds left of the pause and resume hysteresis."""
+
+        if self._mode_change_at is None:
+            return 0.0
+        waited = self._monotonic() - self._mode_change_at
+        return max(0.0, MIN_MODE_CHANGE_INTERVAL_SECONDS - waited)
 
     def _ensure_flush_task(self) -> None:
         if self._flush_task is not None and not self._flush_task.done():

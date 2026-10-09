@@ -12,8 +12,10 @@ specification's explanatory prose is not reproduced.
 
 `custom_components/mennekes_amtron/registers.py` is the machine-readable
 version of this table and the single source of truth in the code.
-`scripts/check_register_map.py` fails the build if the two drift apart from
-the entities and translations built on top of them.
+`scripts/check_register_map.py` fails the build when the two drift apart: it
+compares every address, span, data type, access mode, layout version, unit,
+read block and enumerated value below against the code, and separately
+against the entities and translations built on top of them.
 
 ## Bus parameters
 

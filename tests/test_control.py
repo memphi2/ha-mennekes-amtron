@@ -66,6 +66,7 @@ class Harness:
             state=lambda: self.snapshot,
             request_refresh=self._refresh,
             sleep=self._sleep,
+            monotonic=lambda: self.clock[0],
         )
 
     async def _refresh(self) -> None:
@@ -451,3 +452,126 @@ def test_a_bus_failure_becomes_a_translated_error_and_is_counted() -> None:
 async def _sequence(*awaitables: object) -> None:
     for awaitable in awaitables:
         await awaitable
+
+
+# --- the two rules that meet on 0x0302 -------------------------------------
+
+
+def test_a_setpoint_change_does_not_block_the_pause_switch() -> None:
+    """The five-second register floor must not borrow the five-minute one.
+
+    Both rules used to be keyed on the register, so moving the slider made
+    the pause switch refuse for the next five minutes.
+    """
+
+    harness = Harness(clock=[1000.0])
+
+    async def run() -> None:
+        control = await harness.connect()
+        await control.async_set_charging_current(10)
+        harness.clock[0] += 10
+        harness.snapshot = WallboxData(values={"charging_current_ems": 10.0})
+        await control.async_pause_charging()
+
+    asyncio.run(run())
+    from custom_components.mennekes_amtron.decode import decode_register
+
+    writes = harness.written(R.CHARGING_CURRENT_EMS)
+    assert len(writes) == 2
+    assert decode_register(R.CHARGING_CURRENT_EMS, writes[-1]) == 1.0
+
+
+def test_a_setpoint_change_cannot_undo_a_pause_early() -> None:
+    """Writing a real limit while paused is a resume, and waits like one."""
+
+    harness = Harness(values={"charging_current_ems": 16.0}, clock=[1000.0])
+
+    async def run() -> None:
+        control = await harness.connect()
+        await control.async_pause_charging()
+        harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
+        harness.clock[0] += 6
+        with pytest.raises(ServiceValidationError) as excinfo:
+            await control.async_set_charging_current(12)
+        assert excinfo.value.translation_key == "write_rate_limited"
+
+    asyncio.run(run())
+    assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+
+
+def test_a_setpoint_change_undoes_a_pause_after_the_hysteresis() -> None:
+    harness = Harness(values={"charging_current_ems": 16.0}, clock=[1000.0])
+
+    async def run() -> None:
+        control = await harness.connect()
+        await control.async_pause_charging()
+        harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
+        harness.clock[0] += 301
+        await control.async_set_charging_current(12)
+
+    asyncio.run(run())
+    from custom_components.mennekes_amtron.decode import decode_register
+
+    writes = harness.written(R.CHARGING_CURRENT_EMS)
+    assert len(writes) == 2
+    assert decode_register(R.CHARGING_CURRENT_EMS, writes[-1]) == 12.0
+
+
+def test_a_refused_mode_change_does_not_start_the_hysteresis_again() -> None:
+    """A refusal must not push the deadline out; it never touched the bus."""
+
+    harness = Harness(values={"charging_current_ems": 16.0}, clock=[1000.0])
+
+    async def run() -> None:
+        control = await harness.connect()
+        await control.async_pause_charging()
+        harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
+        harness.clock[0] += 200
+        with pytest.raises(ServiceValidationError):
+            await control.async_resume_charging()
+        harness.clock[0] += 101
+        await control.async_resume_charging()
+
+    asyncio.run(run())
+    assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
+
+
+def test_the_five_second_floor_still_applies_to_a_pause() -> None:
+    """Dropping the five-minute block did not drop the register's own rule.
+
+    A pause is still a write to 0x0302, so it keeps the vendor's five-second
+    distance from the write before it -- it is simply no longer held for five
+    minutes.
+    """
+
+    harness = Harness(clock=[1000.0])
+
+    async def run() -> None:
+        control = await harness.connect()
+        await control.async_set_charging_current(10)
+        harness.clock[0] += 2
+        harness.snapshot = WallboxData(values={"charging_current_ems": 10.0})
+        with pytest.raises(ServiceValidationError) as excinfo:
+            await control.async_pause_charging()
+        assert excinfo.value.translation_key == "write_rate_limited"
+
+    asyncio.run(run())
+    assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+
+
+def test_the_unlimited_opt_in_cannot_undo_a_pause_early_either() -> None:
+    """0 A makes the wallbox signal its maximum, so it is a resume too."""
+
+    harness = Harness(values={"charging_current_ems": 16.0}, clock=[1000.0])
+
+    async def run() -> None:
+        control = await harness.connect()
+        await control.async_pause_charging()
+        harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
+        harness.clock[0] += 6
+        with pytest.raises(ServiceValidationError) as excinfo:
+            await control.async_set_charging_current(0, allow_unlimited=True)
+        assert excinfo.value.translation_key == "write_rate_limited"
+
+    asyncio.run(run())
+    assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1

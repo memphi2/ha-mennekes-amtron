@@ -210,3 +210,104 @@ def test_an_async_close_is_awaited() -> None:
         assert transport.close_calls == 1
 
     asyncio.run(run())
+
+
+# --- the heartbeat's claim on the bus --------------------------------------
+
+
+def test_a_priority_write_overtakes_the_queued_readers() -> None:
+    """The heartbeat waits for the transfer in flight, not for the queue.
+
+    One fair lock let a heartbeat queue behind every reader, so a stalling
+    device -- where each wait is a full timeout plus its retries -- pushed the
+    gap between two heartbeats past what the wallbox allows.
+    """
+
+    order: list[str] = []
+    release = asyncio.Event()
+
+    class BlockingTransport(FakeModbusClient):
+        async def read_holding_registers(
+            self, address: int, *, count: int = 1, device_id: int = 1
+        ):
+            order.append(f"read:{address:#06x}")
+            if address == REGISTER_BLOCKS[0].address:
+                await release.wait()
+            return await super().read_holding_registers(
+                address, count=count, device_id=device_id
+            )
+
+        async def write_register(self, address: int, value: int, *, device_id: int = 1):
+            order.append("write")
+            return await super().write_register(address, value, device_id=device_id)
+
+    async def run() -> None:
+        transport = BlockingTransport(device_bank())
+        client = _client(transport)
+        await client.async_connect()
+
+        # One reader takes the bus and stalls on it.
+        first = asyncio.create_task(client.async_read_block(REGISTER_BLOCKS[0]))
+        await asyncio.sleep(0)
+        # Two more readers queue up behind it.
+        queued = [
+            asyncio.create_task(client.async_read_block(block))
+            for block in REGISTER_BLOCKS[1:3]
+        ]
+        await asyncio.sleep(0)
+        # The heartbeat arrives last of all.
+        beat = asyncio.create_task(
+            client.async_write_register(R.HEARTBEAT, 0x55AA, priority=True)
+        )
+        await asyncio.sleep(0)
+
+        release.set()
+        await asyncio.gather(first, beat, *queued)
+
+    asyncio.run(run())
+    assert order[0] == f"read:{REGISTER_BLOCKS[0].address:#06x}"
+    # Last in, yet served before the two readers that were already waiting.
+    assert order[1] == "write"
+    assert len(order) == 4
+
+
+def test_an_ordinary_write_waits_its_turn() -> None:
+    """Only the heartbeat skips the queue; a user write does not."""
+
+    order: list[str] = []
+    release = asyncio.Event()
+
+    class BlockingTransport(FakeModbusClient):
+        async def read_holding_registers(
+            self, address: int, *, count: int = 1, device_id: int = 1
+        ):
+            order.append("read")
+            if address == REGISTER_BLOCKS[0].address:
+                await release.wait()
+            return await super().read_holding_registers(
+                address, count=count, device_id=device_id
+            )
+
+        async def write_register(self, address: int, value: int, *, device_id: int = 1):
+            order.append("write")
+            return await super().write_register(address, value, device_id=device_id)
+
+    async def run() -> None:
+        transport = BlockingTransport(device_bank())
+        client = _client(transport)
+        await client.async_connect()
+
+        first = asyncio.create_task(client.async_read_block(REGISTER_BLOCKS[0]))
+        await asyncio.sleep(0)
+        queued = asyncio.create_task(client.async_read_block(REGISTER_BLOCKS[1]))
+        await asyncio.sleep(0)
+        write = asyncio.create_task(
+            client.async_write_register(R.CHARGING_RELEASE, 1)
+        )
+        await asyncio.sleep(0)
+
+        release.set()
+        await asyncio.gather(first, queued, write)
+
+    asyncio.run(run())
+    assert order == ["read", "read", "write"]

@@ -34,9 +34,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - A repository gate that fails the build if a voluptuous import returns, since
   Home Assistant's alias would otherwise let one pass unnoticed.
+- The register-map gate now also checks `docs/modbus-registers.md` against the
+  code: every address, span, data type, access mode, layout version, unit,
+  read block and enumerated value. That document is what a reviewer holds next
+  to the manufacturer's specification, and nothing compared the two before.
+- `heartbeats_late` in the diagnostics, counting the times the wallbox was
+  left waiting longer than the ten seconds it allows. Such a gap is also
+  logged as a warning, because the device reports the resulting fault without
+  saying what caused it.
 
 ### Fixed
 
+- **A failing register block no longer leaves a frozen value behind.** Values
+  were carried forward between polls for the slow blocks, which was right, but
+  a block that was read and failed kept its last reading too, and its entities
+  went on reporting it as available. An automation acting on surplus power
+  could not tell that measurement from a live one. The keys of a failed block
+  are now dropped and its entities go unavailable.
+- **The heartbeat no longer walks past the wallbox's ten-second deadline.**
+  Two things pushed it there: the task slept a full interval *after* the
+  write, so time spent waiting for the shared bus was added to the period
+  rather than absorbed, and the heartbeat queued behind every other bus user
+  on a fair lock. Against a device that answers nothing, the gap between two
+  heartbeats measured 12 s with two bus users and 15 s with three. Readers now
+  pass a queue gate the heartbeat skips, and the task sleeps only the
+  remainder of its interval; the worst case measures 6 s regardless of load.
+- **Pausing and changing the charging current no longer block each other
+  wrongly.** Both rules were keyed on `0x0302`, so moving the slider made the
+  pause switch refuse for the next five minutes, while a pause could be undone
+  by a slider move six seconds later. The register's five-second floor stays
+  in the client; the five-minute pause hysteresis moved to the control layer,
+  where the operation is known. Writing a real limit while the pause value is
+  active now counts as a resume.
+- **A single failed port open no longer ends the bus search.** The search gave
+  up at the first candidate whose port would not open and reported "no wallbox
+  answered", although a momentarily busy adapter — or a baud rate the driver
+  cannot set — says nothing about the remaining candidates. It now gives up
+  after five failed opens in a row, and reports that the port could not be
+  used rather than blaming the wiring.
 - Dropped the unused `voluptuous-serialize` development dependency. It was the
   only reason the real voluptuous was installed in the validation environment,
   which masked how the integration actually resolves its schema library.
