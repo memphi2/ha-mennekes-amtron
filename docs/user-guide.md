@@ -83,9 +83,53 @@ blocks that actually move: state, control pilot, signalled current, the
 current limits, the measurements, the session, the functions and the error
 registers. A reconfiguration still shows up on its own, within a minute.
 
+The measurements follow the vehicle rather than the clock. While nothing is
+plugged in, the currents and powers are zero and only the mains voltage keeps
+moving, so those blocks drop to the once-a-minute cadence too. They go back to
+your interval the moment the wallbox reports a connected vehicle. The sensors
+keep their values and stay available throughout.
+
 The heartbeat is **not** part of the poll. It runs in its own background task
 on a fixed five-second interval, because a slow or failing poll must never be
 able to starve it — that is the documented way into error state 200.
+
+## Database load
+
+Home Assistant writes a row every time an entity's state changes, so a short
+polling interval is also a decision about your recorder database. On a
+five-second interval this integration writes roughly **35 000 rows a day**,
+most of them during the hours a car is actually charging. With the default
+ten-day purge that is around 350 000 rows.
+
+Two things already keep that down: numeric states are rounded to the precision
+they are displayed at, instead of storing the `230.10000610351562` that a
+float32 decodes into, and the measurement blocks stop being polled while the
+wallbox is idle. Without those the same wallbox writes about 78 000 rows a day.
+
+If you want less, in rising order of effect:
+
+- **Raise the polling interval.** The cost is linear: 10 s halves the rows,
+  30 s divides them by six. Controls stay responsive either way, because the
+  integration refreshes immediately after every write rather than waiting for
+  the next poll.
+- **Stop recording the per-phase measurements.** They are the bulk of it, and
+  the totals are usually what gets used:
+
+  ```yaml
+  recorder:
+    exclude:
+      entities:
+        - sensor.mennekes_amtron_voltage_l1
+        - sensor.mennekes_amtron_voltage_l2
+        - sensor.mennekes_amtron_voltage_l3
+        - sensor.mennekes_amtron_power_l1
+        - sensor.mennekes_amtron_power_l2
+        - sensor.mennekes_amtron_power_l3
+  ```
+
+  Keep `power_total` and `energy_total` — the Energy dashboard needs them.
+- **Disable the entities you do not use.** A disabled entity is not recorded
+  at all. The diagnostic sensors are the obvious candidates.
 
 ## Use cases
 

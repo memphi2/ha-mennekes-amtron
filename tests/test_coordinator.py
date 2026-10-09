@@ -11,6 +11,7 @@ from custom_components.mennekes_amtron import registers as R
 from custom_components.mennekes_amtron.client import MennekesModbusClient, SerialConfig
 from custom_components.mennekes_amtron.coordinator import MennekesAmtronCoordinator
 from custom_components.mennekes_amtron.data import ConnectionState, DeviceIdentity
+from custom_components.mennekes_amtron.enums import EvseState
 from custom_components.mennekes_amtron.register_blocks import (
     REGISTER_BLOCKS,
     SLOW_BLOCK_INTERVAL_SECONDS,
@@ -216,7 +217,9 @@ def test_a_failing_block_drops_its_values_instead_of_freezing_them() -> None:
     """
 
     async def run() -> None:
-        transport = FakeModbusClient(device_bank())
+        # A connected vehicle keeps the measurement block on the fast cadence;
+        # this test is about the failure path, not about the cadence.
+        transport = FakeModbusClient(device_bank(evse_state=EvseState.CHARGING))
         coordinator = await _coordinator(transport)
         first = await coordinator._async_update_data()
         assert first.has("voltage_l1")
@@ -228,7 +231,7 @@ def test_a_failing_block_drops_its_values_instead_of_freezing_them() -> None:
         assert not second.has("voltage_l1")
         assert second.get("voltage_l1") is None
         # The blocks that did answer are untouched.
-        assert second.get("evse_state") == 1
+        assert second.get("evse_state") == EvseState.CHARGING
 
     asyncio.run(run())
 
@@ -272,5 +275,104 @@ def test_a_failing_slow_block_drops_its_values_when_it_was_due() -> None:
         later = await coordinator._async_update_data()
         assert later.failed_blocks == ("statistics",)
         assert not later.has("energy_total")
+
+    asyncio.run(run())
+
+
+# --- the measurement blocks follow the vehicle, not the clock --------------
+
+
+def _measurement_reads(transport: FakeModbusClient) -> int:
+    measurements = next(
+        block for block in REGISTER_BLOCKS if block.name == "measurements"
+    )
+    return sum(
+        1 for address, _count in transport.reads if address == measurements.address
+    )
+
+
+def test_an_idle_wallbox_stops_polling_the_measurements() -> None:
+    """Three voltages read every few seconds are a database row every few
+    seconds, describing a wallbox that has nothing plugged into it."""
+
+    clock = [0.0]
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank(evse_state=EvseState.IDLE))
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+        coordinator.data = await coordinator._async_update_data()
+        assert _measurement_reads(transport) == 1
+
+        for _ in range(5):
+            clock[0] += 5
+            coordinator.data = await coordinator._async_update_data()
+        assert _measurement_reads(transport) == 1
+        # The values stay in the snapshot, so the entities stay available.
+        assert coordinator.data.has("voltage_l1")
+
+    asyncio.run(run())
+
+
+def test_a_connected_vehicle_keeps_the_measurements_on_the_fast_cadence() -> None:
+    clock = [0.0]
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank(evse_state=EvseState.CHARGING))
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+        for _ in range(6):
+            clock[0] += 5
+            coordinator.data = await coordinator._async_update_data()
+        assert _measurement_reads(transport) == 6
+
+    asyncio.run(run())
+
+
+def test_a_vehicle_that_is_only_plugged_in_already_counts() -> None:
+    """Everything above idle means something is connected."""
+
+    clock = [0.0]
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank(evse_state=EvseState.EV_CONNECTED))
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+        coordinator.data = await coordinator._async_update_data()
+        clock[0] += 5
+        coordinator.data = await coordinator._async_update_data()
+        assert _measurement_reads(transport) == 2
+
+    asyncio.run(run())
+
+
+def test_an_unknown_state_is_treated_as_connected() -> None:
+    """Being wrong this way costs bus traffic; the other way hides a charge."""
+
+    clock = [0.0]
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank())
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+        # No poll has happened, so the snapshot carries no state at all.
+        assert coordinator._vehicle_is_connected()
+        transport.read_exceptions[0x0100] = 0x04
+        coordinator.data = await coordinator._async_update_data()
+        clock[0] += 5
+        coordinator.data = await coordinator._async_update_data()
+        assert _measurement_reads(transport) == 2
+
+    asyncio.run(run())
+
+
+def test_an_idle_wallbox_still_refreshes_the_measurements_every_minute() -> None:
+    """Demoted, not dropped: the mains voltage stays visible."""
+
+    clock = [0.0]
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank(evse_state=EvseState.IDLE))
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+        coordinator.data = await coordinator._async_update_data()
+        clock[0] += SLOW_BLOCK_INTERVAL_SECONDS + 1
+        coordinator.data = await coordinator._async_update_data()
+        assert _measurement_reads(transport) == 2
 
     asyncio.run(run())

@@ -1,4 +1,12 @@
-"""Sensor platform for the MENNEKES AMTRON integration."""
+"""Sensor platform for the MENNEKES AMTRON integration.
+
+Every numeric state is rounded to the precision the entity declares it will
+display. Home Assistant stores the native value, not the displayed one, so a
+sensor that reports more digits than it is willing to show pays for them in
+the recorder on every poll -- and a float32 from the device changes its last
+bits whenever the meter recomputes, which turns a steady mains voltage into a
+database row every few seconds.
+"""
 
 from __future__ import annotations
 
@@ -75,11 +83,11 @@ class AmtronSensor(MennekesAmtronEntity, SensorEntity):
         value = self.register_value
         description = self.entity_description
         if description.value_fn is not None:
-            return description.value_fn(value)
+            return _rounded(description.value_fn(value), description)
         if description.enum_class is not None:
             return _enum_state(description, value)
         if isinstance(value, (int, float, str)):
-            return value
+            return _rounded(value, description)
         return None
 
 
@@ -99,6 +107,24 @@ class AmtronErrorCodeSensor(AmtronSensor):
         if not isinstance(value, int):
             return None
         return {"code": value}
+
+
+def _rounded(
+    value: StateType, description: AmtronSensorEntityDescription
+) -> StateType:
+    """Return a float trimmed to the precision this sensor displays.
+
+    ``suggested_display_precision`` only tells the frontend how to render the
+    state; the value Home Assistant records and builds statistics from is the
+    one returned here. Decoding a float32 into a Python float also carries the
+    conversion artefact along -- 230.1 V arrives as 230.10000610351562 -- so
+    this is what keeps both the database and the history readable.
+    """
+
+    precision = description.suggested_display_precision
+    if precision is None or not isinstance(value, float):
+        return value
+    return round(value, precision)
 
 
 def _enum_state(

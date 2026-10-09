@@ -36,9 +36,18 @@ class BlockCadence(StrEnum):
     when somebody reconfigures the wallbox, not while it charges. Reading them
     at the charging cadence spends a large part of the bus on values that are
     already known.
+
+    ``ACTIVE`` is the third case, and it exists for the recorder rather than
+    for the bus. A wallbox spends most of its life idle, and while it is idle
+    the currents and powers are zero and the mains voltage is the only thing
+    still moving. Read every few seconds, three voltages alone write tens of
+    thousands of database rows a day describing a wallbox that is doing
+    nothing. An active block is read at the user's interval while a vehicle is
+    connected and at the slow interval otherwise.
     """
 
     FAST = "fast"
+    ACTIVE = "active"
     SLOW = "slow"
 
 
@@ -115,6 +124,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=2,
         min_layout=LAYOUT_V01_03,
         keys=("signaled_current",),
+        cadence=BlockCadence.ACTIVE,
     ),
     RegisterBlock(
         name="current_limits",
@@ -178,6 +188,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
             "power_l3",
             "power_total",
         ),
+        cadence=BlockCadence.ACTIVE,
     ),
     RegisterBlock(
         name="temperature",
@@ -193,6 +204,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=6,
         min_layout=LAYOUT_V01_00,
         keys=("session_max_current", "session_energy", "session_duration"),
+        cadence=BlockCadence.ACTIVE,
     ),
     RegisterBlock(
         name="detected_ev_phases",
@@ -200,6 +212,7 @@ REGISTER_BLOCKS: Final[tuple[RegisterBlock, ...]] = (
         count=1,
         min_layout=LAYOUT_V01_02,
         keys=("detected_ev_phases",),
+        cadence=BlockCadence.ACTIVE,
     ),
     RegisterBlock(
         name="functions",

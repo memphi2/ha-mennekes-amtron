@@ -22,6 +22,7 @@ from .client_errors import AmtronBusError, AmtronConnectionError
 from .data import ConnectionState, DeviceIdentity, WallboxData
 from .decode import RegisterValue
 from .entry_types import MennekesAmtronConfigEntry
+from .enums import EvseState
 from .register_blocks import SLOW_BLOCK_INTERVAL_SECONDS, BlockCadence
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,17 +75,34 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
             self._monotonic() - self._slow_read_at >= SLOW_BLOCK_INTERVAL_SECONDS
         )
 
+    def _vehicle_is_connected(self) -> bool:
+        """Return whether anything is plugged into the wallbox.
+
+        Only the one state that means "nothing is connected" demotes the
+        measurement blocks. An unknown or unreadable state reads as connected,
+        because being wrong in that direction only costs bus traffic, while
+        being wrong in the other direction would hide a running charge.
+        """
+
+        return self.current_data().get("evse_state") != EvseState.IDLE
+
     async def _async_update_data(self) -> WallboxData:
         # Configuration registers change when somebody reconfigures the
         # wallbox, not while it charges, so they are carried forward between
         # the slow reads instead of occupying the bus every few seconds.
         slow_due = self._slow_blocks_are_due()
+        # The measurement blocks describe a vehicle. Without one they report
+        # zeroes and a drifting mains voltage, and reading them every few
+        # seconds turns that into a database row every few seconds.
+        active_due = slow_due or self._vehicle_is_connected()
         values: dict[str, RegisterValue] = dict(self.current_data().values)
         read: dict[str, RegisterValue] = {}
         failed: list[str] = []
         stale: list[str] = []
         for block in supported_blocks(self._identity.layout_version):
             if block.cadence is BlockCadence.SLOW and not slow_due:
+                continue
+            if block.cadence is BlockCadence.ACTIVE and not active_due:
                 continue
             try:
                 read.update(await self._client.async_read_block(block))

@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Recorder writes roughly halved.** Home Assistant records an entity's
+  native value, not the one it displays, and writes a row every time that
+  value changes. Two things followed from that and neither was handled:
+  numeric states carried the full float32 conversion artefact, so 230.1 V was
+  stored as `230.10000610351562` and the device's last bits moved whenever its
+  meter recomputed; and the measurement blocks were polled at the user's
+  interval even with nothing plugged in, where the currents and powers are
+  zero and only the mains voltage drifts. Numeric states are now rounded to
+  the precision the entity says it will display, and the blocks that describe
+  a vehicle — measurements, signalled current, session, detected phases — drop
+  to the once-a-minute cadence while the wallbox reports itself idle. Only an
+  explicit idle state demotes them; an unknown state counts as connected.
+  Measured at a five-second interval over twenty idle and four charging hours,
+  that is 77 770 rows a day before and 34 626 after, and 1.22 % to 0.74 % bus
+  occupancy while idle. The entities keep their values and stay available.
+
 - Development tooling moved to `mypy` 2.4.0 and `ruff` 0.16.10, proven against
   both matrix entries. Nothing the integration ships changed.
 
