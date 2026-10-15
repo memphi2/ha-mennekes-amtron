@@ -47,11 +47,19 @@ updates:
           - "version-update:semver-major"
       # Home Assistant compatibility is bumped manually after a min/current CI
       # matrix proof.
+      # Spelled as update-types, not versions: ">=0". A bare version range
+      # is applied on the security path too, which would hide an advisory
+      # against these pins; naming the version-update types keeps routine
+      # bumps out and leaves security updates free to open a pull request.
       - dependency-name: "homeassistant"
-        versions:
-          - ">=0"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
       # pymodbus has to stay equal to the pin of Home Assistant Core's own
       # modbus integration; scripts/check_pymodbus_pin.py enforces that.
       - dependency-name: "pymodbus"
-        versions:
-          - ">=0"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
