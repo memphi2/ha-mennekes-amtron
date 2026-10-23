@@ -119,13 +119,18 @@ If you want less, in rising order of effect:
   recorder:
     exclude:
       entities:
-        - sensor.mennekes_amtron_rtu_voltage_l1
-        - sensor.mennekes_amtron_rtu_voltage_l2
-        - sensor.mennekes_amtron_rtu_voltage_l3
-        - sensor.mennekes_amtron_rtu_power_l1
-        - sensor.mennekes_amtron_rtu_power_l2
-        - sensor.mennekes_amtron_rtu_power_l3
+        - sensor.mennekes_amtron_voltage_l1
+        - sensor.mennekes_amtron_voltage_l2
+        - sensor.mennekes_amtron_voltage_l3
+        - sensor.mennekes_amtron_power_l1
+        - sensor.mennekes_amtron_power_l2
+        - sensor.mennekes_amtron_power_l3
   ```
+
+  These examples use the default device name and English entity names.
+  Check the actual entity IDs in *Settings → Devices & services → Entities*
+  if you renamed the device, use another language or have multiple wallboxes.
+  The `mennekes_amtron_rtu` integration domain does not add `rtu` to entity IDs.
 
   Keep `power_total` and `energy_total` — the Energy dashboard needs them.
 - **Disable the entities you do not use.** A disabled entity is not recorded
