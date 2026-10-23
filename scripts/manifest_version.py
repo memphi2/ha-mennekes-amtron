@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / "custom_components" / "mennekes_amtron" / "manifest.json"
+MANIFEST = ROOT / "custom_components" / "mennekes_amtron_rtu" / "manifest.json"
 
 
 def read_integration_version() -> str:

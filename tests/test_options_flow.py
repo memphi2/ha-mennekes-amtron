@@ -6,19 +6,19 @@ from typing import Any
 
 import probatio
 
-from custom_components.mennekes_amtron._flow_serial import PortOption
-from custom_components.mennekes_amtron.config_schemas import (
+from custom_components.mennekes_amtron_rtu._flow_serial import PortOption
+from custom_components.mennekes_amtron_rtu.config_schemas import (
     options_schema,
     user_schema,
 )
-from custom_components.mennekes_amtron.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONTROL_MODE_MASTER,
     CONTROL_MODE_READ_ONLY,
 )
-from custom_components.mennekes_amtron.options_flow import (
+from custom_components.mennekes_amtron_rtu.options_flow import (
     MennekesAmtronOptionsFlow,
     _max_current,
     control_mode_is_master,

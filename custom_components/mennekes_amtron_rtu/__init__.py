@@ -215,7 +215,7 @@ def _start_heartbeat(
 
     heartbeat = HeartbeatTask(client, diagnostics)
     task = entry.async_create_background_task(
-        hass, heartbeat.async_run(), "mennekes_amtron_heartbeat"
+        hass, heartbeat.async_run(), "mennekes_amtron_rtu_heartbeat"
     )
     heartbeat.attach(task)
     return heartbeat

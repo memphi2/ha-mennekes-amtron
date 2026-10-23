@@ -137,7 +137,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         all_parameters = user_input.get(CONF_SEARCH) == SEARCH_FULL
         self._search_task = self.hass.async_create_task(
             async_search(base, all_parameters=all_parameters),
-            name="mennekes_amtron_bus_search",
+            name="mennekes_amtron_rtu_bus_search",
         )
         return self._async_show_search_progress(base, all_parameters)
 

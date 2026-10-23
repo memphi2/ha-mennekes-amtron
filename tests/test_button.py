@@ -5,9 +5,9 @@ import asyncio
 import pytest
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.button import async_setup_entry
-from custom_components.mennekes_amtron.enums import EvseState
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.button import async_setup_entry
+from custom_components.mennekes_amtron_rtu.enums import EvseState
 from tests.ha_fakes import build_runtime, collect
 
 

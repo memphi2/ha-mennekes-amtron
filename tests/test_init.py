@@ -6,8 +6,8 @@ import pytest
 from homeassistant.const import Platform
 from homeassistant.exceptions import ConfigEntryNotReady
 
-from custom_components import mennekes_amtron as integration
-from custom_components.mennekes_amtron import (
+from custom_components import mennekes_amtron_rtu as integration
+from custom_components.mennekes_amtron_rtu import (
     _control_options,
     _entry_platforms,
     _scan_interval,
@@ -19,8 +19,8 @@ from custom_components.mennekes_amtron import (
     async_unload_entry,
     repairs,
 )
-from custom_components.mennekes_amtron.client import MennekesModbusClient
-from custom_components.mennekes_amtron.const import (
+from custom_components.mennekes_amtron_rtu.client import MennekesModbusClient
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_DEVICE_ID,

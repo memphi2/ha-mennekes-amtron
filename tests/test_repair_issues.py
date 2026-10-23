@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from custom_components.mennekes_amtron.data import (
+from custom_components.mennekes_amtron_rtu.data import (
     DeviceIdentity,
     WallboxData,
     WriteDiagnostics,
 )
-from custom_components.mennekes_amtron.registers import LAYOUT_V01_02, LAYOUT_V01_03
-from custom_components.mennekes_amtron.repair_issues import (
+from custom_components.mennekes_amtron_rtu.registers import LAYOUT_V01_02, LAYOUT_V01_03
+from custom_components.mennekes_amtron_rtu.repair_issues import (
     FIXABLE_ISSUES,
     ISSUE_EMS_HEARTBEAT_LOST,
     fallback_not_configured,

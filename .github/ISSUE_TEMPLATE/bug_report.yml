@@ -168,10 +168,10 @@ body:
     id: logs
     attributes:
       label: Relevant logs
-      description: Paste only the relevant Home Assistant log excerpt. Enable debug logging for custom_components.mennekes_amtron and pymodbus if the problem is on the bus.
+      description: Paste only the relevant Home Assistant log excerpt. Enable debug logging for custom_components.mennekes_amtron_rtu and pymodbus if the problem is on the bus.
       render: text
       placeholder: |
-        Logger: custom_components.mennekes_amtron...
+        Logger: custom_components.mennekes_amtron_rtu...
 
   - type: textarea
     id: diagnostics

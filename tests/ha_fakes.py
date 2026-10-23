@@ -16,17 +16,20 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.client import MennekesModbusClient, SerialConfig
-from custom_components.mennekes_amtron.const import (
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.client import (
+    MennekesModbusClient,
+    SerialConfig,
+)
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONF_PORT,
     CONF_SERIAL_NUMBER,
     CONTROL_MODE_MASTER,
 )
-from custom_components.mennekes_amtron.control import AmtronControl, ControlOptions
-from custom_components.mennekes_amtron.coordinator import MennekesAmtronCoordinator
-from custom_components.mennekes_amtron.data import (
+from custom_components.mennekes_amtron_rtu.control import AmtronControl, ControlOptions
+from custom_components.mennekes_amtron_rtu.coordinator import MennekesAmtronCoordinator
+from custom_components.mennekes_amtron_rtu.data import (
     ConnectionState,
     DeviceIdentity,
     MennekesAmtronRuntimeData,
@@ -133,7 +136,7 @@ class FakeConfigEntry:
     ) -> None:
         self.entry_id = entry_id
         self.title = title
-        self.domain = "mennekes_amtron"
+        self.domain = "mennekes_amtron_rtu"
         self.version = 1
         self.pref_disable_polling = False
         self.state = ConfigEntryState.SETUP_IN_PROGRESS

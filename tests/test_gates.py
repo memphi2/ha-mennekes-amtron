@@ -218,8 +218,8 @@ def test_the_typing_gate_covers_every_module() -> None:
     import check_typing
 
     targets = set(check_typing.strict_targets())
-    assert "custom_components/mennekes_amtron/control.py" in targets
-    assert "custom_components/mennekes_amtron/registers.py" in targets
+    assert "custom_components/mennekes_amtron_rtu/control.py" in targets
+    assert "custom_components/mennekes_amtron_rtu/registers.py" in targets
     assert "scripts/check_repo.py" in targets
 
 
@@ -358,7 +358,7 @@ def test_the_repository_gate_keeps_the_integration_marked_unofficial(
 
     assert check_repo.check_hacs_metadata() == []
 
-    component = tmp_path / "custom_components" / "mennekes_amtron"
+    component = tmp_path / "custom_components" / "mennekes_amtron_rtu"
     component.mkdir(parents=True)
     (component / "manifest.json").write_text(
         json.dumps({"name": "MENNEKES AMTRON"}), encoding="utf-8"
@@ -411,7 +411,7 @@ def test_the_register_gate_rejects_an_icon_that_hides_a_device_class(
 def test_numeric_sensors_declare_a_display_precision() -> None:
     """Otherwise a float32 register shows as 230.10000610351562."""
 
-    from custom_components.mennekes_amtron.sensor_descriptions import (
+    from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         SENSOR_DESCRIPTIONS,
     )
 

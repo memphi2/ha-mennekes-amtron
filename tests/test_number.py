@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.number import async_setup_entry
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.number import async_setup_entry
 from tests.fakes import device_bank
 from tests.ha_fakes import build_runtime, collect
 

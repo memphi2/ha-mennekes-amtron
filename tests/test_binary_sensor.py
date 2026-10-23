@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.binary_sensor import async_setup_entry
-from custom_components.mennekes_amtron.enums import EvseState
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.binary_sensor import async_setup_entry
+from custom_components.mennekes_amtron_rtu.enums import EvseState
 from tests.ha_fakes import FakeHass, build_runtime, collect
 
 

@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron import repairs
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu import repairs
 from tests.fakes import device_bank
 from tests.ha_fakes import build_runtime
 

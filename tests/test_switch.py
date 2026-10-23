@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.switch import async_setup_entry
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.switch import async_setup_entry
 from tests.fakes import device_bank
 from tests.ha_fakes import build_runtime, collect
 

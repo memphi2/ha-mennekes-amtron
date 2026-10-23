@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPONENT = ROOT / "custom_components" / "mennekes_amtron"
+COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
 
 
 def strict_targets() -> list[str]:
@@ -33,8 +33,8 @@ def strict_targets() -> list[str]:
 def main() -> int:
     """Run mypy --strict over the strict target set."""
 
-    # scripts/ import the integration as ``custom_components.mennekes_amtron``
-    # while the package itself resolves as ``mennekes_amtron``. Anchoring the
+    # scripts/ import the integration as ``custom_components.mennekes_amtron_rtu``
+    # while the package itself resolves as ``mennekes_amtron_rtu``. Anchoring the
     # package base at the repository root gives every file one module name.
     search_path = os.pathsep.join((str(ROOT), str(ROOT / "scripts")))
     environment = dict(os.environ, MYPYPATH=search_path)

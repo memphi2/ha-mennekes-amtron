@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from custom_components.mennekes_amtron.data import (
+from custom_components.mennekes_amtron_rtu.data import (
     ConnectionState,
     DeviceIdentity,
     WallboxData,
     WriteDiagnostics,
 )
-from custom_components.mennekes_amtron.registers import LAYOUT_V01_00
+from custom_components.mennekes_amtron_rtu.registers import LAYOUT_V01_00
 
 
 def test_snapshot_reports_missing_values() -> None:

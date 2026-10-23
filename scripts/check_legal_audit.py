@@ -92,8 +92,8 @@ PROJECT_OWNED_BRAND_HASH = (
     "1ec09c77821817d235eb180da6ca006ab305074ffdcda0e2a44b7b85a4897c63"
 )
 BRAND_ASSETS = (
-    "custom_components/mennekes_amtron/brand/icon.png",
-    "custom_components/mennekes_amtron/brand/logo.png",
+    "custom_components/mennekes_amtron_rtu/brand/icon.png",
+    "custom_components/mennekes_amtron_rtu/brand/logo.png",
 )
 REQUIRED_DOCUMENTS = (
     "LICENSE",
@@ -235,7 +235,7 @@ def _check_runtime_requirements() -> list[str]:
     """
 
     manifest = json.loads(
-        (ROOT / "custom_components" / "mennekes_amtron" / "manifest.json").read_text(
+        (ROOT / "custom_components" / "mennekes_amtron_rtu" / "manifest.json").read_text(
             encoding="utf-8"
         )
     )

@@ -324,7 +324,7 @@ class AmtronControl:
             return
         self._flush_task = asyncio.get_running_loop().create_task(
             self._async_flush_pending_current(),
-            name="mennekes_amtron_current_flush",
+            name="mennekes_amtron_rtu_current_flush",
         )
 
     async def _async_flush_pending_current(self) -> None:

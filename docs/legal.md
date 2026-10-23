@@ -64,7 +64,7 @@ The repository must not contain:
 ## Project-owned generic artwork
 
 The integration brand images under
-`custom_components/mennekes_amtron/brand/` are project-owned generic artwork.
+`custom_components/mennekes_amtron_rtu/brand/` are project-owned generic artwork.
 They use an abstract plug-and-bolt motif to describe the integration concept.
 They are not MENNEKES, Home Assistant, HACS or Nabu Casa logos, and they are
 not copied or derived from firmware, product photography or marketing

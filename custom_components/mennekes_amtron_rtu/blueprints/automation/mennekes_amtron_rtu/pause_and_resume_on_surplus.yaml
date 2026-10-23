@@ -29,7 +29,7 @@ blueprint:
       selector:
         entity:
           filter:
-            - integration: mennekes_amtron
+            - integration: mennekes_amtron_rtu
               domain: switch
     pause_below:
       name: Pause below

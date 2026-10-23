@@ -21,7 +21,7 @@ blueprint:
       selector:
         entity:
           filter:
-            - integration: mennekes_amtron
+            - integration: mennekes_amtron_rtu
               domain: sensor
     recover_button:
       name: Recover from error
@@ -29,7 +29,7 @@ blueprint:
       selector:
         entity:
           filter:
-            - integration: mennekes_amtron
+            - integration: mennekes_amtron_rtu
               domain: button
     settle_time:
       name: Settle time

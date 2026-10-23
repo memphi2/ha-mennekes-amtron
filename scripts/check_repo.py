@@ -13,7 +13,7 @@ from check_reporting import report_failures
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_CONFIG_PATH = ROOT / "project-versions.json"
-COMPONENT = ROOT / "custom_components" / "mennekes_amtron"
+COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
 
 REQUIRED_PATHS = (
     "LICENSE",
@@ -29,17 +29,18 @@ REQUIRED_PATHS = (
     "requirements-dev.in",
     "requirements-dev.txt",
     "requirements-dev-min-ha.txt",
-    "custom_components/mennekes_amtron/manifest.json",
-    "custom_components/mennekes_amtron/quality_scale.yaml",
-    "custom_components/mennekes_amtron/strings.json",
-    "custom_components/mennekes_amtron/icons.json",
-    "custom_components/mennekes_amtron/services.yaml",
-    "custom_components/mennekes_amtron/blueprints/automation/mennekes_amtron",
+    "custom_components/mennekes_amtron_rtu/manifest.json",
+    "custom_components/mennekes_amtron_rtu/quality_scale.yaml",
+    "custom_components/mennekes_amtron_rtu/strings.json",
+    "custom_components/mennekes_amtron_rtu/icons.json",
+    "custom_components/mennekes_amtron_rtu/services.yaml",
+    "custom_components/mennekes_amtron_rtu/blueprints/automation/mennekes_amtron_rtu",
     "docs/blueprints.md",
-    "custom_components/mennekes_amtron/translations/en.json",
-    "custom_components/mennekes_amtron/translations/de.json",
+    "custom_components/mennekes_amtron_rtu/translations/en.json",
+    "custom_components/mennekes_amtron_rtu/translations/de.json",
     "docs/README.md",
     "docs/quickstart.md",
+    "docs/upgrading.md",
     "docs/hardware.md",
     "docs/user-guide.md",
     "docs/entities.md",
@@ -178,6 +179,8 @@ def check_release_metadata() -> list[str]:
     manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
     failures: list[str] = []
     expected = VERSION_CONFIG["integration_version"]
+    if manifest.get("domain") != COMPONENT.name:
+        failures.append("manifest.json domain must match the integration directory")
     if manifest.get("version") != expected:
         failures.append(
             f"manifest.json version {manifest.get('version')!r} does not match "

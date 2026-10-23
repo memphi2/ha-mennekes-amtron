@@ -23,7 +23,7 @@ def main() -> int:
             sys.executable,
             "-m",
             "pytest",
-            "--cov=custom_components/mennekes_amtron",
+            "--cov=custom_components/mennekes_amtron_rtu",
             "--cov-report=term-missing:skip-covered",
             f"--cov-fail-under={MINIMUM_COVERAGE}",
             "-q",

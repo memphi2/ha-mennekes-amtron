@@ -5,20 +5,20 @@ from typing import Any
 
 import pytest
 
-from custom_components.mennekes_amtron import config_flow
-from custom_components.mennekes_amtron._flow_connect import async_test_connection
-from custom_components.mennekes_amtron._flow_search import SearchResult
-from custom_components.mennekes_amtron.client import SerialConfig
-from custom_components.mennekes_amtron.client_errors import (
+from custom_components.mennekes_amtron_rtu import config_flow
+from custom_components.mennekes_amtron_rtu._flow_connect import async_test_connection
+from custom_components.mennekes_amtron_rtu._flow_search import SearchResult
+from custom_components.mennekes_amtron_rtu.client import SerialConfig
+from custom_components.mennekes_amtron_rtu.client_errors import (
     AmtronBusError,
     AmtronConnectionError,
 )
-from custom_components.mennekes_amtron.config_flow import (
+from custom_components.mennekes_amtron_rtu.config_flow import (
     MennekesAmtronConfigFlow,
     _entry_title,
     _serial_config,
 )
-from custom_components.mennekes_amtron.const import (
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_DEVICE_ID,
@@ -29,8 +29,8 @@ from custom_components.mennekes_amtron.const import (
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
 )
-from custom_components.mennekes_amtron.data import DeviceIdentity
-from custom_components.mennekes_amtron.options_flow import MennekesAmtronOptionsFlow
+from custom_components.mennekes_amtron_rtu.data import DeviceIdentity
+from custom_components.mennekes_amtron_rtu.options_flow import MennekesAmtronOptionsFlow
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 
@@ -117,7 +117,7 @@ def test_a_stored_entry_still_describes_its_bus() -> None:
 
 
 def test_every_offered_frame_round_trips() -> None:
-    from custom_components.mennekes_amtron.const import (
+    from custom_components.mennekes_amtron_rtu.const import (
         SUPPORTED_FRAMES,
         frame_label,
         frame_parts,
@@ -130,7 +130,7 @@ def test_every_offered_frame_round_trips() -> None:
 
 
 def test_the_offered_frames_are_the_ones_the_device_documents() -> None:
-    from custom_components.mennekes_amtron.const import (
+    from custom_components.mennekes_amtron_rtu.const import (
         SUPPORTED_FRAMES,
         SUPPORTED_PARITY_STOPBITS,
         frame_parts,
@@ -181,7 +181,7 @@ def test_a_device_without_a_serial_number_falls_back_to_the_port(
         flow = Flow(FakeHass())
         result = await flow.async_step_user(dict(USER_INPUT))
         assert CONF_SERIAL_NUMBER not in result["data"]
-        assert flow.set_unique_id == "mennekes_amtron_/dev/fake"
+        assert flow.set_unique_id == "mennekes_amtron_rtu_/dev/fake"
         assert result["data"][CONF_PORT] == "/dev/fake"
 
     asyncio.run(run())
@@ -286,7 +286,7 @@ def test_the_options_flow_is_offered() -> None:
 def test_the_connection_test_reads_the_device_and_closes_the_port() -> None:
     async def run() -> None:
         transport = FakeModbusClient(device_bank())
-        from custom_components.mennekes_amtron import _flow_connect
+        from custom_components.mennekes_amtron_rtu import _flow_connect
 
         original = _flow_connect.MennekesModbusClient
 

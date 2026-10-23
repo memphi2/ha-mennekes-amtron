@@ -12,8 +12,8 @@ from typing import Any
 
 import pytest
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron import smoke_modbus
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu import smoke_modbus
 from tests.fakes import FakeModbusClient, device_bank
 
 
@@ -176,7 +176,7 @@ def test_registers_the_device_does_not_answer_are_left_out(
 
 
 def test_every_documented_evse_state_has_a_label() -> None:
-    from custom_components.mennekes_amtron.enums import EvseState
+    from custom_components.mennekes_amtron_rtu.enums import EvseState
 
     assert set(smoke_modbus.EVSE_STATES) == {int(state) for state in EvseState}
     assert smoke_modbus.EVSE_STATES[5] == "charging"

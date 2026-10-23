@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from custom_components.mennekes_amtron.blueprint_installer import (
+from custom_components.mennekes_amtron_rtu.blueprint_installer import (
     MANIFEST_NAME,
     SOURCE_DIR,
     digest,
@@ -83,7 +83,7 @@ def test_entity_inputs_are_filtered_to_this_integration(path: Path) -> None:
             if isinstance(entry, dict)
         }
         # a PV surplus sensor comes from somewhere else, everything else is ours
-        assert integrations <= {"mennekes_amtron", None}, f"{path.name}: {name}"
+        assert integrations <= {"mennekes_amtron_rtu", None}, f"{path.name}: {name}"
 
 
 def test_installing_into_an_empty_configuration(tmp_path: Path) -> None:
@@ -175,14 +175,14 @@ def test_a_manifest_that_is_not_a_mapping_is_survived(tmp_path: Path) -> None:
 
 
 def test_setup_installs_them_through_the_executor() -> None:
-    from custom_components.mennekes_amtron.blueprint_installer import (
+    from custom_components.mennekes_amtron_rtu.blueprint_installer import (
         async_install_blueprints,
     )
     from tests.ha_fakes import FakeHass
 
     async def run() -> None:
         hass = FakeHass()
-        target = Path(hass.config_dir) / "blueprints" / "automation" / "mennekes_amtron"
+        target = Path(hass.config_dir) / "blueprints" / "automation" / "mennekes_amtron_rtu"
         report = await async_install_blueprints(hass)
         assert set(report.installed) == EXPECTED
         assert (target / "solar_surplus_charging.yaml").is_file()

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
-from custom_components.mennekes_amtron.const import CONF_SERIAL_NUMBER, DOMAIN
-from custom_components.mennekes_amtron.entity import (
+from custom_components.mennekes_amtron_rtu.const import CONF_SERIAL_NUMBER, DOMAIN
+from custom_components.mennekes_amtron_rtu.entity import (
     MennekesAmtronEntity,
     entry_device_info,
     entry_device_key,

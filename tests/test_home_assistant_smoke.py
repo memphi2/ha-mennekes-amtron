@@ -22,8 +22,8 @@ from typing import Any
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.const import (
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.const import (
     CONF_BAUDRATE,
     CONF_CONTROL_MODE,
     CONF_DEVICE_ID,
@@ -136,6 +136,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             assert result["type"] == "create_entry", result
             await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]
+            assert entry.domain == "mennekes_amtron_rtu"
 
             # The title becomes the device name and prefixes every entity id,
             # so it carries no serial number.
@@ -145,6 +146,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             registry = er.async_get(hass)
             entities = er.async_entries_for_config_entry(registry, entry.entry_id)
             assert len(entities) > 40
+            assert all(entity.platform == "mennekes_amtron_rtu" for entity in entities)
             assert all(
                 SERIAL_NUMBER.lower() not in entity.entity_id for entity in entities
             )
@@ -157,6 +159,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             assert device.serial_number == SERIAL_NUMBER
             assert device.sw_version == "2023.21.11024"
             assert device.model == "1313201205"
+            assert device.identifiers == {("mennekes_amtron_rtu", SERIAL_NUMBER)}
 
             # A wallbox in error state 200 without a configured fallback.
             issues = {
@@ -167,6 +170,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             assert issues == {"ems_heartbeat_lost", "ems_fallback_not_configured"}
 
             assert hass.services.has_service(DOMAIN, "set_charging_current")
+            assert not hass.services.has_service("mennekes_amtron", "set_charging_current")
 
             options = await hass.config_entries.options.async_init(entry.entry_id)
             await hass.config_entries.options.async_configure(

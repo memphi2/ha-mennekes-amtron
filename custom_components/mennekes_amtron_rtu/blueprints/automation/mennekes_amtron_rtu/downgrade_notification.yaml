@@ -17,7 +17,7 @@ blueprint:
       selector:
         entity:
           filter:
-            - integration: mennekes_amtron
+            - integration: mennekes_amtron_rtu
               domain: binary_sensor
     downgrade_current:
       name: Downgrade current
@@ -25,7 +25,7 @@ blueprint:
       selector:
         entity:
           filter:
-            - integration: mennekes_amtron
+            - integration: mennekes_amtron_rtu
               domain: sensor
     notify_action:
       name: Notification action

@@ -4,13 +4,13 @@ import asyncio
 
 import pytest
 
-from custom_components.mennekes_amtron._client_read import read_block, read_words
-from custom_components.mennekes_amtron.client_errors import (
+from custom_components.mennekes_amtron_rtu._client_read import read_block, read_words
+from custom_components.mennekes_amtron_rtu.client_errors import (
     AmtronConnectionError,
     AmtronIllegalAddressError,
     AmtronProtocolError,
 )
-from custom_components.mennekes_amtron.register_blocks import REGISTER_BLOCKS
+from custom_components.mennekes_amtron_rtu.register_blocks import REGISTER_BLOCKS
 from tests.fakes import (
     FakeModbusClient,
     device_bank,

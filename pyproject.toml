@@ -64,7 +64,7 @@ ignore = ["E501"]
 "scripts/*" = ["S603", "S607", "INP001"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["custom_components.mennekes_amtron"]
+known-first-party = ["custom_components.mennekes_amtron_rtu"]
 
 [tool.coverage.run]
 branch = true

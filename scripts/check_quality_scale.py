@@ -14,7 +14,7 @@ from pathlib import Path
 from check_reporting import report_failures
 
 ROOT = Path(__file__).resolve().parents[1]
-QUALITY_SCALE = ROOT / "custom_components" / "mennekes_amtron" / "quality_scale.yaml"
+QUALITY_SCALE = ROOT / "custom_components" / "mennekes_amtron_rtu" / "quality_scale.yaml"
 QUALITY_DOC = ROOT / "docs" / "quality-scale.md"
 
 OFFICIAL_RULES = (

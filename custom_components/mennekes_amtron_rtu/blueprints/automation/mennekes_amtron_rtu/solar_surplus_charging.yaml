@@ -32,7 +32,7 @@ blueprint:
       selector:
         entity:
           filter:
-            - integration: mennekes_amtron
+            - integration: mennekes_amtron_rtu
               domain: number
     vehicle_connected:
       name: Vehicle connected
@@ -40,7 +40,7 @@ blueprint:
       selector:
         entity:
           filter:
-            - integration: mennekes_amtron
+            - integration: mennekes_amtron_rtu
               domain: binary_sensor
     switched_phases:
       name: Switched phases
@@ -50,7 +50,7 @@ blueprint:
       selector:
         entity:
           filter:
-            - integration: mennekes_amtron
+            - integration: mennekes_amtron_rtu
               domain: sensor
     grid_voltage:
       name: Grid voltage

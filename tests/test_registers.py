@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from custom_components.mennekes_amtron.registers import (
+from custom_components.mennekes_amtron_rtu.registers import (
     LAYOUT_V01_00,
     LAYOUT_V01_03,
     LAYOUT_VERSIONS,

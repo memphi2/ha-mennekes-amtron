@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Final
 
-DOMAIN: Final = "mennekes_amtron"
+DOMAIN: Final = "mennekes_amtron_rtu"
 
 MANUFACTURER: Final = "MENNEKES"
 DEFAULT_MODEL: Final = "AMTRON"

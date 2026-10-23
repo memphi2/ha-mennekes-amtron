@@ -119,12 +119,12 @@ If you want less, in rising order of effect:
   recorder:
     exclude:
       entities:
-        - sensor.mennekes_amtron_voltage_l1
-        - sensor.mennekes_amtron_voltage_l2
-        - sensor.mennekes_amtron_voltage_l3
-        - sensor.mennekes_amtron_power_l1
-        - sensor.mennekes_amtron_power_l2
-        - sensor.mennekes_amtron_power_l3
+        - sensor.mennekes_amtron_rtu_voltage_l1
+        - sensor.mennekes_amtron_rtu_voltage_l2
+        - sensor.mennekes_amtron_rtu_voltage_l3
+        - sensor.mennekes_amtron_rtu_power_l1
+        - sensor.mennekes_amtron_rtu_power_l2
+        - sensor.mennekes_amtron_rtu_power_l3
   ```
 
   Keep `power_total` and `energy_total` — the Energy dashboard needs them.
@@ -199,7 +199,7 @@ Remove the limit entirely, deliberately:
 
 ```yaml
 actions:
-  - action: mennekes_amtron.set_charging_current
+  - action: mennekes_amtron_rtu.set_charging_current
     target:
       device_id: !input wallbox
     data:
@@ -209,7 +209,7 @@ actions:
 
 ## Actions
 
-### `mennekes_amtron.set_charging_current`
+### `mennekes_amtron_rtu.set_charging_current`
 
 Writes the energy-manager charging-current limit (`0x0302`) of one or more
 wallbox devices.
