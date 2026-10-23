@@ -7,12 +7,15 @@ from typing import Any
 import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.client import MennekesModbusClient, SerialConfig
-from custom_components.mennekes_amtron.coordinator import MennekesAmtronCoordinator
-from custom_components.mennekes_amtron.data import ConnectionState, DeviceIdentity
-from custom_components.mennekes_amtron.enums import EvseState
-from custom_components.mennekes_amtron.register_blocks import (
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.client import (
+    MennekesModbusClient,
+    SerialConfig,
+)
+from custom_components.mennekes_amtron_rtu.coordinator import MennekesAmtronCoordinator
+from custom_components.mennekes_amtron_rtu.data import ConnectionState, DeviceIdentity
+from custom_components.mennekes_amtron_rtu.enums import EvseState
+from custom_components.mennekes_amtron_rtu.register_blocks import (
     REGISTER_BLOCKS,
     SLOW_BLOCK_INTERVAL_SECONDS,
     BlockCadence,

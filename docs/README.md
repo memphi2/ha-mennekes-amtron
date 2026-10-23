@@ -9,6 +9,7 @@ local Modbus RTU.
 |---|---|
 | wire it up: cabling, DIP switches, USB passthrough | [Hardware installation](hardware.md) |
 | get it running in Home Assistant | [Quick start](quickstart.md) |
+| upgrade an existing 0.1.0 installation | [Upgrading](upgrading.md) |
 | know what every entity means | [Entity reference](entities.md) |
 | use a ready-made automation | [Blueprints](blueprints.md) |
 | write my own automations | [Automations](automations.md) |

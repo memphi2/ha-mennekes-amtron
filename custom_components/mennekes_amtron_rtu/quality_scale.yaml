@@ -13,7 +13,7 @@ rules:
     comment: >-
       The Home Assistant Brands repository serves core integrations. This is a
       custom integration installed through HACS, which serves the
-      project-owned brand assets from custom_components/mennekes_amtron/brand/
+      project-owned brand assets from custom_components/mennekes_amtron_rtu/brand/
       instead. docs/legal.md pins their hash and the legal gate fails if it
       changes. The rule becomes relevant again with a core submission.
   common-modules: done

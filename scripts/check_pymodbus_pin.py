@@ -23,7 +23,7 @@ from pathlib import Path
 from check_reporting import report_failures
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / "custom_components" / "mennekes_amtron" / "manifest.json"
+MANIFEST = ROOT / "custom_components" / "mennekes_amtron_rtu" / "manifest.json"
 VERSIONS = ROOT / "project-versions.json"
 REQUIREMENT_RE = re.compile(
     r"^pymodbus(?:\[[a-z,]+\])?(?P<operator>[><=]=)(?P<version>[0-9.]+)$"

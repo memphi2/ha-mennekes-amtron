@@ -5,10 +5,13 @@ import logging
 
 import pytest
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.client import MennekesModbusClient, SerialConfig
-from custom_components.mennekes_amtron.data import WriteDiagnostics
-from custom_components.mennekes_amtron.heartbeat import HeartbeatTask
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.client import (
+    MennekesModbusClient,
+    SerialConfig,
+)
+from custom_components.mennekes_amtron_rtu.data import WriteDiagnostics
+from custom_components.mennekes_amtron_rtu.heartbeat import HeartbeatTask
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)

@@ -117,8 +117,8 @@ this repository.
 ## Brand assets
 
 ```text
-1ec09c77821817d235eb180da6ca006ab305074ffdcda0e2a44b7b85a4897c63  custom_components/mennekes_amtron/brand/icon.png
-1ec09c77821817d235eb180da6ca006ab305074ffdcda0e2a44b7b85a4897c63  custom_components/mennekes_amtron/brand/logo.png
+1ec09c77821817d235eb180da6ca006ab305074ffdcda0e2a44b7b85a4897c63  custom_components/mennekes_amtron_rtu/brand/icon.png
+1ec09c77821817d235eb180da6ca006ab305074ffdcda0e2a44b7b85a4897c63  custom_components/mennekes_amtron_rtu/brand/logo.png
 ```
 
 Both files are the same project-owned 256x256 PNG, generated in this

@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPONENT = ROOT / "custom_components" / "mennekes_amtron"
+COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
 LANGUAGES = ("en", "de")
 
 
@@ -70,7 +70,7 @@ def test_every_raised_translation_key_is_declared() -> None:
 
 
 def test_the_repair_issues_are_translated() -> None:
-    from custom_components.mennekes_amtron import repair_issues
+    from custom_components.mennekes_amtron_rtu import repair_issues
 
     declared = set(_load(COMPONENT / "strings.json")["issues"])
     expected = {

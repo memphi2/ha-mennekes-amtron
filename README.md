@@ -1,4 +1,4 @@
-# MENNEKES AMTRON for Home Assistant (Unofficial)
+# MENNEKES AMTRON RTU for Home Assistant (Unofficial)
 
 [![HACS: Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.9%2B-41BDF5.svg)](https://www.home-assistant.io/)
@@ -37,13 +37,19 @@ they mean. This one does:
 
 ## Quick start (5 minutes)
 
+**Upgrading from 0.1.0?** Version 0.2.0 uses the new integration domain
+`mennekes_amtron_rtu` and requires reconfiguration. Follow the
+[upgrade guide](docs/upgrading.md) before updating.
+
 1. Wire a USB RS-485 adapter to the wallbox: Modbus **A = +**, **B = −**.
 2. Set the wallbox to satellite mode: **DIP bank S1, DIP 4 and DIP 5 to ON**,
    then restart the wallbox.
 3. Find the adapter: `ls -l /dev/serial/by-id/`.
-4. Install this repository as a HACS custom repository (category
-   *Integration*) and restart Home Assistant.
-5. Add **MENNEKES AMTRON** from *Settings → Devices & services*. If the
+4. In HACS, search for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**,
+   download it and restart Home Assistant. While the default-catalog
+   submission is pending, add `https://github.com/memphi2/ha-mennekes-amtron`
+   under *Custom repositories*, category *Integration*, first.
+5. Add **MENNEKES AMTRON RTU (Unofficial)** from *Settings → Devices & services*. If the
    device address or the bus parameters are not the factory ones, the setup
    form can **search the bus for you** — it only reads, so it cannot disturb
    the wallbox.
@@ -52,7 +58,7 @@ they mean. This one does:
 
    ```bash
    docker exec -it homeassistant \
-     python /config/custom_components/mennekes_amtron/smoke_modbus.py \
+     python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py \
      /dev/serial/by-id/<your-adapter>
    ```
 
@@ -71,7 +77,7 @@ Full instructions: [docs/quickstart.md](docs/quickstart.md).
 | Diagnostic sensors | Temperature, Modbus layout, downgrade current, house and EVSE current limits, energy-manager fallback, phase rotation, switched phases, cable lock, grid imbalance, Sunshine+ minimum current, phase-switching pause and mode, connected grid phases |
 | Binary sensors | Vehicle connected, charging, **downgrade active**, error, energy-manager fallback, plus diagnostic capability flags |
 | Controls | Charging-current limit (number), charging paused / charging release / wallbox locked (switches), solar mode and requested phases (selects), recover and restart (buttons) |
-| Action | `mennekes_amtron.set_charging_current` with the explicit `allow_unlimited` opt-in |
+| Action | `mennekes_amtron_rtu.set_charging_current` with the explicit `allow_unlimited` opt-in |
 
 Total energy (`0x1000`) feeds the Energy dashboard. The manufacturer marks it
 *not usable for billing*; the entity description says so too.

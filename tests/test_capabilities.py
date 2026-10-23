@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from custom_components.mennekes_amtron.capabilities import (
+from custom_components.mennekes_amtron_rtu.capabilities import (
     capability_is_supported,
     phase_switch_is_supported,
     supported_blocks,
     supported_register_keys,
 )
-from custom_components.mennekes_amtron.registers import (
+from custom_components.mennekes_amtron_rtu.registers import (
     LAYOUT_V01_00,
     LAYOUT_V01_01,
     LAYOUT_V01_02,

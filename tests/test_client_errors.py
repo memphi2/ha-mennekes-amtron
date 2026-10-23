@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from custom_components.mennekes_amtron.client_errors import (
+from custom_components.mennekes_amtron_rtu.client_errors import (
     AmtronIllegalAddressError,
     AmtronProtocolError,
     AmtronRateLimitedError,

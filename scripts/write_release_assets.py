@@ -76,7 +76,7 @@ def _sbom(
     args: argparse.Namespace, version: str, zip_digest: str
 ) -> dict[str, object]:
     manifest = json.loads(
-        (ROOT / "custom_components" / "mennekes_amtron" / "manifest.json").read_text(
+        (ROOT / "custom_components" / "mennekes_amtron_rtu" / "manifest.json").read_text(
             encoding="utf-8"
         )
     )

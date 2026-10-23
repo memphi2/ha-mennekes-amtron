@@ -17,9 +17,14 @@ read-only mode. See [safety.md](safety.md).
 
 **HACS (recommended)**
 
-1. HACS → three-dot menu → *Custom repositories*.
-2. Add this repository, category *Integration*.
-3. Install, then restart Home Assistant.
+**Existing 0.1.0 installation:** follow [Upgrading](upgrading.md) first.
+The integration domain changes in 0.2.0 and the wallbox must be added again.
+
+1. Search HACS for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**.
+2. While the default-catalog submission is pending, add
+   `https://github.com/memphi2/ha-mennekes-amtron` through the three-dot menu →
+   *Custom repositories*, category *Integration*, then search again.
+3. Download the integration, then restart Home Assistant.
 
 **Manual**
 
@@ -51,13 +56,13 @@ changes when devices are re-enumerated, the `by-id` path does not.
 
 The integration ships the check, so after step 3 it is already on the machine
 with the adapter, at
-`/config/custom_components/mennekes_amtron/smoke_modbus.py`. Home Assistant's
+`/config/custom_components/mennekes_amtron_rtu/smoke_modbus.py`. Home Assistant's
 own Python already has pymodbus, so nothing has to be installed:
 
 | Installation | Command |
 |---|---|
-| Home Assistant OS / Supervised / Container | `docker exec -it homeassistant python /config/custom_components/mennekes_amtron/smoke_modbus.py <port>` |
-| Home Assistant Core | `/srv/homeassistant/bin/python /config/custom_components/mennekes_amtron/smoke_modbus.py <port>` |
+| Home Assistant OS / Supervised / Container | `docker exec -it homeassistant python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py <port>` |
+| Home Assistant Core | `/srv/homeassistant/bin/python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py <port>` |
 
 The check is read-only and sends no heartbeat, so it cannot put the wallbox
 into the energy-manager error state. A good run prints:
@@ -81,7 +86,7 @@ with the MENNEKES configuration tool, let it search:
 
 ```bash
 docker exec -it homeassistant \
-  python /config/custom_components/mennekes_amtron/smoke_modbus.py \
+  python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py \
   /dev/serial/by-id/<your-adapter> --scan --scan-baudrate
 ```
 
@@ -94,7 +99,7 @@ Home Assistant.
 
 ## 6. Add the wallbox
 
-*Settings → Devices & services → Add integration → MENNEKES AMTRON.*
+*Settings → Devices & services → Add integration → MENNEKES AMTRON RTU (Unofficial).*
 
 Pick the port, confirm the device address and the bus parameters. The flow
 opens the port and reads the device before it creates the entry, so a wrong
@@ -130,7 +135,7 @@ control entities appear.
 
 ## Removing the integration
 
-*Settings → Devices & services → MENNEKES AMTRON → three-dot menu → Delete.*
+*Settings → Devices & services → MENNEKES AMTRON RTU (Unofficial) → three-dot menu → Delete.*
 
 Deleting the entry stops the heartbeat and closes the serial port. The
 wallbox keeps the last values it received; if you want it to fall back to a
@@ -138,4 +143,4 @@ defined state instead, configure an energy-manager fallback current with the
 MENNEKES configuration tool before removing the integration.
 
 To remove the files as well, uninstall it in HACS or delete
-`custom_components/mennekes_amtron`.
+`custom_components/mennekes_amtron_rtu`.

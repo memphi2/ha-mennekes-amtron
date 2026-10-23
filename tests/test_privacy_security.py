@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPONENT = ROOT / "custom_components" / "mennekes_amtron"
+COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
 TEXT_SUFFIXES = {".json", ".md", ".py", ".toml", ".txt", ".yaml", ".yml", ".in"}
 IGNORED = {
     ".git",

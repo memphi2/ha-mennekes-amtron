@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import pytest
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron import services
-from custom_components.mennekes_amtron.const import (
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu import services
+from custom_components.mennekes_amtron_rtu.const import (
     ATTR_ALLOW_UNLIMITED,
     ATTR_CURRENT,
     DOMAIN,
@@ -116,12 +116,13 @@ def test_an_unloaded_entry_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("domain", ["other", "mennekes_amtron"])
 def test_a_device_of_another_integration_is_refused(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, domain: str,
 ) -> None:
     async def run() -> None:
         hass, entry, _transport = await build_runtime()
-        entry.domain = "other"
+        entry.domain = domain
         _patch_registry(
             monkeypatch, {"dev": SimpleNamespace(config_entries={entry.entry_id})}
         )

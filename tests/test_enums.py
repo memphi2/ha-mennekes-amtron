@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.mennekes_amtron.enums import (
+from custom_components.mennekes_amtron_rtu.enums import (
     CableLockStatus,
     CpState,
     ErrorCategory,
@@ -67,7 +67,7 @@ def test_error_codes_map_to_documented_categories(
 
 
 def test_the_fallback_register_separates_modes_from_currents() -> None:
-    from custom_components.mennekes_amtron.enums import (
+    from custom_components.mennekes_amtron_rtu.enums import (
         EmsFallbackBehaviour,
         ems_fallback_behaviour,
         ems_fallback_current,

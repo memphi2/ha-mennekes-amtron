@@ -3,17 +3,17 @@
 
 This file ships with the integration so it is already on the machine the
 USB RS-485 adapter is plugged into. After installing the integration it is at
-``/config/custom_components/mennekes_amtron/smoke_modbus.py``, and Home
+``/config/custom_components/mennekes_amtron_rtu/smoke_modbus.py``, and Home
 Assistant's own Python already has pymodbus, so nothing has to be installed.
 
     # Home Assistant OS, Supervised or Container
     docker exec -it homeassistant \
-        python /config/custom_components/mennekes_amtron/smoke_modbus.py \
+        python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py \
         /dev/serial/by-id/<your-adapter>
 
     # Home Assistant Core in a virtual environment
     /srv/homeassistant/bin/python \
-        /config/custom_components/mennekes_amtron/smoke_modbus.py \
+        /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py \
         /dev/serial/by-id/<your-adapter>
 
 It never writes. It cannot put the wallbox into the energy-manager error
@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover - only hit outside Home Assistant
         "pymodbus is missing. Run this with the Python that Home Assistant "
         "itself uses, for example:\n"
         "  docker exec -it homeassistant python "
-        "/config/custom_components/mennekes_amtron/smoke_modbus.py <port>\n"
+        "/config/custom_components/mennekes_amtron_rtu/smoke_modbus.py <port>\n"
     )
     raise SystemExit(2) from None
 

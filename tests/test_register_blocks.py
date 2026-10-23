@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from custom_components.mennekes_amtron.register_blocks import (
+from custom_components.mennekes_amtron_rtu.register_blocks import (
     REGISTER_BLOCKS,
     RegisterBlock,
     block_consistency_failures,
 )
-from custom_components.mennekes_amtron.registers import READABLE_REGISTERS
+from custom_components.mennekes_amtron_rtu.registers import READABLE_REGISTERS
 
 
 def test_declared_blocks_match_the_register_map() -> None:
@@ -86,7 +86,7 @@ def test_consistency_rule_rejects_an_oversized_block() -> None:
 
 
 def _failures_for(block: RegisterBlock) -> list[str]:
-    from custom_components.mennekes_amtron import register_blocks
+    from custom_components.mennekes_amtron_rtu import register_blocks
 
     original = register_blocks.REGISTER_BLOCKS
     register_blocks.REGISTER_BLOCKS = (block,)
@@ -97,7 +97,7 @@ def _failures_for(block: RegisterBlock) -> list[str]:
 
 
 def test_consistency_rule_rejects_a_register_in_two_blocks() -> None:
-    from custom_components.mennekes_amtron import register_blocks
+    from custom_components.mennekes_amtron_rtu import register_blocks
 
     duplicate = RegisterBlock(
         name="duplicate",

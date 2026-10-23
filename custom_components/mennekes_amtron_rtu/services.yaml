@@ -4,7 +4,7 @@ set_charging_current:
       required: true
       selector:
         device:
-          integration: mennekes_amtron
+          integration: mennekes_amtron_rtu
           multiple: true
     current:
       required: true

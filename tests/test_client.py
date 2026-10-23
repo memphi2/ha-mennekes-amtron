@@ -4,18 +4,18 @@ import asyncio
 
 import pytest
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.client import (
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.client import (
     MennekesModbusClient,
     SerialConfig,
     create_serial_client,
 )
-from custom_components.mennekes_amtron.client_errors import (
+from custom_components.mennekes_amtron_rtu.client_errors import (
     AmtronConnectionError,
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
 )
-from custom_components.mennekes_amtron.register_blocks import REGISTER_BLOCKS
+from custom_components.mennekes_amtron_rtu.register_blocks import REGISTER_BLOCKS
 from tests.fakes import FakeModbusClient, device_bank
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)

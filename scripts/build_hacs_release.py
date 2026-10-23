@@ -5,12 +5,12 @@ Two archives, because two install paths want different shapes:
 
 ``ha-mennekes-amtron.zip``
     What HACS downloads. ``zip_release`` extracts the archive *into*
-    ``config/custom_components/mennekes_amtron/``, so its contents have to sit
+    ``config/custom_components/mennekes_amtron_rtu/``, so its contents have to sit
     at the archive root with no wrapping directory.
 
 ``ha-mennekes-amtron-manual.zip``
     What a human downloads. It carries the full
-    ``custom_components/mennekes_amtron/`` path, so unpacking it over a Home
+    ``custom_components/mennekes_amtron_rtu/`` path, so unpacking it over a Home
     Assistant configuration directory puts every file where it belongs
     instead of scattering fifty files into the download folder.
 
@@ -29,7 +29,7 @@ from pathlib import Path
 from manifest_version import read_integration_version
 
 ROOT = Path(__file__).resolve().parents[1]
-DOMAIN = "mennekes_amtron"
+DOMAIN = "mennekes_amtron_rtu"
 COMPONENT_SRC = ROOT / "custom_components" / DOMAIN
 RELEASE_ROOT = ROOT / ".release"
 PACKAGE_ROOT = RELEASE_ROOT / "package"

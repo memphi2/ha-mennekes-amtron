@@ -30,7 +30,7 @@
           "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Das Suchen liest nur und kann die Wallbox nicht stören."
         },
         "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
-        "title": "MENNEKES AMTRON"
+        "title": "MENNEKES AMTRON RTU"
       },
       "search_result": {
         "description": "Nach {attempts} Versuchen hat eine Wallbox geantwortet:\n\n- Geräteadresse: **{device_id}**\n- Bus: **{baudrate} Baud, {frame}**\n- Modbus-Layout: **{layout}**\n- Seriennummer: **{serial_number}**\n\nMit Absenden wird die Wallbox mit diesen Werten eingerichtet.",
@@ -52,7 +52,7 @@
           "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Das Suchen liest nur und kann die Wallbox nicht stören."
         },
         "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
-        "title": "MENNEKES AMTRON"
+        "title": "MENNEKES AMTRON RTU"
       }
     }
   },

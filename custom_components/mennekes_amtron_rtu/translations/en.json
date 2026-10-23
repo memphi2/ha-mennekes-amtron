@@ -30,7 +30,7 @@
           "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox."
         },
         "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
-        "title": "MENNEKES AMTRON"
+        "title": "MENNEKES AMTRON RTU"
       },
       "search_result": {
         "description": "A wallbox answered after {attempts} attempts:\n\n- Device address: **{device_id}**\n- Bus: **{baudrate} baud, {frame}**\n- Modbus layout: **{layout}**\n- Serial number: **{serial_number}**\n\nSubmit to set the wallbox up with these values.",
@@ -52,7 +52,7 @@
           "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox."
         },
         "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
-        "title": "MENNEKES AMTRON"
+        "title": "MENNEKES AMTRON RTU"
       }
     }
   },

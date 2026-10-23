@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from custom_components.mennekes_amtron._flow_serial import (
+from custom_components.mennekes_amtron_rtu._flow_serial import (
     PortOption,
     list_by_id_ports,
     list_comports,

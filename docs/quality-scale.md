@@ -5,7 +5,7 @@ Target: Platinum.
 Current status: Platinum. Open rules: none — all 52 official rules are
 answered, 43 as `done` and 9 as `exempt`, each exemption with a reason.
 
-`custom_components/mennekes_amtron/quality_scale.yaml` is the
+`custom_components/mennekes_amtron_rtu/quality_scale.yaml` is the
 machine-readable status. `scripts/check_quality_scale.py` fails the build when
 it drifts from this document, when a rule is missing or unknown, and when any
 rule goes back to `todo` without being documented as a blocker here.

@@ -35,11 +35,13 @@ def _build(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_the_hacs_zip_has_no_wrapping_directory(tmp_path: Path) -> None:
-    """HACS extracts the archive into custom_components/mennekes_amtron."""
+    """HACS extracts the archive into custom_components/mennekes_amtron_rtu."""
 
     hacs_zip, _manual = _build(tmp_path)
     with zipfile.ZipFile(hacs_zip) as archive:
         names = set(archive.namelist())
+        manifest = json.loads(archive.read("manifest.json"))
+    assert manifest["domain"] == "mennekes_amtron_rtu"
     assert "manifest.json" in names
     assert "strings.json" in names
     assert "translations/de.json" in names
@@ -56,9 +58,20 @@ def test_the_manual_zip_unpacks_onto_a_configuration_directory(
     _hacs, manual_zip = _build(tmp_path / "build")
     target = tmp_path / "config"
     target.mkdir()
+    # A TCP integration using the original domain must remain untouched.
+    tcp = target / "custom_components" / "mennekes_amtron"
+    tcp.mkdir(parents=True)
+    sentinel = tcp / "manifest.json"
+    sentinel.write_text('{"domain": "mennekes_amtron", "name": "TCP"}')
     with zipfile.ZipFile(manual_zip) as archive:
+        assert all(
+            name.startswith("custom_components/mennekes_amtron_rtu/")
+            for name in archive.namelist()
+        )
         archive.extractall(target)
-    component = target / "custom_components" / "mennekes_amtron"
+    assert sentinel.read_text() == '{"domain": "mennekes_amtron", "name": "TCP"}'
+    assert list(tcp.iterdir()) == [sentinel]
+    component = target / "custom_components" / "mennekes_amtron_rtu"
     assert (component / "manifest.json").is_file()
     assert (component / "translations" / "de.json").is_file()
     assert (component / "brand" / "icon.png").is_file()
@@ -70,7 +83,7 @@ def test_both_archives_carry_the_same_files(tmp_path: Path) -> None:
         flat = set(archive.namelist())
     with zipfile.ZipFile(manual_zip) as archive:
         nested = {
-            name.removeprefix("custom_components/mennekes_amtron/")
+            name.removeprefix("custom_components/mennekes_amtron_rtu/")
             for name in archive.namelist()
         }
     assert flat == nested
@@ -95,6 +108,9 @@ def test_the_build_is_reproducible(tmp_path: Path) -> None:
 
 
 def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
+    from manifest_version import read_integration_version
+
+    version = read_integration_version()
     zip_path, manual_zip = _build(tmp_path)
     sums = tmp_path / "SHA256SUMS"
     metadata = tmp_path / "build-metadata.json"
@@ -108,7 +124,7 @@ def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
             "--manual-zip",
             str(manual_zip),
             "--tag",
-            "v0.1.0",
+            f"v{version}",
             "--repository",
             "example/ha-mennekes-amtron",
             "--sha256sums",
@@ -126,10 +142,8 @@ def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
 
     payload = json.loads(metadata.read_text(encoding="utf-8"))
-    from manifest_version import read_integration_version
-
-    assert payload["release_tag"] == "v0.1.0"
-    assert payload["integration_version"] == read_integration_version()
+    assert payload["release_tag"] == f"v{version}"
+    assert payload["integration_version"] == version
     assert payload["zip_entries"] > 10
     assert payload["manual_zip_entries"] == payload["zip_entries"]
     assert payload["manual_zip_sha256"] != payload["zip_sha256"]

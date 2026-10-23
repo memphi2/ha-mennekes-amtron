@@ -72,7 +72,7 @@ restart has a defined outcome. The integration raises a repair issue when
 A naive `number` entity with `min: 0` therefore requests *full load* when
 dragged to zero. The number entity in this integration starts at 6 A, pausing
 has its own switch, and 0 A can only be written through the
-`mennekes_amtron.set_charging_current` action with `allow_unlimited: true`.
+`mennekes_amtron_rtu.set_charging_current` action with `allow_unlimited: true`.
 
 ## Manufacturer rate limits
 

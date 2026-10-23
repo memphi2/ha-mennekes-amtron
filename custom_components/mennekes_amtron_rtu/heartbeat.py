@@ -107,7 +107,7 @@ class HeartbeatTask:
             return
         self._stopping = False
         self._task = asyncio.get_running_loop().create_task(
-            self.async_run(), name="mennekes_amtron_heartbeat"
+            self.async_run(), name="mennekes_amtron_rtu_heartbeat"
         )
 
     def attach(self, task: asyncio.Task[None]) -> None:

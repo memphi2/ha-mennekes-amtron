@@ -10,7 +10,7 @@ repository does not vendor it. Register addresses, data types and enumerated
 values are facts restated here so the code can be reviewed; the
 specification's explanatory prose is not reproduced.
 
-`custom_components/mennekes_amtron/registers.py` is the machine-readable
+`custom_components/mennekes_amtron_rtu/registers.py` is the machine-readable
 version of this table and the single source of truth in the code.
 `scripts/check_register_map.py` fails the build when the two drift apart: it
 compares every address, span, data type, access mode, layout version, unit,

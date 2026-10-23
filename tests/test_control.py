@@ -12,15 +12,18 @@ import asyncio
 import pytest
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.mennekes_amtron import registers as R
-from custom_components.mennekes_amtron.client import MennekesModbusClient, SerialConfig
-from custom_components.mennekes_amtron.control import AmtronControl, ControlOptions
-from custom_components.mennekes_amtron.data import (
+from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.client import (
+    MennekesModbusClient,
+    SerialConfig,
+)
+from custom_components.mennekes_amtron_rtu.control import AmtronControl, ControlOptions
+from custom_components.mennekes_amtron_rtu.data import (
     DeviceIdentity,
     WallboxData,
     WriteDiagnostics,
 )
-from custom_components.mennekes_amtron.enums import (
+from custom_components.mennekes_amtron_rtu.enums import (
     EvseState,
     RequestedPhases,
     SolarChargingMode,
@@ -207,7 +210,7 @@ def test_resuming_restores_the_stored_setpoint() -> None:
         await control.async_resume_charging()
 
     asyncio.run(run())
-    from custom_components.mennekes_amtron.decode import decode_register
+    from custom_components.mennekes_amtron_rtu.decode import decode_register
 
     last = harness.written(R.CHARGING_CURRENT_EMS)[-1]
     assert decode_register(R.CHARGING_CURRENT_EMS, last) == 12.0
@@ -221,7 +224,7 @@ def test_resuming_without_a_setpoint_uses_the_maximum() -> None:
         await control.async_resume_charging()
 
     asyncio.run(run())
-    from custom_components.mennekes_amtron.decode import decode_register
+    from custom_components.mennekes_amtron_rtu.decode import decode_register
 
     last = harness.written(R.CHARGING_CURRENT_EMS)[-1]
     assert decode_register(R.CHARGING_CURRENT_EMS, last) == 16.0
@@ -251,7 +254,7 @@ def test_a_fast_current_change_is_deferred_not_rejected() -> None:
             await asyncio.sleep(0)
 
     asyncio.run(run())
-    from custom_components.mennekes_amtron.decode import decode_register
+    from custom_components.mennekes_amtron_rtu.decode import decode_register
 
     writes = harness.written(R.CHARGING_CURRENT_EMS)
     assert len(writes) == 2
@@ -474,7 +477,7 @@ def test_a_setpoint_change_does_not_block_the_pause_switch() -> None:
         await control.async_pause_charging()
 
     asyncio.run(run())
-    from custom_components.mennekes_amtron.decode import decode_register
+    from custom_components.mennekes_amtron_rtu.decode import decode_register
 
     writes = harness.written(R.CHARGING_CURRENT_EMS)
     assert len(writes) == 2
@@ -510,7 +513,7 @@ def test_a_setpoint_change_undoes_a_pause_after_the_hysteresis() -> None:
         await control.async_set_charging_current(12)
 
     asyncio.run(run())
-    from custom_components.mennekes_amtron.decode import decode_register
+    from custom_components.mennekes_amtron_rtu.decode import decode_register
 
     writes = harness.written(R.CHARGING_CURRENT_EMS)
     assert len(writes) == 2

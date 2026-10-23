@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from custom_components.mennekes_amtron._flow_search import (
+from custom_components.mennekes_amtron_rtu._flow_search import (
     CONNECT_FAILURE_LIMIT,
     DEVICE_IDS,
     PROBE_RETRIES,
@@ -15,13 +15,13 @@ from custom_components.mennekes_amtron._flow_search import (
     async_search,
     search_space,
 )
-from custom_components.mennekes_amtron.client import SerialConfig
-from custom_components.mennekes_amtron.client_errors import AmtronConnectionError
-from custom_components.mennekes_amtron.const import (
+from custom_components.mennekes_amtron_rtu.client import SerialConfig
+from custom_components.mennekes_amtron_rtu.client_errors import AmtronConnectionError
+from custom_components.mennekes_amtron_rtu.const import (
     SUPPORTED_BAUDRATES,
     SUPPORTED_PARITY_STOPBITS,
 )
-from custom_components.mennekes_amtron.data import DeviceIdentity
+from custom_components.mennekes_amtron_rtu.data import DeviceIdentity
 from tests.fakes import FakeModbusClient, device_bank
 
 BASE = SerialConfig(
@@ -98,7 +98,7 @@ def test_a_probe_reads_the_identity_of_a_wallbox(
 ) -> None:
     transport = FakeModbusClient(device_bank())
     monkeypatch.setattr(
-        "custom_components.mennekes_amtron._flow_search.MennekesModbusClient",
+        "custom_components.mennekes_amtron_rtu._flow_search.MennekesModbusClient",
         lambda config: _client(config, transport),
     )
     identity = asyncio.run(async_probe(BASE))
@@ -112,7 +112,7 @@ def test_a_probe_on_a_silent_address_returns_nothing(
 ) -> None:
     transport = FakeModbusClient({})
     monkeypatch.setattr(
-        "custom_components.mennekes_amtron._flow_search.MennekesModbusClient",
+        "custom_components.mennekes_amtron_rtu._flow_search.MennekesModbusClient",
         lambda config: _client(config, transport),
     )
     assert asyncio.run(async_probe(BASE)) is None
@@ -124,7 +124,7 @@ def test_a_probe_on_a_rejecting_address_returns_nothing(
     transport = FakeModbusClient(device_bank())
     transport.read_exceptions[0x0000] = 0x02
     monkeypatch.setattr(
-        "custom_components.mennekes_amtron._flow_search.MennekesModbusClient",
+        "custom_components.mennekes_amtron_rtu._flow_search.MennekesModbusClient",
         lambda config: _client(config, transport),
     )
     assert asyncio.run(async_probe(BASE)) is None
@@ -138,7 +138,7 @@ def test_a_port_that_will_not_open_makes_the_probe_raise(
     transport = FakeModbusClient({})
     transport.connect_result = False
     monkeypatch.setattr(
-        "custom_components.mennekes_amtron._flow_search.MennekesModbusClient",
+        "custom_components.mennekes_amtron_rtu._flow_search.MennekesModbusClient",
         lambda config: _client(config, transport),
     )
     with pytest.raises(AmtronConnectionError):
@@ -146,7 +146,7 @@ def test_a_port_that_will_not_open_makes_the_probe_raise(
 
 
 def _client(config: SerialConfig, transport: FakeModbusClient) -> object:
-    from custom_components.mennekes_amtron.client import MennekesModbusClient
+    from custom_components.mennekes_amtron_rtu.client import MennekesModbusClient
 
     return MennekesModbusClient(config, client_factory=lambda _c: transport)
 

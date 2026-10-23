@@ -88,7 +88,7 @@ body:
       render: text
       placeholder: |
         docker exec -it homeassistant python \
-          /config/custom_components/mennekes_amtron/smoke_modbus.py /dev/serial/by-id/...
+          /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py /dev/serial/by-id/...
 
   - type: input
     id: adapter

@@ -18,7 +18,7 @@ from typing import Any
 from check_reporting import report_failures
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPONENT = ROOT / "custom_components" / "mennekes_amtron"
+COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
 ENTITY_REFERENCE = ROOT / "docs" / "entities.md"
 REGISTER_REFERENCE = ROOT / "docs" / "modbus-registers.md"
 LANGUAGES = ("en", "de")
@@ -70,7 +70,7 @@ def main() -> int:
 def check_addresses() -> list[str]:
     """Reject duplicate keys and overlapping register ranges."""
 
-    from custom_components.mennekes_amtron.registers import REGISTERS
+    from custom_components.mennekes_amtron_rtu.registers import REGISTERS
 
     failures: list[str] = []
     seen_keys: set[str] = set()
@@ -94,7 +94,7 @@ def check_addresses() -> list[str]:
 def check_layouts() -> list[str]:
     """Reject register layout versions the specification does not define."""
 
-    from custom_components.mennekes_amtron.registers import (
+    from custom_components.mennekes_amtron_rtu.registers import (
         LAYOUT_VERSIONS,
         REGISTERS,
     )
@@ -109,7 +109,7 @@ def check_layouts() -> list[str]:
 def check_blocks() -> list[str]:
     """Reject read blocks that disagree with the register map."""
 
-    from custom_components.mennekes_amtron.register_blocks import (
+    from custom_components.mennekes_amtron_rtu.register_blocks import (
         block_consistency_failures,
     )
 
@@ -125,8 +125,8 @@ def check_register_document() -> list[str]:
     the old one in the other indefinitely.
     """
 
-    from custom_components.mennekes_amtron.register_blocks import REGISTER_BLOCKS
-    from custom_components.mennekes_amtron.registers import (
+    from custom_components.mennekes_amtron_rtu.register_blocks import REGISTER_BLOCKS
+    from custom_components.mennekes_amtron_rtu.registers import (
         REGISTERS,
         REGISTERS_BY_KEY,
         layout_label,
@@ -305,10 +305,10 @@ def check_entity_icons() -> list[str]:
 def _device_classes_with_icon() -> dict[str, dict[str, str]]:
     """Return every entity whose device class already carries an icon."""
 
-    from custom_components.mennekes_amtron.binary_sensor_descriptions import (
+    from custom_components.mennekes_amtron_rtu.binary_sensor_descriptions import (
         BINARY_SENSOR_DESCRIPTIONS,
     )
-    from custom_components.mennekes_amtron.sensor_descriptions import (
+    from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         SENSOR_DESCRIPTIONS,
     )
 
@@ -371,10 +371,10 @@ def check_enum_states() -> list[str]:
 
 
 def _entity_keys() -> dict[str, set[str]]:
-    from custom_components.mennekes_amtron.binary_sensor_descriptions import (
+    from custom_components.mennekes_amtron_rtu.binary_sensor_descriptions import (
         BINARY_SENSOR_DESCRIPTIONS,
     )
-    from custom_components.mennekes_amtron.sensor_descriptions import (
+    from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         SENSOR_DESCRIPTIONS,
     )
 
@@ -391,12 +391,12 @@ def _entity_keys() -> dict[str, set[str]]:
 
 
 def _enum_states() -> dict[tuple[str, str], tuple[str, ...]]:
-    from custom_components.mennekes_amtron.enums import (
+    from custom_components.mennekes_amtron_rtu.enums import (
         RequestedPhases,
         SolarChargingMode,
         enum_options,
     )
-    from custom_components.mennekes_amtron.sensor_descriptions import (
+    from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         SENSOR_DESCRIPTIONS,
     )
 

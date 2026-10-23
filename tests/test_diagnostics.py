@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from custom_components.mennekes_amtron.diagnostics import (
+from custom_components.mennekes_amtron_rtu.diagnostics import (
     async_get_config_entry_diagnostics,
     decoded_values,
     fnv1a64,

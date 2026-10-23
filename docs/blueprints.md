@@ -1,8 +1,12 @@
 # Blueprints
 
 The integration ships four automation blueprints. Setting it up installs them
-into `config/blueprints/automation/mennekes_amtron/`, and they appear under
+into `config/blueprints/automation/mennekes_amtron_rtu/`, and they appear under
 *Settings → Automations & scenes → Blueprints*.
+
+When upgrading from 0.1.0, existing automations keep their old blueprint
+paths. Follow [Upgrading](upgrading.md) to point them at the new directory
+and check their entity inputs. Edited old blueprints are left untouched.
 
 | Blueprint | What it does |
 |---|---|
