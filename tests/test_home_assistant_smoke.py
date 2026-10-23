@@ -147,6 +147,13 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             entities = er.async_entries_for_config_entry(registry, entry.entry_id)
             assert len(entities) > 40
             assert all(entity.platform == "mennekes_amtron_rtu" for entity in entities)
+            # Recorder examples use the device name, not the integration domain.
+            recorder_examples = {
+                f"sensor.mennekes_amtron_{measurement}_l{phase}"
+                for measurement in ("voltage", "power")
+                for phase in (1, 2, 3)
+            }
+            assert recorder_examples <= {entity.entity_id for entity in entities}
             assert all(
                 SERIAL_NUMBER.lower() not in entity.entity_id for entity in entities
             )
