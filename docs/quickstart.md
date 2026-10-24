@@ -15,7 +15,7 @@ read-only mode. See [safety.md](safety.md).
 
 ## 3. Install
 
-**HACS (recommended)**
+**HACS**
 
 **Existing 0.1.0 installation:** follow [Upgrading](upgrading.md) first.
 The integration domain changes in 0.2.0 and the wallbox must be added again.
@@ -25,14 +25,6 @@ The integration domain changes in 0.2.0 and the wallbox must be added again.
    `https://github.com/memphi2/ha-mennekes-amtron` through the three-dot menu →
    *Custom repositories*, category *Integration*, then search again.
 3. Download the integration, then restart Home Assistant.
-
-**Manual**
-
-Download `ha-mennekes-amtron-manual.zip` from the release and unpack it over
-your Home Assistant configuration directory, then restart. Do not use
-`ha-mennekes-amtron.zip` for this: that one is the HACS asset and has no
-wrapping folder, because HACS extracts it directly into the integration
-directory.
 
 ## 4. Find the adapter
 
