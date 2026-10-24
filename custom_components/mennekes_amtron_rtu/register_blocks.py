@@ -42,8 +42,8 @@ class BlockCadence(StrEnum):
     the currents and powers are zero and the mains voltage is the only thing
     still moving. Read every few seconds, three voltages alone write tens of
     thousands of database rows a day describing a wallbox that is doing
-    nothing. An active block is read at the user's interval while a vehicle is
-    connected and at the slow interval otherwise.
+    nothing. An active block has its own measurement interval while a vehicle
+    is connected and a minimum interval of one minute otherwise.
     """
 
     FAST = "fast"

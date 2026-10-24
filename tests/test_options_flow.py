@@ -14,6 +14,7 @@ from custom_components.mennekes_amtron_rtu.config_schemas import (
 from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
+    CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_SCAN_INTERVAL_SECONDS,
     CONTROL_MODE_MASTER,
     CONTROL_MODE_READ_ONLY,
@@ -91,6 +92,7 @@ def test_submitting_normalises_the_values() -> None:
         assert result["data"] == {
             CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
             CONF_SCAN_INTERVAL_SECONDS: 7,
+            CONF_MEASUREMENT_INTERVAL_SECONDS: 30,
             CONF_CURRENT_LIMIT: 11.5,
         }
 

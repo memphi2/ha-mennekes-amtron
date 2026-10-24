@@ -28,6 +28,7 @@ from custom_components.mennekes_amtron_rtu.const import (
     CONF_CONTROL_MODE,
     CONF_DEVICE_ID,
     CONF_FRAME,
+    CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SEARCH,
@@ -137,6 +138,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]
             assert entry.domain == "mennekes_amtron_rtu"
+            assert entry.runtime_data.coordinator._measurement_interval == 30
 
             # The title becomes the device name and prefixes every entity id,
             # so it carries no serial number.
@@ -150,10 +152,14 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             # Recorder examples use the device name, not the integration domain.
             recorder_examples = {
                 f"sensor.mennekes_amtron_{measurement}_l{phase}"
-                for measurement in ("voltage", "power")
+                for measurement in ("voltage", "power", "current")
                 for phase in (1, 2, 3)
             }
-            assert recorder_examples <= {entity.entity_id for entity in entities}
+            assert recorder_examples | {
+                "sensor.mennekes_amtron_session_duration",
+                "sensor.mennekes_amtron_total_power",
+                "sensor.mennekes_amtron_total_energy",
+            } <= {entity.entity_id for entity in entities}
             assert all(
                 SERIAL_NUMBER.lower() not in entity.entity_id for entity in entities
             )
@@ -185,6 +191,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
                 {
                     CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
                     CONF_SCAN_INTERVAL_SECONDS: 5,
+                    CONF_MEASUREMENT_INTERVAL_SECONDS: 60,
                     "current_limit": 16.0,
                 },
             )
@@ -194,6 +201,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             assert {"number", "switch", "select", "button"} <= {
                 entity.domain for entity in entities
             }
+            assert entry.runtime_data.coordinator._measurement_interval == 60
             assert entry.runtime_data.heartbeat is not None
             assert entry.runtime_data.heartbeat.running
 
@@ -335,6 +343,7 @@ def test_the_bundled_blueprints_run_as_automations(tmp_path: Path) -> None:
                 {
                     CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
                     CONF_SCAN_INTERVAL_SECONDS: 5,
+                    CONF_MEASUREMENT_INTERVAL_SECONDS: 60,
                     "current_limit": 16.0,
                 },
             )

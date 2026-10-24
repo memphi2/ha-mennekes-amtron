@@ -59,6 +59,7 @@ HEARTBEAT_DEADLINE_SECONDS: Final = 10.0
 DEFAULT_SCAN_INTERVAL_SECONDS: Final = 5
 MIN_SCAN_INTERVAL_SECONDS: Final = 2
 MAX_SCAN_INTERVAL_SECONDS: Final = 300
+DEFAULT_MEASUREMENT_INTERVAL_SECONDS: Final = 30
 
 # Vendor rate limits: charging current not faster than every 5 s, and
 # pause/resume plus phase switching with hysteresis and intervals > 5 min.
@@ -87,6 +88,7 @@ CONF_STOPBITS: Final = "stopbits"
 CONF_DEVICE_ID: Final = "device_id"
 CONF_CONTROL_MODE: Final = "control_mode"
 CONF_SCAN_INTERVAL_SECONDS: Final = "scan_interval_seconds"
+CONF_MEASUREMENT_INTERVAL_SECONDS: Final = "measurement_interval_seconds"
 CONF_CURRENT_LIMIT: Final = "current_limit"
 CONF_SERIAL_NUMBER: Final = "serial_number"
 CONF_SEARCH: Final = "search"

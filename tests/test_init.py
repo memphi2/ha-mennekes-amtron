@@ -34,9 +34,7 @@ from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 
 
-def _patch_client(
-    monkeypatch: pytest.MonkeyPatch, transport: FakeModbusClient
-) -> None:
+def _patch_client(monkeypatch: pytest.MonkeyPatch, transport: FakeModbusClient) -> None:
     def factory(config: object) -> MennekesModbusClient:
         return MennekesModbusClient(config, client_factory=lambda _c: transport)
 
@@ -196,5 +194,80 @@ def test_only_the_known_entry_version_is_accepted() -> None:
         assert await async_migrate_entry(FakeHass(), entry)
         entry.version = 2
         assert not await async_migrate_entry(FakeHass(), entry)
+
+    asyncio.run(run())
+
+
+def test_a_failed_unload_keeps_the_connection_and_heartbeat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
+        transport = FakeModbusClient(device_bank())
+        _patch_client(monkeypatch, transport)
+        _patch_issues(monkeypatch)
+        assert await async_setup_entry(hass, entry)
+        try:
+            hass.config_entries.unload_result = False
+            assert not await async_unload_entry(hass, entry)
+            assert entry.runtime_data.client.connected
+            assert entry.runtime_data.heartbeat.running
+            assert transport.close_calls == 0
+        finally:
+            hass.config_entries.unload_result = True
+            await async_unload_entry(hass, entry)
+
+    asyncio.run(run())
+
+
+def test_failed_platform_setup_releases_the_port_and_heartbeat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
+        transport = FakeModbusClient(device_bank())
+        _patch_client(monkeypatch, transport)
+        _patch_issues(monkeypatch)
+
+        async def fail(*args: object) -> None:
+            raise RuntimeError("platform setup failed")
+
+        monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", fail)
+        try:
+            with pytest.raises(RuntimeError, match="platform setup failed"):
+                await async_setup_entry(hass, entry)
+            assert transport.close_calls == 1
+            assert not entry.runtime_data.heartbeat.running
+        finally:
+            await entry.runtime_data.heartbeat.async_stop()
+            await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_cancelled_identity_read_releases_the_serial_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry()
+        transport = FakeModbusClient(device_bank())
+        _patch_client(monkeypatch, transport)
+        entered = asyncio.Event()
+
+        async def blocked_identity(_client: object) -> None:
+            entered.set()
+            await asyncio.Future()
+
+        monkeypatch.setattr(integration, "async_read_identity", blocked_identity)
+        setup = asyncio.create_task(async_setup_entry(hass, entry))
+        await entered.wait()
+        setup.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await setup
+        assert transport.close_calls == 1
+        assert not transport.connected
 
     asyncio.run(run())

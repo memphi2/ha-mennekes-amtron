@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .capabilities import supported_blocks
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError, AmtronConnectionError
+from .const import DEFAULT_MEASUREMENT_INTERVAL_SECONDS
 from .data import ConnectionState, DeviceIdentity, WallboxData
 from .decode import RegisterValue
 from .entry_types import MennekesAmtronConfigEntry
@@ -40,6 +41,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         identity: DeviceIdentity,
         connection_state: ConnectionState,
         scan_interval: float,
+        measurement_interval: float = DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         super().__init__(
@@ -54,6 +56,8 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         self._connection_state = connection_state
         self._monotonic = monotonic
         self._slow_read_at: float | None = None
+        self._active_read_at: float | None = None
+        self._measurement_interval = measurement_interval
 
     @property
     def identity(self) -> DeviceIdentity:
@@ -71,46 +75,54 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
 
         if self._slow_read_at is None:
             return True
-        return (
-            self._monotonic() - self._slow_read_at >= SLOW_BLOCK_INTERVAL_SECONDS
-        )
-
-    def _vehicle_is_connected(self) -> bool:
-        """Return whether anything is plugged into the wallbox.
-
-        Only the one state that means "nothing is connected" demotes the
-        measurement blocks. An unknown or unreadable state reads as connected,
-        because being wrong in that direction only costs bus traffic, while
-        being wrong in the other direction would hide a running charge.
-        """
-
-        return self.current_data().get("evse_state") != EvseState.IDLE
+        return self._monotonic() - self._slow_read_at >= SLOW_BLOCK_INTERVAL_SECONDS
 
     async def _async_update_data(self) -> WallboxData:
         # Configuration registers change when somebody reconfigures the
         # wallbox, not while it charges, so they are carried forward between
         # the slow reads instead of occupying the bus every few seconds.
         slow_due = self._slow_blocks_are_due()
-        # The measurement blocks describe a vehicle. Without one they report
-        # zeroes and a drifting mains voltage, and reading them every few
-        # seconds turns that into a database row every few seconds.
-        active_due = slow_due or self._vehicle_is_connected()
+        active_due: bool | None = None
         values: dict[str, RegisterValue] = dict(self.current_data().values)
         read: dict[str, RegisterValue] = {}
-        failed: list[str] = []
+        failed = set(self.current_data().failed_blocks)
         stale: list[str] = []
-        for block in supported_blocks(self._identity.layout_version):
-            if block.cadence is BlockCadence.SLOW and not slow_due:
+        # Read status first: a plug/start/stop transition must refresh the
+        # measurements and final energy counters in this same poll.
+        order = {BlockCadence.FAST: 0, BlockCadence.ACTIVE: 1, BlockCadence.SLOW: 2}
+        blocks = sorted(
+            supported_blocks(self._identity.layout_version),
+            key=lambda block: order[block.cadence],
+        )
+        for block in blocks:
+            state_changed = read.get("evse_state") != values.get("evse_state")
+            if block.cadence is BlockCadence.SLOW and not (
+                slow_due or (block.name == "statistics" and state_changed)
+            ):
                 continue
-            if block.cadence is BlockCadence.ACTIVE and not active_due:
-                continue
+            if block.cadence is BlockCadence.ACTIVE:
+                if active_due is None:
+                    interval = (
+                        max(SLOW_BLOCK_INTERVAL_SECONDS, self._measurement_interval)
+                        if read.get("evse_state") == EvseState.IDLE
+                        else self._measurement_interval
+                    )
+                    active_due = (
+                        self._active_read_at is None
+                        or state_changed
+                        or not self.last_update_success
+                        or self._monotonic() - self._active_read_at >= interval
+                    )
+                if not active_due:
+                    continue
+            failed.discard(block.name)
             try:
                 read.update(await self._client.async_read_block(block))
             except AmtronConnectionError as err:
                 self._log_unavailable(err)
                 raise UpdateFailed(str(err)) from err
             except AmtronBusError as err:
-                failed.append(block.name)
+                failed.add(block.name)
                 # Carrying a block forward is only right while it was not due.
                 # A block that was read and failed has no current value, and a
                 # frozen measurement an automation still believes is worse than
@@ -121,11 +133,13 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
             raise UpdateFailed("no register block could be read")
         if slow_due:
             self._slow_read_at = self._monotonic()
+        if active_due:
+            self._active_read_at = self._monotonic()
         for key in stale:
             values.pop(key, None)
         values.update(read)
         self._log_available()
-        return WallboxData(values=values, failed_blocks=tuple(failed))
+        return WallboxData(values=values, failed_blocks=tuple(sorted(failed)))
 
     def _log_unavailable(self, err: Exception) -> None:
         changed = self._connection_state.record(False)

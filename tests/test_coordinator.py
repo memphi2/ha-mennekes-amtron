@@ -30,6 +30,7 @@ async def _coordinator(
     layout: int = R.LAYOUT_V01_03,
     connection_state: ConnectionState | None = None,
     monotonic: Any = None,
+    measurement_interval: float = 5,
 ) -> MennekesAmtronCoordinator:
     client = MennekesModbusClient(
         SerialConfig(port="/dev/fake"), client_factory=lambda _config: transport
@@ -42,6 +43,7 @@ async def _coordinator(
         identity=DeviceIdentity(layout_version=layout),
         connection_state=connection_state or ConnectionState(),
         scan_interval=5,
+        measurement_interval=measurement_interval,
         **({"monotonic": monotonic} if monotonic else {}),
     )
 
@@ -223,12 +225,14 @@ def test_a_failing_block_drops_its_values_instead_of_freezing_them() -> None:
         # A connected vehicle keeps the measurement block on the fast cadence;
         # this test is about the failure path, not about the cadence.
         transport = FakeModbusClient(device_bank(evse_state=EvseState.CHARGING))
-        coordinator = await _coordinator(transport)
+        clock = [0.0]
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
         first = await coordinator._async_update_data()
         assert first.has("voltage_l1")
         coordinator.data = first
 
         transport.read_exceptions[0x0500] = 0x04
+        clock[0] += 5
         second = await coordinator._async_update_data()
         assert second.failed_blocks == ("measurements",)
         assert not second.has("voltage_l1")
@@ -253,9 +257,7 @@ def test_a_slow_block_that_is_not_due_keeps_its_values() -> None:
         clock[0] += 1
         later = await coordinator._async_update_data()
         slow = [
-            block
-            for block in REGISTER_BLOCKS
-            if block.cadence is BlockCadence.SLOW
+            block for block in REGISTER_BLOCKS if block.cadence is BlockCadence.SLOW
         ]
         assert slow
         assert later.failed_blocks == ()
@@ -355,7 +357,7 @@ def test_an_unknown_state_is_treated_as_connected() -> None:
         transport = FakeModbusClient(device_bank())
         coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
         # No poll has happened, so the snapshot carries no state at all.
-        assert coordinator._vehicle_is_connected()
+        assert coordinator.current_data().get("evse_state") is None
         transport.read_exceptions[0x0100] = 0x04
         coordinator.data = await coordinator._async_update_data()
         clock[0] += 5
@@ -377,5 +379,86 @@ def test_an_idle_wallbox_still_refreshes_the_measurements_every_minute() -> None
         clock[0] += SLOW_BLOCK_INTERVAL_SECONDS + 1
         coordinator.data = await coordinator._async_update_data()
         assert _measurement_reads(transport) == 2
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("state", [EvseState.CHARGING, EvseState.EV_CONNECTED])
+def test_measurements_are_throttled_while_status_stays_fast(state: EvseState) -> None:
+    async def run() -> None:
+        from tests.fakes import put
+
+        clock = [0.0]
+        transport = FakeModbusClient(device_bank(evse_state=state))
+        coordinator = await _coordinator(
+            transport, monotonic=lambda: clock[0], measurement_interval=30
+        )
+        coordinator.data = await coordinator._async_update_data()
+        for tick in range(5, 30, 5):
+            clock[0] = tick
+            put(transport.bank, R.VOLTAGE_L1, 231.0)
+            put(transport.bank, R.CHARGING_CURRENT_EMS, 7.0 + tick / 10)
+            coordinator.data = await coordinator._async_update_data()
+            assert coordinator.data.get("voltage_l1") != 231.0
+            assert coordinator.data.get("charging_current_ems") == pytest.approx(
+                7 + tick / 10
+            )
+        assert _measurement_reads(transport) == 1
+        clock[0] = 30
+        coordinator.data = await coordinator._async_update_data()
+        assert coordinator.data.get("voltage_l1") == 231.0
+        assert _measurement_reads(transport) == 2
+
+    asyncio.run(run())
+
+
+def test_start_and_stop_refresh_measurements_and_energy_in_the_same_poll() -> None:
+    async def run() -> None:
+        from tests.fakes import put
+
+        clock = [0.0]
+        transport = FakeModbusClient(device_bank())
+        coordinator = await _coordinator(
+            transport, monotonic=lambda: clock[0], measurement_interval=30
+        )
+        coordinator.data = await coordinator._async_update_data()
+        for state, power, total in (
+            (EvseState.CHARGING, 11000, 1234.51),
+            (EvseState.EV_CONNECTED, 0, 1234.52),
+            (EvseState.IDLE, 0, 1234.52),
+        ):
+            clock[0] += 5
+            put(transport.bank, R.EVSE_STATE, state)
+            put(transport.bank, R.POWER_TOTAL, power)
+            put(transport.bank, R.ENERGY_TOTAL, total)
+            coordinator.data = await coordinator._async_update_data()
+            assert coordinator.data.get("evse_state") == state
+            assert coordinator.data.get("power_total") == power
+            assert coordinator.data.get("energy_total") == pytest.approx(total)
+        assert _measurement_reads(transport) == 4
+
+    asyncio.run(run())
+
+
+def test_a_failed_measurement_stays_unavailable_until_read_again() -> None:
+    async def run() -> None:
+        clock = [0.0]
+        transport = FakeModbusClient(device_bank(evse_state=EvseState.CHARGING))
+        coordinator = await _coordinator(
+            transport, monotonic=lambda: clock[0], measurement_interval=30
+        )
+        coordinator.data = await coordinator._async_update_data()
+        transport.read_exceptions[0x0500] = 4
+        clock[0] = 30
+        coordinator.data = await coordinator._async_update_data()
+        transport.read_exceptions.clear()
+        clock[0] = 35
+        coordinator.data = await coordinator._async_update_data()
+        assert not coordinator.data.has("voltage_l1")
+        assert coordinator.data.failed_blocks == ("measurements",)
+        clock[0] = 60
+        coordinator.data = await coordinator._async_update_data()
+        assert coordinator.data.has("voltage_l1")
+        assert coordinator.data.failed_blocks == ()
 
     asyncio.run(run())

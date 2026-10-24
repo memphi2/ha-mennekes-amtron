@@ -10,8 +10,10 @@ from .config_schemas import options_schema
 from .const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
+    CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_SCAN_INTERVAL_SECONDS,
     CONTROL_MODE_MASTER,
+    DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
 )
 
 
@@ -39,6 +41,11 @@ def _normalized(user_input: dict[str, Any]) -> dict[str, Any]:
     return {
         CONF_CONTROL_MODE: str(user_input[CONF_CONTROL_MODE]),
         CONF_SCAN_INTERVAL_SECONDS: int(user_input[CONF_SCAN_INTERVAL_SECONDS]),
+        CONF_MEASUREMENT_INTERVAL_SECONDS: int(
+            user_input.get(
+                CONF_MEASUREMENT_INTERVAL_SECONDS, DEFAULT_MEASUREMENT_INTERVAL_SECONDS
+            )
+        ),
         CONF_CURRENT_LIMIT: float(user_input[CONF_CURRENT_LIMIT]),
     }
 

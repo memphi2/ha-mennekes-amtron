@@ -13,6 +13,7 @@ local Modbus RTU.
 | know what every entity means | [Entity reference](entities.md) |
 | use a ready-made automation | [Blueprints](blueprints.md) |
 | write my own automations | [Automations](automations.md) |
+| reduce database growth and configure history retention | [Recorder](recorder.md) |
 | understand the options and the daily use | [User guide](user-guide.md) |
 | fix something that is broken | [Troubleshooting](troubleshooting.md) |
 | know what can go wrong with a wallbox | [Safety and limitations](safety.md) |

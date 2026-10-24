@@ -33,6 +33,7 @@ from .const import (
     DEFAULT_RETRIES,
     DEFAULT_STOPBITS,
     DEFAULT_TIMEOUT,
+    MIN_CURRENT_WRITE_INTERVAL_SECONDS,
 )
 from .decode import RegisterValue, decode_register
 from .register_blocks import RegisterBlock
@@ -151,10 +152,24 @@ class MennekesModbusClient:
     async def async_read_block(self, block: RegisterBlock) -> dict[str, RegisterValue]:
         """Read one register block."""
 
-        async with self._queue, self._lock:
+        async with self._queue:
             client = self._require_client()
             return await _client_read.read_block(
-                client, block=block, device_id=self._config.device_id
+                client,
+                block=block,
+                device_id=self._config.device_id,
+                read=self._async_read_words_locked,
+            )
+
+    async def _async_read_words_locked(self, address: int, count: int) -> list[int]:
+        """Release the bus between fallback reads so a heartbeat can pass."""
+
+        async with self._lock:
+            return await _client_read.read_words(
+                self._require_client(),
+                address=address,
+                count=count,
+                device_id=self._config.device_id,
             )
 
     async def async_read_register(self, spec: RegisterSpec) -> RegisterValue:
@@ -211,6 +226,8 @@ class MennekesModbusClient:
         min_interval: float,
     ) -> None:
         async with self._lock:
+            if spec.key == "charging_current_ems":
+                min_interval = max(min_interval, MIN_CURRENT_WRITE_INTERVAL_SECONDS)
             now = self._monotonic()
             remaining = self._rate_limiter.remaining(
                 spec.key, now=now, min_interval=min_interval
