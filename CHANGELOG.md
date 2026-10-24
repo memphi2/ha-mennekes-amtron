@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Publish one installation archive for HACS; remove the separate manual ZIP.
+
 - Separate measurement interval, default 30 seconds, reduces Recorder writes
   while status and controls retain their five-second default. Existing entries
   also use 30 seconds unless configured otherwise. EVSE state transitions

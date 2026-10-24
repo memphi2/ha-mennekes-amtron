@@ -1,21 +1,10 @@
 #!/usr/bin/env python3
-"""Build the release archives.
+"""Build the HACS release archive.
 
-Two archives, because two install paths want different shapes:
-
-``ha-mennekes-amtron.zip``
-    What HACS downloads. ``zip_release`` extracts the archive *into*
-    ``config/custom_components/mennekes_amtron_rtu/``, so its contents have to sit
-    at the archive root with no wrapping directory.
-
-``ha-mennekes-amtron-manual.zip``
-    What a human downloads. It carries the full
-    ``custom_components/mennekes_amtron_rtu/`` path, so unpacking it over a Home
-    Assistant configuration directory puts every file where it belongs
-    instead of scattering fifty files into the download folder.
-
-Both are built with fixed timestamps and permissions, so two builds of the
-same commit produce the same bytes.
+HACS extracts ``ha-mennekes-amtron.zip`` directly into
+``config/custom_components/mennekes_amtron_rtu/``, so the archive contains
+component files at its root. Fixed timestamps and permissions make repeated
+builds of the same source byte-for-byte reproducible.
 """
 
 from __future__ import annotations
@@ -34,8 +23,6 @@ COMPONENT_SRC = ROOT / "custom_components" / DOMAIN
 RELEASE_ROOT = ROOT / ".release"
 PACKAGE_ROOT = RELEASE_ROOT / "package"
 HACS_ZIP_NAME = "ha-mennekes-amtron.zip"
-MANUAL_ZIP_NAME = "ha-mennekes-amtron-manual.zip"
-COMPONENT_PREFIX = f"custom_components/{DOMAIN}"
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 
 # Apache-2.0 asks for the licence and the notice to travel with the work.
@@ -45,14 +32,14 @@ PACKAGE_METADATA = ("LICENSE", "NOTICE")
 
 
 def main() -> int:
-    """Build both release archives."""
+    """Build the HACS release archive."""
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory for the archives. Defaults to .release.",
+        help="Directory for the archive. Defaults to .release.",
     )
     args = parser.parse_args()
 
@@ -62,11 +49,8 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     hacs_zip = output_dir / HACS_ZIP_NAME
-    manual_zip = output_dir / MANUAL_ZIP_NAME
-    _write_zip(hacs_zip, prefix="")
-    _write_zip(manual_zip, prefix=COMPONENT_PREFIX)
+    _write_zip(hacs_zip)
     sys.stdout.write(f"Built {hacs_zip} for version {version}\n")
-    sys.stdout.write(f"Built {manual_zip} for version {version}\n")
     return 0
 
 
@@ -82,13 +66,13 @@ def _prepare_package() -> None:
         shutil.copyfile(ROOT / name, PACKAGE_ROOT / name)
 
 
-def _write_zip(output: Path, *, prefix: str) -> None:
+def _write_zip(output: Path) -> None:
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(PACKAGE_ROOT.rglob("*")):
             if not path.is_file():
                 continue
             name = str(path.relative_to(PACKAGE_ROOT))
-            archive.writestr(_zip_info(f"{prefix}/{name}" if prefix else name), path.read_bytes())
+            archive.writestr(_zip_info(name), path.read_bytes())
 
 
 def _zip_info(name: str) -> zipfile.ZipInfo:
