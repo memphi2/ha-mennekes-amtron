@@ -85,7 +85,9 @@ class Harness:
         return self.control
 
     def written(self, spec: R.RegisterSpec) -> list[list[int]]:
-        return [words for address, words in self.transport.writes if address == spec.address]
+        return [
+            words for address, words in self.transport.writes if address == spec.address
+        ]
 
 
 def _run(coro_factory) -> Harness:
@@ -126,7 +128,7 @@ def test_zero_ampere_is_written_only_with_the_opt_in() -> None:
     assert harness.written(R.CHARGING_CURRENT_EMS) == [[0, 0]]
 
 
-@pytest.mark.parametrize("value", [0.01, 1.0, 3.5, 5.99])
+@pytest.mark.parametrize("value", [0.01, 1.0, 3.5, 5.99, float("nan"), float("inf")])
 def test_the_invalid_band_is_always_refused(value: float) -> None:
     harness = Harness()
 
@@ -382,6 +384,79 @@ def test_recovery_writes_the_documented_sequence_in_order() -> None:
     assert harness.diagnostics.recoveries == 1
 
 
+@pytest.mark.parametrize("elapsed", [5.0, 15.0])
+def test_repeated_recovery_only_waits_for_the_register_interval(elapsed: float) -> None:
+    async def run() -> None:
+        harness = Harness(values={"charging_current_ems": 16.0, "error_code": 200})
+        control = await harness.connect()
+        await control.async_recover_from_error()
+        harness.clock[0] += elapsed
+        await control.async_recover_from_error()
+        assert [address for address, _ in harness.transport.writes] == [
+            R.HEARTBEAT.address,
+            R.CHARGING_RELEASE.address,
+            R.CHARGING_CURRENT_EMS.address,
+        ] * 2
+        assert harness.diagnostics.recoveries == 2
+
+    asyncio.run(run())
+
+
+def test_recovery_without_resuming_does_not_delay_a_later_pause() -> None:
+    async def run() -> None:
+        harness = Harness(values={"charging_current_ems": 16.0})
+        control = await harness.connect()
+        await control.async_recover_from_error()
+        harness.clock[0] += 15
+        await control.async_pause_charging()
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
+
+    asyncio.run(run())
+
+
+def test_recovery_of_a_resumed_charge_does_not_wait_five_minutes() -> None:
+    async def run() -> None:
+        harness = Harness(values={"charging_current_ems": 1.0})
+        control = await harness.connect()
+        await control.async_resume_charging()
+        harness.snapshot = WallboxData(values={"charging_current_ems": 16.0})
+        harness.clock[0] += 15
+        await control.async_recover_from_error()
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
+        assert harness.diagnostics.recoveries == 1
+
+    asyncio.run(run())
+
+
+def test_recovery_that_resumes_a_pause_obeys_and_restarts_hysteresis() -> None:
+    async def run() -> None:
+        harness = Harness(values={"charging_current_ems": 16.0})
+        control = await harness.connect()
+        await control.async_pause_charging()
+        harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
+        harness.clock[0] += 15
+        with pytest.raises(ServiceValidationError) as err:
+            await control.async_recover_from_error()
+        assert err.value.translation_key == "write_rate_limited"
+        assert err.value.translation_placeholders == {"seconds": "285"}
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        assert harness.diagnostics.recoveries == 0
+
+        harness.clock[0] += 285
+        await control.async_recover_from_error()
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
+        assert harness.diagnostics.recoveries == 1
+
+        harness.snapshot = WallboxData(values={"charging_current_ems": 16.0})
+        harness.clock[0] += 15
+        with pytest.raises(ServiceValidationError) as err:
+            await control.async_pause_charging()
+        assert err.value.translation_placeholders == {"seconds": "285"}
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
+
+    asyncio.run(run())
+
+
 def test_restart_is_refused_outside_the_idle_state() -> None:
     harness = Harness(values={"evse_state": EvseState.CHARGING})
 
@@ -578,3 +653,75 @@ def test_the_unlimited_opt_in_cannot_undo_a_pause_early_either() -> None:
 
     asyncio.run(run())
     assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+
+
+@pytest.mark.parametrize("newer", ["pause", "setpoint"])
+def test_an_accepted_command_supersedes_a_deferred_current(newer: str) -> None:
+    """A stale slider write must never resume a later pause."""
+    from custom_components.mennekes_amtron_rtu.decode import decode_register
+
+    async def run() -> None:
+        harness = Harness(values={"charging_current_ems": 6.0})
+        control = await harness.connect()
+        await control.async_set_charging_current(6)
+        await control.async_set_charging_current(8)
+        harness.clock[0] += 6
+        if newer == "pause":
+            await control.async_pause_charging()
+        else:
+            await control.async_set_charging_current(16)
+        for _ in range(20):
+            await asyncio.sleep(0)
+        assert [
+            decode_register(R.CHARGING_CURRENT_EMS, words)
+            for words in harness.written(R.CHARGING_CURRENT_EMS)
+        ] == [6.0, 1.0 if newer == "pause" else 16.0]
+        await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_recovery_cannot_bypass_the_current_write_interval() -> None:
+    async def run() -> None:
+        harness = Harness()
+        control = await harness.connect()
+        await control.async_set_charging_current(6)
+        harness.clock[0] += 4
+        with pytest.raises(ServiceValidationError) as err:
+            await control.async_recover_from_error()
+        assert err.value.translation_key == "write_rate_limited"
+        assert err.value.translation_placeholders == {"seconds": "1"}
+        # A rejected recovery must not claim success or silently finish later.
+        for _ in range(10):
+            await asyncio.sleep(0)
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        assert harness.diagnostics.recoveries == 0
+        await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_a_sleeping_deferred_write_cannot_undo_a_pause() -> None:
+    async def run() -> None:
+        harness = Harness(values={"charging_current_ems": 6.0})
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def sleep(_delay: float) -> None:
+            entered.set()
+            await release.wait()
+
+        control = await harness.connect()
+        control._sleep = sleep
+        await control.async_set_charging_current(6)
+        await control.async_set_charging_current(8)
+        await entered.wait()
+        harness.clock[0] += 6
+        await control.async_pause_charging()
+        release.set()
+        for _ in range(10):
+            await asyncio.sleep(0)
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
+        await control.async_shutdown()
+
+    asyncio.run(run())

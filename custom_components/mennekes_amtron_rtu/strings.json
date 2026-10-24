@@ -373,12 +373,14 @@
         "data": {
           "control_mode": "Control mode",
           "current_limit": "Charging current cap",
-          "scan_interval_seconds": "Polling interval"
+          "measurement_interval_seconds": "Measurement interval",
+          "scan_interval_seconds": "Status polling interval"
         },
         "data_description": {
           "control_mode": "Read only never writes to the bus. Modbus master sends the required heartbeat and enables the control entities. Use read only if another Modbus master already drives this RS-485 bus.",
           "current_limit": "Upper bound of the charging-current entity, in addition to the limit the wallbox itself enforces.",
-          "scan_interval_seconds": "How often the register blocks are read. The heartbeat runs independently of this interval."
+          "measurement_interval_seconds": "Power, voltage, current and session values: 30 seconds reduces database load. Status changes refresh immediately. Without a vehicle, at least 60 seconds. The status interval sets the shortest possible polling time.",
+          "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently."
         },
         "title": "Options"
       }

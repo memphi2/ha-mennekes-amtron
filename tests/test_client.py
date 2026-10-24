@@ -136,18 +136,14 @@ def test_a_write_inside_the_interval_is_rate_limited() -> None:
     async def run() -> None:
         client = _client(transport, clock)
         await client.async_connect()
-        await client.async_write_register(
-            R.CHARGING_CURRENT_EMS, 6.0, min_interval=5.0
-        )
+        await client.async_write_register(R.CHARGING_CURRENT_EMS, 6.0, min_interval=5.0)
         with pytest.raises(AmtronRateLimitedError) as excinfo:
             await client.async_write_register(
                 R.CHARGING_CURRENT_EMS, 7.0, min_interval=5.0
             )
         assert excinfo.value.retry_after == pytest.approx(5.0)
         clock[0] += 5.0
-        await client.async_write_register(
-            R.CHARGING_CURRENT_EMS, 8.0, min_interval=5.0
-        )
+        await client.async_write_register(R.CHARGING_CURRENT_EMS, 8.0, min_interval=5.0)
         assert len(transport.writes) == 2
 
     asyncio.run(run())
@@ -161,9 +157,7 @@ def test_a_failed_write_does_not_start_the_rate_limit() -> None:
         client = _client(transport)
         await client.async_connect()
         with pytest.raises(AmtronWriteRejectedError):
-            await client.async_write_register(
-                R.CHARGING_RELEASE, 1, min_interval=5.0
-            )
+            await client.async_write_register(R.CHARGING_RELEASE, 1, min_interval=5.0)
         transport.write_exceptions.clear()
         await client.async_write_register(R.CHARGING_RELEASE, 1, min_interval=5.0)
         assert transport.writes == [(R.CHARGING_RELEASE.address, [1])]
@@ -301,9 +295,7 @@ def test_an_ordinary_write_waits_its_turn() -> None:
         await asyncio.sleep(0)
         queued = asyncio.create_task(client.async_read_block(REGISTER_BLOCKS[1]))
         await asyncio.sleep(0)
-        write = asyncio.create_task(
-            client.async_write_register(R.CHARGING_RELEASE, 1)
-        )
+        write = asyncio.create_task(client.async_write_register(R.CHARGING_RELEASE, 1))
         await asyncio.sleep(0)
 
         release.set()
@@ -311,3 +303,61 @@ def test_an_ordinary_write_waits_its_turn() -> None:
 
     asyncio.run(run())
     assert order == ["read", "read", "write"]
+
+
+def test_a_priority_write_can_interrupt_registerwise_fallback() -> None:
+    """A rejected block must not lock out the heartbeat for ten transfers."""
+    from pymodbus.pdu import ExceptionResponse
+
+    async def run() -> None:
+        order: list[str] = []
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        block = next(b for b in REGISTER_BLOCKS if b.name == "measurements")
+
+        class Transport(FakeModbusClient):
+            async def read_holding_registers(
+                self, address: int, *, count: int = 1, device_id: int = 1
+            ):
+                if count == block.count:
+                    return ExceptionResponse(3, 2)
+                order.append("read")
+                if address == block.address:
+                    entered.set()
+                    await release.wait()
+                return await super().read_holding_registers(
+                    address, count=count, device_id=device_id
+                )
+
+            async def write_register(
+                self, address: int, value: int, *, device_id: int = 1
+            ):
+                order.append("heartbeat")
+                return await super().write_register(address, value, device_id=device_id)
+
+        client = _client(Transport(device_bank()))
+        await client.async_connect()
+        reading = asyncio.create_task(client.async_read_block(block))
+        await entered.wait()
+        heartbeat = asyncio.create_task(
+            client.async_write_register(R.HEARTBEAT, 0x55AA, priority=True)
+        )
+        await asyncio.sleep(0)
+        release.set()
+        await asyncio.gather(reading, heartbeat)
+        assert order[:2] == ["read", "heartbeat"]
+        await client.async_close()
+
+    asyncio.run(run())
+
+
+def test_the_current_register_enforces_its_floor_without_caller_opt_in() -> None:
+    async def run() -> None:
+        client = _client(FakeModbusClient(device_bank()))
+        await client.async_connect()
+        await client.async_write_register(R.CHARGING_CURRENT_EMS, 6)
+        with pytest.raises(AmtronRateLimitedError):
+            await client.async_write_register(R.CHARGING_CURRENT_EMS, 8)
+        await client.async_close()
+
+    asyncio.run(run())

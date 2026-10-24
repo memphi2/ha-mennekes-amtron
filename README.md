@@ -9,8 +9,10 @@ A local Home Assistant integration for MENNEKES AMTRON wallboxes that speak
 config flow, diagnostics and repair issues. No cloud, no account, no polling
 of anybody's server.
 
-Developed and validated against an **AMTRON 4You 310 11 C2** (article
-1313201205, 11 kW, fixed cable, 16 A) on Modbus register layout **v01.03**.
+Developed for the **AMTRON 4You 310 11 C2** (article 1313201205, 11 kW,
+fixed cable, 16 A) on Modbus register layout **v01.03**. Automated validation
+uses a virtual Modbus RTU server and real Home Assistant; it does not replace
+verification on a physical wallbox.
 
 > This is an independent community project. It is not affiliated with,
 > endorsed by, sponsored by, or certified by MENNEKES, Home Assistant, Nabu
@@ -28,7 +30,7 @@ they mean. This one does:
   user drags the slider to zero. Here, the slider cannot go below 6 A at all.
 - **The heartbeat is mandatory.** `0x0D00 = 0x55AA` has to arrive at least
   every 10 s or the wallbox goes into error state 200. This integration runs
-  it in its own task, so a slow poll can never starve it.
+  it in its own task with priority access between bus transactions.
 - **Capability gating.** Registers appeared over four layout versions, and the
   phase switch needs 11 kW hardware. Entities exist only where the device
   actually has the register.

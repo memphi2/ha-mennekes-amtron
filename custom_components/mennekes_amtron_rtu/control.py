@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from dataclasses import dataclass
 
 from homeassistant.exceptions import HomeAssistantError
@@ -84,6 +86,7 @@ class AmtronControl:
         self._sleep = sleep
         self._monotonic = monotonic
         self._pending_current: float | None = None
+        self._current_lock = asyncio.Lock()
         self._flush_task: asyncio.Task[None] | None = None
         self._mode_change_at: float | None = None
         self.charging_setpoint: float | None = None
@@ -153,7 +156,7 @@ class AmtronControl:
                 "Writing 0 A to 0x0302: the wallbox will signal its maximum "
                 "current, not a charging stop"
             )
-        elif current < CHARGING_CURRENT_MINIMUM:
+        elif not math.isfinite(current) or current < CHARGING_CURRENT_MINIMUM:
             raise service_validation_error(
                 "charging_current_invalid",
                 {
@@ -219,9 +222,7 @@ class AmtronControl:
         if not phase_switch_is_supported(self._identity.phase_options_hw):
             raise service_validation_error("phase_switch_unsupported")
         if self._state().get("evse_state") == EvseState.CHARGING:
-            await self._async_request_current(
-                CHARGING_PAUSE_CURRENT, mode_change=True
-            )
+            await self._async_request_current(CHARGING_PAUSE_CURRENT, mode_change=True)
         await self._async_write(
             REQUESTED_PHASES,
             int(phases),
@@ -237,12 +238,16 @@ class AmtronControl:
 
         self._require_write_access()
         target = self.charging_setpoint or self.max_charging_current
-        await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
-        await self._async_write(CHARGING_RELEASE, 1)
-        await self._async_write(
-            CHARGING_CURRENT_EMS,
-            max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current)),
-        )
+        async with self._current_lock:
+            await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
+            await self._async_write(CHARGING_RELEASE, 1)
+            await self._async_request_current_locked(
+                max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current)),
+                # Recovery only changes charging mode if it lifts a pause.
+                # Its final write must finish before recovery reports success.
+                mode_change=self.is_paused,
+                defer=False,
+            )
         self._diagnostics.recoveries += 1
 
     async def async_restart(self) -> None:
@@ -262,6 +267,8 @@ class AmtronControl:
         self._flush_task = None
         if task is not None and not task.done():
             task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
     async def _async_request_current(
         self,
@@ -285,6 +292,16 @@ class AmtronControl:
         quietly performing it minutes later is worse than refusing it.
         """
 
+        async with self._current_lock:
+            await self._async_request_current_locked(
+                value, mode_change=mode_change or self.is_paused
+            )
+
+    async def _async_request_current_locked(
+        self, value: float, *, mode_change: bool, defer: bool = True
+    ) -> None:
+        """Serialize a new command against any deferred setpoint."""
+
         if mode_change:
             remaining = self._mode_change_remaining()
             if remaining > 0:
@@ -300,7 +317,7 @@ class AmtronControl:
             )
         except AmtronRateLimitedError as err:
             self._diagnostics.writes_rate_limited += 1
-            if mode_change:
+            if mode_change or not defer:
                 raise service_validation_error(
                     "write_rate_limited",
                     {"seconds": f"{err.retry_after:.0f}"},
@@ -308,6 +325,9 @@ class AmtronControl:
             self._pending_current = value
             self._ensure_flush_task()
             return
+        # A successful command supersedes every older deferred setpoint,
+        # including one whose background task is currently sleeping.
+        self._pending_current = None
         if mode_change:
             self._mode_change_at = self._monotonic()
 
@@ -329,23 +349,28 @@ class AmtronControl:
 
     async def _async_flush_pending_current(self) -> None:
         try:
-            while (value := self._pending_current) is not None:
-                try:
-                    await self._async_write(
-                        CHARGING_CURRENT_EMS,
-                        value,
-                        min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
-                    )
-                except AmtronRateLimitedError as err:
-                    await self._sleep(err.retry_after)
-                    continue
-                except HomeAssistantError:
-                    # _async_write already counted and translated the failure;
-                    # the task must not die with an unretrieved exception.
-                    self._pending_current = None
-                    return
-                if self._pending_current == value:
-                    self._pending_current = None
+            while True:
+                async with self._current_lock:
+                    value = self._pending_current
+                    if value is None:
+                        return
+                    try:
+                        await self._async_write(
+                            CHARGING_CURRENT_EMS,
+                            value,
+                            min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
+                        )
+                    except AmtronRateLimitedError as err:
+                        retry_after = err.retry_after
+                    except HomeAssistantError:
+                        # The write path already counted and translated it.
+                        self._pending_current = None
+                        return
+                    else:
+                        self._pending_current = None
+                        return
+                # New commands must be able to replace a sleeping setpoint.
+                await self._sleep(retry_after)
         finally:
             self._flush_task = None
 

@@ -1,12 +1,14 @@
 """Block reads with a single-register fallback.
 
-The caller is expected to hold the bus lock: RS-485 is a single-master bus,
-so these helpers never serialize anything themselves.
+The caller serializes each transaction on the single-master RS-485 bus.
+Block reads can accept a callback that releases the bus between fallback
+transactions, allowing a priority heartbeat to pass.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from pymodbus.exceptions import ConnectionException, ModbusException
@@ -60,6 +62,7 @@ async def read_block(
     *,
     block: RegisterBlock,
     device_id: int,
+    read: Callable[[int, int], Awaitable[list[int]]] | None = None,
 ) -> dict[str, RegisterValue]:
     """Read one block, falling back to single registers when rejected.
 
@@ -67,18 +70,19 @@ async def read_block(
     block would otherwise lose every register in that block.
     """
 
-    try:
-        words = await read_words(
-            client, address=block.address, count=block.count, device_id=device_id
+    read_range = read or (
+        lambda address, count: read_words(
+            client, address=address, count=count, device_id=device_id
         )
+    )
+    try:
+        words = await read_range(block.address, block.count)
     except AmtronIllegalAddressError:
         _LOGGER.debug(
             "Block %s rejected as a range read, falling back to single registers",
             block.name,
         )
-        return await _read_block_registerwise(
-            client, block=block, device_id=device_id
-        )
+        return await _read_block_registerwise(block=block, read=read_range)
 
     decoded: dict[str, RegisterValue] = {}
     for spec in block.specs:
@@ -88,20 +92,14 @@ async def read_block(
 
 
 async def _read_block_registerwise(
-    client: Any,
     *,
     block: RegisterBlock,
-    device_id: int,
+    read: Callable[[int, int], Awaitable[list[int]]],
 ) -> dict[str, RegisterValue]:
     decoded: dict[str, RegisterValue] = {}
     for spec in block.specs:
         try:
-            words = await read_words(
-                client,
-                address=spec.address,
-                count=spec.count,
-                device_id=device_id,
-            )
+            words = await read(spec.address, spec.count)
         except AmtronIllegalAddressError:
             decoded[spec.key] = None
             continue

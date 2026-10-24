@@ -21,6 +21,7 @@ from .const import (
     CONF_BYTESIZE,
     CONF_CURRENT_LIMIT,
     CONF_DEVICE_ID,
+    CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_PARITY,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
@@ -28,6 +29,7 @@ from .const import (
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
+    DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
     DEFAULT_PARITY,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_STOPBITS,
@@ -76,9 +78,11 @@ async def async_setup_entry(
     try:
         await client.async_connect()
         identity = await async_read_identity(client)
-    except AmtronBusError as err:
+    except BaseException as err:
         await client.async_close()
-        raise ConfigEntryNotReady(str(err)) from err
+        if isinstance(err, AmtronBusError):
+            raise ConfigEntryNotReady(str(err)) from err
+        raise
 
     diagnostics = WriteDiagnostics()
     connection_state = ConnectionState()
@@ -89,6 +93,11 @@ async def async_setup_entry(
         identity=identity,
         connection_state=connection_state,
         scan_interval=_scan_interval(entry),
+        measurement_interval=float(
+            entry.options.get(
+                CONF_MEASUREMENT_INTERVAL_SECONDS, DEFAULT_MEASUREMENT_INTERVAL_SECONDS
+            )
+        ),
     )
     control = AmtronControl(
         client,
@@ -109,18 +118,21 @@ async def async_setup_entry(
 
     try:
         await coordinator.async_config_entry_first_refresh()
-    except Exception:
+        if not control.read_only:
+            entry.runtime_data.heartbeat = _start_heartbeat(
+                hass, entry, client, diagnostics
+            )
+        await hass.config_entries.async_forward_entry_setups(
+            entry, _entry_platforms(entry)
+        )
+        entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+        async_setup_repairs(hass, entry)
+    except BaseException:
+        if entry.runtime_data.heartbeat is not None:
+            await entry.runtime_data.heartbeat.async_stop()
+        await control.async_shutdown()
         await client.async_close()
         raise
-
-    if not control.read_only:
-        entry.runtime_data.heartbeat = _start_heartbeat(
-            hass, entry, client, diagnostics
-        )
-
-    await hass.config_entries.async_forward_entry_setups(entry, _entry_platforms(entry))
-    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
-    async_setup_repairs(hass, entry)
     return True
 
 
@@ -133,6 +145,8 @@ async def async_unload_entry(
     unloaded = await hass.config_entries.async_unload_platforms(
         entry, _entry_platforms(entry)
     )
+    if not unloaded:
+        return False
     if runtime_data.heartbeat is not None:
         await runtime_data.heartbeat.async_stop()
     await runtime_data.control.async_shutdown()
@@ -186,9 +200,7 @@ def _serial_config(entry: MennekesAmtronConfigEntry) -> SerialConfig:
 
 
 def _scan_interval(entry: MennekesAmtronConfigEntry) -> float:
-    value = entry.options.get(
-        CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS
-    )
+    value = entry.options.get(CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS)
     return float(value)
 
 

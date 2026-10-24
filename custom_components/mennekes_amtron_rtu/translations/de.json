@@ -373,12 +373,14 @@
         "data": {
           "control_mode": "Steuermodus",
           "current_limit": "Obergrenze des Ladestroms",
-          "scan_interval_seconds": "Abfrageintervall"
+          "measurement_interval_seconds": "Messwertintervall",
+          "scan_interval_seconds": "Statusintervall"
         },
         "data_description": {
           "control_mode": "Nur lesen schreibt nie auf den Bus. Modbus-Master sendet den nötigen Heartbeat und aktiviert die Steuer-Entitäten. Nutze Nur lesen, wenn bereits ein anderer Modbus-Master diesen RS-485-Bus betreibt.",
           "current_limit": "Obergrenze der Ladestrom-Entität, zusätzlich zur Begrenzung, die die Wallbox selbst erzwingt.",
-          "scan_interval_seconds": "Wie oft die Registerblöcke gelesen werden. Der Heartbeat läuft unabhängig von diesem Intervall."
+          "measurement_interval_seconds": "Leistung, Spannung, Strom und Sitzungswerte: 30 Sekunden reduzieren die Datenbanklast. Statuswechsel aktualisieren sofort. Ohne Fahrzeug mindestens 60 Sekunden. Das Statusintervall bestimmt die kürzeste mögliche Abfragezeit.",
+          "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon."
         },
         "title": "Optionen"
       }

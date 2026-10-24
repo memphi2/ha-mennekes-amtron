@@ -23,6 +23,7 @@ from .const import (
     CONF_CURRENT_LIMIT,
     CONF_DEVICE_ID,
     CONF_FRAME,
+    CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SEARCH,
@@ -31,6 +32,7 @@ from .const import (
     DEFAULT_CONTROL_MODE,
     DEFAULT_DEVICE_ID,
     DEFAULT_FRAME,
+    DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_SEARCH,
     DEVICE_ID_MAX,
@@ -106,6 +108,21 @@ def options_schema(
                 CONF_SCAN_INTERVAL_SECONDS,
                 default=current.get(
                     CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS
+                ),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=MIN_SCAN_INTERVAL_SECONDS,
+                    max=MAX_SCAN_INTERVAL_SECONDS,
+                    step=1,
+                    unit_of_measurement="s",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
+            probatio.Required(
+                CONF_MEASUREMENT_INTERVAL_SECONDS,
+                default=current.get(
+                    CONF_MEASUREMENT_INTERVAL_SECONDS,
+                    DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
                 ),
             ): NumberSelector(
                 NumberSelectorConfig(

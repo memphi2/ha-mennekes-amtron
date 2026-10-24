@@ -68,10 +68,24 @@ def test_the_manifest_requests_only_pymodbus_and_only_as_a_minimum() -> None:
 
 
 def test_diagnostics_never_report_the_port_or_the_serial_number() -> None:
-    source = (COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
-    assert "port_category(" in source
-    assert "fnv1a64(identity.serial_number)" in source
-    assert "client.config.port," not in source
+    import asyncio
+
+    from custom_components.mennekes_amtron_rtu.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+    from tests.ha_fakes import build_runtime
+
+    async def run() -> None:
+        hass, entry, _transport = await build_runtime()
+        entry.runtime_data.diagnostics.last_error = "ABC123456789 failed on /dev/fake"
+        await entry.runtime_data.client.async_close()
+        dump = await async_get_config_entry_diagnostics(hass, entry)
+        assert "/dev/fake" not in repr(dump)
+        assert "ABC123456789" not in repr(dump)
+        assert "serial_number" not in dump["registers"]
+        assert dump["device"]["serial_number_hash"]
+
+    asyncio.run(run())
 
 
 def test_no_vendor_document_is_tracked() -> None:

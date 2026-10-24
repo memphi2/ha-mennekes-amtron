@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.2.1 — 2026-10-24
+
+### Changed
+
+- Separate measurement interval, default 30 seconds, reduces Recorder writes
+  while status and controls retain their five-second default. Existing entries
+  also use 30 seconds unless configured otherwise. EVSE state transitions
+  immediately refresh measurements and lifetime counters.
+- Document measured Recorder load, retention, optional detail exclusions and
+  the distinction between simulated validation and physical hardware testing.
+
+### Fixed
+
+- Accepted current and pause commands supersede older deferred setpoints;
+  deferred writes are serialized with new commands and awaited on shutdown.
+- The five-second current-write floor also applies during error recovery.
+- Error recovery only applies pause/resume hysteresis when it actually lifts
+  a pause; repeated recovery after the five-second floor remains possible.
+  A rate-limited recovery reports failure without deferring its final write.
+- Rejected platform unloads keep the connection and heartbeat alive; failed
+  setup releases both. Register fallback reads allow heartbeat priority.
+- Diagnostics omit serial-number words and redact identifiers from errors.
+- Invalid non-finite and fractional enum writes are rejected before encoding.
+- Failed-block diagnostics survive skipped polls until a successful retry.
+
 ## 0.2.0 — 2026-10-23
 
 ### Breaking changes

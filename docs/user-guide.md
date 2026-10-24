@@ -4,7 +4,7 @@
 
 | Device | Status |
 |---|---|
-| AMTRON 4You 310 11 C2 (article `1313201205`) | Validated |
+| AMTRON 4You 310 11 C2 (article `1313201205`) | Primary development target; simulated validation |
 | AMTRON 4You 300 | Expected to work, untested |
 | AMTRON Compact 2.0s | Expected to work, untested |
 | AMTRON Start 2.0s | Expected to work, untested |
@@ -61,7 +61,8 @@ Changeable any time in the entry options:
 | Option | Default | Notes |
 |---|---|---|
 | Control mode | `Read only` | `Modbus master` enables the heartbeat and the control entities |
-| Polling interval | `5 s` | `2`–`300 s`. The heartbeat is independent of this |
+| Status polling interval | `5 s` | `2`–`300 s`; status, errors and control readback. Heartbeat independent. |
+| Measurement interval | `30 s` | `2`–`300 s`; power, voltage, current and session values. Actual reads occur on status polls. |
 | Charging current cap | device maximum | An extra upper bound for the number entity |
 
 Changing an option reloads the entry.
@@ -83,11 +84,16 @@ blocks that actually move: state, control pilot, signalled current, the
 current limits, the measurements, the session, the functions and the error
 registers. A reconfiguration still shows up on its own, within a minute.
 
-The measurements follow the vehicle rather than the clock. While nothing is
-plugged in, the currents and powers are zero and only the mains voltage keeps
-moving, so those blocks drop to the once-a-minute cadence too. They go back to
-your interval the moment the wallbox reports a connected vehicle. The sensors
-keep their values and stay available throughout.
+Measurements have a separate interval, defaulting to 30 seconds, even while
+a vehicle is plugged in or charging. Without a vehicle they are read at most
+once a minute (or less often if you choose a longer measurement interval).
+Charging and connection state changes refresh the measurements and lifetime
+energy counter in the same status poll. Values remain available between
+scheduled reads. Failed reads make the affected sensors unavailable.
+
+Existing entries without a measurement option also use the new 30-second
+default. Set it to 5 seconds if your automation needs that resolution; a
+longer status interval still limits how often a measurement can be read.
 
 The heartbeat is **not** part of the poll. It runs in its own background task
 on a fixed five-second interval, because a slow or failing poll must never be
@@ -95,46 +101,21 @@ able to starve it — that is the documented way into error state 200.
 
 ## Database load
 
-Home Assistant writes a row every time an entity's state changes, so a short
-polling interval is also a decision about your recorder database. On a
-five-second interval this integration writes roughly **35 000 rows a day**,
-most of them during the hours a car is actually charging. With the default
-ten-day purge that is around 350 000 rows.
+The default measurement interval limits routine updates, and native numeric
+values are rounded to their declared precision. Unchanged states do not create
+extra Recorder rows. These measures reduce database growth; they do not impose
+a storage limit or change your Home Assistant Recorder settings.
 
-Two things already keep that down: numeric states are rounded to the precision
-they are displayed at, instead of storing the `230.10000610351562` that a
-float32 decodes into, and the measurement blocks stop being polled while the
-wallbox is idle. Without those the same wallbox writes about 78 000 rows a day.
+A synthetic 24-hour replay through real Home Assistant and SQLite measured
+**35,036 → 10,120 state rows** for 20 hours unplugged and four hours charging,
+and **185,527 → 36,031 rows** for continuous charging, comparing the released
+five-second cadence with the new 30-second measurement default. These are
+scenario results, not upper bounds or measurements on a physical wallbox.
 
-If you want less, in rising order of effect:
-
-- **Raise the polling interval.** The cost is linear: 10 s halves the rows,
-  30 s divides them by six. Controls stay responsive either way, because the
-  integration refreshes immediately after every write rather than waiting for
-  the next poll.
-- **Stop recording the per-phase measurements.** They are the bulk of it, and
-  the totals are usually what gets used:
-
-  ```yaml
-  recorder:
-    exclude:
-      entities:
-        - sensor.mennekes_amtron_voltage_l1
-        - sensor.mennekes_amtron_voltage_l2
-        - sensor.mennekes_amtron_voltage_l3
-        - sensor.mennekes_amtron_power_l1
-        - sensor.mennekes_amtron_power_l2
-        - sensor.mennekes_amtron_power_l3
-  ```
-
-  These examples use the default device name and English entity names.
-  Check the actual entity IDs in *Settings → Devices & services → Entities*
-  if you renamed the device, use another language or have multiple wallboxes.
-  The `mennekes_amtron_rtu` integration domain does not add `rtu` to entity IDs.
-
-  Keep `power_total` and `energy_total` — the Energy dashboard needs them.
-- **Disable the entities you do not use.** A disabled entity is not recorded
-  at all. The diagnostic sensors are the obvious candidates.
+See [Recorder settings and measured database load](recorder.md) for a complete
+configuration example, reproducible measurements and retention limits. Keep
+the lifetime energy counter recorded for the Energy dashboard. Excluding a
+sensor from Recorder also removes its future history and statistics.
 
 ## Use cases
 
@@ -156,7 +137,7 @@ on the current limit to charge during a cheap window.
 `sensor.<name>_downgrade_current` to see when the grid operator dims your
 wallbox and by how much.
 
-**Energy dashboard.** Add `sensor.<name>_energy_total` as a consumption
+**Energy dashboard.** Add `sensor.<name>_total_energy` as a consumption
 source. The manufacturer marks this register as not usable for billing.
 
 ## Examples
@@ -235,17 +216,18 @@ entity. Everything else is an entity.
 ## Troubleshooting
 
 See [troubleshooting.md](troubleshooting.md). The short version: the setup
-form can search the bus for you, the diagnostics download carries the full raw
-register image, and four repair issues explain the four ways this device gets
+form can search the bus for you, the diagnostics download carries the raw
+register image with identifying fields omitted, and four repair issues explain the four ways this device gets
 stuck.
 
 ## Known limitations
 
 - Only one wallbox per config entry, and one master per RS-485 bus.
-- Validated only on the AMTRON 4You 310 11 C2 with layout v01.03.
+- Automated validation uses simulated device data and a virtual Modbus RTU
+  server. It does not establish physical-wallbox behavior.
 - No discovery: a USB RS-485 adapter cannot be identified as this wallbox, so
   the port is chosen manually.
-- `sensor.<name>_energy_total` is explicitly not usable for billing.
+- `sensor.<name>_total_energy` is explicitly not usable for billing.
 - The error-code sensor reports the categories the specification documents;
   anything else becomes `Other error` with the raw code as an attribute.
 - Writing the solar charging mode only drives the wallbox display and needs

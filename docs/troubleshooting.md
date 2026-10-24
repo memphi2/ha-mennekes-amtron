@@ -131,6 +131,6 @@ off the **Charging paused** switch to resume.
 
 ## Getting help
 
-Open an issue with the diagnostics download attached. It contains the full raw
-register image, which is usually what decides the question, and it contains
+Open an issue with the diagnostics download attached. It contains the raw
+register image with identifying fields omitted, which is usually what decides the question, and it contains
 neither the serial port path nor the wallbox serial number.

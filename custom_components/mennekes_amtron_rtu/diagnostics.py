@@ -3,8 +3,8 @@
 The dump is built from an allowlist, never from the config entry itself: the
 serial number identifies the household's hardware and a ``/dev/serial/by-id``
 path contains the adapter's serial number, so neither value is reported.
-What support actually needs is the register image, and that is included in
-full.
+Support also receives a register image, excluding the raw serial-number
+block, and error messages with known identifiers redacted.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ async def async_get_config_entry_diagnostics(
     coordinator = runtime_data.coordinator
     data = coordinator.current_data()
 
-    return {
+    payload = {
         "bus": {
             "port_category": port_category(client.config.port),
             CONF_BAUDRATE: client.config.baudrate,
@@ -67,8 +67,7 @@ async def async_get_config_entry_diagnostics(
             "charging_setpoint": runtime_data.control.charging_setpoint,
             "is_paused": runtime_data.control.is_paused,
             "heartbeat_running": bool(
-                runtime_data.heartbeat is not None
-                and runtime_data.heartbeat.running
+                runtime_data.heartbeat is not None and runtime_data.heartbeat.running
             ),
         },
         "write_diagnostics": {
@@ -93,6 +92,26 @@ async def async_get_config_entry_diagnostics(
         "values": decoded_values(data.values),
         "registers": await async_raw_registers(entry),
     }
+    identifiers = (client.config.port, identity.serial_number)
+    return {
+        key: _redact_identifiers(value, identifiers) for key, value in payload.items()
+    }
+
+
+def _redact_identifiers(value: Any, identifiers: tuple[str | None, ...]) -> Any:
+    """Also redact identifiers embedded in transport error messages."""
+
+    if isinstance(value, dict):
+        return {
+            key: _redact_identifiers(item, identifiers) for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_identifiers(item, identifiers) for item in value]
+    if isinstance(value, str):
+        for identifier in identifiers:
+            if identifier:
+                value = value.replace(identifier, "**REDACTED**")
+    return value
 
 
 def decoded_values(values: dict[str, Any]) -> dict[str, Any]:
@@ -121,6 +140,10 @@ async def async_raw_registers(entry: MennekesAmtronConfigEntry) -> dict[str, Any
     client = runtime_data.client
     image: dict[str, Any] = {}
     for block in supported_blocks(runtime_data.identity.layout_version):
+        # Raw register words encode the same serial number as the decoded
+        # string. Omitting only the string does not anonymize the dump.
+        if "serial_number" in block.keys:
+            continue
         try:
             words = await client.async_read_words(
                 address=block.address, count=block.count
@@ -129,14 +152,13 @@ async def async_raw_registers(entry: MennekesAmtronConfigEntry) -> dict[str, Any
             image[block.name] = {"error": str(err)}
             continue
         image[block.name] = {
-            f"0x{block.address + offset:04X}": word
-            for offset, word in enumerate(words)
+            f"0x{block.address + offset:04X}": word for offset, word in enumerate(words)
         }
     return image
 
 
 def fnv1a64(value: str | None) -> str | None:
-    """Return a stable, non-reversible hash of an identifying string."""
+    """Return a stable pseudonymous identifier for matching support reports."""
 
     if not value:
         return None

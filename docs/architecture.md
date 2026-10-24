@@ -102,31 +102,22 @@ the article number, the DIP-configured limits. The coordinator reads them once
 a minute and carries their values forward in between, which halves the bus
 traffic without hiding a reconfiguration for longer than a minute.
 
-`ACTIVE` is about the recorder. Four blocks describe a vehicle: the
-measurements, the signalled current, the session and the detected phases. A
-wallbox spends most of its life with nothing plugged into it, and in that
-state the currents and powers are zero while the mains voltage keeps drifting.
-Home Assistant records the native value, so three voltages polled every five
-seconds are three database rows every five seconds describing a wallbox that
-is doing nothing — around 43 000 rows a day before anybody charges anything.
-Those blocks therefore run at the user's interval while a vehicle is connected
-and at the slow interval otherwise. The entities keep their values and stay
-available; they simply stop being rewritten.
+`ACTIVE` contains measurements, signalled current, session values and detected
+vehicle phases. These blocks have a separate configurable cadence, defaulting
+to 30 seconds. While unplugged, the cadence is at least 60 seconds. Plugged-in
+vehicles no longer generate five-second voltage history merely by remaining
+connected overnight.
 
-The rule is deliberately lopsided: only `evse_state` reading exactly *idle*
-demotes them. An unknown or unreadable state counts as connected, because
-being wrong that way costs bus traffic, while being wrong the other way would
-hide a running charge.
+The coordinator reads `FAST` blocks first. An EVSE state transition forces the
+active blocks and lifetime counters to refresh in that same poll, so starting
+and stopping a charge does not leave a stale power reading until the next
+measurement interval. Failed block names remain in diagnostics until the
+block is actually read successfully again.
 
-Measured on one wallbox at a five-second interval, with the mains jittering by
-0.2 V and charging power by 20 W, over twenty idle hours and four charging
-hours:
-
-| | rows/day | bus while idle |
-|---|---|---|
-| raw floats, measurements always fast | 77 770 | 1.22 % |
-| rounded to the displayed precision | 68 551 | 1.22 % |
-| measurements demoted while idle | **34 626** | **0.74 %** |
+The [Recorder replay](recorder.md#measured-load) uses real Home Assistant
+entities and SQLite with synthetic register data. It counts stored state rows
+rather than estimating writes from the number of bus reads. It does not model
+24 hours of statistics, retention or physical-wallbox behavior.
 
 The rounding is the other half. `suggested_display_precision` only tells the
 frontend how to render a state; what Home Assistant records and builds

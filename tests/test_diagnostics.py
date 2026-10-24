@@ -60,3 +60,16 @@ def test_a_failing_block_is_reported_in_the_raw_image() -> None:
         assert "error" in dump["registers"]["statistics"]
 
     asyncio.run(run())
+
+
+def test_diagnostics_do_not_expose_identifiers_as_words_or_errors() -> None:
+    async def run() -> None:
+        hass, entry, transport = await build_runtime()
+        entry.runtime_data.diagnostics.last_error = "failed on /dev/fake"
+        dump = await async_get_config_entry_diagnostics(hass, entry)
+        assert "serial_number" not in dump["registers"]
+        assert "/dev/fake" not in repr(dump)
+        transport.close()
+        await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())

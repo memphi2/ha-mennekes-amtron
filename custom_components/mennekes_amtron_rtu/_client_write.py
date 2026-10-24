@@ -8,6 +8,7 @@ the ones a future caller remembers to throttle.
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 from pymodbus.exceptions import ConnectionException, ModbusException
@@ -57,7 +58,9 @@ def validate_write(spec: RegisterSpec, value: float) -> None:
 
     if not spec.writable:
         raise AmtronWriteRejectedError(f"{spec.key} is not writable")
-    if spec.enum_map is not None and int(value) not in spec.enum_map:
+    if not math.isfinite(value):
+        raise AmtronWriteRejectedError(f"{spec.key} requires a finite value")
+    if spec.enum_map is not None and value not in spec.enum_map:
         allowed = ", ".join(str(key) for key in sorted(spec.enum_map))
         raise AmtronWriteRejectedError(
             f"{spec.key} accepts only {allowed}, got {value}"

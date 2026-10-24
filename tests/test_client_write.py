@@ -106,3 +106,14 @@ def test_forgetting_a_register_clears_its_interval() -> None:
     limiter.forget("a")
     limiter.forget("missing")
     assert limiter.remaining("a", now=10.5, min_interval=5.0) == 0.0
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_non_finite_values_are_refused_before_encoding(value: float) -> None:
+    with pytest.raises(AmtronWriteRejectedError, match="finite"):
+        validate_write(R.CHARGING_CURRENT_EMS, value)
+
+
+def test_an_enum_register_does_not_truncate_fractional_values() -> None:
+    with pytest.raises(AmtronWriteRejectedError, match="accepts only"):
+        validate_write(R.SOLAR_CHARGING_MODE, 1.5)

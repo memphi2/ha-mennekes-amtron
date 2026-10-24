@@ -21,11 +21,13 @@ The diagnostics download is built from an allowlist. It deliberately omits:
 - the serial port path — a `/dev/serial/by-id/...` path contains the USB
   adapter's serial number. Only a category (`by-id`, `tty`, `other`) is
   reported.
-- the wallbox serial number — only a non-reversible FNV-1a 64 hash of it.
+- the wallbox serial number — only a stable FNV-1a 64 hash of it. The raw serial-number
+  register block is omitted too. This hash is a pseudonymous support
+  identifier, not a cryptographic anonymization guarantee.
 
 It includes the bus parameters, the device capabilities, the write counters
-and the full raw register image, because that is what makes a support report
-decidable.
+and a raw register image excluding identifying fields. Known identifiers are
+also redacted when they appear inside transport error messages.
 
 ## Charging data
 
