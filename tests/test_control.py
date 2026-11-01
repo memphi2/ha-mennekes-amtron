@@ -355,6 +355,50 @@ def test_the_phase_switch_pauses_a_running_charge_first() -> None:
     assert harness.written(R.REQUESTED_PHASES) == [[1]]
 
 
+@pytest.mark.parametrize("remembered", [None, 16.0])
+def test_phase_pause_restores_the_actual_pre_pause_current(remembered) -> None:
+    harness = Harness(values={"charging_current_ems": 8.0, "evse_state": EvseState.CHARGING})
+
+    async def run() -> None:
+        control = await harness.connect()
+        control.charging_setpoint = remembered
+        observed = []
+
+        async def refresh():
+            # HA reads the remembered value during its refresh callbacks,
+            # before the phase-change action has returned to its caller.
+            observed.append(control.charging_setpoint)
+
+        control._request_refresh = refresh
+        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        assert observed == [8.0, 8.0]
+        assert control.charging_setpoint == 8.0
+        harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
+        harness.clock[0] += 301
+        await control.async_resume_charging()
+        from custom_components.mennekes_amtron_rtu.decode import decode_register
+
+        assert decode_register(
+            R.CHARGING_CURRENT_EMS, harness.written(R.CHARGING_CURRENT_EMS)[-1]
+        ) == 8.0
+
+    asyncio.run(run())
+
+
+def test_a_rejected_pause_keeps_the_previously_accepted_setpoint() -> None:
+    harness = Harness(values={"charging_current_ems": 8.0})
+
+    async def run() -> None:
+        control = await harness.connect()
+        control.charging_setpoint = 10.0
+        harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = 3
+        with pytest.raises(HomeAssistantError):
+            await control.async_pause_charging()
+        assert control.charging_setpoint == 10.0
+
+    asyncio.run(run())
+
+
 def test_the_phase_switch_skips_the_pause_when_idle() -> None:
     harness = Harness(values={"evse_state": EvseState.IDLE})
 

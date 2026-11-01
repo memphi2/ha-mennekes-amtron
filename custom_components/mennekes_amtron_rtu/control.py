@@ -173,18 +173,11 @@ class AmtronControl:
         # resume the charge, whatever the caller meant by it. So they answer
         # to the same hysteresis the pause switch does.
         await self._async_request_current(current, mode_change=self.is_paused)
-        # A rejected command must not change what a later resume restores.
-        # A deferred command has been accepted and may become the new setpoint.
-        if current >= CHARGING_CURRENT_MINIMUM:
-            self.charging_setpoint = current
 
     async def async_pause_charging(self) -> None:
         """Pause charging the documented way, by signalling 0 A to the EV."""
 
         self._require_write_access()
-        value = self._state().get(CHARGING_CURRENT_EMS.key)
-        if isinstance(value, (int, float)) and float(value) >= CHARGING_CURRENT_MINIMUM:
-            self.charging_setpoint = float(value)
         await self._async_request_current(CHARGING_PAUSE_CURRENT, mode_change=True)
 
     async def async_resume_charging(self) -> None:
@@ -319,6 +312,7 @@ class AmtronControl:
     ) -> None:
         """Serialize a new command against any deferred setpoint."""
 
+        previous = self._state().get(CHARGING_CURRENT_EMS.key)
         if mode_change:
             remaining = self._mode_change_remaining()
             if remaining > 0:
@@ -331,6 +325,7 @@ class AmtronControl:
                 CHARGING_CURRENT_EMS,
                 value,
                 min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
+                refresh=False,
             )
         except AmtronRateLimitedError as err:
             self._diagnostics.writes_rate_limited += 1
@@ -340,13 +335,28 @@ class AmtronControl:
                     {"seconds": f"{err.retry_after:.0f}"},
                 ) from err
             self._pending_current = value
+            if value >= CHARGING_CURRENT_MINIMUM:
+                self.charging_setpoint = value
             self._ensure_flush_task()
             return
         # A successful command supersedes every older deferred setpoint,
         # including one whose background task is currently sleeping.
         self._pending_current = None
+        # Publish accepted bookkeeping before coordinator callbacks read it.
+        # Rejected commands never alter the setpoint; pauses retain the actual
+        # previous limit, whether requested manually or by a phase change.
+        if value >= CHARGING_CURRENT_MINIMUM:
+            self.charging_setpoint = value
+        elif (
+            value == CHARGING_PAUSE_CURRENT
+            and isinstance(previous, (int, float))
+            and previous >= CHARGING_CURRENT_MINIMUM
+        ):
+            self.charging_setpoint = float(previous)
         if mode_change:
             self._mode_change_at = self._monotonic()
+        if self._request_refresh is not None:
+            await self._request_refresh()
 
     def _mode_change_remaining(self) -> float:
         """Return the seconds left of the pause and resume hysteresis."""
@@ -397,6 +407,7 @@ class AmtronControl:
         value: float,
         *,
         min_interval: float = 0.0,
+        refresh: bool = True,
     ) -> None:
         try:
             await self._client.async_write_register(
@@ -413,7 +424,7 @@ class AmtronControl:
                 "write_failed", {"register": spec.key, "error": str(err)}
             ) from err
         self._diagnostics.writes_sent += 1
-        if self._request_refresh is not None:
+        if refresh and self._request_refresh is not None:
             await self._request_refresh()
 
     def _require_write_access(self) -> None:
