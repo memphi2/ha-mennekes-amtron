@@ -2,7 +2,8 @@
 
 Target: Platinum.
 
-Current status: Platinum. Open rules: none — all 52 official rules are
+Current status: Platinum (local self-assessment; no official Home Assistant
+certification). Open rules: none — all 52 official rules are
 answered, 43 as `done` and 9 as `exempt`, each exemption with a reason.
 
 `custom_components/mennekes_amtron_rtu/quality_scale.yaml` is the
@@ -57,9 +58,9 @@ script, and pymodbus' async serial client is used throughout.
 ## Rules this integration earns that a push integration cannot
 
 - `appropriate-polling`: the device has no push channel, so polling is the
-  correct model. The interval is five seconds by default and configurable, the
-  reads are blocked into eighteen contiguous ranges rather than fifty single
-  reads, and the heartbeat is deliberately kept out of the poll.
+  correct model. Status is polled every five seconds by default; measurements
+  every 30 seconds, and idle measurements/configuration every five minutes.
+  Reads use eighteen contiguous ranges; the heartbeat runs independently.
 - `test-before-configure`: the config flow reads the device before an entry is
   created.
 - `log-when-unavailable`: the serial connection is held open, so a loss and a
@@ -82,17 +83,19 @@ job regardless, on every matrix entry. See
 [repository-settings.md](repository-settings.md).
 
 `mypy --strict` covers all 53 modules, the integration and the tooling alike.
-It runs against `current_homeassistant` only. Home Assistant moved its own
-config-flow and action annotations from voluptuous to `probatio` in 2026.10,
+It runs against `current_homeassistant` and the pinned November preview.
+Home Assistant moved its own config-flow and action annotations from
+voluptuous to `probatio` in 2026.10,
 so no single source file can satisfy `--strict` against both ends of the
 supported range; the minimum matrix entry runs the whole test suite instead
 and proves the integration works there. See [SUPPORT.md](../SUPPORT.md).
 
 ## Coverage
 
-The ratchet is 99 percent, above the Platinum target of 95. The suite leaves
-no statement of the integration uncovered; what remains are three partial
-branches in loops that only exit on cancellation.
+The enforced statement/branch coverage threshold is 99 percent, above the
+Platinum target of 95. It is not a claim of complete coverage. The validation
+command prints uncovered statements and branch paths for the exact checkout;
+those results, rather than a hard-coded zero-miss claim, are the evidence.
 
 Coverage is not the claim, though. The tests that matter are the ones that
 pin the device's dangerous semantics: that `0x0302` can never be written with
@@ -108,7 +111,7 @@ integration has been measured against real hardware yet. The verification
 steps in [quickstart.md](quickstart.md) and [safety.md](safety.md) are what
 close that gap.
 
-Everything that needed a public repository is in place: CodeQL, branch
-protection on `main`, secret scanning with push protection, and build
-provenance attestations on the release assets. See
+GitHub settings and published artifacts need separate live verification.
+The 2026-11-01 audit found the pinned preview check missing from required
+branch checks; the local settings-tool fix is prepared but not applied. See
 [repository-settings.md](repository-settings.md).
