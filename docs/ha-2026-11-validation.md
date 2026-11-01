@@ -17,7 +17,7 @@ Snapshot: 2026-11-01. Local preparation based on v0.2.1, commit
 | Marketplace metadata | The manifest declares `energy.ev_charging`; the same ZIP and `hacs.json` serve the Marketplace and older HACS installations. |
 | Installation guidance | The DHE Connect structure is adapted to AMTRON: Marketplace and HACS instructions, existing entries, updates and removal. The pending catalog submission and the separate 0.1.0 domain migration remain explicit. |
 | Marketplace installer | Offline tests run the real November installer with our built ZIP, including first-install discovery, update restart requests, invalid-package rollback and preservation of a separate TCP integration. |
-| PV automation behavior | Real HA automations reproduce and fix writes while paused, incorrect kW conversion and commands from invalid inputs. Thirty parameter cases cover current adjustment and pause/resume, including a stable budget after resume, vehicle connection or a phase change. Existing current automations must select the new pause-switch input. |
+| PV automation behavior | Real HA automations reproduce and fix writes while paused, incorrect kW conversion and commands from invalid inputs. Thirty-two parameter cases cover current adjustment and pause/resume, including a stable budget after resume, vehicle connection or a phase change. A real HA test with a virtual RTU also verifies setting the first current limit from unlimited mode without a restored setpoint. Existing current automations must select the new pause-switch input. |
 | Phase-switch errors | A second phase request after 15 seconds still waits 285 seconds, now reported as a translated HA validation error. The regression also proves the request succeeds at the five-minute boundary without a current write while idle. |
 | User documentation | Setup uses the UI, optional tools are separated, and daily controls/phase-switch pauses are explained. Removed incorrect physical-validation and whole-house protection claims. Entity-ID examples are checked against public English names instead of register keys. |
 
@@ -38,9 +38,9 @@ environment used `--skip-typing`, matching CI.
 
 | Home Assistant | Tests | Coverage | Strict typing |
 |---|---:|---:|---|
-| 2026.9.0 | 445 passed, 2 skipped | 99.42% | Skipped: older Core annotations |
-| 2026.10.0 | 445 passed, 2 skipped | 99.42% | Passed, 53 source files |
-| 2026.11.0b1 | 447 passed | 99.42% | Passed, 53 source files |
+| 2026.9.0 | 448 passed, 2 skipped | 99.42% | Skipped: older Core annotations |
+| 2026.10.0 | 448 passed, 2 skipped | 99.42% | Passed, 53 source files |
+| 2026.11.0b1 | 450 passed | 99.42% | Passed, 53 source files |
 
 The two skips on September/October are the Marketplace installer tests:
 that component first ships in November. They are required by the fixed

@@ -60,7 +60,9 @@ phases automatically.
 - Missing or invalid power values, or a unit other than W/kW, produce no new
   commands. They do **not** pause charging automatically. The last setting
   remains in effect while the integration's heartbeat continues.
-- An unavailable pause switch or phase sensor prevents current adjustment.
+- An unavailable current control, pause switch or phase sensor prevents
+  current adjustment. An unknown initial current setpoint can still be set
+  from a valid power budget when the current control is available.
 - Home Assistant resets pending hold timers when it restarts or reloads
   automations. The thresholds must become true again to trigger a new timer;
   this is not a persistent charging schedule. See the

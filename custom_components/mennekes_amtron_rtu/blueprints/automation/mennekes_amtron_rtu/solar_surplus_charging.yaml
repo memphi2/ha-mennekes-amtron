@@ -145,7 +145,7 @@ conditions:
          and is_number(states(surplus_entity))
          and state_attr(surplus_entity, 'unit_of_measurement') in ['W', 'kW']
          and states(phases_entity) in ['single_phase', 'all_available']
-         and is_number(states(current_entity))
+         and not is_state(current_entity, 'unavailable')
          and is_number(state_attr(current_entity, 'max'))
          and minimum | float >= 6
          and minimum | float <= maximum | float

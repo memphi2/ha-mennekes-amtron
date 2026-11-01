@@ -36,20 +36,22 @@ def _expand(name: str, inputs: dict) -> dict:
 
 
 @pytest.mark.parametrize(
-    ("pause", "power", "unit", "phases", "expected"),
+    ("pause", "power", "unit", "phases", "expected", "current"),
     [
-        ("off", "6900", "W", "all_available", 10),
-        ("off", "6.9", "kW", "all_available", 10),
-        ("off", "2300", "W", "single_phase", 10),
-        ("off", "9000", "W", "single_phase", 16),
-        ("off", "-200", "W", "all_available", 6),
-        ("on", "6900", "W", "all_available", None),
-        ("unavailable", "6900", "W", "all_available", None),
-        (None, "6900", "W", "all_available", None),
-        ("off", "unavailable", "W", "all_available", None),
-        ("off", "nan", "W", "all_available", None),
-        ("off", "6900", "VA", "all_available", None),
-        ("off", "6900", "W", "unknown", None),
+        ("off", "6900", "W", "all_available", 10, "6"),
+        ("off", "6.9", "kW", "all_available", 10, "6"),
+        ("off", "2300", "W", "single_phase", 10, "6"),
+        ("off", "9000", "W", "single_phase", 16, "6"),
+        ("off", "-200", "W", "all_available", 6, "6"),
+        ("on", "6900", "W", "all_available", None, "6"),
+        ("unavailable", "6900", "W", "all_available", None, "6"),
+        (None, "6900", "W", "all_available", None, "6"),
+        ("off", "unavailable", "W", "all_available", None, "6"),
+        ("off", "nan", "W", "all_available", None, "6"),
+        ("off", "6900", "VA", "all_available", None, "6"),
+        ("off", "6900", "W", "unknown", None, "6"),
+        ("off", "6900", "W", "all_available", 10, "unknown"),
+        ("off", "6900", "W", "all_available", None, "unavailable"),
     ],
 )
 def test_current_blueprint_respects_pause_and_power_units(
@@ -59,6 +61,7 @@ def test_current_blueprint_respects_pause_and_power_units(
     unit: str,
     phases: str,
     expected: float | None,
+    current: str,
 ) -> None:
     async def run() -> None:
         hass = await _boot(tmp_path / "config")
@@ -72,7 +75,7 @@ def test_current_blueprint_respects_pause_and_power_units(
             hass.states.async_set("sensor.surplus", "0", {"unit_of_measurement": unit})
             hass.states.async_set("sensor.phases", phases)
             hass.states.async_set("binary_sensor.vehicle", "on")
-            hass.states.async_set("number.current", "6", {"max": 16})
+            hass.states.async_set("number.current", current, {"max": 16})
             hass.states.async_set("switch.paused", pause or "off")
             inputs = {
                 "surplus_power": "sensor.surplus",

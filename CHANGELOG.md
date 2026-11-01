@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Let PV control initialize an unknown current setpoint when the wallbox is
+  available and its current cap is valid, including unlimited mode without a
+  restored setpoint. Unavailable controls remain excluded.
 - Recalculate the PV current after resume, vehicle connection and phase
   changes, even when the surplus remains constant. A paused charge still
   receives no current writes.

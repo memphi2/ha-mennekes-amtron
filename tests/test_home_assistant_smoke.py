@@ -37,7 +37,7 @@ from custom_components.mennekes_amtron_rtu.const import (
     SEARCH_ADDRESSES,
     SEARCH_OFF,
 )
-from tests.fakes import device_bank
+from tests.fakes import device_bank, put
 from tests.test_serial_loopback import (
     REGISTER_COUNT,
     _server_context,
@@ -304,11 +304,15 @@ def test_the_flow_finds_a_wallbox_on_an_unknown_address(tmp_path: Path) -> None:
     asyncio.run(asyncio.wait_for(run(), timeout=300))
 
 
-def test_the_bundled_blueprints_run_as_automations(tmp_path: Path) -> None:
+@pytest.mark.parametrize("initial_limit", [16.0, 0.0])
+def test_the_bundled_blueprints_run_as_automations(
+    tmp_path: Path, initial_limit: float
+) -> None:
     """Schema-valid is not the same as working: these are really run."""
 
     async def run() -> None:
         bank = device_bank(evse_state=5)
+        put(bank, R.CHARGING_CURRENT_EMS, initial_limit)
         device_port, client_port = _virtual_serial_link()
         server, serving = await _start_wallbox(device_port, bank)
         try:
@@ -430,7 +434,11 @@ def test_the_bundled_blueprints_run_as_automations(tmp_path: Path) -> None:
             assert all(state.state == "on" for state in automations)
 
             # and the surplus one really drives the wallbox
-            assert hass.states.get(number).state == "16.0"
+            # Unlimited with no restored setpoint is available but unknown.
+            assert hass.states.get(number).state == (
+                "unknown" if initial_limit == 0 else "16.0"
+            )
+            assert hass.states.get(number).attributes["max"] == 16
             hass.states.async_set(
                 surplus,
                 "5000.0",
