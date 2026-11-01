@@ -5,7 +5,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigEntryState,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 
 from ._flow_connect import async_test_connection
 from ._flow_search import SearchResult, async_search, search_space
@@ -40,6 +45,7 @@ from .const import (
 )
 from .data import DeviceIdentity
 from .entry_types import MennekesAmtronConfigEntry
+from .identity import async_read_identity
 from .options_flow import MennekesAmtronOptionsFlow
 from .registers import VALIDATED_LAYOUT, layout_label
 
@@ -90,15 +96,13 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             config = _serial_config(user_input)
             try:
-                identity = await async_test_connection(config)
+                return await self._async_test_and_finish(step_id, user_input, config)
             except AmtronConnectionError as err:
                 _LOGGER.debug("Connection test failed: %s", err)
                 errors["base"] = "cannot_connect"
             except AmtronBusError as err:
                 _LOGGER.debug("Identity read failed: %s", err)
                 errors["base"] = "invalid_response"
-            else:
-                return await self._async_finish(step_id, user_input, identity)
 
             # Something is wrong with the address or the bus parameters. The
             # wallbox can be anywhere in the documented ranges, so offer to
@@ -107,6 +111,55 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self._async_start_search(step_id, user_input)
 
         return await self._async_show_bus_form(step_id, user_input, errors)
+
+    async def _async_test_and_finish(
+        self, step_id: str, user_input: dict[str, Any], config: SerialConfig
+    ) -> ConfigFlowResult:
+        entry = self._get_reconfigure_entry() if step_id == "reconfigure" else None
+        loaded = entry is not None and entry.state is ConfigEntryState.LOADED
+        if loaded and entry is not None and config == entry.runtime_data.client.config:
+            # The existing client owns the exclusive port and serializes reads
+            # with polling and heartbeat; an unchanged form needs no new client.
+            identity = await async_read_identity(entry.runtime_data.client)
+            return await self._async_finish(step_id, user_input, identity)
+        if (
+            loaded
+            and entry is not None
+            and not await self.hass.config_entries.async_unload(entry.entry_id)
+        ):
+            raise AmtronConnectionError("cannot release the active serial port")
+        try:
+            identity = await async_test_connection(config)
+            return await self._async_finish(step_id, user_input, identity)
+        except BaseException:
+            # A failed probe, wrong device or cancelled flow keeps the old entry
+            # usable. On success the flow's update/reload helper starts it instead.
+            if loaded and entry is not None:
+                await self.hass.config_entries.async_setup(entry.entry_id)
+            raise
+
+    async def _async_search_bus(
+        self, base: SerialConfig, all_parameters: bool
+    ) -> SearchResult | None:
+        entry = (
+            self._get_reconfigure_entry()
+            if self._pending_step == "reconfigure"
+            else None
+        )
+        loaded = entry is not None and entry.state is ConfigEntryState.LOADED
+        if (
+            loaded
+            and entry is not None
+            and not await self.hass.config_entries.async_unload(entry.entry_id)
+        ):
+            raise AmtronConnectionError("cannot release the active serial port")
+        try:
+            return await async_search(base, all_parameters=all_parameters)
+        finally:
+            # Search results need user acceptance. Restore the original entry
+            # while that form is open, also when the search was cancelled.
+            if loaded and entry is not None:
+                await self.hass.config_entries.async_setup(entry.entry_id)
 
     async def _async_show_bus_form(
         self,
@@ -136,7 +189,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         base = _serial_config(user_input)
         all_parameters = user_input.get(CONF_SEARCH) == SEARCH_FULL
         self._search_task = self.hass.async_create_task(
-            async_search(base, all_parameters=all_parameters),
+            self._async_search_bus(base, all_parameters),
             name="mennekes_amtron_rtu_bus_search",
         )
         return self._async_show_search_progress(base, all_parameters)
@@ -163,9 +216,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         task = self._search_task
         if task is not None and not task.done():
             base = _serial_config(self._pending_input or {})
-            all_parameters = (
-                (self._pending_input or {}).get(CONF_SEARCH) == SEARCH_FULL
-            )
+            all_parameters = (self._pending_input or {}).get(CONF_SEARCH) == SEARCH_FULL
             return self._async_show_search_progress(base, all_parameters)
 
         self._search_result = None

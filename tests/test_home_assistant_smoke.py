@@ -230,6 +230,14 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             assert suggested[CONF_DEVICE_ID] == 50
             assert suggested[CONF_FRAME] == "8n2"
 
+            # Saving the same values uses the active client's exclusive port.
+            result = await hass.config_entries.flow.async_configure(
+                reconfigure["flow_id"],
+                {CONF_PORT: client_port, CONF_DEVICE_ID: 50,
+                 CONF_BAUDRATE: 57600, CONF_FRAME: "8n2", CONF_SEARCH: SEARCH_OFF},
+            )
+            assert result["reason"] == "reconfigure_successful"
+
             heartbeat = entry.runtime_data.heartbeat
             assert await hass.config_entries.async_unload(entry.entry_id)
             assert not heartbeat.running

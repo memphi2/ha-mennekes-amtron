@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Reconfigure through the existing serial client when settings are unchanged;
+  release the exclusive port for changed settings and searches, restoring the
+  original entry after a failed or cancelled attempt.
 - Enforce Home Assistant control permissions for the charging-current action,
   including unlimited mode, before writing to any targeted wallbox.
 - Disable automatic routine Dependabot PRs for GitHub Actions and Python;

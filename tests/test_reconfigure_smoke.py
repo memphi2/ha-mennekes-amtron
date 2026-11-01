@@ -20,9 +20,22 @@ def test_reconfigure_reloads_once_only_when_changed(
     tmp_path: Path, caplog: pytest.LogCaptureFixture, changed: bool, loaded: bool
 ) -> None:
     async def run() -> None:
+        clients: list[FakeModbusClient] = []
+
+        class ExclusiveClient(FakeModbusClient):
+            async def connect(self) -> bool:
+                if any(client.connected and client is not self for client in clients):
+                    raise OSError("serial port is already exclusively locked")
+                return await super().connect()
+
+        def factory(*args, **kwargs):
+            client = ExclusiveClient(device_bank())
+            clients.append(client)
+            return client
+
         with patch(
             "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
-            side_effect=lambda *args, **kwargs: FakeModbusClient(device_bank()),
+            side_effect=factory,
         ):
             hass = await _boot(tmp_path / "config")
             try:

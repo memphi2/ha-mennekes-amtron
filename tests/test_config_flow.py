@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 
 from custom_components.mennekes_amtron_rtu import config_flow
 from custom_components.mennekes_amtron_rtu._flow_connect import async_test_connection
@@ -32,7 +34,7 @@ from custom_components.mennekes_amtron_rtu.const import (
 from custom_components.mennekes_amtron_rtu.data import DeviceIdentity
 from custom_components.mennekes_amtron_rtu.options_flow import MennekesAmtronOptionsFlow
 from tests.fakes import FakeModbusClient, device_bank
-from tests.ha_fakes import FakeConfigEntry, FakeHass
+from tests.ha_fakes import FakeConfigEntry, FakeHass, build_runtime
 
 USER_INPUT = {
     CONF_PORT: " /dev/fake ",
@@ -283,6 +285,58 @@ def test_the_options_flow_is_offered() -> None:
         MennekesAmtronConfigFlow.async_get_options_flow(FakeConfigEntry()),
         MennekesAmtronOptionsFlow,
     )
+
+
+@pytest.mark.parametrize("operation", ["probe", "search"])
+@pytest.mark.parametrize("failure", ["connection", "cancel", "unload"])
+def test_reconfigure_restores_the_entry_after_failed_or_cancelled_probes(
+    monkeypatch: pytest.MonkeyPatch, operation: str, failure: str
+) -> None:
+    async def run() -> None:
+        hass, entry, transport = await build_runtime()
+        entry.state = ConfigEntryState.LOADED
+        events = []
+
+        async def unload(entry_id):
+            assert entry_id == entry.entry_id
+            events.append("unload")
+            if failure == "unload":
+                return False
+            await entry.runtime_data.client.async_close()
+            entry.state = ConfigEntryState.NOT_LOADED
+            return True
+
+        async def setup(entry_id):
+            assert entry_id == entry.entry_id
+            events.append("restore")
+            await entry.runtime_data.client.async_connect()
+            entry.state = ConfigEntryState.LOADED
+            return True
+
+        hass.config_entries.async_unload = unload
+        hass.config_entries.async_setup = setup
+        flow = SearchFlow(hass)
+        flow.reconfigure_entry = entry
+        flow._pending_step = "reconfigure"
+        error = asyncio.CancelledError if failure == "cancel" else AmtronConnectionError
+        probe = AsyncMock(side_effect=error("probe failed"))
+        monkeypatch.setattr(config_flow, "async_test_connection", probe)
+        monkeypatch.setattr(config_flow, "async_search", probe)
+        config = SerialConfig(port="/dev/changed")
+        attempt = (
+            flow._async_test_and_finish("reconfigure", USER_INPUT, config)
+            if operation == "probe"
+            else flow._async_search_bus(config, False)
+        )
+        with pytest.raises(error):
+            await attempt
+        assert entry.state is ConfigEntryState.LOADED
+        assert transport.connected
+        assert events == (["unload"] if failure == "unload" else ["unload", "restore"])
+        assert probe.await_count == (0 if failure == "unload" else 1)
+        await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
 
 
 def test_the_connection_test_reads_the_device_and_closes_the_port() -> None:
