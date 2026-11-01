@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- Reconfiguring bus parameters reloads the entry once through its update
+  listener, avoiding the duplicate reload deprecated for Home Assistant
+  2026.12. Submitting unchanged parameters on a loaded entry leaves the
+  connection running; an unloaded entry is started by reconfiguration.
+
 ## 0.2.1 — 2026-10-24
 
 ### Changed
