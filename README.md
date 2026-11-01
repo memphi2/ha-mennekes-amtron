@@ -1,6 +1,6 @@
 # MENNEKES AMTRON RTU for Home Assistant (Unofficial)
 
-[![HACS: Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+[![Marketplace: Custom](https://img.shields.io/badge/Marketplace-Custom-41BDF5.svg)](docs/installation.md)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.9%2B-41BDF5.svg)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
@@ -37,39 +37,47 @@ they mean. This one does:
 - **Rate limits.** The manufacturer asks for ≤ 1 current change per 5 s and
   > 5 min between pause, resume and phase switches. Both are enforced.
 
-## Quick start (5 minutes)
+## Installation
 
 **Upgrading from 0.1.0?** Version 0.2.0 uses the new integration domain
 `mennekes_amtron_rtu` and requires reconfiguration. Follow the
 [upgrade guide](docs/upgrading.md) before updating.
 
-1. Wire a USB RS-485 adapter to the wallbox: Modbus **A = +**, **B = −**.
-2. Set the wallbox to satellite mode: **DIP bank S1, DIP 4 and DIP 5 to ON**,
-   then restart the wallbox.
-3. Find the adapter: `ls -l /dev/serial/by-id/`.
-4. In HACS, search for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**,
-   download it and restart Home Assistant. While the default-catalog
-   submission is pending, add `https://github.com/memphi2/ha-mennekes-amtron`
-   under *Custom repositories*, category *Integration*, first.
-5. Add **MENNEKES AMTRON RTU (Unofficial)** from *Settings → Devices & services*. If the
-   device address or the bus parameters are not the factory ones, the setup
-   form can **search the bus for you**. It sends read requests and requires
-   exclusive bus access, just like normal polling.
-6. If the bus itself is suspect, the integration also ships a read-only check
-   you can run on the server:
+Before setup, connect the RS-485 adapter and configure the wallbox as a
+Modbus satellite. Follow [hardware installation](docs/hardware.md) and use
+an exclusive bus: read-only mode also sends requests.
 
-   ```bash
-   docker exec -it homeassistant \
-     python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py \
-     /dev/serial/by-id/<your-adapter>
-   ```
+### Home Assistant Marketplace (2026.11 and newer)
 
-   See [docs/quickstart.md](docs/quickstart.md) for the other installation
-   types.
-7. The entry starts in **read-only** mode. Check the sensors, then switch the
-   control mode to *Modbus master* in the entry options when you are ready.
+1. Open **Settings → Marketplace** and accept the community-content notice
+   when requested.
+2. Search for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**.
+3. While the catalog submission is pending, add
+   `https://github.com/memphi2/ha-mennekes-amtron` as a custom repository,
+   category **Integration**. The [installation guide](docs/installation.md#home-assistant-marketplace)
+   includes a direct Marketplace link; custom repositories require a GitHub connection.
+4. Install the integration, then add **MENNEKES AMTRON RTU (Unofficial)** under
+   **Settings → Devices & services** and enter the adapter and bus settings.
 
-Full instructions: [docs/quickstart.md](docs/quickstart.md).
+A first Marketplace installation normally needs no restart. Complete the
+requested restart after an update or removal of loaded integration code.
+
+### HACS (Home Assistant 2026.9 and 2026.10)
+
+Search HACS for the same integration. If it is not listed, add the repository
+above under **Custom repositories**, category **Integration**. Download it,
+restart Home Assistant, then add the integration under **Devices & services**.
+
+### Existing installations, updates and removal
+
+Keep existing **0.2.x** entries when moving from HACS to the Marketplace.
+Updates appear under **Settings → Updates** on 2026.11+. Read the release
+notes and account for the heartbeat interruption during a restart.
+
+The entry starts in **read-only** mode. Follow the [quick start](docs/quickstart.md)
+to check readings before enabling *Modbus master* and trying the first charge.
+See [installation, updates and removal](docs/installation.md) for the complete
+workflow, including the pending catalog submission and existing installations.
 
 ## What you get
 

@@ -13,20 +13,20 @@ Modbus RTU uses a **single master**. If another energy manager or a §14a contro
 box already drives it, do not set up this integration on that bus.
 Read-only mode also sends requests. See [safety.md](safety.md).
 
-## 3. Install
-
-**HACS**
+## 2. Install
 
 **Existing 0.1.0 installation:** follow [Upgrading](upgrading.md) first.
 The integration domain changes in 0.2.0 and the wallbox must be added again.
 
-1. Search HACS for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**.
-2. While the default-catalog submission is pending, add
-   `https://github.com/memphi2/ha-mennekes-amtron` through the three-dot menu →
-   *Custom repositories*, category *Integration*, then search again.
-3. Download the integration, then restart Home Assistant.
+On **Home Assistant 2026.11+**, use **Settings → Marketplace**. On
+**2026.9/2026.10**, use **HACS**. Follow [Installation](installation.md) to
+install **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**, including the
+custom-repository step while catalog inclusion is pending.
 
-## 4. Find the adapter
+The first Marketplace installation normally needs no restart. HACS installs
+and updates of already loaded integration code need a restart.
+
+## 3. Find the adapter
 
 The adapter is plugged into the machine Home Assistant runs on, so this has to
 run there too:
@@ -44,9 +44,9 @@ add-on and turn its protection mode off, otherwise the add-on cannot reach
 Use the `/dev/serial/by-id/...` path, not `/dev/ttyUSB0`: the `ttyUSB` number
 changes when devices are re-enumerated, the `by-id` path does not.
 
-## 5. Prove the bus before writing anything
+## 4. Prove the bus before writing anything
 
-The integration ships the check, so after step 3 it is already on the machine
+The integration ships the check, so after step 2 it is already on the machine
 with the adapter, at
 `/config/custom_components/mennekes_amtron_rtu/smoke_modbus.py`. Home Assistant's
 own Python already has pymodbus, so nothing has to be installed:
@@ -56,8 +56,9 @@ own Python already has pymodbus, so nothing has to be installed:
 | Home Assistant OS / Supervised / Container | `docker exec -it homeassistant python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py <port>` |
 | Home Assistant Core | `/srv/homeassistant/bin/python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py <port>` |
 
-The check is read-only and sends no heartbeat, so it cannot put the wallbox
-into the energy-manager error state. A good run prints:
+Run this check before adding an active entry: it needs exclusive bus and port
+access. It reads registers without writing them or sending a heartbeat.
+A good run prints:
 
 ```text
 port             /dev/serial/by-id/usb-...
@@ -89,7 +90,7 @@ will take before it starts.
 If it fails, the cause is wiring, bus parameters or the device address — not
 Home Assistant.
 
-## 6. Add the wallbox
+## 5. Add the wallbox
 
 *Settings → Devices & services → Add integration → MENNEKES AMTRON RTU (Unofficial).*
 
@@ -102,10 +103,10 @@ value fails here instead of producing an empty device.
 flow tries every documented device address at your bus parameters — about
 twenty seconds — and offers what it found. *Search every address, baud rate
 and frame* widens that to every documented combination and takes several
-minutes. Both only read registers, so neither can disturb a wallbox or put it
-into the energy-manager error state.
+minutes. Both send read requests and require exclusive bus access; they do
+not write registers or send a heartbeat.
 
-## 7. Start in read-only mode
+## 6. Start in read-only mode
 
 A new entry is **read-only**: it polls and creates sensors, but it never
 writes and it sends no heartbeat. Check that the sensors look plausible
@@ -115,7 +116,7 @@ When you are satisfied, open the entry options and switch *Control mode* to
 **Modbus master**. The entry reloads, the heartbeat task starts and the
 control entities appear.
 
-## 8. First charge
+## 7. First charge
 
 1. Set `number.<name>_charging_current_limit` to 6 A.
 2. `sensor.<name>_signaled_current` has to follow within a few seconds.
@@ -127,12 +128,5 @@ control entities appear.
 
 ## Removing the integration
 
-*Settings → Devices & services → MENNEKES AMTRON RTU (Unofficial) → three-dot menu → Delete.*
-
-Deleting the entry stops the heartbeat and closes the serial port. The
-wallbox keeps the last values it received; if you want it to fall back to a
-defined state instead, configure an energy-manager fallback current with the
-MENNEKES configuration tool before removing the integration.
-
-To remove the files as well, uninstall it in HACS or delete
-`custom_components/mennekes_amtron_rtu`.
+Follow [Removal](installation.md#removal). Deleting an entry stops its
+heartbeat and closes the serial port; check fallback behavior before doing so.

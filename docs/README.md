@@ -8,6 +8,7 @@ local Modbus RTU.
 | I want to… | Read |
 |---|---|
 | wire it up: cabling, DIP switches, USB passthrough | [Hardware installation](hardware.md) |
+| install, update or remove the integration | [Installation and updates](installation.md) |
 | get it running in Home Assistant | [Quick start](quickstart.md) |
 | upgrade an existing 0.1.0 installation | [Upgrading](upgrading.md) |
 | know what every entity means | [Entity reference](entities.md) |

@@ -23,16 +23,17 @@ These steps apply only to the RTU integration from
 3. Check `custom_components/mennekes_amtron/manifest.json` before removing
    files: its `documentation` URL must identify `memphi2/ha-mennekes-amtron`.
    If it identifies `nobelp/mennekes-amtron-ha`, leave that directory and its
-   HACS installation alone. In *Settings → Devices & services*, delete only
+   managed installation alone. In *Settings → Devices & services*, delete only
    this project's old RTU config entry. If the old files belong to this RTU
-   project, uninstall **memphi2/ha-mennekes-amtron** through HACS while 0.1.0
-   is still installed, or remove the old directory for a manual installation.
+   project, uninstall **memphi2/ha-mennekes-amtron** through HACS (or the
+   Marketplace on 2026.11+) while 0.1.0 is still installed, or remove the old
+   directory for a manual installation.
 4. Restart Home Assistant to unload the old integration.
 
 ## Install and reconfigure
 
-1. Install 0.2.0 following [Quick start](quickstart.md#3-install), then restart
-   Home Assistant. Manual installs now use
+1. Install the current 0.2.x release following [Installation](installation.md),
+   completing any requested Home Assistant restart. Manual installs now use
    `custom_components/mennekes_amtron_rtu/`.
 2. Add **MENNEKES AMTRON RTU (Unofficial)** with the recorded bus settings.
    New entries start in read-only mode. Check the readings, then restore

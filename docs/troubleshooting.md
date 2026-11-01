@@ -1,5 +1,9 @@
 # Troubleshooting
 
+For Marketplace/HACS installation, updates and removal, start with
+[Installation and updates](installation.md). Runtime communication is local
+over Modbus RTU and does not depend on the Marketplace.
+
 Work down this page in order: each section assumes the ones above it are fine.
 
 ## The config flow cannot connect
@@ -32,7 +36,7 @@ If the search finds nothing, the problem is below the protocol:
   Container install the device has to be passed into the container.
 
 The shipped bus check isolates all of this from Home Assistant; see
-[quickstart.md](quickstart.md#5-prove-the-bus-before-writing-anything).
+[quickstart.md](quickstart.md#4-prove-the-bus-before-writing-anything).
 
 ## The device answered but reported no layout version
 

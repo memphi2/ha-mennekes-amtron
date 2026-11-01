@@ -193,7 +193,7 @@ dead bus.
    [quickstart.md](quickstart.md).
 2. For an answer outside Home Assistant, the integration ships a read-only bus
    check; see
-   [quickstart.md](quickstart.md#5-prove-the-bus-before-writing-anything).
+   [quickstart.md](quickstart.md#4-prove-the-bus-before-writing-anything).
 3. After setup, read the DIP-configured values back from the diagnostic
    sensors: `max_current_house`, `max_evse_current`, `downgrade_current`,
    `phase_switching_mode`. If one of them does not match what you set, the DIP

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Document Marketplace installation, existing entries, updates and removal,
+  retaining HACS instructions for Home Assistant 2026.9 and 2026.10.
 - Declare the `energy.ev_charging` category for Marketplace discovery.
 - Add Home Assistant 2026.11.0b1 to the fixed validation and release matrices
   alongside 2026.9.0 and 2026.10.0, retaining rolling next-version checks.
