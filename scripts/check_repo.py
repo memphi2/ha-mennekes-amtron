@@ -451,7 +451,7 @@ def check_hardware_document() -> list[str]:
             "**(Manual)**",
             "Have an electrician do the work",
             "bank S1, DIP 4 and DIP 5",
-            "RS-485 allows exactly one master",
+            "Modbus RTU allows exactly one master",
         )
         if phrase not in text
     ]

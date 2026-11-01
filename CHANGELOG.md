@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Correct documentation and setup/options help: read-only still transmits
+  Modbus requests and cannot share an RS-485 bus with another master.
+- Align the support policy's hardware claims with simulated RTU validation.
 - Reconfiguring bus parameters reloads the entry once through its update
   listener, avoiding the duplicate reload deprecated for Home Assistant
   2026.12. Submitting unchanged parameters on a loaded entry leaves the

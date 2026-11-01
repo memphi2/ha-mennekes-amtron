@@ -1,7 +1,7 @@
 """Serial Modbus client for one AMTRON wallbox.
 
-RS-485 is a single-master bus and this integration shares it between the data
-poll, the heartbeat task and user-triggered writes. Every transaction
+Modbus RTU uses a single master, and this integration shares its connection
+between the data poll, the heartbeat task and user-triggered writes. Every transaction
 therefore passes through one lock in this module; nothing else may talk to
 pymodbus.
 

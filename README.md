@@ -53,8 +53,8 @@ they mean. This one does:
    under *Custom repositories*, category *Integration*, first.
 5. Add **MENNEKES AMTRON RTU (Unofficial)** from *Settings → Devices & services*. If the
    device address or the bus parameters are not the factory ones, the setup
-   form can **search the bus for you** — it only reads, so it cannot disturb
-   the wallbox.
+   form can **search the bus for you**. It sends read requests and requires
+   exclusive bus access, just like normal polling.
 6. If the bus itself is suspect, the integration also ships a read-only check
    you can run on the server:
 
@@ -92,7 +92,8 @@ This integration never tries to work around it — it makes it **visible**
 through `binary_sensor.*_downgrade_active` and the downgrade-current sensor.
 
 If your §14a control box is itself a Modbus master on the same RS-485 bus,
-leave this integration in read-only mode: RS-485 has exactly one master. See
+do not run this integration on that bus, even in read-only mode: it sends
+read requests, and Modbus RTU permits only one master on the bus. See
 [docs/safety.md](docs/safety.md).
 
 ## Documentation

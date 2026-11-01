@@ -46,7 +46,7 @@ The same cause: a wallbox that is not in satellite mode answers reads and
 refuses writes. The integration raises a repair issue for this.
 
 If writes were working and stopped, check whether something else started
-driving the bus. RS-485 has exactly one master.
+driving the bus. Modbus RTU permits only one master on the bus.
 
 ## Error 200, "Energy manager unavailable"
 

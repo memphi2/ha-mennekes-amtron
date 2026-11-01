@@ -134,8 +134,8 @@ nothing more.
 **It decides whether you may be the master.** If your §14a control box is
 wired to XG1, it is not on the Modbus bus and there is no conflict. If instead
 it is itself a Modbus master on the same RS-485 pair, then this integration
-has to stay in read-only mode: RS-485 allows exactly one master. Check this
-before switching the control mode. See [safety.md](safety.md).
+must not run on that bus, even read-only: Modbus RTU allows exactly one master.
+Check this before setup or bus discovery. See [safety.md](safety.md).
 
 ## Making the adapter visible to Home Assistant
 

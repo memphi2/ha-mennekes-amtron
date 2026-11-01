@@ -9,9 +9,9 @@ Cabling, DIP switches, the §14a downgrade input and USB passthrough are in
 - The wallbox has to be in **Modbus satellite mode**: bank S1, DIP 4 and
   DIP 5 to ON, then restart it. Without that it answers nothing.
 
-RS-485 is a **single-master** bus. If another energy manager or a §14a control
-box already drives it, do not add a second master — keep this integration in
-read-only mode. See [safety.md](safety.md).
+Modbus RTU uses a **single master**. If another energy manager or a §14a control
+box already drives it, do not set up this integration on that bus.
+Read-only mode also sends requests. See [safety.md](safety.md).
 
 ## 3. Install
 

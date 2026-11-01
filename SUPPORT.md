@@ -53,9 +53,13 @@ minimum matrix entry runs the full test suite and proves the integration
 works there; the current entry additionally runs the typing gate. Neither
 entry skips a runtime check.
 
-## Validated Hardware
+## Reference Hardware
 
 - AMTRON 4You 310 11 C2, article `1313201205`, 11 kW, fixed cable, 16 A.
+
+Validation uses simulated registers, a virtual serial RTU link and real
+Home Assistant/SQLite. Physical wallbox validation is still outstanding;
+the reference model is not a claim of a completed hardware test.
 
 Other AMTRON models covered by the same Modbus specification (4You 300,
 Compact 2.0s, Start 2.0s) are expected to work through capability gating but

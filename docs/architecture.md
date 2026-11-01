@@ -34,10 +34,10 @@ repairs.py            + repair_issues.py
 
 ## Six decisions worth explaining
 
-### One lock, because RS-485 has one master
+### One lock, because Modbus RTU has one master
 
 Every transaction — poll, heartbeat and write — goes through a single
-`asyncio.Lock` in `client.py`. RS-485 is a single-master bus; two overlapping
+`asyncio.Lock` in `client.py`. Modbus RTU is a single-master protocol; two overlapping
 transactions are not slow, they are corrupt. Nothing outside `client.py`
 touches pymodbus.
 

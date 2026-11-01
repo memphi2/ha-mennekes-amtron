@@ -27,7 +27,7 @@
           "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
           "frame": "Die Wallbox dokumentiert genau diese drei. Werkseinstellung sind 8 Datenbits, keine Parität, 2 Stoppbits.",
           "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
-          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Das Suchen liest nur und kann die Wallbox nicht stören."
+          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Die Suche sendet Leseanfragen. Nur auf einem Bus ohne anderen Modbus-Master verwenden."
         },
         "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
         "title": "MENNEKES AMTRON RTU"
@@ -49,7 +49,7 @@
           "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
           "frame": "Die Wallbox dokumentiert genau diese drei. Werkseinstellung sind 8 Datenbits, keine Parität, 2 Stoppbits.",
           "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
-          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Das Suchen liest nur und kann die Wallbox nicht stören."
+          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Die Suche sendet Leseanfragen. Nur auf einem Bus ohne anderen Modbus-Master verwenden."
         },
         "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
         "title": "MENNEKES AMTRON RTU"
@@ -377,7 +377,7 @@
           "scan_interval_seconds": "Statusintervall"
         },
         "data_description": {
-          "control_mode": "Nur lesen schreibt nie auf den Bus. Modbus-Master sendet den nötigen Heartbeat und aktiviert die Steuer-Entitäten. Nutze Nur lesen, wenn bereits ein anderer Modbus-Master diesen RS-485-Bus betreibt.",
+          "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
           "current_limit": "Obergrenze der Ladestrom-Entität, zusätzlich zur Begrenzung, die die Wallbox selbst erzwingt.",
           "measurement_interval_seconds": "Leistung, Spannung, Strom und Sitzungswerte: 30 Sekunden reduzieren die Datenbanklast. Statuswechsel aktualisieren sofort. Ohne Fahrzeug mindestens 60 Sekunden. Das Statusintervall bestimmt die kürzeste mögliche Abfragezeit.",
           "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon."

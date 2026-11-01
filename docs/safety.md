@@ -12,15 +12,17 @@ the manufacturer's installation manual and local regulations.
 [hardware.md](hardware.md) describes the Modbus side of an installation that
 somebody qualified has already made safe.
 
-## RS-485 is a single-master bus
+## Modbus RTU uses a single master
 
 Exactly one device may be master. If something else already drives the bus —
 another energy manager, a §14a control box, a second Home Assistant instance —
-then adding this integration in **Modbus master** mode produces bus
-collisions, not just failed reads.
+then running this integration in either control mode can produce bus
+collisions. Read-only mode still transmits Modbus read requests; it is not a
+passive listener. It only disables register writes and the heartbeat.
 
-Check this *before* enabling master mode. If you are not certain, stay in
-read-only mode: it never transmits a write and never sends the heartbeat.
+Check exclusive bus ownership before setup, discovery or the smoke test.
+If another master is present, disable this integration and use a separate
+supported interface or obtain the readings from the existing master.
 
 ## §14a EnWG is enforced in hardware
 
@@ -40,7 +42,7 @@ do so. What it does is make the state visible:
 `binary_sensor.*_downgrade_active` and the downgrade-current sensor.
 
 If your §14a control box is itself a Modbus master on the same bus, see the
-previous section: read-only mode is the only correct configuration.
+previous section: this integration must not share that bus, even read-only.
 
 ## The heartbeat, and what happens without it
 

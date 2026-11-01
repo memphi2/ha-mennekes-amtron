@@ -23,10 +23,10 @@ What matters for security here is different from a cloud integration:
 - **Physical bus access.** Anyone with access to the RS-485 pair can read and
   write the wallbox regardless of Home Assistant. Treat the bus as a trusted,
   physically protected segment.
-- **Single master.** RS-485 allows exactly one master. Running this
-  integration in master mode on a bus that already has one produces
-  unpredictable behaviour, not just failed reads. The read-only control mode
-  exists for that case.
+- **Single master.** Modbus RTU allows exactly one master. This integration
+  transmits read requests in both control modes. Read-only disables register
+  writes and heartbeat, but does not make sharing with another master safe.
+  Setup, discovery and the smoke test also require exclusive bus access.
 - **Write authority.** In master mode the integration can release charging,
   lock the wallbox and restart it. Home Assistant user permissions are the
   only thing between a Home Assistant account and those actions.

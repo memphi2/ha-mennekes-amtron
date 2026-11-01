@@ -27,7 +27,7 @@
           "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
           "frame": "The wallbox documents exactly these three. Factory default is 8 data bits, no parity, 2 stop bits.",
           "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
-          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox."
+          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching sends read requests. Only use it on a bus without another Modbus master."
         },
         "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
         "title": "MENNEKES AMTRON RTU"
@@ -49,7 +49,7 @@
           "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
           "frame": "The wallbox documents exactly these three. Factory default is 8 data bits, no parity, 2 stop bits.",
           "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
-          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching is read-only and cannot disturb the wallbox."
+          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching sends read requests. Only use it on a bus without another Modbus master."
         },
         "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
         "title": "MENNEKES AMTRON RTU"
@@ -377,7 +377,7 @@
           "scan_interval_seconds": "Status polling interval"
         },
         "data_description": {
-          "control_mode": "Read only never writes to the bus. Modbus master sends the required heartbeat and enables the control entities. Use read only if another Modbus master already drives this RS-485 bus.",
+          "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
           "current_limit": "Upper bound of the charging-current entity, in addition to the limit the wallbox itself enforces.",
           "measurement_interval_seconds": "Power, voltage, current and session values: 30 seconds reduces database load. Status changes refresh immediately. Without a vehicle, at least 60 seconds. The status interval sets the shortest possible polling time.",
           "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently."

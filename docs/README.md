@@ -36,9 +36,9 @@ heartbeat. Look at the sensors, confirm they match the wallbox display, and
 only then switch the control mode to *Modbus master*. See
 [quickstart.md](quickstart.md).
 
-**One master per bus.** RS-485 allows exactly one. If a §14a control box or
-another energy manager already drives your bus, this integration has to stay
-read-only. See [safety.md](safety.md).
+**One master per bus.** Modbus RTU allows exactly one. If a §14a control box or
+another energy manager already drives your bus, this integration must not
+share it. Read-only mode still sends requests. See [safety.md](safety.md).
 
 **0 A does not mean "stop".** Writing 0 A to the charging-current register
 removes the limit and makes the wallbox signal its *maximum*. The integration
