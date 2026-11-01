@@ -10,10 +10,14 @@ explicitly here.
 from __future__ import annotations
 
 import probatio
+from homeassistant.auth.models import User
+from homeassistant.auth.permissions.const import POLICY_CONTROL
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.exceptions import Unauthorized, UnknownUser
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     ATTR_ALLOW_UNLIMITED,
@@ -22,6 +26,7 @@ from .const import (
     SERVICE_SET_CHARGING_CURRENT,
 )
 from .control import AmtronControl
+from .entity import entry_entity_unique_id
 from .exceptions import service_validation_error
 
 SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
@@ -43,9 +48,15 @@ def async_setup_services(hass: HomeAssistant) -> None:
         return
 
     async def async_handle_set_charging_current(call: ServiceCall) -> None:
+        user = None
+        if call.context.user_id:
+            user = await hass.auth.async_get_user(call.context.user_id)
+            if user is None:
+                raise UnknownUser(context=call.context)
         current = float(call.data[ATTR_CURRENT])
         allow_unlimited = bool(call.data[ATTR_ALLOW_UNLIMITED])
-        for control in async_resolve_controls(hass, call.data[ATTR_DEVICE_ID]):
+        # Resolve and authorize every target before the first device is written.
+        for control in async_resolve_controls(hass, call.data[ATTR_DEVICE_ID], user):
             await control.async_set_charging_current(
                 current, allow_unlimited=allow_unlimited
             )
@@ -60,7 +71,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
 @callback
 def async_resolve_controls(
-    hass: HomeAssistant, device_ids: list[str]
+    hass: HomeAssistant, device_ids: list[str], user: User | None = None
 ) -> list[AmtronControl]:
     """Return the control objects of the targeted devices."""
 
@@ -79,6 +90,16 @@ def async_resolve_controls(
                 raise service_validation_error(
                     "entry_not_loaded", {"device": device_id}
                 )
+            if user is not None and not user.is_admin:
+                entity_id = er.async_get(hass).async_get_entity_id(
+                    "number", DOMAIN, entry_entity_unique_id(entry, "charging_current_limit")
+                )
+                if entity_id is None or not user.permissions.check_entity(
+                    entity_id, POLICY_CONTROL
+                ):
+                    raise Unauthorized(
+                        user_id=user.id, entity_id=entity_id, permission=POLICY_CONTROL
+                    )
             controls.append(runtime_data.control)
     if not controls:
         raise service_validation_error("no_wallbox_target")

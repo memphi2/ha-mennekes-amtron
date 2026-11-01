@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Enforce Home Assistant control permissions for the charging-current action,
+  including unlimited mode, before writing to any targeted wallbox.
 - Disable automatic routine Dependabot PRs for GitHub Actions and Python;
   retain grouped security updates and vulnerability alerts. The quarterly
   schedule introduced in 0.2.2 still allowed immediate checks after changes

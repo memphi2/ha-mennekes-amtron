@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from homeassistant.core import Context
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu import registers as R
@@ -57,6 +58,7 @@ def test_the_schema_rejects_the_invalid_band_through_control(
 
         await handler(
             SimpleNamespace(
+                context=Context(),
                 data={
                     "device_id": ["dev"],
                     ATTR_CURRENT: 10.0,
@@ -72,6 +74,7 @@ def test_the_schema_rejects_the_invalid_band_through_control(
         with pytest.raises(ServiceValidationError):
             await handler(
                 SimpleNamespace(
+                    context=Context(),
                     data={
                         "device_id": ["dev"],
                         ATTR_CURRENT: 0.0,
