@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Group routine dependency updates quarterly with one open PR per ecosystem;
+  keep security updates separate and enabled in the repository settings.
+  Remove the pip-compile input that caused unwanted transitive Python pins.
 - Rewrite end-user setup, daily controls, automation and troubleshooting
   guidance. Correct entity IDs and action fields, explain phase-switch pauses,
   and put Recorder retention/exclusion choices before technical measurements.

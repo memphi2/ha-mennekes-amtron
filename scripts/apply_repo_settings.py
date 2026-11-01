@@ -92,6 +92,11 @@ def steps(repository: str) -> list[Step]:
             f"repos/{repository}/vulnerability-alerts",
         ),
         Step(
+            "Dependabot security updates",
+            "PUT",
+            f"repos/{repository}/automated-security-fixes",
+        ),
+        Step(
             "Secret scanning and push protection",
             "PATCH",
             f"repos/{repository}",

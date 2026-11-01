@@ -3,13 +3,17 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "quarterly"
       time: "05:00"
       timezone: "Europe/Berlin"
-    open-pull-requests-limit: 5
+    # This limit applies only to routine version updates, not security fixes.
+    open-pull-requests-limit: 1
     groups:
       github-actions:
+        patterns:
+          - "*"
+      github-actions-security:
+        applies-to: security-updates
         patterns:
           - "*"
     commit-message:
@@ -25,10 +29,10 @@ updates:
     exclude-paths:
       - "requirements-dev-min-ha.txt"
     schedule:
-      interval: "monthly"
+      interval: "quarterly"
       time: "05:30"
       timezone: "Europe/Berlin"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
     groups:
       python-patch-minor:
         patterns:
@@ -36,6 +40,10 @@ updates:
         update-types:
           - "minor"
           - "patch"
+      python-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
     commit-message:
       prefix: "deps"
     ignore:
