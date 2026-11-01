@@ -82,7 +82,7 @@ need a public repository, and the Python security rules above run in every CI
 job regardless, on every matrix entry. See
 [repository-settings.md](repository-settings.md).
 
-`mypy --strict` covers all 53 modules, the integration and the tooling alike.
+`mypy --strict` covers all integration modules and tooling scripts.
 It runs against `current_homeassistant` and the pinned November preview.
 Home Assistant moved its own config-flow and action annotations from
 voluptuous to `probatio` in 2026.10,
@@ -112,6 +112,7 @@ steps in [quickstart.md](quickstart.md) and [safety.md](safety.md) are what
 close that gap.
 
 GitHub settings and published artifacts need separate live verification.
-The 2026-11-01 audit found the pinned preview check missing from required
-branch checks; the local settings-tool fix is prepared but not applied. See
+On 2026-11-01 the required checks were verified to include the November
+preview and the current-head Codex security-review gate. Its event workflow
+becomes automatic when the introducing PR reaches the default branch. See
 [repository-settings.md](repository-settings.md).

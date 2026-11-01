@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Require a clean Codex Security Review of the current PR head before merging;
+  verify bot/App identity and reject stale, incomplete or failed evidence.
 - Refresh the legal/provenance audit and quality evidence, retaining the old
   snapshot in Git history and stating hardware, coverage and policy limits.
 - Reuse the block decoder in the Modbus read path and remove an unused heartbeat

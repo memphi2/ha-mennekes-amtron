@@ -27,7 +27,7 @@ DEFAULT_REPOSITORY = "memphi2/ha-mennekes-amtron"
 # Status checks that have to pass before main can move. The names are the CI
 # job names; scripts/check_repo.py verifies that they still exist in
 # .github/workflows/validate.yml.
-REQUIRED_CHECKS = (
+REQUIRED_CI_CHECKS = (
     "dependabot",
     "hacs",
     "hassfest",
@@ -35,6 +35,7 @@ REQUIRED_CHECKS = (
     "validate (current-ha)",
     "validate (preview-ha)",
 )
+REQUIRED_CHECKS = (*REQUIRED_CI_CHECKS, "codex-security-review")
 
 REPOSITORY_SETTINGS = {
     "has_issues": True,
@@ -173,7 +174,12 @@ def merged_status_checks(current: dict[str, Any]) -> dict[str, Any]:
     known = {check["context"] for check in checks}
     for context in [*current.get("contexts", []), *REQUIRED_CHECKS]:
         if context not in known:
-            checks.append({"context": context})
+            check = {"context": context}
+            if context == "codex-security-review":
+                # Allow both the trusted Actions workflow and an authenticated
+                # maintainer running the verifier during initial rollout.
+                check["app_id"] = -1
+            checks.append(check)
             known.add(context)
     return {"strict": True, "checks": checks}
 

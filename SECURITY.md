@@ -39,3 +39,19 @@ What matters for security here is different from a cloud integration:
 
 - Firmware vulnerabilities in the wallbox itself. Report those to MENNEKES.
 - Attacks that require physical access to the RS-485 wiring.
+
+## Required pull-request review
+
+Every PR into `main` requires a completed Codex Security Review for its current
+head commit, in addition to the normal code review and CI. The required
+`codex-security-review` status accepts only authenticated Codex bot evidence
+and an explicit clean security-review receipt. Missing, stale, failed or
+inconsistent results block merging. Findings require remediation and a new
+review; a normal code-review receipt cannot substitute for a security review.
+
+Automatic security reviews are configured for all PRs on every push in Codex.
+To retry manually, post exactly `@codex security review` in the PR. Reporting
+thresholds are configured in Codex; a clean receipt means no issues were
+reported under that policy, not proof that the code has no vulnerabilities.
+See [repository settings](docs/repository-settings.md#required-codex-security-review)
+for the enforcement workflow and initial rollout.

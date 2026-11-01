@@ -28,7 +28,8 @@ dependency, Ruff, test/coverage and strict-typing gates. The second reads
 GitHub required-check settings and reports drift without changing them.
 It is separate from code validation and requires authenticated `gh` access.
 
-Local validation on 2026-11-01 used Python 3.14 and pymodbus 3.13.1:
+Integration-audit validation on 2026-11-01, before the security-gate extension,
+used Python 3.14 and pymodbus 3.13.1:
 
 | HA version | Tests passed | Skipped | Statement/branch coverage |
 |---|---:|---:|---:|
@@ -84,8 +85,18 @@ default and exposes no network listener or cloud API.
 The settings tool now merges required checks through GitHub's dedicated
 endpoint, preserving review rules, administrator enforcement and existing
 App IDs. API errors fail the command. The read-only check on 2026-11-01 found
-`validate (preview-ha)` missing from live required checks; this local audit
-has not applied GitHub settings. Passing local tests does not fix that drift.
+`validate (preview-ha)` missing from live required checks. During the subsequent
+security-review enforcement change, the preview and `codex-security-review`
+checks were added to live branch protection. Administrator enforcement and
+all other protection settings were verified unchanged. The owner confirmed
+automatic Codex security review for all PRs on every push.
+
+The security-gate extension adds 33 regression cases (513 passed, two
+Marketplace skips on current HA; integration coverage remains 99.43%) and
+increases the strict-typing set to 54 modules. The gate uses authenticated
+bot evidence and executes only trusted default-branch code; see
+[repository settings](../repository-settings.md#required-codex-security-review)
+for format dependencies, reporting thresholds and the initial rollout.
 
 Routine Dependabot PRs remain disabled; security alerts and security updates
 remain part of the repository policy. This reduces routine work, but it is

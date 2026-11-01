@@ -54,9 +54,11 @@ REQUIRED_PATHS = (
     ".github/workflows/validate.yml",
     ".github/workflows/release.yml",
     ".github/workflows/codeql.yml",
+    ".github/workflows/security-review.yml",
     ".github/dependabot.yml",
     "docs/repository-settings.md",
     "scripts/apply_repo_settings.py",
+    "scripts/check_security_review.py",
     ".github/ISSUE_TEMPLATE/config.yml",
     ".github/ISSUE_TEMPLATE/bug_report.yml",
     ".github/ISSUE_TEMPLATE/feature_request.yml",
@@ -407,13 +409,13 @@ def check_branch_protection_contexts() -> list[str]:
     """
 
     sys.path.insert(0, str(ROOT / "scripts"))
-    from apply_repo_settings import REQUIRED_CHECKS
+    from apply_repo_settings import REQUIRED_CI_CHECKS
 
     workflow = (ROOT / ".github" / "workflows" / "validate.yml").read_text(
         encoding="utf-8"
     )
     failures: list[str] = []
-    for context in REQUIRED_CHECKS:
+    for context in REQUIRED_CI_CHECKS:
         job, _, matrix_entry = context.partition(" (")
         if f"  {job}:" not in workflow:
             failures.append(
