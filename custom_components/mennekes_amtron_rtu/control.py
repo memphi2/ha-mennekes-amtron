@@ -168,12 +168,15 @@ class AmtronControl:
             )
         else:
             current = min(current, self.max_charging_current)
-            self.charging_setpoint = current
         # Every value this method accepts is either a real limit or the
         # explicit 0 A, and while the pause value is active both of them
         # resume the charge, whatever the caller meant by it. So they answer
         # to the same hysteresis the pause switch does.
         await self._async_request_current(current, mode_change=self.is_paused)
+        # A rejected command must not change what a later resume restores.
+        # A deferred command has been accepted and may become the new setpoint.
+        if current >= CHARGING_CURRENT_MINIMUM:
+            self.charging_setpoint = current
 
     async def async_pause_charging(self) -> None:
         """Pause charging the documented way, by signalling 0 A to the EV."""

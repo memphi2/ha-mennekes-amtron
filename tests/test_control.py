@@ -577,6 +577,32 @@ def test_a_setpoint_change_cannot_undo_a_pause_early() -> None:
     assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
 
 
+@pytest.mark.parametrize("rejection", ["cooldown", "device"])
+def test_rejected_setpoint_does_not_change_the_later_resume(rejection: str) -> None:
+    harness = Harness(values={"charging_current_ems": 8.0})
+
+    async def run() -> None:
+        control = await harness.connect()
+        await control.async_pause_charging()
+        harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
+        harness.clock[0] += 6 if rejection == "cooldown" else 301
+        if rejection == "device":
+            harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = 3
+        with pytest.raises(HomeAssistantError):
+            await control.async_set_charging_current(16)
+        assert control.charging_setpoint == 8.0
+        harness.transport.write_exceptions.clear()
+        harness.clock[0] += 301
+        await control.async_resume_charging()
+        from custom_components.mennekes_amtron_rtu.decode import decode_register
+
+        assert decode_register(
+            R.CHARGING_CURRENT_EMS, harness.written(R.CHARGING_CURRENT_EMS)[-1]
+        ) == 8.0
+
+    asyncio.run(run())
+
+
 def test_a_setpoint_change_undoes_a_pause_after_the_hysteresis() -> None:
     harness = Harness(values={"charging_current_ems": 16.0}, clock=[1000.0])
 
