@@ -221,14 +221,20 @@ class AmtronControl:
         self._require_write_access()
         if not phase_switch_is_supported(self._identity.phase_options_hw):
             raise service_validation_error("phase_switch_unsupported")
-        if self._state().get("evse_state") == EvseState.CHARGING:
-            await self._async_request_current(CHARGING_PAUSE_CURRENT, mode_change=True)
         try:
-            await self._async_write(
-                REQUESTED_PHASES,
-                int(phases),
-                min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS,
-            )
+            async with self._current_lock:
+                self._client.check_write_interval(
+                    REQUESTED_PHASES, min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS
+                )
+                if self._state().get("evse_state") == EvseState.CHARGING:
+                    await self._async_request_current_locked(
+                        CHARGING_PAUSE_CURRENT, mode_change=True, defer=False
+                    )
+                await self._async_write(
+                    REQUESTED_PHASES,
+                    int(phases),
+                    min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS,
+                )
         except AmtronRateLimitedError as err:
             self._diagnostics.writes_rate_limited += 1
             raise service_validation_error(

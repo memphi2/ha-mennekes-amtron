@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Check the phase-switch cooldown before pausing a running charge, and serialize
+  the complete sequence against other current and phase requests.
 - Retain register write intervals after a lost reply, device failure or
   cancellation; only definite rejections allow an immediate retry.
 - Reconfigure through the existing serial client when settings are unchanged;

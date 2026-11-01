@@ -223,6 +223,23 @@ class MennekesModbusClient:
         async with self._queue:
             await self._async_write_locked(spec, value, min_interval=min_interval)
 
+    def check_write_interval(
+        self, spec: RegisterSpec, *, min_interval: float = 0.0
+    ) -> None:
+        """Reject a write still in cooldown, without reserving the register.
+
+        Compound operations can check before changing other registers. They
+        must serialize their callers; the actual write checks again on the bus.
+        """
+
+        if spec.key == "charging_current_ems":
+            min_interval = max(min_interval, MIN_CURRENT_WRITE_INTERVAL_SECONDS)
+        remaining = self._rate_limiter.remaining(
+            spec.key, now=self._monotonic(), min_interval=min_interval
+        )
+        if remaining > 0:
+            raise AmtronRateLimitedError(spec.key, remaining)
+
     async def _async_write_locked(
         self,
         spec: RegisterSpec,
@@ -231,16 +248,9 @@ class MennekesModbusClient:
         min_interval: float,
     ) -> None:
         async with self._lock:
-            if spec.key == "charging_current_ems":
-                min_interval = max(min_interval, MIN_CURRENT_WRITE_INTERVAL_SECONDS)
-            now = self._monotonic()
-            remaining = self._rate_limiter.remaining(
-                spec.key, now=now, min_interval=min_interval
-            )
-            if remaining > 0:
-                raise AmtronRateLimitedError(spec.key, remaining)
+            self.check_write_interval(spec, min_interval=min_interval)
             client = self._require_client()
-            self._rate_limiter.record(spec.key, now=now)
+            self._rate_limiter.record(spec.key, now=self._monotonic())
             try:
                 await _client_write.write_register(
                     client,
