@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -13,7 +14,13 @@ from homeassistant.config_entries import (
 )
 
 from ._flow_connect import async_test_connection
-from ._flow_search import SearchResult, async_search, search_space
+from ._flow_search import (
+    PROBE_RETRIES,
+    PROBE_TIMEOUT,
+    SearchResult,
+    async_search,
+    search_space,
+)
 from ._flow_serial import list_by_id_ports, list_comports, merge_port_options
 from .client import SerialConfig
 from .client_errors import AmtronBusError, AmtronConnectionError
@@ -204,7 +211,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             progress_task=self._search_task,
             description_placeholders={
                 "candidates": str(candidates),
-                "minutes": f"{candidates * 0.5 / 60:.0f}",
+                "minutes": str(max(1, math.ceil(
+                    candidates * PROBE_TIMEOUT * (PROBE_RETRIES + 1) / 60
+                ))),
             },
         )
 

@@ -5,8 +5,9 @@ MENNEKES configuration tool, so a user who inherited an installation often
 does not know them. Rather than making them guess, the config flow can try
 the documented combinations and report what answered.
 
-The search is read-only: it reads the Modbus layout register and nothing
-else, so it cannot put a wallbox into the energy-manager error state.
+The search reads the layout and, if a device answers, its identity. It writes
+no registers. Reconfiguring a loaded entry does stop its heartbeat while the
+search owns the port; the configured wallbox fallback then applies.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from .registers import MODBUS_LAYOUT_VERSION
 _LOGGER = logging.getLogger(__name__)
 
 # A probe only has to see whether something answers, so it waits briefly and
-# does not retry. A full search is hundreds of probes.
+# retries a read once. A full search is hundreds of probes.
 PROBE_TIMEOUT = 0.5
 PROBE_RETRIES = 1
 DEVICE_IDS = range(DEVICE_ID_MIN, DEVICE_ID_MAX + 1)
