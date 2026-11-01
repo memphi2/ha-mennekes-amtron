@@ -1,6 +1,9 @@
 {
   "domain": "mennekes_amtron_rtu",
   "name": "MENNEKES AMTRON RTU (Unofficial)",
+  "categories": [
+    "energy.ev_charging"
+  ],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],
