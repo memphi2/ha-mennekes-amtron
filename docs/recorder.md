@@ -106,6 +106,49 @@ period; excluding unused detail sensors prevents new statistics for those
 sensors. Existing statistics remain until explicitly deleted. See
 [Home Assistant long-term statistics](https://www.home-assistant.io/docs/configuration/long-term-statistics/).
 
+### Long-term statistics in Home Assistant 2026.11
+
+The 30-second measurement interval reduces state rows, not the fixed
+five-minute and hourly statistics cadence. There are 17 statistics-capable
+sensors enabled by default on layout v01.03. If all have valid recorded
+values throughout the year, that is 408 hourly rows per day or 148,920 per
+365-day year, before other integrations. The exclusions above leave seven
+such sensors. These are row counts, not disk-size estimates.
+
+If only total energy and total power history are needed, also add these
+five entries to the same `recorder.exclude.entities` list:
+
+```yaml
+      - sensor.mennekes_amtron_signaled_current
+      - sensor.mennekes_amtron_downgrade_current
+      - sensor.mennekes_amtron_session_energy
+      - sensor.mennekes_amtron_charging_sessions
+      - sensor.mennekes_amtron_temperature
+```
+
+This leaves two statistics series (48 hourly rows per day), with live states
+still available for all excluded sensors. It also removes their new detailed
+history. Existing statistics are retained. The integration never changes
+Recorder filters or deletes historical data on its own.
+
+Home Assistant 2026.11 requires `mean_type` and `unit_class` for integrations
+that import or modify statistics through the Recorder API. This integration
+uses ordinary sensor states instead: Home Assistant derives the metadata
+from the state class, device class and unit. The lifetime energy counter is
+`total_increasing` in kWh, and total power is `measurement` in W. No custom
+statistics import or migration is required. See the
+[Recorder API announcement](https://contributors.home-assistant.io/blog/2025/10/16/recorder-statistics-api-changes/).
+
+`tests/test_statistics.py` compiles a synthetic hour through the real Recorder
+and SQLite. It checks energy increments, power averages, metadata and all
+three exclusion profiles, including that excluded sensors remain available
+live. This complements the state-row replay; it is not a disk-space soak test.
+
+The November beta also adds deletion of selected statistic time ranges in
+**Settings → Tools → Statistics**, useful for removing bad readings. Inspect
+the preview before deleting; it is not automatic retention. See the
+[2026.11 beta notes](https://rc.home-assistant.io/blog/2026/10/28/release-202611/).
+
 The integration cannot guarantee that the whole Home Assistant database will
 never fill the disk. Keep automatic purging enabled, retain headroom for
 repacking, and monitor actual database size and host free space. This audit

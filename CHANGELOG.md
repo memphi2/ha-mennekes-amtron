@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   alongside 2026.9.0 and 2026.10.0, retaining rolling next-version checks.
 - Type-check platform device classes on both October and November Home
   Assistant without obsolete ignore comments or changing the runtime imports.
+- Validate hourly energy/power statistics and Recorder exclusion profiles
+  against real SQLite; document November statistics metadata and optional
+  history restricted to total energy and total power.
 
 ### Fixed
 
