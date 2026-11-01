@@ -21,7 +21,7 @@ The script is idempotent and needs an authenticated `gh`.
 | Auto-merge, delete branch on merge | disabled |
 | Dependabot vulnerability alerts | enabled |
 | Secret scanning and push protection | enabled |
-| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (current-ha)`, strict |
+| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (current-ha)`, `validate (preview-ha)`, strict |
 | `main`: force pushes, deletions | blocked |
 
 `scripts/check_repo.py` verifies that every required status check still names

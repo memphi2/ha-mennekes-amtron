@@ -4,14 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-# Core re-exports the device-class enums with ``noqa`` instead of ``__all__``
-# (2026.10), so mypy cannot see the re-export; see docs/architecture.md.
-# ``--strict`` flags the ignore as unused once Core exports the name itself.
-from homeassistant.components.binary_sensor import (  # type: ignore[attr-defined]
-    BinarySensorDeviceClass,
-    BinarySensorEntityDescription,
-)
+from homeassistant.components.binary_sensor import BinarySensorEntityDescription
 from homeassistant.const import EntityCategory
 
 from .decode import RegisterValue
@@ -20,6 +15,11 @@ from .enums import (
     EvseState,
     PhaseOptionsHardware,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
+else:
+    from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 VEHICLE_CONNECTED_STATES = frozenset(
     {

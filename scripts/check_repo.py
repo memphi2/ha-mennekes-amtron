@@ -99,6 +99,7 @@ def _load_version_config() -> dict[str, str]:
     required_keys = {
         "min_homeassistant",
         "current_homeassistant",
+        "preview_homeassistant",
         "python",
         "pymodbus_minimum",
         "amtron_modbus_layout",
@@ -368,10 +369,16 @@ def check_github_automation() -> list[str]:
     validate = (ROOT / ".github" / "workflows" / "validate.yml").read_text(
         encoding="utf-8"
     )
-    for key in ("min_homeassistant", "current_homeassistant", "python"):
-        value = VERSION_CONFIG[key]
-        if value not in validate:
-            failures.append(f"validate.yml does not pin {key} {value}")
+    for workflow in ("validate.yml", "release.yml"):
+        contents = (ROOT / ".github" / "workflows" / workflow).read_text(
+            encoding="utf-8"
+        )
+        for key in (
+            "min_homeassistant", "current_homeassistant", "preview_homeassistant", "python"
+        ):
+            value = VERSION_CONFIG[key]
+            if value not in contents:
+                failures.append(f"{workflow} does not pin {key} {value}")
     # The early-warning job deliberately resolves the newest pre-release
     # instead of pinning one, so that it never ends up testing a beta that a
     # later release has already superseded.

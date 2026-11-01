@@ -2,12 +2,17 @@
 
 ## Supported Release Line
 
-- `0.1.x`: active
+- `0.2.x`: active
 
 ## Compatibility Baseline
 
 - Minimum Home Assistant: `2026.9.0`
 - Validated Home Assistant: `2026.9.x` and `2026.10.x`
+- November preparation: a fixed `2026.11.0b1` matrix entry runs the full
+  validation including strict typing in both PR and release workflows.
+  This is beta compatibility, not a claim that 2026.11 stable has shipped.
+  After stable ships, promote it to `current_homeassistant` and refresh the
+  workflow matrices and this document together.
 - Early warning: every push is also validated against the newest Home
   Assistant pre-release in a job that is allowed to fail, so a breaking change
   in Core is noticed before it ships rather than after. The version is
@@ -65,7 +70,7 @@ because they are not tested.
 
 The features that set the floor are the reconfigure-flow helpers
 (`_get_reconfigure_entry`, `_abort_if_unique_id_mismatch`,
-`async_update_reload_and_abort` with `data_updates`), the progress step with a
+`async_update_and_abort` with `data_updates`), the progress step with a
 `progress_task` that the bus search uses, and typed `runtime_data` on the
 config entry. Lowering the minimum means adding that version to the matrix
 first.

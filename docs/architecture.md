@@ -226,16 +226,11 @@ types its own signatures against. Home Assistant still aliases the name
 
 ## Importing device-class enums
 
-`switch.py`, `button.py` and `binary_sensor_descriptions.py` import their
-device-class enum with a `type: ignore[attr-defined]`. In 2026.10 Home
-Assistant moved those enums into each platform's `const` submodule and
-re-exports them from the package with a `# noqa: F401`, which satisfies ruff
-but is not an explicit re-export, so `mypy --strict` refuses to see it.
+`switch.py`, `button.py` and `binary_sensor_descriptions.py` keep importing
+platform device classes through the public package at runtime. Home Assistant
+2026.9 has no separate `const` module for these enums; 2026.10 moves them there
+without an explicit typed re-export, and 2026.11 fixes the re-export.
 
-The package stays the public path: Core's own integrations import
-`BinarySensorDeviceClass` from `homeassistant.components.binary_sensor` in 317
-places and from the `const` submodule in none, and that submodule does not
-exist at all on the oldest supported release. Importing the private module to
-satisfy the type checker would therefore trade a correct import for a fragile
-one. The ignores remove themselves: `--strict` reports an unused ignore as an
-error the moment Core exports the names properly.
+Under `TYPE_CHECKING`, the imports point to the defining `const` modules. This
+lets both the 2026.10 and 2026.11 typing gates check the actual enum without
+version-dependent ignore comments, while retaining the 2026.9 runtime path.

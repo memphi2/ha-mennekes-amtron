@@ -43,6 +43,12 @@ jobs:
             homeassistant: "2026.10.0"
             requirements-lock: requirements-dev.txt
             validate-arguments: ""
+          # Fixed November compatibility target; next-ha still tracks new betas.
+          - name: preview-ha
+            python-version: "3.14"
+            homeassistant: "2026.11.0b1"
+            requirements-lock: requirements-dev.txt
+            validate-arguments: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

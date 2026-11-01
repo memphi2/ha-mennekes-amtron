@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- Add Home Assistant 2026.11.0b1 to the fixed validation and release matrices
+  alongside 2026.9.0 and 2026.10.0, retaining rolling next-version checks.
+- Type-check platform device classes on both October and November Home
+  Assistant without obsolete ignore comments or changing the runtime imports.
+
 ### Fixed
 
 - Reconfiguring bus parameters reloads the entry once through its update

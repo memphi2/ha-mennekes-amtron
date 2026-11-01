@@ -273,6 +273,7 @@ def test_the_protected_checks_match_the_ci_jobs() -> None:
         "hassfest",
         "validate (min-ha)",
         "validate (current-ha)",
+        "validate (preview-ha)",
     }
     names = [step.name for step in steps("owner/repo")]
     assert names[0] == "Repository settings"
