@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Fixed
+
+- Disable automatic routine Dependabot PRs for GitHub Actions and Python;
+  retain grouped security updates and vulnerability alerts. The quarterly
+  schedule introduced in 0.2.2 still allowed immediate checks after changes
+  to the Dependabot configuration. No integration update is required.
+
 ## 0.2.2 — 2026-11-01
 
 ### Upgrade action
