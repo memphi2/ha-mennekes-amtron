@@ -28,6 +28,7 @@ local Modbus RTU.
 | [Repository settings](repository-settings.md) | Branch protection and the security options, declared as code |
 | [Legal notes](legal.md) | Licence, trademarks, and why no vendor document is in this repository |
 | [Provenance audit](audits/current-legal-provenance.md) | The technical audit snapshot behind those claims |
+| [November compatibility audit](ha-2026-11-validation.md) | Local compatibility, Recorder and repository validation results |
 
 ## The three things worth knowing before you start
 
