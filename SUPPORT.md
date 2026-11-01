@@ -17,6 +17,10 @@
   Assistant pre-release in a job that is allowed to fail, so a breaking change
   in Core is noticed before it ships rather than after. The version is
   resolved, not pinned, so the job never tests a superseded beta
+- The full matrix also runs every Tuesday at 05:43 UTC and can be started
+  manually. On these maintenance runs the early-warning job is required to
+  pass, so a failure makes the workflow red. GitHub Actions notifications
+  should be enabled for this repository. These runs create no update PRs.
 - Python: `3.14`
 - Modbus register layout: `v01.03` (validated), `v01.00`–`v01.02` supported
   with capability gating and untested

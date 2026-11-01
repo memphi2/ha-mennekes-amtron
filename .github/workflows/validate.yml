@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: "43 5 * * 2"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -73,7 +76,9 @@ jobs:
   next-ha:
     name: next-ha (early warning)
     runs-on: ubuntu-24.04
-    continue-on-error: true
+    # PRs retain an advisory preview; unattended/manual maintenance runs must
+    # fail visibly so compatibility regressions do not disappear in green CI.
+    continue-on-error: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
