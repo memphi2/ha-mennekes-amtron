@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Report phase-switch rate limits as translated Home Assistant errors with
+  the remaining wait time, while preserving the five-minute write floor.
 - PV blueprints accept W/kW and skip invalid inputs. Current adjustment now
   requires an unpaused wallbox and respects the configured entity cap. Existing
   current automations must select the new Charging paused input; otherwise

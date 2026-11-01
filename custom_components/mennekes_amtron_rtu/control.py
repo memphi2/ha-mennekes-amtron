@@ -223,11 +223,17 @@ class AmtronControl:
             raise service_validation_error("phase_switch_unsupported")
         if self._state().get("evse_state") == EvseState.CHARGING:
             await self._async_request_current(CHARGING_PAUSE_CURRENT, mode_change=True)
-        await self._async_write(
-            REQUESTED_PHASES,
-            int(phases),
-            min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS,
-        )
+        try:
+            await self._async_write(
+                REQUESTED_PHASES,
+                int(phases),
+                min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS,
+            )
+        except AmtronRateLimitedError as err:
+            self._diagnostics.writes_rate_limited += 1
+            raise service_validation_error(
+                "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
+            ) from err
 
     async def async_recover_from_error(self) -> None:
         """Run the documented recovery sequence for error state 200.

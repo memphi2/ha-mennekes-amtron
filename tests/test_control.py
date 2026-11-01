@@ -725,3 +725,24 @@ def test_a_sleeping_deferred_write_cannot_undo_a_pause() -> None:
         await control.async_shutdown()
 
     asyncio.run(run())
+
+
+def test_phase_switch_rate_limit_reports_a_translated_wait() -> None:
+    harness = Harness(values={"evse_state": EvseState.IDLE})
+
+    async def run() -> None:
+        control = await harness.connect()
+        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        harness.clock[0] += 15
+        with pytest.raises(ServiceValidationError) as error:
+            await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
+        assert error.value.translation_key == "write_rate_limited"
+        assert error.value.translation_placeholders == {"seconds": "285"}
+        assert harness.diagnostics.writes_rate_limited == 1
+        assert harness.written(R.REQUESTED_PHASES) == [[1]]
+        harness.clock[0] += 285
+        await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
+        assert harness.written(R.REQUESTED_PHASES) == [[1], [0]]
+        assert harness.written(R.CHARGING_CURRENT_EMS) == []
+
+    asyncio.run(run())
