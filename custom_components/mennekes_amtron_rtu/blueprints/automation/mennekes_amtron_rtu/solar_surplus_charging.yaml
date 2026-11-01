@@ -3,8 +3,9 @@ blueprint:
   description: >-
     Follows the photovoltaic surplus with the wallbox charging current.
 
-    The current is recomputed whenever the surplus sensor changes, divided by
-    one or three phases, and clamped to the configured current range.
+    The current is recomputed when surplus or selected phases change, a
+    vehicle connects, or charging resumes. It is divided by one or three
+    phases and clamped to the configured current range.
     This assumes a three-phase installation when all phases are selected.
     It only writes while a vehicle is connected and charging is not paused.
     Select the Charging paused input when updating an existing automation;
@@ -110,10 +111,12 @@ blueprint:
 mode: single
 max_exceeded: silent
 
+trigger_variables:
+  paused_entity: !input charging_paused
+
 variables:
   surplus_entity: !input surplus_power
   phases_entity: !input switched_phases
-  paused_entity: !input charging_paused
   current_entity: !input charging_current
   volts: !input grid_voltage
   minimum: !input minimum_current
@@ -122,6 +125,15 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input surplus_power
+  - trigger: state
+    entity_id: !input switched_phases
+  - trigger: state
+    entity_id: !input vehicle_connected
+    to: "on"
+  # A template keeps the empty default valid for existing automations.
+  - trigger: template
+    value_template: >-
+      {{ paused_entity != '' and is_state(paused_entity, 'off') }}
 
 conditions:
   - condition: state

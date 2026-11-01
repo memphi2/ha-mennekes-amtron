@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Recalculate the PV current after resume, vehicle connection and phase
+  changes, even when the surplus remains constant. A paused charge still
+  receives no current writes.
 - Report phase-switch rate limits as translated Home Assistant errors with
   the remaining wait time, while preserving the five-minute write floor.
 - PV blueprints accept W/kW and skip invalid inputs. Current adjustment now

@@ -159,3 +159,90 @@ def test_pause_blueprint_converts_power_and_checks_switch(
             await hass.async_stop()
 
     asyncio.run(asyncio.wait_for(run(), timeout=60))
+
+
+@pytest.mark.parametrize(
+    (
+        "event",
+        "power",
+        "unit",
+        "pause_input",
+        "blueprint_cap",
+        "entity_cap",
+        "expected",
+    ),
+    [
+        ("resume", "2300", "W", True, 16, 16, 10),
+        ("resume", "2.3", "kW", True, 16, 16, 10),
+        ("resume", "2300", "W", True, 8, 16, 8),
+        ("resume", "2300", "W", True, 16, 8, 8),
+        ("resume", "unavailable", "W", True, 16, 16, None),
+        ("resume", "2300", "W", False, 16, 16, None),
+        ("connect", "2300", "W", True, 16, 16, 10),
+        ("phase", "2300", "W", True, 16, 16, 10),
+    ],
+)
+def test_current_blueprint_recalculates_with_a_stable_surplus(
+    tmp_path: Path,
+    event: str,
+    power: str,
+    unit: str,
+    pause_input: bool,
+    blueprint_cap: int,
+    entity_cap: int,
+    expected: float | None,
+) -> None:
+    """A budget ignored while paused/disconnected must apply on activation."""
+
+    async def run() -> None:
+        hass = await _boot(tmp_path / "config")
+        calls = []
+        try:
+
+            async def record(call):
+                calls.append(call.data["value"])
+
+            hass.services.async_register("number", "set_value", record)
+            hass.states.async_set("sensor.surplus", "0", {"unit_of_measurement": unit})
+            hass.states.async_set(
+                "sensor.phases", "all_available" if event == "phase" else "single_phase"
+            )
+            hass.states.async_set(
+                "binary_sensor.vehicle", "off" if event == "connect" else "on"
+            )
+            hass.states.async_set("number.current", "16", {"max": entity_cap})
+            hass.states.async_set("switch.paused", "on" if event == "resume" else "off")
+            inputs = {
+                "surplus_power": "sensor.surplus",
+                "switched_phases": "sensor.phases",
+                "vehicle_connected": "binary_sensor.vehicle",
+                "charging_current": "number.current",
+                "maximum_current": blueprint_cap,
+            }
+            if pause_input:
+                inputs["charging_paused"] = "switch.paused"
+            config = _expand("solar_surplus_charging.yaml", inputs)
+            assert await async_setup_component(
+                hass, "automation", {"automation": [config]}
+            )
+            await hass.async_block_till_done()
+            assert hass.states.get("automation.pv_test").state == "on"
+            hass.states.async_set(
+                "sensor.surplus", power, {"unit_of_measurement": unit}
+            )
+            await hass.async_block_till_done()
+            assert calls == ([6] if event == "phase" else [])
+            calls.clear()
+            entity, value = {
+                "resume": ("switch.paused", "off"),
+                "connect": ("binary_sensor.vehicle", "on"),
+                "phase": ("sensor.phases", "single_phase"),
+            }[event]
+            # No further surplus update: only the wallbox state changes.
+            hass.states.async_set(entity, value)
+            await hass.async_block_till_done()
+            assert calls == ([] if expected is None else [expected])
+        finally:
+            await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), timeout=60))

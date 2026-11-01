@@ -49,8 +49,11 @@ phases automatically.
 
 ## What to expect
 
-- The current updates when the surplus sensor changes. A faster request is
-  deferred by the integration to respect the five-second write interval.
+- The current is recalculated when surplus or selected phases change, when a
+  vehicle connects, and when the pause switch turns off. A stable surplus
+  therefore also applies after resuming. Resume first restores the remembered
+  setpoint; the recalculated value follows at the next permitted write. The
+  integration still enforces the five-second current-write interval.
 - **Charging paused: on** prevents the current blueprint from writing. To
   keep a manual pause, also disable the pause/resume automation; that
   automation is explicitly allowed to resume when its threshold is met.
