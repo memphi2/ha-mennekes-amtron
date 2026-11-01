@@ -1,8 +1,8 @@
 # Home Assistant 2026.11 preparation and repository audit
 
-Snapshot: 2026-11-01. Local preparation based on v0.2.1, commit
-`7fdec943cd3ff966f36f34405a20ad07688129e6`. Integration version remains
-0.2.1; the changes are documented under **Unreleased**.
+Snapshot: 2026-11-01. Validation for v0.2.2, based on v0.2.1 at commit
+`7fdec943cd3ff966f36f34405a20ad07688129e6`. The release retains Home
+Assistant 2026.9.0 as its minimum; November support is beta-tested.
 
 ## Changes and regression evidence
 
@@ -90,7 +90,9 @@ Physical wallbox validation remains outstanding. Hosted HACS, Hassfest and
 CodeQL results are tracked separately in the
 [PR checks](https://github.com/memphi2/ha-mennekes-amtron/pull/14/checks).
 
-No tag, release, live Home Assistant change or database deletion was performed.
+This audit covers the proposed v0.2.2 source. Publication and downloaded
+release assets are verified separately. No live Home Assistant change or
+database deletion was performed during validation.
 Dependabot security updates were enabled and confirmed through the GitHub API;
 vulnerability alerts were already enabled. Quarterly schedules and the new
 dependency-file layout take effect after merging the PR into the default

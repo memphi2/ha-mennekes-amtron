@@ -76,7 +76,7 @@ vehicle before leaving an automation unattended.
 
 ## Updating existing blueprint automations
 
-With the PV fixes under **Unreleased**, open each existing **Charge from PV
+When upgrading to **0.2.2**, open each existing **Charge from PV
 surplus** automation and select its new **Charging paused** input. Until you
 select it, that automation deliberately sends no current commands. Existing
 automations still load. Review the power sensor, phase assumption and thresholds

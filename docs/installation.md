@@ -81,7 +81,7 @@ entry. For polling intervals and control mode, use its options.
 4. Complete the requested Home Assistant restart.
 5. Check that the existing wallbox entry loads and reports current readings.
    In master mode, also check for energy-manager or fallback repair messages.
-6. Review blueprint automations for changed inputs. The upcoming PV fix needs
+6. Review blueprint automations for changed inputs. Version **0.2.2** needs
    the new **Charging paused** input on existing current automations; follow
    [Blueprint updates](blueprints.md#updating-existing-blueprint-automations).
 

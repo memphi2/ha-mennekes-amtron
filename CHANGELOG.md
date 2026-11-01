@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.2.2 — 2026-11-01
+
+### Upgrade action
+
+- Existing **Charge from PV surplus** automations must select the wallbox's
+  new **Charging paused** input, then be saved and reloaded. Until configured,
+  they load but send no current commands. Edited blueprint copies need the
+  changes applied manually. See [Blueprint updates](docs/blueprints.md#updating-existing-blueprint-automations).
+
 ### Changed
 
 - Use **Mennekes Amtron RTU** as the Marketplace/HACS display name and setup
