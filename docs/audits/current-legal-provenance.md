@@ -42,7 +42,8 @@ The two skips concern Marketplace APIs absent in the older HA versions.
 Strict typing passed for all 54 source/tooling modules against current and
 preview HA; minimum HA runs the runtime suite without the typing gate.
 The local HACS build contains 54 files, including byte-identical LICENSE and
-NOTICE copies. It is a development build; no new release has been published.
+NOTICE copies. These results record the pre-release audit; publication and
+verification of downloaded release assets are separate release gates.
 
 ## License, attribution and artwork
 

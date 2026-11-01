@@ -7,10 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.2.3 — 2026-11-01
+
+### Upgrade action
+
+- Reload existing **Charge from PV surplus** automations after the updated
+  blueprint is installed so they follow the latest power budget. Apply the
+  changes manually to edited blueprint copies. When upgrading from 0.2.1 or
+  earlier, also select the **Charging paused** input introduced in 0.2.2.
+
 ### Changed
 
+- Run weekly and manual HA compatibility checks without opening routine
+  dependency PRs. Check the pymodbus version resolved by each HA installation,
+  including Core's dependency pin and package constraints.
+- Verify repeated Recorder purge/repack cycles, preserved hourly statistics
+  and database integrity with full and lean profiles; document disk monitoring.
+- Explain bus-search duration and the heartbeat interruption during
+  reconfiguration, including the wallbox's fallback behavior.
 - Require a clean Codex Security Review of the current PR head before merging;
   verify bot/App identity and reject stale, incomplete or failed evidence.
+  New or edited review requests invalidate old approval; a pending review
+  blocks merging without causing a spurious publisher-job failure.
 - Refresh the legal/provenance audit and quality evidence, retaining the old
   snapshot in Git history and stating hardware, coverage and policy limits.
 - Reuse the block decoder in the Modbus read path and remove an unused heartbeat
@@ -24,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Disable pymodbus transport retries for writes so missing replies cannot
+  bypass register cooldowns. Preserve the bounded retry budget for reads.
+- Propagate cancellation wrapped by pymodbus, stopping bus searches and
+  releasing the serial port while retaining uncertain-write cooldowns.
+- Keep the accepted resume current after a rejected setpoint. Pausing for a
+  phase change remembers the actual current before publishing the paused state.
+- Replace an in-flight PV current adjustment when a newer surplus value
+  arrives instead of dropping that update.
 - Preserve existing GitHub branch protection and check App IDs when applying
   repository settings; add a read-only required-check drift check.
 - Keep the integration available when optional blueprint files cannot be read
