@@ -14,6 +14,9 @@ Snapshot: 2026-11-01. Local preparation based on v0.2.1, commit
 | Bus ownership | Setup help, translations and documentation now explain that read-only still transmits requests. Modbus RTU requires a single master in both control modes. Hardware claims identify simulated validation. |
 | Repair lifecycle | Deleting a config entry removes only its own repair issues. Reloading preserves them, and issues from other entries or domains remain. |
 | Serial probe cleanup | Failed or cancelled connection attempts close the transport before another search candidate is tried. Regression tests reproduce both paths. |
+| Marketplace metadata | The manifest declares `energy.ev_charging`; the same ZIP and `hacs.json` serve the Marketplace and older HACS installations. |
+| Installation guidance | The DHE Connect structure is adapted to AMTRON: Marketplace and HACS instructions, existing entries, updates and removal. The pending catalog submission and the separate 0.1.0 domain migration remain explicit. |
+| Marketplace installer | Offline tests run the real November installer with our built ZIP, including first-install discovery, update restart requests, invalid-package rollback and preservation of a separate TCP integration. |
 
 The reconfiguration change follows the
 [update-listener deprecation](https://contributors.home-assistant.io/blog/2026/05/07/config-entry-listener-together-with-reloading-methods/):
@@ -32,9 +35,16 @@ environment used `--skip-typing`, matching CI.
 
 | Home Assistant | Tests | Coverage | Strict typing |
 |---|---:|---:|---|
-| 2026.9.0 | 413 passed | 99.42% | Skipped: older Core annotations |
-| 2026.10.0 | 413 passed | 99.42% | Passed, 53 source files |
-| 2026.11.0b1 | 413 passed | 99.42% | Passed, 53 source files |
+| 2026.9.0 | 413 passed, 2 skipped | 99.42% | Skipped: older Core annotations |
+| 2026.10.0 | 413 passed, 2 skipped | 99.42% | Passed, 53 source files |
+| 2026.11.0b1 | 415 passed | 99.42% | Passed, 53 source files |
+
+The two skips on September/October are the Marketplace installer tests:
+that component first ships in November. They are required by the fixed
+November CI job. The tests use a disposable HA configuration, local download
+fixtures and a synthetic catalog entry. GitHub API access is blocked in the
+test. This verifies the install backend, not browser interaction, account
+authorization or actual catalog acceptance.
 
 The gate includes Ruff, repository consistency, register-map validation,
 quality-scale checks, dependency constraints and the legal/provenance audit.

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Exercise the built-in Marketplace installer offline: first install, update
+  restart requests, rollback of an invalid package and coexistence with TCP.
 - Document Marketplace installation, existing entries, updates and removal,
   retaining HACS instructions for Home Assistant 2026.9 and 2026.10.
 - Declare the `energy.ev_charging` category for Marketplace discovery.

@@ -53,6 +53,20 @@ minimum matrix entry runs the full test suite and proves the integration
 works there; the current entry additionally runs the typing gate. Neither
 entry skips a runtime check.
 
+## Distribution validation
+
+The integration uses one release ZIP for both HACS and the built-in Marketplace.
+The manifest declares the `energy.ev_charging` category. Installation guidance
+covers the [Marketplace and older HACS installations](docs/installation.md).
+
+On HA 2026.11+, `tests/test_marketplace.py` runs the real Marketplace installer
+against the built release archive in a disposable HA configuration. Downloads
+come from local fixtures and the catalog entry is synthetic. The test checks
+first-install discovery, update restart requests, invalid-package rollback
+and preservation of a separate TCP integration. On older HA versions it is
+skipped because the Marketplace does not exist; release packaging and runtime
+tests still run there. This does not claim catalog acceptance or a browser test.
+
 ## Reference Hardware
 
 - AMTRON 4You 310 11 C2, article `1313201205`, 11 kW, fixed cable, 16 A.
