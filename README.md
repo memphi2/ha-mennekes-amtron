@@ -42,6 +42,8 @@ an exclusive bus: read-only mode also sends requests.
 
 ### Home Assistant Marketplace (2026.11 and newer)
 
+[![Open your Home Assistant instance and open this repository in the Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=memphi2&repository=ha-mennekes-amtron&category=integration)
+
 1. Open **Settings → Marketplace** and accept the community-content notice
    when requested.
 2. Search for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**.
