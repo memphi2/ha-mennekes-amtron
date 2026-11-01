@@ -104,6 +104,51 @@ def test_current_blueprint_respects_pause_and_power_units(
     asyncio.run(asyncio.wait_for(run(), timeout=60))
 
 
+def test_latest_surplus_replaces_a_command_that_is_still_running(tmp_path: Path) -> None:
+    async def run() -> None:
+        hass = await _boot(tmp_path / "config")
+        started = asyncio.Event()
+        updated = asyncio.Event()
+        release = asyncio.Event()
+        completed = []
+        try:
+            async def record(call):
+                if call.data["value"] == 10:
+                    started.set()
+                    await release.wait()
+                else:
+                    updated.set()
+                completed.append(call.data["value"])
+
+            hass.services.async_register("number", "set_value", record)
+            hass.states.async_set("sensor.surplus", "0", {"unit_of_measurement": "W"})
+            hass.states.async_set("sensor.phases", "single_phase")
+            hass.states.async_set("binary_sensor.vehicle", "on")
+            hass.states.async_set("number.current", "6", {"max": 16})
+            hass.states.async_set("switch.paused", "off")
+            config = _expand("solar_surplus_charging.yaml", {
+                "surplus_power": "sensor.surplus",
+                "switched_phases": "sensor.phases",
+                "vehicle_connected": "binary_sensor.vehicle",
+                "charging_current": "number.current",
+                "charging_paused": "switch.paused",
+            })
+            assert await async_setup_component(hass, "automation", {"automation": [config]})
+            await hass.async_block_till_done()
+            hass.states.async_set("sensor.surplus", "2300", {"unit_of_measurement": "W"})
+            await asyncio.wait_for(started.wait(), 3)
+            hass.states.async_set("sensor.surplus", "1380", {"unit_of_measurement": "W"})
+            await asyncio.wait_for(updated.wait(), 3)
+            release.set()
+            await hass.async_block_till_done()
+            assert completed == [6]
+        finally:
+            release.set()
+            await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), 30))
+
+
 @pytest.mark.parametrize(
     ("power", "unit", "paused", "expected"),
     [
