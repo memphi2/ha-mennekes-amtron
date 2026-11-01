@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Reuse the block decoder in the Modbus read path and remove an unused heartbeat
+  type alias.
 - Run the complete Python suite once per validation job with coverage enabled,
   removing the duplicate test pass while retaining the 99% gate.
 - Notify entities only when polled data or availability changes; report write

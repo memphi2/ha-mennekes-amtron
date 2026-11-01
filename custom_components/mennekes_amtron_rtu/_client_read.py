@@ -20,7 +20,7 @@ from .client_errors import (
     AmtronProtocolError,
     protocol_error_for,
 )
-from .decode import RegisterValue, decode_register
+from .decode import RegisterValue, decode_block, decode_register
 from .register_blocks import RegisterBlock
 
 _LOGGER = logging.getLogger(__name__)
@@ -84,11 +84,7 @@ async def read_block(
         )
         return await _read_block_registerwise(block=block, read=read_range)
 
-    decoded: dict[str, RegisterValue] = {}
-    for spec in block.specs:
-        offset = spec.address - block.address
-        decoded[spec.key] = decode_register(spec, words[offset : offset + spec.count])
-    return decoded
+    return decode_block(block, words)
 
 
 async def _read_block_registerwise(
