@@ -1,6 +1,6 @@
 # Installation and updates
 
-Install **MENNEKES AMTRON RTU (Unofficial)** from
+Install **Mennekes Amtron RTU** from
 **memphi2/ha-mennekes-amtron**. This is a community integration for Modbus RTU
 wallboxes, using the domain `mennekes_amtron_rtu`.
 
@@ -26,14 +26,14 @@ For Home Assistant 2026.11 and newer:
 
 1. Open **Settings → Marketplace** and accept the community-content notice
    when requested.
-2. Search for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**.
+2. Search for **Mennekes Amtron RTU** by **memphi2**.
 3. If it is not listed, open the repository using the button below. While
    [catalog PR #11749](https://github.com/hacs/default/pull/11749) is pending,
    add it as a custom repository, category **Integration**. Custom repositories
    require a GitHub connection in the Marketplace.
 4. Install the integration.
 5. Open **Settings → Devices & services → Add integration** and select
-   **MENNEKES AMTRON RTU (Unofficial)**. Follow the
+   **Mennekes Amtron RTU**. Follow the
    [wallbox setup](quickstart.md#5-add-the-wallbox).
 
 [![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=memphi2&repository=ha-mennekes-amtron&category=integration)
@@ -50,11 +50,11 @@ and [installation behavior](https://contributors.home-assistant.io/marketplace/g
 
 ## HACS on Home Assistant 2026.9 and 2026.10
 
-1. Open HACS and search for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**.
+1. Open HACS and search for **Mennekes Amtron RTU** by **memphi2**.
 2. If it is not listed, open the three-dot menu → **Custom repositories**.
    Add `https://github.com/memphi2/ha-mennekes-amtron` with category **Integration**.
 3. Download the integration and restart Home Assistant.
-4. Add **MENNEKES AMTRON RTU (Unofficial)** under **Settings → Devices & services**
+4. Add **Mennekes Amtron RTU** under **Settings → Devices & services**
    and follow the [wallbox setup](quickstart.md#5-add-the-wallbox).
 
 ## Existing installations

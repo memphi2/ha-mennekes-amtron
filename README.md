@@ -1,4 +1,4 @@
-# MENNEKES AMTRON RTU for Home Assistant (Unofficial)
+# Mennekes Amtron RTU for Home Assistant (Unofficial)
 
 [![Marketplace: Custom](https://img.shields.io/badge/Marketplace-Custom-41BDF5.svg)](docs/installation.md)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.9%2B-41BDF5.svg)](https://www.home-assistant.io/)
@@ -46,12 +46,12 @@ an exclusive bus: read-only mode also sends requests.
 
 1. Open **Settings → Marketplace** and accept the community-content notice
    when requested.
-2. Search for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**.
+2. Search for **Mennekes Amtron RTU** by **memphi2**.
 3. While the catalog submission is pending, add
    `https://github.com/memphi2/ha-mennekes-amtron` as a custom repository,
    category **Integration**. The [installation guide](docs/installation.md#home-assistant-marketplace)
    includes a direct Marketplace link; custom repositories require a GitHub connection.
-4. Install the integration, then add **MENNEKES AMTRON RTU (Unofficial)** under
+4. Install the integration, then add **Mennekes Amtron RTU** under
    **Settings → Devices & services** and enter the adapter and bus settings.
 
 A first Marketplace installation normally needs no restart. Complete the

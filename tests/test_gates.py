@@ -350,7 +350,7 @@ def test_the_legal_gate_allows_a_citation_of_the_specification() -> None:
     ) == []
 
 
-def test_the_repository_gate_keeps_the_integration_marked_unofficial(
+def test_the_repository_gate_keeps_catalog_names_consistent(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The manifest name is what Home Assistant shows in the install list."""
@@ -362,7 +362,7 @@ def test_the_repository_gate_keeps_the_integration_marked_unofficial(
     component = tmp_path / "custom_components" / "mennekes_amtron_rtu"
     component.mkdir(parents=True)
     (component / "manifest.json").write_text(
-        json.dumps({"name": "MENNEKES AMTRON"}), encoding="utf-8"
+        json.dumps({"name": "Mennekes Amtron RTU"}), encoding="utf-8"
     )
     (tmp_path / "hacs.json").write_text(
         json.dumps(
@@ -380,7 +380,6 @@ def test_the_repository_gate_keeps_the_integration_marked_unofficial(
 
     failures = check_repo.check_hacs_metadata()
     assert any("disagree" in failure for failure in failures)
-    assert any("unofficial" in failure for failure in failures)
 
 
 def test_the_register_gate_rejects_an_icon_that_hides_a_device_class(

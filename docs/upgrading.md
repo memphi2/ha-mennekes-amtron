@@ -1,7 +1,8 @@
 # Upgrading from 0.1.0 to 0.2.0
 
-Version 0.2.0 uses the Home Assistant integration domain `mennekes_amtron_rtu`
-and appears as **MENNEKES AMTRON RTU (Unofficial)**. Version 0.1.0 used
+Since version 0.2.0, this integration uses the Home Assistant domain
+`mennekes_amtron_rtu`. Its current display name is **Mennekes Amtron RTU**.
+Version 0.1.0 used
 `mennekes_amtron`, which is also the domain of the separate Modbus TCP
 integration `nobelp/mennekes-amtron-ha`.
 
@@ -35,7 +36,7 @@ These steps apply only to the RTU integration from
 1. Install the current 0.2.x release following [Installation](installation.md),
    completing any requested Home Assistant restart. Manual installs now use
    `custom_components/mennekes_amtron_rtu/`.
-2. Add **MENNEKES AMTRON RTU (Unofficial)** with the recorded bus settings.
+2. Add **Mennekes Amtron RTU** with the recorded bus settings.
    New entries start in read-only mode. Check the readings, then restore
    your options and enable *Modbus master* when ready.
 3. Check the new entity IDs and update dashboards, scripts and automations.

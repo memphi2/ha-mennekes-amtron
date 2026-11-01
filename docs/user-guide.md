@@ -1,8 +1,8 @@
 # Using the wallbox
 
 Start with [Quick start](quickstart.md) if you have not added the integration.
-The device page is under **Settings → Devices & services → MENNEKES AMTRON
-RTU (Unofficial)**. Labels below use English; the UI also provides German
+The device page is under **Settings → Devices & services → Mennekes Amtron RTU**.
+Labels below use English; the UI also provides German
 translations.
 
 ## Everyday controls

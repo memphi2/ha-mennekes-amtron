@@ -17,7 +17,7 @@ requests; it is not a passive listener.
 
 ## 2. Install
 
-Install **MENNEKES AMTRON RTU (Unofficial)** by **memphi2** using the
+Install **Mennekes Amtron RTU** by **memphi2** using the
 [installation guide](installation.md): Marketplace on Home Assistant 2026.11+,
 HACS on 2026.9/2026.10. That guide includes the custom-repository fallback and
 explains when a restart is needed.
@@ -46,8 +46,8 @@ control. Keep the vehicle disconnected during the initial control setup.
 
 ## 5. Add the wallbox
 
-Open **Settings → Devices & services → Add integration → MENNEKES AMTRON
-RTU (Unofficial)**. Select the adapter and enter the configured bus settings.
+Open **Settings → Devices & services → Add integration → Mennekes Amtron RTU**.
+Select the adapter and enter the configured bus settings.
 Factory defaults are:
 
 | Setting | Value |

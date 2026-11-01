@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Use **Mennekes Amtron RTU** as the Marketplace/HACS display name and setup
+  title. Add the direct Marketplace repository button to the README.
 - Group routine dependency updates quarterly with one open PR per ecosystem;
   keep security updates separate and enabled in the repository settings.
   Remove the pip-compile input that caused unwanted transitive Python pins.
