@@ -11,7 +11,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from pymodbus.exceptions import ConnectionException, ModbusException
+from pymodbus.exceptions import ConnectionException, ModbusException, ModbusIOException
 from pymodbus.pdu import ExceptionResponse
 
 from .client_errors import (
@@ -32,17 +32,25 @@ async def read_words(
     address: int,
     count: int,
     device_id: int,
+    retries: int = 0,
 ) -> list[int]:
-    """Read ``count`` holding registers and return their raw words."""
+    """Read words, retrying unanswered reads without retrying any writes."""
 
-    try:
-        response = await client.read_holding_registers(
-            address, count=count, device_id=device_id
-        )
-    except ConnectionException as err:
-        raise AmtronConnectionError(str(err) or "serial connection failed") from err
-    except ModbusException as err:
-        raise AmtronProtocolError(str(err) or "modbus transaction failed") from err
+    remaining = retries
+    while True:
+        try:
+            response = await client.read_holding_registers(
+                address, count=count, device_id=device_id
+            )
+            break
+        except ConnectionException as err:
+            raise AmtronConnectionError(str(err) or "serial connection failed") from err
+        except ModbusIOException as err:
+            if remaining <= 0:
+                raise AmtronProtocolError(str(err) or "modbus read failed") from err
+            remaining -= 1
+        except ModbusException as err:
+            raise AmtronProtocolError(str(err) or "modbus transaction failed") from err
 
     if isinstance(response, ExceptionResponse):
         raise protocol_error_for(response.exception_code, address)

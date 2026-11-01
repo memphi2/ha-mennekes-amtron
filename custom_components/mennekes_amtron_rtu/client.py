@@ -79,7 +79,10 @@ def create_serial_client(config: SerialConfig) -> AsyncModbusSerialClient:
         parity=config.parity,
         stopbits=config.stopbits,
         timeout=config.timeout,
-        retries=config.retries,
+        # A lost reply does not prove that a write was not applied. Library
+        # retries would resend it after one second, bypassing our write floor.
+        # Only reads may retry, explicitly in _client_read.read_words.
+        retries=0,
     )
 
 
@@ -175,6 +178,7 @@ class MennekesModbusClient:
                 address=address,
                 count=count,
                 device_id=self._config.device_id,
+                retries=self._config.retries,
             )
 
     async def async_read_register(self, spec: RegisterSpec) -> RegisterValue:
@@ -187,6 +191,7 @@ class MennekesModbusClient:
                 address=spec.address,
                 count=spec.count,
                 device_id=self._config.device_id,
+                retries=self._config.retries,
             )
         return decode_register(spec, words)
 
@@ -200,6 +205,7 @@ class MennekesModbusClient:
                 address=address,
                 count=count,
                 device_id=self._config.device_id,
+                retries=self._config.retries,
             )
 
     async def async_write_register(
