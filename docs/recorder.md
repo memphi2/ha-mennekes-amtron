@@ -1,20 +1,98 @@
 # Recorder and database growth
 
-The integration does not create a database or insert rows itself. Home
-Assistant Recorder stores entity changes. The integration controls how often
-it reads measurements and rounds native values before publishing them.
+The integration reduces routine updates but **does not impose a database size
+limit**. Home Assistant Recorder stores entity changes. Keep automatic purging
+enabled and monitor database size and free disk space. Long-term statistics
+are not removed by ordinary history retention.
 
-Version 0.2.1 uses a **30-second measurement interval** by default,
-including for existing entries that do not yet have that option. Status,
-errors and control readback keep their **five-second** default. A charging or
-connection state change refreshes measurements and lifetime energy in the same
-status poll. Without a vehicle, measurement reads are at least 60 seconds
-apart. Longer configured intervals remain effective. The heartbeat is separate.
+## Choose the history you need
 
-A longer interval reduces the resolution of power graphs and any automation
-using these measurements. Choose five seconds in the integration options if
-that resolution is necessary, and exclude detail sensors from Recorder if
-you do not need their history. The options do not alter Recorder globally.
+Keep the default **30-second measurement interval** unless you need faster
+power/current readings. Status and controls keep a separate **five-second**
+default, and the heartbeat is independent. Unchanged values do not produce
+extra state rows. A longer interval reduces detail in graphs and automations;
+it does not reduce the number of hourly statistics series.
+
+| Profile | What to configure below | Statistics series | Hourly rows per day |
+|---|---|---:|---:|
+| Full history | Keep all default sensors recorded | 17 | 408 |
+| Less detail | Exclude phase current/voltage/power and session duration | 7 | 168 |
+| Energy and power statistics only | Also exclude the five extra sensors listed below | 2 | 48 |
+
+Counts assume one wallbox on layout v01.03, default enabled sensors and valid
+values throughout the day. They are statistics-row counts, **not disk-space
+limits**. State history for other entities can still be recorded in the smaller
+profiles. All excluded sensors remain usable live; exclusion only stops their
+new history and statistics. Existing statistics are retained.
+
+## Configure history retention and detail exclusions
+
+Back up your configuration, then merge this into your existing `recorder:`
+section in `configuration.yaml`; there may only be one such section. Keep your existing filters and database
+connection settings. Retention and commit settings affect **all** recorded
+entities, not only this integration. This example keeps ten days of detailed
+history and omits per-phase measurements and session duration:
+
+```yaml
+recorder:
+  auto_purge: true
+  auto_repack: true
+  purge_keep_days: 10
+  commit_interval: 30
+  exclude:
+    entities:
+      - sensor.mennekes_amtron_current_l1
+      - sensor.mennekes_amtron_current_l2
+      - sensor.mennekes_amtron_current_l3
+      - sensor.mennekes_amtron_voltage_l1
+      - sensor.mennekes_amtron_voltage_l2
+      - sensor.mennekes_amtron_voltage_l3
+      - sensor.mennekes_amtron_power_l1
+      - sensor.mennekes_amtron_power_l2
+      - sensor.mennekes_amtron_power_l3
+      - sensor.mennekes_amtron_session_duration
+```
+
+Check Home Assistant configuration and restart to apply changes to Recorder.
+
+These IDs assume the default device name and English entity names. Check the
+actual IDs under **Settings → Devices & services → Entities**, especially
+with renamed devices, another language, or multiple wallboxes. The integration
+domain `mennekes_amtron_rtu` does not add `rtu` to these entity IDs.
+
+Keep **`sensor.mennekes_amtron_total_energy`** recorded for the Energy
+dashboard, along with **`sensor.mennekes_amtron_total_power`** if you want
+power history. Excluded entities remain usable live, but they no longer get
+new history or statistics. Disabling an entity also removes its live state.
+
+`commit_interval: 30` batches database commits; it does **not** reduce the
+number of recorded state changes. Purging removes old history, and repacking
+can reclaim space. These settings and the need for temporary free disk space
+are documented by [Home Assistant Recorder](https://www.home-assistant.io/integrations/recorder/).
+
+Hourly long-term statistics are **not deleted automatically** by
+`purge_keep_days`. They continue to grow even with a short history retention
+period; excluding unused detail sensors prevents new statistics for those
+sensors. Existing statistics remain until explicitly deleted. See
+[Home Assistant long-term statistics](https://www.home-assistant.io/docs/configuration/long-term-statistics/).
+
+## Keep only energy and power statistics
+
+If only total energy and total power history are needed, also add these
+five entries to the same `recorder.exclude.entities` list:
+
+```yaml
+      - sensor.mennekes_amtron_signaled_current
+      - sensor.mennekes_amtron_downgrade_current
+      - sensor.mennekes_amtron_session_energy
+      - sensor.mennekes_amtron_charging_sessions
+      - sensor.mennekes_amtron_temperature
+```
+
+This leaves two statistics series (48 hourly rows per day), with live states
+still available for all excluded sensors. It also removes their new detailed
+history. Existing statistics are retained. The integration never changes
+Recorder filters or deletes historical data on its own.
 
 ## Measured load
 
@@ -58,78 +136,7 @@ not a 24-hour soak test of Recorder statistics and retention. The automated
 suite also checks unchanged values, reduced row counts and retained total
 power/energy recording with shorter replays.
 
-## Keep history bounded
-
-Merge this into your existing `recorder:` section in `configuration.yaml`;
-there may only be one such section. Keep your existing filters and database
-connection settings. This example keeps ten days of detailed history and
-omits per-phase measurements and session duration:
-
-```yaml
-recorder:
-  auto_purge: true
-  auto_repack: true
-  purge_keep_days: 10
-  commit_interval: 30
-  exclude:
-    entities:
-      - sensor.mennekes_amtron_current_l1
-      - sensor.mennekes_amtron_current_l2
-      - sensor.mennekes_amtron_current_l3
-      - sensor.mennekes_amtron_voltage_l1
-      - sensor.mennekes_amtron_voltage_l2
-      - sensor.mennekes_amtron_voltage_l3
-      - sensor.mennekes_amtron_power_l1
-      - sensor.mennekes_amtron_power_l2
-      - sensor.mennekes_amtron_power_l3
-      - sensor.mennekes_amtron_session_duration
-```
-
-These IDs assume the default device name and English entity names. Check the
-actual IDs under **Settings → Devices & services → Entities**, especially
-with renamed devices, another language, or multiple wallboxes. The integration
-domain `mennekes_amtron_rtu` does not add `rtu` to these entity IDs.
-
-Keep **`sensor.mennekes_amtron_total_energy`** recorded for the Energy
-dashboard, along with **`sensor.mennekes_amtron_total_power`** if you want
-power history. Excluded entities remain usable live, but they no longer get
-new history or statistics. Disabling an entity also removes its live state.
-
-`commit_interval: 30` batches database commits; it does **not** reduce the
-number of recorded state changes. Purging removes old history, and repacking
-can reclaim space. These settings and the need for temporary free disk space
-are documented by [Home Assistant Recorder](https://www.home-assistant.io/integrations/recorder/).
-
-Hourly long-term statistics are **not deleted automatically** by
-`purge_keep_days`. They continue to grow even with a short history retention
-period; excluding unused detail sensors prevents new statistics for those
-sensors. Existing statistics remain until explicitly deleted. See
-[Home Assistant long-term statistics](https://www.home-assistant.io/docs/configuration/long-term-statistics/).
-
-### Long-term statistics in Home Assistant 2026.11
-
-The 30-second measurement interval reduces state rows, not the fixed
-five-minute and hourly statistics cadence. There are 17 statistics-capable
-sensors enabled by default on layout v01.03. If all have valid recorded
-values throughout the year, that is 408 hourly rows per day or 148,920 per
-365-day year, before other integrations. The exclusions above leave seven
-such sensors. These are row counts, not disk-size estimates.
-
-If only total energy and total power history are needed, also add these
-five entries to the same `recorder.exclude.entities` list:
-
-```yaml
-      - sensor.mennekes_amtron_signaled_current
-      - sensor.mennekes_amtron_downgrade_current
-      - sensor.mennekes_amtron_session_energy
-      - sensor.mennekes_amtron_charging_sessions
-      - sensor.mennekes_amtron_temperature
-```
-
-This leaves two statistics series (48 hourly rows per day), with live states
-still available for all excluded sensors. It also removes their new detailed
-history. Existing statistics are retained. The integration never changes
-Recorder filters or deletes historical data on its own.
+## November compatibility and verification
 
 Home Assistant 2026.11 requires `mean_type` and `unit_class` for integrations
 that import or modify statistics through the Recorder API. This integration

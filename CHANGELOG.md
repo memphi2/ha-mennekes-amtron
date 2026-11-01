@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Rewrite end-user setup, daily controls, automation and troubleshooting
+  guidance. Correct entity IDs and action fields, explain phase-switch pauses,
+  and put Recorder retention/exclusion choices before technical measurements.
+  Remove unsupported physical-validation and whole-house protection claims.
 - Exercise the built-in Marketplace installer offline: first install, update
   restart requests, rollback of an invalid package and coexistence with TCP.
 - Document Marketplace installation, existing entries, updates and removal,

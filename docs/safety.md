@@ -81,9 +81,10 @@ has its own switch, and 0 A can only be written through the
 - Change the charging current no more often than every **5 seconds**. The
   integration defers a faster change and writes the newest value when the
   interval has passed.
-- Pause, resume and phase switches should be at least **5 minutes** apart and
-  should use hysteresis. The integration rejects faster changes with an
-  explanatory error.
+- Keep pause, resume and phase switches **more than 5 minutes** apart and
+  use hysteresis. The integration enforces a five-minute floor and rejects
+  faster changes with an explanatory error. The timing guards are in memory and restart on an
+  entry reload; keep the waiting interval in your automation too.
 
 ## Phase switching can abort a charge
 
@@ -94,6 +95,8 @@ option 2. Even there:
 - some vehicles need the charging current set to the pause value **before**
   the phase count changes. The integration does that automatically while the
   wallbox is charging;
+- the integration leaves charging paused after this sequence. Resume
+  explicitly after the waiting interval;
 - not every vehicle tolerates phase switching at all. Check your vehicle's
   documentation before you automate it.
 
@@ -104,9 +107,17 @@ refuses to act in any other state.
 
 ## What is validated, and what is not
 
-Validated: AMTRON 4You 310 11 C2, register layout v01.03.
+Automated tests exercise real Home Assistant with simulated register data
+and a virtual Modbus RTU server, using the AMTRON 4You 310 11 C2 on layout
+v01.03 as the development target. **No physical-wallbox validation is claimed**,
+including for that model. The [compatibility audit](ha-2026-11-validation.md)
+records tested software versions and remaining checks.
 
-Not validated: every other model and every older layout version. The
-integration gates entities by layout version and hardware capability, so an
-older device gets fewer entities rather than wrong ones — but the behaviour on
-that hardware is untested.
+Entities are filtered by reported layout version and hardware capability.
+This reduces unsupported operations but does not establish correct behavior
+on every firmware or vehicle.
+
+The configured wallbox current limits restrict the wallbox, not the combined
+load of other household consumers. PV blueprints and example automations are
+not overload protection for the house connection. Loss of an external surplus
+sensor does not stop the integration's heartbeat or automatically pause charging.

@@ -4,38 +4,31 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.9%2B-41BDF5.svg)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-A local Home Assistant integration for MENNEKES AMTRON wallboxes that speak
-**Modbus RTU** over RS-485 — full sensor coverage, safe charging control, a
-config flow, diagnostics and repair issues. No cloud, no account, no polling
-of anybody's server.
+Read charging status, power and energy from a MENNEKES AMTRON wallbox and
+control its current, pause/resume and supported phase settings in Home
+Assistant. Communication is local over **Modbus RTU / RS-485**. The wallbox
+connection needs no cloud account; Marketplace custom-repository installation
+can require a GitHub connection.
 
 Developed for the **AMTRON 4You 310 11 C2** (article 1313201205, 11 kW,
-fixed cable, 16 A) on Modbus register layout **v01.03**. Automated validation
-uses a virtual Modbus RTU server and real Home Assistant; it does not replace
-verification on a physical wallbox.
+fixed cable, 16 A), register layout **v01.03**. Automated validation uses real
+Home Assistant and simulated RTU devices. Physical-wallbox validation remains
+outstanding. See [supported devices and limitations](docs/user-guide.md#compatibility-and-limitations).
 
 > This is an independent community project. It is not affiliated with,
 > endorsed by, sponsored by, or certified by MENNEKES, Home Assistant, Nabu
 > Casa or HACS.
 
-## Why not the built-in `modbus:` integration
+## Before you start
 
-The built-in integration can read these registers, but it has no idea what
-they mean. This one does:
+- Use an **exclusive RS-485 bus**. Read-only mode also sends requests and
+  cannot share the bus with another master.
+- Start read-only and check the readings. Before enabling control, configure
+  the wallbox's fallback for a stopped Home Assistant heartbeat.
+- Use **Charging paused** to stop charging. **0 A removes the current limit**.
 
-- **`0x0302` has three meanings.** `0 A` is *no limitation* — the wallbox then
-  signals its **maximum** current. `0.01–5.99 A` is *invalid* and makes it
-  signal 0 A, which is the manufacturer's documented way to pause. `≥ 6 A` is
-  a real limit. A YAML `number` with `min: 0` requests **full load** when a
-  user drags the slider to zero. Here, the slider cannot go below 6 A at all.
-- **The heartbeat is mandatory.** `0x0D00 = 0x55AA` has to arrive at least
-  every 10 s or the wallbox goes into error state 200. This integration runs
-  it in its own task with priority access between bus transactions.
-- **Capability gating.** Registers appeared over four layout versions, and the
-  phase switch needs 11 kW hardware. Entities exist only where the device
-  actually has the register.
-- **Rate limits.** The manufacturer asks for ≤ 1 current change per 5 s and
-  > 5 min between pause, resume and phase switches. Both are enforced.
+Electrical work belongs with a qualified electrician. Read
+[Safety and limitations](docs/safety.md) and the [hardware guide](docs/hardware.md).
 
 ## Installation
 
@@ -79,30 +72,21 @@ to check readings before enabling *Modbus master* and trying the first charge.
 See [installation, updates and removal](docs/installation.md) for the complete
 workflow, including the pending catalog submission and existing installations.
 
-## What you get
+## Everyday use
 
-| Kind | Entities |
+| I want to… | Use |
 |---|---|
-| Sensors | EVSE state, CP state, authorization, error code, signaled current, current/voltage/power L1–L3, total power, session energy/duration/max current, total energy, total sessions |
-| Diagnostic sensors | Temperature, Modbus layout, downgrade current, house and EVSE current limits, energy-manager fallback, phase rotation, switched phases, cable lock, grid imbalance, Sunshine+ minimum current, phase-switching pause and mode, connected grid phases |
-| Binary sensors | Vehicle connected, charging, **downgrade active**, error, energy-manager fallback, plus diagnostic capability flags |
-| Controls | Charging-current limit (number), charging paused / charging release / wallbox locked (switches), solar mode and requested phases (selects), recover and restart (buttons) |
-| Action | `mennekes_amtron_rtu.set_charging_current` with the explicit `allow_unlimited` opt-in |
+| Set the charging rate | **Charging current limit**, from 6 A to the configured cap |
+| Pause or resume | **Charging paused**: on pauses, off resumes after the waiting interval |
+| Track consumption | **Total energy** in the Energy dashboard; not usable for billing |
+| Charge from PV surplus | The two [PV blueprints](docs/blueprints.md), with a suitable power-budget sensor |
+| See a grid-operator restriction | **Downgrade active** and **Downgrade current**; the wallbox applies the restriction in hardware |
+| Reduce database growth | Keep the 30-second measurement default and choose a [Recorder profile](docs/recorder.md) |
 
-Total energy (`0x1000`) feeds the Energy dashboard. The manufacturer marks it
-*not usable for billing*; the entity description says so too.
-
-## §14a EnWG
-
-The grid-operator downgrade is enforced **in the wallbox hardware**, over the
-XG1 input, and limits the charging current regardless of what Modbus asks for.
-This integration never tries to work around it — it makes it **visible**
-through `binary_sensor.*_downgrade_active` and the downgrade-current sensor.
-
-If your §14a control box is itself a Modbus master on the same RS-485 bus,
-do not run this integration on that bus, even in read-only mode: it sends
-read requests, and Modbus RTU permits only one master on the bus. See
-[docs/safety.md](docs/safety.md).
+Controls appear in **Modbus master** mode. The integration enforces current
+write intervals and pause/resume waiting times. Setting **Solar charging mode**
+alone does not implement PV control. Follow the [user guide](docs/user-guide.md)
+for behavior, configuration and limits.
 
 ## Documentation
 
@@ -114,8 +98,9 @@ Everything is indexed in **[docs/README.md](docs/README.md)**. The short list:
 | [Quick start](docs/quickstart.md) | Installation in Home Assistant and the first charge |
 | [Entity reference](docs/entities.md) | Every entity, what it means, when it exists |
 | [Blueprints](docs/blueprints.md) | Four ready-made automations, installed with the integration |
-| [Automations](docs/automations.md) | PV surplus, load management, phase switching, §14a |
-| [User guide](docs/user-guide.md) | Options, actions, how data is updated |
+| [Automations](docs/automations.md) | Tariff schedules, phase changes and action examples |
+| [User guide](docs/user-guide.md) | Daily controls, options and actions |
+| [Recorder](docs/recorder.md) | History retention, statistics and database growth |
 | [Troubleshooting](docs/troubleshooting.md) | When it does not work |
 | [Safety and limitations](docs/safety.md) | Read before enabling control |
 | [Modbus register map](docs/modbus-registers.md) | The device contract |

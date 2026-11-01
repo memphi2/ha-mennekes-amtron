@@ -1,236 +1,160 @@
-# User Guide
+# Using the wallbox
 
-## Supported devices
+Start with [Quick start](quickstart.md) if you have not added the integration.
+The device page is under **Settings → Devices & services → MENNEKES AMTRON
+RTU (Unofficial)**. Labels below use English; the UI also provides German
+translations.
 
-| Device | Status |
+## Everyday controls
+
+Controls appear only in **Modbus master** mode. A new entry starts read-only;
+change this in the entry options after checking the readings and exclusive
+bus access.
+
+| Control | How to use it |
 |---|---|
-| AMTRON 4You 310 11 C2 (article `1313201205`) | Primary development target; simulated validation |
-| AMTRON 4You 300 | Expected to work, untested |
-| AMTRON Compact 2.0s | Expected to work, untested |
-| AMTRON Start 2.0s | Expected to work, untested |
+| **Charging current limit** | Set a limit from 6 A up to the displayed maximum. The wallbox and vehicle may draw less. Changing it while paused can resume charging. |
+| **Charging paused** | **On** pauses; **off** resumes using the remembered current. Use this for ordinary start/stop and tariff schedules. |
+| **Charging release** | Controls the charging release/relay. Leave this out of frequent surplus adjustments; use the pause switch. |
+| **Wallbox locked** | Prevents charging while locked. |
+| **Solar charging mode** | Changes the mode shown by the wallbox; it does not calculate or follow PV surplus. It requires DIP 7 as described in the hardware guide. |
+| **Requested phases** | Available only on capable hardware. See phase switching below. |
+| **Recover from error** | Runs the documented sequence for a lost energy-manager heartbeat. It may release and resume charging. |
+| **Restart** | Restarts the wallbox only when it reports idle. |
 
-All four are covered by the same MENNEKES Modbus RTU specification. The
-integration reads the register layout version from the device and only creates
-entities for registers that layout actually has, so an older firmware yields
-fewer entities instead of broken ones.
+**0 A is not a stop command.** It removes the energy-manager limit. The
+slider excludes it; use **Charging paused** to stop a charge.
 
-Requirements: the wallbox has to be in Modbus satellite mode (DIP bank S1,
-DIP 4 and DIP 5 on, then restart) and reachable over RS-485 from the Home
-Assistant host.
+Current requests closer than five seconds are deferred, with the newest
+accepted request taking precedence. Pause/resume requests inside the
+five-minute waiting interval are rejected with the remaining wait time;
+they are not queued for later. Allow more than five minutes in automations.
+The timing guards restart when the entry reloads, so do not use a reload to
+bypass a waiting interval.
 
-## Supported functions
+While paused, the slider shows the remembered setpoint, not a measured
+current. The integration restores that setpoint when available after a
+restart. If none can be restored, resuming uses the configured maximum.
+Check the slider and current cap before resuming.
 
-**Reading**
+## Understand the readings
 
-- Charging state (EVSE state, CP state, authorization, error code)
-- Live measurements: current, voltage and power per phase, total power
-- Signaled current, i.e. what the wallbox actually offers the vehicle
-- Charging session: energy, duration, maximum current, detected vehicle phases
-- Lifetime totals: energy and number of sessions
-- Configuration readback: current limits, phase options, cable lock, grid
-  imbalance, Sunshine+ minimum current, phase-switching pause
-- Downgrade state and downgrade current (§14a visibility)
-- Internal temperature
+- **Vehicle connected** means a cable/vehicle is detected; it does not mean
+  charging has started. Authorization, vehicle settings and release still matter.
+- **Charging** and **EVSE state** describe the wallbox's state.
+- **Signaled current** is what the wallbox offers the vehicle. It can be lower
+  than your requested limit because of installation limits or a downgrade.
+- **Total power** shows the actual combined power draw.
+- **Session energy** belongs to the current session. **Total energy** is the
+  lifetime counter to use in the Energy dashboard; it is **not usable for billing**.
+- **Downgrade active** and **Downgrade current** show the wallbox's hardware
+  grid-operator restriction. An automation cannot override it.
 
-**Writing** (only in *Modbus master* control mode)
+See [Entity reference](entities.md) for the full list and exact state values
+used in templates. Copy actual entity IDs from the entity settings; language,
+renaming and multiple devices can change them.
 
-- Charging-current limit
-- Pause and resume charging
-- Charging release (the wallbox relay)
-- Lock and unlock the wallbox
-- Solar charging mode shown on the wallbox display
-- Requested phases, on hardware that supports switching
-- Recovery sequence after a lost heartbeat
-- Restart, while the wallbox is idle
+## Configuration and options
 
-## Configuration parameters
+Use **Reconfigure** on an existing entry to change the connection, rather than
+adding the wallbox again:
 
-Set when the entry is created, changeable with *Reconfigure*:
+| Connection setting | Factory default |
+|---|---|
+| Serial port | Select your adapter; prefer `/dev/serial/by-id/...` |
+| Modbus device address | `50` (documented range `10`–`50`) |
+| Baud rate | `57600` |
+| Frame | `8` data bits, parity `N`, `2` stop bits |
 
-| Parameter | Default | Notes |
+Use the entry **options** for behavior:
+
+| Option | Default | Effect |
 |---|---|---|
-| Serial port | — | Prefer `/dev/serial/by-id/...`; `/dev/ttyUSB0` moves |
-| Modbus device address | `50` | `10`–`50`, changeable with the MENNEKES tool |
-| Baud rate | `57600` | Factory default |
-| Data bits | `8` | Factory default |
-| Parity | `N` | Factory default |
-| Stop bits | `2` | Factory default is 2 stop bits with no parity |
+| Control mode | Read only | Modbus master enables writes, controls and heartbeat |
+| Status polling interval | 5 seconds | State, errors and control readback; range 2–300 seconds |
+| Measurement interval | 30 seconds | Current, voltage, power and session readings; range 2–300 seconds |
+| Charging current cap | Device maximum | Additional upper bound for normal current commands |
 
-Changeable any time in the entry options:
+Changes reload the entry. Measurements are read on status polls, so a long
+status interval also limits measurement updates. With no vehicle, measurement
+reads are at least a minute apart. A charging/connection transition refreshes
+measurements and lifetime counters in the same status poll. Failed reads make
+the affected entities unavailable; unchanged values remain available between
+successful reads.
 
-| Option | Default | Notes |
-|---|---|---|
-| Control mode | `Read only` | `Modbus master` enables the heartbeat and the control entities |
-| Status polling interval | `5 s` | `2`–`300 s`; status, errors and control readback. Heartbeat independent. |
-| Measurement interval | `30 s` | `2`–`300 s`; power, voltage, current and session values. Actual reads occur on status polls. |
-| Charging current cap | device maximum | An extra upper bound for the number entity |
+The heartbeat runs separately every five seconds in master mode. A stalled
+serial bus or stopped Home Assistant can still interrupt it: configure and
+understand the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it)
+before relying on unattended charging.
 
-Changing an option reloads the entry.
+## Energy dashboard and database size
 
-## How data is updated
+Select **Total energy** as the wallbox's consumption source under the Energy
+dashboard's individual devices. Its default English ID is
+`sensor.mennekes_amtron_total_energy`.
 
-The wallbox has no push channel, so the integration polls. Every interval it
-reads the register blocks the device supports — contiguous ranges rather than
-fifty single registers. A block the device rejects is retried register by
-register, and a block that keeps failing is reported in diagnostics without
-taking the rest of the snapshot with it.
+The 30-second measurement default reduces history traffic. It does not cap
+database size, change Recorder settings or stop hourly statistics growth.
+Keep total energy recorded for the Energy dashboard. Use the
+[Recorder guide](recorder.md) to choose detailed history or a smaller profile
+that retains only energy and power statistics while all sensors stay live.
 
-Not every block is read every time. Half of the register map is
-configuration — the serial number, the article number, the DIP-configured
-limits, the hardware phase option, the lifetime counters — and those change
-when somebody reconfigures the wallbox, not while it charges. They are read
-once a minute and carried forward in between, which leaves the bus to the ten
-blocks that actually move: state, control pilot, signalled current, the
-current limits, the measurements, the session, the functions and the error
-registers. A reconfiguration still shows up on its own, within a minute.
+## PV charging and schedules
 
-Measurements have a separate interval, defaulting to 30 seconds, even while
-a vehicle is plugged in or charging. Without a vehicle they are read at most
-once a minute (or less often if you choose a longer measurement interval).
-Charging and connection state changes refresh the measurements and lifetime
-energy counter in the same status poll. Values remain available between
-scheduled reads. Failed reads make the affected sensors unavailable.
+Use the [PV blueprints](blueprints.md) for current adjustment and pause/resume.
+They need a correctly defined power budget and thresholds matching the phase
+count. Selecting **Solar charging mode** alone does not enable this behavior.
+[Automations](automations.md) includes a tariff schedule and action examples.
 
-Existing entries without a measurement option also use the new 30-second
-default. Set it to 5 seconds if your automation needs that resolution; a
-longer status interval still limits how often a measurement can be read.
+The wallbox's configured limits restrict its own current; they do not measure
+other household consumers. A simple surplus/current template is not dynamic
+protection for your whole house connection.
 
-The heartbeat is **not** part of the poll. It runs in its own background task
-on a fixed five-second interval, because a slow or failing poll must never be
-able to starve it — that is the documented way into error state 200.
+## Phase switching
 
-## Database load
-
-The default measurement interval limits routine updates, and native numeric
-values are rounded to their declared precision. Unchanged states do not create
-extra Recorder rows. These measures reduce database growth; they do not impose
-a storage limit or change your Home Assistant Recorder settings.
-
-A synthetic 24-hour replay through real Home Assistant and SQLite measured
-**35,036 → 10,120 state rows** for 20 hours unplugged and four hours charging,
-and **185,527 → 36,031 rows** for continuous charging, comparing the released
-five-second cadence with the new 30-second measurement default. These are
-scenario results, not upper bounds or measurements on a physical wallbox.
-
-See [Recorder settings and measured database load](recorder.md) for a complete
-configuration example, reproducible measurements and retention limits. Keep
-the lifetime energy counter recorded for the Energy dashboard. Excluding a
-sensor from Recorder also removes its future history and statistics.
-
-## Use cases
-
-**Solar surplus charging.** Feed your PV surplus into
-`number.<name>_charging_current_limit`. Compute amps as
-`surplus_watts / 230 / phases`, clamp to at least 6 A, and let the automation
-pause through `switch.<name>_charging_paused` when the surplus disappears.
-Keep at least five minutes between pause and resume.
-
-**Dynamic load management.** Subtract the rest of the house from your main
-fuse rating and write the remainder as the charging-current limit. The wallbox
-clamps anything you send to its own configured maximum, so an over-eager
-automation cannot exceed the installation limit.
-
-**Cheap-tariff charging.** Use `switch.<name>_charging_release` or a schedule
-on the current limit to charge during a cheap window.
-
-**§14a transparency.** Watch `binary_sensor.<name>_downgrade_active` and
-`sensor.<name>_downgrade_current` to see when the grid operator dims your
-wallbox and by how much.
-
-**Energy dashboard.** Add `sensor.<name>_total_energy` as a consumption
-source. The manufacturer marks this register as not usable for billing.
-
-## Examples
-
-Charge with PV surplus, in 1 A steps, never below 6 A:
-
-```yaml
-automation:
-  - alias: Wallbox follows PV surplus
-    triggers:
-      - trigger: state
-        entity_id: sensor.pv_surplus_power
-    conditions:
-      - condition: state
-        entity_id: binary_sensor.amtron_vehicle_connected
-        state: "on"
-    actions:
-      - action: number.set_value
-        target:
-          entity_id: number.amtron_charging_current_limit
-        data:
-          value: >-
-            {{ [[ (states('sensor.pv_surplus_power') | float(0)
-                   / 230 / 3) | round(1), 6 ] | max, 16 ] | min }}
-    mode: single
-```
-
-Pause when the surplus is gone, with the manufacturer's hysteresis:
-
-```yaml
-automation:
-  - alias: Wallbox pauses without surplus
-    triggers:
-      - trigger: numeric_state
-        entity_id: sensor.pv_surplus_power
-        below: 1380
-        for: "00:05:00"
-    actions:
-      - action: switch.turn_on
-        target:
-          entity_id: switch.amtron_charging_paused
-```
-
-Remove the limit entirely, deliberately:
-
-```yaml
-actions:
-  - action: mennekes_amtron_rtu.set_charging_current
-    target:
-      device_id: !input wallbox
-    data:
-      current: 0
-      allow_unlimited: true
-```
+Only supported 11 kW hardware exposes **Requested phases**. Check that your
+vehicle supports switching before using it. A change while charging first
+pauses the current, then requests the phases; **it does not resume automatically**.
+After the waiting interval, resume explicitly with the pause switch and check
+the result. Some vehicles abort the session and require further intervention.
 
 ## Actions
 
-### `mennekes_amtron_rtu.set_charging_current`
+Most automations should use the entities. The additional action
+`mennekes_amtron_rtu.set_charging_current` offers an explicit unlimited option:
 
-Writes the energy-manager charging-current limit (`0x0302`) of one or more
-wallbox devices.
-
-| Field | Required | Meaning |
+| Data field | Required | Meaning |
 |---|---|---|
-| `current` | yes | Limit in ampere, `0` or `6`–`32` |
-| `allow_unlimited` | no, default `false` | Required to write `0 A` |
+| `device_id` | Yes | One wallbox device ID or a list of device IDs |
+| `current` | Yes | `6`–`32` A for a normal limit, clamped to the configured cap; `0` removes the limit |
+| `allow_unlimited` | Only for `current: 0` | Must be `true` to deliberately request no energy-manager limit |
 
-`0 A` does **not** stop charging: it removes the limit and the wallbox signals
-its maximum current. Values between `0.01 A` and `5.99 A` are rejected,
-because the wallbox treats them as invalid and signals 0 A — use
-`switch.<name>_charging_paused` to pause instead.
+Use the action editor to select the device. `device_id` belongs inside
+**`data`**, not a `target` block. A normal action looks like this; replace the
+placeholder with the selected device ID:
 
-The action exists because this one argument cannot be offered safely as an
-entity. Everything else is an entity.
+```yaml
+action: mennekes_amtron_rtu.set_charging_current
+data:
+  device_id: REPLACE_WITH_YOUR_DEVICE_ID
+  current: 10
+```
 
-## Troubleshooting
+Removing the limit also bypasses the integration's extra current cap. Hardware
+limits still apply. Values between 0 and 6 A are not accepted by this action;
+use the pause switch instead.
 
-See [troubleshooting.md](troubleshooting.md). The short version: the setup
-form can search the bus for you, the diagnostics download carries the raw
-register image with identifying fields omitted, and four repair issues explain the four ways this device gets
-stuck.
+## Compatibility and limitations
 
-## Known limitations
+| Device | Validation status |
+|---|---|
+| AMTRON 4You 310 11 C2, article `1313201205` | Development target; automated tests use simulated device data and virtual RTU |
+| AMTRON 4You 300, Compact 2.0s, Start 2.0s | Covered by the same RTU specification; physical behavior unverified |
 
-- Only one wallbox per config entry, and one master per RS-485 bus.
-- Automated validation uses simulated device data and a virtual Modbus RTU
-  server. It does not establish physical-wallbox behavior.
-- No discovery: a USB RS-485 adapter cannot be identified as this wallbox, so
-  the port is chosen manually.
-- `sensor.<name>_total_energy` is explicitly not usable for billing.
-- The error-code sensor reports the categories the specification documents;
-  anything else becomes `Other error` with the raw code as an attribute.
-- Writing the solar charging mode only drives the wallbox display and needs
-  DIP 7 on; the energy manager still owns the solar algorithm.
-- The integration cannot bypass a §14a downgrade, a DIP-configured
-  installation limit or the EVSE maximum, and is not intended to.
+Entities depend on the reported register layout and hardware capabilities.
+Physical-wallbox validation remains outstanding, including on the development
+target. This integration is for **Modbus RTU over RS-485**, not Modbus TCP.
+Use one entry per wallbox and exclusive access to each serial bus.
+
+For a problem, start with [Troubleshooting](troubleshooting.md). See
+[Safety and limitations](safety.md) before enabling control.

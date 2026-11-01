@@ -7,13 +7,13 @@ local Modbus RTU.
 
 | I want to… | Read |
 |---|---|
-| wire it up: cabling, DIP switches, USB passthrough | [Hardware installation](hardware.md) |
+| prepare the installation with an electrician | [Hardware installation](hardware.md) |
 | install, update or remove the integration | [Installation and updates](installation.md) |
-| get it running in Home Assistant | [Quick start](quickstart.md) |
+| add the wallbox and test the first charge | [Quick start](quickstart.md) |
 | upgrade an existing 0.1.0 installation | [Upgrading](upgrading.md) |
 | know what every entity means | [Entity reference](entities.md) |
 | use a ready-made automation | [Blueprints](blueprints.md) |
-| write my own automations | [Automations](automations.md) |
+| set up a tariff schedule or action | [Automations](automations.md) |
 | reduce database growth and configure history retention | [Recorder](recorder.md) |
 | understand the options and the daily use | [User guide](user-guide.md) |
 | fix something that is broken | [Troubleshooting](troubleshooting.md) |
@@ -28,10 +28,10 @@ local Modbus RTU.
 | [Quality scale](quality-scale.md) | The Home Assistant quality-scale status, rule by rule |
 | [Repository settings](repository-settings.md) | Branch protection and the security options, declared as code |
 | [Legal notes](legal.md) | Licence, trademarks, and why no vendor document is in this repository |
-| [Provenance audit](audits/current-legal-provenance.md) | The technical audit snapshot behind those claims |
+| [Provenance audit](audits/current-legal-provenance.md) | Source and licensing evidence |
 | [November compatibility audit](ha-2026-11-validation.md) | Local compatibility, Recorder and repository validation results |
 
-## The three things worth knowing before you start
+## Before you start
 
 **Read-only first.** A new config entry never writes and never sends the
 heartbeat. Look at the sensors, confirm they match the wallbox display, and

@@ -73,9 +73,9 @@ the satellite switches; the manual says the same for the others.)
 **(Spec)** The wallbox speaks Modbus only when it is configured as a
 *satellite*: **bank S1, DIP 4 and DIP 5 to ON**, then restart.
 
-Without it the wallbox answers nothing, or answers reads and refuses writes.
-That is the single most common reason the setup fails, and the integration
-raises a repair issue naming it.
+An incorrect mode can prevent communication or cause register writes to be
+refused. Check it when the device rejects writes; the integration raises a
+repair issue for that response.
 
 ### Installation current — bank S2, DIP 6–8
 
@@ -168,6 +168,10 @@ Log out and in, or restart the service, for the group to take effect.
 
 ## Finding and checking the port
 
+Use the integration setup form's port list for normal setup. It lists stable
+paths first and also accepts a manually entered path. If you already have an
+administration shell, you can inspect ports there:
+
 ```bash
 # Home Assistant OS, Supervised, Container
 docker exec homeassistant ls -l /dev/serial/by-id/
@@ -176,12 +180,12 @@ docker exec homeassistant ls -l /dev/serial/by-id/
 ls -l /dev/serial/by-id/
 ```
 
-On Home Assistant OS, open a shell with the *Advanced SSH & Web Terminal*
-add-on and turn its protection mode off, otherwise the add-on cannot reach
-`docker`.
+The Docker command requires host-level container access. A terminal add-on
+may not have it; normal integration setup does not require changing add-on
+protection settings or enabling a host shell.
 
-Always use the `/dev/serial/by-id/...` path. It is built from the adapter's
-own identifiers and survives reboots and re-enumeration; `/dev/ttyUSB0` does
+Prefer the `/dev/serial/by-id/...` path when available. It is built from the
+adapter's own identifiers and survives reboots and re-enumeration; `/dev/ttyUSB0` does
 not, and a wallbox that moves to `ttyUSB1` after a reboot looks exactly like a
 dead bus.
 
@@ -193,11 +197,12 @@ dead bus.
    [quickstart.md](quickstart.md).
 2. For an answer outside Home Assistant, the integration ships a read-only bus
    check; see
-   [quickstart.md](quickstart.md#4-prove-the-bus-before-writing-anything).
+   [quickstart.md](quickstart.md#optional-command-line-bus-check).
 3. After setup, read the DIP-configured values back from the diagnostic
-   sensors: `max_current_house`, `max_evse_current`, `downgrade_current`,
-   `phase_switching_mode`. If one of them does not match what you set, the DIP
-   switches are not what you think they are.
+   sensors: **Maximum house current**, **Maximum wallbox current**,
+   **Downgrade current** and **Phase switching mode**. If a reading differs
+   from the intended setup, have the installer check the configuration and
+   model-specific interpretation before enabling control.
 
 ## Factory bus parameters
 
