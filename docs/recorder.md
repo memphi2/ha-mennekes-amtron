@@ -175,6 +175,45 @@ are replay measurements with the limitations above, not storage guarantees.
 .venv/bin/python -m tests.recorder_replay /tmp/amtron-lean --scenario charging --profile lean
 ```
 
+## Repeated retention and repack checks
+
+`tests/test_recorder_retention.py` runs six simulated daily charging windows
+through the real integration and SQLite Recorder, for both full and lean
+profiles. It compiles short-term and hourly statistics, performs four purge
+cycles with a two-day history window, and verifies actual SQLite `VACUUM`
+completion and database integrity. Detailed history reaches a stable row
+count while hourly energy statistics and their accumulated totals survive.
+
+```bash
+.venv/bin/python -m pytest tests/test_recorder_retention.py
+```
+
+Event time is accelerated; each simulated day contains one hour of readings.
+This checks retention mechanics, not a six-day wall-clock soak or the nightly
+scheduler. It neither proves a fixed database size nor covers host disk
+exhaustion, external databases, backups or other integrations.
+
+## Monitor free space on the database disk
+
+Add [System Monitor](https://www.home-assistant.io/integrations/systemmonitor/)
+and enable **Disk free** for the mount containing your Recorder database.
+Its entities are disabled by default. It monitors a filesystem, not the size
+of an individual directory; verify the selected mount, especially in a
+container or when using a database on another host.
+
+Choose an alert threshold that leaves room for database maintenance and
+normal growth. Home Assistant requires at least the database's size again
+as free temporary space for operations such as repacking; see
+[Recorder disk-space requirements](https://www.home-assistant.io/integrations/recorder/#disk-space-requirements).
+Include backups and WAL growth in your margin. A percentage alone can hide
+insufficient headroom on a large database.
+
+Create an automation that checks **Disk free** at HA startup and every
+15 minutes. If it is below your chosen threshold, create a persistent
+notification with a fixed notification ID so repeated checks replace it.
+Check the sensor's unit when entering the threshold. Test the notification
+before relying on it. Monitor an external database on its own host too.
+
 ## November compatibility and verification
 
 Home Assistant 2026.11 requires `mean_type` and `unit_class` for integrations
