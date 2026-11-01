@@ -74,6 +74,7 @@ class AmtronControl:
         options: ControlOptions,
         state: Callable[[], WallboxData],
         request_refresh: Callable[[], Awaitable[None]] | None = None,
+        notify_write_error: Callable[[], None] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -83,6 +84,7 @@ class AmtronControl:
         self._options = options
         self._state = state
         self._request_refresh = request_refresh
+        self._notify_write_error = notify_write_error
         self._sleep = sleep
         self._monotonic = monotonic
         self._pending_current: float | None = None
@@ -402,6 +404,8 @@ class AmtronControl:
         except AmtronBusError as err:
             self._diagnostics.writes_rejected += 1
             self._diagnostics.last_error = str(err)
+            if self._notify_write_error is not None:
+                self._notify_write_error()
             raise home_assistant_error(
                 "write_failed", {"register": spec.key, "error": str(err)}
             ) from err

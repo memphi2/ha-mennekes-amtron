@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Notify entities only when polled data or availability changes; report write
+  repair issues immediately even when device registers remain unchanged.
 - Provide a complete low-history Recorder profile and a reproducible full/lean
   replay comparison while retaining live sensors and energy/power statistics.
 

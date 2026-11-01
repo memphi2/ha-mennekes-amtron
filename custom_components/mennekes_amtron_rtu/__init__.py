@@ -48,7 +48,7 @@ from .entry_types import MennekesAmtronConfigEntry
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
 from .options_flow import control_mode_is_master
-from .repairs import async_setup_repairs
+from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -107,6 +107,7 @@ async def async_setup_entry(
         options=_control_options(entry),
         state=coordinator.current_data,
         request_refresh=coordinator.async_request_refresh,
+        notify_write_error=lambda: async_check_repairs(hass, entry),
     )
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
