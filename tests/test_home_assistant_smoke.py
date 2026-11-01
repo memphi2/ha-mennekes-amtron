@@ -98,6 +98,10 @@ async def _start_wallbox(
 def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
     """Set up, switch to master mode, reconfigure and unload again."""
 
+    local_blueprint = tmp_path / "config" / "blueprints" / "automation" / DOMAIN / "solar_surplus_charging.yaml"
+    local_blueprint.parent.mkdir(parents=True)
+    local_blueprint.write_bytes("local blueprint".encode("utf-16"))
+
     async def run() -> None:
         bank = device_bank(error_code=200, fallback_current=0)
         device_port, client_port = _virtual_serial_link()

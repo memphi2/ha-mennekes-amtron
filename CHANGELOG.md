@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Keep the integration available when optional blueprint files cannot be read
+  or written; preserve local edits and replace updated files atomically.
 - Check the phase-switch cooldown before pausing a running charge, and serialize
   the complete sequence against other current and phase requests.
 - Retain register write intervals after a lost reply, device failure or
