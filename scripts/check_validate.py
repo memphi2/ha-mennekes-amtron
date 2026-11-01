@@ -5,7 +5,8 @@
 its own flow and service annotations from voluptuous to probatio in 2026.10,
 so one source file cannot satisfy ``mypy --strict`` against both ends of the
 supported range. CI therefore type-checks against ``current_homeassistant``
-and uses the minimum matrix entry to prove the integration still runs.
+and the preview, and uses the minimum matrix entry to prove the integration
+still runs. Tests execute once per matrix entry, with coverage enabled.
 """
 
 from __future__ import annotations
@@ -52,9 +53,8 @@ def steps(*, skip_typing: bool = False) -> list[ValidationStep]:
             (sys.executable, "scripts/check_pymodbus_pin.py"),
         ),
         ValidationStep("Ruff", (sys.executable, "-m", "ruff", "check", ".")),
-        ValidationStep("Python tests", (sys.executable, "-m", "pytest")),
         ValidationStep(
-            "Python coverage ratchet",
+            "Python tests and coverage",
             (sys.executable, "scripts/check_coverage.py"),
         ),
         ValidationStep(
