@@ -85,6 +85,12 @@ write access. As with other commit statuses, repository writers are trusted
 publishers; public commenters cannot publish a status or forge the bot IDs.
 Existing App bindings on other checks are preserved.
 
+The publisher exits successfully after delivering a `pending` status; waiting
+for Codex is an expected state, not a workflow failure. The required commit
+status still blocks merging. Read-only checks exit unsuccessfully until the
+review is approved. Findings, inconsistent evidence and API errors still
+fail the publishing command.
+
 **Initial rollout:** GitHub loads comment and workflow-run handlers from the
 default branch. For the PR introducing this workflow, run the same reviewed
 verifier locally after its final security review and publish its result.

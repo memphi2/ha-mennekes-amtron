@@ -153,7 +153,11 @@ def evaluate(
 
 
 def check(repository: str, number: int, *, publish: bool) -> bool:
-    """Evaluate an open PR and optionally publish the result on its head SHA."""
+    """Check approval, or publish a success/pending status without job noise.
+
+    Publishing pending is a successful delivery of a blocking status. In
+    read-only mode, only an approved review counts as success.
+    """
 
     pull = api(f"repos/{repository}/pulls/{number}")
     if pull["state"] != "open":
@@ -183,7 +187,7 @@ def check(repository: str, number: int, *, publish: bool) -> bool:
             payload["target_url"] = evidence
         api(f"repos/{repository}/statuses/{sha}", payload)
     sys.stdout.write(f"PR #{number} {sha}: {state}: {description}\n")
-    return state == "success"
+    return state == "success" or (publish and state == "pending")
 
 
 def main(argv: list[str] | None = None) -> int:

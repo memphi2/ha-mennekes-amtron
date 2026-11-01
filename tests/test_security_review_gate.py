@@ -252,10 +252,35 @@ def test_published_status_uses_verified_head_and_result(monkeypatch, valid):
         return evidence() if valid else []
 
     monkeypatch.setattr(gate, "api", api)
-    assert gate.check(REPO, 16, publish=True) is valid
+    assert gate.check(REPO, 16, publish=True)
     assert all(path == f"repos/{REPO}/statuses/{SHA}" for path, _ in writes)
     assert [body["state"] for _, body in writes] == ["pending", "success" if valid else "pending"]
     assert writes[-1][1]["context"] == gate.STATUS_CONTEXT
+
+
+@pytest.mark.parametrize(
+    ("state", "publish", "expected"),
+    [("pending", True, 0), ("pending", False, 1),
+     ("failure", True, 1), ("failure", False, 1)],
+)
+def test_pending_publication_is_quiet_but_never_an_approval(monkeypatch, state, publish, expected):
+    writes = []
+
+    def api(path, body=None):
+        if "/pulls/" in path:
+            return {"state": "open", "head": {"sha": SHA}}
+        if body is not None:
+            writes.append(body["state"])
+            return {}
+        return []
+
+    monkeypatch.setattr(gate, "api", api)
+    monkeypatch.setattr(gate, "evaluate", lambda *_args: (state, "test result", None))
+    args = ["--repository", REPO, "--pr", "16"]
+    if publish:
+        args.append("--publish")
+    assert gate.main(args) == expected
+    assert writes == (["pending", state] if publish else [])
 
 
 def test_required_context_cannot_drift_from_verifier():
