@@ -87,7 +87,7 @@ and adds the controls. Resolve any repair messages before charging.
    Allow more than five minutes between pause and resume. Do not set 0 A to stop.
 
 Once basic operation is verified, follow the [user guide](user-guide.md),
-configure [Recorder](recorder.md) and add [blueprint automations](blueprints.md).
+choose a [Recorder profile](recorder.md#keep-only-energy-and-power-statistics) and add [blueprint automations](blueprints.md).
 
 ## Optional command-line bus check
 

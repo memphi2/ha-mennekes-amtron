@@ -78,16 +78,35 @@ sensors. Existing statistics remain until explicitly deleted. See
 
 ## Keep only energy and power statistics
 
-If only total energy and total power history are needed, also add these
-five entries to the same `recorder.exclude.entities` list:
+For the smallest profile, merge this **complete list** into your existing
+`recorder.exclude.entities` list; it includes the detail exclusions above.
+Replace the example IDs with the actual IDs of your wallbox. Keep your
+existing Recorder settings and any other exclusions.
 
 ```yaml
+recorder:
+  exclude:
+    entities:
+      - sensor.mennekes_amtron_current_l1
+      - sensor.mennekes_amtron_current_l2
+      - sensor.mennekes_amtron_current_l3
+      - sensor.mennekes_amtron_voltage_l1
+      - sensor.mennekes_amtron_voltage_l2
+      - sensor.mennekes_amtron_voltage_l3
+      - sensor.mennekes_amtron_power_l1
+      - sensor.mennekes_amtron_power_l2
+      - sensor.mennekes_amtron_power_l3
+      - sensor.mennekes_amtron_session_duration
       - sensor.mennekes_amtron_signaled_current
       - sensor.mennekes_amtron_downgrade_current
       - sensor.mennekes_amtron_session_energy
       - sensor.mennekes_amtron_charging_sessions
       - sensor.mennekes_amtron_temperature
 ```
+
+Keep total energy and total power recorded. Check the configuration and
+restart Home Assistant. Confirm their history continues and the excluded
+sensors still show live readings. Existing statistics are not deleted.
 
 This leaves two statistics series (48 hourly rows per day), with live states
 still available for all excluded sensors. It also removes their new detailed
@@ -135,6 +154,26 @@ Assistant. Time advances only for the integration polling logic: this is
 not a 24-hour soak test of Recorder statistics and retention. The automated
 suite also checks unchanged values, reduced row counts and retained total
 power/energy recording with shorter replays.
+
+### Full history versus the lean profile
+
+Repeated on 2026-11-01 with HA 2026.10.0, a 30-second measurement interval
+and the same synthetic continuous-charging day:
+
+| Profile | Additional state rows | Attribute rows | SQLite allocation |
+|---|---:|---:|---:|
+| Full | 36,031 | 44 | 5,849,088 bytes |
+| Lean, complete list above | 4,320 | 29 | 843,776 bytes |
+
+The lean profile produced **88% fewer state rows** in this scenario. Both
+recorded the same 2,877 total-power changes and 1,439 total-energy changes;
+the other four retained changes describe charging/connection state. These
+are replay measurements with the limitations above, not storage guarantees.
+
+```bash
+.venv/bin/python -m tests.recorder_replay /tmp/amtron-full --scenario charging --profile full
+.venv/bin/python -m tests.recorder_replay /tmp/amtron-lean --scenario charging --profile lean
+```
 
 ## November compatibility and verification
 

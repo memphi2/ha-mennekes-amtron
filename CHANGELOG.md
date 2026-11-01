@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- Provide a complete low-history Recorder profile and a reproducible full/lean
+  replay comparison while retaining live sensors and energy/power statistics.
+
 ### Fixed
 
 - Preserve existing GitHub branch protection and check App IDs when applying
