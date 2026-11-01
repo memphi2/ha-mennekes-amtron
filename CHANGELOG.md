@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- PV blueprints accept W/kW and skip invalid inputs. Current adjustment now
+  requires an unpaused wallbox and respects the configured entity cap. Existing
+  current automations must select the new Charging paused input; otherwise
+  they send no commands. Use a hold time above five minutes (new default: six).
+  Real Home Assistant automation tests cover the behavior.
 - Close probe transports when opening the serial port fails or is cancelled,
   so a search does not retain resources between candidates.
 - Remove an entry's repair issues when the entry is deleted, preserving them

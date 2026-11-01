@@ -1,53 +1,92 @@
-# Blueprints
+# Ready-made automations
 
-The integration ships four automation blueprints. Setting it up installs them
-into `config/blueprints/automation/mennekes_amtron_rtu/`, and they appear under
-*Settings → Automations & scenes → Blueprints*.
+The integration includes four blueprints. Adding the wallbox installs them
+under **Settings → Automations & scenes → Blueprints**. Choose a blueprint,
+select **Create automation**, then choose the entities for the same wallbox.
+The PV sensor comes from your inverter or energy-management setup.
 
-When upgrading from 0.1.0, existing automations keep their old blueprint
-paths. Follow [Upgrading](upgrading.md) to point them at the new directory
-and check their entity inputs. Edited old blueprints are left untouched.
-
-| Blueprint | What it does |
+| Blueprint | Purpose |
 |---|---|
-| **Charge from PV surplus** | Follows a surplus sensor with the charging current, divided by the phases the wallbox will really use and clamped to the range it accepts |
-| **Pause and resume on PV surplus** | Pauses when the surplus stays low and resumes when it stays high, with two thresholds and a hold time |
-| **Recover from a lost heartbeat** | Presses the recovery button when the wallbox reports that the energy manager is unavailable |
-| **Notify on a grid-operator downgrade** | Sends a notification when a §14a downgrade starts and when it ends |
+| **Charge from PV surplus** | Adjust the current while a vehicle is connected and charging is not paused |
+| **Pause and resume on PV surplus** | Pause below one power threshold and resume above a higher one, after a hold time |
+| **Recover from a lost heartbeat** | Run the recovery sequence after an energy-manager-unavailable error |
+| **Notify on a grid-operator downgrade** | Notify when a downgrade starts and ends |
 
-## Using one
+## Set up PV charging
 
-*Settings → Automations & scenes → Blueprints → Create automation*, pick the
-blueprint, fill in the entities. Every entity picker is filtered to this
-integration, so you only see your wallbox's entities — except the PV surplus
-sensor, which comes from wherever your inverter lives.
+Use the two PV blueprints together if you want both current adjustment and
+automatic start/stop. The current blueprint alone keeps at least 6 A and can
+therefore draw from the grid when the available solar power is too low.
 
-## Why they are split the way they are
+1. Choose a power sensor in **W or kW**, positive for available surplus.
+   It must report the **total power budget available to the wallbox**, including
+   power the vehicle already consumes. Raw grid export alone falls as charging
+   increases; using it directly can make the current oscillate. Verify your
+   sensor's definition before enabling the automation.
+2. For **Charge from PV surplus**, select **Charging current limit**,
+   **Charging paused**, **Vehicle connected** and **Switched phases** from
+   the same wallbox. Set the maximum current to suit the installation. The
+   automation also respects the number entity's configured maximum.
+3. Check the phase assumption: `single_phase` divides the power by one phase;
+   `all_available` divides it by three. This blueprint assumes a three-phase
+   installation and does not detect how many phases your vehicle actually uses.
+4. For **Pause and resume on PV surplus**, select the same power sensor and
+   pause switch. Match the thresholds to your chosen phase count and minimum
+   current; the defaults are for **one phase**, not three.
 
-Following the surplus and pausing on it look like one job and are not. The
-current can be adjusted every few seconds; a pause has to wait, because the
-manufacturer asks for hysteresis and more than five minutes between a pause
-and a resume. Putting both in one automation means one of them gets the wrong
-timing. So one blueprint writes the current, the other decides whether
-charging happens at all, and they are independent.
+At 230 V and a minimum of 6 A, these are example thresholds:
 
-The pause blueprint uses the **charging-pause** switch, which signals 0 A to
-the vehicle. It deliberately does not use the charging release, because that
-switches the wallbox relay and wears it out.
+| Charging configuration | Pause below | Resume above |
+|---|---:|---:|
+| One phase | 1,380 W | 1,700 W |
+| Three phases | 4,140 W | 5,000 W |
 
-## Your edits are yours
+Threshold inputs are always in **watts**, including when the sensor uses kW.
+Keep the resume threshold higher than the pause threshold. A higher minimum
+current needs correspondingly higher thresholds. The default hold time is
+six minutes; keep it longer than five minutes. These examples do not switch
+phases automatically.
 
-The installer records a digest of every file it writes. On the next start it
-replaces a file only if it still matches what was written; a blueprint you
-edited is left alone, and so is a file you created under the same name. A
-blueprint that is withdrawn in a later version is removed only if it was never
-touched.
+## What to expect
 
-If you want to start from a shipped blueprint and change it, copy it to a new
-filename first. Then updates to the original never fight your copy.
+- The current updates when the surplus sensor changes. A faster request is
+  deferred by the integration to respect the five-second write interval.
+- **Charging paused: on** prevents the current blueprint from writing. To
+  keep a manual pause, also disable the pause/resume automation; that
+  automation is explicitly allowed to resume when its threshold is met.
+- Missing or invalid power values, or a unit other than W/kW, produce no new
+  commands. They do **not** pause charging automatically. The last setting
+  remains in effect while the integration's heartbeat continues.
+- An unavailable pause switch or phase sensor prevents current adjustment.
+- Home Assistant resets pending hold timers when it restarts or reloads
+  automations. The thresholds must become true again to trigger a new timer;
+  this is not a persistent charging schedule. See the
+  [Home Assistant trigger documentation](https://www.home-assistant.io/docs/automation/trigger/#template-trigger).
+- Avoid competing automations that write the current or pause switch. A
+  tariff schedule, manual command or phase change can conflict with PV control.
 
-## Writing your own instead
+These are convenience automations, not house-connection overload protection.
+Review [Safety and limitations](safety.md) and test the behavior with your
+vehicle before leaving an automation unattended.
 
-[automations.md](automations.md) has the same logic as plain YAML
-automations, with more explanation and more room to adapt. The blueprints are
-the packaged form of those recipes, not a different mechanism.
+## Updating existing blueprint automations
+
+With the PV fixes under **Unreleased**, open each existing **Charge from PV
+surplus** automation and select its new **Charging paused** input. Until you
+select it, that automation deliberately sends no current commands. Existing
+automations still load. Review the power sensor, phase assumption and thresholds
+above; re-save your selections and reload automations after the blueprint files
+have been updated. The six-minute hold-time default applies unless you saved
+an explicit value previously.
+
+The integration updates unchanged bundled files on setup. It preserves files
+you have edited, so those copies do **not** receive these fixes automatically.
+Back up custom edits, compare with the updated bundled blueprint and apply the
+changes to your copy. Prefer a separate filename for custom blueprints.
+
+Blueprint files live in
+`config/blueprints/automation/mennekes_amtron_rtu/`. If upgrading from **0.1.0**,
+also follow [Upgrading](upgrading.md) to change old blueprint paths and entity
+references. This is separate from adding the new pause input.
+
+For tariff schedules and action examples, see [Automations](automations.md).

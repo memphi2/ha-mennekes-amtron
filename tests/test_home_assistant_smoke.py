@@ -385,6 +385,7 @@ def test_the_bundled_blueprints_run_as_automations(tmp_path: Path) -> None:
                             "input": {
                                 "surplus_power": surplus,
                                 "charging_current": number,
+                                "charging_paused": pick("_charging_paused"),
                                 "vehicle_connected": pick("_vehicle_connected"),
                                 "switched_phases": pick("_switched_phases"),
                             },
