@@ -18,6 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from .capabilities import capability_is_supported
+from .decode import enum_option
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .registers import REGISTERS_BY_KEY
@@ -137,6 +138,4 @@ def _enum_state(
     """
 
     spec = REGISTERS_BY_KEY.get(description.register_key)
-    if spec is None or spec.enum_map is None or not isinstance(value, int):
-        return None
-    return spec.enum_map.get(value)
+    return enum_option(spec, value) if spec is not None else None
