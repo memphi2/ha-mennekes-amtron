@@ -28,6 +28,19 @@ The script is idempotent and needs an authenticated `gh`.
 a job that exists in `.github/workflows/validate.yml`. Without that check,
 renaming a CI job would leave branch protection quietly protecting nothing.
 
+## Validation dependencies
+
+`requirements-dev.txt` contains the direct validation tools for current and
+preview Home Assistant. Dependabot updates this file as ordinary pip
+requirements. `requirements-dev-min-ha.txt` is maintained separately for the
+minimum supported Home Assistant. Their versions may differ intentionally.
+
+Do not add a `requirements*.in` source: Dependabot treats paired `.in`/`.txt`
+files as pip-compile input/output and adds transitive pins. The repository
+gate rejects both such input files and packages outside its direct-dependency
+allowlist. Home Assistant is installed separately and resolves its own
+dependencies; `pymodbus` compatibility remains covered by the matrix checks.
+
 ## What needs a public repository
 
 Two of those steps need a public repository or a paid plan, and the script

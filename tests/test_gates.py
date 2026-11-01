@@ -598,7 +598,7 @@ def test_the_lock_gate_passes_on_this_repository() -> None:
 def test_the_lock_gate_rejects_a_transitive_pin(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """This is the shape a monthly Dependabot run offers.
+    """Reject the unwanted transitive expansion previously offered by Dependabot.
 
     It expands the lock into pip-compile output, pinning the versions Home
     Assistant happens to resolve today. CI passes, and the next Home Assistant
@@ -607,9 +607,6 @@ def test_the_lock_gate_rejects_a_transitive_pin(
 
     import check_repo
 
-    (tmp_path / "requirements-dev.in").write_text(
-        "mypy==2.4.0\nruff==0.16.10\n", encoding="utf-8"
-    )
     (tmp_path / "requirements-dev.txt").write_text(
         "mypy==2.4.0\nmypy-extensions==1.1.0\nruff==0.16.10\n"
         "typing-extensions==4.16.0\n",
@@ -634,9 +631,6 @@ def test_the_lock_gate_allows_extras_and_comments(
 
     import check_repo
 
-    (tmp_path / "requirements-dev.in").write_text(
-        "# a comment\npymodbus[serial]==3.13.1\nruff==0.16.10\n", encoding="utf-8"
-    )
     (tmp_path / "requirements-dev.txt").write_text(
         "pymodbus==3.13.1  # resolved without the extra\nruff==0.16.10\n",
         encoding="utf-8",
@@ -647,6 +641,22 @@ def test_the_lock_gate_allows_extras_and_comments(
     monkeypatch.setattr(check_repo, "ROOT", tmp_path)
 
     assert check_repo.check_direct_dependency_locks() == []
+
+
+def test_the_lock_gate_rejects_reintroducing_a_pip_compile_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import check_repo
+
+    for name in check_repo.REQUIREMENTS_LOCKS:
+        (tmp_path / name).write_text("ruff==0.17.0\n", encoding="utf-8")
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+    assert check_repo.check_direct_dependency_locks() == []
+
+    (tmp_path / "requirements-dev.in").write_text("ruff==0.17.0\n", encoding="utf-8")
+    failures = check_repo.check_direct_dependency_locks()
+    assert len(failures) == 1
+    assert "requirements-dev.in selects pip-compile" in failures[0]
 
 
 def test_entity_reference_uses_public_names_instead_of_register_keys(

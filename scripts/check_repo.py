@@ -26,7 +26,6 @@ REQUIRED_PATHS = (
     "hacs.json",
     "project-versions.json",
     "pyproject.toml",
-    "requirements-dev.in",
     "requirements-dev.txt",
     "requirements-dev-min-ha.txt",
     "custom_components/mennekes_amtron_rtu/manifest.json",
@@ -87,9 +86,11 @@ SECRET_PATTERN_SOURCES = {
 SHA_PINNED_USES = re.compile(r"uses: [^@\s]+@(?P<ref>[^\s]+)")
 VOLUPTUOUS_IMPORT = re.compile(r"^(?:import voluptuous|from voluptuous)\b")
 
-# The declaration of what the validation environment may contain, and the
-# locks that have to stay within it.
-REQUIREMENTS_DECLARATION = "requirements-dev.in"
+# Keep the allowed direct packages separate from their version pins. A paired
+# requirements-dev.in would make Dependabot treat the .txt as pip-compile output.
+DIRECT_VALIDATION_DEPENDENCIES = frozenset(
+    {"mypy", "pymodbus", "pytest", "pytest-cov", "ruff", "spdx-tools"}
+)
 REQUIREMENTS_LOCKS = ("requirements-dev.txt", "requirements-dev-min-ha.txt")
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 
@@ -282,27 +283,24 @@ def check_direct_dependency_locks() -> list[str]:
     pinned those would either fight that resolution or silently freeze it at
     whatever one Home Assistant release happened to want.
 
-    Dependabot cannot know that: a monthly run reads these files as pip-compile
-    output and offers to expand them into a full transitive lock. The offer
-    looks harmless, because the versions it adds are exactly the ones already
-    installed. This is the check that says no.
+    The .txt files are ordinary pip requirements, without a pip-compile .in
+    source. Reject reintroducing that source or pinning transitive packages.
     """
 
-    declared = _pinned_packages(REQUIREMENTS_DECLARATION)
-    if not declared:
-        return [f"{REQUIREMENTS_DECLARATION} declares no dependencies"]
-
-    failures: list[str] = []
+    failures = [
+        f"{path.name} selects pip-compile in Dependabot; keep direct pins in "
+        "the requirements .txt files without a .in source."
+        for path in sorted(ROOT.glob("requirements*.in"))
+    ]
     for rel in REQUIREMENTS_LOCKS:
         pinned = _pinned_packages(rel)
         if not pinned:
             failures.append(f"{rel} pins no dependencies")
             continue
-        if extra := sorted(pinned - declared):
+        if extra := sorted(pinned - DIRECT_VALIDATION_DEPENDENCIES):
             failures.append(
-                f"{rel} pins {', '.join(extra)}, which "
-                f"{REQUIREMENTS_DECLARATION} does not declare. The locks carry "
-                f"direct dependencies only; Home Assistant resolves the rest."
+                f"{rel} pins {', '.join(extra)}, outside the direct validation "
+                "dependencies. Home Assistant resolves the rest."
             )
     return failures
 
