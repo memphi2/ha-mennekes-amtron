@@ -23,9 +23,22 @@ from custom_components.mennekes_amtron_rtu.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
 from tests.test_home_assistant_smoke import _boot
 
+DETAILS = [
+    f"{kind}_l{phase}"
+    for kind in ("current", "voltage", "power")
+    for phase in (1, 2, 3)
+] + ["session_duration"]
+EXTRAS = [
+    "signaled_current", "downgrade_current", "session_energy",
+    "charging_sessions", "temperature",
+]
+PROFILES = {"full": [], "detail": DETAILS, "lean": DETAILS + EXTRAS}
+SCENARIOS = ("constant", "idle", "connected_idle", "mixed", "charging")
+
 
 async def measure(
-    target: Path, scenario: str, measurement_interval: int = 30, duration: int = 86400
+    target: Path, scenario: str, measurement_interval: int = 30, duration: int = 86400,
+    *, profile: str = "full",
 ):
     interval = 5
     transport = FakeModbusClient(device_bank())
@@ -46,6 +59,9 @@ async def measure(
                         "db_url": f"sqlite:///{target}/recorder.db",
                         "commit_interval": 1,
                         "auto_purge": False,
+                        "exclude": {"entities": [
+                            f"sensor.mennekes_amtron_{key}" for key in PROFILES[profile]
+                        ]},
                     }
                 },
             )
@@ -158,6 +174,7 @@ async def measure(
             }
             result = {
                 "scenario": scenario,
+                "profile": profile,
                 "status_interval": interval,
                 "measurement_interval": measurement_interval,
                 "simulated_seconds": duration,
@@ -180,14 +197,17 @@ async def main() -> None:
     parser.add_argument("output_dir", type=Path)
     parser.add_argument("--measurement-interval", type=int, default=30)
     parser.add_argument("--duration", type=int, default=86400)
+    parser.add_argument("--profile", choices=PROFILES, default="full")
+    parser.add_argument("--scenario", choices=SCENARIOS)
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    for scenario in ("constant", "idle", "connected_idle", "mixed", "charging"):
+    for scenario in (args.scenario,) if args.scenario else SCENARIOS:
         result = await measure(
             args.output_dir / scenario,
             scenario,
             args.measurement_interval,
             args.duration,
+            profile=args.profile,
         )
         sys.stdout.write(json.dumps(result) + "\n")
         sys.stdout.flush()

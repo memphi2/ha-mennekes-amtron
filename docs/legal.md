@@ -14,7 +14,7 @@ applications, protocols or trademarks, or to third-party projects.
 
 ## Trademark notice
 
-MENNEKES, AMTRON, Home Assistant, HACS, Nabu Casa, Anthropic, Claude and other
+MENNEKES, AMTRON, Home Assistant, HACS, Nabu Casa, Modbus and other
 referenced names are trademarks or names of their respective owners. They are
 used only for compatibility, attribution, and descriptive reference. Modbus is
 a registered trademark of Schneider Electric USA, Inc., licensed to the Modbus

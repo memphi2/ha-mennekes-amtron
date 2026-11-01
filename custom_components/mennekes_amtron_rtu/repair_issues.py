@@ -18,9 +18,6 @@ ISSUE_EMS_FALLBACK_NOT_CONFIGURED: Final = "ems_fallback_not_configured"
 ISSUE_UNSUPPORTED_LAYOUT: Final = "unsupported_modbus_layout"
 ISSUE_WRITE_REJECTED: Final = "write_rejected"
 
-FIXABLE_ISSUES: Final = frozenset({ISSUE_EMS_HEARTBEAT_LOST})
-
-
 def heartbeat_lost(data: WallboxData) -> bool:
     """Return true while the wallbox reports the missing-heartbeat error."""
 

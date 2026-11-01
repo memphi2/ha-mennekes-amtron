@@ -78,16 +78,35 @@ sensors. Existing statistics remain until explicitly deleted. See
 
 ## Keep only energy and power statistics
 
-If only total energy and total power history are needed, also add these
-five entries to the same `recorder.exclude.entities` list:
+For the smallest profile, merge this **complete list** into your existing
+`recorder.exclude.entities` list; it includes the detail exclusions above.
+Replace the example IDs with the actual IDs of your wallbox. Keep your
+existing Recorder settings and any other exclusions.
 
 ```yaml
+recorder:
+  exclude:
+    entities:
+      - sensor.mennekes_amtron_current_l1
+      - sensor.mennekes_amtron_current_l2
+      - sensor.mennekes_amtron_current_l3
+      - sensor.mennekes_amtron_voltage_l1
+      - sensor.mennekes_amtron_voltage_l2
+      - sensor.mennekes_amtron_voltage_l3
+      - sensor.mennekes_amtron_power_l1
+      - sensor.mennekes_amtron_power_l2
+      - sensor.mennekes_amtron_power_l3
+      - sensor.mennekes_amtron_session_duration
       - sensor.mennekes_amtron_signaled_current
       - sensor.mennekes_amtron_downgrade_current
       - sensor.mennekes_amtron_session_energy
       - sensor.mennekes_amtron_charging_sessions
       - sensor.mennekes_amtron_temperature
 ```
+
+Keep total energy and total power recorded. Check the configuration and
+restart Home Assistant. Confirm their history continues and the excluded
+sensors still show live readings. Existing statistics are not deleted.
 
 This leaves two statistics series (48 hourly rows per day), with live states
 still available for all excluded sensors. It also removes their new detailed
@@ -135,6 +154,65 @@ Assistant. Time advances only for the integration polling logic: this is
 not a 24-hour soak test of Recorder statistics and retention. The automated
 suite also checks unchanged values, reduced row counts and retained total
 power/energy recording with shorter replays.
+
+### Full history versus the lean profile
+
+Repeated on 2026-11-01 with HA 2026.10.0, a 30-second measurement interval
+and the same synthetic continuous-charging day:
+
+| Profile | Additional state rows | Attribute rows | SQLite allocation |
+|---|---:|---:|---:|
+| Full | 36,031 | 44 | 5,849,088 bytes |
+| Lean, complete list above | 4,320 | 29 | 843,776 bytes |
+
+The lean profile produced **88% fewer state rows** in this scenario. Both
+recorded the same 2,877 total-power changes and 1,439 total-energy changes;
+the other four retained changes describe charging/connection state. These
+are replay measurements with the limitations above, not storage guarantees.
+
+```bash
+.venv/bin/python -m tests.recorder_replay /tmp/amtron-full --scenario charging --profile full
+.venv/bin/python -m tests.recorder_replay /tmp/amtron-lean --scenario charging --profile lean
+```
+
+## Repeated retention and repack checks
+
+`tests/test_recorder_retention.py` runs six simulated daily charging windows
+through the real integration and SQLite Recorder, for both full and lean
+profiles. It compiles short-term and hourly statistics, performs four purge
+cycles with a two-day history window, and verifies actual SQLite `VACUUM`
+completion and database integrity. Detailed history reaches a stable row
+count while hourly energy statistics and their accumulated totals survive.
+
+```bash
+.venv/bin/python -m pytest tests/test_recorder_retention.py
+```
+
+Event time is accelerated; each simulated day contains one hour of readings.
+This checks retention mechanics, not a six-day wall-clock soak or the nightly
+scheduler. It neither proves a fixed database size nor covers host disk
+exhaustion, external databases, backups or other integrations.
+
+## Monitor free space on the database disk
+
+Add [System Monitor](https://www.home-assistant.io/integrations/systemmonitor/)
+and enable **Disk free** for the mount containing your Recorder database.
+Its entities are disabled by default. It monitors a filesystem, not the size
+of an individual directory; verify the selected mount, especially in a
+container or when using a database on another host.
+
+Choose an alert threshold that leaves room for database maintenance and
+normal growth. Home Assistant requires at least the database's size again
+as free temporary space for operations such as repacking; see
+[Recorder disk-space requirements](https://www.home-assistant.io/integrations/recorder/#disk-space-requirements).
+Include backups and WAL growth in your margin. A percentage alone can hide
+insufficient headroom on a large database.
+
+Create an automation that checks **Disk free** at HA startup and every
+15 minutes. If it is below your chosen threshold, create a persistent
+notification with a fixed notification ID so repeated checks replace it.
+Check the sensor's unit when entering the threshold. Test the notification
+before relying on it. Monitor an external database on its own host too.
 
 ## November compatibility and verification
 

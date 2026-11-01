@@ -50,6 +50,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
             config_entry=entry,
             name=f"MENNEKES AMTRON {client.config.port}",
             update_interval=timedelta(seconds=scan_interval),
+            always_update=False,
         )
         self._client = client
         self._identity = identity

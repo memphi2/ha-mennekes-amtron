@@ -11,7 +11,7 @@
       "not_found": "No wallbox answered on this port. Check the wiring (Modbus A is +, B is -, GND connected) and that DIP 4 and DIP 5 on bank S1 are on, with the wallbox restarted afterwards."
     },
     "progress": {
-      "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes. Nothing is written."
+      "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes plus connection checks. No registers are written. During reconfiguration, the existing connection and heartbeat are paused; the wallbox's configured fallback applies."
     },
     "step": {
       "reconfigure": {

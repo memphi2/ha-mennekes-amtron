@@ -20,21 +20,10 @@ from homeassistant.util import dt as dt_util
 from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
+from tests.recorder_replay import DETAILS, EXTRAS
 from tests.test_home_assistant_smoke import _boot
 
 PREFIX = "sensor.mennekes_amtron_"
-DETAILS = [
-    f"{kind}_l{phase}"
-    for kind in ("current", "voltage", "power")
-    for phase in (1, 2, 3)
-] + ["session_duration"]
-EXTRAS = [
-    "signaled_current",
-    "downgrade_current",
-    "session_energy",
-    "charging_sessions",
-    "temperature",
-]
 
 
 @pytest.mark.parametrize("excluded", [[], DETAILS, DETAILS + EXTRAS])

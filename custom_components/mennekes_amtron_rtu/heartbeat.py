@@ -36,9 +36,6 @@ from .registers import HEARTBEAT
 
 _LOGGER = logging.getLogger(__name__)
 
-type TaskFactory = Callable[[Awaitable[None], str], object]
-
-
 class HeartbeatTask:
     """Periodic heartbeat writer for one wallbox."""
 

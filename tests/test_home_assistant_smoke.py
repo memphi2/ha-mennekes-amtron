@@ -98,6 +98,10 @@ async def _start_wallbox(
 def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
     """Set up, switch to master mode, reconfigure and unload again."""
 
+    local_blueprint = tmp_path / "config" / "blueprints" / "automation" / DOMAIN / "solar_surplus_charging.yaml"
+    local_blueprint.parent.mkdir(parents=True)
+    local_blueprint.write_bytes("local blueprint".encode("utf-16"))
+
     async def run() -> None:
         bank = device_bank(error_code=200, fallback_current=0)
         device_port, client_port = _virtual_serial_link()
@@ -229,6 +233,14 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
             assert suggested[CONF_PORT] == client_port
             assert suggested[CONF_DEVICE_ID] == 50
             assert suggested[CONF_FRAME] == "8n2"
+
+            # Saving the same values uses the active client's exclusive port.
+            result = await hass.config_entries.flow.async_configure(
+                reconfigure["flow_id"],
+                {CONF_PORT: client_port, CONF_DEVICE_ID: 50,
+                 CONF_BAUDRATE: 57600, CONF_FRAME: "8n2", CONF_SEARCH: SEARCH_OFF},
+            )
+            assert result["reason"] == "reconfigure_successful"
 
             heartbeat = entry.runtime_data.heartbeat
             assert await hass.config_entries.async_unload(entry.entry_id)

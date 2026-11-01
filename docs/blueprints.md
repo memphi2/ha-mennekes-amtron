@@ -54,6 +54,9 @@ phases automatically.
   therefore also applies after resuming. Resume first restores the remembered
   setpoint; the recalculated value follows at the next permitted write. The
   integration still enforces the five-second current-write interval.
+- A newer valid power budget replaces a still-running current adjustment.
+  The latest value is applied at the next permitted write; a slow response
+  does not silently discard it. Cancellation retains the write cooldown.
 - **Charging paused: on** prevents the current blueprint from writing. To
   keep a manual pause, also disable the pause/resume automation; that
   automation is explicitly allowed to resume when its threshold is met.
@@ -76,13 +79,17 @@ vehicle before leaving an automation unattended.
 
 ## Updating existing blueprint automations
 
-When upgrading to **0.2.2**, open each existing **Charge from PV
-surplus** automation and select its new **Charging paused** input. Until you
+When upgrading from **0.2.1 or earlier**, open each existing **Charge from PV
+surplus** automation and select the **Charging paused** input added in 0.2.2. Until you
 select it, that automation deliberately sends no current commands. Existing
 automations still load. Review the power sensor, phase assumption and thresholds
 above; re-save your selections and reload automations after the blueprint files
 have been updated. The six-minute hold-time default applies unless you saved
 an explicit value previously.
+
+For **0.2.3**, reload existing PV surplus automations after installing the
+updated blueprint to use the latest surplus value during overlapping updates.
+Existing 0.2.2 input selections remain valid.
 
 The integration updates unchanged bundled files on setup. It preserves files
 you have edited, so those copies do **not** receive these fixes automatically.

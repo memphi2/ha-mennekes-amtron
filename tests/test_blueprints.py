@@ -174,6 +174,72 @@ def test_a_manifest_that_is_not_a_mapping_is_survived(tmp_path: Path) -> None:
     assert set(install_blueprints(SOURCE_DIR, tmp_path).installed) == EXPECTED
 
 
+@pytest.mark.parametrize("name", ["solar_surplus_charging.yaml", MANIFEST_NAME])
+def test_non_utf8_local_files_do_not_prevent_other_installs(
+    tmp_path: Path, name: str
+) -> None:
+    content = "local content".encode("utf-16")
+    (tmp_path / name).write_bytes(content)
+    report = install_blueprints(SOURCE_DIR, tmp_path)
+    assert set(report.installed) == EXPECTED - {name}
+    if name != MANIFEST_NAME:
+        assert report.failed == [name]
+        assert (tmp_path / name).read_bytes() == content
+
+
+def test_unwritable_directory_is_optional(tmp_path: Path) -> None:
+    target = tmp_path / "not_a_directory"
+    target.write_text("keep", encoding="utf-8")
+    report = install_blueprints(SOURCE_DIR, target)
+    assert report.failed == ["blueprint directory"]
+    assert not report.changed
+
+
+@pytest.mark.parametrize("name", ["downgrade_notification.yaml", MANIFEST_NAME])
+def test_failed_atomic_update_preserves_original_and_cleans_temporary_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    install_blueprints(SOURCE_DIR, tmp_path)
+    target = tmp_path / "downgrade_notification.yaml"
+    target.write_text("older", encoding="utf-8")
+    manifest_path = tmp_path / MANIFEST_NAME
+    recorded = json.loads(manifest_path.read_text(encoding="utf-8"))
+    recorded[target.name] = digest("older")
+    manifest_path.write_text(json.dumps(recorded), encoding="utf-8")
+    before = (tmp_path / name).read_bytes()
+    replace = Path.replace
+
+    def fail_replace(self: Path, destination: Path) -> Path:
+        if destination.name == name:
+            raise PermissionError("test denies replacement")
+        return replace(self, destination)
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    report = install_blueprints(SOURCE_DIR, tmp_path)
+    assert report.failed == [name]
+    assert (tmp_path / name).read_bytes() == before
+    assert {path.name for path in tmp_path.iterdir()} == EXPECTED | {MANIFEST_NAME}
+
+
+def test_unreadable_retired_file_is_preserved_and_manifest_cannot_escape_target(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "blueprints"
+    target.mkdir()
+    outside = tmp_path / "outside.yaml"
+    outside.write_text("outside", encoding="utf-8")
+    retired = target / "retired.yaml"
+    retired.write_bytes("local".encode("utf-16"))
+    (target / MANIFEST_NAME).write_text(
+        json.dumps({"../outside.yaml": digest("outside"), "retired.yaml": "old"}),
+        encoding="utf-8",
+    )
+    report = install_blueprints(SOURCE_DIR, target)
+    assert report.failed == ["retired.yaml"]
+    assert outside.exists()
+    assert retired.exists()
+
+
 def test_setup_installs_them_through_the_executor() -> None:
     from custom_components.mennekes_amtron_rtu.blueprint_installer import (
         async_install_blueprints,
@@ -182,7 +248,9 @@ def test_setup_installs_them_through_the_executor() -> None:
 
     async def run() -> None:
         hass = FakeHass()
-        target = Path(hass.config_dir) / "blueprints" / "automation" / "mennekes_amtron_rtu"
+        target = (
+            Path(hass.config_dir) / "blueprints" / "automation" / "mennekes_amtron_rtu"
+        )
         report = await async_install_blueprints(hass)
         assert set(report.installed) == EXPECTED
         assert (target / "solar_surplus_charging.yaml").is_file()
@@ -193,7 +261,5 @@ def test_setup_installs_them_through_the_executor() -> None:
 def _minimum_ha() -> str:
     """Return the oldest Home Assistant the project supports."""
 
-    versions = json.loads(
-        (ROOT / "project-versions.json").read_text(encoding="utf-8")
-    )
+    versions = json.loads((ROOT / "project-versions.json").read_text(encoding="utf-8"))
     return str(versions["min_homeassistant"])

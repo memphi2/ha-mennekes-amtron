@@ -7,8 +7,6 @@ from custom_components.mennekes_amtron_rtu.data import (
 )
 from custom_components.mennekes_amtron_rtu.registers import LAYOUT_V01_02, LAYOUT_V01_03
 from custom_components.mennekes_amtron_rtu.repair_issues import (
-    FIXABLE_ISSUES,
-    ISSUE_EMS_HEARTBEAT_LOST,
     fallback_not_configured,
     heartbeat_lost,
     layout_placeholders,
@@ -46,7 +44,3 @@ def test_a_refused_write_raises_the_satellite_issue() -> None:
     assert not write_rejected(diagnostics)
     diagnostics.writes_rejected = 1
     assert write_rejected(diagnostics)
-
-
-def test_only_the_heartbeat_issue_is_fixable() -> None:
-    assert frozenset({ISSUE_EMS_HEARTBEAT_LOST}) == FIXABLE_ISSUES

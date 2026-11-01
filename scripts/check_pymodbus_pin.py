@@ -15,9 +15,12 @@ version at or above it.
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
+import subprocess
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from check_reporting import report_failures
@@ -33,7 +36,39 @@ REQUIREMENT_RE = re.compile(
 def main() -> int:
     """Compare every place the pymodbus version is recorded."""
 
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--install", action="store_true",
+        help="Install the runtime dependency using the installed HA constraints first",
+    )
+    if parser.parse_args().install:
+        result = install_runtime()
+        if result:
+            return result
     return report_failures(check_pin(), "pymodbus requirement validation passed")
+
+
+def install_runtime() -> int:
+    """Resolve the dependency as HA does, after installing validation tools."""
+
+    try:
+        import homeassistant
+    except ImportError:
+        sys.stderr.write("Install the target Home Assistant before resolving pymodbus\n")
+        return 1
+    requirement = manifest_requirement()
+    if requirement is None:
+        return 1
+    operator, minimum = requirement
+    requirements = [f"pymodbus[serial]{operator}{minimum}"]
+    core = core_version()
+    if core is not None:
+        requirements.append(f"pymodbus=={core}")
+    constraints = Path(str(homeassistant.__file__)).parent / "package_constraints.txt"
+    command = [sys.executable, "-m", "pip", "install", "--upgrade", *requirements]
+    if constraints.is_file():
+        command.extend(["--constraint", str(constraints)])
+    return subprocess.run(command, check=False).returncode
 
 
 def check_pin() -> list[str]:
@@ -64,13 +99,26 @@ def check_pin() -> list[str]:
     core = core_version()
     if core is None:
         sys.stdout.write(
-            "Home Assistant is not installed; skipping the Core comparison\n"
+            "No Home Assistant pymodbus pin found; checking the installed minimum\n"
         )
     elif _as_tuple(core) < _as_tuple(minimum):
         failures.append(
             f"Home Assistant Core resolves pymodbus {core}, which is below the "
             f"declared minimum {minimum}"
         )
+    try:
+        installed = version("pymodbus")
+    except PackageNotFoundError:
+        failures.append("pymodbus is not installed; runtime compatibility is untested")
+    else:
+        sys.stdout.write(f"pymodbus installed={installed}, Core pin={core or 'none'}\n")
+        if _as_tuple(installed) < _as_tuple(minimum):
+            failures.append(f"installed pymodbus {installed} is below {minimum}")
+        if core is not None and installed != core:
+            failures.append(
+                f"installed pymodbus {installed} differs from Home Assistant's {core}; "
+                "run scripts/check_pymodbus_pin.py --install"
+            )
     return failures
 
 

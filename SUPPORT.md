@@ -17,6 +17,10 @@
   Assistant pre-release in a job that is allowed to fail, so a breaking change
   in Core is noticed before it ships rather than after. The version is
   resolved, not pinned, so the job never tests a superseded beta
+- The full matrix also runs every Tuesday at 05:43 UTC and can be started
+  manually. On these maintenance runs the early-warning job is required to
+  pass, so a failure makes the workflow red. GitHub Actions notifications
+  should be enabled for this repository. These runs create no update PRs.
 - Python: `3.14`
 - Modbus register layout: `v01.03` (validated), `v01.00`–`v01.02` supported
   with capability gating and untested
@@ -30,6 +34,13 @@ version. The floor is the oldest version any supported Home Assistant
 resolves to. `scripts/check_pymodbus_pin.py` enforces that the declared
 minimum stays a minimum and stays at or below what the installed Home
 Assistant resolves to.
+
+Validation installs the selected Home Assistant first, then its tooling and
+`python scripts/check_pymodbus_pin.py --install`. This resolves pymodbus using
+that HA version's pin and package constraints. The gate checks the **installed**
+version too, so a future Core update cannot pass while tests still use the
+older development pin. The development requirements retain their baseline pin
+for local bootstrapping and dependency alerts.
 
 Core also ships `tmodbus` and `modbus-connection` next to pymodbus for its own
 `modbus` integration, so Core may be migrating away from pymodbus. That does

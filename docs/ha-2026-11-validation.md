@@ -1,5 +1,8 @@
 # Home Assistant 2026.11 preparation and repository audit
 
+Historical v0.2.2 validation snapshot. For the current development checkout,
+see the [current audit](audits/current-legal-provenance.md).
+
 Snapshot: 2026-11-01. Validation for v0.2.2, based on v0.2.1 at commit
 `7fdec943cd3ff966f36f34405a20ad07688129e6`. The release retains Home
 Assistant 2026.9.0 as its minimum; November support is beta-tested.

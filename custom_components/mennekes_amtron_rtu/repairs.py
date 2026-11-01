@@ -31,7 +31,11 @@ LEARN_MORE_URL = (
 def async_setup_repairs(
     hass: HomeAssistant, entry: MennekesAmtronConfigEntry
 ) -> None:
-    """Evaluate the repair issues now and on every coordinator update."""
+    """Evaluate repairs now and when coordinator data or availability changes.
+
+    Control errors also call async_check_repairs directly: a failed write need
+    not change any polled register, and identical polls do not notify listeners.
+    """
 
     async_check_repairs(hass, entry)
     coordinator = entry.runtime_data.coordinator

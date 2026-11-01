@@ -7,6 +7,7 @@ the ones a future caller remembers to throttle.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from typing import Any
@@ -48,7 +49,7 @@ class WriteRateLimiter:
         self._last_write[key] = now
 
     def forget(self, key: str) -> None:
-        """Drop the recorded time of a register, used when a write failed."""
+        """Drop the recorded time only after a definite write rejection."""
 
         self._last_write.pop(key, None)
 
@@ -94,12 +95,14 @@ async def write_register(
     except ConnectionException as err:
         raise AmtronConnectionError(str(err) or "serial connection failed") from err
     except ModbusException as err:
+        if isinstance(err.__cause__, asyncio.CancelledError):
+            raise err.__cause__ from None
         raise AmtronProtocolError(str(err) or "modbus transaction failed") from err
 
     if isinstance(response, ExceptionResponse):
         raise protocol_error_for(response.exception_code, spec.address)
     if response is None or response.isError():
-        raise AmtronWriteRejectedError(
-            f"device rejected the write to 0x{spec.address:04X}"
+        raise AmtronProtocolError(
+            f"write to 0x{spec.address:04X} was not confirmed"
         )
     _LOGGER.debug("Wrote %s = %s to 0x%04X", spec.key, value, spec.address)

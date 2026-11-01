@@ -17,9 +17,14 @@ def test_measurement_interval_reduces_real_recorder_writes(tmp_path: Path) -> No
     async def run() -> None:
         fast = await measure(tmp_path / "fast", "charging", 5, duration=300)
         default = await measure(tmp_path / "default", "charging", 30, duration=300)
+        lean = await measure(tmp_path / "lean", "charging", 30, duration=300, profile="lean")
         assert 0 < default["state_rows"] < fast["state_rows"] * 0.3
         assert default["attributes_rows"] == fast["attributes_rows"]
         assert default["rows_by_entity"]["sensor.mennekes_amtron_total_energy"] > 0
         assert default["rows_by_entity"]["sensor.mennekes_amtron_total_power"] > 0
+        assert 0 < lean["state_rows"] < default["state_rows"] * 0.2
+        for key in ("total_energy", "total_power"):
+            entity_id = f"sensor.mennekes_amtron_{key}"
+            assert lean["rows_by_entity"][entity_id] == default["rows_by_entity"][entity_id]
 
     asyncio.run(run())

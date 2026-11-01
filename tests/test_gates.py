@@ -49,8 +49,7 @@ def test_the_validation_sequence_matches_the_documented_order() -> None:
         "Register map checks",
         "pymodbus requirement check",
         "Ruff",
-        "Python tests",
-        "Python coverage ratchet",
+        "Python tests and coverage",
         "Python typing ratchet",
     ]
 
@@ -146,6 +145,35 @@ def test_the_requirement_gate_rejects_a_minimum_above_core(
     )
     failures = check_pymodbus_pin.check_pin()
     assert any("below the declared minimum" in failure for failure in failures)
+
+
+def test_the_requirement_gate_rejects_testing_an_older_library_than_core(monkeypatch):
+    import check_pymodbus_pin
+
+    monkeypatch.setattr(check_pymodbus_pin, "core_version", lambda: "3.14.0")
+    monkeypatch.setattr(check_pymodbus_pin, "version", lambda _name: "3.13.1")
+    failures = check_pymodbus_pin.check_pin()
+    assert any("differs from Home Assistant" in failure for failure in failures)
+
+
+def test_runtime_install_uses_the_selected_ha_pin_and_constraints(monkeypatch):
+    from types import SimpleNamespace
+
+    import check_pymodbus_pin
+
+    calls = []
+    monkeypatch.setattr(check_pymodbus_pin, "core_version", lambda: "3.14.0")
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(check_pymodbus_pin.subprocess, "run", run)
+    assert check_pymodbus_pin.install_runtime() == 0
+    assert "pymodbus==3.14.0" in calls[0]
+    assert "pymodbus[serial]>=3.13.1" in calls[0]
+    assert calls[0][-2] == "--constraint"
+    assert calls[0][-1].endswith("package_constraints.txt")
 
 
 def test_the_requirement_gate_needs_a_pymodbus_requirement(
@@ -274,10 +302,14 @@ def test_the_protected_checks_match_the_ci_jobs() -> None:
         "validate (min-ha)",
         "validate (current-ha)",
         "validate (preview-ha)",
+        "codex-security-review",
     }
     names = [step.name for step in steps("owner/repo")]
     assert names[0] == "Repository settings"
-    assert any(step.needs_public_or_pro for step in steps("owner/repo"))
+    protection = [step for step in steps("owner/repo") if step.merge_status_checks]
+    assert len(protection) == 1
+    assert protection[0].method == "PATCH"
+    assert protection[0].path.endswith("/protection/required_status_checks")
 
 
 def test_a_renamed_ci_job_breaks_branch_protection(

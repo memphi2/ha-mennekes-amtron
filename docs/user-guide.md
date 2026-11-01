@@ -59,6 +59,13 @@ renaming and multiple devices can change them.
 Use **Reconfigure** on an existing entry to change the connection, rather than
 adding the wallbox again:
 
+Changing bus parameters or starting a search temporarily stops the existing
+connection and its heartbeat. Check the configured fallback first and expect
+charging to pause or enter the fallback state. Failed or cancelled searches
+restore the old entry. The full search has 861 candidates and roughly
+15 minutes of response waits, including one read retry per candidate;
+opening ports and checking a responding device can add time.
+
 | Connection setting | Factory default |
 |---|---|
 | Serial port | Select your adapter; prefer `/dev/serial/by-id/...` |

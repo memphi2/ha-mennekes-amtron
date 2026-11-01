@@ -9,9 +9,8 @@ from __future__ import annotations
 import subprocess
 import sys
 
-# Above the Platinum target of 95. The suite leaves no statement uncovered, so
-# the ratchet sits just under the measured value and catches a real regression
-# instead of tolerating one.
+# Above the Platinum target of 95. Measure statements and branches on every
+# run; term-missing reports the remaining gaps instead of claiming full coverage.
 MINIMUM_COVERAGE = 99
 
 

@@ -6,10 +6,18 @@ not in the repository, so they never show up in a diff and are easy to lose.
 
 ```bash
 python scripts/apply_repo_settings.py            # print what would change
+python scripts/apply_repo_settings.py --check    # read live required checks; report drift
 python scripts/apply_repo_settings.py --apply    # change it
 ```
 
-The script is idempotent and needs an authenticated `gh`.
+The script is idempotent and needs an authenticated `gh` for `--check` or
+`--apply`. Existing branch protection with required status checks must already
+exist; a failed read aborts the update. Review requirements, administrator
+enforcement, restrictions, force-push/deletion policy and conversation rules
+are preserved. Required checks are merged with existing checks, including
+their GitHub App IDs, through the targeted
+[status-check endpoint](https://docs.github.com/en/rest/branches/branch-protection#update-status-check-protection).
+`--check` checks required-check drift only, not every repository setting.
 
 ## What it enforces
 
@@ -18,16 +26,80 @@ The script is idempotent and needs an authenticated `gh`.
 | Issues | enabled |
 | Wiki, Projects | disabled |
 | Merge, squash and rebase merges | all allowed |
-| Auto-merge, delete branch on merge | disabled |
+| Auto-merge | disabled |
+| Delete branch on merge | enabled |
 | Dependabot vulnerability alerts | enabled |
 | Dependabot security updates | enabled |
+| Private vulnerability reporting | enabled |
 | Secret scanning and push protection | enabled |
-| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (current-ha)`, `validate (preview-ha)`, strict |
-| `main`: force pushes, deletions | blocked |
+| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (current-ha)`, `validate (preview-ha)`, `codex-security-review`, strict |
+| Other `main` protections | preserved; not overwritten by this script |
 
-`scripts/check_repo.py` verifies that every required status check still names
-a job that exists in `.github/workflows/validate.yml`. Without that check,
-renaming a CI job would leave branch protection quietly protecting nothing.
+`scripts/check_repo.py` checks the CI job names and requires the security-gate
+workflow and verifier. Tests keep the security status name aligned with the
+required-check policy.
+
+## Required Codex Security Review
+
+Every PR into `main` must have a clean `codex-security-review` status for its
+current head SHA. The status is independent of CodeQL and the ordinary Codex
+code review. The administrator-enforcement setting is preserved.
+
+In [Codex settings](https://chatgpt.com/codex/cloud/settings/general), enable
+**Auto security review → All PRs → On every push** for this repository.
+The owner confirmed these settings on 2026-11-01. Codex settings are outside
+the GitHub repository API; the settings script cannot enable them. See the
+[official Security Review documentation](https://learn.chatgpt.com/docs/security/security-review)
+for scope and reporting thresholds. To retry, post exactly:
+
+```text
+@codex security review
+```
+
+`.github/workflows/security-review.yml` reacts to Codex and maintainer comment
+updates and Validate workflow activity. A new maintainer security-review
+request invalidates an older clean receipt on the same SHA, including when an
+older comment is edited into a request. The verifier compares the request's
+edit time with the receipt's creation time; missing or ambiguous timestamps
+keep the gate pending. It does not wait for the bot to respond before revoking
+the previous status. It executes only the trusted default-branch
+verifier, never PR code, artifacts or caches. The token can read the repository
+and PR metadata and publish commit statuses. It handles fork PRs without using
+`pull_request_target`. A new commit has no successful security status and
+remains blocked until it has fresh evidence.
+
+The verifier checks the bot's numeric user ID and GitHub App ID, full head SHA,
+repository/PR identity, completion state, and the latest explicit clean
+security-review receipt. A changed/unknown bot format fails closed. If Codex
+reports findings, fix them and rerun the review. These are reported findings
+under the configured Codex threshold, not an assurance of vulnerability-free
+code. Report text remains on the PR; the gate stores only a short status and
+an evidence link.
+
+Read-only troubleshooting and an explicitly published recheck:
+
+```bash
+python scripts/check_security_review.py --repository memphi2/ha-mennekes-amtron --pr 16
+python scripts/check_security_review.py --repository memphi2/ha-mennekes-amtron --pr 16 --publish
+```
+
+Use the relevant PR number. Publishing requires authenticated `gh` with status
+write access. As with other commit statuses, repository writers are trusted
+publishers; public commenters cannot publish a status or forge the bot IDs.
+Existing App bindings on other checks are preserved.
+
+The publisher exits successfully after delivering a `pending` status; waiting
+for Codex is an expected state, not a workflow failure. The required commit
+status still blocks merging. Read-only checks exit unsuccessfully until the
+review is approved. Findings, inconsistent evidence and API errors still
+fail the publishing command.
+
+**Initial rollout:** GitHub loads comment and workflow-run handlers from the
+default branch. For the PR introducing this workflow, run the same reviewed
+verifier locally after its final security review and publish its result.
+After this PR is merged, subsequent PRs are evaluated automatically. Do not
+remove the required status to bypass a missing review. If a workflow failed,
+fix the cause and rerun the gate; absent or pending results block merging.
 
 ## Dependency maintenance
 
@@ -71,8 +143,9 @@ dependencies; `pymodbus` compatibility remains covered by the matrix checks.
 
 ## What needs a public repository
 
-Two of those steps need a public repository or a paid plan, and the script
-reports them as unavailable instead of failing:
+Some protection features depend on repository visibility and the GitHub plan.
+Any failed API request makes the script fail, including an unavailable security
+feature; a partial run is never reported as fully applied:
 
 - **Secret scanning and push protection** — GitHub Advanced Security.
 - **Branch protection and rulesets on `main`** — GitHub Pro or Team.
@@ -81,10 +154,8 @@ The repository is public, so both are active. The CodeQL workflow is in the
 same position: its analysis always runs, but uploading the result needs code
 scanning, so that step is conditional on the repository being public.
 
-`ruff` carries the same class of checks regardless: it selects the bandit
-ruleset `S`, which fails the build on the Python findings CodeQL would
-report. CodeQL adds the GitHub Actions analysis and cross-file data flow on
-top, which is why the job stays in place rather than being deleted.
+Ruff's Bandit ruleset `S` provides local Python security checks. It does not
+replace CodeQL's cross-file data-flow or GitHub Actions analysis.
 
 ## Settings this script does not cover
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from pymodbus.exceptions import ModbusIOException
+from pymodbus.pdu import ExceptionResponse
 
 from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu.client import (
@@ -11,6 +13,7 @@ from custom_components.mennekes_amtron_rtu.client import (
     create_serial_client,
 )
 from custom_components.mennekes_amtron_rtu.client_errors import (
+    AmtronBusError,
     AmtronConnectionError,
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
@@ -149,7 +152,7 @@ def test_a_write_inside_the_interval_is_rate_limited() -> None:
     asyncio.run(run())
 
 
-def test_a_failed_write_does_not_start_the_rate_limit() -> None:
+def test_a_definitely_rejected_write_does_not_start_the_rate_limit() -> None:
     transport = FakeModbusClient(device_bank())
     transport.write_exceptions[R.CHARGING_RELEASE.address] = 0x01
 
@@ -161,6 +164,43 @@ def test_a_failed_write_does_not_start_the_rate_limit() -> None:
         transport.write_exceptions.clear()
         await client.async_write_register(R.CHARGING_RELEASE, 1, min_interval=5.0)
         assert transport.writes == [(R.CHARGING_RELEASE.address, [1])]
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", ["lost_reply", "missing_reply", "device_failure", "cancelled"])
+def test_an_uncertain_write_keeps_the_register_interval(failure: str) -> None:
+    class LostReplyClient(FakeModbusClient):
+        first = True
+
+        async def write_registers(self, address, values, *, device_id=1):
+            response = await super().write_registers(address, values, device_id=device_id)
+            if not self.first:
+                return response
+            self.first = False
+            if failure == "lost_reply":
+                raise ModbusIOException("reply lost after the write")
+            if failure == "cancelled":
+                raise asyncio.CancelledError
+            if failure == "device_failure":
+                return ExceptionResponse(0x10, 0x04)
+            return None
+
+    async def run() -> None:
+        transport = LostReplyClient(device_bank())
+        clock = [100.0]
+        client = _client(transport, clock)
+        await client.async_connect()
+        with pytest.raises(asyncio.CancelledError if failure == "cancelled" else AmtronBusError):
+            await client.async_write_register(R.CHARGING_CURRENT_EMS, 6.0)
+        clock[0] += 1
+        with pytest.raises(AmtronRateLimitedError):
+            await client.async_write_register(R.CHARGING_CURRENT_EMS, 10.0)
+        assert len(transport.writes) == 1
+        clock[0] += 4
+        await client.async_write_register(R.CHARGING_CURRENT_EMS, 10.0)
+        assert len(transport.writes) == 2
+        await client.async_close()
 
     asyncio.run(run())
 

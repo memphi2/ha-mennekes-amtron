@@ -24,7 +24,12 @@ from pymodbus import FramerType
 from pymodbus.client import AsyncModbusSerialClient
 
 from . import _client_read, _client_write
-from .client_errors import AmtronConnectionError, AmtronRateLimitedError
+from .client_errors import (
+    AmtronConnectionError,
+    AmtronIllegalAddressError,
+    AmtronRateLimitedError,
+    AmtronWriteRejectedError,
+)
 from .const import (
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
@@ -74,7 +79,10 @@ def create_serial_client(config: SerialConfig) -> AsyncModbusSerialClient:
         parity=config.parity,
         stopbits=config.stopbits,
         timeout=config.timeout,
-        retries=config.retries,
+        # A lost reply does not prove that a write was not applied. Library
+        # retries would resend it after one second, bypassing our write floor.
+        # Only reads may retry, explicitly in _client_read.read_words.
+        retries=0,
     )
 
 
@@ -170,6 +178,7 @@ class MennekesModbusClient:
                 address=address,
                 count=count,
                 device_id=self._config.device_id,
+                retries=self._config.retries,
             )
 
     async def async_read_register(self, spec: RegisterSpec) -> RegisterValue:
@@ -182,6 +191,7 @@ class MennekesModbusClient:
                 address=spec.address,
                 count=spec.count,
                 device_id=self._config.device_id,
+                retries=self._config.retries,
             )
         return decode_register(spec, words)
 
@@ -195,6 +205,7 @@ class MennekesModbusClient:
                 address=address,
                 count=count,
                 device_id=self._config.device_id,
+                retries=self._config.retries,
             )
 
     async def async_write_register(
@@ -218,6 +229,23 @@ class MennekesModbusClient:
         async with self._queue:
             await self._async_write_locked(spec, value, min_interval=min_interval)
 
+    def check_write_interval(
+        self, spec: RegisterSpec, *, min_interval: float = 0.0
+    ) -> None:
+        """Reject a write still in cooldown, without reserving the register.
+
+        Compound operations can check before changing other registers. They
+        must serialize their callers; the actual write checks again on the bus.
+        """
+
+        if spec.key == "charging_current_ems":
+            min_interval = max(min_interval, MIN_CURRENT_WRITE_INTERVAL_SECONDS)
+        remaining = self._rate_limiter.remaining(
+            spec.key, now=self._monotonic(), min_interval=min_interval
+        )
+        if remaining > 0:
+            raise AmtronRateLimitedError(spec.key, remaining)
+
     async def _async_write_locked(
         self,
         spec: RegisterSpec,
@@ -226,16 +254,9 @@ class MennekesModbusClient:
         min_interval: float,
     ) -> None:
         async with self._lock:
-            if spec.key == "charging_current_ems":
-                min_interval = max(min_interval, MIN_CURRENT_WRITE_INTERVAL_SECONDS)
-            now = self._monotonic()
-            remaining = self._rate_limiter.remaining(
-                spec.key, now=now, min_interval=min_interval
-            )
-            if remaining > 0:
-                raise AmtronRateLimitedError(spec.key, remaining)
+            self.check_write_interval(spec, min_interval=min_interval)
             client = self._require_client()
-            self._rate_limiter.record(spec.key, now=now)
+            self._rate_limiter.record(spec.key, now=self._monotonic())
             try:
                 await _client_write.write_register(
                     client,
@@ -243,7 +264,10 @@ class MennekesModbusClient:
                     value=value,
                     device_id=self._config.device_id,
                 )
-            except Exception:
+            except (AmtronWriteRejectedError, AmtronIllegalAddressError):
+                # A definite rejection did not change the register. A missing
+                # reply or transport failure may follow an applied write, so
+                # those retain the interval, as does cancellation.
                 self._rate_limiter.forget(spec.key)
                 raise
 
