@@ -58,8 +58,11 @@ for scope and reporting thresholds. To retry, post exactly:
 
 `.github/workflows/security-review.yml` reacts to Codex and maintainer comment
 updates and Validate workflow activity. A new maintainer security-review
-request invalidates an older clean receipt on the same SHA immediately,
-without waiting for the bot to respond. It executes only the trusted default-branch
+request invalidates an older clean receipt on the same SHA, including when an
+older comment is edited into a request. The verifier compares the request's
+edit time with the receipt's creation time; missing or ambiguous timestamps
+keep the gate pending. It does not wait for the bot to respond before revoking
+the previous status. It executes only the trusted default-branch
 verifier, never PR code, artifacts or caches. The token can read the repository
 and PR metadata and publish commit statuses. It handles fork PRs without using
 `pull_request_target`. A new commit has no successful security status and

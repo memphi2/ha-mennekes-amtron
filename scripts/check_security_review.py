@@ -12,6 +12,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import datetime
 from typing import Any
 
 STATUS_CONTEXT = "codex-security-review"
@@ -129,13 +130,27 @@ def evaluate(
     if not receipts:
         return "failure", "No clean security-review receipt for this commit", None
     receipt = receipts[-1]
-    if any(
-        c["id"] > receipt["id"]
-        and c.get("body", "").strip() == "@codex security review"
-        and c.get("author_association") in {"OWNER", "MEMBER", "COLLABORATOR"}
+    requests = [
+        c
         for c in comments
-    ):
-        return "pending", "Waiting for the newly requested security review", None
+        if c.get("body", "").strip() == "@codex security review"
+        and c.get("author_association") in {"OWNER", "MEMBER", "COLLABORATOR"}
+    ]
+    if requests:
+        try:
+            completed_at = datetime.fromisoformat(receipt["created_at"])
+            requested_at = [datetime.fromisoformat(c["updated_at"]) for c in requests]
+            if completed_at.tzinfo is None or any(t.tzinfo is None for t in requested_at):
+                raise ValueError("Review timestamps must include a timezone")
+        except KeyError, TypeError, ValueError:
+            return "pending", "Cannot verify security-review request timestamps", None
+        # IDs do not change when an old comment is edited into a request. Use
+        # its edit time and the receipt's creation time; editing a receipt later
+        # must not renew approval. Equal-second timestamps stay closed.
+        if any(t >= completed_at for t in requested_at) or any(
+            c["id"] > receipt["id"] for c in requests
+        ):
+            return "pending", "Waiting for the newly requested security review", None
     reviewed = re.search(
         r"\*\*Reviewed commit:\*\* `([0-9a-f]{10,40})`", receipt["body"]
     )

@@ -46,6 +46,8 @@ def evidence():
         {
             **copy.deepcopy(identity),
             "id": 2,
+            "created_at": "2026-11-01T19:00:00Z",
+            "updated_at": "2026-11-01T19:00:00Z",
             "html_url": "https://github.com/owner/repo/pull/16#issuecomment-2",
             "body": "<!-- codex-review-receipt:v1 -->\n### Codex Security Review\n"
             + gate.CLEAN_RECEIPT
@@ -171,13 +173,66 @@ def test_paginated_evidence_is_not_truncated(monkeypatch):
 def test_an_old_clean_receipt_cannot_satisfy_a_new_manual_review():
     comments = evidence()
     comments.append({
-        "id": 3, "body": "@codex security review", "author_association": "OWNER"
+        "id": 3, "body": "@codex security review", "author_association": "OWNER",
+        "updated_at": "2026-11-01T19:01:00Z",
     })
     assert gate.evaluate(REPO, 16, SHA, comments)[0] == "pending"
     fresh = copy.deepcopy(comments[1])
     fresh["id"] = 4
+    fresh["created_at"] = "2026-11-01T19:02:00Z"
     comments.append(fresh)
     assert gate.evaluate(REPO, 16, SHA, comments)[0] == "success"
+
+
+def test_editing_an_old_comment_into_a_request_requires_a_fresh_receipt():
+    comments = evidence()
+    comments.append({
+        "id": 0, "body": "@codex security review", "author_association": "OWNER",
+        "created_at": "2026-11-01T18:00:00Z",
+        "updated_at": "2026-11-01T19:01:00Z",
+    })
+    # A later edit to the old receipt is not a new completed review.
+    comments[1]["updated_at"] = "2026-11-01T19:02:00Z"
+    assert gate.evaluate(REPO, 16, SHA, comments)[0] == "pending"
+    fresh = copy.deepcopy(comments[1])
+    fresh.update(id=3, created_at="2026-11-01T19:03:00Z")
+    comments.append(fresh)
+    assert gate.evaluate(REPO, 16, SHA, comments)[0] == "success"
+
+
+@pytest.mark.parametrize(
+    ("association", "updated_at", "expected"),
+    [
+        ("OWNER", "2026-11-01T18:59:59Z", "success"),
+        ("MEMBER", "2026-11-01T19:00:00Z", "pending"),
+        ("COLLABORATOR", "2026-11-01T20:01:00+01:00", "pending"),
+        ("NONE", "2026-11-01T19:01:00Z", "success"),
+    ],
+)
+def test_review_request_edit_order_and_authorization(association, updated_at, expected):
+    comments = evidence()
+    comments.append({
+        "id": 0, "body": "@codex security review", "author_association": association,
+        "updated_at": updated_at,
+    })
+    assert gate.evaluate(REPO, 16, SHA, comments)[0] == expected
+
+
+@pytest.mark.parametrize("target", ["receipt", "request"])
+@pytest.mark.parametrize("timestamp", [None, "invalid", "2026-11-01T18:59:00"])
+def test_unverifiable_review_timestamps_never_approve(target, timestamp):
+    comments = evidence()
+    request = {
+        "id": 0, "body": "@codex security review", "author_association": "OWNER",
+        "updated_at": "2026-11-01T18:59:00Z",
+    }
+    comments.append(request)
+    comment, key = (comments[1], "created_at") if target == "receipt" else (request, "updated_at")
+    if timestamp is None:
+        del comment[key]
+    else:
+        comment[key] = timestamp
+    assert gate.evaluate(REPO, 16, SHA, comments)[0] == "pending"
 
 
 def test_read_only_check_never_publishes(monkeypatch):

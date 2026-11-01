@@ -34,9 +34,9 @@ including its package constraints:
 
 | HA version | Tests passed | Skipped | Statement/branch coverage |
 |---|---:|---:|---:|
-| 2026.9.0 | 530 | 2 | 99.44% |
-| 2026.10.0 | 530 | 2 | 99.44% |
-| 2026.11.0b1 | 532 | 0 | 99.44% |
+| 2026.9.0 | 541 | 2 | 99.44% |
+| 2026.10.0 | 541 | 2 | 99.44% |
+| 2026.11.0b1 | 543 | 0 | 99.44% |
 
 The two skips concern Marketplace APIs absent in the older HA versions.
 Strict typing passed for all 54 source/tooling modules against current and
@@ -98,7 +98,8 @@ checks were added to live branch protection. Administrator enforcement and
 all other protection settings were verified unchanged. The owner confirmed
 automatic Codex security review for all PRs on every push.
 
-The security gate has 37 regression cases. Its publisher can successfully
+The security gate has 48 regression cases, including edited review requests,
+timestamp ordering and authorization. Its publisher can successfully
 deliver a blocking `pending` status without treating normal waiting as a job
 failure. Read-only checks still fail until review approval. The gate uses
 authenticated bot evidence and executes only trusted default-branch code; see
