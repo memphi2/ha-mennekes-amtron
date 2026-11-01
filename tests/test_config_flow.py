@@ -75,11 +75,13 @@ class Flow(MennekesAmtronConfigFlow):
     def _get_reconfigure_entry(self) -> FakeConfigEntry:
         return self.reconfigure_entry
 
-    def async_update_reload_and_abort(
+    def async_update_and_abort(
         self, entry: Any, *, data_updates: dict[str, Any]
     ) -> dict[str, Any]:
         self.updates = data_updates
         return {"type": "abort", "reason": "reconfigure_successful"}
+
+    async_update_reload_and_abort = async_update_and_abort
 
 
 def _patch_connection(monkeypatch: pytest.MonkeyPatch, result: Any) -> None:

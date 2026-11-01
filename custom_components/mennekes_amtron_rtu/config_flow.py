@@ -231,9 +231,13 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if step_id == "reconfigure":
             self._abort_if_unique_id_mismatch()
-            return self.async_update_reload_and_abort(
-                self._get_reconfigure_entry(), data_updates=data
-            )
+            entry = self._get_reconfigure_entry()
+            if not entry.update_listeners:
+                # An unloaded or failed setup has no listener to start it.
+                return self.async_update_reload_and_abort(entry, data_updates=data)
+            # The entry's update listener owns reloading, including options.
+            # A second reload here races it and is rejected from HA 2026.12.
+            return self.async_update_and_abort(entry, data_updates=data)
 
         self._abort_if_unique_id_configured()
         return self.async_create_entry(title=_entry_title(identity), data=data)

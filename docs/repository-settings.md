@@ -20,13 +20,48 @@ The script is idempotent and needs an authenticated `gh`.
 | Merge, squash and rebase merges | all allowed |
 | Auto-merge, delete branch on merge | disabled |
 | Dependabot vulnerability alerts | enabled |
+| Dependabot security updates | enabled |
 | Secret scanning and push protection | enabled |
-| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (current-ha)`, strict |
+| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (current-ha)`, `validate (preview-ha)`, strict |
 | `main`: force pushes, deletions | blocked |
 
 `scripts/check_repo.py` verifies that every required status check still names
 a job that exists in `.github/workflows/validate.yml`. Without that check,
 renaming a CI job would leave branch protection quietly protecting nothing.
+
+## Dependency maintenance
+
+Routine GitHub Actions and Python tool updates are checked quarterly, on
+January 1, April 1, July 1 and October 1. Each ecosystem has one version-update
+group and at most one open routine PR. Python major versions, Home Assistant
+and `pymodbus` remain planned compatibility work with matrix validation.
+
+Security updates have separate groups and are opened when GitHub detects an
+applicable advisory with a fix; they do not wait for the quarterly schedule
+or consume the routine PR limit. Alerts and automatic security PRs must both
+be enabled in GitHub. The settings script declares both switches. Review
+alerts affecting the manually maintained minimum-HA requirements as well.
+
+These rules take effect once `.github/dependabot.yml` reaches the default
+branch. Review and passing checks are still required before merging. Changes
+limited to validation tools or GitHub Actions do not need an integration
+release. HA API changes and security fixes may require work between quarters.
+
+See the [Dependabot options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference)
+for schedules, groups and the separate security-update limit.
+
+## Validation dependencies
+
+`requirements-dev.txt` contains the direct validation tools for current and
+preview Home Assistant. Dependabot updates this file as ordinary pip
+requirements. `requirements-dev-min-ha.txt` is maintained separately for the
+minimum supported Home Assistant. Their versions may differ intentionally.
+
+Do not add a `requirements*.in` source: Dependabot treats paired `.in`/`.txt`
+files as pip-compile input/output and adds transitive pins. The repository
+gate rejects both such input files and packages outside its direct-dependency
+allowlist. Home Assistant is installed separately and resolves its own
+dependencies; `pymodbus` compatibility remains covered by the matrix checks.
 
 ## What needs a public repository
 

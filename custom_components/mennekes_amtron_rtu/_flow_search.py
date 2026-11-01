@@ -139,16 +139,14 @@ async def async_probe(config: SerialConfig) -> DeviceIdentity | None:
     client = MennekesModbusClient(config)
     try:
         await client.async_connect()
-    except AmtronConnectionError:
-        # Raised on to the search, which decides whether this was one bad
-        # candidate or a port that cannot be used at all.
-        raise
-    try:
-        layout = await client.async_read_register(MODBUS_LAYOUT_VERSION)
-        if not isinstance(layout, int) or layout <= 0:
+        try:
+            layout = await client.async_read_register(MODBUS_LAYOUT_VERSION)
+            if not isinstance(layout, int) or layout <= 0:
+                return None
+            return await async_read_identity(client)
+        except AmtronBusError:
             return None
-        return await async_read_identity(client)
-    except AmtronBusError:
-        return None
     finally:
+        # Opening may fail or be cancelled after allocating the transport.
+        # Close it before probing another candidate with different settings.
         await client.async_close()

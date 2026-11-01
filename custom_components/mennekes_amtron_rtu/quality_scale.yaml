@@ -77,7 +77,7 @@ rules:
     status: done
     comment: >-
       Read platforms use the coordinator; command platforms set
-      PARALLEL_UPDATES to 1 because RS-485 is a single-master bus.
+      PARALLEL_UPDATES to 1 because Modbus RTU uses a single master.
   reauthentication-flow:
     status: exempt
     comment: The serial bus has no credentials.

@@ -2,15 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-# Core re-exports the device-class enums with ``noqa`` instead of ``__all__``
-# (2026.10), so mypy cannot see the re-export; see docs/architecture.md.
-# ``--strict`` flags the ignore as unused once Core exports the name itself.
-from homeassistant.components.button import (  # type: ignore[attr-defined]
-    ButtonDeviceClass,
-    ButtonEntity,
-)
+from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -19,6 +13,11 @@ from .capabilities import capability_is_supported
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .registers import ERROR_CODE, SYSTEM_RESTART
+
+if TYPE_CHECKING:
+    from homeassistant.components.button.const import ButtonDeviceClass
+else:
+    from homeassistant.components.button import ButtonDeviceClass
 
 PARALLEL_UPDATES = 1
 

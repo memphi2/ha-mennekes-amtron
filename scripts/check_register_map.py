@@ -337,13 +337,22 @@ def check_entity_reference() -> list[str]:
     entity that is not in it is an entity nobody can use on purpose.
     """
 
+    from homeassistant.util import slugify
+
     reference = ENTITY_REFERENCE.read_text(encoding="utf-8")
-    return [
-        f"docs/entities.md does not describe {platform}.{key}"
-        for platform, keys in _entity_keys().items()
-        for key in sorted(keys)
-        if f"`{platform}.*_{key}`" not in reference
-    ]
+    translated = _translation_payloads()["en"].get("entity", {})
+    failures: list[str] = []
+    for platform, keys in _entity_keys().items():
+        for key in sorted(keys):
+            name = translated.get(platform, {}).get(key, {}).get("name", "")
+            # HA generates default IDs from the translated name, not the
+            # internal key (energy_total -> total_energy, for example).
+            if not name or f"`{platform}.*_{slugify(name)}`" not in reference:
+                failures.append(
+                    f"docs/entities.md does not describe {platform}.{key} "
+                    "with its English entity ID"
+                )
+    return failures
 
 
 def check_enum_states() -> list[str]:

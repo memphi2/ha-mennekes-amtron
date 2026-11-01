@@ -1,138 +1,120 @@
-# Quick Start
+# Quick start
 
-## 1. Hardware
+This walkthrough takes you from an installed adapter to the first controlled
+charge. Normal setup uses the Home Assistant UI; a command-line bus check is
+optional.
 
-Cabling, DIP switches, the §14a downgrade input and USB passthrough are in
-**[hardware.md](hardware.md)**. The two things you cannot skip:
+## 1. Check the hardware
 
-- Modbus `A` is `+`, `B` is `−`, and `GND` has to be connected.
-- The wallbox has to be in **Modbus satellite mode**: bank S1, DIP 4 and
-  DIP 5 to ON, then restart it. Without that it answers nothing.
+Have a qualified electrician prepare the wallbox using its installation
+manual and the [hardware guide](hardware.md). It must support Modbus RTU,
+have the RS-485 adapter connected, and be in **Modbus satellite mode**
+(bank S1, DIP 4 and DIP 5 on, followed by a wallbox restart).
 
-RS-485 is a **single-master** bus. If another energy manager or a §14a control
-box already drives it, do not add a second master — keep this integration in
-read-only mode. See [safety.md](safety.md).
+Confirm **exclusive bus access**. Another energy manager, control box or Home
+Assistant instance must not drive the same bus. Read-only mode also sends
+requests; it is not a passive listener.
 
-## 3. Install
+## 2. Install
 
-**HACS**
+Install **Mennekes Amtron RTU** by **memphi2** using the
+[installation guide](installation.md): Marketplace on Home Assistant 2026.11+,
+HACS on 2026.9/2026.10. That guide includes the custom-repository fallback and
+explains when a restart is needed.
 
-**Existing 0.1.0 installation:** follow [Upgrading](upgrading.md) first.
-The integration domain changes in 0.2.0 and the wallbox must be added again.
+For an existing **0.1.0** installation, follow [Upgrading](upgrading.md) first.
+Existing **0.2.x** entries can be kept.
 
-1. Search HACS for **MENNEKES AMTRON RTU (Unofficial)** by **memphi2**.
-2. While the default-catalog submission is pending, add
-   `https://github.com/memphi2/ha-mennekes-amtron` through the three-dot menu →
-   *Custom repositories*, category *Integration*, then search again.
-3. Download the integration, then restart Home Assistant.
+## 3. Make the adapter available
 
-## 4. Find the adapter
+Connect the USB RS-485 adapter to the machine running Home Assistant. With a
+virtual machine or container, pass it through to Home Assistant; see
+[USB passthrough](hardware.md#making-the-adapter-visible-to-home-assistant). The setup form lists available
+ports and prefers stable `/dev/serial/by-id/...` paths. Use one when available:
+`/dev/ttyUSB0` can change after reconnecting USB devices.
 
-The adapter is plugged into the machine Home Assistant runs on, so this has to
-run there too:
+If the adapter is missing from the list, check passthrough and permissions
+before changing wallbox settings. You can enter a port manually in the form.
 
-| Installation | Command |
+## 4. Check fallback behavior
+
+Read [Safety and limitations](safety.md), especially the energy-manager
+fallback. In master mode, the wallbox depends on a heartbeat from Home
+Assistant. A restart, lost USB connection or integration removal stops it.
+Configure the intended fallback with the manufacturer's tool before enabling
+control. Keep the vehicle disconnected during the initial control setup.
+
+## 5. Add the wallbox
+
+Open **Settings → Devices & services → Add integration → Mennekes Amtron RTU**.
+Select the adapter and enter the configured bus settings.
+Factory defaults are:
+
+| Setting | Value |
 |---|---|
-| Home Assistant OS / Supervised | `docker exec homeassistant ls -l /dev/serial/by-id/` |
-| Home Assistant Container | `docker exec homeassistant ls -l /dev/serial/by-id/` |
-| Home Assistant Core | `ls -l /dev/serial/by-id/` |
+| Device address | `50` |
+| Baud rate | `57600` |
+| Data bits / parity / stop bits | `8` / `N` / `2` |
 
-On Home Assistant OS, open a shell with the *Advanced SSH & Web Terminal*
-add-on and turn its protection mode off, otherwise the add-on cannot reach
-`docker`.
+The form verifies communication before creating an entry. If the values are
+unknown, use its search option: search addresses at the chosen bus settings
+first, or all documented baud rates and frames if needed. The broader search
+can take several minutes. Searches send read requests without register writes
+or a heartbeat and still require exclusive bus access.
 
-Use the `/dev/serial/by-id/...` path, not `/dev/ttyUSB0`: the `ttyUSB` number
-changes when devices are re-enumerated, the `by-id` path does not.
+## 6. Verify readings, then enable control
 
-## 5. Prove the bus before writing anything
+New entries start in **read-only** mode: sensors are available, controls and
+the heartbeat are disabled. Compare the readings with the wallbox display.
+Read-only mode does not take over an energy-manager heartbeat.
 
-The integration ships the check, so after step 3 it is already on the machine
-with the adapter, at
-`/config/custom_components/mennekes_amtron_rtu/smoke_modbus.py`. Home Assistant's
-own Python already has pymodbus, so nothing has to be installed:
+When readings are plausible and fallback is configured, open the entry
+options. Set the **charging current cap** for your installation and change
+**Control mode** to **Modbus master**. The entry reloads, starts the heartbeat
+and adds the controls. Resolve any repair messages before charging.
 
-| Installation | Command |
-|---|---|
-| Home Assistant OS / Supervised / Container | `docker exec -it homeassistant python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py <port>` |
-| Home Assistant Core | `/srv/homeassistant/bin/python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py <port>` |
+## 7. First charge
 
-The check is read-only and sends no heartbeat, so it cannot put the wallbox
-into the energy-manager error state. A good run prints:
+1. Set **Charging current limit** to 6 A before connecting the vehicle.
+2. Connect the vehicle and complete any required authorization. Check that
+   the wallbox is unlocked and charging is released.
+3. Check **Charging**, **EVSE state**, **Signaled current** and **Total power**.
+   Actual charging also depends on the vehicle; a connection alone does not
+   guarantee that it will draw current.
+4. Raise the limit as appropriate. Faster changes are deferred to respect the
+   five-second write interval.
+5. Test **Charging paused**: on pauses; off resumes after the waiting interval.
+   Allow more than five minutes between pause and resume. Do not set 0 A to stop.
 
-```text
-port             /dev/serial/by-id/usb-...
-bus              57600 baud, 8N2
-device address   50
-modbus layout    v01.03
-firmware         2023.21.11024
-serial number    <your serial>
-article number   1313201205
-evse state       1 (idle, no vehicle connected)
-max EVSE current 16.0 A
+Once basic operation is verified, follow the [user guide](user-guide.md),
+configure [Recorder](recorder.md) and add [blueprint automations](blueprints.md).
 
-The bus is fine. Add the integration with these values.
-```
+## Optional command-line bus check
 
-If you do not know the device address, or somebody changed the bus parameters
-with the MENNEKES configuration tool, let it search:
+Use this only for troubleshooting, before adding an active entry or after
+unloading it. The check needs exclusive use of the serial port and bus; do not
+run it alongside the integration or another Modbus master.
+
+From a host administration shell with access to the Home Assistant container:
 
 ```bash
 docker exec -it homeassistant \
   python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py \
-  /dev/serial/by-id/<your-adapter> --scan --scan-baudrate
+  /dev/serial/by-id/REPLACE_WITH_YOUR_ADAPTER
 ```
 
-`--scan` tries every documented device address from 10 to 50, and
-`--scan-baudrate` every documented baud rate as well. It prints how long that
-will take before it starts.
+Adjust the container name and config path if needed. The installed integration
+includes the script and its dependencies. It reads identification and state
+registers without writing or sending a heartbeat. `--scan` searches addresses;
+`--scan-baudrate` extends that search to bus settings. A failure can mean port
+access, wiring, conflicting bus use, unsupported responses or incorrect settings.
+See [Troubleshooting](troubleshooting.md).
 
-If it fails, the cause is wiring, bus parameters or the device address — not
-Home Assistant.
-
-## 6. Add the wallbox
-
-*Settings → Devices & services → Add integration → MENNEKES AMTRON RTU (Unofficial).*
-
-Pick the port, confirm the device address and the bus parameters. The flow
-opens the port and reads the device before it creates the entry, so a wrong
-value fails here instead of producing an empty device.
-
-**If you do not know the address or the parameters**, leave the last field at
-*Search every device address*. When the values you entered do not work, the
-flow tries every documented device address at your bus parameters — about
-twenty seconds — and offers what it found. *Search every address, baud rate
-and frame* widens that to every documented combination and takes several
-minutes. Both only read registers, so neither can disturb a wallbox or put it
-into the energy-manager error state.
-
-## 7. Start in read-only mode
-
-A new entry is **read-only**: it polls and creates sensors, but it never
-writes and it sends no heartbeat. Check that the sensors look plausible
-against the wallbox display.
-
-When you are satisfied, open the entry options and switch *Control mode* to
-**Modbus master**. The entry reloads, the heartbeat task starts and the
-control entities appear.
-
-## 8. First charge
-
-1. Set `number.<name>_charging_current_limit` to 6 A.
-2. `sensor.<name>_signaled_current` has to follow within a few seconds.
-3. `sensor.<name>_cp_state` goes to `C2`, `sensor.<name>_evse_state` to
-   `Charging`.
-4. Raise the limit. Leave at least five seconds between changes — the
-   integration defers faster changes rather than rejecting them, but the
-   wallbox still only accepts one every five seconds.
+The output includes device identifiers. Remove the serial number and full
+adapter path before sharing it publicly. This check is optional; do not enable
+host-shell access solely to complete normal UI setup.
 
 ## Removing the integration
 
-*Settings → Devices & services → MENNEKES AMTRON RTU (Unofficial) → three-dot menu → Delete.*
-
-Deleting the entry stops the heartbeat and closes the serial port. The
-wallbox keeps the last values it received; if you want it to fall back to a
-defined state instead, configure an energy-manager fallback current with the
-MENNEKES configuration tool before removing the integration.
-
-To remove the files as well, uninstall it in HACS or delete
-`custom_components/mennekes_amtron_rtu`.
+Follow [Removal](installation.md#removal). Deleting an entry stops its
+heartbeat and closes the serial port; check fallback behavior first.

@@ -5,6 +5,68 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+## 0.2.2 — 2026-11-01
+
+### Upgrade action
+
+- Existing **Charge from PV surplus** automations must select the wallbox's
+  new **Charging paused** input, then be saved and reloaded. Until configured,
+  they load but send no current commands. Edited blueprint copies need the
+  changes applied manually. See [Blueprint updates](docs/blueprints.md#updating-existing-blueprint-automations).
+
+### Changed
+
+- Use **Mennekes Amtron RTU** as the Marketplace/HACS display name and setup
+  title. Add the direct Marketplace repository button to the README.
+- Group routine dependency updates quarterly with one open PR per ecosystem;
+  keep security updates separate and enabled in the repository settings.
+  Remove the pip-compile input that caused unwanted transitive Python pins.
+- Rewrite end-user setup, daily controls, automation and troubleshooting
+  guidance. Correct entity IDs and action fields, explain phase-switch pauses,
+  and put Recorder retention/exclusion choices before technical measurements.
+  Remove unsupported physical-validation and whole-house protection claims.
+- Exercise the built-in Marketplace installer offline: first install, update
+  restart requests, rollback of an invalid package and coexistence with TCP.
+- Document Marketplace installation, existing entries, updates and removal,
+  retaining HACS instructions for Home Assistant 2026.9 and 2026.10.
+- Declare the `energy.ev_charging` category for Marketplace discovery.
+- Add Home Assistant 2026.11.0b1 to the fixed validation and release matrices
+  alongside 2026.9.0 and 2026.10.0, retaining rolling next-version checks.
+- Type-check platform device classes on both October and November Home
+  Assistant without obsolete ignore comments or changing the runtime imports.
+- Validate hourly energy/power statistics and Recorder exclusion profiles
+  against real SQLite; document November statistics metadata and optional
+  history restricted to total energy and total power.
+
+### Fixed
+
+- Let PV control initialize an unknown current setpoint when the wallbox is
+  available and its current cap is valid, including unlimited mode without a
+  restored setpoint. Unavailable controls remain excluded.
+- Recalculate the PV current after resume, vehicle connection and phase
+  changes, even when the surplus remains constant. A paused charge still
+  receives no current writes.
+- Report phase-switch rate limits as translated Home Assistant errors with
+  the remaining wait time, while preserving the five-minute write floor.
+- PV blueprints accept W/kW and skip invalid inputs. Current adjustment now
+  requires an unpaused wallbox and respects the configured entity cap. Existing
+  current automations must select the new Charging paused input; otherwise
+  they send no commands. Use a hold time above five minutes (new default: six).
+  Real Home Assistant automation tests cover the behavior.
+- Close probe transports when opening the serial port fails or is cancelled,
+  so a search does not retain resources between candidates.
+- Remove an entry's repair issues when the entry is deleted, preserving them
+  during reloads and retaining issues belonging to other entries.
+- Correct documentation and setup/options help: read-only still transmits
+  Modbus requests and cannot share an RS-485 bus with another master.
+- Align the support policy's hardware claims with simulated RTU validation.
+- Reconfiguring bus parameters reloads the entry once through its update
+  listener, avoiding the duplicate reload deprecated for Home Assistant
+  2026.12. Submitting unchanged parameters on a loaded entry leaves the
+  connection running; an unloaded entry is started by reconfiguration.
+
 ## 0.2.1 — 2026-10-24
 
 ### Changed

@@ -3,10 +3,13 @@ blueprint:
   description: >-
     Follows the photovoltaic surplus with the wallbox charging current.
 
-    The current is recomputed whenever the surplus sensor changes, divided by
-    the number of phases the wallbox will actually use, and clamped to the
-    range the wallbox accepts. It is only written while a vehicle is
-    connected.
+    The current is recomputed when surplus or selected phases change, a
+    vehicle connects, or charging resumes. It is divided by one or three
+    phases and clamped to the configured current range.
+    This assumes a three-phase installation when all phases are selected.
+    It only writes while a vehicle is connected and charging is not paused.
+    Select the Charging paused input when updating an existing automation;
+    without it, the automation leaves the current unchanged.
 
     The manufacturer asks for at most one current change every five seconds.
     The integration enforces that by deferring a faster change and writing the
@@ -20,7 +23,11 @@ blueprint:
   input:
     surplus_power:
       name: PV surplus
-      description: A sensor reporting the surplus power available for charging.
+      description: >-
+        Total power available to the wallbox in W or kW, positive for surplus,
+        including power already used by the vehicle. Raw grid export alone
+        is not this budget while charging.
+        Unknown values or other units leave the current unchanged.
       selector:
         entity:
           filter:
@@ -34,6 +41,17 @@ blueprint:
           filter:
             - integration: mennekes_amtron_rtu
               domain: number
+    charging_paused:
+      name: Charging paused
+      description: >-
+        Select this wallbox's charging-pause switch. Required for current
+        updates; an empty selection leaves existing automations inactive.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron_rtu
+              domain: switch
     vehicle_connected:
       name: Vehicle connected
       description: The wallbox vehicle-connected binary sensor.
@@ -45,8 +63,9 @@ blueprint:
     switched_phases:
       name: Switched phases
       description: >-
-        The wallbox switched-phases sensor, used to divide the surplus by the
-        number of phases the wallbox will really use.
+        The wallbox switched-phases sensor. Single phase uses one phase;
+        all available uses three. This does not detect the vehicle's actual
+        phase use. An unknown state leaves the current unchanged.
       selector:
         entity:
           filter:
@@ -79,7 +98,7 @@ blueprint:
           mode: box
     maximum_current:
       name: Maximum current
-      description: Never ask for more than this. The wallbox clamps it again anyway.
+      description: Upper bound, also limited by the charging-current entity maximum.
       default: 16
       selector:
         number:
@@ -92,9 +111,13 @@ blueprint:
 mode: single
 max_exceeded: silent
 
+trigger_variables:
+  paused_entity: !input charging_paused
+
 variables:
   surplus_entity: !input surplus_power
   phases_entity: !input switched_phases
+  current_entity: !input charging_current
   volts: !input grid_voltage
   minimum: !input minimum_current
   maximum: !input maximum_current
@@ -102,11 +125,31 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input surplus_power
+  - trigger: state
+    entity_id: !input switched_phases
+  - trigger: state
+    entity_id: !input vehicle_connected
+    to: "on"
+  # A template keeps the empty default valid for existing automations.
+  - trigger: template
+    value_template: >-
+      {{ paused_entity != '' and is_state(paused_entity, 'off') }}
 
 conditions:
   - condition: state
     entity_id: !input vehicle_connected
     state: "on"
+  - condition: template
+    value_template: >-
+      {{ paused_entity != '' and is_state(paused_entity, 'off')
+         and is_number(states(surplus_entity))
+         and state_attr(surplus_entity, 'unit_of_measurement') in ['W', 'kW']
+         and states(phases_entity) in ['single_phase', 'all_available']
+         and not is_state(current_entity, 'unavailable')
+         and is_number(state_attr(current_entity, 'max'))
+         and minimum | float >= 6
+         and minimum | float <= maximum | float
+         and minimum | float <= state_attr(current_entity, 'max') | float(0) }}
 
 actions:
   - action: number.set_value
@@ -115,5 +158,7 @@ actions:
     data:
       value: >-
         {% set phases = 1 if is_state(phases_entity, 'single_phase') else 3 %}
-        {% set amps = states(surplus_entity) | float(0) / (volts | float(230)) / phases %}
-        {{ [[ amps | round(1), minimum | float(6)] | max, maximum | float(16)] | min }}
+        {% set factor = 1000 if state_attr(surplus_entity, 'unit_of_measurement') == 'kW' else 1 %}
+        {% set amps = states(surplus_entity) | float * factor / (volts | float) / phases %}
+        {{ [[amps | round(1), minimum | float] | max,
+             maximum | float, state_attr(current_entity, 'max') | float] | min }}

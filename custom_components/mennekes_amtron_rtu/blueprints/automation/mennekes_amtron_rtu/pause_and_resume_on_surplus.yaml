@@ -17,7 +17,11 @@ blueprint:
   input:
     surplus_power:
       name: PV surplus
-      description: A sensor reporting the surplus power available for charging.
+      description: >-
+        Total power available to the wallbox in W or kW, positive for surplus,
+        including power already used by the vehicle. Raw grid export alone
+        is not this budget while charging.
+        Unknown values or other units cancel pending threshold timers.
       selector:
         entity:
           filter:
@@ -60,26 +64,40 @@ blueprint:
         happens. The manufacturer recommends more than five minutes between a
         pause and a resume.
       default:
-        minutes: 5
+        minutes: 6
       selector:
         duration:
 
 mode: single
 max_exceeded: silent
 
+trigger_variables:
+  surplus_entity: !input surplus_power
+  pause_threshold: !input pause_below
+  resume_threshold: !input resume_above
+
 triggers:
-  - trigger: numeric_state
-    entity_id: !input surplus_power
-    below: !input pause_below
+  - trigger: template
+    value_template: >-
+      {% set unit = state_attr(surplus_entity, 'unit_of_measurement') %}
+      {{ is_number(states(surplus_entity)) and unit in ['W', 'kW']
+         and states(surplus_entity) | float(0) * (1000 if unit == 'kW' else 1)
+             < pause_threshold | float }}
     for: !input hold_time
     id: pause
-  - trigger: numeric_state
-    entity_id: !input surplus_power
-    above: !input resume_above
+  - trigger: template
+    value_template: >-
+      {% set unit = state_attr(surplus_entity, 'unit_of_measurement') %}
+      {{ is_number(states(surplus_entity)) and unit in ['W', 'kW']
+         and states(surplus_entity) | float(0) * (1000 if unit == 'kW' else 1)
+             > resume_threshold | float }}
     for: !input hold_time
     id: resume
 
-conditions: []
+conditions:
+  - condition: template
+    value_template: >-
+      {{ resume_threshold | float > pause_threshold | float >= 0 }}
 
 actions:
   - choose:

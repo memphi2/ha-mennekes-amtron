@@ -3,13 +3,17 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "quarterly"
       time: "05:00"
       timezone: "Europe/Berlin"
-    open-pull-requests-limit: 5
+    # This limit applies only to routine version updates, not security fixes.
+    open-pull-requests-limit: 1
     groups:
       github-actions:
+        patterns:
+          - "*"
+      github-actions-security:
+        applies-to: security-updates
         patterns:
           - "*"
     commit-message:
@@ -20,17 +24,15 @@ updates:
     # Dependabot updates requirements-dev.txt. The minimum-HA validation lock
     # is curated manually; Home Assistant transitive dependencies come from the
     # selected Home Assistant matrix version instead of being committed here.
-    #
-    # Dependabot reads these files as pip-compile output and will offer to
-    # expand them into a full transitive lock. Take the version bumps, leave
-    # the expansion: scripts/check_repo.py fails the build on it.
+    # These are ordinary pip requirements, not pip-compile output. Do not add
+    # a paired .in file: it would generate unwanted transitive pins again.
     exclude-paths:
       - "requirements-dev-min-ha.txt"
     schedule:
-      interval: "monthly"
+      interval: "quarterly"
       time: "05:30"
       timezone: "Europe/Berlin"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
     groups:
       python-patch-minor:
         patterns:
@@ -38,6 +40,10 @@ updates:
         update-types:
           - "minor"
           - "patch"
+      python-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
     commit-message:
       prefix: "deps"
     ignore:

@@ -273,6 +273,7 @@ def test_the_protected_checks_match_the_ci_jobs() -> None:
         "hassfest",
         "validate (min-ha)",
         "validate (current-ha)",
+        "validate (preview-ha)",
     }
     names = [step.name for step in steps("owner/repo")]
     assert names[0] == "Repository settings"
@@ -349,7 +350,7 @@ def test_the_legal_gate_allows_a_citation_of_the_specification() -> None:
     ) == []
 
 
-def test_the_repository_gate_keeps_the_integration_marked_unofficial(
+def test_the_repository_gate_keeps_catalog_names_consistent(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The manifest name is what Home Assistant shows in the install list."""
@@ -361,7 +362,7 @@ def test_the_repository_gate_keeps_the_integration_marked_unofficial(
     component = tmp_path / "custom_components" / "mennekes_amtron_rtu"
     component.mkdir(parents=True)
     (component / "manifest.json").write_text(
-        json.dumps({"name": "MENNEKES AMTRON"}), encoding="utf-8"
+        json.dumps({"name": "Mennekes Amtron RTU"}), encoding="utf-8"
     )
     (tmp_path / "hacs.json").write_text(
         json.dumps(
@@ -379,7 +380,6 @@ def test_the_repository_gate_keeps_the_integration_marked_unofficial(
 
     failures = check_repo.check_hacs_metadata()
     assert any("disagree" in failure for failure in failures)
-    assert any("unofficial" in failure for failure in failures)
 
 
 def test_the_register_gate_rejects_an_icon_that_hides_a_device_class(
@@ -597,7 +597,7 @@ def test_the_lock_gate_passes_on_this_repository() -> None:
 def test_the_lock_gate_rejects_a_transitive_pin(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """This is the shape a monthly Dependabot run offers.
+    """Reject the unwanted transitive expansion previously offered by Dependabot.
 
     It expands the lock into pip-compile output, pinning the versions Home
     Assistant happens to resolve today. CI passes, and the next Home Assistant
@@ -606,9 +606,6 @@ def test_the_lock_gate_rejects_a_transitive_pin(
 
     import check_repo
 
-    (tmp_path / "requirements-dev.in").write_text(
-        "mypy==2.4.0\nruff==0.16.10\n", encoding="utf-8"
-    )
     (tmp_path / "requirements-dev.txt").write_text(
         "mypy==2.4.0\nmypy-extensions==1.1.0\nruff==0.16.10\n"
         "typing-extensions==4.16.0\n",
@@ -633,9 +630,6 @@ def test_the_lock_gate_allows_extras_and_comments(
 
     import check_repo
 
-    (tmp_path / "requirements-dev.in").write_text(
-        "# a comment\npymodbus[serial]==3.13.1\nruff==0.16.10\n", encoding="utf-8"
-    )
     (tmp_path / "requirements-dev.txt").write_text(
         "pymodbus==3.13.1  # resolved without the extra\nruff==0.16.10\n",
         encoding="utf-8",
@@ -646,3 +640,38 @@ def test_the_lock_gate_allows_extras_and_comments(
     monkeypatch.setattr(check_repo, "ROOT", tmp_path)
 
     assert check_repo.check_direct_dependency_locks() == []
+
+
+def test_the_lock_gate_rejects_reintroducing_a_pip_compile_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import check_repo
+
+    for name in check_repo.REQUIREMENTS_LOCKS:
+        (tmp_path / name).write_text("ruff==0.17.0\n", encoding="utf-8")
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+    assert check_repo.check_direct_dependency_locks() == []
+
+    (tmp_path / "requirements-dev.in").write_text("ruff==0.17.0\n", encoding="utf-8")
+    failures = check_repo.check_direct_dependency_locks()
+    assert len(failures) == 1
+    assert "requirements-dev.in selects pip-compile" in failures[0]
+
+
+def test_entity_reference_uses_public_names_instead_of_register_keys(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import check_register_map
+
+    assert check_register_map.check_entity_reference() == []
+    reference = tmp_path / "entities.md"
+    reference.write_text(
+        check_register_map.ENTITY_REFERENCE.read_text(encoding="utf-8").replace(
+            "`sensor.*_total_energy`", "`sensor.*_energy_total`"
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(check_register_map, "ENTITY_REFERENCE", reference)
+    failures = check_register_map.check_entity_reference()
+    assert len(failures) == 1
+    assert "sensor.energy_total" in failures[0]

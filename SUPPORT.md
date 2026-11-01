@@ -2,12 +2,17 @@
 
 ## Supported Release Line
 
-- `0.1.x`: active
+- `0.2.x`: active
 
 ## Compatibility Baseline
 
 - Minimum Home Assistant: `2026.9.0`
 - Validated Home Assistant: `2026.9.x` and `2026.10.x`
+- November preparation: a fixed `2026.11.0b1` matrix entry runs the full
+  validation including strict typing in both PR and release workflows.
+  This is beta compatibility, not a claim that 2026.11 stable has shipped.
+  After stable ships, promote it to `current_homeassistant` and refresh the
+  workflow matrices and this document together.
 - Early warning: every push is also validated against the newest Home
   Assistant pre-release in a job that is allowed to fail, so a breaking change
   in Core is noticed before it ships rather than after. The version is
@@ -48,9 +53,27 @@ minimum matrix entry runs the full test suite and proves the integration
 works there; the current entry additionally runs the typing gate. Neither
 entry skips a runtime check.
 
-## Validated Hardware
+## Distribution validation
+
+The integration uses one release ZIP for both HACS and the built-in Marketplace.
+The manifest declares the `energy.ev_charging` category. Installation guidance
+covers the [Marketplace and older HACS installations](docs/installation.md).
+
+On HA 2026.11+, `tests/test_marketplace.py` runs the real Marketplace installer
+against the built release archive in a disposable HA configuration. Downloads
+come from local fixtures and the catalog entry is synthetic. The test checks
+first-install discovery, update restart requests, invalid-package rollback
+and preservation of a separate TCP integration. On older HA versions it is
+skipped because the Marketplace does not exist; release packaging and runtime
+tests still run there. This does not claim catalog acceptance or a browser test.
+
+## Reference Hardware
 
 - AMTRON 4You 310 11 C2, article `1313201205`, 11 kW, fixed cable, 16 A.
+
+Validation uses simulated registers, a virtual serial RTU link and real
+Home Assistant/SQLite. Physical wallbox validation is still outstanding;
+the reference model is not a claim of a completed hardware test.
 
 Other AMTRON models covered by the same Modbus specification (4You 300,
 Compact 2.0s, Start 2.0s) are expected to work through capability gating but
@@ -65,7 +88,7 @@ because they are not tested.
 
 The features that set the floor are the reconfigure-flow helpers
 (`_get_reconfigure_entry`, `_abort_if_unique_id_mismatch`,
-`async_update_reload_and_abort` with `data_updates`), the progress step with a
+`async_update_and_abort` with `data_updates`), the progress step with a
 `progress_task` that the bus search uses, and typed `runtime_data` on the
 config entry. Lowering the minimum means adding that version to the matrix
 first.

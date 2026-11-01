@@ -12,15 +12,17 @@ the manufacturer's installation manual and local regulations.
 [hardware.md](hardware.md) describes the Modbus side of an installation that
 somebody qualified has already made safe.
 
-## RS-485 is a single-master bus
+## Modbus RTU uses a single master
 
 Exactly one device may be master. If something else already drives the bus —
 another energy manager, a §14a control box, a second Home Assistant instance —
-then adding this integration in **Modbus master** mode produces bus
-collisions, not just failed reads.
+then running this integration in either control mode can produce bus
+collisions. Read-only mode still transmits Modbus read requests; it is not a
+passive listener. It only disables register writes and the heartbeat.
 
-Check this *before* enabling master mode. If you are not certain, stay in
-read-only mode: it never transmits a write and never sends the heartbeat.
+Check exclusive bus ownership before setup, discovery or the smoke test.
+If another master is present, disable this integration and use a separate
+supported interface or obtain the readings from the existing master.
 
 ## §14a EnWG is enforced in hardware
 
@@ -40,7 +42,7 @@ do so. What it does is make the state visible:
 `binary_sensor.*_downgrade_active` and the downgrade-current sensor.
 
 If your §14a control box is itself a Modbus master on the same bus, see the
-previous section: read-only mode is the only correct configuration.
+previous section: this integration must not share that bus, even read-only.
 
 ## The heartbeat, and what happens without it
 
@@ -79,9 +81,10 @@ has its own switch, and 0 A can only be written through the
 - Change the charging current no more often than every **5 seconds**. The
   integration defers a faster change and writes the newest value when the
   interval has passed.
-- Pause, resume and phase switches should be at least **5 minutes** apart and
-  should use hysteresis. The integration rejects faster changes with an
-  explanatory error.
+- Keep pause, resume and phase switches **more than 5 minutes** apart and
+  use hysteresis. The integration enforces a five-minute floor and rejects
+  faster changes with an explanatory error. The timing guards are in memory and restart on an
+  entry reload; keep the waiting interval in your automation too.
 
 ## Phase switching can abort a charge
 
@@ -92,6 +95,8 @@ option 2. Even there:
 - some vehicles need the charging current set to the pause value **before**
   the phase count changes. The integration does that automatically while the
   wallbox is charging;
+- the integration leaves charging paused after this sequence. Resume
+  explicitly after the waiting interval;
 - not every vehicle tolerates phase switching at all. Check your vehicle's
   documentation before you automate it.
 
@@ -102,9 +107,17 @@ refuses to act in any other state.
 
 ## What is validated, and what is not
 
-Validated: AMTRON 4You 310 11 C2, register layout v01.03.
+Automated tests exercise real Home Assistant with simulated register data
+and a virtual Modbus RTU server, using the AMTRON 4You 310 11 C2 on layout
+v01.03 as the development target. **No physical-wallbox validation is claimed**,
+including for that model. The [compatibility audit](ha-2026-11-validation.md)
+records tested software versions and remaining checks.
 
-Not validated: every other model and every older layout version. The
-integration gates entities by layout version and hardware capability, so an
-older device gets fewer entities rather than wrong ones — but the behaviour on
-that hardware is untested.
+Entities are filtered by reported layout version and hardware capability.
+This reduces unsupported operations but does not establish correct behavior
+on every firmware or vehicle.
+
+The configured wallbox current limits restrict the wallbox, not the combined
+load of other household consumers. PV blueprints and example automations are
+not overload protection for the house connection. Loss of an external surplus
+sensor does not stop the integration's heartbeat or automatically pause charging.

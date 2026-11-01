@@ -32,6 +32,7 @@ REQUIRED_CHECKS = (
     "hassfest",
     "validate (min-ha)",
     "validate (current-ha)",
+    "validate (preview-ha)",
 )
 
 REPOSITORY_SETTINGS = {
@@ -89,6 +90,11 @@ def steps(repository: str) -> list[Step]:
             "Dependabot vulnerability alerts",
             "PUT",
             f"repos/{repository}/vulnerability-alerts",
+        ),
+        Step(
+            "Dependabot security updates",
+            "PUT",
+            f"repos/{repository}/automated-security-fixes",
         ),
         Step(
             "Secret scanning and push protection",
