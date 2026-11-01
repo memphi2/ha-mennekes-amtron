@@ -647,3 +647,22 @@ def test_the_lock_gate_allows_extras_and_comments(
     monkeypatch.setattr(check_repo, "ROOT", tmp_path)
 
     assert check_repo.check_direct_dependency_locks() == []
+
+
+def test_entity_reference_uses_public_names_instead_of_register_keys(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import check_register_map
+
+    assert check_register_map.check_entity_reference() == []
+    reference = tmp_path / "entities.md"
+    reference.write_text(
+        check_register_map.ENTITY_REFERENCE.read_text(encoding="utf-8").replace(
+            "`sensor.*_total_energy`", "`sensor.*_energy_total`"
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(check_register_map, "ENTITY_REFERENCE", reference)
+    failures = check_register_map.check_entity_reference()
+    assert len(failures) == 1
+    assert "sensor.energy_total" in failures[0]
