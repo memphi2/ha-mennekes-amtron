@@ -11,6 +11,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 
 from .blueprint_installer import async_install_blueprints
@@ -160,6 +161,17 @@ async def async_reload_entry(
     """Reload the entry after its options changed."""
 
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_remove_entry(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry
+) -> None:
+    """Remove repairs owned by a deleted entry, also on HA before 2026.11."""
+
+    prefix = f"{entry.entry_id}_"
+    for domain, issue_id in tuple(ir.async_get(hass).issues):
+        if domain == DOMAIN and issue_id.startswith(prefix):
+            ir.async_delete_issue(hass, domain, issue_id)
 
 
 async def async_migrate_entry(

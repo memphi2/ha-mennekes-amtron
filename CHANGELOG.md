@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Remove an entry's repair issues when the entry is deleted, preserving them
+  during reloads and retaining issues belonging to other entries.
 - Correct documentation and setup/options help: read-only still transmits
   Modbus requests and cannot share an RS-485 bus with another master.
 - Align the support policy's hardware claims with simulated RTU validation.
