@@ -147,6 +147,35 @@ def test_the_requirement_gate_rejects_a_minimum_above_core(
     assert any("below the declared minimum" in failure for failure in failures)
 
 
+def test_the_requirement_gate_rejects_testing_an_older_library_than_core(monkeypatch):
+    import check_pymodbus_pin
+
+    monkeypatch.setattr(check_pymodbus_pin, "core_version", lambda: "3.14.0")
+    monkeypatch.setattr(check_pymodbus_pin, "version", lambda _name: "3.13.1")
+    failures = check_pymodbus_pin.check_pin()
+    assert any("differs from Home Assistant" in failure for failure in failures)
+
+
+def test_runtime_install_uses_the_selected_ha_pin_and_constraints(monkeypatch):
+    from types import SimpleNamespace
+
+    import check_pymodbus_pin
+
+    calls = []
+    monkeypatch.setattr(check_pymodbus_pin, "core_version", lambda: "3.14.0")
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(check_pymodbus_pin.subprocess, "run", run)
+    assert check_pymodbus_pin.install_runtime() == 0
+    assert "pymodbus==3.14.0" in calls[0]
+    assert "pymodbus[serial]>=3.13.1" in calls[0]
+    assert calls[0][-2] == "--constraint"
+    assert calls[0][-1].endswith("package_constraints.txt")
+
+
 def test_the_requirement_gate_needs_a_pymodbus_requirement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

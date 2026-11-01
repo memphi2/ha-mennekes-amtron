@@ -48,6 +48,7 @@ jobs:
         run: |
           python -m pip install "homeassistant==${{ matrix.homeassistant }}"
           python -m pip install -r "${{ matrix.requirements-lock }}"
+          python scripts/check_pymodbus_pin.py --install
           python -m pip check
           python - <<'PY'
           from importlib.metadata import version
@@ -84,6 +85,7 @@ jobs:
         run: |
           python -m pip install --pre --upgrade homeassistant
           python -m pip install -r requirements-dev.txt
+          python scripts/check_pymodbus_pin.py --install
           python -m pip check
       - name: Report the resolved version
         run: |

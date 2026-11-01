@@ -31,6 +31,13 @@ resolves to. `scripts/check_pymodbus_pin.py` enforces that the declared
 minimum stays a minimum and stays at or below what the installed Home
 Assistant resolves to.
 
+Validation installs the selected Home Assistant first, then its tooling and
+`python scripts/check_pymodbus_pin.py --install`. This resolves pymodbus using
+that HA version's pin and package constraints. The gate checks the **installed**
+version too, so a future Core update cannot pass while tests still use the
+older development pin. The development requirements retain their baseline pin
+for local bootstrapping and dependency alerts.
+
 Core also ships `tmodbus` and `modbus-connection` next to pymodbus for its own
 `modbus` integration, so Core may be migrating away from pymodbus. That does
 not change anything here: if Core drops pymodbus, Home Assistant installs it
