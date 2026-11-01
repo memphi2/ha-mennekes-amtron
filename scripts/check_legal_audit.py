@@ -221,9 +221,12 @@ def _check_required_documents() -> list[str]:
         )
     readme_path = ROOT / "README.md"
     if readme_path.is_file():
-        first_line = readme_path.read_text(encoding="utf-8").splitlines()[0]
-        if "(Unofficial)" not in first_line:
-            failures.append("README title must keep the project marked as unofficial")
+        readme = _normalized_text(readme_path).casefold()
+        failures.extend(
+            f"README must retain the {phrase!r} project notice"
+            for phrase in ("unofficial", "not affiliated")
+            if phrase not in readme
+        )
     return failures
 
 

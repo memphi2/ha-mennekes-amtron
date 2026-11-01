@@ -111,8 +111,8 @@ this repository.
   pins pymodbus for the whole instance and moves that pin between releases, so
   an exact pin here would conflict with Core. `codeowners` is empty, so no
   personal metadata ships in the package.
-- `README.md` marks the project as unofficial in its title and repeats the
-  non-affiliation statement.
+- `README.md` retains a short unofficial/non-affiliation notice and links
+  to `LICENSE`, `NOTICE` and the detailed legal information.
 
 ## Brand assets
 
