@@ -20,6 +20,7 @@ Snapshot: 2026-11-01. Local preparation based on v0.2.1, commit
 | PV automation behavior | Real HA automations reproduce and fix writes while paused, incorrect kW conversion and commands from invalid inputs. Thirty-two parameter cases cover current adjustment and pause/resume, including a stable budget after resume, vehicle connection or a phase change. A real HA test with a virtual RTU also verifies setting the first current limit from unlimited mode without a restored setpoint. Existing current automations must select the new pause-switch input. |
 | Phase-switch errors | A second phase request after 15 seconds still waits 285 seconds, now reported as a translated HA validation error. The regression also proves the request succeeds at the five-minute boundary without a current write while idle. |
 | User documentation | Setup uses the UI, optional tools are separated, and daily controls/phase-switch pauses are explained. Removed incorrect physical-validation and whole-house protection claims. Entity-ID examples are checked against public English names instead of register keys. |
+| Dependency maintenance | Quarterly routine groups with one open PR per ecosystem; separate security groups. Removed the paired pip-compile input and added a regression check against reintroducing it. Adopted the direct tool/Actions updates from PRs #12 and #13. Dependabot YAML passes the published configuration schema. |
 
 The reconfiguration change follows the
 [update-listener deprecation](https://contributors.home-assistant.io/blog/2026/05/07/config-entry-listener-together-with-reloading-methods/):
@@ -36,11 +37,14 @@ All runs used Python 3.14.4 and pymodbus 3.13.1. Each environment passed
 `python -m pip check` and `python scripts/check_validate.py`; the minimum
 environment used `--skip-typing`, matching CI.
 
+The October/November environments use mypy 2.4.1, pytest 9.2.0 and Ruff
+0.17.3. The minimum environment retains pytest 9.1.1 and Ruff 0.16.10.
+
 | Home Assistant | Tests | Coverage | Strict typing |
 |---|---:|---:|---|
-| 2026.9.0 | 448 passed, 2 skipped | 99.42% | Skipped: older Core annotations |
-| 2026.10.0 | 448 passed, 2 skipped | 99.42% | Passed, 53 source files |
-| 2026.11.0b1 | 450 passed | 99.42% | Passed, 53 source files |
+| 2026.9.0 | 449 passed, 2 skipped | 99.42% | Skipped: older Core annotations |
+| 2026.10.0 | 449 passed, 2 skipped | 99.42% | Passed, 53 source files |
+| 2026.11.0b1 | 451 passed | 99.42% | Passed, 53 source files |
 
 The two skips on September/October are the Marketplace installer tests:
 that component first ships in November. They are required by the fixed
@@ -86,5 +90,9 @@ Physical wallbox validation remains outstanding. Hosted HACS, Hassfest and
 CodeQL results are tracked separately in the
 [PR checks](https://github.com/memphi2/ha-mennekes-amtron/pull/14/checks).
 
-No tag, release, live Home Assistant change or database deletion was performed. The required-check declaration was updated locally; GitHub branch
-protection was not changed.
+No tag, release, live Home Assistant change or database deletion was performed.
+Dependabot security updates were enabled and confirmed through the GitHub API;
+vulnerability alerts were already enabled. Quarterly schedules and the new
+dependency-file layout take effect after merging the PR into the default
+branch. The required-check declaration was updated; GitHub branch protection
+was not changed.
