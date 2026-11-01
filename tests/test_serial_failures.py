@@ -10,6 +10,7 @@ from contextlib import contextmanager
 import pytest
 
 from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu._flow_search import async_probe, async_search
 from custom_components.mennekes_amtron_rtu.client import (
     MennekesModbusClient,
     SerialConfig,
@@ -81,6 +82,57 @@ def test_unanswered_reads_keep_the_configured_retry_budget():
                     await client.async_read_register(R.EVSE_STATE)
                 assert len(frames) == 3
                 assert all(frame[1] == 0x03 for frame in frames)
+            finally:
+                await client.async_close()
+
+    asyncio.run(asyncio.wait_for(run(), 10))
+
+
+def test_cancelling_an_inflight_probe_stops_search_and_releases_the_port():
+    async def run():
+        with silent_serial() as (port, frames, received):
+            attempts = []
+
+            async def probe(config):
+                attempts.append(config.device_id)
+                return await async_probe(config)
+
+            task = asyncio.create_task(
+                async_search(SerialConfig(port=port), all_parameters=False, probe=probe)
+            )
+            await asyncio.wait_for(received.wait(), 3)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert attempts == [50]
+            assert len(frames) == 1
+            # A new exclusive serial client must be able to own the port now.
+            replacement = MennekesModbusClient(SerialConfig(port=port))
+            try:
+                await replacement.async_connect()
+                assert replacement.connected
+            finally:
+                await replacement.async_close()
+
+    asyncio.run(asyncio.wait_for(run(), 10))
+
+
+def test_cancelled_write_propagates_and_retains_the_uncertain_write_floor():
+    async def run():
+        with silent_serial() as (port, frames, received):
+            client = MennekesModbusClient(SerialConfig(port=port))
+            try:
+                await client.async_connect()
+                task = asyncio.create_task(
+                    client.async_write_register(R.CHARGING_CURRENT_EMS, 8)
+                )
+                await asyncio.wait_for(received.wait(), 3)
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+                with pytest.raises(AmtronRateLimitedError):
+                    await client.async_write_register(R.CHARGING_CURRENT_EMS, 10)
+                assert len(frames) == 1
             finally:
                 await client.async_close()
 

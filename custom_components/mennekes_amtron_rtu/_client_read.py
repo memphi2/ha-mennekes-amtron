@@ -7,6 +7,7 @@ transactions, allowing a priority heartbeat to pass.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -46,6 +47,10 @@ async def read_words(
         except ConnectionException as err:
             raise AmtronConnectionError(str(err) or "serial connection failed") from err
         except ModbusIOException as err:
+            # pymodbus 3.13 wraps cancellation in ModbusIOException. Preserve
+            # task cancellation instead of treating it as another read timeout.
+            if isinstance(err.__cause__, asyncio.CancelledError):
+                raise err.__cause__ from None
             if remaining <= 0:
                 raise AmtronProtocolError(str(err) or "modbus read failed") from err
             remaining -= 1

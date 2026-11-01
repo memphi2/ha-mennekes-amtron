@@ -7,6 +7,7 @@ the ones a future caller remembers to throttle.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from typing import Any
@@ -94,6 +95,8 @@ async def write_register(
     except ConnectionException as err:
         raise AmtronConnectionError(str(err) or "serial connection failed") from err
     except ModbusException as err:
+        if isinstance(err.__cause__, asyncio.CancelledError):
+            raise err.__cause__ from None
         raise AmtronProtocolError(str(err) or "modbus transaction failed") from err
 
     if isinstance(response, ExceptionResponse):
