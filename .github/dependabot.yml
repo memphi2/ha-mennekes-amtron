@@ -2,16 +2,15 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
+    # Required by Dependabot; the zero limit prevents routine PRs even from
+    # checks triggered immediately by configuration changes.
     schedule:
       interval: "quarterly"
       time: "05:00"
       timezone: "Europe/Berlin"
-    # This limit applies only to routine version updates, not security fixes.
-    open-pull-requests-limit: 1
+    # Security fixes have a separate limit and remain enabled.
+    open-pull-requests-limit: 0
     groups:
-      github-actions:
-        patterns:
-          - "*"
       github-actions-security:
         applies-to: security-updates
         patterns:
@@ -28,18 +27,14 @@ updates:
     # a paired .in file: it would generate unwanted transitive pins again.
     exclude-paths:
       - "requirements-dev-min-ha.txt"
+    # Required by Dependabot even when routine version PRs are disabled.
     schedule:
       interval: "quarterly"
       time: "05:30"
       timezone: "Europe/Berlin"
-    open-pull-requests-limit: 1
+    # Security fixes have a separate limit and remain enabled.
+    open-pull-requests-limit: 0
     groups:
-      python-patch-minor:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
       python-security:
         applies-to: security-updates
         patterns:
