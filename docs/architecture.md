@@ -41,17 +41,22 @@ Every transaction — poll, heartbeat and write — goes through a single
 transactions are not slow, they are corrupt. Nothing outside `client.py`
 touches pymodbus.
 
-One lock alone is not enough, though, because `asyncio.Lock` is fair: a
-waiter is served in arrival order. With a stalling device every wait is a
-full `timeout` plus its `retries`, so a heartbeat arriving behind the poll
-and a diagnostics dump waits for both of them. Measured against a device
-that answers nothing, the gap between two heartbeats grew to 12 s with two
-bus users and 15 s with three — past the 10 s the wallbox allows.
+One lock alone is not enough, because `asyncio.Lock` is fair: a waiter is
+served in arrival order. A heartbeat must not queue behind every pending
+poll, diagnostic request and user action.
 
 Bulk users therefore pass a second gate before they reach the bus, so only
 one of them is ever queued in front of a heartbeat, and the heartbeat write
-skips that gate. The worst case is then one transfer in flight plus its own,
-independent of how many readers compete: measured 6 s, whatever the load.
+skips that gate. Its wait depends on the current transfer, including that
+read's bounded retries, rather than the number of readers in the queue.
+Fallback block reads release the bus between individual register ranges.
+
+The pymodbus transport has automatic retries disabled: a write with a lost
+reply might already have taken effect and must not be resent inside the
+five-second floor. Only reads retry, explicitly and within the configured
+budget. Cancellation wrapped by pymodbus is restored as task cancellation
+on both paths. `tests/test_serial_failures.py` verifies actual RTU bytes,
+missing replies, cancellation and exclusive-port release.
 
 ### The heartbeat is not part of the poll
 

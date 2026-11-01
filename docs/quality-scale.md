@@ -59,7 +59,7 @@ script, and pymodbus' async serial client is used throughout.
 
 - `appropriate-polling`: the device has no push channel, so polling is the
   correct model. Status is polled every five seconds by default; measurements
-  every 30 seconds, and idle measurements/configuration every five minutes.
+  every 30 seconds, and idle measurements/configuration at least a minute apart.
   Reads use eighteen contiguous ranges; the heartbeat runs independently.
 - `test-before-configure`: the config flow reads the device before an entry is
   created.
@@ -68,7 +68,7 @@ script, and pymodbus' async serial client is used throughout.
 
 ## Static analysis
 
-`ruff` runs with 38 rulesets selected, every one of them a ruleset the
+`ruff` runs with explicit rule families selected, every one of them a ruleset the
 integration passes completely — including `S`, the bandit security rules,
 `BLE` for blind excepts, `ASYNC` for blocking calls in async code, `SLF` for
 private-member access and `PTH` for `os.path` use. They are selected rather

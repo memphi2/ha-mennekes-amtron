@@ -28,17 +28,18 @@ dependency, Ruff, test/coverage and strict-typing gates. The second reads
 GitHub required-check settings and reports drift without changing them.
 It is separate from code validation and requires authenticated `gh` access.
 
-Integration-audit validation on 2026-11-01, before the security-gate extension,
-used Python 3.14 and pymodbus 3.13.1:
+Current audit validation on 2026-11-01 uses Python 3.14 and pymodbus 3.13.1.
+The resolved dependency is checked against each Home Assistant installation,
+including its package constraints:
 
 | HA version | Tests passed | Skipped | Statement/branch coverage |
 |---|---:|---:|---:|
-| 2026.9.0 | 480 | 2 | 99.43% |
-| 2026.10.0 | 480 | 2 | 99.43% |
-| 2026.11.0b1 | 482 | 0 | 99.43% |
+| 2026.9.0 | 530 | 2 | 99.44% |
+| 2026.10.0 | 530 | 2 | 99.44% |
+| 2026.11.0b1 | 532 | 0 | 99.44% |
 
 The two skips concern Marketplace APIs absent in the older HA versions.
-Strict typing passed for all 53 source/tooling modules against current and
+Strict typing passed for all 54 source/tooling modules against current and
 preview HA; minimum HA runs the runtime suite without the typing gate.
 The local HACS build contains 54 files, including byte-identical LICENSE and
 NOTICE copies. It is a development build; no new release has been published.
@@ -79,8 +80,14 @@ not presented as current evidence.
 Local regression coverage includes HA action permissions, exclusive serial
 ownership during reconfigure, conservative cooldown after uncertain writes,
 phase-switch preflight, optional blueprint failures and repair notifications
-when unchanged polls are suppressed. The integration remains read-only by
-default and exposes no network listener or cloud API.
+when unchanged polls are suppressed. Additional real-serial failure tests
+verify that lost replies do not cause automatic write retransmissions and
+that cancellation stops a probe and releases its port. Rejected setpoints
+preserve the previous accepted current, phase-change pauses remember the
+actual current, and HA refresh callbacks see that value immediately. A real
+HA automation test checks replacement of an in-flight PV adjustment by the
+latest power budget. The integration remains read-only by default and exposes
+no network listener or cloud API.
 
 The settings tool now merges required checks through GitHub's dedicated
 endpoint, preserving review rules, administrator enforcement and existing
@@ -91,21 +98,29 @@ checks were added to live branch protection. Administrator enforcement and
 all other protection settings were verified unchanged. The owner confirmed
 automatic Codex security review for all PRs on every push.
 
-The security-gate extension adds 33 regression cases (513 passed, two
-Marketplace skips on current HA; integration coverage remains 99.43%) and
-increases the strict-typing set to 54 modules. The gate uses authenticated
-bot evidence and executes only trusted default-branch code; see
+The security gate has 37 regression cases. Its publisher can successfully
+deliver a blocking `pending` status without treating normal waiting as a job
+failure. Read-only checks still fail until review approval. The gate uses
+authenticated bot evidence and executes only trusted default-branch code; see
 [repository settings](../repository-settings.md#required-codex-security-review)
 for format dependencies, reporting thresholds and the initial rollout.
 
 Routine Dependabot PRs remain disabled; security alerts and security updates
 remain part of the repository policy. This reduces routine work, but it is
 not a promise of maintenance-free compatibility with future HA releases.
+The full compatibility matrix now also has a weekly/manual maintenance run;
+its next-HA job must pass on those runs, making regressions visible without
+creating dependency-update PRs. Scheduled execution starts after merge.
 
 [Recorder](../recorder.md) documents the 30-second measurement default,
 complete lean exclusion profile, measured state-row savings and the limits
 of the synthetic replay. The integration does not change global Recorder
 configuration, delete historical data or impose a database size cap.
+The new retention test replays six daily charging windows and four real
+purge/repack cycles in both full and lean profiles. It checks stable detailed
+history counts, retained hourly statistics, actual SQLite VACUUM completion
+and database integrity. Disk-monitoring guidance covers the database mount
+and the temporary free space needed for maintenance.
 
 ## Limits
 
@@ -113,6 +128,6 @@ No public clone/similarity search, jurisdiction-specific clearance or legal
 opinion was performed. Static provenance checks cannot establish ownership
 of every contribution. Hardware behavior has not been verified on a physical
 wallbox; serial transport is tested through a virtual RTU bus. Synthetic
-Recorder replay and hourly-statistics tests are not a real-time retention or
-disk-full soak test. November beta compatibility is evidence for that tested
+Recorder replay, statistics and accelerated retention tests are not a
+wall-clock or disk-full soak test. November beta compatibility is evidence for that tested
 beta, not a guarantee about a future stable release.

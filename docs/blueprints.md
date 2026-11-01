@@ -54,6 +54,9 @@ phases automatically.
   therefore also applies after resuming. Resume first restores the remembered
   setpoint; the recalculated value follows at the next permitted write. The
   integration still enforces the five-second current-write interval.
+- A newer valid power budget replaces a still-running current adjustment.
+  The latest value is applied at the next permitted write; a slow response
+  does not silently discard it. Cancellation retains the write cooldown.
 - **Charging paused: on** prevents the current blueprint from writing. To
   keep a manual pause, also disable the pause/resume automation; that
   automation is explicitly allowed to resume when its threshold is met.
