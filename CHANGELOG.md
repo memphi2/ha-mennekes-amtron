@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Retain register write intervals after a lost reply, device failure or
+  cancellation; only definite rejections allow an immediate retry.
 - Reconfigure through the existing serial client when settings are unchanged;
   release the exclusive port for changed settings and searches, restoring the
   original entry after a failed or cancelled attempt.

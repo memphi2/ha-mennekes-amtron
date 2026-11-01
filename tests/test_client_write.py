@@ -75,7 +75,7 @@ def test_a_protocol_error_becomes_a_protocol_error() -> None:
 def test_a_refusing_wallbox_is_reported_as_a_rejected_write() -> None:
     transport = FakeModbusClient()
     transport.write_exceptions[R.CHARGING_RELEASE.address] = "error"
-    with pytest.raises(AmtronWriteRejectedError, match="0x0D05"):
+    with pytest.raises(AmtronProtocolError, match="0x0D05"):
         asyncio.run(
             write_register(transport, spec=R.CHARGING_RELEASE, value=1, device_id=50)
         )

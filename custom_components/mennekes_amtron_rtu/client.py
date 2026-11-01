@@ -24,7 +24,12 @@ from pymodbus import FramerType
 from pymodbus.client import AsyncModbusSerialClient
 
 from . import _client_read, _client_write
-from .client_errors import AmtronConnectionError, AmtronRateLimitedError
+from .client_errors import (
+    AmtronConnectionError,
+    AmtronIllegalAddressError,
+    AmtronRateLimitedError,
+    AmtronWriteRejectedError,
+)
 from .const import (
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
@@ -243,7 +248,10 @@ class MennekesModbusClient:
                     value=value,
                     device_id=self._config.device_id,
                 )
-            except Exception:
+            except (AmtronWriteRejectedError, AmtronIllegalAddressError):
+                # A definite rejection did not change the register. A missing
+                # reply or transport failure may follow an applied write, so
+                # those retain the interval, as does cancellation.
                 self._rate_limiter.forget(spec.key)
                 raise
 
