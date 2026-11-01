@@ -6,10 +6,18 @@ not in the repository, so they never show up in a diff and are easy to lose.
 
 ```bash
 python scripts/apply_repo_settings.py            # print what would change
+python scripts/apply_repo_settings.py --check    # read live required checks; report drift
 python scripts/apply_repo_settings.py --apply    # change it
 ```
 
-The script is idempotent and needs an authenticated `gh`.
+The script is idempotent and needs an authenticated `gh` for `--check` or
+`--apply`. Existing branch protection with required status checks must already
+exist; a failed read aborts the update. Review requirements, administrator
+enforcement, restrictions, force-push/deletion policy and conversation rules
+are preserved. Required checks are merged with existing checks, including
+their GitHub App IDs, through the targeted
+[status-check endpoint](https://docs.github.com/en/rest/branches/branch-protection#update-status-check-protection).
+`--check` checks required-check drift only, not every repository setting.
 
 ## What it enforces
 
@@ -18,12 +26,14 @@ The script is idempotent and needs an authenticated `gh`.
 | Issues | enabled |
 | Wiki, Projects | disabled |
 | Merge, squash and rebase merges | all allowed |
-| Auto-merge, delete branch on merge | disabled |
+| Auto-merge | disabled |
+| Delete branch on merge | enabled |
 | Dependabot vulnerability alerts | enabled |
 | Dependabot security updates | enabled |
+| Private vulnerability reporting | enabled |
 | Secret scanning and push protection | enabled |
 | `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (current-ha)`, `validate (preview-ha)`, strict |
-| `main`: force pushes, deletions | blocked |
+| Other `main` protections | preserved; not overwritten by this script |
 
 `scripts/check_repo.py` verifies that every required status check still names
 a job that exists in `.github/workflows/validate.yml`. Without that check,
@@ -71,8 +81,9 @@ dependencies; `pymodbus` compatibility remains covered by the matrix checks.
 
 ## What needs a public repository
 
-Two of those steps need a public repository or a paid plan, and the script
-reports them as unavailable instead of failing:
+Some protection features depend on repository visibility and the GitHub plan.
+Any failed API request makes the script fail, including an unavailable security
+feature; a partial run is never reported as fully applied:
 
 - **Secret scanning and push protection** — GitHub Advanced Security.
 - **Branch protection and rulesets on `main`** — GitHub Pro or Team.
@@ -81,10 +92,8 @@ The repository is public, so both are active. The CodeQL workflow is in the
 same position: its analysis always runs, but uploading the result needs code
 scanning, so that step is conditional on the repository being public.
 
-`ruff` carries the same class of checks regardless: it selects the bandit
-ruleset `S`, which fails the build on the Python findings CodeQL would
-report. CodeQL adds the GitHub Actions analysis and cross-file data flow on
-top, which is why the job stays in place rather than being deleted.
+Ruff's Bandit ruleset `S` provides local Python security checks. It does not
+replace CodeQL's cross-file data-flow or GitHub Actions analysis.
 
 ## Settings this script does not cover
 

@@ -277,7 +277,10 @@ def test_the_protected_checks_match_the_ci_jobs() -> None:
     }
     names = [step.name for step in steps("owner/repo")]
     assert names[0] == "Repository settings"
-    assert any(step.needs_public_or_pro for step in steps("owner/repo"))
+    protection = [step for step in steps("owner/repo") if step.merge_status_checks]
+    assert len(protection) == 1
+    assert protection[0].method == "PATCH"
+    assert protection[0].path.endswith("/protection/required_status_checks")
 
 
 def test_a_renamed_ci_job_breaks_branch_protection(

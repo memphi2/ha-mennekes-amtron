@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Preserve existing GitHub branch protection and check App IDs when applying
+  repository settings; add a read-only required-check drift check.
 - Keep the integration available when optional blueprint files cannot be read
   or written; preserve local edits and replace updated files atomically.
 - Check the phase-switch cooldown before pausing a running charge, and serialize
