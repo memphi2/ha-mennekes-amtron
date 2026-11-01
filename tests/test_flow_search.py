@@ -143,6 +143,24 @@ def test_a_port_that_will_not_open_makes_the_probe_raise(
     )
     with pytest.raises(AmtronConnectionError):
         asyncio.run(async_probe(BASE))
+    assert transport.close_calls == 1
+
+
+def test_cancelled_connect_closes_the_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    class CancelledTransport(FakeModbusClient):
+        async def connect(self) -> bool:
+            self.connected = True
+            raise asyncio.CancelledError
+
+    transport = CancelledTransport()
+    monkeypatch.setattr(
+        "custom_components.mennekes_amtron_rtu._flow_search.MennekesModbusClient",
+        lambda config: _client(config, transport),
+    )
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(async_probe(BASE))
+    assert transport.close_calls == 1
+    assert not transport.connected
 
 
 def _client(config: SerialConfig, transport: FakeModbusClient) -> object:

@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Close probe transports when opening the serial port fails or is cancelled,
+  so a search does not retain resources between candidates.
 - Remove an entry's repair issues when the entry is deleted, preserving them
   during reloads and retaining issues belonging to other entries.
 - Correct documentation and setup/options help: read-only still transmits
