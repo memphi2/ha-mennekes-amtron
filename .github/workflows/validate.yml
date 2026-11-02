@@ -102,6 +102,30 @@ jobs:
       - name: Validation gates
         run: python scripts/check_validate.py
 
+  latest-stable-ha:
+    name: latest stable HA
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Install latest stable HA and validation tools
+        run: |
+          python -m pip install --upgrade homeassistant
+          python -m pip install -r requirements-dev.txt
+          python scripts/check_pymodbus_pin.py --install
+          python -m pip check
+      - name: Verify the selected stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_ha_channel.py
+      - name: Validation gates
+        run: python scripts/check_validate.py
+
   runtime-soak:
     name: runtime resource soak
     runs-on: ubuntu-24.04

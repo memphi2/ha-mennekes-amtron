@@ -49,6 +49,7 @@ def test_the_validation_sequence_matches_the_documented_order() -> None:
         "Register map checks",
         "pymodbus requirement check",
         "Ruff",
+        "Owned API deprecations",
         "Python tests and coverage",
         "Python typing ratchet",
     ]

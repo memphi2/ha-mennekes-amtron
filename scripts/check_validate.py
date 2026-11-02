@@ -53,6 +53,7 @@ def steps(*, skip_typing: bool = False) -> list[ValidationStep]:
             (sys.executable, "scripts/check_pymodbus_pin.py"),
         ),
         ValidationStep("Ruff", (sys.executable, "-m", "ruff", "check", ".")),
+        ValidationStep("Owned API deprecations", (sys.executable, "scripts/check_deprecations.py")),
         ValidationStep(
             "Python tests and coverage",
             (sys.executable, "scripts/check_coverage.py"),

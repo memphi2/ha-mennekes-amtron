@@ -41,3 +41,16 @@ extra, changed or non-regular files. The HACS layout remains flat, with LICENSE
 and NOTICE included. `--archive PATH` also verifies a local package. The release
 workflow runs the published check after uploading the assets, in addition to
 its existing SPDX schema and attestation verification before publication.
+
+## Stable and preview compatibility
+
+Weekly/manual maintenance additionally installs the newest stable HA in a
+fresh job and compares it with Core's published latest stable release. An
+older fallback selected because of Python constraints fails that check. The
+existing `next-ha` job still tracks prereleases independently; neither job
+rewrites repository version pins or opens dependency PRs.
+
+`scripts/check_deprecations.py` checks owned Python calls for a focused list
+of obsolete APIs and rejects blanket suppression of deprecation warnings.
+It does not flag historical documentation, string test vectors or HA's own
+UTC helper. Third-party warnings remain visible and must be assessed separately.
