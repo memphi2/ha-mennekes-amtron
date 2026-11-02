@@ -264,3 +264,8 @@ jobs:
               --notes-file "$notes_file" \
               --verify-tag
           fi
+      - name: Verify the published release against the approved source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.release-tag.outputs.commit }}
+        run: python scripts/release_check.py --ref "$RELEASE_COMMIT" --published --repo "$GITHUB_REPOSITORY"

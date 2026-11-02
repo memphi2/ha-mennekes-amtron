@@ -25,3 +25,19 @@ CI runs 30 cycles, while the ordinary suite uses three for a quicker regression
 check. The serial simulator also closes its relay threads and descriptors.
 This bounded stress test does not replace physical-wallbox validation, a
 wall-clock soak lasting days, or the separate Recorder retention tests.
+
+## Published release verification
+
+```bash
+.venv/bin/python scripts/release_check.py --ref v0.2.3 --published
+```
+
+Use the intended release tag or approved commit. This read-only check requires
+authenticated `gh`. It resolves annotated tags, checks stable-release metadata
+and the exact committed notes, downloads the four expected assets, verifies
+GitHub digests, SHA256SUMS, build metadata and the SBOM package identity, then
+compares every ZIP member with the approved Git tree. It rejects duplicate,
+extra, changed or non-regular files. The HACS layout remains flat, with LICENSE
+and NOTICE included. `--archive PATH` also verifies a local package. The release
+workflow runs the published check after uploading the assets, in addition to
+its existing SPDX schema and attestation verification before publication.
