@@ -95,7 +95,7 @@ async def _start_wallbox(
     return server, task
 
 
-def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
+def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.FixtureRequest) -> None:
     """Set up, switch to master mode, reconfigure and unload again."""
 
     local_blueprint = tmp_path / "config" / "blueprints" / "automation" / DOMAIN / "solar_surplus_charging.yaml"
@@ -104,7 +104,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
 
     async def run() -> None:
         bank = device_bank(error_code=200, fallback_current=0)
-        device_port, client_port = _virtual_serial_link()
+        device_port, client_port = _virtual_serial_link(request)
         server, serving = await _start_wallbox(device_port, bank)
         try:
             hass = await _boot(tmp_path / "config")
@@ -253,12 +253,12 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path) -> None:
     asyncio.run(asyncio.wait_for(run(), timeout=180))
 
 
-def test_the_flow_finds_a_wallbox_on_an_unknown_address(tmp_path: Path) -> None:
+def test_the_flow_finds_a_wallbox_on_an_unknown_address(tmp_path: Path, request: pytest.FixtureRequest) -> None:
     """The user gives the wrong address; the flow searches and finds it."""
 
     async def run() -> None:
         bank = device_bank()
-        device_port, client_port = _virtual_serial_link()
+        device_port, client_port = _virtual_serial_link(request)
         server, serving = await _start_wallbox(device_port, bank, device_id=23)
         try:
             hass = await _boot(tmp_path / "config")
@@ -318,14 +318,14 @@ def test_the_flow_finds_a_wallbox_on_an_unknown_address(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("initial_limit", [16.0, 0.0])
 def test_the_bundled_blueprints_run_as_automations(
-    tmp_path: Path, initial_limit: float
+    tmp_path: Path, initial_limit: float, request: pytest.FixtureRequest
 ) -> None:
     """Schema-valid is not the same as working: these are really run."""
 
     async def run() -> None:
         bank = device_bank(evse_state=5)
         put(bank, R.CHARGING_CURRENT_EMS, initial_limit)
-        device_port, client_port = _virtual_serial_link()
+        device_port, client_port = _virtual_serial_link(request)
         server, serving = await _start_wallbox(device_port, bank)
         try:
             hass = await _boot(tmp_path / "config")
