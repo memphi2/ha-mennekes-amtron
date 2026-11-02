@@ -7,6 +7,7 @@ from custom_components.mennekes_amtron_rtu.diagnostics import (
     decoded_values,
     fnv1a64,
 )
+from custom_components.mennekes_amtron_rtu.runtime_events import EventType
 from tests.ha_fakes import build_runtime
 
 
@@ -35,7 +36,10 @@ def test_decoded_values_hide_identifying_strings() -> None:
 def test_the_dump_carries_no_port_path_and_no_serial_number() -> None:
     async def run() -> None:
         hass, entry, _transport = await build_runtime()
+        entry.runtime_data.diagnostics.timeline.record(EventType.CONNECTION_LOST)
         dump = await async_get_config_entry_diagnostics(hass, entry)
+        assert dump["runtime_events"][0]["event"] == "connection_lost"
+        assert dump["runtime_events"][0]["register_address"] is None
         text = repr(dump)
         assert "/dev/fake" not in text
         assert "ABC123456789" not in text

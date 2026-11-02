@@ -93,6 +93,7 @@ async def async_setup_entry(
         client=client,
         identity=identity,
         connection_state=connection_state,
+        timeline=diagnostics.timeline,
         scan_interval=_scan_interval(entry),
         measurement_interval=float(
             entry.options.get(

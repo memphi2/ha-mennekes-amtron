@@ -426,6 +426,9 @@ def test_recovery_writes_the_documented_sequence_in_order() -> None:
         R.CHARGING_CURRENT_EMS.address,
     ]
     assert harness.diagnostics.recoveries == 1
+    assert [event["event"] for event in harness.diagnostics.timeline.snapshot()] == [
+        "recovery_started", "recovery_completed",
+    ]
 
 
 @pytest.mark.parametrize("elapsed", [5.0, 15.0])
@@ -767,6 +770,9 @@ def test_recovery_cannot_bypass_the_current_write_interval() -> None:
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
         assert harness.diagnostics.recoveries == 0
         await control.async_shutdown()
+        assert [event["event"] for event in harness.diagnostics.timeline.snapshot()] == [
+            "recovery_started", "write_rate_limited",
+        ]
 
     asyncio.run(run())
 

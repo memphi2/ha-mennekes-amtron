@@ -25,6 +25,7 @@ from .decode import RegisterValue
 from .entry_types import MennekesAmtronConfigEntry
 from .enums import EvseState
 from .register_blocks import SLOW_BLOCK_INTERVAL_SECONDS, BlockCadence
+from .runtime_events import EventTimeline, EventType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         connection_state: ConnectionState,
         scan_interval: float,
         measurement_interval: float = DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
+        timeline: EventTimeline | None = None,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         super().__init__(
@@ -55,6 +57,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         self._client = client
         self._identity = identity
         self._connection_state = connection_state
+        self._timeline = timeline
         self._monotonic = monotonic
         self._slow_read_at: float | None = None
         self._active_read_at: float | None = None
@@ -144,6 +147,8 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
 
     def _log_unavailable(self, err: Exception) -> None:
         changed = self._connection_state.record(False)
+        if changed and self._timeline is not None:
+            self._timeline.record(EventType.CONNECTION_LOST)
         if changed and not self._connection_state.logged_unavailable:
             _LOGGER.warning(
                 "Lost the connection to %s: %s", self._client.config.port, err
@@ -152,6 +157,8 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
 
     def _log_available(self) -> None:
         changed = self._connection_state.record(True)
+        if changed and self._timeline is not None:
+            self._timeline.record(EventType.CONNECTION_RECOVERED)
         if changed and self._connection_state.logged_unavailable:
             _LOGGER.info("Reconnected to %s", self._client.config.port)
             self._connection_state.logged_unavailable = False

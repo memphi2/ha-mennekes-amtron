@@ -33,6 +33,7 @@ from .const import (
 )
 from .data import WriteDiagnostics
 from .registers import HEARTBEAT
+from .runtime_events import EventType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ class HeartbeatTask:
         self._task: asyncio.Task[None] | None = None
         self._stopping = False
         self._delivered_at: float | None = None
+        self._failed = False
 
     @property
     def running(self) -> bool:
@@ -73,11 +75,17 @@ class HeartbeatTask:
                 HEARTBEAT, HEARTBEAT_VALUE, priority=True
             )
         except AmtronBusError as err:
+            if not self._failed:
+                self._diagnostics.timeline.record(EventType.HEARTBEAT_FAILED)
+            self._failed = True
             self._diagnostics.heartbeats_failed += 1
             self._diagnostics.last_error = str(err)
             _LOGGER.debug("Heartbeat write failed: %s", err)
             return False
         self._diagnostics.heartbeats_sent += 1
+        if self._failed:
+            self._diagnostics.timeline.record(EventType.HEARTBEAT_RECOVERED)
+            self._failed = False
         return True
 
     async def async_run(self) -> None:
@@ -140,6 +148,7 @@ class HeartbeatTask:
         if gap <= self._deadline:
             return
         self._diagnostics.heartbeats_late += 1
+        self._diagnostics.timeline.record(EventType.HEARTBEAT_LATE)
         _LOGGER.warning(
             "The heartbeat reached %s %.1f s apart, more than the %.0f s the "
             "wallbox allows; it may report the energy-manager error",
