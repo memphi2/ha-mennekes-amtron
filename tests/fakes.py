@@ -23,6 +23,9 @@ class FakeResponse:
     """A successful pymodbus read or write response."""
 
     registers: list[int] = field(default_factory=list)
+    function_code: int = 0x03
+    address: int = 0
+    count: int = 0
 
     def isError(self) -> bool:  # noqa: N802
         """Return false: this response carries data."""
@@ -102,7 +105,7 @@ class FakeModbusClient:
         self.writes.append((address, values))
         for offset, value in enumerate(values):
             self.bank[address + offset] = value
-        return FakeResponse(values)
+        return FakeResponse(values, function_code=function, address=address, count=len(values))
 
 
 def _raise_or_return(failure: Any, address: int, function: int) -> Any:

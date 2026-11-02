@@ -26,6 +26,7 @@ local Modbus RTU.
 | [Modbus register map](modbus-registers.md) | Every register the integration implements, the enumerated values, the read blocks and the rules the device imposes |
 | [Architecture](architecture.md) | How the code is laid out and the four decisions behind it |
 | [Quality scale](quality-scale.md) | The Home Assistant quality-scale status, rule by rule |
+| [Maintenance validation](validation.md) | Resource measurements, release integrity, compatibility, privacy and serial fault checks |
 | [Repository settings](repository-settings.md) | Branch protection and the security options, declared as code |
 | [Legal notes](legal.md) | Licence, trademarks, and why no vendor document is in this repository |
 | [Provenance audit](audits/current-legal-provenance.md) | Source and licensing evidence |
