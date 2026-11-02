@@ -1,18 +1,16 @@
 # Current Legal and Provenance Audit Snapshot
 
-Audit date: 2026-11-01
+Audit date: 2026-11-02
 
-This is a technical repository audit of the local changes following v0.2.2,
-based on `7bb602d39632092c238cdc12c70a72a3d43f79d1`. It is not a legal opinion,
+This is a technical repository audit for v0.3.0, following the published
+v0.2.3 at `e71e538bcdad64209714a99123224af8f9003ab5`. It is not a legal opinion,
 a trademark or patent clearance, or a certification of the integration.
 
 ## Scope and evidence
 
-The repository is public and v0.2.2 has been released. The previous document
-still described the initial unpublished 0.1 work; its later edits had also
-changed some dependency facts without updating the audit date. That document
-remains available in [Git history](https://github.com/memphi2/ha-mennekes-amtron/blob/7bb602d39632092c238cdc12c70a72a3d43f79d1/docs/audits/current-legal-provenance.md)
-as historical context, not evidence of the current state.
+The repository is public. The previous audit remains available in
+[Git history](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.2.3/docs/audits/current-legal-provenance.md)
+as a dated record of v0.2.3.
 
 The current review covers tracked integration code, tests, repository tooling,
 user documentation, dependencies, generic artwork and release packaging.
@@ -28,20 +26,19 @@ dependency, Ruff, test/coverage and strict-typing gates. The second reads
 GitHub required-check settings and reports drift without changing them.
 It is separate from code validation and requires authenticated `gh` access.
 
-Current audit validation on 2026-11-01 uses Python 3.14 and pymodbus 3.13.1.
+Current audit validation on 2026-11-02 uses Python 3.14 and pymodbus 3.13.1.
 The resolved dependency is checked against each Home Assistant installation,
 including its package constraints:
 
 | HA version | Tests passed | Skipped | Statement/branch coverage |
 |---|---:|---:|---:|
-| 2026.9.0 | 541 | 2 | 99.44% |
-| 2026.10.0 | 541 | 2 | 99.44% |
-| 2026.11.0b1 | 543 | 0 | 99.44% |
+| 2026.9.0 | 627 | 2 | 99.46% |
+| 2026.10.4 | 627 | 2 | 99.46% |
 
 The two skips concern Marketplace APIs absent in the older HA versions.
-Strict typing passed for all 54 source/tooling modules against current and
-preview HA; minimum HA runs the runtime suite without the typing gate.
-The local HACS build contains 54 files, including byte-identical LICENSE and
+Strict typing passed for all 60 source/tooling modules against latest stable
+HA; minimum HA runs the runtime suite without the typing gate.
+The local HACS build contains 55 files, including byte-identical LICENSE and
 NOTICE copies. These results record the pre-release audit; publication and
 verification of downloaded release assets are separate release gates.
 
@@ -90,14 +87,12 @@ HA automation test checks replacement of an in-flight PV adjustment by the
 latest power budget. The integration remains read-only by default and exposes
 no network listener or cloud API.
 
-The settings tool now merges required checks through GitHub's dedicated
-endpoint, preserving review rules, administrator enforcement and existing
-App IDs. API errors fail the command. The read-only check on 2026-11-01 found
-`validate (preview-ha)` missing from live required checks. During the subsequent
-security-review enforcement change, the preview and `codex-security-review`
-checks were added to live branch protection. Administrator enforcement and
-all other protection settings were verified unchanged. The owner confirmed
-automatic Codex security review for all PRs on every push.
+The settings tool migrates required checks to minimum and latest stable HA
+through GitHub's dedicated endpoint, preserving review rules, administrator
+enforcement and existing App IDs. Only the replaced current/preview contexts
+are removed; the mandatory `codex-security-review` gate remains. The local
+policy is applied and verified separately during release preparation.
+The owner confirmed automatic Codex security review for all PRs on every push.
 
 The security gate has 48 regression cases, including edited review requests,
 timestamp ordering and authorization. Its publisher can successfully
@@ -110,9 +105,10 @@ for format dependencies, reporting thresholds and the initial rollout.
 Routine Dependabot PRs remain disabled; security alerts and security updates
 remain part of the repository policy. This reduces routine work, but it is
 not a promise of maintenance-free compatibility with future HA releases.
-The full compatibility matrix now also has a weekly/manual maintenance run;
-its next-HA job must pass on those runs, making regressions visible without
-creating dependency-update PRs. Scheduled execution starts after merge.
+The min/latest stable matrix runs for PRs and releases. The next-HA preview
+is tested only weekly or manually, making maintenance regressions visible
+without creating dependency-update PRs. A deprecated-API guard checks owned
+code while leaving third-party warnings visible.
 
 [Recorder](../recorder.md) documents the 30-second measurement default,
 complete lean exclusion profile, measured state-row savings and the limits
@@ -124,6 +120,14 @@ history counts, retained hourly statistics, actual SQLite VACUUM completion
 and database integrity. Disk-monitoring guidance covers the database mount
 and the temporary free space needed for maintenance.
 
+The bounded diagnostics history retains at most 40 events in RAM, outside
+entity data and Recorder state. Thirty measured lifecycle and serial cycles
+showed no growing task, timer or descriptor count and no retained clients or
+listeners after unload. Fault injection checks mismatched RTU responses and
+preserves the uncertain-write cooldown. Public privacy scanning inspected 156
+published text/asset surfaces before this release, with no heuristic findings
+other than documented placeholders; post-publication checks are separate.
+
 ## Limits
 
 No public clone/similarity search, jurisdiction-specific clearance or legal
@@ -131,5 +135,5 @@ opinion was performed. Static provenance checks cannot establish ownership
 of every contribution. Hardware behavior has not been verified on a physical
 wallbox; serial transport is tested through a virtual RTU bus. Synthetic
 Recorder replay, statistics and accelerated retention tests are not a
-wall-clock or disk-full soak test. November beta compatibility is evidence for that tested
-beta, not a guarantee about a future stable release.
+wall-clock or disk-full soak test. Testing the minimum and latest stable HA
+does not guarantee compatibility with every intermediate or future release.

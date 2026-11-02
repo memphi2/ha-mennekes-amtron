@@ -2,7 +2,7 @@
 
 ## Supported Release Line
 
-- `0.2.x`: active
+- `0.3.x`: active
 
 ## Compatibility Baseline
 
