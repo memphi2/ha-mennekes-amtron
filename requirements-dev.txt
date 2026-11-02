@@ -1,4 +1,4 @@
-# Direct validation dependencies for the current Home Assistant matrix. CI
+# Direct validation dependencies for the latest stable Home Assistant matrix. CI
 # installs Home Assistant separately, so this file intentionally does not pin
 # Home Assistant transitive dependencies.
 mypy==2.4.1

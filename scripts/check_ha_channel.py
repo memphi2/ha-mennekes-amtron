@@ -1,7 +1,8 @@
-"""Check that the stable maintenance job really installed the latest stable HA."""
+"""Verify the installed HA target after dependency resolution."""
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
@@ -21,18 +22,24 @@ def validate_release(release: dict[str, Any], installed: str) -> None:
         raise ValueError("installed HA does not match the latest stable release")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--expected", default="latest", help="Exact version or latest (stable)")
+    args = parser.parse_args(argv)
     try:
-        result = subprocess.run(
-            ["gh", "api", "repos/home-assistant/core/releases/latest"],
-            capture_output=True, check=True, text=True,
-        )
         installed = version("homeassistant")
-        validate_release(json.loads(result.stdout), installed)
-    except (OSError, subprocess.CalledProcessError, PackageNotFoundError, ValueError, KeyError, TypeError):
-        sys.stderr.write("Cannot verify latest stable HA; check release availability and Python/dependency compatibility.\n")
+        if args.expected == "latest":
+            result = subprocess.run(
+                ["gh", "api", "repos/home-assistant/core/releases/latest"],
+                capture_output=True, check=True, text=True, timeout=60,
+            )
+            validate_release(json.loads(result.stdout), installed)
+        elif Version(installed) != Version(args.expected):
+            raise ValueError("installed HA differs from the requested minimum")
+    except (OSError, subprocess.SubprocessError, PackageNotFoundError, ValueError, KeyError, TypeError):
+        sys.stderr.write("Cannot verify HA target; check release availability and Python/dependency compatibility.\n")
         return 1
-    sys.stdout.write(f"Latest stable HA verified: {installed}\n")
+    sys.stdout.write(f"HA target {args.expected} verified: {installed}\n")
     return 0
 
 

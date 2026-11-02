@@ -15,9 +15,14 @@ The script is idempotent and needs an authenticated `gh` for `--check` or
 exist; a failed read aborts the update. Review requirements, administrator
 enforcement, restrictions, force-push/deletion policy and conversation rules
 are preserved. Required checks are merged with existing checks, including
-their GitHub App IDs, through the targeted
+their GitHub App IDs. Only the retired `validate (current-ha)` and
+`validate (preview-ha)` contexts are removed during migration to min/latest,
+through the targeted
 [status-check endpoint](https://docs.github.com/en/rest/branches/branch-protection#update-status-check-protection).
 `--check` checks required-check drift only, not every repository setting.
+When deploying the min/latest workflows, apply the declared checks once the new
+`validate (latest-ha)` check is available. The local declaration alone does not
+change GitHub branch protection.
 
 ## What it enforces
 
@@ -32,7 +37,7 @@ their GitHub App IDs, through the targeted
 | Dependabot security updates | enabled |
 | Private vulnerability reporting | enabled |
 | Secret scanning and push protection | enabled |
-| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (current-ha)`, `validate (preview-ha)`, `codex-security-review`, strict |
+| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (latest-ha)`, `codex-security-review`, strict |
 | Other `main` protections | preserved; not overwritten by this script |
 
 `scripts/check_repo.py` checks the CI job names and requires the security-gate
@@ -130,8 +135,8 @@ for schedules, groups and the separate security-update limit, and GitHub's
 
 ## Validation dependencies
 
-`requirements-dev.txt` contains the direct validation tools for current and
-preview Home Assistant. Dependabot security updates treat this file as
+`requirements-dev.txt` contains the direct validation tools for latest stable and
+weekly preview Home Assistant. Dependabot security updates treat this file as
 ordinary pip requirements. `requirements-dev-min-ha.txt` is maintained separately
 for the minimum supported Home Assistant. Their versions may differ intentionally.
 

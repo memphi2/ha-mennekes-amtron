@@ -30,7 +30,7 @@ jobs:
       matrix:
         include:
           # The minimum entry proves the integration runs on the oldest
-          # supported release; the current entry additionally type-checks it,
+          # supported release; latest stable additionally type-checks it,
           # because Home Assistant's own annotations moved from voluptuous to
           # probatio in 2026.10 and cannot both be satisfied at once.
           - name: min-ha
@@ -38,15 +38,9 @@ jobs:
             homeassistant: "2026.9.0"
             requirements-lock: requirements-dev-min-ha.txt
             validate-arguments: "--skip-typing"
-          - name: current-ha
+          - name: latest-ha
             python-version: "3.14"
-            homeassistant: "2026.10.0"
-            requirements-lock: requirements-dev.txt
-            validate-arguments: ""
-          # Fixed November compatibility target; next-ha still tracks new betas.
-          - name: preview-ha
-            python-version: "3.14"
-            homeassistant: "2026.11.0b1"
+            homeassistant: "latest"
             requirements-lock: requirements-dev.txt
             validate-arguments: ""
     steps:
@@ -58,11 +52,23 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Python validation tools
+        env:
+          HA_TARGET: ${{ matrix.homeassistant }}
+          REQUIREMENTS_LOCK: ${{ matrix.requirements-lock }}
         run: |
-          python -m pip install "homeassistant==${{ matrix.homeassistant }}"
-          python -m pip install -r "${{ matrix.requirements-lock }}"
+          if [ "$HA_TARGET" = latest ]; then
+            python -m pip install --upgrade homeassistant
+          else
+            python -m pip install "homeassistant==$HA_TARGET"
+          fi
+          python -m pip install -r "$REQUIREMENTS_LOCK"
           python scripts/check_pymodbus_pin.py --install
           python -m pip check
+      - name: Verify installed Home Assistant target
+        env:
+          HA_TARGET: ${{ matrix.homeassistant }}
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_ha_channel.py --expected "$HA_TARGET"
       - name: Validation gates
         run: python scripts/check_validate.py ${{ matrix.validate-arguments }}
 

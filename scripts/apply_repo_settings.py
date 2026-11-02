@@ -32,10 +32,11 @@ REQUIRED_CI_CHECKS = (
     "hacs",
     "hassfest",
     "validate (min-ha)",
-    "validate (current-ha)",
-    "validate (preview-ha)",
+    "validate (latest-ha)",
 )
 REQUIRED_CHECKS = (*REQUIRED_CI_CHECKS, "codex-security-review")
+# Remove only the two replaced matrix jobs; unrelated/security checks survive.
+RETIRED_CI_CHECKS = {"validate (current-ha)", "validate (preview-ha)"}
 
 REPOSITORY_SETTINGS = {
     "has_issues": True,
@@ -168,12 +169,13 @@ def _run(step: Step) -> str | None:
 
 
 def merged_status_checks(current: dict[str, Any]) -> dict[str, Any]:
-    """Add required contexts without losing custom checks or their App IDs."""
+    """Migrate owned contexts without losing custom checks or their App IDs."""
 
-    checks = [dict(check) for check in current.get("checks", [])]
+    checks = [dict(check) for check in current.get("checks", [])
+              if check["context"] not in RETIRED_CI_CHECKS]
     known = {check["context"] for check in checks}
     for context in [*current.get("contexts", []), *REQUIRED_CHECKS]:
-        if context not in known:
+        if context not in known and context not in RETIRED_CI_CHECKS:
             check = {"context": context}
             if context == "codex-security-review":
                 # Allow both the trusted Actions workflow and an authenticated
@@ -209,8 +211,9 @@ def _check_required_checks(repository: str) -> int:
         check["context"] for check in current.get("checks", [])
     }
     missing = sorted(set(REQUIRED_CHECKS) - known)
-    if missing or not current.get("strict"):
-        _write(f"Drift: missing checks={missing}, strict={current.get('strict')}")
+    retired = sorted(RETIRED_CI_CHECKS & known)
+    if missing or retired or not current.get("strict"):
+        _write(f"Drift: missing checks={missing}, retired checks={retired}, strict={current.get('strict')}")
         return 1
     _write("Required checks match the repository policy")
     return 0

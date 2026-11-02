@@ -301,8 +301,7 @@ def test_the_protected_checks_match_the_ci_jobs() -> None:
         "hacs",
         "hassfest",
         "validate (min-ha)",
-        "validate (current-ha)",
-        "validate (preview-ha)",
+        "validate (latest-ha)",
         "codex-security-review",
     }
     names = [step.name for step in steps("owner/repo")]

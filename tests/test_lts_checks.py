@@ -6,6 +6,7 @@ import pytest
 import yaml
 
 from scripts.check_deprecations import source_issues
+from scripts.check_ha_channel import main as check_ha
 from scripts.check_ha_channel import validate_release
 
 
@@ -40,13 +41,38 @@ def test_prose_test_vectors_and_unrelated_warnings_are_not_deprecations():
     assert not source_issues("import warnings\nwarnings.simplefilter('ignore', UserWarning)")
 
 
-def test_latest_stable_and_preview_are_separate_without_pin_changes():
-    jobs = yaml.safe_load(Path(".github/workflows/validate.yml").read_text())["jobs"]
-    stable = jobs["latest-stable-ha"]
-    commands = "\n".join(step.get("run", "") for step in stable["steps"])
-    assert "schedule" in stable["if"]
-    assert "workflow_dispatch" in stable["if"]
+@pytest.mark.parametrize("workflow", ["validate.yml", "release.yml"])
+def test_required_matrix_is_minimum_and_dynamic_latest_only(workflow):
+    jobs = yaml.safe_load((Path(".github/workflows") / workflow).read_text())["jobs"]
+    entries = jobs["validate"]["strategy"]["matrix"]["include"]
+    assert [entry["name"] for entry in entries] == ["min-ha", "latest-ha"]
+    assert entries[0]["homeassistant"] == "2026.9.0"
+    assert entries[0]["validate-arguments"] == "--skip-typing"
+    assert entries[1]["homeassistant"] == "latest"
+    assert entries[1]["validate-arguments"] == ""
+    commands = "\n".join(step.get("run", "") for step in jobs["validate"]["steps"])
     assert "--pre" not in commands
-    assert "check_ha_channel.py" in commands
     assert "--upgrade homeassistant" in commands
-    assert "--pre" in str(jobs["next-ha"])
+    assert commands.index('check_ha_channel.py --expected "$HA_TARGET"') > commands.index("pip check")
+    assert "latest-stable-ha" not in jobs
+
+
+def test_preview_is_weekly_or_manual_and_soak_uses_latest():
+    jobs = yaml.safe_load(Path(".github/workflows/validate.yml").read_text())["jobs"]
+    preview = jobs["next-ha"]
+    assert preview["if"] == "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+    assert not preview.get("continue-on-error")
+    assert "--pre --upgrade homeassistant" in str(preview)
+    assert "--upgrade homeassistant" in str(jobs["runtime-soak"])
+    assert "check_ha_channel.py" in str(jobs["runtime-soak"])
+
+
+@pytest.mark.parametrize("installed", ["2026.9.0", "2026.10.4"])
+def test_minimum_identity_is_checked_without_network(monkeypatch, installed):
+    from scripts import check_ha_channel
+
+    monkeypatch.setattr(check_ha_channel, "version", lambda _package: installed)
+    def no_network(*_args, **_kwargs):
+        pytest.fail("The fixed minimum does not need a release API request")
+    monkeypatch.setattr(check_ha_channel.subprocess, "run", no_network)
+    assert check_ha(["--expected", "2026.9.0"]) == int(installed != "2026.9.0")

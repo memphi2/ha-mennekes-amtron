@@ -29,6 +29,30 @@ def test_status_checks_preserve_custom_contexts_and_app_identity() -> None:
     assert settings.merged_status_checks(merged) == merged
 
 
+def test_replaced_matrix_contexts_are_removed_without_weakening_other_checks():
+    protected = [
+        {"context": "custom", "app_id": 42},
+        {"context": "codex-security-review", "app_id": 15368},
+    ]
+    current = {
+        "strict": True,
+        "contexts": ["validate (current-ha)", "validate (preview-ha)", "additional-review"],
+        "checks": [*protected, {"context": "validate (preview-ha)", "app_id": 15368}],
+    }
+    merged = settings.merged_status_checks(current)
+    assert merged["checks"][:2] == protected
+    assert {check["context"] for check in merged["checks"]} == set(
+        settings.REQUIRED_CHECKS
+    ) | {"custom", "additional-review"}
+    assert settings.merged_status_checks(merged) == merged
+
+
+def test_retired_matrix_checks_count_as_policy_drift(monkeypatch):
+    current = {"strict": True, "contexts": [*settings.REQUIRED_CHECKS, "validate (preview-ha)"]}
+    monkeypatch.setattr(settings, "_read_required_checks", lambda _path: (current, None))
+    assert settings.main(["--check"]) == 1
+
+
 @pytest.mark.parametrize("read_fails", [False, True])
 def test_branch_update_reads_before_writing_and_never_replaces_protection(
     monkeypatch, read_fails

@@ -1,8 +1,8 @@
 # Maintenance validation
 
 Run the normal suite with `.venv/bin/python scripts/check_validate.py`.
-The minimum HA environment uses `--skip-typing`; current and preview HA
-also run strict typing. These checks do not access a physical wallbox.
+The minimum HA environment uses `--skip-typing`; latest stable HA
+also runs strict typing. These checks do not access a physical wallbox.
 
 ## Resource measurements
 
@@ -44,11 +44,18 @@ its existing SPDX schema and attestation verification before publication.
 
 ## Stable and preview compatibility
 
-Weekly/manual maintenance additionally installs the newest stable HA in a
-fresh job and compares it with Core's published latest stable release. An
-older fallback selected because of Python constraints fails that check. The
-existing `next-ha` job still tracks prereleases independently; neither job
-rewrites repository version pins or opens dependency PRs.
+PR and release validation each have exactly two HA targets: the fixed minimum
+from `project-versions.json` and the automatically resolved latest stable release.
+Both run the full test suite; latest stable also runs strict typing. After tool
+and runtime dependency installation, CI verifies the installed HA version.
+The latest target is compared with Core's published latest stable release, so
+an older Python-compatible fallback cannot pass unnoticed. No current or beta
+version pin needs routine updates.
+
+The separate `next-ha` early-warning job runs only weekly or manually. It tracks
+prereleases independently and makes maintenance failures visible. It is not a
+required PR/release check. The resource soak uses latest stable as well; none
+of these checks rewrites pins or opens dependency PRs.
 
 `scripts/check_deprecations.py` checks owned Python calls for a focused list
 of obsolete APIs and rejects blanket suppression of deprecation warnings.
