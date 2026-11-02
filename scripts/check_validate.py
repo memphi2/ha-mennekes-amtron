@@ -4,8 +4,8 @@
 ``--skip-typing`` leaves the strict typing gate out. Home Assistant moved
 its own flow and service annotations from voluptuous to probatio in 2026.10,
 so one source file cannot satisfy ``mypy --strict`` against both ends of the
-supported range. CI therefore type-checks against ``current_homeassistant``
-and the preview, and uses the minimum matrix entry to prove the integration
+supported range. CI therefore type-checks against the latest stable HA
+(and weekly preview), and uses the minimum matrix entry to prove the integration
 still runs. Tests execute once per matrix entry, with coverage enabled.
 """
 
@@ -53,6 +53,7 @@ def steps(*, skip_typing: bool = False) -> list[ValidationStep]:
             (sys.executable, "scripts/check_pymodbus_pin.py"),
         ),
         ValidationStep("Ruff", (sys.executable, "-m", "ruff", "check", ".")),
+        ValidationStep("Owned API deprecations", (sys.executable, "scripts/check_deprecations.py")),
         ValidationStep(
             "Python tests and coverage",
             (sys.executable, "scripts/check_coverage.py"),

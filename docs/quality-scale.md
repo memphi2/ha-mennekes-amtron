@@ -83,7 +83,7 @@ job regardless, on every matrix entry. See
 [repository-settings.md](repository-settings.md).
 
 `mypy --strict` covers all integration modules and tooling scripts.
-It runs against `current_homeassistant` and the pinned November preview.
+It runs against the latest stable Home Assistant and the weekly preview.
 Home Assistant moved its own config-flow and action annotations from
 voluptuous to `probatio` in 2026.10,
 so no single source file can satisfy `--strict` against both ends of the

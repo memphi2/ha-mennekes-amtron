@@ -33,7 +33,7 @@ These steps apply only to the RTU integration from
 
 ## Install and reconfigure
 
-1. Install the current 0.2.x release following [Installation](installation.md),
+1. Install the current release following [Installation](installation.md),
    completing any requested Home Assistant restart. Manual installs now use
    `custom_components/mennekes_amtron_rtu/`.
 2. Add **Mennekes Amtron RTU** with the recorded bus settings.

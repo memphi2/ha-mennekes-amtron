@@ -58,9 +58,13 @@ async def read_words(
             raise AmtronProtocolError(str(err) or "modbus transaction failed") from err
 
     if isinstance(response, ExceptionResponse):
+        if response.function_code != 0x83:
+            raise AmtronProtocolError("read received an exception for another function")
         raise protocol_error_for(response.exception_code, address)
     if response is None or response.isError():
         raise AmtronProtocolError(f"read of 0x{address:04X} failed")
+    if getattr(response, "function_code", None) != 0x03:
+        raise AmtronProtocolError(f"read of 0x{address:04X} received another function")
 
     words = [int(word) for word in getattr(response, "registers", [])]
     if len(words) != count:

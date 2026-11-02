@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import os
 import pty
+import select
 import threading
 
 import pytest
@@ -43,15 +44,19 @@ DEVICE_ID = 50
 REGISTER_COUNT = 0x1010
 
 
-def _virtual_serial_link() -> tuple[str, str]:
+def _virtual_serial_link(request: pytest.FixtureRequest) -> tuple[str, str]:
     """Return two serial paths that are wired to each other."""
 
     master_a, slave_a = pty.openpty()
     master_b, slave_b = pty.openpty()
+    stopping = threading.Event()
+    threads = []
 
     def relay(source: int, target: int) -> None:
-        while True:
+        while not stopping.is_set():
             try:
+                if not select.select([source], [], [], 0.05)[0]:
+                    continue
                 data = os.read(source, 4096)
             except OSError:
                 return
@@ -63,7 +68,19 @@ def _virtual_serial_link() -> tuple[str, str]:
                 return
 
     for source, target in ((master_a, master_b), (master_b, master_a)):
-        threading.Thread(target=relay, args=(source, target), daemon=True).start()
+        thread = threading.Thread(target=relay, args=(source, target), daemon=True)
+        threads.append(thread)
+        thread.start()
+
+    def cleanup() -> None:
+        stopping.set()
+        for thread in threads:
+            thread.join(timeout=1)
+        for descriptor in (master_a, slave_a, master_b, slave_b):
+            os.close(descriptor)
+        assert all(not thread.is_alive() for thread in threads)
+
+    request.addfinalizer(cleanup)
     return os.ttyname(slave_a), os.ttyname(slave_b)
 
 
@@ -80,12 +97,12 @@ def _server_context(words: list[int], device_id: int = DEVICE_ID) -> object:
     return [SimDevice(device_id, simdata=[registers])]
 
 
-def test_the_integration_drives_a_real_modbus_rtu_server() -> None:
+def test_the_integration_drives_a_real_modbus_rtu_server(request: pytest.FixtureRequest) -> None:
     from pymodbus import FramerType
     from pymodbus.server import ModbusSerialServer
 
     bank = device_bank()
-    device_port, client_port = _virtual_serial_link()
+    device_port, client_port = _virtual_serial_link(request)
 
     async def run() -> None:
         words = [_signed(bank.get(address, 0)) for address in range(REGISTER_COUNT)]

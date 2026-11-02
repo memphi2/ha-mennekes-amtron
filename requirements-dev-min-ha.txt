@@ -5,7 +5,7 @@
 # mypy is absent on purpose: Home Assistant's flow and service annotations
 # moved from voluptuous to probatio in 2026.10, so a single source file
 # cannot satisfy --strict on both matrix entries. The floor proves the
-# integration runs; the current entry proves it type-checks.
+# integration runs; the latest stable entry proves it type-checks.
 pymodbus[serial]==3.13.1
 pytest==9.1.1
 pytest-cov==7.1.0

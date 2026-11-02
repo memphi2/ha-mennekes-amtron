@@ -89,6 +89,7 @@ async def async_get_config_entry_diagnostics(
                 )
             ),
         },
+        "runtime_events": runtime_data.diagnostics.timeline.snapshot(),
         "values": decoded_values(data.values),
         "registers": await async_raw_registers(entry),
     }

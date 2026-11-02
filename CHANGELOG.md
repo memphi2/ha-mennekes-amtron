@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.3.0 — 2026-11-02
+
+### Added
+
+- Include the last 40 connection, heartbeat, recovery and rejected-write events
+  in diagnostics. The history lives only in RAM, resets on reload and adds no
+  entity attributes or Recorder state changes.
+- Measure repeated HA setup, recovery, idle and unload cycles, including task,
+  listener, client, memory and serial-descriptor cleanup.
+- Verify published release assets against the approved Git tree, checksums,
+  metadata and SBOM; audit public GitHub text and release assets for likely
+  identifying values without printing matches.
+
+### Changed
+
+- Validate PRs and releases against the fixed minimum and automatically resolved
+  latest stable HA. Keep prerelease checks for weekly/manual maintenance only.
+  Migrate the retired required-check names while retaining the security gate.
+- Guard owned code against known deprecated APIs and blanket warning suppression.
+
+### Fixed
+
+- Reject Modbus replies for the wrong function and write acknowledgements with
+  the wrong register address, value or count. Mismatched replies cannot claim
+  write success or release the cooldown for an uncertain write.
+- Verify fragmented, corrupt, truncated, foreign-device and delayed RTU replies
+  with the real serial library. Close virtual serial relay threads and all
+  descriptors after tests.
+
+Existing 0.2.x config entries, devices and entity IDs remain valid. The minimum
+Home Assistant version remains 2026.9.0. Upgrades from 0.2.3 need no blueprint
+or config-entry migration; older releases retain their documented upgrade steps.
+
 ## 0.2.3 — 2026-11-01
 
 ### Upgrade action

@@ -19,7 +19,7 @@ jobs:
       matrix:
         include:
           # The minimum entry proves the integration runs on the oldest
-          # supported release; the current entry additionally type-checks it,
+          # supported release; latest stable additionally type-checks it,
           # because Home Assistant's own annotations moved from voluptuous to
           # probatio in 2026.10 and cannot both be satisfied at once.
           - name: min-ha
@@ -27,15 +27,9 @@ jobs:
             homeassistant: "2026.9.0"
             requirements-lock: requirements-dev-min-ha.txt
             validate-arguments: "--skip-typing"
-          - name: current-ha
+          - name: latest-ha
             python-version: "3.14"
-            homeassistant: "2026.10.0"
-            requirements-lock: requirements-dev.txt
-            validate-arguments: ""
-          # Fixed November compatibility target; next-ha still tracks new betas.
-          - name: preview-ha
-            python-version: "3.14"
-            homeassistant: "2026.11.0b1"
+            homeassistant: "latest"
             requirements-lock: requirements-dev.txt
             validate-arguments: ""
     name: validate (${{ matrix.name }})
@@ -48,37 +42,32 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Python validation tools
+        env:
+          HA_TARGET: ${{ matrix.homeassistant }}
+          REQUIREMENTS_LOCK: ${{ matrix.requirements-lock }}
         run: |
-          python -m pip install "homeassistant==${{ matrix.homeassistant }}"
-          python -m pip install -r "${{ matrix.requirements-lock }}"
+          if [ "$HA_TARGET" = latest ]; then
+            python -m pip install --upgrade homeassistant
+          else
+            python -m pip install "homeassistant==$HA_TARGET"
+          fi
+          python -m pip install -r "$REQUIREMENTS_LOCK"
           python scripts/check_pymodbus_pin.py --install
           python -m pip check
-          python - <<'PY'
-          from importlib.metadata import version
-
-          expected = "${{ matrix.homeassistant }}"
-          actual = version("homeassistant")
-          if actual != expected:
-              raise SystemExit(f"homeassistant lock mismatch: expected {expected}, got {actual}")
-          PY
+      - name: Verify installed Home Assistant target
+        env:
+          HA_TARGET: ${{ matrix.homeassistant }}
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_ha_channel.py --expected "$HA_TARGET"
       - name: Validation gates
         run: python scripts/check_validate.py ${{ matrix.validate-arguments }}
 
-  # Early warning for the next Home Assistant release. It is allowed to fail:
-  # a pre-release breaking is information, not a reason to block a merge. When
-  # it goes stable, it moves into the matrix above.
-  #
-  # The version is resolved rather than pinned. A pinned beta goes stale the
-  # moment it is superseded, which turns the job into a test of an obsolete
-  # release instead of the next one. With --pre, pip installs the newest
-  # version there is; while no pre-release is newer than the current stable
-  # that is the stable itself, and the job simply agrees with the matrix.
+  # Preview checks are maintenance signals, not part of the PR/release matrix.
+  # Resolve the newest available prerelease instead of keeping an old beta pin.
   next-ha:
     name: next-ha (early warning)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
-    # PRs retain an advisory preview; unattended/manual maintenance runs must
-    # fail visibly so compatibility regressions do not disappear in green CI.
-    continue-on-error: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -101,6 +90,44 @@ jobs:
           PY
       - name: Validation gates
         run: python scripts/check_validate.py
+
+  runtime-soak:
+    name: runtime resource soak
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Install latest stable HA and validation tools
+        run: |
+          python -m pip install --upgrade homeassistant
+          python -m pip install -r requirements-dev.txt
+          python scripts/check_pymodbus_pin.py --install
+          python -m pip check
+      - name: Verify latest stable HA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_ha_channel.py
+      - name: Measure repeated lifecycle, recovery and serial cleanup
+        run: python scripts/check_runtime_soak.py --cycles 30 --idle-seconds 10
+
+  public-privacy:
+    name: public privacy audit
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Inspect published text and release assets without modifying GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/audit_github_public.py --hacs-pr 11749
 
   dependabot:
     runs-on: ubuntu-24.04

@@ -49,6 +49,7 @@ def test_the_validation_sequence_matches_the_documented_order() -> None:
         "Register map checks",
         "pymodbus requirement check",
         "Ruff",
+        "Owned API deprecations",
         "Python tests and coverage",
         "Python typing ratchet",
     ]
@@ -300,8 +301,7 @@ def test_the_protected_checks_match_the_ci_jobs() -> None:
         "hacs",
         "hassfest",
         "validate (min-ha)",
-        "validate (current-ha)",
-        "validate (preview-ha)",
+        "validate (latest-ha)",
         "codex-security-review",
     }
     names = [step.name for step in steps("owner/repo")]

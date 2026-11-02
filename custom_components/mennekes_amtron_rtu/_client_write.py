@@ -99,10 +99,23 @@ async def write_register(
             raise err.__cause__ from None
         raise AmtronProtocolError(str(err) or "modbus transaction failed") from err
 
+    function = 0x06 if len(words) == 1 else 0x10
     if isinstance(response, ExceptionResponse):
+        if response.function_code != function | 0x80:
+            raise AmtronProtocolError("write received an exception for another function")
         raise protocol_error_for(response.exception_code, spec.address)
     if response is None or response.isError():
         raise AmtronProtocolError(
             f"write to 0x{spec.address:04X} was not confirmed"
+        )
+    # RTU has no transaction identifier. pymodbus checks the slave and CRC,
+    # but not whether the acknowledgement actually echoes this request.
+    # A mismatch leaves the outcome uncertain, so the client keeps its floor.
+    if (getattr(response, "function_code", None) != function
+            or getattr(response, "address", None) != spec.address
+            or (len(words) == 1 and getattr(response, "registers", None) != words)
+            or (len(words) > 1 and getattr(response, "count", None) != len(words))):
+        raise AmtronProtocolError(
+            f"write to 0x{spec.address:04X} received a mismatched acknowledgement"
         )
     _LOGGER.debug("Wrote %s = %s to 0x%04X", spec.key, value, spec.address)

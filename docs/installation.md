@@ -18,7 +18,7 @@ Use a published release for normal operation. The [support policy](../SUPPORT.md
 distinguishes stable support from November beta validation.
 
 **Upgrading from 0.1.0:** follow the [domain migration guide](upgrading.md)
-first. The steps for keeping an existing entry below apply to **0.2.x**.
+first. The steps for keeping an existing entry below apply to **0.2.x and 0.3.x**.
 
 ## Home Assistant Marketplace
 
@@ -59,7 +59,7 @@ and [installation behavior](https://contributors.home-assistant.io/marketplace/g
 
 ## Existing installations
 
-For **0.2.x**, keep your config entries, devices, entity IDs and automations.
+For **0.2.x and 0.3.x**, keep your config entries, devices, entity IDs and automations.
 Moving from HACS to the Marketplace does not change this integration's
 repository or domain and does not require adding the wallbox again.
 

@@ -50,6 +50,7 @@ from .registers import (
     SYSTEM_RESTART,
     RegisterSpec,
 )
+from .runtime_events import EventType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -249,6 +250,7 @@ class AmtronControl:
         self._require_write_access()
         target = self.charging_setpoint or self.max_charging_current
         async with self._current_lock:
+            self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
             await self._async_write(CHARGING_RELEASE, 1)
             await self._async_request_current_locked(
@@ -259,6 +261,7 @@ class AmtronControl:
                 defer=False,
             )
         self._diagnostics.recoveries += 1
+        self._diagnostics.timeline.record(EventType.RECOVERY_COMPLETED)
 
     async def async_restart(self) -> None:
         """Restart the wallbox through 0x0D19, which needs the idle state."""
@@ -317,6 +320,9 @@ class AmtronControl:
             remaining = self._mode_change_remaining()
             if remaining > 0:
                 self._diagnostics.writes_rate_limited += 1
+                self._diagnostics.timeline.record(
+                    EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
+                )
                 raise service_validation_error(
                     "write_rate_limited", {"seconds": f"{remaining:.0f}"}
                 )
@@ -414,8 +420,10 @@ class AmtronControl:
                 spec, value, min_interval=min_interval
             )
         except AmtronRateLimitedError:
+            self._diagnostics.timeline.record(EventType.WRITE_RATE_LIMITED, register=spec.address)
             raise
         except AmtronBusError as err:
+            self._diagnostics.timeline.record(EventType.WRITE_REJECTED, register=spec.address)
             self._diagnostics.writes_rejected += 1
             self._diagnostics.last_error = str(err)
             if self._notify_write_error is not None:

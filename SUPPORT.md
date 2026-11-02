@@ -2,25 +2,22 @@
 
 ## Supported Release Line
 
-- `0.2.x`: active
+- `0.3.x`: active
 
 ## Compatibility Baseline
 
 - Minimum Home Assistant: `2026.9.0`
-- Validated Home Assistant: `2026.9.x` and `2026.10.x`
-- November preparation: a fixed `2026.11.0b1` matrix entry runs the full
-  validation including strict typing in both PR and release workflows.
-  This is beta compatibility, not a claim that 2026.11 stable has shipped.
-  After stable ships, promote it to `current_homeassistant` and refresh the
-  workflow matrices and this document together.
-- Early warning: every push is also validated against the newest Home
-  Assistant pre-release in a job that is allowed to fail, so a breaking change
-  in Core is noticed before it ships rather than after. The version is
-  resolved, not pinned, so the job never tests a superseded beta
-- The full matrix also runs every Tuesday at 05:43 UTC and can be started
-  manually. On these maintenance runs the early-warning job is required to
-  pass, so a failure makes the workflow red. GitHub Actions notifications
-  should be enabled for this repository. These runs create no update PRs.
+- Required PR and release validation: the fixed minimum and the latest stable
+  Home Assistant. Latest is resolved automatically, without changing a version
+  pin or opening an update PR. CI verifies the installed version after resolving
+  dependencies; an older Python-compatible fallback or a beta cannot pass as
+  latest stable.
+- Early warning: the newest available prerelease is tested only on the weekly
+  Tuesday 05:43 UTC maintenance run or manual dispatch. Failures make those
+  maintenance runs red, but do not add a required PR/release matrix target.
+  Enable GitHub Actions notifications to receive compatibility warnings.
+- The same two-target matrix also runs weekly and manually. These runs create
+  no update PRs.
 - Python: `3.14`
 - Modbus register layout: `v01.03` (validated), `v01.00`–`v01.02` supported
   with capability gating and untested

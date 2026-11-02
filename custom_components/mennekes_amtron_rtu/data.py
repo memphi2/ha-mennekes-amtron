@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from .decode import RegisterValue
 from .registers import LAYOUT_V01_00
+from .runtime_events import EventTimeline
 
 if TYPE_CHECKING:
     from .client import MennekesModbusClient
@@ -57,6 +58,7 @@ class WriteDiagnostics:
     writes_rate_limited: int = 0
     recoveries: int = 0
     last_error: str | None = None
+    timeline: EventTimeline = field(default_factory=EventTimeline)
 
 
 @dataclass(slots=True)
