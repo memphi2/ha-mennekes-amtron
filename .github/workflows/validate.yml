@@ -144,6 +144,22 @@ jobs:
       - name: Measure repeated lifecycle, recovery and serial cleanup
         run: python scripts/check_runtime_soak.py --cycles 30 --idle-seconds 10
 
+  public-privacy:
+    name: public privacy audit
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Inspect published text and release assets without modifying GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/audit_github_public.py --hacs-pr 11749
+
   dependabot:
     runs-on: ubuntu-24.04
     steps:
