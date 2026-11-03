@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Confirm a fresh idle state before restarting the wallbox; missing, invalid
+  or non-idle device status prevents the restart command.
 - Preserve the pre-pause current across entry reloads for resume and recovery,
   while still applying the current cap configured after the reload.
 - Retry failed heartbeats on a one-second interval so a brief serial reconnect

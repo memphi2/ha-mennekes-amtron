@@ -914,8 +914,9 @@ def test_phase_switch_uses_fresh_device_status(cached, actual, pause):
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("operation", ["phase", "restart"])
 @pytest.mark.parametrize("failure", ["missing", "protocol", "invalid"])
-def test_phase_switch_refuses_unconfirmed_status_without_writes(failure):
+def test_guarded_operations_refuse_unconfirmed_status_without_writes(operation, failure):
     harness = Harness(values={"evse_state": EvseState.IDLE})
     if failure == "invalid":
         harness.transport.bank[R.EVSE_STATE.address] = 99
@@ -926,9 +927,36 @@ def test_phase_switch_refuses_unconfirmed_status_without_writes(failure):
 
     async def run():
         control = await harness.connect()
+        action = (control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+                  if operation == "phase" else control.async_restart())
         with pytest.raises(ServiceValidationError) as error:
-            await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
-        assert error.value.translation_key == "phase_state_unknown"
+            await action
+        assert error.value.translation_key == f"{operation}_state_unknown"
         assert not harness.transport.writes
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("cached", "actual"), [
+    (EvseState.IDLE, EvseState.CHARGING),
+    (EvseState.IDLE, EvseState.EV_CONNECTED),
+    (EvseState.CHARGING, EvseState.IDLE),
+    (None, EvseState.IDLE),
+])
+def test_restart_uses_fresh_device_status(cached, actual):
+    harness = Harness(values={"evse_state": EvseState.IDLE})
+    harness.snapshot.values["evse_state"] = cached
+    harness.transport.bank[R.EVSE_STATE.address] = int(actual)
+
+    async def run():
+        control = await harness.connect()
+        if actual == EvseState.IDLE:
+            await control.async_restart()
+        else:
+            with pytest.raises(ServiceValidationError) as error:
+                await control.async_restart()
+            assert error.value.translation_key == "restart_requires_idle"
+        assert bool(harness.written(R.SYSTEM_RESTART)) == (actual == EvseState.IDLE)
+        assert harness.transport.reads == [(R.EVSE_STATE.address, 1)]
 
     asyncio.run(run())

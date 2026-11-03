@@ -245,12 +245,7 @@ class AmtronControl:
                 self._client.check_write_interval(
                     REQUESTED_PHASES, min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS
                 )
-                try:
-                    state = await self._client.async_read_register(EVSE_STATE)
-                except AmtronBusError as err:
-                    raise service_validation_error("phase_state_unknown") from err
-                if not isinstance(state, int) or state not in EvseState:
-                    raise service_validation_error("phase_state_unknown")
+                state = await self._async_current_evse_state("phase_state_unknown")
                 if state == EvseState.CHARGING:
                     await self._async_request_current_locked(
                         CHARGING_PAUSE_CURRENT, mode_change=True, defer=False
@@ -293,10 +288,22 @@ class AmtronControl:
         """Restart the wallbox through 0x0D19, which needs the idle state."""
 
         self._require_write_access()
-        state = self._state().get("evse_state")
-        if state != EvseState.IDLE:
-            raise service_validation_error("restart_requires_idle")
-        await self._async_write(SYSTEM_RESTART, SYSTEM_RESTART_VALUE)
+        async with self._current_lock:
+            state = await self._async_current_evse_state("restart_state_unknown")
+            if state != EvseState.IDLE:
+                raise service_validation_error("restart_requires_idle")
+            await self._async_write(SYSTEM_RESTART, SYSTEM_RESTART_VALUE)
+
+    async def _async_current_evse_state(self, error_key: str) -> EvseState:
+        """Confirm the device state immediately before a guarded operation."""
+
+        try:
+            state = await self._client.async_read_register(EVSE_STATE)
+        except AmtronBusError as err:
+            raise service_validation_error(error_key) from err
+        if not isinstance(state, int) or state not in EvseState:
+            raise service_validation_error(error_key)
+        return EvseState(state)
 
     async def async_shutdown(self) -> None:
         """Cancel a deferred charging-current write during unload."""

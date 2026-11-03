@@ -343,6 +343,9 @@
     },
     "phase_state_unknown": {
       "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurden keine Phasen umgeschaltet. Prüfe die Verbindung und versuche es erneut."
+    },
+    "restart_state_unknown": {
+      "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurde kein Neustart ausgelöst. Prüfe die Verbindung und versuche es erneut."
     }
   },
   "issues": {

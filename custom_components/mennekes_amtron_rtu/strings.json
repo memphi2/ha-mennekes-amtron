@@ -343,6 +343,9 @@
     },
     "phase_state_unknown": {
       "message": "The current charging state could not be confirmed. No phases were switched. Check the connection and try again."
+    },
+    "restart_state_unknown": {
+      "message": "The current charging state could not be confirmed. No restart was requested. Check the connection and try again."
     }
   },
   "issues": {

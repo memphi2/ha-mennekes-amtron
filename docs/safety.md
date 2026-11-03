@@ -116,7 +116,8 @@ option 2. Even there:
 ## Restart
 
 `0x0D19` may only be used while the wallbox is idle. The restart button
-refuses to act in any other state.
+reads the current state immediately before the command. It refuses to act
+in any other state or when that fresh read fails or returns an unknown value.
 
 ## What is validated, and what is not
 
