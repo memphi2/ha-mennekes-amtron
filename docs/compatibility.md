@@ -15,6 +15,7 @@ means the owner reported successful operation with the released integration.
 |---|---|---|
 | Amtron 4You 310 7.4 C2 | `1313207205`, `1313207205BK` | Unverified |
 | Amtron 4You 310 11 C2 | `1313201205`, `1313201205BK` | Reported, 2026-11-03 |
+| Amtron 4You 310 11 T2S | `1313201605`, `1313201605BK` | Unverified |
 | Amtron 4You 310 22 C2 | `1313202205`, `1313202205BK` | Unverified |
 | Amtron 4You 310 11 C2 PV-Bundle | `1313201265`, `1313201265BK` | Unverified |
 | Amtron Compact 2.0s 7.4 C2 | `1321307205` | Unverified |
@@ -30,6 +31,12 @@ The hardware report covers the released integration on an Amtron 4You 310
 11 C2. The owner reported that the functions they used worked. Firmware,
 individual test cases and a long-term Recorder measurement were not supplied.
 The report does not validate subsequent development changes or other models.
+
+The socket variants are included too: **4You 310 11 T2S** and **Start 2.0s
+7.4/22 T2S**. MENNEKES explicitly added the 4You 310 11 T2S in the firmware
+2.2_11282 notes. The Start 2.0s 7.4/22 variants without a suffix retain the
+names used in the manufacturer's declaration. A T2/T2S suffix alone does not
+establish RTU compatibility for another Amtron family.
 
 ## Model identification
 
@@ -51,6 +58,7 @@ Article/name sources from MENNEKES:
 
 - [4You portfolio, including the 7.4, 11 and 22 kW variants](https://www.mennekes.ch/emobility/produkte/portfolio/amtronr-wallboxen/)
 - [4You 310 11 C2 product sheet](https://www.mennekes.de/fileadmin/products_media/medien_sge2/produktdatenblaetter/20241218/1313201205BK_de.pdf)
+- [4You firmware notes identifying the 310 11 T2S socket variant](https://www.mennekes.de/fileadmin/MEN-Deutschland/emobility/04_software/12_amtron_4you_100_300/Release_Notes_for_AMTRON_4You_110_310_SW_2.22.pdf)
 - [4You 310 11 C2 PV-Bundle](https://www.mennekes.de/emobility/produkt-details/1313201265BK/)
 - [Compact 2.0s and Start 2.0s declaration listing all seven variants](https://www.mennekes.de/fileadmin/products_media/medien_sge2/konformitaetserklaerungen/1321301205_ke.pdf)
 - [Compact 2.0s 11 C2 PV-Bundle](https://www.mennekes.de/emobility/produkt-details/1321301265/)

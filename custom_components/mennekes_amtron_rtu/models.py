@@ -14,6 +14,8 @@ ARTICLE_MODELS: Final = {
     "1313207205BK": "Amtron 4You 310 7.4 C2",
     "1313201205": "Amtron 4You 310 11 C2",
     "1313201205BK": "Amtron 4You 310 11 C2",
+    "1313201605": "Amtron 4You 310 11 T2S",
+    "1313201605BK": "Amtron 4You 310 11 T2S",
     "1313202205": "Amtron 4You 310 22 C2",
     "1313202205BK": "Amtron 4You 310 22 C2",
     "1313201265": "Amtron 4You 310 11 C2 PV-Bundle",

@@ -9,7 +9,7 @@ charging current, pause charging and use PV surplus automations.
 
 | Model family | Variants | Hardware test |
 |---|---|---|
-| Amtron 4You 300 | 310: 7.4, 11 and 22 kW; 11 kW PV bundle | Successful operation reported for 310 11 C2 |
+| Amtron 4You 300 | 310 C2: 7.4, 11 and 22 kW; 11 T2S; 11 kW PV bundle | Successful operation reported for 310 11 C2 |
 | Amtron Compact 2.0s | 7.4, 11 and 22 kW; 11 kW PV bundle | Not yet reported |
 | Amtron Start 2.0s | 7.4 and 22 kW, including T2S | Not yet reported |
 

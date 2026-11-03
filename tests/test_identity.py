@@ -24,6 +24,7 @@ CONFIG = SerialConfig(port="/dev/fake", device_id=50)
 @pytest.mark.parametrize(("articles", "model"), [
     (("1313207205", "1313207205BK"), "Amtron 4You 310 7.4 C2"),
     (("1313201205", "1313201205BK"), "Amtron 4You 310 11 C2"),
+    (("1313201605", "1313201605BK"), "Amtron 4You 310 11 T2S"),
     (("1313202205", "1313202205BK"), "Amtron 4You 310 22 C2"),
     (("1313201265", "1313201265BK"), "Amtron 4You 310 11 C2 PV-Bundle"),
     (("1321307205",), "Amtron Compact 2.0s 7.4 C2"),
@@ -44,7 +45,7 @@ def test_supported_models_match_complete_padded_articles(
         assert model_name(f"{article}OTHER") == "Amtron"
 
 
-@pytest.mark.parametrize("article", ["1311201205BK", "1321101205", "1315001205BK"])
+@pytest.mark.parametrize("article", ["1311201205BK", "1311201605BK", "1321101205", "1315001205BK"])
 def test_similarly_named_families_are_not_identified_as_supported(article: str) -> None:
     assert model_name(article) == "Amtron"
 

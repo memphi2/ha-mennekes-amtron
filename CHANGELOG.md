@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Include the Amtron 4You 310 11 T2S socket variant, article 1313201605/BK,
+  in model recognition and the compatibility matrix alongside Start 2.0s T2S.
 - Allow 0 A in the charging-current number input to disable the EMS limit;
   display unlimited mode as 0 and preserve it across pause/resume and reloads.
   Reject values between 0 and 6 A and retain write and pause/resume guards.
