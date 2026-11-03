@@ -92,6 +92,11 @@ has its own switch, and 0 A can only be written through the
 
 ## Phase switching can abort a charge
 
+Before a phase request, the integration reads the charging state directly
+from the wallbox. A missing, invalid or failed status reply rejects the
+request before any register is written. Cached dashboard state is not used
+to decide whether charging must first be paused.
+
 Dynamic phase switching exists only on 11 kW hardware that reports phase
 option 2. Even there:
 

@@ -340,6 +340,9 @@
     },
     "write_rate_limited": {
       "message": "The wallbox accepts this change again in {seconds} s. The manufacturer asks for hysteresis and intervals of more than five minutes for pausing, resuming and phase switching."
+    },
+    "phase_state_unknown": {
+      "message": "The current charging state could not be confirmed. No phases were switched. Check the connection and try again."
     }
   },
   "issues": {

@@ -48,6 +48,7 @@ from .exceptions import home_assistant_error, service_validation_error
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
+    EVSE_STATE,
     HEARTBEAT,
     LOCK_EVSE,
     REQUESTED_PHASES,
@@ -235,7 +236,13 @@ class AmtronControl:
                 self._client.check_write_interval(
                     REQUESTED_PHASES, min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS
                 )
-                if self._state().get("evse_state") == EvseState.CHARGING:
+                try:
+                    state = await self._client.async_read_register(EVSE_STATE)
+                except AmtronBusError as err:
+                    raise service_validation_error("phase_state_unknown") from err
+                if not isinstance(state, int) or state not in EvseState:
+                    raise service_validation_error("phase_state_unknown")
+                if state == EvseState.CHARGING:
                     await self._async_request_current_locked(
                         CHARGING_PAUSE_CURRENT, mode_change=True, defer=False
                     )

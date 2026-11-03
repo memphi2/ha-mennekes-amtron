@@ -45,7 +45,10 @@ class Harness:
         values: dict[str, object] | None = None,
         clock: list[float] | None = None,
     ) -> None:
-        self.transport = FakeModbusClient(device_bank())
+        self.transport = FakeModbusClient(device_bank(
+            evse_state=(values or {}).get("evse_state", EvseState.IDLE),
+            charging_current=(values or {}).get("charging_current_ems", 16.0),
+        ))
         self.clock = clock if clock is not None else [1000.0]
         self.client = MennekesModbusClient(
             CONFIG,
@@ -854,6 +857,7 @@ def test_phase_switch_rate_limit_reports_a_translated_wait(charging: bool) -> No
         harness.clock[0] += 15
         if charging:
             harness.snapshot.values["evse_state"] = EvseState.CHARGING
+            harness.transport.bank[R.EVSE_STATE.address] = int(EvseState.CHARGING)
         with pytest.raises(ServiceValidationError) as error:
             await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
         assert error.value.translation_key == "write_rate_limited"
@@ -886,5 +890,45 @@ def test_uncertain_pause_keeps_hysteresis_even_with_old_readback(outcome):
             await control.async_set_charging_current(8)
         assert limited.value.translation_placeholders == {"seconds": "294"}
         assert not harness.written(R.CHARGING_CURRENT_EMS)
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("cached", "actual", "pause"), [
+    (EvseState.IDLE, EvseState.CHARGING, True),
+    (None, EvseState.CHARGING, True),
+    (EvseState.CHARGING, EvseState.IDLE, False),
+])
+def test_phase_switch_uses_fresh_device_status(cached, actual, pause):
+    harness = Harness(values={"charging_current_ems": 8.0})
+    harness.snapshot.values["evse_state"] = cached
+    harness.transport.bank[R.EVSE_STATE.address] = int(actual)
+
+    async def run():
+        control = await harness.connect()
+        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        assert bool(harness.written(R.CHARGING_CURRENT_EMS)) == pause
+        assert harness.written(R.REQUESTED_PHASES) == [[1]]
+        assert harness.transport.reads[0] == (R.EVSE_STATE.address, 1)
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", ["missing", "protocol", "invalid"])
+def test_phase_switch_refuses_unconfirmed_status_without_writes(failure):
+    harness = Harness(values={"evse_state": EvseState.IDLE})
+    if failure == "invalid":
+        harness.transport.bank[R.EVSE_STATE.address] = 99
+    else:
+        harness.transport.read_exceptions[R.EVSE_STATE.address] = (
+            raise_connection_error() if failure == "missing" else 4
+        )
+
+    async def run():
+        control = await harness.connect()
+        with pytest.raises(ServiceValidationError) as error:
+            await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        assert error.value.translation_key == "phase_state_unknown"
+        assert not harness.transport.writes
 
     asyncio.run(run())

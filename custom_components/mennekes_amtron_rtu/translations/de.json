@@ -340,6 +340,9 @@
     },
     "write_rate_limited": {
       "message": "Die Wallbox akzeptiert diese Änderung erst in {seconds} s wieder. Der Hersteller verlangt für Pause, Fortsetzen und Phasenwechsel eine Hysterese und Abstände von mehr als fünf Minuten."
+    },
+    "phase_state_unknown": {
+      "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurden keine Phasen umgeschaltet. Prüfe die Verbindung und versuche es erneut."
     }
   },
   "issues": {

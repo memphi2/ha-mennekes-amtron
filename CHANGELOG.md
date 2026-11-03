@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Read a fresh charging state before switching phases; reject unknown status
+  instead of skipping the required pause based on missing or stale readback.
 - Ignore old current readback from polls that overlap a write, including
   uncertain or cancelled writes, so a delayed poll cannot lift pause protection.
 - Preserve write intervals and pause/resume hysteresis across entry reloads.
