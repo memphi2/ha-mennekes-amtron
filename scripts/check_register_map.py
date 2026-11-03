@@ -391,7 +391,7 @@ def _entity_keys() -> dict[str, set[str]]:
         "sensor": {description.key for description in SENSOR_DESCRIPTIONS},
         "binary_sensor": {
             description.key for description in BINARY_SENSOR_DESCRIPTIONS
-        },
+        } | {"heartbeat"},
         "number": {"charging_current_limit"},
         "switch": {"charging_paused", "charging_release", "lock_evse"},
         "select": {"solar_charging_mode", "requested_phases"},

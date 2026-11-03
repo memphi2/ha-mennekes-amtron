@@ -350,3 +350,126 @@ def test_persistent_failure_retries_without_spinning_or_accumulating_events():
     assert sleeps == [1.0] * 5
     assert diagnostics.heartbeats_failed == 5
     assert len(diagnostics.timeline.snapshot()) == 1
+
+
+@pytest.mark.parametrize("delivered_first", [False, True])
+def test_health_expires_while_the_writer_is_blocked(delivered_first):
+    """A deadline needs no new response or coordinator update to become visible."""
+
+    async def run():
+        transport = FakeModbusClient(device_bank())
+        client = _client(transport)
+        await client.async_connect()
+        blocked = asyncio.Event()
+        expired = asyncio.Event()
+        original = transport.write_register
+        calls = 0
+
+        async def write(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if not delivered_first or calls > 1:
+                await blocked.wait()
+            return await original(*args, **kwargs)
+
+        transport.write_register = write
+        heartbeat = HeartbeatTask(client, WriteDiagnostics(), interval=0, deadline=0.02)
+        states = []
+
+        def changed():
+            states.append(heartbeat.healthy)
+            if heartbeat.healthy is False:
+                expired.set()
+
+        remove = heartbeat.async_add_listener(changed)
+        assert heartbeat.healthy is None
+        heartbeat.start()
+        await asyncio.wait_for(expired.wait(), 2)
+        assert heartbeat.running
+        assert states == ([True, False] if delivered_first else [False])
+        await heartbeat.async_stop()
+        assert heartbeat._deadline_handle is None
+        remove()
+        remove()
+        assert not heartbeat._listeners
+        await client.async_close()
+
+    asyncio.run(run())
+
+
+def test_health_reports_transitions_only_and_recovers_after_a_deadline():
+    async def run():
+        transport = FakeModbusClient(device_bank())
+        client = _client(transport)
+        await client.async_connect()
+        ticks = asyncio.Queue()
+        sleeps = asyncio.Queue()
+
+        async def sleep(delay):
+            sleeps.put_nowait(delay)
+            await ticks.get()
+
+        heartbeat = HeartbeatTask(client, WriteDiagnostics(), sleep=sleep)
+        states = []
+        heartbeat.async_add_listener(lambda: states.append(heartbeat.healthy))
+        heartbeat.start()
+        await sleeps.get()
+        for _ in range(100):
+            ticks.put_nowait(None)
+            await sleeps.get()
+        assert states == [True]
+        transport.write_exceptions[R.HEARTBEAT.address] = raise_connection_error()
+        ticks.put_nowait(None)
+        assert await sleeps.get() == pytest.approx(1, abs=0.1)
+        assert heartbeat.healthy is True  # One missed attempt is not a missed deadline.
+        heartbeat._deadline_handle.cancel()
+        heartbeat._deadline_expired()
+        assert states == [True, False]
+        transport.write_exceptions.clear()
+        ticks.put_nowait(None)
+        await sleeps.get()
+        assert states == [True, False, True]
+        await heartbeat.async_stop()
+        assert states == [True, False, True, False]
+        await client.async_close()
+
+    asyncio.run(run())
+
+
+def test_a_bad_status_listener_cannot_stop_heartbeats(caplog):
+    async def run():
+        client = _client(FakeModbusClient(device_bank()))
+        await client.async_connect()
+        heartbeat = HeartbeatTask(client, WriteDiagnostics())
+
+        def broken():
+            raise RuntimeError("observer failure")
+
+        heartbeat.async_add_listener(broken)
+        heartbeat.start()
+        await asyncio.sleep(0)
+        assert heartbeat.running
+        assert heartbeat.healthy
+        await heartbeat.async_stop()
+        await client.async_close()
+
+    asyncio.run(run())
+    assert "Heartbeat status listener failed" in caplog.text
+
+
+def test_an_unexpected_writer_exit_marks_heartbeat_unhealthy():
+    async def run():
+        transport = FakeModbusClient(device_bank())
+        transport.write_exceptions[R.HEARTBEAT.address] = RuntimeError("unexpected")
+        client = _client(transport)
+        await client.async_connect()
+        heartbeat = HeartbeatTask(client, WriteDiagnostics())
+        heartbeat.start()
+        with pytest.raises(RuntimeError, match="unexpected"):
+            await heartbeat._task
+        assert heartbeat.healthy is False
+        assert heartbeat._deadline_handle is None
+        await heartbeat.async_stop()
+        await client.async_close()
+
+    asyncio.run(run())

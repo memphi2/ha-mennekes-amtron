@@ -74,6 +74,7 @@ These sit under *Diagnostic* on the device page.
 | `binary_sensor.*_charging` | Charging | battery_charging | always | The wallbox reports the charging state. |
 | `binary_sensor.*_downgrade_active` | Downgrade active |  | always | The grid operator's downgrade input is active and the wallbox is limiting the current. **This is the §14a EnWG visibility.** |
 | `binary_sensor.*_error` | Error | problem | always | An error code other than zero is active. |
+| `binary_sensor.*_heartbeat` | Heartbeat | problem | master mode | OK after a confirmed heartbeat; problem when none is confirmed within ten seconds or the sender stops. Independent of register polling. |
 | `binary_sensor.*_energy_manager_fallback_active` | Energy manager fallback active | problem | layout v01.02 | The wallbox has fallen back because the energy manager stopped answering. |
 | `binary_sensor.*_authorization_enabled` | Authorization enabled |  | layout v01.02 | RFID authorization is switched on in the wallbox. |
 | `binary_sensor.*_grid_imbalance_monitoring` | Grid imbalance monitoring |  | layout v01.02 | Imbalance monitoring is switched on. |
@@ -118,6 +119,6 @@ and templates see.
 
 ## The action
 
-`mennekes_amtron_rtu.set_charging_current` writes the charging-current limit
-and is the only way to reach the "no limitation" value. See
+`mennekes_amtron_rtu.set_charging_current` writes the charging-current limit.
+Both the action and the slider accept 0 A to remove the limit. See
 [user-guide.md](user-guide.md#actions).

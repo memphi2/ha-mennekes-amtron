@@ -85,16 +85,17 @@ the integration's extra current cap, while hardware limits remain in force.
 - Change the charging current no more often than every **5 seconds**. The
   integration defers a faster change and writes the newest value when the
   interval has passed.
-- Keep pause, resume and phase switches **more than 5 minutes** apart and
-  use hysteresis. The integration enforces a five-minute floor and rejects
-  faster changes with an explanatory error. Timing guards survive an entry
+- MENNEKES **recommends more than 5 minutes** between pauses, resumes and phase
+  switches to avoid excessive cycling. Use hysteresis in automations; the
+  bundled PV pause/resume blueprint defaults to six minutes. Manual pause and
+  resume use the five-second current-write floor. Phase switching retains a
+  separate five-minute guard. Timing guards survive an entry
   reload in memory, without Recorder writes. The remembered current before a
   pause also survives reloads; resuming still respects a newly lowered current
   cap. After a full Home Assistant
   restart (or the first setup), the previous timing is unknown: current
-  writes wait five seconds, and pause/resume and phase changes wait five
-  minutes from setup. Reading and the heartbeat remain available. Keep the
-  waiting interval in your automation too.
+  writes and pause/resume wait five seconds, and phase changes wait five
+  minutes from setup. Reading and the heartbeat remain available.
 
 ## Phase switching can abort a charge
 
@@ -116,6 +117,13 @@ option 2. Even there:
   documentation before you automate it.
 
 ## Error recovery
+
+In master mode, a confirmed error 200 triggers automatic recovery once the
+heartbeat is healthy. It respects a pause, device lock and explicitly disabled
+charging release, keeps the live
+current limit or a lower remembered limit, and restores unlimited mode after
+the required temporary 6 A recovery write. At most three attempts are made
+while the fault persists. The manual recovery button can lift a pause.
 
 Recovery checks known current-write and pause/resume cooldowns before sending
 its heartbeat/release/current sequence. A cooldown rejection therefore does

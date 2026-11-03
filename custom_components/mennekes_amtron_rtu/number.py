@@ -52,7 +52,7 @@ class AmtronChargingCurrentNumber(MennekesAmtronEntity, NumberEntity, RestoreEnt
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
     _attr_native_min_value = CHARGING_CURRENT_UNLIMITED
     _attr_native_step = CHARGING_CURRENT_STEP
-    _attr_mode = NumberMode.BOX
+    _attr_mode = NumberMode.SLIDER
 
     def __init__(
         self, entry: MennekesAmtronConfigEntry, coordinator: Any

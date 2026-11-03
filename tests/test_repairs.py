@@ -7,7 +7,7 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu import repairs
-from tests.fakes import device_bank
+from tests.fakes import device_bank, put, raise_connection_error
 from tests.ha_fakes import build_runtime
 
 
@@ -69,6 +69,7 @@ def test_the_remaining_conditions_raise_their_issues(
             layout=R.LAYOUT_V01_02,
         )
         entry.runtime_data.diagnostics.writes_rejected = 1
+        entry.runtime_data.diagnostics.write_errors.add("charging_release")
         repairs.async_check_repairs(hass, entry)
         assert "entry-1_ems_fallback_not_configured" in registry.created
         assert "entry-1_write_rejected" in registry.created
@@ -143,7 +144,7 @@ def test_changed_placeholders_are_written_again(
     asyncio.run(run())
 
 
-def test_the_fix_flow_runs_the_recovery_sequence() -> None:
+def test_a_stale_repair_closes_without_recovering_a_healthy_wallbox() -> None:
     async def run() -> None:
         hass, entry, transport = await build_runtime()
         flow = await repairs.async_create_fix_flow(
@@ -158,11 +159,7 @@ def test_the_fix_flow_runs_the_recovery_sequence() -> None:
 
         result = await flow.async_step_confirm({})
         assert result["type"] == "create_entry"
-        assert [address for address, _ in transport.writes] == [
-            R.HEARTBEAT.address,
-            R.CHARGING_RELEASE.address,
-            R.CHARGING_CURRENT_EMS.address,
-        ]
+        assert transport.writes == []
 
     asyncio.run(run())
 
@@ -179,6 +176,65 @@ def test_the_fix_flow_tolerates_a_missing_entry() -> None:
         flow = await repairs.async_create_fix_flow(hass, "x", {"entry_id": "blank"})
         flow.hass = hass
         flow.async_create_entry = lambda **kwargs: {"type": "create_entry"}
-        assert (await flow.async_step_confirm({}))["type"] == "create_entry"
+        flow.async_show_form = lambda **kwargs: {"type": "form", **kwargs}
+        assert (await flow.async_step_confirm({}))["errors"] == {"base": "entry_unavailable"}
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("scenario", "error"), [
+    ("rate_limit", "write_rate_limited"),
+    ("read_only", "read_only"),
+    ("read_failure", "recovery_failed"),
+    ("write_failure", "recovery_failed"),
+    ("different_error", "different_error"),
+    ("still_active", "still_active"),
+])
+def test_expected_repair_failures_stay_in_the_dialog(scenario, error):
+    import time
+
+    async def run():
+        hass, entry, transport = await build_runtime(
+            bank=device_bank(error_code=2011 if scenario == "different_error" else 200),
+            read_only=scenario == "read_only",
+        )
+        if scenario == "read_failure":
+            transport.read_exceptions[R.ERROR_CODE.address] = raise_connection_error()
+        elif scenario == "write_failure":
+            transport.write_exceptions[R.HEARTBEAT.address] = raise_connection_error()
+        elif scenario == "rate_limit":
+            entry.runtime_data.client.write_state.limiter.record("charging_current_ems", now=time.monotonic())
+        flow = await repairs.async_create_fix_flow(hass, "x", {"entry_id": entry.entry_id})
+        flow.hass = hass
+        flow.async_show_form = lambda **kwargs: {"type": "form", **kwargs}
+        result = await flow.async_step_confirm({})
+        assert result["type"] == "form"
+        assert result["errors"] == {"base": error}
+        await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_repair_finishes_only_after_the_wallbox_confirms_recovery():
+    async def run():
+        hass, entry, transport = await build_runtime(bank=device_bank(error_code=200))
+        original = transport.write_registers
+
+        async def write(address, values, **kwargs):
+            response = await original(address, values, **kwargs)
+            if address == R.CHARGING_CURRENT_EMS.address:
+                put(transport.bank, R.ERROR_CODE, 0)
+            return response
+
+        transport.write_registers = write
+        flow = await repairs.async_create_fix_flow(hass, "x", {"entry_id": entry.entry_id})
+        flow.hass = hass
+        flow.async_create_entry = lambda **kwargs: {"type": "create_entry", **kwargs}
+        result = await flow.async_step_confirm({})
+        assert result["type"] == "create_entry"
+        assert [address for address, _ in transport.writes] == [
+            R.HEARTBEAT.address, R.CHARGING_RELEASE.address, R.CHARGING_CURRENT_EMS.address,
+        ]
+        await entry.runtime_data.client.async_close()
 
     asyncio.run(run())

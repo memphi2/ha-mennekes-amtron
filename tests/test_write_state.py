@@ -30,7 +30,7 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         clock = [1000.0]
         hass = FakeHass()
         entry = FakeConfigEntry(options={"control_mode": CONTROL_MODE_MASTER})
-        transport = FakeModbusClient(device_bank(charging_current=initial))
+        transport = FakeModbusClient(device_bank(charging_current=initial, error_code=200))
 
         def factory(config, **kwargs):
             return MennekesModbusClient(config, client_factory=lambda _: transport,
@@ -50,7 +50,7 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         with pytest.raises(ServiceValidationError):
             await runtime.control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
 
-        clock[0] += 300
+        clock[0] += 5
         await runtime.control.async_pause_charging()
         assert runtime.control.charging_setpoint == initial
         state = runtime.client.write_state
@@ -66,14 +66,14 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         assert runtime.control.charging_setpoint == initial
         with pytest.raises(AmtronRateLimitedError):
             await runtime.client.async_write_register(R.CHARGING_CURRENT_EMS, 8, min_interval=5)
-        clock[0] += 5
+        clock[0] += 1
         runtime.coordinator.data = WallboxData(values={"charging_current_ems": 1.0})
         with pytest.raises(ServiceValidationError) as error:
             await runtime.control.async_resume_charging()
-        assert error.value.translation_placeholders == {"seconds": "294"}
-        clock[0] += 294
+        assert error.value.translation_placeholders == {"seconds": "3"}
+        clock[0] += 3
         await getattr(runtime.control, resume_action)()
-        expected = new_cap or initial or 16
+        expected = new_cap or initial or 6
         if initial == 0 and resume_action == "async_resume_charging":
             expected = 0
         assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == expected

@@ -6,10 +6,13 @@ from typing import Any
 
 from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 
-from .const import DOMAIN
+from .client_errors import AmtronBusError
+from .const import DOMAIN, ERROR_CODE_EMS_UNAVAILABLE
 from .entry_types import MennekesAmtronConfigEntry
+from .registers import ERROR_CODE
 from .repair_issues import (
     ISSUE_EMS_FALLBACK_NOT_CONFIGURED,
     ISSUE_EMS_HEARTBEAT_LOST,
@@ -119,9 +122,39 @@ class HeartbeatRecoveryRepairFlow(RepairsFlow):
             return self.async_show_form(step_id="confirm", data_schema=None)
 
         entry = self.hass.config_entries.async_get_entry(self._entry_id)
-        if entry is not None and hasattr(entry, "runtime_data"):
-            await entry.runtime_data.control.async_recover_from_error()
-        return self.async_create_entry(title="", data={})
+        if entry is None:
+            return self.async_create_entry(data={})
+        if not hasattr(entry, "runtime_data"):
+            return self._show_error("entry_unavailable")
+        runtime = entry.runtime_data
+        try:
+            # The error may already have cleared while the dialog was open.
+            # Acknowledging a stale issue must not send another recovery.
+            error = await runtime.client.async_read_register(ERROR_CODE)
+            if error == 0:
+                runtime.repair_state[ISSUE_EMS_HEARTBEAT_LOST] = None
+                return self.async_create_entry(data={})
+            if error != ERROR_CODE_EMS_UNAVAILABLE:
+                return self._show_error("different_error")
+            await runtime.control.async_recover_from_error()
+            error = await runtime.client.async_read_register(ERROR_CODE)
+        except ServiceValidationError as err:
+            return self._show_error(
+                "read_only" if err.translation_key == "read_only_mode"
+                else "write_rate_limited" if err.translation_key == "write_rate_limited"
+                else "recovery_failed"
+            )
+        except (AmtronBusError, HomeAssistantError):
+            return self._show_error("recovery_failed")
+        if error != 0:
+            return self._show_error("still_active")
+        runtime.repair_state[ISSUE_EMS_HEARTBEAT_LOST] = None
+        return self.async_create_entry(data={})
+
+    def _show_error(self, error: str) -> RepairsFlowResult:
+        return self.async_show_form(
+            step_id="confirm", data_schema=None, errors={"base": error}
+        )
 
 
 def _issue_id(entry: MennekesAmtronConfigEntry, issue: str) -> str:

@@ -84,6 +84,9 @@
       },
       "vehicle_connected": {
         "name": "Vehicle connected"
+      },
+      "heartbeat": {
+        "name": "Heartbeat"
       }
     },
     "button": {
@@ -339,13 +342,19 @@
       "message": "Writing {register} to the wallbox failed: {error}"
     },
     "write_rate_limited": {
-      "message": "The wallbox accepts this change again in {seconds} s. The manufacturer asks for hysteresis and intervals of more than five minutes for pausing, resuming and phase switching."
+      "message": "This change is available again in {seconds} s. Current changes, pause and resume have a five-second minimum interval; phase changes retain a five-minute interval."
     },
     "phase_state_unknown": {
       "message": "The current charging state could not be confirmed. No phases were switched. Check the connection and try again."
     },
     "restart_state_unknown": {
       "message": "The current charging state could not be confirmed. No restart was requested. Check the connection and try again."
+    },
+    "recovery_not_applicable": {
+      "message": "The wallbox reports an error other than heartbeat error 200. No recovery commands were sent."
+    },
+    "recovery_state_unknown": {
+      "message": "The current error or charging-current state could not be confirmed. No recovery commands were sent."
     }
   },
   "issues": {
@@ -357,9 +366,17 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "The wallbox reports error 200: it did not receive an energy-manager heartbeat in time and will not start a charging session. Fixing this issue writes the documented recovery sequence (heartbeat, charging release, charging current). Confirming writes the heartbeat, the charging release and the charging-current limit, in that order.",
+            "description": "The wallbox reports error 200 after a missing heartbeat. In Modbus master mode, automatic recovery runs when heartbeat delivery resumes, unless charging is paused, the wallbox is locked or charging release was explicitly disabled. Confirm to try manual recovery: this writes the heartbeat, charging release and a current limit of at least 6 A, and can resume charging. A resolved issue closes without sending commands.",
             "title": "Wallbox lost the energy-manager heartbeat"
           }
+        },
+        "error": {
+          "entry_unavailable": "The integration is not loaded. Restore its connection before retrying.",
+          "different_error": "The wallbox reports a different error. Heartbeat recovery does not reset that error.",
+          "read_only": "Enable Modbus master mode before requesting recovery.",
+          "write_rate_limited": "A recent command is still inside its minimum write interval. Wait briefly and try again.",
+          "recovery_failed": "The recovery could not be confirmed. Check the connection and retry.",
+          "still_active": "The recovery commands were sent, but the wallbox still reports an error. Wait for its status to update; check the connection if the error persists."
         }
       },
       "title": "Wallbox lost the energy-manager heartbeat"
@@ -369,7 +386,7 @@
       "title": "Wallbox uses an older Modbus register layout"
     },
     "write_rejected": {
-      "description": "The wallbox rejected a write. Check that it is configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 have to be on, and the wallbox has to be restarted afterwards.",
+      "description": "A write was not confirmed. Check the serial connection and the wallbox satellite configuration. This issue clears after the affected command succeeds. Historical failures remain in the diagnostic counter.",
       "title": "Wallbox refused a write"
     }
   },

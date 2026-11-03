@@ -42,9 +42,9 @@ def unsupported_layout(identity: DeviceIdentity) -> bool:
 
 
 def write_rejected(diagnostics: WriteDiagnostics) -> bool:
-    """Return true once the wallbox has refused a write."""
+    """Return true until the affected command has succeeded again."""
 
-    return diagnostics.writes_rejected > 0
+    return bool(diagnostics.write_errors)
 
 
 def layout_placeholders(identity: DeviceIdentity) -> dict[str, str]:

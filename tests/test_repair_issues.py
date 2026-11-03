@@ -43,4 +43,8 @@ def test_a_refused_write_raises_the_satellite_issue() -> None:
     diagnostics = WriteDiagnostics()
     assert not write_rejected(diagnostics)
     diagnostics.writes_rejected = 1
+    diagnostics.write_errors.add("charging_release")
     assert write_rejected(diagnostics)
+    diagnostics.write_errors.clear()
+    assert not write_rejected(diagnostics)
+    assert diagnostics.writes_rejected == 1

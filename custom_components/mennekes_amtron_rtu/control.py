@@ -36,9 +36,11 @@ from .const import (
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_UNLIMITED,
     CHARGING_PAUSE_CURRENT,
+    ERROR_CODE_EMS_UNAVAILABLE,
     HEARTBEAT_VALUE,
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
-    MIN_MODE_CHANGE_INTERVAL_SECONDS,
+    MIN_PAUSE_RESUME_INTERVAL_SECONDS,
+    MIN_PHASE_CHANGE_INTERVAL_SECONDS,
     SYSTEM_RESTART_VALUE,
 )
 from .data import DeviceIdentity, WallboxData, WriteDiagnostics
@@ -47,6 +49,7 @@ from .exceptions import home_assistant_error, service_validation_error
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
+    ERROR_CODE,
     EVSE_STATE,
     HEARTBEAT,
     LOCK_EVSE,
@@ -107,6 +110,16 @@ class AmtronControl:
     @charging_setpoint.setter
     def charging_setpoint(self, value: float | None) -> None:
         self._write_state.charging_setpoint = value
+
+    @property
+    def charging_release_requested(self) -> bool | None:
+        """Return explicit release intent, independently of fault readback."""
+
+        return self._write_state.charging_release_requested
+
+    @charging_release_requested.setter
+    def charging_release_requested(self, value: bool | None) -> None:
+        self._write_state.charging_release_requested = value
 
     @property
     def options(self) -> ControlOptions:
@@ -188,7 +201,7 @@ class AmtronControl:
         # Every value this method accepts is either a real limit or the
         # explicit 0 A, and while the pause value is active both of them
         # resume the charge, whatever the caller meant by it. So they answer
-        # to the same hysteresis the pause switch does.
+        # to the same short write guard as the pause switch.
         await self._async_request_current(current)
 
     async def async_pause_charging(self) -> None:
@@ -213,7 +226,17 @@ class AmtronControl:
         """Open or close the charging relay through 0x0D05."""
 
         self._require_write_access()
-        await self._async_write(CHARGING_RELEASE, int(released))
+        async with self._current_lock:
+            previous = self.charging_release_requested
+            self.charging_release_requested = released
+            try:
+                await self._async_write(CHARGING_RELEASE, int(released))
+            except (HomeAssistantError, asyncio.CancelledError):
+                # A failed block command still expresses the user's intent.
+                # A failed enable must never erase a previously blocked state.
+                if released:
+                    self.charging_release_requested = previous
+                raise
 
     async def async_set_lock_evse(self, locked: bool) -> None:
         """Lock or unlock the wallbox through 0x0D06."""
@@ -241,7 +264,7 @@ class AmtronControl:
         try:
             async with self._current_lock:
                 self._client.check_write_interval(
-                    REQUESTED_PHASES, min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS
+                    REQUESTED_PHASES, min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS
                 )
                 state = await self._async_current_evse_state("phase_state_unknown")
                 if state == EvseState.CHARGING:
@@ -251,7 +274,7 @@ class AmtronControl:
                 await self._async_write(
                     REQUESTED_PHASES,
                     int(phases),
-                    min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS,
+                    min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
                 )
         except AmtronRateLimitedError as err:
             self._diagnostics.writes_rate_limited += 1
@@ -259,7 +282,7 @@ class AmtronControl:
                 "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
             ) from err
 
-    async def async_recover_from_error(self) -> None:
+    async def async_recover_from_error(self, *, automatic: bool = False) -> bool:
         """Run the documented recovery sequence for error state 200.
 
         The specification requires 0x0D00, 0x0D05 and 0x0302 to be written,
@@ -268,6 +291,25 @@ class AmtronControl:
 
         self._require_write_access()
         async with self._current_lock:
+            if automatic and self.charging_release_requested is False:
+                return False
+            try:
+                error = await self._client.async_read_register(ERROR_CODE)
+                if error == 0:
+                    return False
+                if error != ERROR_CODE_EMS_UNAVAILABLE:
+                    raise service_validation_error("recovery_not_applicable")
+                current = await self._client.async_read_register(CHARGING_CURRENT_EMS)
+                locked = (
+                    await self._client.async_read_register(LOCK_EVSE) if automatic else 0
+                )
+            except AmtronBusError as err:
+                raise service_validation_error("recovery_state_unknown") from err
+            if not isinstance(current, (int, float)) or not math.isfinite(current) or current < 0:
+                raise service_validation_error("recovery_state_unknown")
+            # Restoring communication must never undo a deliberate pause/lock.
+            if automatic and (0 < current < CHARGING_CURRENT_MINIMUM or locked != 0):
+                return False
             # Refuse known cooldowns before changing charging release. The
             # final current write still rechecks after the awaited bus calls.
             if self.is_paused is not False:
@@ -284,10 +326,24 @@ class AmtronControl:
                 raise service_validation_error(
                     "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
                 ) from err
-            target = self.charging_setpoint or self.max_charging_current
+            remembered = self.charging_setpoint
+            if current == CHARGING_CURRENT_UNLIMITED:
+                target = CHARGING_CURRENT_UNLIMITED
+            elif current >= CHARGING_CURRENT_MINIMUM:
+                target = (
+                    min(current, remembered)
+                    if remembered is not None and remembered >= CHARGING_CURRENT_MINIMUM
+                    else current
+                )
+            elif remembered is not None:
+                target = remembered
+            else:
+                target = CHARGING_CURRENT_MINIMUM
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
             await self._async_write(CHARGING_RELEASE, 1)
+            if not automatic:
+                self.charging_release_requested = True
             await self._async_request_current_locked(
                 max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current)),
                 # Recovery only changes charging mode if it lifts a pause.
@@ -295,8 +351,13 @@ class AmtronControl:
                 mode_change=self.is_paused is not False,
                 defer=False,
             )
+            if automatic and target == CHARGING_CURRENT_UNLIMITED:
+                # The recovery sequence needs >=6 A. Restore unlimited through
+                # the existing replaceable queue after its five-second floor.
+                await self._async_request_current_locked(0, mode_change=False)
         self._diagnostics.recoveries += 1
         self._diagnostics.timeline.record(EventType.RECOVERY_COMPLETED)
+        return True
 
     async def async_restart(self) -> None:
         """Restart the wallbox through 0x0D19, which needs the idle state."""
@@ -338,18 +399,14 @@ class AmtronControl:
     ) -> None:
         """Write 0x0302, deferring the write when it comes too fast.
 
-        Two different rules meet on this one register. Every write has to keep
-        the vendor's five-second distance; that is a property of the register
-        and lives in the client's rate limiter. Pausing and resuming need
-        minutes between them; that is a property of the operation and lives
-        here. Keying both on the register made a dragged slider block the
-        pause switch for five minutes, and let a pause be undone six seconds
-        later by a slider move.
+        Every write keeps the five-second distance enforced by the client.
+        The vendor's longer anti-cycling recommendation is implemented by
+        automation hysteresis, not a five-minute manual-control lockout.
 
         Rejecting a plain setpoint write would make a dragged slider fail, so
         the newest value is remembered and written once the interval passed. A
         mode change is reported back instead: it is a deliberate act, and
-        quietly performing it minutes later is worse than refusing it.
+        quietly performing it later would hide the user's actual pause state.
         """
 
         async with self._current_lock:
@@ -433,7 +490,7 @@ class AmtronControl:
         if self._write_state.mode_change_at is None:
             return 0.0
         waited = self._monotonic() - self._write_state.mode_change_at
-        return max(0.0, MIN_MODE_CHANGE_INTERVAL_SECONDS - waited)
+        return max(0.0, MIN_PAUSE_RESUME_INTERVAL_SECONDS - waited)
 
     def _ensure_flush_task(self) -> None:
         if self._flush_task is not None and not self._flush_task.done():
@@ -494,6 +551,8 @@ class AmtronControl:
         except AmtronBusError as err:
             self._diagnostics.timeline.record(EventType.WRITE_REJECTED, register=spec.address)
             self._diagnostics.writes_rejected += 1
+            if spec != HEARTBEAT:
+                self._diagnostics.write_errors.add(spec.key)
             self._diagnostics.last_error = str(err)
             if self._notify_write_error is not None:
                 self._notify_write_error()
@@ -501,6 +560,10 @@ class AmtronControl:
                 "write_failed", {"register": spec.key, "error": str(err)}
             ) from err
         self._diagnostics.writes_sent += 1
+        if spec.key in self._diagnostics.write_errors:
+            self._diagnostics.write_errors.remove(spec.key)
+            if self._notify_write_error is not None:
+                self._notify_write_error()
         if refresh and self._request_refresh is not None:
             await self._request_refresh()
 

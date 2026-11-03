@@ -5,7 +5,40 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.4.1 — 2026-11-03
+
+### Added
+
+- Recover error 200 automatically in master mode once heartbeat delivery
+  resumes, with at most three attempts per persistent fault. Respect pause,
+  device lock, explicitly disabled charging release, current limits and the
+  five-second write floor; restore an
+  unlimited setting through the existing replaceable command queue.
+- Add a diagnostic Heartbeat problem sensor in master mode. It detects a
+  missed ten-second acknowledgement deadline or stopped task independently
+  of polling, without per-heartbeat Recorder updates.
+
+### Fixed
+
+- Remember an explicitly disabled charging release across entry reloads and
+  Home Assistant restarts. Automatic recovery cannot override it, including
+  after an unconfirmed block command or a failed enable command.
+- Read the error and current before recovery. A healthy wallbox receives no
+  recovery commands, other faults are rejected and a missing saved setpoint
+  no longer raises a live 6 A limit to the device maximum.
+- Clear write repair issues when the affected command succeeds, while retaining
+  historical diagnostic counters. Repair dialogs now handle connection errors,
+  write cooldowns and read-only mode explicitly, verify recovery and close
+  already-resolved heartbeat issues without sending more commands.
+
+### Changed
+
+- Show the charging-current limit as a slider, retaining 0 A for no limit and
+  the separate charging-pause switch.
+
+- Allow pause and resume after the five-second current-write interval instead
+  of imposing a five-minute manual-control lockout. Phase switching keeps its
+  own five-minute guard; PV automation hysteresis retains its six-minute default.
 
 ## 0.4.0 — 2026-11-03
 

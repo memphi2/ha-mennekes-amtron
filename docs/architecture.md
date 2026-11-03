@@ -21,6 +21,7 @@ write_state.py        shared write guards retained across entry reloads
 identity.py           the read-once device facts
 coordinator.py        the poll
 heartbeat.py          the heartbeat task
+recovery.py           bounded recovery of a confirmed heartbeat fault
 control.py            the only write path
 exceptions.py         translated Home Assistant errors
 entity.py             entity base: unique id, device info, availability
@@ -76,6 +77,12 @@ heartbeat is exactly how the device reaches error state 200. So it is an
 entry-owned background task on its own five-second interval, started only in
 master mode and cancelled on unload.
 
+The task starts before the first full data poll. A separate deadline timer
+marks its diagnostic health unhealthy even while a transaction is blocked.
+The Heartbeat problem sensor subscribes only to health transitions and remains
+available when register polling fails. It never exposes per-beat timestamps
+or counters to Recorder. Timer and listener lifetimes follow the entry.
+
 The task *spends* the interval rather than adding it: it sleeps whatever is
 left of the five seconds after the write returned. Sleeping the full interval
 on top of a write that waited for the bus is the other half of how the gap
@@ -88,9 +95,24 @@ After a failed heartbeat, its task uses a one-second retry interval, still
 subtracting the time spent on the failed attempt. Once delivery succeeds it
 returns to five seconds. This avoids spending the entire ten-second deadline
 on one brief disconnect. Only the heartbeat's fixed, idempotent value receives
-this treatment; control writes retain their existing intervals and are never
-automatically replayed. Repeated failures produce one failure event until
+this treatment; control writes retain their existing intervals. Repeated failures produce one failure event until
 recovery, rather than growing the event history on every retry.
+
+The recovery worker subscribes to heartbeat health and coordinator changes.
+It runs only for a confirmed error 200, healthy heartbeat delivery and an
+unpaused, unlocked device in master mode whose charging release has not been
+explicitly disabled. Release intent is retained in WriteState across reloads
+and in the switch's extra restore data across HA restarts; it is not a Recorder
+attribute. Fault readback cannot overwrite that intent. Release commands use
+the same current-command lock as recovery. It reads the error, current and
+lock again under the current-command lock, then uses the normal write path.
+The live limit is never increased to a missing/default saved setpoint. Zero
+is restored through the replaceable current queue after the required >=6 A
+recovery write. New user commands can supersede that queued restoration.
+At most three attempts are made per persistent fault, 30 seconds apart;
+current-write cooldowns delay attempts without consuming the budget. A
+confirmed error-free poll resets the budget. Entry unload cancels the task,
+retry timer and both listeners. Healthy operation adds no polling or states.
 
 ### One choke point for writes
 
@@ -100,20 +122,16 @@ of them are dangerous. Centralising it means the minimum current, the
 `allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics
 counters are written once and cannot be forgotten by a new platform.
 
-The charging current is also the one write that is *deferred* rather than
-rejected when it comes too fast: a dragged slider should not fail. Pause,
-resume and phase switches are rejected instead, because the manufacturer asks
-for minutes of hysteresis there and silently queueing those would hide a bad
-automation.
+Current commands retain the newest pending value when requested inside the
+five-second register interval. Pause/resume commands are instead rejected
+with the short remaining wait, so an old deferred setpoint cannot silently
+undo a later pause. The manufacturer recommends longer anti-cycling hysteresis;
+that belongs in automation policy, and the bundled PV blueprint defaults to
+six minutes. Manual pause/resume no longer has a five-minute lockout.
 
-Two different rules meet on `0x0302`, and they are deliberately kept apart.
-Every write to it has to keep five seconds from the write before; that is a
-property of the register and lives in the client's rate limiter. Pausing and
-resuming need five minutes between them; that is a property of the
-*operation* and lives in `control.py`. Keying both on the register made the
-pause switch refuse for five minutes after any slider move, and let a pause
-be undone by a slider move six seconds later. A real limit written while the
-pause value is active counts as a resume, whatever the caller meant by it.
+Phase requests retain a separate five-minute interval. Both guards survive
+entry reloads, including uncertain write outcomes. A cold start applies five
+seconds to current and pause/resume, and five minutes to phase requests.
 
 ### Three polling cadences, and one of them is about the database
 

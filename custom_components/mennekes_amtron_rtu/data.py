@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from .control import AmtronControl
     from .coordinator import MennekesAmtronCoordinator
     from .heartbeat import HeartbeatTask
+    from .recovery import HeartbeatRecovery
 
 
 @dataclass(slots=True)
@@ -58,6 +59,7 @@ class WriteDiagnostics:
     heartbeats_late: int = 0
     writes_sent: int = 0
     writes_rejected: int = 0
+    write_errors: set[str] = field(default_factory=set)
     writes_rate_limited: int = 0
     recoveries: int = 0
     last_error: str | None = None
@@ -90,6 +92,7 @@ class MennekesAmtronRuntimeData:
     diagnostics: WriteDiagnostics
     connection_state: ConnectionState
     heartbeat: HeartbeatTask | None = None
+    recovery: HeartbeatRecovery | None = None
     # What the repair issues looked like last time, so an unchanged issue is
     # not written to the issue registry on every poll.
     repair_state: dict[str, dict[str, str] | None] = field(default_factory=dict)

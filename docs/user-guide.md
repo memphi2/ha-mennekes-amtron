@@ -22,18 +22,20 @@ bus access.
 | **Recover from error** | Runs the documented sequence for a lost energy-manager heartbeat. It may release and resume charging. |
 | **Restart** | Restarts the wallbox only when it reports idle. |
 
-**0 A turns the limit off.** The wallbox's own limits still apply; the extra
+The current control is a slider. **0 A turns the limit off.** The wallbox's own limits still apply; the extra
 current cap in the integration options is bypassed. Enter 6 A or more to
 enable a limit again. Values between 0 and 6 A are rejected. Use
 **Charging paused** to stop a charge.
 
 Current requests closer than five seconds are deferred, with the newest
 accepted request taking precedence. Pause/resume requests inside the
-five-minute waiting interval are rejected with the remaining wait time;
-they are not queued for later. Allow more than five minutes in automations.
+five-second waiting interval are rejected with the remaining wait time;
+they are not queued for later. MENNEKES recommends more than five minutes
+between repeated pause/resume cycles; use hysteresis in automations. The
+bundled PV pause/resume blueprint defaults to six minutes.
 Timing guards survive an entry reload. After a full Home Assistant restart
-or the first setup, current writes wait five seconds and pause/resume and
-phase changes wait five minutes from setup. This protects the wallbox when
+or the first setup, current writes and pause/resume wait five seconds;
+phase changes still wait five minutes from setup. This protects the wallbox when
 the previous write history is unknown. Reading and the heartbeat continue.
 
 While paused, the current field shows the remembered setting, including 0
@@ -99,6 +101,14 @@ serial bus or stopped Home Assistant can still interrupt it: configure and
 understand the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it)
 before relying on unattended charging.
 
+The **Heartbeat** diagnostic sensor shows OK or a problem without recording
+every heartbeat. After a restart or temporary interruption, error 200 is
+recovered automatically once heartbeat delivery resumes. Automatic recovery
+respects a pause, device lock or explicitly disabled charging release and
+retains the current setting. It stops
+after three attempts if the fault persists; see
+[heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable).
+
 ## Energy dashboard and database size
 
 Select **Total energy** as the wallbox's consumption source under the Energy
@@ -161,9 +171,10 @@ Removing the limit also bypasses the integration's extra current cap. Hardware
 limits still apply. Values between 0 and 6 A are not accepted by this action;
 use the pause switch instead.
 
-**Recover from error** follows the manufacturer's recovery sequence with a
-limit of at least 6 A. After recovering from an error, set the current to 0
-again if you want the limit off.
+The manual **Recover from error** button follows the manufacturer's recovery
+sequence with a limit of at least 6 A. After manual recovery, set the current
+to 0 again if you want the limit off. Automatic recovery restores a previous
+0 A setting after the five-second write interval.
 
 ## Compatible devices
 

@@ -84,6 +84,9 @@
       },
       "vehicle_connected": {
         "name": "Fahrzeug verbunden"
+      },
+      "heartbeat": {
+        "name": "Heartbeat"
       }
     },
     "button": {
@@ -339,13 +342,19 @@
       "message": "Das Schreiben von {register} an die Wallbox ist fehlgeschlagen: {error}"
     },
     "write_rate_limited": {
-      "message": "Die Wallbox akzeptiert diese Änderung erst in {seconds} s wieder. Der Hersteller verlangt für Pause, Fortsetzen und Phasenwechsel eine Hysterese und Abstände von mehr als fünf Minuten."
+      "message": "Diese Änderung ist in {seconds} s wieder möglich. Stromänderungen, Pause und Fortsetzen haben fünf Sekunden Mindestabstand; Phasenwechsel behalten fünf Minuten Abstand."
     },
     "phase_state_unknown": {
       "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurden keine Phasen umgeschaltet. Prüfe die Verbindung und versuche es erneut."
     },
     "restart_state_unknown": {
       "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurde kein Neustart ausgelöst. Prüfe die Verbindung und versuche es erneut."
+    },
+    "recovery_not_applicable": {
+      "message": "Die Wallbox meldet einen anderen Fehler als den Heartbeat-Fehler 200. Es wurden keine Wiederherstellungsbefehle gesendet."
+    },
+    "recovery_state_unknown": {
+      "message": "Der aktuelle Fehler- oder Stromzustand konnte nicht bestätigt werden. Es wurden keine Wiederherstellungsbefehle gesendet."
     }
   },
   "issues": {
@@ -357,9 +366,17 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Die Wallbox meldet Fehler 200: Sie hat nicht rechtzeitig einen Heartbeat des Energiemanagers erhalten und startet keinen Ladevorgang. Das Beheben schreibt die dokumentierte Wiederherstellungssequenz (Heartbeat, Ladefreigabe, Ladestrom). Mit dem Bestätigen werden Heartbeat, Ladefreigabe und Ladestrom-Begrenzung in dieser Reihenfolge geschrieben.",
+            "description": "Die Wallbox meldet Fehler 200 nach einem ausgebliebenen Heartbeat. Im Modbus-Master-Modus läuft die Wiederherstellung automatisch, sobald der Heartbeat wieder ankommt, sofern das Laden nicht pausiert, die Wallbox gesperrt oder die Ladefreigabe bewusst ausgeschaltet ist. Mit dem Bestätigen startest du einen manuellen Versuch: Heartbeat, Ladefreigabe und mindestens 6 A werden geschrieben; das Laden kann dabei fortgesetzt werden. Ein bereits behobener Fehler wird ohne weitere Befehle geschlossen.",
             "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
           }
+        },
+        "error": {
+          "entry_unavailable": "Die Integration ist nicht geladen. Stelle zuerst die Verbindung wieder her.",
+          "different_error": "Die Wallbox meldet einen anderen Fehler. Die Heartbeat-Wiederherstellung setzt diesen nicht zurück.",
+          "read_only": "Aktiviere zuerst den Modbus-Master-Modus, um die Wiederherstellung auszuführen.",
+          "write_rate_limited": "Der Mindestabstand seit einem vorherigen Befehl ist noch nicht abgelaufen. Warte kurz und versuche es erneut.",
+          "recovery_failed": "Die Wiederherstellung konnte nicht bestätigt werden. Prüfe die Verbindung und versuche es erneut.",
+          "still_active": "Die Wiederherstellungsbefehle wurden gesendet, die Wallbox meldet aber noch einen Fehler. Warte auf die Statusaktualisierung; prüfe bei anhaltendem Fehler die Verbindung."
         }
       },
       "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
@@ -369,7 +386,7 @@
       "title": "Wallbox nutzt ein älteres Modbus-Register-Layout"
     },
     "write_rejected": {
-      "description": "Die Wallbox hat einen Schreibzugriff abgelehnt. Prüfe, ob sie als Modbus-Satellite konfiguriert ist: Die DIP-Schalter 4 und 5 auf Bank S1 müssen auf ON stehen und die Wallbox muss danach neu gestartet werden.",
+      "description": "Ein Schreibzugriff wurde nicht bestätigt. Prüfe die serielle Verbindung und die Satellite-Konfiguration der Wallbox. Die Meldung verschwindet nach einem erfolgreichen Zugriff auf den betroffenen Befehl. Frühere Fehler bleiben im Diagnosezähler erhalten.",
       "title": "Wallbox hat einen Schreibzugriff abgelehnt"
     }
   },

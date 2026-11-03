@@ -56,13 +56,26 @@ these cases.
 
 ## Error 200, "Energy manager unavailable"
 
-The wallbox did not receive a usable heartbeat in time. In master mode,
-**Recover from error** or the repair issue's **Fix** runs the documented
-heartbeat → charging release → current sequence. Recovery can resume charging;
-check the intended current first. A recent current write or pause may delay
-recovery: wait for the reported interval, then retry.
+The wallbox did not receive a usable heartbeat in time. In master mode, the
+integration recovers automatically once heartbeat delivery resumes and a
+fresh read confirms error 200. It runs the documented heartbeat → charging
+release → current sequence, respects a pause, device lock or explicitly disabled
+charging release, and retains the
+current limit. An unlimited setting is restored after the five-second write
+interval. Recovery can release and resume charging.
 
-If the error returns, investigate the cause before enabling automatic recovery:
+There are at most three attempts, 30 seconds apart, while the fault persists.
+The repair issue disappears after a poll confirms the fault has cleared. A
+new confirmed healthy state or an entry reload resets the retry budget. No
+extra recovery automation is needed; disable an older recovery blueprint to
+avoid duplicate attempts.
+
+If automatic recovery cannot complete, **Recover from error** or the repair
+issue's **Fix** remains available. Manual recovery can lift a pause; check the
+intended current first. The dialog explains connection problems, write
+cooldowns or a still-active fault instead of closing prematurely.
+
+If the error returns, investigate the cause:
 
 - Home Assistant restarts, entry reloads or switching to read-only stop the
   heartbeat temporarily or permanently.

@@ -51,6 +51,7 @@ from .entry_types import MennekesAmtronConfigEntry
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
 from .options_flow import control_mode_is_master
+from .recovery import HeartbeatRecovery
 from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
 from .write_state import WriteState
@@ -134,17 +135,22 @@ async def async_setup_entry(
     )
 
     try:
-        await coordinator.async_config_entry_first_refresh()
         if not control.read_only:
             entry.runtime_data.heartbeat = _start_heartbeat(
                 hass, entry, client, diagnostics
             )
+        await coordinator.async_config_entry_first_refresh()
         await hass.config_entries.async_forward_entry_setups(
             entry, _entry_platforms(entry)
         )
         entry.async_on_unload(entry.add_update_listener(async_reload_entry))
         async_setup_repairs(hass, entry)
+        if not control.read_only:
+            entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)
+            entry.runtime_data.recovery.start()
     except BaseException:
+        if entry.runtime_data.recovery is not None:
+            await entry.runtime_data.recovery.async_stop()
         if entry.runtime_data.heartbeat is not None:
             await entry.runtime_data.heartbeat.async_stop()
         await control.async_shutdown()
@@ -164,6 +170,8 @@ async def async_unload_entry(
     )
     if not unloaded:
         return False
+    if runtime_data.recovery is not None:
+        await runtime_data.recovery.async_stop()
     if runtime_data.heartbeat is not None:
         await runtime_data.heartbeat.async_stop()
     await runtime_data.control.async_shutdown()

@@ -9,7 +9,7 @@ The PV sensor comes from your inverter or energy-management setup.
 |---|---|
 | **Charge from PV surplus** | Adjust the current while a vehicle is connected and charging is not paused |
 | **Pause and resume on PV surplus** | Pause below one power threshold and resume above a higher one, after a hold time |
-| **Recover from a lost heartbeat** | Run the recovery sequence after an energy-manager-unavailable error |
+| **Recover from a lost heartbeat** | Legacy manual-button automation; recovery is now built in. Disable existing instances to avoid duplicate attempts. |
 | **Notify on a grid-operator downgrade** | Notify when a downgrade starts and ends |
 
 ## Set up PV charging
