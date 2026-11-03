@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- Recover error 200 while charging is paused, locked or explicitly not released.
+  Both automatic recovery and the manual repair reassert the existing controls
+  instead of enabling charging or forcing a temporary current of at least 6 A.
+- Restore deliberate pause intent across entry reloads and Home Assistant
+  restarts, independently of changed wallbox readback, and keep the saved
+  resume current. No additional Recorder attribute or heartbeat history is added.
+- Keep an uncertain pause request after a lost acknowledgement or cancellation;
+  discard older queued current writes that could otherwise undo that pause.
+
 ## 0.4.1 — 2026-11-03
 
 ### Added

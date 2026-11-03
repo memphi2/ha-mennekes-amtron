@@ -120,10 +120,11 @@ option 2. Even there:
 
 In master mode, a confirmed error 200 triggers automatic recovery once the
 heartbeat is healthy. It respects a pause, device lock and explicitly disabled
-charging release, keeps the live
-current limit or a lower remembered limit, and restores unlimited mode after
-the required temporary 6 A recovery write. At most three attempts are made
-while the fault persists. The manual recovery button can lift a pause.
+charging release while reasserting the EMS commands. A pause stays at the
+pause value, unlimited mode stays at 0 A, and a normal limit is kept or lowered
+to the remembered limit. Manual recovery follows the same rules and cannot
+resume charging. At most three automatic attempts are made while the fault
+persists; clearing a repair requires a confirmed error-free state.
 
 Recovery checks known current-write and pause/resume cooldowns before sending
 its heartbeat/release/current sequence. A cooldown rejection therefore does

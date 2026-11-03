@@ -74,7 +74,10 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         clock[0] += 3
         await getattr(runtime.control, resume_action)()
         expected = new_cap or initial or 6
-        if initial == 0 and resume_action == "async_resume_charging":
+        if resume_action == "async_recover_from_error":
+            expected = 1
+            assert runtime.control.charging_setpoint == initial
+        elif initial == 0:
             expected = 0
         assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == expected
         assert await integration.async_unload_entry(hass, entry)

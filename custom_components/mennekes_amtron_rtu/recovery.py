@@ -42,14 +42,11 @@ class HeartbeatRecovery:
         return bool(
             not self._stopped
             and not runtime.control.read_only
-            and runtime.control.charging_release_requested is not False
             and runtime.heartbeat is not None
             and runtime.heartbeat.healthy is True
             and runtime.coordinator.last_update_success
             and runtime.coordinator.current_data().get("error_code")
             == ERROR_CODE_EMS_UNAVAILABLE
-            and runtime.control.is_paused is False
-            and runtime.coordinator.current_data().get("lock_evse") == 0
             and self._attempts < MAX_RECOVERY_ATTEMPTS
         )
 
@@ -86,7 +83,7 @@ class HeartbeatRecovery:
         retry_after: float | None = None
         runtime = self._entry.runtime_data
         try:
-            attempted = await runtime.control.async_recover_from_error(automatic=True)
+            attempted = await runtime.control.async_recover_from_error()
             if attempted:
                 self._attempts += 1
                 retry_after = RECOVERY_RETRY_SECONDS

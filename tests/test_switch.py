@@ -63,6 +63,7 @@ def test_the_pause_switch_uses_the_documented_pause_value() -> None:
         )
         entry.runtime_data.coordinator.data.values["charging_current_ems"] = 1.0
         assert pause.is_on is True
+        assert entry.runtime_data.control.pause_requested is True
 
     asyncio.run(run())
 
@@ -74,6 +75,7 @@ def test_resuming_restores_charging() -> None:
         )
         entry.runtime_data.control.charging_setpoint = 12.0
         await switches["charging_paused"].async_turn_off()
+        assert entry.runtime_data.control.pause_requested is False
         assert any(
             address == R.CHARGING_CURRENT_EMS.address for address, _ in transport.writes
         )
@@ -82,30 +84,46 @@ def test_resuming_restores_charging() -> None:
 
 
 @pytest.mark.parametrize("requested", [False, True, None])
-def test_release_intent_is_restored_separately_from_fault_readback(requested):
+@pytest.mark.parametrize(
+    ("entity_key", "intent_key"),
+    [
+        ("charging_release", "charging_release_requested"),
+        ("charging_paused", "pause_requested"),
+    ],
+)
+def test_control_intent_is_restored_separately_from_fault_readback(
+    requested, entity_key, intent_key
+):
     async def run():
         switches, entry, _transport = await _switches()
-        switch = switches["charging_release"]
+        switch = switches[entity_key]
 
         async def extra():
-            return RestoredExtraData({"charging_release_requested": requested})
+            return RestoredExtraData({intent_key: requested})
 
         switch.async_get_last_extra_data = extra
         await switch.async_added_to_hass()
-        assert entry.runtime_data.control.charging_release_requested is requested
-        assert switch.extra_restore_state_data.as_dict() == {
-            "charging_release_requested": requested
-        }
+        assert getattr(entry.runtime_data.control, intent_key) is requested
+        assert switch.extra_restore_state_data.as_dict() == {intent_key: requested}
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("old_state", [None, "off", "on", "unavailable"])
 @pytest.mark.parametrize("extra_value", ["absent", "invalid", "missing_key"])
-def test_upgrades_preserve_a_previously_disabled_release(old_state, extra_value):
+@pytest.mark.parametrize(
+    ("entity_key", "intent_key", "blocked_state", "intent"),
+    [
+        ("charging_release", "charging_release_requested", "off", False),
+        ("charging_paused", "pause_requested", "on", True),
+    ],
+)
+def test_upgrades_preserve_a_previously_stopped_charge(
+    old_state, extra_value, entity_key, intent_key, blocked_state, intent
+):
     async def run():
         switches, entry, _transport = await _switches()
-        switch = switches["charging_release"]
+        switch = switches[entity_key]
 
         async def extra():
             if extra_value == "missing_key":
@@ -113,7 +131,7 @@ def test_upgrades_preserve_a_previously_disabled_release(old_state, extra_value)
             return (
                 None
                 if extra_value == "absent"
-                else RestoredExtraData({"charging_release_requested": "bad"})
+                else RestoredExtraData({intent_key: "bad"})
             )
 
         async def state():
@@ -122,19 +140,28 @@ def test_upgrades_preserve_a_previously_disabled_release(old_state, extra_value)
         switch.async_get_last_extra_data = extra
         switch.async_get_last_state = state
         await switch.async_added_to_hass()
-        assert entry.runtime_data.control.charging_release_requested is (
-            False if old_state == "off" else None
+        assert getattr(entry.runtime_data.control, intent_key) is (
+            intent if old_state == blocked_state else None
         )
 
     asyncio.run(run())
 
 
-def test_reload_does_not_override_current_release_intent():
+@pytest.mark.parametrize(
+    ("entity_key", "intent_key", "intent"),
+    [
+        ("charging_release", "charging_release_requested", False),
+        ("charging_paused", "pause_requested", True),
+    ],
+)
+def test_reload_does_not_override_current_control_intent(
+    entity_key, intent_key, intent
+):
     async def run():
         switches, entry, _transport = await _switches()
-        entry.runtime_data.control.charging_release_requested = False
-        await switches["charging_release"].async_added_to_hass()
-        assert entry.runtime_data.control.charging_release_requested is False
+        setattr(entry.runtime_data.control, intent_key, intent)
+        await switches[entity_key].async_added_to_hass()
+        assert getattr(entry.runtime_data.control, intent_key) is intent
 
     asyncio.run(run())
 

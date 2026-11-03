@@ -99,16 +99,24 @@ this treatment; control writes retain their existing intervals. Repeated failure
 recovery, rather than growing the event history on every retry.
 
 The recovery worker subscribes to heartbeat health and coordinator changes.
-It runs only for a confirmed error 200, healthy heartbeat delivery and an
-unpaused, unlocked device in master mode whose charging release has not been
-explicitly disabled. Release intent is retained in WriteState across reloads
-and in the switch's extra restore data across HA restarts; it is not a Recorder
-attribute. Fault readback cannot overwrite that intent. Release commands use
-the same current-command lock as recovery. It reads the error, current and
-lock again under the current-command lock, then uses the normal write path.
-The live limit is never increased to a missing/default saved setpoint. Zero
-is restored through the replaceable current queue after the required >=6 A
-recovery write. New user commands can supersede that queued restoration.
+It runs for a confirmed error 200 and healthy heartbeat delivery in master
+mode, including when charging is paused, locked or not released. Pause and
+release intent are retained in WriteState across reloads and in the switches'
+extra restore data across HA restarts, without Recorder attributes. Fault
+readback cannot overwrite that intent. Release commands and recovery share
+the current-command lock. Recovery reads the error and current again before
+writing heartbeat, the intended release and the preserved current setting.
+A saved pause takes precedence over reset current readback; its saved resume
+limit is retained. Recovery never writes the device-lock register.
+
+The vendor specifies rewriting the three EMS registers after a heartbeat
+fault. Its >=6 A startup example is not used as permission to resume a paused
+charge. Recovery reasserts the pause value or zero directly, with no temporary
+charging limit or deferred restore command. Tests model fault clearance once
+all three commands arrive and verify no transaction permits charging during
+a paused recovery. Firmware acceptance of fault clearance while paused still
+requires hardware validation; a persistent fault remains visible and never
+causes an automatic escalation to a running current.
 At most three attempts are made per persistent fault, 30 seconds apart;
 current-write cooldowns delay attempts without consuming the budget. A
 confirmed error-free poll resets the budget. Entry unload cancels the task,

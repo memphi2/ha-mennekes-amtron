@@ -122,6 +122,16 @@ class AmtronControl:
         self._write_state.charging_release_requested = value
 
     @property
+    def pause_requested(self) -> bool | None:
+        """Return pause intent, independently of fault/reset readback."""
+
+        return self._write_state.pause_requested
+
+    @pause_requested.setter
+    def pause_requested(self, value: bool | None) -> None:
+        self._write_state.pause_requested = value
+
+    @property
     def options(self) -> ControlOptions:
         """Return the active control options."""
 
@@ -282,17 +292,17 @@ class AmtronControl:
                 "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
             ) from err
 
-    async def async_recover_from_error(self, *, automatic: bool = False) -> bool:
+    async def async_recover_from_error(self) -> bool:
         """Run the documented recovery sequence for error state 200.
 
         The specification requires 0x0D00, 0x0D05 and 0x0302 to be written,
-        in that order, to bring the wallbox back to idle.
+        in that order. Reassert the existing commands: recovering communication
+        is not authorization to start charging. The >=6 A example in the
+        specification starts a charge; it must not replace a pause or zero.
         """
 
         self._require_write_access()
         async with self._current_lock:
-            if automatic and self.charging_release_requested is False:
-                return False
             try:
                 error = await self._client.async_read_register(ERROR_CODE)
                 if error == 0:
@@ -300,19 +310,13 @@ class AmtronControl:
                 if error != ERROR_CODE_EMS_UNAVAILABLE:
                     raise service_validation_error("recovery_not_applicable")
                 current = await self._client.async_read_register(CHARGING_CURRENT_EMS)
-                locked = (
-                    await self._client.async_read_register(LOCK_EVSE) if automatic else 0
-                )
             except AmtronBusError as err:
                 raise service_validation_error("recovery_state_unknown") from err
             if not isinstance(current, (int, float)) or not math.isfinite(current) or current < 0:
                 raise service_validation_error("recovery_state_unknown")
-            # Restoring communication must never undo a deliberate pause/lock.
-            if automatic and (0 < current < CHARGING_CURRENT_MINIMUM or locked != 0):
-                return False
             # Refuse known cooldowns before changing charging release. The
             # final current write still rechecks after the awaited bus calls.
-            if self.is_paused is not False:
+            if self.is_paused is not False or self.pause_requested is True:
                 self._check_mode_change_interval()
             try:
                 self._client.check_write_interval(
@@ -327,34 +331,27 @@ class AmtronControl:
                     "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
                 ) from err
             remembered = self.charging_setpoint
-            if current == CHARGING_CURRENT_UNLIMITED:
+            paused = self.pause_requested is True or 0 < current < CHARGING_CURRENT_MINIMUM
+            if paused:
+                target = CHARGING_PAUSE_CURRENT
+            elif current == CHARGING_CURRENT_UNLIMITED:
                 target = CHARGING_CURRENT_UNLIMITED
-            elif current >= CHARGING_CURRENT_MINIMUM:
+            else:
                 target = (
                     min(current, remembered)
                     if remembered is not None and remembered >= CHARGING_CURRENT_MINIMUM
                     else current
                 )
-            elif remembered is not None:
-                target = remembered
-            else:
-                target = CHARGING_CURRENT_MINIMUM
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
-            await self._async_write(CHARGING_RELEASE, 1)
-            if not automatic:
-                self.charging_release_requested = True
+            await self._async_write(CHARGING_RELEASE, int(self.charging_release_requested is not False))
             await self._async_request_current_locked(
-                max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current)),
-                # Recovery only changes charging mode if it lifts a pause.
-                # Its final write must finish before recovery reports success.
+                min(target, self.max_charging_current),
+                # Confirm the final write before reporting sequence completion.
                 mode_change=self.is_paused is not False,
                 defer=False,
+                preserve_setpoint=paused,
             )
-            if automatic and target == CHARGING_CURRENT_UNLIMITED:
-                # The recovery sequence needs >=6 A. Restore unlimited through
-                # the existing replaceable queue after its five-second floor.
-                await self._async_request_current_locked(0, mode_change=False)
         self._diagnostics.recoveries += 1
         self._diagnostics.timeline.record(EventType.RECOVERY_COMPLETED)
         return True
@@ -415,12 +412,13 @@ class AmtronControl:
             )
 
     async def _async_request_current_locked(
-        self, value: float, *, mode_change: bool, defer: bool = True
+        self, value: float, *, mode_change: bool, defer: bool = True,
+        preserve_setpoint: bool = False,
     ) -> None:
         """Serialize a new command against any deferred setpoint."""
 
         paused = self.is_paused
-        mode_change = mode_change or paused is not False
+        mode_change = mode_change or paused is not False or self.pause_requested is True
         previous = self._write_state.confirmed_current
         if mode_change:
             self._check_mode_change_interval()
@@ -450,11 +448,15 @@ class AmtronControl:
                 # pause or resume. Unknown outcome must not remove hysteresis.
                 self._write_state.confirmed_current = None
                 self._write_state.mode_change_at = self._monotonic()
+                if 0 < value < CHARGING_CURRENT_MINIMUM:
+                    self.pause_requested = True
+                    self._pending_current = None
             raise
         # A successful command supersedes every older deferred setpoint,
         # including one whose background task is currently sleeping.
         self._pending_current = None
         self._write_state.confirmed_current = value
+        self.pause_requested = 0 < value < CHARGING_CURRENT_MINIMUM
         # Publish accepted bookkeeping before coordinator callbacks read it.
         # Rejected commands never alter the setpoint; pauses retain the actual
         # previous limit, whether requested manually or by a phase change.
@@ -462,6 +464,7 @@ class AmtronControl:
             self.charging_setpoint = value
         elif (
             value == CHARGING_PAUSE_CURRENT
+            and (not preserve_setpoint or self.charging_setpoint is None)
             and isinstance(previous, (int, float))
             and (previous == CHARGING_CURRENT_UNLIMITED or previous >= CHARGING_CURRENT_MINIMUM)
         ):

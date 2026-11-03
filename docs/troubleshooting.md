@@ -61,8 +61,8 @@ integration recovers automatically once heartbeat delivery resumes and a
 fresh read confirms error 200. It runs the documented heartbeat → charging
 release → current sequence, respects a pause, device lock or explicitly disabled
 charging release, and retains the
-current limit. An unlimited setting is restored after the five-second write
-interval. Recovery can release and resume charging.
+current limit. Paused and unlimited settings are reasserted directly without a
+temporary charging limit. A deliberate pause is remembered across HA restarts.
 
 There are at most three attempts, 30 seconds apart, while the fault persists.
 The repair issue disappears after a poll confirms the fault has cleared. A
@@ -71,8 +71,8 @@ extra recovery automation is needed; disable an older recovery blueprint to
 avoid duplicate attempts.
 
 If automatic recovery cannot complete, **Recover from error** or the repair
-issue's **Fix** remains available. Manual recovery can lift a pause; check the
-intended current first. The dialog explains connection problems, write
+issue's **Fix** remains available. It preserves the stopped state too; use the
+pause or charging-release switch explicitly to resume. The dialog explains connection problems, write
 cooldowns or a still-active fault instead of closing prematurely.
 
 If the error returns, investigate the cause:

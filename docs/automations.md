@@ -89,8 +89,8 @@ See [Phase switching](user-guide.md#phase-switching).
 
 Error 200 is recovered automatically in master mode. Disable any older
 **Recover from a lost heartbeat** automation to avoid duplicate attempts.
-The blueprint remains available for existing installations, but its manual
-button action can lift a deliberate pause. If the error returns, investigate
+The blueprint remains available for existing installations. Its button action
+preserves a deliberate pause. If the error returns, investigate
 [heartbeat failures](troubleshooting.md#error-200-energy-manager-unavailable).
 Repeated recovery is not a substitute for a functioning connection.
 

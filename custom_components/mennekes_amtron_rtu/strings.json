@@ -366,7 +366,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "The wallbox reports error 200 after a missing heartbeat. In Modbus master mode, automatic recovery runs when heartbeat delivery resumes, unless charging is paused, the wallbox is locked or charging release was explicitly disabled. Confirm to try manual recovery: this writes the heartbeat, charging release and a current limit of at least 6 A, and can resume charging. A resolved issue closes without sending commands.",
+            "description": "The wallbox reports error 200 after a missing heartbeat. In Modbus master mode, automatic recovery reasserts the existing controls when heartbeat delivery resumes, including while charging is paused. Confirm to retry manually. A deliberate pause, device lock, disabled charging release and current setting are preserved. This does not resume charging. A resolved issue closes without sending commands.",
             "title": "Wallbox lost the energy-manager heartbeat"
           }
         },
