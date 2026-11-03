@@ -259,7 +259,7 @@ class MennekesModbusClient:
         async with self._lock:
             self.check_write_interval(spec, min_interval=min_interval)
             client = self._require_client()
-            self._rate_limiter.record(spec.key, now=self._monotonic())
+            rejected = False
             try:
                 await _client_write.write_register(
                     client,
@@ -272,7 +272,14 @@ class MennekesModbusClient:
                 # reply or transport failure may follow an applied write, so
                 # those retain the interval, as does cancellation.
                 self._rate_limiter.forget(spec.key)
+                rejected = True
                 raise
+            finally:
+                if not rejected:
+                    # Connect/send/response delays belong to this transaction.
+                    # Even cancellation can follow an applied write. Measuring
+                    # from completion conservatively protects the wire interval.
+                    self._rate_limiter.record(spec.key, now=self._monotonic())
 
     def _require_client(self) -> Any:
         if self._client is None:

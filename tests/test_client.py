@@ -24,6 +24,45 @@ from tests.fakes import FakeModbusClient, device_bank
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)
 
 
+@pytest.mark.parametrize("outcome", ["success", "uncertain", "cancelled", "rejected"])
+def test_write_floor_starts_after_delayed_transaction(outcome):
+    clock = [0.0]
+
+    class DelayedTransport(FakeModbusClient):
+        async def write_registers(self, address, values, *, device_id):
+            clock[0] += 4
+            if outcome == "uncertain":
+                raise ModbusIOException("lost response")
+            if outcome == "cancelled":
+                raise asyncio.CancelledError
+            if outcome == "rejected":
+                return ExceptionResponse(0x10, 3)
+            return await super().write_registers(address, values, device_id=device_id)
+
+    async def run():
+        transport = DelayedTransport(device_bank())
+        client = _client(transport, clock)
+        await client.async_connect()
+        if outcome == "success":
+            await client.async_write_register(R.CHARGING_CURRENT_EMS, 8, min_interval=5)
+        else:
+            error = asyncio.CancelledError if outcome == "cancelled" else AmtronBusError
+            with pytest.raises(error):
+                await client.async_write_register(R.CHARGING_CURRENT_EMS, 8, min_interval=5)
+        clock[0] = 5
+        if outcome == "rejected":
+            client.check_write_interval(R.CHARGING_CURRENT_EMS, min_interval=5)
+        else:
+            with pytest.raises(AmtronRateLimitedError) as limited:
+                await client.async_write_register(R.CHARGING_CURRENT_EMS, 9, min_interval=5)
+            assert limited.value.retry_after == 4
+            clock[0] = 9
+            client.check_write_interval(R.CHARGING_CURRENT_EMS, min_interval=5)
+        await client.async_close()
+
+    asyncio.run(run())
+
+
 def _client(
     transport: FakeModbusClient, monotonic: list[float] | None = None
 ) -> MennekesModbusClient:
