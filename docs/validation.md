@@ -32,12 +32,16 @@ For continuously loaded operation, run:
 .venv/bin/python scripts/check_runtime_steady.py --seconds 3600 --json-output /tmp/amtron-steady.json
 ```
 
-This separate test uses real elapsed time, active polling and heartbeat timers,
-and injected connection loss/recovery every 30 seconds without reloading the
-entry. It measures the same resource budgets every five seconds and checks
+This separate test uses real elapsed time, a real Modbus RTU client and server
+connected through virtual serial ports, and active polling and heartbeat timers.
+It closes and reopens the actual serial transport every 30 seconds without
+reloading the entry. Measurements change while delayed replies and concurrent
+reads exercise the bus scheduler. Every delivered-heartbeat gap, including a
+silent tail at the end, must stay within ten seconds. It measures the same
+resource budgets approximately every five seconds and checks
 cleanup afterwards. The normal suite exercises a short version; scheduled
 and manual CI runs measure one hour on latest stable HA. This adds no required
-HA version to the minimum/latest matrix. It uses simulated Modbus replies and
+HA version to the minimum/latest matrix. The wallbox register values are simulated; it
 does not replace the separate SQLite Recorder retention tests or hardware tests.
 
 ## Published release verification

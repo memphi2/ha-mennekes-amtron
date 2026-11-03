@@ -75,14 +75,17 @@ async def _boot(config_dir: Path) -> Any:
 
 
 async def _start_wallbox(
-    port: str, bank: dict[int, int], *, device_id: int = 50
+    port: str, bank: dict[int, int], *, device_id: int = 50, action: Any = None
 ) -> Any:
     from pymodbus import FramerType
     from pymodbus.server import ModbusSerialServer
 
     words = [_signed(bank.get(address, 0)) for address in range(REGISTER_COUNT)]
+    devices = _server_context(words, device_id)
+    if action is not None:
+        devices[0].action = action
     server = ModbusSerialServer(
-        _server_context(words, device_id),
+        devices,
         framer=FramerType.RTU,
         port=port,
         baudrate=57600,

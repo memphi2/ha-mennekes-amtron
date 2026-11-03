@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Exercise real serial transport reconnects, changing readings and delayed
+  replies in the continuous soak; check maximum heartbeat gaps, not only totals.
 - Type the Modbus transport boundary and share write timing state across reloads.
 - Cancel superseded PR validation, add job time limits and cache dependency
   downloads. Required HA validation remains minimum plus latest stable.
