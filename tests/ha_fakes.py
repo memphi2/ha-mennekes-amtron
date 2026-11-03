@@ -108,6 +108,7 @@ class FakeHass:
             path=lambda *parts: str(Path(self.config_dir, *parts)),
         )
         self.data: dict[str, Any] = {}
+        self.is_stopping = False
         self.config_entries = FakeConfigEntries()
         self.services = FakeServices()
         try:
@@ -168,7 +169,7 @@ class FakeConfigEntry:
         return lambda: None
 
     def async_create_background_task(
-        self, hass: Any, target: Any, name: str
+        self, hass: Any, target: Any, name: str, eager_start: bool = True
     ) -> asyncio.Task[Any]:
         """Create a background task the way Home Assistant does."""
 

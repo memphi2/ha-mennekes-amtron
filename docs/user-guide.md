@@ -101,6 +101,13 @@ serial bus or stopped Home Assistant can still interrupt it: configure and
 understand the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it)
 before relying on unattended charging.
 
+The **Heartbeat** diagnostic sensor shows OK or a problem without recording
+every heartbeat. After a restart or temporary interruption, error 200 is
+recovered automatically once heartbeat delivery resumes. Automatic recovery
+respects a pause or device lock and retains the current setting. It stops
+after three attempts if the fault persists; see
+[heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable).
+
 ## Energy dashboard and database size
 
 Select **Total energy** as the wallbox's consumption source under the Energy
@@ -163,9 +170,10 @@ Removing the limit also bypasses the integration's extra current cap. Hardware
 limits still apply. Values between 0 and 6 A are not accepted by this action;
 use the pause switch instead.
 
-**Recover from error** follows the manufacturer's recovery sequence with a
-limit of at least 6 A. After recovering from an error, set the current to 0
-again if you want the limit off.
+The manual **Recover from error** button follows the manufacturer's recovery
+sequence with a limit of at least 6 A. After manual recovery, set the current
+to 0 again if you want the limit off. Automatic recovery restores a previous
+0 A setting after the five-second write interval.
 
 ## Compatible devices
 

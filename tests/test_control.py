@@ -44,8 +44,10 @@ class Harness:
         phase_options: int | None = 2,
         values: dict[str, object] | None = None,
         clock: list[float] | None = None,
+        error_code: int = 0,
     ) -> None:
         self.transport = FakeModbusClient(device_bank(
+            error_code=error_code,
             evse_state=(values or {}).get("evse_state", EvseState.IDLE),
             charging_current=(values or {}).get("charging_current_ems", 16.0),
         ))
@@ -415,7 +417,7 @@ def test_the_phase_switch_skips_the_pause_when_idle() -> None:
 
 
 def test_recovery_writes_the_documented_sequence_in_order() -> None:
-    harness = Harness()
+    harness = Harness(error_code=200, )
 
     async def run() -> None:
         control = await harness.connect()
@@ -437,7 +439,7 @@ def test_recovery_writes_the_documented_sequence_in_order() -> None:
 @pytest.mark.parametrize("elapsed", [5.0, 15.0])
 def test_repeated_recovery_only_waits_for_the_register_interval(elapsed: float) -> None:
     async def run() -> None:
-        harness = Harness(values={"charging_current_ems": 16.0, "error_code": 200})
+        harness = Harness(error_code=200, values={"charging_current_ems": 16.0, "error_code": 200})
         control = await harness.connect()
         await control.async_recover_from_error()
         harness.clock[0] += elapsed
@@ -454,7 +456,7 @@ def test_repeated_recovery_only_waits_for_the_register_interval(elapsed: float) 
 
 def test_recovery_without_resuming_does_not_delay_a_later_pause() -> None:
     async def run() -> None:
-        harness = Harness(values={"charging_current_ems": 16.0})
+        harness = Harness(error_code=200, values={"charging_current_ems": 16.0})
         control = await harness.connect()
         await control.async_recover_from_error()
         harness.clock[0] += 15
@@ -466,7 +468,7 @@ def test_recovery_without_resuming_does_not_delay_a_later_pause() -> None:
 
 def test_recovery_of_a_resumed_charge_does_not_wait_five_minutes() -> None:
     async def run() -> None:
-        harness = Harness(values={"charging_current_ems": 1.0})
+        harness = Harness(error_code=200, values={"charging_current_ems": 1.0})
         control = await harness.connect()
         await control.async_resume_charging()
         harness.snapshot = WallboxData(values={"charging_current_ems": 16.0})
@@ -480,7 +482,7 @@ def test_recovery_of_a_resumed_charge_does_not_wait_five_minutes() -> None:
 
 def test_recovery_that_resumes_a_pause_obeys_and_restarts_hysteresis() -> None:
     async def run() -> None:
-        harness = Harness(values={"charging_current_ems": 16.0})
+        harness = Harness(error_code=200, values={"charging_current_ems": 16.0})
         control = await harness.connect()
         await control.async_pause_charging()
         harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
@@ -537,7 +539,7 @@ def test_restart_writes_the_magic_value_when_idle() -> None:
 
 
 def test_read_only_mode_refuses_every_write() -> None:
-    harness = Harness(read_only=True, values={"evse_state": EvseState.IDLE})
+    harness = Harness(error_code=200, read_only=True, values={"evse_state": EvseState.IDLE})
 
     async def run() -> None:
         control = await harness.connect()
@@ -591,7 +593,7 @@ def test_a_setpoint_change_does_not_block_the_pause_switch() -> None:
     """The five-second register floor must not borrow the five-minute one.
 
     Both rules used to be keyed on the register, so moving the slider made
-    the pause switch refuse for the next five minutes.
+    the pause switch refuse for the next five seconds.
     """
 
     harness = Harness(clock=[1000.0])
@@ -632,7 +634,7 @@ def test_a_setpoint_change_cannot_undo_a_pause_early() -> None:
 @pytest.mark.parametrize("missing", [None, float("nan"), "invalid", "old_snapshot"])
 @pytest.mark.parametrize("command", ["current", "unlimited", "recovery"])
 def test_lost_or_old_readback_cannot_lift_a_confirmed_pause(missing, command):
-    harness = Harness(values={"charging_current_ems": 8.0})
+    harness = Harness(error_code=200, values={"charging_current_ems": 8.0})
 
     async def run():
         control = await harness.connect()
@@ -845,7 +847,7 @@ def test_deferred_zero_preserves_the_write_floor_and_replaces_a_pending_limit() 
 
 def test_recovery_cannot_bypass_the_current_write_interval() -> None:
     async def run() -> None:
-        harness = Harness()
+        harness = Harness(error_code=200, )
         control = await harness.connect()
         await control.async_set_charging_current(6)
         harness.transport.bank[R.CHARGING_RELEASE.address] = 0

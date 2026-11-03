@@ -349,6 +349,12 @@
     },
     "restart_state_unknown": {
       "message": "The current charging state could not be confirmed. No restart was requested. Check the connection and try again."
+    },
+    "recovery_not_applicable": {
+      "message": "The wallbox reports an error other than heartbeat error 200. No recovery commands were sent."
+    },
+    "recovery_state_unknown": {
+      "message": "The current error or charging-current state could not be confirmed. No recovery commands were sent."
     }
   },
   "issues": {
@@ -360,7 +366,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "The wallbox reports error 200: it did not receive an energy-manager heartbeat in time and will not start a charging session. Fixing this issue writes the documented recovery sequence (heartbeat, charging release, charging current). Confirming writes the heartbeat, the charging release and the charging-current limit, in that order.",
+            "description": "The wallbox reports error 200 after a missing heartbeat. In Modbus master mode, automatic recovery runs when heartbeat delivery resumes, unless charging is paused or the wallbox is locked. Confirm to try manual recovery: this writes the heartbeat, charging release and a current limit of at least 6 A, and can resume charging. A resolved issue closes without sending commands.",
             "title": "Wallbox lost the energy-manager heartbeat"
           }
         },

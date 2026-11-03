@@ -36,6 +36,7 @@ from .const import (
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_UNLIMITED,
     CHARGING_PAUSE_CURRENT,
+    ERROR_CODE_EMS_UNAVAILABLE,
     HEARTBEAT_VALUE,
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
     MIN_PAUSE_RESUME_INTERVAL_SECONDS,
@@ -48,6 +49,7 @@ from .exceptions import home_assistant_error, service_validation_error
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
+    ERROR_CODE,
     EVSE_STATE,
     HEARTBEAT,
     LOCK_EVSE,
@@ -260,7 +262,7 @@ class AmtronControl:
                 "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
             ) from err
 
-    async def async_recover_from_error(self) -> None:
+    async def async_recover_from_error(self, *, automatic: bool = False) -> bool:
         """Run the documented recovery sequence for error state 200.
 
         The specification requires 0x0D00, 0x0D05 and 0x0302 to be written,
@@ -269,6 +271,21 @@ class AmtronControl:
 
         self._require_write_access()
         async with self._current_lock:
+            try:
+                error = await self._client.async_read_register(ERROR_CODE)
+                if error == 0:
+                    return False
+                if error != ERROR_CODE_EMS_UNAVAILABLE:
+                    raise service_validation_error("recovery_not_applicable")
+                current = await self._client.async_read_register(CHARGING_CURRENT_EMS)
+                locked = await self._client.async_read_register(LOCK_EVSE) if automatic else 0
+            except AmtronBusError as err:
+                raise service_validation_error("recovery_state_unknown") from err
+            if not isinstance(current, (int, float)) or not math.isfinite(current) or current < 0:
+                raise service_validation_error("recovery_state_unknown")
+            # Restoring communication must never undo a deliberate pause/lock.
+            if automatic and (0 < current < CHARGING_CURRENT_MINIMUM or locked != 0):
+                return False
             # Refuse known cooldowns before changing charging release. The
             # final current write still rechecks after the awaited bus calls.
             if self.is_paused is not False:
@@ -285,7 +302,13 @@ class AmtronControl:
                 raise service_validation_error(
                     "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
                 ) from err
-            target = self.charging_setpoint or self.max_charging_current
+            remembered = self.charging_setpoint
+            if current >= CHARGING_CURRENT_MINIMUM:
+                target = min(current, remembered) if remembered is not None and remembered >= CHARGING_CURRENT_MINIMUM else current
+            elif remembered is not None:
+                target = remembered
+            else:
+                target = CHARGING_CURRENT_UNLIMITED if current == 0 else CHARGING_CURRENT_MINIMUM
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
             await self._async_write(CHARGING_RELEASE, 1)
@@ -296,8 +319,13 @@ class AmtronControl:
                 mode_change=self.is_paused is not False,
                 defer=False,
             )
+            if automatic and target == CHARGING_CURRENT_UNLIMITED:
+                # The recovery sequence needs >=6 A. Restore unlimited through
+                # the existing replaceable queue after its five-second floor.
+                await self._async_request_current_locked(0, mode_change=False)
         self._diagnostics.recoveries += 1
         self._diagnostics.timeline.record(EventType.RECOVERY_COMPLETED)
+        return True
 
     async def async_restart(self) -> None:
         """Restart the wallbox through 0x0D19, which needs the idle state."""

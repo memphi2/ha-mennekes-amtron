@@ -349,6 +349,12 @@
     },
     "restart_state_unknown": {
       "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurde kein Neustart ausgelöst. Prüfe die Verbindung und versuche es erneut."
+    },
+    "recovery_not_applicable": {
+      "message": "Die Wallbox meldet einen anderen Fehler als den Heartbeat-Fehler 200. Es wurden keine Wiederherstellungsbefehle gesendet."
+    },
+    "recovery_state_unknown": {
+      "message": "Der aktuelle Fehler- oder Stromzustand konnte nicht bestätigt werden. Es wurden keine Wiederherstellungsbefehle gesendet."
     }
   },
   "issues": {
@@ -360,7 +366,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Die Wallbox meldet Fehler 200: Sie hat nicht rechtzeitig einen Heartbeat des Energiemanagers erhalten und startet keinen Ladevorgang. Das Beheben schreibt die dokumentierte Wiederherstellungssequenz (Heartbeat, Ladefreigabe, Ladestrom). Mit dem Bestätigen werden Heartbeat, Ladefreigabe und Ladestrom-Begrenzung in dieser Reihenfolge geschrieben.",
+            "description": "Die Wallbox meldet Fehler 200 nach einem ausgebliebenen Heartbeat. Im Modbus-Master-Modus läuft die Wiederherstellung automatisch, sobald der Heartbeat wieder ankommt, sofern das Laden nicht pausiert oder die Wallbox gesperrt ist. Mit dem Bestätigen startest du einen manuellen Versuch: Heartbeat, Ladefreigabe und mindestens 6 A werden geschrieben; das Laden kann dabei fortgesetzt werden. Ein bereits behobener Fehler wird ohne weitere Befehle geschlossen.",
             "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
           }
         },

@@ -17,7 +17,7 @@ from tests.ha_fakes import build_runtime
 @pytest.mark.parametrize("command", ["current", "unlimited", "recovery"])
 def test_poll_finishing_after_pause_cannot_resume_early(outcome, command):
     async def run():
-        _, entry, transport = await build_runtime(bank=device_bank(charging_current=8))
+        _, entry, transport = await build_runtime(bank=device_bank(charging_current=8, error_code=200))
         runtime = entry.runtime_data
         control, client, coordinator = runtime.control, runtime.client, runtime.coordinator
         clock = [1000.0]
@@ -52,7 +52,7 @@ def test_poll_finishing_after_pause_cannot_resume_early(outcome, command):
                 with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError):
                     await control.async_pause_charging()
                 transport.write_registers = original_write
-            clock[0] += 6
+            clock[0] += 4
             finish_poll.set()
             coordinator.data = await poll
             assert coordinator.data.get("charging_current_ems") == 8
@@ -61,7 +61,7 @@ def test_poll_finishing_after_pause_cannot_resume_early(outcome, command):
                       control.async_set_charging_current(0 if command == "unlimited" else 12, allow_unlimited=True))
             with pytest.raises(ServiceValidationError) as limited:
                 await action
-            assert limited.value.translation_placeholders == {"seconds": "294"}
+            assert limited.value.translation_placeholders == {"seconds": "1"}
             assert len([w for w in transport.writes if w[0] == R.CHARGING_CURRENT_EMS.address]) == 1
             # A later poll can still report an actual external state change.
             client.async_read_block = original_read

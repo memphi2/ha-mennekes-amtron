@@ -21,6 +21,7 @@ write_state.py        shared write guards retained across entry reloads
 identity.py           the read-once device facts
 coordinator.py        the poll
 heartbeat.py          the heartbeat task
+recovery.py           bounded recovery of a confirmed heartbeat fault
 control.py            the only write path
 exceptions.py         translated Home Assistant errors
 entity.py             entity base: unique id, device info, availability
@@ -94,9 +95,20 @@ After a failed heartbeat, its task uses a one-second retry interval, still
 subtracting the time spent on the failed attempt. Once delivery succeeds it
 returns to five seconds. This avoids spending the entire ten-second deadline
 on one brief disconnect. Only the heartbeat's fixed, idempotent value receives
-this treatment; control writes retain their existing intervals and are never
-automatically replayed. Repeated failures produce one failure event until
+this treatment; control writes retain their existing intervals. Repeated failures produce one failure event until
 recovery, rather than growing the event history on every retry.
+
+The recovery worker subscribes to heartbeat health and coordinator changes.
+It runs only for a confirmed error 200, healthy heartbeat delivery and an
+unpaused, unlocked device in master mode. It reads the error, current and
+lock again under the current-command lock, then uses the normal write path.
+The live limit is never increased to a missing/default saved setpoint. Zero
+is restored through the replaceable current queue after the required >=6 A
+recovery write. New user commands can supersede that queued restoration.
+At most three attempts are made per persistent fault, 30 seconds apart;
+current-write cooldowns delay attempts without consuming the budget. A
+confirmed error-free poll resets the budget. Entry unload cancels the task,
+retry timer and both listeners. Healthy operation adds no polling or states.
 
 ### One choke point for writes
 

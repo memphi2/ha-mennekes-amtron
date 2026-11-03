@@ -8,6 +8,7 @@ from homeassistant.exceptions import ServiceValidationError
 from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu.button import async_setup_entry
 from custom_components.mennekes_amtron_rtu.enums import EvseState
+from tests.fakes import device_bank
 from tests.ha_fakes import build_runtime, collect
 
 
@@ -20,7 +21,7 @@ async def _buttons(**kwargs: object):
 
 def test_the_recover_button_writes_the_documented_sequence() -> None:
     async def run() -> None:
-        buttons, _entry, transport = await _buttons()
+        buttons, _entry, transport = await _buttons(bank=device_bank(error_code=200))
         await buttons["recover_from_error"].async_press()
         assert [address for address, _ in transport.writes] == [
             R.HEARTBEAT.address,

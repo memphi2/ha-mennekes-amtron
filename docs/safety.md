@@ -118,6 +118,12 @@ option 2. Even there:
 
 ## Error recovery
 
+In master mode, a confirmed error 200 triggers automatic recovery once the
+heartbeat is healthy. It respects a pause and device lock, keeps the live
+current limit or a lower remembered limit, and restores unlimited mode after
+the required temporary 6 A recovery write. At most three attempts are made
+while the fault persists. The manual recovery button can lift a pause.
+
 Recovery checks known current-write and pause/resume cooldowns before sending
 its heartbeat/release/current sequence. A cooldown rejection therefore does
 not change the charging release. A transport failure during the sequence can

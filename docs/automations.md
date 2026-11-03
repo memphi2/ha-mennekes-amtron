@@ -1,7 +1,7 @@
 # Automations
 
-Start with the four [bundled blueprints](blueprints.md) for PV charging,
-heartbeat recovery and downgrade notifications. They appear in Home Assistant
+Start with the [bundled blueprints](blueprints.md) for PV charging and
+downgrade notifications. They appear in Home Assistant
 after you add the wallbox and need no YAML editing.
 
 Use one control strategy at a time. A PV automation and a tariff schedule can
@@ -87,9 +87,10 @@ See [Phase switching](user-guide.md#phase-switching).
 
 ## Recovery and notifications
 
-Use **Recover from a lost heartbeat** for error 200. Recovery writes the
-heartbeat, charging release and current, so it can resume charging. If recovery
-keeps firing, disable the automation and investigate
+Error 200 is recovered automatically in master mode. Disable any older
+**Recover from a lost heartbeat** automation to avoid duplicate attempts.
+The blueprint remains available for existing installations, but its manual
+button action can lift a deliberate pause. If the error returns, investigate
 [heartbeat failures](troubleshooting.md#error-200-energy-manager-unavailable).
 Repeated recovery is not a substitute for a functioning connection.
 

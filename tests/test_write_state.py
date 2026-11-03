@@ -30,7 +30,7 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         clock = [1000.0]
         hass = FakeHass()
         entry = FakeConfigEntry(options={"control_mode": CONTROL_MODE_MASTER})
-        transport = FakeModbusClient(device_bank(charging_current=initial))
+        transport = FakeModbusClient(device_bank(charging_current=initial, error_code=200))
 
         def factory(config, **kwargs):
             return MennekesModbusClient(config, client_factory=lambda _: transport,
@@ -73,7 +73,7 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         assert error.value.translation_placeholders == {"seconds": "3"}
         clock[0] += 3
         await getattr(runtime.control, resume_action)()
-        expected = new_cap or initial or 16
+        expected = new_cap or initial or 6
         if initial == 0 and resume_action == "async_resume_charging":
             expected = 0
         assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == expected

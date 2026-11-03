@@ -1,6 +1,10 @@
 blueprint:
   name: MENNEKES AMTRON - recover from a lost heartbeat
   description: >-
+    Legacy automation: the integration now recovers error 200 automatically
+    in master mode. Disable this automation to avoid duplicate attempts.
+    Unlike built-in recovery, this manual-button action can lift a pause.
+
     Presses the recovery button when the wallbox reports that the energy
     manager is unavailable.
 
@@ -9,8 +13,8 @@ blueprint:
     release and the charging current have been written again. The recovery
     button writes exactly that sequence.
 
-    If this fires regularly, the serial link is dropping frames. Fix the bus
-    instead of papering over it: see docs/troubleshooting.md.
+    If the fault returns, investigate restarts, delayed heartbeat writes and
+    bus failures: see docs/troubleshooting.md.
   domain: automation
   homeassistant:
     min_version: "2026.9.0"
