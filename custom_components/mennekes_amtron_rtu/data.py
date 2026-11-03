@@ -58,6 +58,7 @@ class WriteDiagnostics:
     heartbeats_late: int = 0
     writes_sent: int = 0
     writes_rejected: int = 0
+    write_errors: set[str] = field(default_factory=set)
     writes_rate_limited: int = 0
     recoveries: int = 0
     last_error: str | None = None

@@ -363,6 +363,14 @@
             "description": "Die Wallbox meldet Fehler 200: Sie hat nicht rechtzeitig einen Heartbeat des Energiemanagers erhalten und startet keinen Ladevorgang. Das Beheben schreibt die dokumentierte Wiederherstellungssequenz (Heartbeat, Ladefreigabe, Ladestrom). Mit dem Bestätigen werden Heartbeat, Ladefreigabe und Ladestrom-Begrenzung in dieser Reihenfolge geschrieben.",
             "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
           }
+        },
+        "error": {
+          "entry_unavailable": "Die Integration ist nicht geladen. Stelle zuerst die Verbindung wieder her.",
+          "different_error": "Die Wallbox meldet einen anderen Fehler. Die Heartbeat-Wiederherstellung setzt diesen nicht zurück.",
+          "read_only": "Aktiviere zuerst den Modbus-Master-Modus, um die Wiederherstellung auszuführen.",
+          "write_rate_limited": "Der Mindestabstand seit einem vorherigen Befehl ist noch nicht abgelaufen. Warte kurz und versuche es erneut.",
+          "recovery_failed": "Die Wiederherstellung konnte nicht bestätigt werden. Prüfe die Verbindung und versuche es erneut.",
+          "still_active": "Die Wiederherstellungsbefehle wurden gesendet, die Wallbox meldet aber noch einen Fehler. Warte auf die Statusaktualisierung; prüfe bei anhaltendem Fehler die Verbindung."
         }
       },
       "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
@@ -372,7 +380,7 @@
       "title": "Wallbox nutzt ein älteres Modbus-Register-Layout"
     },
     "write_rejected": {
-      "description": "Die Wallbox hat einen Schreibzugriff abgelehnt. Prüfe, ob sie als Modbus-Satellite konfiguriert ist: Die DIP-Schalter 4 und 5 auf Bank S1 müssen auf ON stehen und die Wallbox muss danach neu gestartet werden.",
+      "description": "Ein Schreibzugriff wurde nicht bestätigt. Prüfe die serielle Verbindung und die Satellite-Konfiguration der Wallbox. Die Meldung verschwindet nach einem erfolgreichen Zugriff auf den betroffenen Befehl. Frühere Fehler bleiben im Diagnosezähler erhalten.",
       "title": "Wallbox hat einen Schreibzugriff abgelehnt"
     }
   },

@@ -80,6 +80,7 @@ async def async_get_config_entry_diagnostics(
             "heartbeats_late": runtime_data.diagnostics.heartbeats_late,
             "writes_sent": runtime_data.diagnostics.writes_sent,
             "writes_rejected": runtime_data.diagnostics.writes_rejected,
+            "unresolved_write_errors": sorted(runtime_data.diagnostics.write_errors),
             "writes_rate_limited": runtime_data.diagnostics.writes_rate_limited,
             "recoveries": runtime_data.diagnostics.recoveries,
             "last_error": runtime_data.diagnostics.last_error,

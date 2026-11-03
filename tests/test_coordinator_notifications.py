@@ -84,6 +84,13 @@ def test_identical_polls_are_quiet_but_changes_failures_and_repairs_are_visible(
                 assert (DOMAIN, f"{entry.entry_id}_write_rejected") in issues
                 assert notifications == [True, True, False, True]
                 assert entry.runtime_data.diagnostics.timeline.snapshot()[-1]["event"] == "write_rejected"
+                # A different successful command must not hide the failed one.
+                await entry.runtime_data.control.async_set_lock_evse(False)
+                assert (DOMAIN, f"{entry.entry_id}_write_rejected") in issues
+                transport.write_exceptions.clear()
+                await entry.runtime_data.control.async_set_charging_release(True)
+                assert (DOMAIN, f"{entry.entry_id}_write_rejected") not in issues
+                assert entry.runtime_data.diagnostics.writes_rejected == 1
                 remove()
             finally:
                 await hass.async_stop()

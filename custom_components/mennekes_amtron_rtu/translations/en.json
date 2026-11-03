@@ -363,6 +363,14 @@
             "description": "The wallbox reports error 200: it did not receive an energy-manager heartbeat in time and will not start a charging session. Fixing this issue writes the documented recovery sequence (heartbeat, charging release, charging current). Confirming writes the heartbeat, the charging release and the charging-current limit, in that order.",
             "title": "Wallbox lost the energy-manager heartbeat"
           }
+        },
+        "error": {
+          "entry_unavailable": "The integration is not loaded. Restore its connection before retrying.",
+          "different_error": "The wallbox reports a different error. Heartbeat recovery does not reset that error.",
+          "read_only": "Enable Modbus master mode before requesting recovery.",
+          "write_rate_limited": "A recent command is still inside its minimum write interval. Wait briefly and try again.",
+          "recovery_failed": "The recovery could not be confirmed. Check the connection and retry.",
+          "still_active": "The recovery commands were sent, but the wallbox still reports an error. Wait for its status to update; check the connection if the error persists."
         }
       },
       "title": "Wallbox lost the energy-manager heartbeat"
@@ -372,7 +380,7 @@
       "title": "Wallbox uses an older Modbus register layout"
     },
     "write_rejected": {
-      "description": "The wallbox rejected a write. Check that it is configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 have to be on, and the wallbox has to be restarted afterwards.",
+      "description": "A write was not confirmed. Check the serial connection and the wallbox satellite configuration. This issue clears after the affected command succeeds. Historical failures remain in the diagnostic counter.",
       "title": "Wallbox refused a write"
     }
   },

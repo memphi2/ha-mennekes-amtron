@@ -491,6 +491,8 @@ class AmtronControl:
         except AmtronBusError as err:
             self._diagnostics.timeline.record(EventType.WRITE_REJECTED, register=spec.address)
             self._diagnostics.writes_rejected += 1
+            if spec != HEARTBEAT:
+                self._diagnostics.write_errors.add(spec.key)
             self._diagnostics.last_error = str(err)
             if self._notify_write_error is not None:
                 self._notify_write_error()
@@ -498,6 +500,10 @@ class AmtronControl:
                 "write_failed", {"register": spec.key, "error": str(err)}
             ) from err
         self._diagnostics.writes_sent += 1
+        if spec.key in self._diagnostics.write_errors:
+            self._diagnostics.write_errors.remove(spec.key)
+            if self._notify_write_error is not None:
+                self._notify_write_error()
         if refresh and self._request_refresh is not None:
             await self._request_refresh()
 

@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   missed ten-second acknowledgement deadline or stopped task independently
   of polling, without per-heartbeat Recorder updates.
 
+### Fixed
+
+- Clear write repair issues when the affected command succeeds, while retaining
+  historical diagnostic counters. Repair dialogs now handle connection errors,
+  write cooldowns and read-only mode explicitly, verify recovery and close
+  already-resolved heartbeat issues without sending more commands.
+
 ### Changed
 
 - Allow pause and resume after the five-second current-write interval instead
