@@ -20,7 +20,9 @@ verify exclusive port release and zero descriptor growth.
 
 `scripts/check_runtime_soak.py` defines the growth budgets. Measurements compare
 equivalent phases; unloaded entries must leave no owned tasks, listeners or
-open clients. A successful subprocess without a valid report cannot pass.
+open clients. Listener counts must not grow in any measured phase after warmup,
+including continuous operation; a temporary peak also fails the check.
+A successful subprocess without a valid report cannot pass.
 CI runs 30 cycles, while the ordinary suite uses three for a quicker regression
 check. The serial simulator also closes its relay threads and descriptors.
 This bounded stress test does not replace physical-wallbox validation, a

@@ -14,7 +14,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 LIMITS = {"integration_bytes": 512 * 1024, "traced_bytes": 8 * 1024**2,
-          "rss_bytes": 32 * 1024**2, "tasks": 2, "timers": 4, "fds": 2}
+          "rss_bytes": 32 * 1024**2, "tasks": 2, "timers": 4, "fds": 2,
+          "listeners": 0}
 PHASES = ("loaded", "recovered", "idle", "unloaded")
 
 

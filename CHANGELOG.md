@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Reject growing or missing listener counts in loaded and continuous soak
+  measurements, including peaks that disappear again before unload.
 - Check recovery cooldowns before writing heartbeat or charging release,
   so an already blocked current command cannot leave a partial recovery.
 - Confirm a fresh idle state before restarting the wallbox; missing, invalid
