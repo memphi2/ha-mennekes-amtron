@@ -107,10 +107,12 @@ its three registers in the documented order.
 
 ## What is still open
 
-Nothing in the quality scale. What is open is the device: no value in this
-integration has been measured against real hardware yet. The verification
-steps in [quickstart.md](quickstart.md) and [safety.md](safety.md) are what
-close that gap.
+The owner reported successful operation of the released integration on an
+Amtron 4You 310 11 C2 on 2026-11-03. This is a user report, without a firmware
+version or measurements for each feature; it does not cover subsequent code
+changes or other models. The [compatibility matrix](compatibility.md) tracks
+that scope. Use the verification steps in [quickstart.md](quickstart.md) and
+[safety.md](safety.md) when testing another installation or version.
 
 GitHub settings and published artifacts need separate live verification.
 On 2026-11-01 the required checks were verified to include the November

@@ -131,10 +131,13 @@ in any other state or when that fresh read fails or returns an unknown value.
 ## What is validated, and what is not
 
 Automated tests exercise real Home Assistant with simulated register data
-and a virtual Modbus RTU server, using the AMTRON 4You 310 11 C2 on layout
-v01.03 as the development target. **No physical-wallbox validation is claimed**,
-including for that model. The [compatibility audit](ha-2026-11-validation.md)
-records tested software versions and remaining checks.
+and a virtual Modbus RTU server, using the Amtron 4You 310 11 C2 on layout
+v01.03 as the development target. The owner reported successful operation of
+the released integration on that model on 2026-11-03. Firmware and a detailed
+test checklist were not supplied; this does not validate later development
+changes. See the [hardware-test scope and model matrix](compatibility.md).
+The [software compatibility audit](ha-2026-11-validation.md) records tested
+software versions and remaining checks.
 
 Entities are filtered by reported layout version and hardware capability.
 This reduces unsupported operations but does not establish correct behavior

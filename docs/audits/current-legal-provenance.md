@@ -132,8 +132,11 @@ other than documented placeholders; post-publication checks are separate.
 
 No public clone/similarity search, jurisdiction-specific clearance or legal
 opinion was performed. Static provenance checks cannot establish ownership
-of every contribution. Hardware behavior has not been verified on a physical
-wallbox; serial transport is tested through a virtual RTU bus. Synthetic
+of every contribution. The owner reported successful use of the released
+integration on an Amtron 4You 310 11 C2 on 2026-11-03; see the
+[hardware-test scope](../compatibility.md). This does not validate later
+development changes or other models. Automated serial transport checks use
+a virtual RTU bus. Synthetic
 Recorder replay, statistics and accelerated retention tests are not a
 wall-clock or disk-full soak test. Testing the minimum and latest stable HA
 does not guarantee compatibility with every intermediate or future release.

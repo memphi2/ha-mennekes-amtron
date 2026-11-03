@@ -60,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Record the owner's successful hardware test of the released integration on
+  Amtron 4You 310 11 C2 separately from automated and unreleased validation.
 - Exercise real serial transport reconnects, changing readings and delayed
   replies in the continuous soak; check maximum heartbeat gaps, not only totals.
 - Type the Modbus transport boundary and share write timing state across reloads.
