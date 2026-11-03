@@ -63,10 +63,12 @@ MIN_SCAN_INTERVAL_SECONDS: Final = 2
 MAX_SCAN_INTERVAL_SECONDS: Final = 300
 DEFAULT_MEASUREMENT_INTERVAL_SECONDS: Final = 30
 
-# Vendor rate limits: charging current not faster than every 5 s, and
-# pause/resume plus phase switching with hysteresis and intervals > 5 min.
+# Current commands, including pause/resume, share the five-second write floor.
+# The vendor's five-minute anti-cycling recommendation belongs in automation
+# hysteresis; phase switching retains its own conservative interval.
 MIN_CURRENT_WRITE_INTERVAL_SECONDS: Final = 5.0
-MIN_MODE_CHANGE_INTERVAL_SECONDS: Final = 300.0
+MIN_PAUSE_RESUME_INTERVAL_SECONDS: Final = 5.0
+MIN_PHASE_CHANGE_INTERVAL_SECONDS: Final = 300.0
 
 # 0x0302 semantics. 0 A means "no limitation" and makes the wallbox signal its
 # maximum, 0.01-5.99 A is the vendor's documented pause value.

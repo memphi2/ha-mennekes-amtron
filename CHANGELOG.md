@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- Allow pause and resume after the five-second current-write interval instead
+  of imposing a five-minute manual-control lockout. Phase switching keeps its
+  own five-minute guard; PV automation hysteresis retains its six-minute default.
+
 ## 0.4.0 — 2026-11-03
 
 ### Fixed

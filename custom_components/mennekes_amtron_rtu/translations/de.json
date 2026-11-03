@@ -339,7 +339,7 @@
       "message": "Das Schreiben von {register} an die Wallbox ist fehlgeschlagen: {error}"
     },
     "write_rate_limited": {
-      "message": "Die Wallbox akzeptiert diese Änderung erst in {seconds} s wieder. Der Hersteller verlangt für Pause, Fortsetzen und Phasenwechsel eine Hysterese und Abstände von mehr als fünf Minuten."
+      "message": "Diese Änderung ist in {seconds} s wieder möglich. Stromänderungen, Pause und Fortsetzen haben fünf Sekunden Mindestabstand; Phasenwechsel behalten fünf Minuten Abstand."
     },
     "phase_state_unknown": {
       "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurden keine Phasen umgeschaltet. Prüfe die Verbindung und versuche es erneut."

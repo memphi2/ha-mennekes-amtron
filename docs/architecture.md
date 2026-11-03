@@ -100,20 +100,16 @@ of them are dangerous. Centralising it means the minimum current, the
 `allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics
 counters are written once and cannot be forgotten by a new platform.
 
-The charging current is also the one write that is *deferred* rather than
-rejected when it comes too fast: a dragged slider should not fail. Pause,
-resume and phase switches are rejected instead, because the manufacturer asks
-for minutes of hysteresis there and silently queueing those would hide a bad
-automation.
+Current commands retain the newest pending value when requested inside the
+five-second register interval. Pause/resume commands are instead rejected
+with the short remaining wait, so an old deferred setpoint cannot silently
+undo a later pause. The manufacturer recommends longer anti-cycling hysteresis;
+that belongs in automation policy, and the bundled PV blueprint defaults to
+six minutes. Manual pause/resume no longer has a five-minute lockout.
 
-Two different rules meet on `0x0302`, and they are deliberately kept apart.
-Every write to it has to keep five seconds from the write before; that is a
-property of the register and lives in the client's rate limiter. Pausing and
-resuming need five minutes between them; that is a property of the
-*operation* and lives in `control.py`. Keying both on the register made the
-pause switch refuse for five minutes after any slider move, and let a pause
-be undone by a slider move six seconds later. A real limit written while the
-pause value is active counts as a resume, whatever the caller meant by it.
+Phase requests retain a separate five-minute interval. Both guards survive
+entry reloads, including uncertain write outcomes. A cold start applies five
+seconds to current and pause/resume, and five minutes to phase requests.
 
 ### Three polling cadences, and one of them is about the database
 

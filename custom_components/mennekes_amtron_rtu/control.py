@@ -38,7 +38,8 @@ from .const import (
     CHARGING_PAUSE_CURRENT,
     HEARTBEAT_VALUE,
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
-    MIN_MODE_CHANGE_INTERVAL_SECONDS,
+    MIN_PAUSE_RESUME_INTERVAL_SECONDS,
+    MIN_PHASE_CHANGE_INTERVAL_SECONDS,
     SYSTEM_RESTART_VALUE,
 )
 from .data import DeviceIdentity, WallboxData, WriteDiagnostics
@@ -188,7 +189,7 @@ class AmtronControl:
         # Every value this method accepts is either a real limit or the
         # explicit 0 A, and while the pause value is active both of them
         # resume the charge, whatever the caller meant by it. So they answer
-        # to the same hysteresis the pause switch does.
+        # to the same short write guard as the pause switch.
         await self._async_request_current(current)
 
     async def async_pause_charging(self) -> None:
@@ -241,7 +242,7 @@ class AmtronControl:
         try:
             async with self._current_lock:
                 self._client.check_write_interval(
-                    REQUESTED_PHASES, min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS
+                    REQUESTED_PHASES, min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS
                 )
                 state = await self._async_current_evse_state("phase_state_unknown")
                 if state == EvseState.CHARGING:
@@ -251,7 +252,7 @@ class AmtronControl:
                 await self._async_write(
                     REQUESTED_PHASES,
                     int(phases),
-                    min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS,
+                    min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
                 )
         except AmtronRateLimitedError as err:
             self._diagnostics.writes_rate_limited += 1
@@ -338,18 +339,14 @@ class AmtronControl:
     ) -> None:
         """Write 0x0302, deferring the write when it comes too fast.
 
-        Two different rules meet on this one register. Every write has to keep
-        the vendor's five-second distance; that is a property of the register
-        and lives in the client's rate limiter. Pausing and resuming need
-        minutes between them; that is a property of the operation and lives
-        here. Keying both on the register made a dragged slider block the
-        pause switch for five minutes, and let a pause be undone six seconds
-        later by a slider move.
+        Every write keeps the five-second distance enforced by the client.
+        The vendor's longer anti-cycling recommendation is implemented by
+        automation hysteresis, not a five-minute manual-control lockout.
 
         Rejecting a plain setpoint write would make a dragged slider fail, so
         the newest value is remembered and written once the interval passed. A
         mode change is reported back instead: it is a deliberate act, and
-        quietly performing it minutes later is worse than refusing it.
+        quietly performing it later would hide the user's actual pause state.
         """
 
         async with self._current_lock:
@@ -433,7 +430,7 @@ class AmtronControl:
         if self._write_state.mode_change_at is None:
             return 0.0
         waited = self._monotonic() - self._write_state.mode_change_at
-        return max(0.0, MIN_MODE_CHANGE_INTERVAL_SECONDS - waited)
+        return max(0.0, MIN_PAUSE_RESUME_INTERVAL_SECONDS - waited)
 
     def _ensure_flush_task(self) -> None:
         if self._flush_task is not None and not self._flush_task.done():

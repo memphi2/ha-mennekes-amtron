@@ -29,11 +29,13 @@ enable a limit again. Values between 0 and 6 A are rejected. Use
 
 Current requests closer than five seconds are deferred, with the newest
 accepted request taking precedence. Pause/resume requests inside the
-five-minute waiting interval are rejected with the remaining wait time;
-they are not queued for later. Allow more than five minutes in automations.
+five-second waiting interval are rejected with the remaining wait time;
+they are not queued for later. MENNEKES recommends more than five minutes
+between repeated pause/resume cycles; use hysteresis in automations. The
+bundled PV pause/resume blueprint defaults to six minutes.
 Timing guards survive an entry reload. After a full Home Assistant restart
-or the first setup, current writes wait five seconds and pause/resume and
-phase changes wait five minutes from setup. This protects the wallbox when
+or the first setup, current writes and pause/resume wait five seconds;
+phase changes still wait five minutes from setup. This protects the wallbox when
 the previous write history is unknown. Reading and the heartbeat continue.
 
 While paused, the current field shows the remembered setting, including 0

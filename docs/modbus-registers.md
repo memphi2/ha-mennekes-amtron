@@ -204,5 +204,7 @@ block.
   while the wallbox is idle.
 - **`0x1000`** is marked by the manufacturer as not usable for billing.
 - **Timing**: change the charging current no faster than every five seconds;
-  keep pauses, resumes and phase switches more than five minutes apart and use
-  hysteresis.
+  the manufacturer recommends keeping pauses, resumes and phase switches
+  more than five minutes apart with hysteresis. This recommendation is not a
+  protocol lockout. The integration retains a five-minute phase-switch guard
+  and a five-second write floor for pause/resume.

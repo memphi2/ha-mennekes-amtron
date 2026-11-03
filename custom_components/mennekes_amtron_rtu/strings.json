@@ -339,7 +339,7 @@
       "message": "Writing {register} to the wallbox failed: {error}"
     },
     "write_rate_limited": {
-      "message": "The wallbox accepts this change again in {seconds} s. The manufacturer asks for hysteresis and intervals of more than five minutes for pausing, resuming and phase switching."
+      "message": "This change is available again in {seconds} s. Current changes, pause and resume have a five-second minimum interval; phase changes retain a five-minute interval."
     },
     "phase_state_unknown": {
       "message": "The current charging state could not be confirmed. No phases were switched. Check the connection and try again."
