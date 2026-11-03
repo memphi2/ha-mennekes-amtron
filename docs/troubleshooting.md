@@ -103,6 +103,7 @@ limited feature coverage.
 | Observation | Check |
 |---|---|
 | A new setting is delayed | Current writes have a five-second floor. The latest accepted request is written after that interval. |
+| Pause/resume or phase switching is refused just after startup | After a full HA restart or first setup, these commands wait five minutes because previous timing is unknown. The error reports the remaining wait. Entry reloads preserve the existing guard. |
 | The offered current is lower than requested | Wallbox/installation limits and an active downgrade can lower **Signaled current**. The vehicle can draw less again. |
 | A current change is rejected while paused | A normal current command would resume charging and must respect the pause/resume interval. Switching the pause control off obeys the same interval; it is not a bypass. |
 | The slider shows a value while charging is paused | It shows the remembered setpoint, not actual current. Check **Charging paused**, **Signaled current** and **Total power**. |

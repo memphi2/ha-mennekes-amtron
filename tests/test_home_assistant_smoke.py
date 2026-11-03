@@ -219,6 +219,10 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
                 blocking=True,
             )
             await hass.async_block_till_done()
+            if pending := entry.runtime_data.control._flush_task:
+                await pending
+            await entry.runtime_data.coordinator.async_refresh()
+            await hass.async_block_till_done()
             assert hass.states.get(number).state == "10.0"
 
             # Reconfiguring starts from the entry, not from the factory values.
@@ -458,6 +462,10 @@ def test_the_bundled_blueprints_run_as_automations(
             )
             await hass.async_block_till_done()
             await asyncio.sleep(0.5)
+            await hass.async_block_till_done()
+            if pending := entry.runtime_data.control._flush_task:
+                await pending
+            await entry.runtime_data.coordinator.async_refresh()
             await hass.async_block_till_done()
             # 5000 W / 230 V / 3 phases, through a float32 register
             assert float(hass.states.get(number).state) == pytest.approx(7.2)

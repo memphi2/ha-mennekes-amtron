@@ -91,7 +91,7 @@ class AmtronControl:
         self._pending_current: float | None = None
         self._current_lock = asyncio.Lock()
         self._flush_task: asyncio.Task[None] | None = None
-        self._mode_change_at: float | None = None
+        self._write_state = client.write_state
         self.charging_setpoint: float | None = None
 
     @property
@@ -360,16 +360,16 @@ class AmtronControl:
         ):
             self.charging_setpoint = float(previous)
         if mode_change:
-            self._mode_change_at = self._monotonic()
+            self._write_state.mode_change_at = self._monotonic()
         if self._request_refresh is not None:
             await self._request_refresh()
 
     def _mode_change_remaining(self) -> float:
         """Return the seconds left of the pause and resume hysteresis."""
 
-        if self._mode_change_at is None:
+        if self._write_state.mode_change_at is None:
             return 0.0
-        waited = self._monotonic() - self._mode_change_at
+        waited = self._monotonic() - self._write_state.mode_change_at
         return max(0.0, MIN_MODE_CHANGE_INTERVAL_SECONDS - waited)
 
     def _ensure_flush_task(self) -> None:

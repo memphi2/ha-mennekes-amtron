@@ -43,6 +43,7 @@ from .const import (
 from .decode import RegisterValue, decode_register
 from .register_blocks import RegisterBlock
 from .registers import RegisterSpec
+from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -95,6 +96,7 @@ class MennekesModbusClient:
         *,
         client_factory: ClientFactory = create_serial_client,
         monotonic: Callable[[], float] = time.monotonic,
+        write_state: WriteState | None = None,
     ) -> None:
         self._config = config
         self._client_factory = client_factory
@@ -106,7 +108,8 @@ class MennekesModbusClient:
         # skips the gate: it is the one transaction with a deadline, and
         # queueing it behind every reader is how it misses that deadline.
         self._queue = asyncio.Lock()
-        self._rate_limiter = _client_write.WriteRateLimiter()
+        self.write_state = write_state if write_state is not None else WriteState()
+        self._rate_limiter = self.write_state.limiter
 
     @property
     def config(self) -> SerialConfig:

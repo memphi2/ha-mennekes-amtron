@@ -29,8 +29,10 @@ Current requests closer than five seconds are deferred, with the newest
 accepted request taking precedence. Pause/resume requests inside the
 five-minute waiting interval are rejected with the remaining wait time;
 they are not queued for later. Allow more than five minutes in automations.
-The timing guards restart when the entry reloads, so do not use a reload to
-bypass a waiting interval.
+Timing guards survive an entry reload. After a full Home Assistant restart
+or the first setup, current writes wait five seconds and pause/resume and
+phase changes wait five minutes from setup. This protects the wallbox when
+the previous write history is unknown. Reading and the heartbeat continue.
 
 While paused, the slider shows the remembered setpoint, not a measured
 current. The integration restores that setpoint when available after a

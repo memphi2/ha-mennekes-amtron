@@ -35,8 +35,8 @@ from tests.ha_fakes import FakeConfigEntry, FakeHass
 
 
 def _patch_client(monkeypatch: pytest.MonkeyPatch, transport: FakeModbusClient) -> None:
-    def factory(config: object) -> MennekesModbusClient:
-        return MennekesModbusClient(config, client_factory=lambda _c: transport)
+    def factory(config: object, **kwargs) -> MennekesModbusClient:
+        return MennekesModbusClient(config, client_factory=lambda _c: transport, **kwargs)
 
     monkeypatch.setattr(integration, "MennekesModbusClient", factory)
 
