@@ -22,14 +22,15 @@ from tests.test_init import _patch_issues
 
 @pytest.mark.parametrize("resume_action", ["async_resume_charging", "async_recover_from_error"])
 @pytest.mark.parametrize("new_cap", [None, 6])
+@pytest.mark.parametrize("initial", [0, 8])
 def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
-    monkeypatch, resume_action, new_cap
+    monkeypatch, resume_action, new_cap, initial
 ):
     async def run():
         clock = [1000.0]
         hass = FakeHass()
         entry = FakeConfigEntry(options={"control_mode": CONTROL_MODE_MASTER})
-        transport = FakeModbusClient(device_bank(charging_current=8))
+        transport = FakeModbusClient(device_bank(charging_current=initial))
 
         def factory(config, **kwargs):
             return MennekesModbusClient(config, client_factory=lambda _: transport,
@@ -51,7 +52,7 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
 
         clock[0] += 300
         await runtime.control.async_pause_charging()
-        assert runtime.control.charging_setpoint == 8
+        assert runtime.control.charging_setpoint == initial
         state = runtime.client.write_state
         assert await integration.async_unload_entry(hass, entry)
         if new_cap is not None:
@@ -62,7 +63,7 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         runtime.control._monotonic = lambda: clock[0]
         runtime.control._request_refresh = None
         assert runtime.client.write_state is state
-        assert runtime.control.charging_setpoint == 8
+        assert runtime.control.charging_setpoint == initial
         with pytest.raises(AmtronRateLimitedError):
             await runtime.client.async_write_register(R.CHARGING_CURRENT_EMS, 8, min_interval=5)
         clock[0] += 5
@@ -72,7 +73,10 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         assert error.value.translation_placeholders == {"seconds": "294"}
         clock[0] += 294
         await getattr(runtime.control, resume_action)()
-        assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == (new_cap or 8)
+        expected = new_cap or initial or 16
+        if initial == 0 and resume_action == "async_resume_charging":
+            expected = 0
+        assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == expected
         assert await integration.async_unload_entry(hass, entry)
         monkeypatch.setattr(integration.ir, "async_get", lambda _: SimpleNamespace(issues={}))
         await integration.async_remove_entry(hass, entry)

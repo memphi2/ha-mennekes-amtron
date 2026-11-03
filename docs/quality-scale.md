@@ -99,8 +99,9 @@ those results, rather than a hard-coded zero-miss claim, are the evidence.
 
 Coverage is not the claim, though. The tests that matter are the ones that
 pin the device's dangerous semantics: that `0x0302` can never be written with
-0 A without an explicit opt-in, that the invalid 0.01-5.99 A band is refused
-even with it, that the heartbeat keeps running while the poll fails, that the
+0 A through a direct action without an explicit opt-in, that the number input
+accepts 0 for no limit while the invalid 0.01-5.99 A band is refused, that the
+heartbeat keeps running while the poll fails, that the
 bus lock serializes every transaction, and that the recovery sequence writes
 its three registers in the documented order.
 

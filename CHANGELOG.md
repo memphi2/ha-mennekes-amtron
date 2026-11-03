@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Allow 0 A in the charging-current number input to disable the EMS limit;
+  display unlimited mode as 0 and preserve it across pause/resume and reloads.
+  Reject values between 0 and 6 A and retain write and pause/resume guards.
 - Recognize all documented variants of the three supported RTU families,
   with a sourced model matrix and a separate user-reported hardware-test status.
 - Run the continuous serial soak with real SQLite Recorder: measure row and

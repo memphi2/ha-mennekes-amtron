@@ -73,10 +73,12 @@ restart has a defined outcome. The integration raises a repair issue when
 | `0.01 … 5.99` | Invalid — signals 0 A, the documented way to pause |
 | `≥ 6` | A real limit, clamped to the wallbox's own maximum |
 
-A naive `number` entity with `min: 0` therefore requests *full load* when
-dragged to zero. The number entity in this integration starts at 6 A, pausing
-has its own switch, and 0 A can only be written through the
-`mennekes_amtron_rtu.set_charging_current` action with `allow_unlimited: true`.
+The **Charging current limit** number input accepts 0 A to deliberately
+disable the EMS limit. It displays 0 while unlimited; 6 A or more enables a
+limit again. The invalid band between 0 and 6 A is rejected. Pausing has its
+own switch. Direct `mennekes_amtron_rtu.set_charging_current` action calls
+still require `allow_unlimited: true` for 0 A. Unlimited mode also bypasses
+the integration's extra current cap, while hardware limits remain in force.
 
 ## Manufacturer rate limits
 

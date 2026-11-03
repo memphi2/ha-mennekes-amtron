@@ -42,7 +42,7 @@ For HACS on HA 2026.9/2026.10, updates or an existing installation, see
 
 | Task | Control or guide |
 |---|---|
-| Set the charging current | **Charging current limit**, from 6 A to the configured cap |
+| Set the charging current | **Charging current limit**: 0 A disables the limit; 6 A up to the configured cap sets a limit |
 | Pause or resume charging | **Charging paused**; resume follows the required waiting interval |
 | Track consumption | **Total energy** in the Energy dashboard |
 | Charge from PV surplus | [PV blueprints](docs/blueprints.md) |

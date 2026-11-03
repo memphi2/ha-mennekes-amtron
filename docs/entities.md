@@ -86,7 +86,7 @@ Only in **Modbus master** mode.
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
-| `number.*_charging_current_limit` | Charging current limit | always | The charging-current limit sent to the wallbox. Starts at 6 A and never goes lower; pausing and "no limit" have their own controls. |
+| `number.*_charging_current_limit` | Charging current limit | always | Enter 0 A for no limit, or 6 A up to the configured cap for a limit. Values between 0 and 6 A are rejected. Use the pause switch to stop charging. |
 | `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. |
 | `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. |
 | `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |

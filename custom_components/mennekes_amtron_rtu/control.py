@@ -8,9 +8,8 @@ of them are dangerous.
     0.01 - 5.99  invalid -- the wallbox signals 0 A, the documented pause
     >= 6         a real charging-current limit
 
-A plain number entity with ``min: 0`` would therefore request full load when
-a user drags the slider to zero. The only way to reach either special value
-is an explicitly named call below.
+The current-limit input explicitly accepts zero as "limit off". Direct action
+calls require allow_unlimited; pausing uses the dedicated pause command.
 """
 
 from __future__ import annotations
@@ -175,10 +174,7 @@ class AmtronControl:
         if current == CHARGING_CURRENT_UNLIMITED:
             if not allow_unlimited:
                 raise service_validation_error("charging_current_zero")
-            _LOGGER.warning(
-                "Writing 0 A to 0x0302: the wallbox will signal its maximum "
-                "current, not a charging stop"
-            )
+            _LOGGER.info("Disabling the EMS current limit (0 A)")
         elif not math.isfinite(current) or current < CHARGING_CURRENT_MINIMUM:
             raise service_validation_error(
                 "charging_current_invalid",
@@ -205,11 +201,13 @@ class AmtronControl:
         """Resume charging with the setpoint that was active before the pause."""
 
         self._require_write_access()
-        target = self.charging_setpoint or self.max_charging_current
-        await self._async_request_current(
-            max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current)),
-            mode_change=True,
-        )
+        async with self._current_lock:
+            target = self.charging_setpoint
+            if target is None:
+                target = self.max_charging_current
+            elif target != CHARGING_CURRENT_UNLIMITED:
+                target = max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current))
+            await self._async_request_current_locked(target, mode_change=True)
 
     async def async_set_charging_release(self, released: bool) -> None:
         """Open or close the charging relay through 0x0D05."""
@@ -384,8 +382,7 @@ class AmtronControl:
                     {"seconds": f"{err.retry_after:.0f}"},
                 ) from err
             self._pending_current = value
-            if value >= CHARGING_CURRENT_MINIMUM:
-                self.charging_setpoint = value
+            self.charging_setpoint = value
             self._ensure_flush_task()
             return
         except (HomeAssistantError, asyncio.CancelledError) as err:
@@ -404,12 +401,12 @@ class AmtronControl:
         # Publish accepted bookkeeping before coordinator callbacks read it.
         # Rejected commands never alter the setpoint; pauses retain the actual
         # previous limit, whether requested manually or by a phase change.
-        if value >= CHARGING_CURRENT_MINIMUM:
+        if value == CHARGING_CURRENT_UNLIMITED or value >= CHARGING_CURRENT_MINIMUM:
             self.charging_setpoint = value
         elif (
             value == CHARGING_PAUSE_CURRENT
             and isinstance(previous, (int, float))
-            and previous >= CHARGING_CURRENT_MINIMUM
+            and (previous == CHARGING_CURRENT_UNLIMITED or previous >= CHARGING_CURRENT_MINIMUM)
         ):
             self.charging_setpoint = float(previous)
         if mode_change:

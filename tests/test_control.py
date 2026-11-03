@@ -774,7 +774,7 @@ def test_the_unlimited_opt_in_cannot_undo_a_pause_early_either() -> None:
     assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
 
 
-@pytest.mark.parametrize("newer", ["pause", "setpoint"])
+@pytest.mark.parametrize("newer", ["pause", "setpoint", "unlimited"])
 def test_an_accepted_command_supersedes_a_deferred_current(newer: str) -> None:
     """A stale slider write must never resume a later pause."""
     from custom_components.mennekes_amtron_rtu.decode import decode_register
@@ -787,6 +787,8 @@ def test_an_accepted_command_supersedes_a_deferred_current(newer: str) -> None:
         harness.clock[0] += 6
         if newer == "pause":
             await control.async_pause_charging()
+        elif newer == "unlimited":
+            await control.async_set_charging_current(0, allow_unlimited=True)
         else:
             await control.async_set_charging_current(16)
         for _ in range(20):
@@ -794,8 +796,49 @@ def test_an_accepted_command_supersedes_a_deferred_current(newer: str) -> None:
         assert [
             decode_register(R.CHARGING_CURRENT_EMS, words)
             for words in harness.written(R.CHARGING_CURRENT_EMS)
-        ] == [6.0, 1.0 if newer == "pause" else 16.0]
+        ] == [6.0, {"pause": 1.0, "setpoint": 16.0, "unlimited": 0.0}[newer]]
         await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("initial", [0.0, 12.0])
+def test_pause_and_resume_preserve_unlimited_mode(initial: float) -> None:
+    async def run() -> None:
+        harness = Harness(values={"charging_current_ems": initial}, current_cap=10)
+        control = await harness.connect()
+        control.charging_setpoint = 8  # An old limit must not replace unlimited.
+        if initial != 0:
+            await control.async_set_charging_current(0, allow_unlimited=True)
+            assert control.charging_setpoint == 0
+            harness.clock[0] += 5
+        await control.async_pause_charging()
+        assert control.charging_setpoint == 0
+        with pytest.raises(ServiceValidationError) as error:
+            await control.async_resume_charging()
+        assert error.value.translation_key == "write_rate_limited"
+        harness.clock[0] += 300
+        await control.async_resume_charging()
+        assert control.charging_setpoint == 0
+        assert harness.written(R.CHARGING_CURRENT_EMS)[-1] == [0, 0]
+        assert control.is_paused is False
+
+    asyncio.run(run())
+
+
+def test_deferred_zero_preserves_the_write_floor_and_replaces_a_pending_limit() -> None:
+    async def run() -> None:
+        harness = Harness()
+        control = await harness.connect()
+        await control.async_set_charging_current(10)
+        await control.async_set_charging_current(8)
+        await control.async_set_charging_current(0, allow_unlimited=True)
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        assert control.charging_setpoint == 0
+        await control._flush_task
+        assert harness.clock[0] == 1005
+        assert harness.written(R.CHARGING_CURRENT_EMS)[-1] == [0, 0]
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
 
     asyncio.run(run())
 

@@ -245,6 +245,20 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             await hass.async_block_till_done()
             assert hass.states.get(number).state == "10.0"
 
+            # The public number service accepts zero, observes the write floor,
+            # and displays the register's unlimited mode as zero.
+            await hass.services.async_call(
+                "number", "set_value", {"entity_id": number, "value": 0}, blocking=True
+            )
+            if pending := entry.runtime_data.control._flush_task:
+                await pending
+            await entry.runtime_data.coordinator.async_refresh()
+            await hass.async_block_till_done()
+            assert hass.states.get(number).state == "0.0"
+            assert hass.states.get(number).attributes["min"] == 0
+            assert hass.states.get(number).attributes["mode"] == "box"
+            assert await entry.runtime_data.client.async_read_register(R.CHARGING_CURRENT_EMS) == 0
+
             # Reconfiguring starts from the entry, not from the factory values.
             reconfigure = await hass.config_entries.flow.async_init(
                 DOMAIN,
@@ -470,10 +484,8 @@ def test_the_bundled_blueprints_run_as_automations(
             assert all(state.state == "on" for state in automations)
 
             # and the surplus one really drives the wallbox
-            # Unlimited with no restored setpoint is available but unknown.
-            assert hass.states.get(number).state == (
-                "unknown" if initial_limit == 0 else "16.0"
-            )
+            # Unlimited is shown as zero, even without a restored setpoint.
+            assert hass.states.get(number).state == str(float(initial_limit))
             assert hass.states.get(number).attributes["max"] == 16
             hass.states.async_set(
                 surplus,
