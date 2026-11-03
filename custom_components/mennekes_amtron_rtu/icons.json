@@ -15,6 +15,9 @@
       },
       "phase_switch_capable": {
         "default": "mdi:swap-horizontal"
+      },
+      "heartbeat": {
+        "default": "mdi:heart-pulse"
       }
     },
     "button": {

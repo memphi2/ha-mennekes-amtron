@@ -69,6 +69,10 @@ async def async_get_config_entry_diagnostics(
             "heartbeat_running": bool(
                 runtime_data.heartbeat is not None and runtime_data.heartbeat.running
             ),
+            "heartbeat_healthy": (
+                runtime_data.heartbeat.healthy
+                if runtime_data.heartbeat is not None else None
+            ),
         },
         "write_diagnostics": {
             "heartbeats_sent": runtime_data.diagnostics.heartbeats_sent,

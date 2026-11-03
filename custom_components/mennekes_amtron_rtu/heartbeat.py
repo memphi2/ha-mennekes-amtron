@@ -61,6 +61,47 @@ class HeartbeatTask:
         self._stopping = False
         self._delivered_at: float | None = None
         self._failed = False
+        self._healthy: bool | None = None
+        self._deadline_handle: asyncio.TimerHandle | None = None
+        self._listeners: set[Callable[[], None]] = set()
+
+    @property
+    def healthy(self) -> bool | None:
+        """Whether this task has a confirmed heartbeat inside its deadline."""
+
+        return self._healthy
+
+    def async_add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
+        """Subscribe to health transitions, never to individual beats."""
+
+        self._listeners.add(listener)
+        return lambda: self._listeners.discard(listener)
+
+    def _set_healthy(self, healthy: bool | None) -> None:
+        if self._healthy is healthy:
+            return
+        self._healthy = healthy
+        for listener in tuple(self._listeners):
+            try:
+                listener()
+            except Exception:
+                # A UI observer must never kill the time-critical writer.
+                _LOGGER.exception("Heartbeat status listener failed")
+
+    def _cancel_deadline(self) -> None:
+        if self._deadline_handle is not None:
+            self._deadline_handle.cancel()
+            self._deadline_handle = None
+
+    def _arm_deadline(self) -> None:
+        self._cancel_deadline()
+        self._deadline_handle = asyncio.get_running_loop().call_later(
+            self._deadline, self._deadline_expired
+        )
+
+    def _deadline_expired(self) -> None:
+        self._deadline_handle = None
+        self._set_healthy(False)
 
     @property
     def running(self) -> bool:
@@ -98,19 +139,26 @@ class HeartbeatTask:
         walks past the deadline the device enforces.
         """
 
-        while not self._stopping:
-            started = self._monotonic()
-            delivered = await self.async_beat_once()
-            finished = self._monotonic()
-            if delivered:
-                self._note_delivery(finished)
-            # A single failed scheduled write followed by another full five
-            # seconds would already exhaust the wallbox's ten-second deadline.
-            # Only this idempotent heartbeat gets a shorter retry cadence.
-            interval = self._interval if delivered else min(
-                self._interval, HEARTBEAT_RETRY_INTERVAL_SECONDS
-            )
-            await self._sleep(max(0.0, interval - (finished - started)))
+        self._set_healthy(None)
+        self._delivered_at = None
+        self._arm_deadline()
+        try:
+            while not self._stopping:
+                started = self._monotonic()
+                delivered = await self.async_beat_once()
+                finished = self._monotonic()
+                if delivered:
+                    self._note_delivery(finished)
+                    self._set_healthy(True)
+                    self._arm_deadline()
+                # Only this idempotent heartbeat gets a shorter retry cadence.
+                interval = self._interval if delivered else min(
+                    self._interval, HEARTBEAT_RETRY_INTERVAL_SECONDS
+                )
+                await self._sleep(max(0.0, interval - (finished - started)))
+        finally:
+            self._cancel_deadline()
+            self._set_healthy(False)
 
     def start(self) -> None:
         """Start the heartbeat as an asyncio task."""
@@ -132,6 +180,8 @@ class HeartbeatTask:
         """Cancel the heartbeat task and wait for it to finish."""
 
         self._stopping = True
+        self._cancel_deadline()
+        self._set_healthy(False)
         task = self._task
         self._task = None
         if task is None or task.done():

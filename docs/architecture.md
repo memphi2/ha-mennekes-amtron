@@ -76,6 +76,12 @@ heartbeat is exactly how the device reaches error state 200. So it is an
 entry-owned background task on its own five-second interval, started only in
 master mode and cancelled on unload.
 
+The task starts before the first full data poll. A separate deadline timer
+marks its diagnostic health unhealthy even while a transaction is blocked.
+The Heartbeat problem sensor subscribes only to health transitions and remains
+available when register polling fails. It never exposes per-beat timestamps
+or counters to Recorder. Timer and listener lifetimes follow the entry.
+
 The task *spends* the interval rather than adding it: it sleeps whatever is
 left of the five seconds after the write returned. Sleeping the full interval
 on top of a write that waited for the bus is the other half of how the gap

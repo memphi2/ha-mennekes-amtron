@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- Add a diagnostic Heartbeat problem sensor in master mode. It detects a
+  missed ten-second acknowledgement deadline or stopped task independently
+  of polling, without per-heartbeat Recorder updates.
+
 ### Changed
 
 - Allow pause and resume after the five-second current-write interval instead

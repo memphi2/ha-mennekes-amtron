@@ -134,11 +134,11 @@ async def async_setup_entry(
     )
 
     try:
-        await coordinator.async_config_entry_first_refresh()
         if not control.read_only:
             entry.runtime_data.heartbeat = _start_heartbeat(
                 hass, entry, client, diagnostics
             )
+        await coordinator.async_config_entry_first_refresh()
         await hass.config_entries.async_forward_entry_setups(
             entry, _entry_platforms(entry)
         )

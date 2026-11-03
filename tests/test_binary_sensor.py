@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
+from contextlib import closing
+from unittest.mock import patch
+
+from homeassistant.components.recorder import get_instance
+from homeassistant.setup import async_setup_component
 
 from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu.binary_sensor import async_setup_entry
@@ -63,3 +69,86 @@ def test_capability_gating_hides_unsupported_binary_sensors() -> None:
         assert "vehicle_connected" in sensors
 
     asyncio.run(run())
+
+
+def test_heartbeat_uses_actual_health_and_records_only_transitions(tmp_path):
+    from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+    from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
+    from tests.test_home_assistant_smoke import _boot
+
+    async def run():
+        target = tmp_path / "config"
+        transport = FakeModbusClient(device_bank())
+        with patch(
+            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            return_value=transport,
+        ):
+            hass = await _boot(target)
+            from homeassistant.helpers.recorder import async_initialize_recorder
+
+            async_initialize_recorder(hass)
+            try:
+                assert await async_setup_component(hass, "recorder", {
+                    "recorder": {"db_url": f"sqlite:///{target}/recorder.db",
+                                 "auto_purge": False, "commit_interval": 1},
+                })
+                flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+                await hass.config_entries.flow.async_configure(flow["flow_id"], {
+                    "port": "/dev/fake", "device_id": 50, "baudrate": 57600,
+                    "frame": "8n2", "search": "off",
+                })
+                await hass.async_block_till_done()
+                entity_id = "binary_sensor.mennekes_amtron_heartbeat"
+                assert hass.states.get(entity_id) is None  # No sender in read-only mode.
+                entry = hass.config_entries.async_entries(DOMAIN)[0]
+                hass.config_entries.async_update_entry(entry, options={"control_mode": CONTROL_MODE_MASTER})
+                await hass.async_block_till_done()
+                heartbeat = entry.runtime_data.heartbeat
+                await heartbeat.async_stop()
+                ticks, sleeps = asyncio.Queue(), asyncio.Queue()
+
+                async def sleep(delay):
+                    sleeps.put_nowait(delay)
+                    await ticks.get()
+
+                heartbeat._sleep = sleep
+                heartbeat.start()
+                await sleeps.get()
+                recorder = get_instance(hass)
+                await recorder.async_block_till_done()
+
+                def rows():
+                    with closing(sqlite3.connect(target / "recorder.db")) as conn:
+                        return conn.execute(
+                            "SELECT count(*), count(DISTINCT attributes_id) FROM states "
+                            "JOIN states_meta USING(metadata_id) WHERE states_meta.entity_id = ?",
+                            (entity_id,),
+                        ).fetchone()
+
+                before, attributes = rows()
+                assert hass.states.get(entity_id).state == "off"
+                for _ in range(100):
+                    ticks.put_nowait(None)
+                    await sleeps.get()
+                await recorder.async_block_till_done()
+                assert rows() == (before, attributes)
+
+                transport.read_exceptions[0x0100] = raise_connection_error()
+                await entry.runtime_data.coordinator.async_refresh()
+                assert hass.states.get(entity_id).state == "off"  # Poll failure is independent.
+                heartbeat._deadline_handle.cancel()
+                heartbeat._deadline_expired()
+                assert hass.states.get(entity_id).state == "on"
+                ticks.put_nowait(None)
+                await sleeps.get()
+                assert hass.states.get(entity_id).state == "off"
+                await recorder.async_block_till_done()
+                assert rows() == (before + 2, attributes)
+
+                assert await hass.config_entries.async_unload(entry.entry_id)
+                assert not heartbeat._listeners
+                assert heartbeat._deadline_handle is None
+            finally:
+                await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))

@@ -84,6 +84,9 @@
       },
       "vehicle_connected": {
         "name": "Vehicle connected"
+      },
+      "heartbeat": {
+        "name": "Heartbeat"
       }
     },
     "button": {

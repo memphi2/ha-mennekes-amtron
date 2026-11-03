@@ -13,6 +13,10 @@ default, and the heartbeat is independent. Unchanged values do not produce
 extra state rows. A longer interval reduces detail in graphs and automations;
 it does not reduce the number of hourly statistics series.
 
+The diagnostic **Heartbeat** binary sensor records only health transitions.
+Successful five-second heartbeats do not change its state or attributes; it
+has no per-heartbeat timestamp, counter or statistics series.
+
 | Profile | What to configure below | Statistics series | Hourly rows per day |
 |---|---|---:|---:|
 | Full history | Keep all default sensors recorded | 17 | 408 |
