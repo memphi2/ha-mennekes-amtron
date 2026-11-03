@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Check recovery cooldowns before writing heartbeat or charging release,
+  so an already blocked current command cannot leave a partial recovery.
 - Confirm a fresh idle state before restarting the wallbox; missing, invalid
   or non-idle device status prevents the restart command.
 - Preserve the pre-pause current across entry reloads for resume and recovery,

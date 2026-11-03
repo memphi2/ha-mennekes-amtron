@@ -113,6 +113,13 @@ option 2. Even there:
 - not every vehicle tolerates phase switching at all. Check your vehicle's
   documentation before you automate it.
 
+## Error recovery
+
+Recovery checks known current-write and pause/resume cooldowns before sending
+its heartbeat/release/current sequence. A cooldown rejection therefore does
+not change the charging release. A transport failure during the sequence can
+still leave a partial operation; it is reported as a failed recovery.
+
 ## Restart
 
 `0x0D19` may only be used while the wallbox is idle. The restart button

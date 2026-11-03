@@ -490,6 +490,8 @@ def test_recovery_that_resumes_a_pause_obeys_and_restarts_hysteresis() -> None:
         assert err.value.translation_key == "write_rate_limited"
         assert err.value.translation_placeholders == {"seconds": "285"}
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        assert harness.written(R.HEARTBEAT) == []
+        assert harness.written(R.CHARGING_RELEASE) == []
         assert harness.diagnostics.recoveries == 0
 
         harness.clock[0] += 285
@@ -803,6 +805,7 @@ def test_recovery_cannot_bypass_the_current_write_interval() -> None:
         harness = Harness()
         control = await harness.connect()
         await control.async_set_charging_current(6)
+        harness.transport.bank[R.CHARGING_RELEASE.address] = 0
         harness.clock[0] += 4
         with pytest.raises(ServiceValidationError) as err:
             await control.async_recover_from_error()
@@ -812,10 +815,14 @@ def test_recovery_cannot_bypass_the_current_write_interval() -> None:
         for _ in range(10):
             await asyncio.sleep(0)
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        assert harness.written(R.HEARTBEAT) == []
+        assert harness.written(R.CHARGING_RELEASE) == []
+        assert harness.transport.bank[R.CHARGING_RELEASE.address] == 0
+        assert harness.diagnostics.writes_rate_limited == 1
         assert harness.diagnostics.recoveries == 0
         await control.async_shutdown()
         assert [event["event"] for event in harness.diagnostics.timeline.snapshot()] == [
-            "recovery_started", "write_rate_limited",
+            "write_rate_limited",
         ]
 
     asyncio.run(run())

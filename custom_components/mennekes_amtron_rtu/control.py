@@ -269,8 +269,24 @@ class AmtronControl:
         """
 
         self._require_write_access()
-        target = self.charging_setpoint or self.max_charging_current
         async with self._current_lock:
+            # Refuse known cooldowns before changing charging release. The
+            # final current write still rechecks after the awaited bus calls.
+            if self.is_paused is not False:
+                self._check_mode_change_interval()
+            try:
+                self._client.check_write_interval(
+                    CHARGING_CURRENT_EMS, min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS
+                )
+            except AmtronRateLimitedError as err:
+                self._diagnostics.writes_rate_limited += 1
+                self._diagnostics.timeline.record(
+                    EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
+                )
+                raise service_validation_error(
+                    "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
+                ) from err
+            target = self.charging_setpoint or self.max_charging_current
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
             await self._async_write(CHARGING_RELEASE, 1)
@@ -352,15 +368,7 @@ class AmtronControl:
         mode_change = mode_change or paused is not False
         previous = self._write_state.confirmed_current
         if mode_change:
-            remaining = self._mode_change_remaining()
-            if remaining > 0:
-                self._diagnostics.writes_rate_limited += 1
-                self._diagnostics.timeline.record(
-                    EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
-                )
-                raise service_validation_error(
-                    "write_rate_limited", {"seconds": f"{remaining:.0f}"}
-                )
+            self._check_mode_change_interval()
         try:
             await self._async_write(
                 CHARGING_CURRENT_EMS,
@@ -408,6 +416,19 @@ class AmtronControl:
             self._write_state.mode_change_at = self._monotonic()
         if self._request_refresh is not None:
             await self._request_refresh()
+
+    def _check_mode_change_interval(self) -> None:
+        """Reject a known pause/resume cooldown before any operation writes."""
+
+        remaining = self._mode_change_remaining()
+        if remaining > 0:
+            self._diagnostics.writes_rate_limited += 1
+            self._diagnostics.timeline.record(
+                EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
+            )
+            raise service_validation_error(
+                "write_rate_limited", {"seconds": f"{remaining:.0f}"}
+            )
 
     def _mode_change_remaining(self) -> float:
         """Return the seconds left of the pause and resume hysteresis."""
