@@ -276,6 +276,8 @@ class MennekesModbusClient:
                 raise
             finally:
                 if not rejected:
+                    if spec.key == "charging_current_ems":
+                        self.write_state.current_write_generation += 1
                     # Connect/send/response delays belong to this transaction.
                     # Even cancellation can follow an applied write. Measuring
                     # from completion conservatively protects the wire interval.

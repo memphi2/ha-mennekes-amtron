@@ -39,6 +39,13 @@ repairs.py            + repair_issues.py
 
 ### One lock, because Modbus RTU has one master
 
+Poll snapshots carry an internal current-write generation. A current write
+with a successful or uncertain outcome advances that generation under the
+bus lock. A poll that started earlier cannot overwrite the controller's
+confirmed current or pause state. The generation survives entry reloads,
+is excluded from snapshot equality, and is never an entity attribute or
+Recorder value. A later poll in the current generation can confirm the state.
+
 Every transaction — poll, heartbeat and write — goes through a single
 `asyncio.Lock` in `client.py`. Modbus RTU is a single-master protocol; two overlapping
 transactions are not slow, they are corrupt. Nothing outside `client.py`

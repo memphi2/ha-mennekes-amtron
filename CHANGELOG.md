@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Ignore old current readback from polls that overlap a write, including
+  uncertain or cancelled writes, so a delayed poll cannot lift pause protection.
 - Preserve write intervals and pause/resume hysteresis across entry reloads.
   On first setup or a full HA restart, guard current writes for five seconds
   and pause/resume/phase changes for five minutes while timing history is unknown.

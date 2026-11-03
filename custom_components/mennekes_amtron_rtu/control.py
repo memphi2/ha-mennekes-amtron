@@ -97,7 +97,6 @@ class AmtronControl:
         self._current_lock = asyncio.Lock()
         self._flush_task: asyncio.Task[None] | None = None
         self._write_state = client.write_state
-        self._observed_snapshot: WallboxData | None = None
         self.charging_setpoint: float | None = None
 
     @property
@@ -138,8 +137,7 @@ class AmtronControl:
         """Keep confirmed state across failed polls; unknown is not running."""
 
         snapshot = self._state()
-        if snapshot is not self._observed_snapshot:
-            self._observed_snapshot = snapshot
+        if snapshot.current_write_generation == self._write_state.current_write_generation:
             current = snapshot.get(CHARGING_CURRENT_EMS.key)
             if isinstance(current, (int, float)) and math.isfinite(current) and current >= 0:
                 self._write_state.confirmed_current = float(current)
@@ -329,7 +327,7 @@ class AmtronControl:
 
         paused = self.is_paused
         mode_change = mode_change or paused is not False
-        previous = self._state().get(CHARGING_CURRENT_EMS.key)
+        previous = self._write_state.confirmed_current
         if mode_change:
             remaining = self._mode_change_remaining()
             if remaining > 0:

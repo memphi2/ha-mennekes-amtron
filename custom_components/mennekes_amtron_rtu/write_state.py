@@ -19,6 +19,7 @@ class WriteState:
     limiter: WriteRateLimiter = field(default_factory=WriteRateLimiter)
     mode_change_at: float | None = None
     confirmed_current: float | None = None
+    current_write_generation: int = 0
 
     @classmethod
     def cold_start(cls, now: float) -> WriteState:
