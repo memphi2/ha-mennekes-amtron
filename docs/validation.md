@@ -44,6 +44,13 @@ and manual CI runs measure one hour on latest stable HA. This adds no required
 HA version to the minimum/latest matrix. The wallbox register values are simulated; it
 does not replace the separate SQLite Recorder retention tests or hardware tests.
 
+The continuous run checkpoints its measurements after each sample. Reports
+include completion status, the last test stage and failure categories; a
+test failure or timeout retains the available samples. CI uploads this report
+even when the test fails. With `--json-output`, checkpoints are written directly
+to the artifact path so they also survive interruption of the runner itself.
+A partial report cannot pass validation.
+
 ## Published release verification
 
 ```bash

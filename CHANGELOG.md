@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Retain continuous-soak measurements on failures and timeouts, and upload
+  diagnostic reports even when the CI test fails.
 - Verify the downloaded SBOM dependency inventory, versions, extras and
   relationships against the approved manifest even when checksums are consistent.
 - Read a fresh charging state before switching phases; reject unknown status

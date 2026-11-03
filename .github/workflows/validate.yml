@@ -159,6 +159,7 @@ jobs:
       - name: Measure one hour without reloading the entry
         run: python scripts/check_runtime_steady.py --seconds 3600 --json-output /tmp/amtron-steady.json
       - name: Retain measurements
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: amtron-steady-runtime

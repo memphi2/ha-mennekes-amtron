@@ -31,6 +31,18 @@ from tests.test_serial_loopback import _virtual_serial_link
 def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
     seconds = float(os.environ.get("AMTRON_STEADY_SECONDS", "10"))
     device_port, client_port = _virtual_serial_link(request)
+    report = {"status": "running", "stage": "boot", "seconds": seconds,
+              "elapsed": 0, "recoveries": 0, "heartbeats": 0,
+              "measurement_changes": 0, "transport": "serial_loopback", "samples": []}
+
+    def checkpoint():
+        if destination := os.environ.get("AMTRON_STEADY_REPORT"):
+            path = Path(destination)
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(report, indent=2) + "\n")
+            temporary.replace(path)
+
+    checkpoint()
 
     async def run():
         load_enabled = False
@@ -41,10 +53,21 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
 
         server, serving = await _start_wallbox(device_port, device_bank(), action=slow_reads)
         hass = None
-        samples = []
+        samples = report["samples"]
         recoveries = 0
         changes = 0
         last_power = None
+        started = None
+
+        def record_progress():
+            if started is not None:
+                now = time.monotonic()
+                report.update(elapsed=now - started, recoveries=recoveries,
+                              heartbeats=measured.deliveries,
+                              heartbeat_max_gap=measured.maximum_gap(now),
+                              measurement_changes=changes)
+            checkpoint()
+
         try:
             hass = await _boot(tmp_path / "config")
             flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
@@ -72,6 +95,7 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
             load_enabled = True
             tracemalloc.start()
             started = time.monotonic()
+            report["stage"] = "running"
             next_recovery = started
             interval = min(5, seconds / 4)
             while time.monotonic() - started < seconds or len(samples) < 3:
@@ -123,23 +147,24 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                 assert len(runtime.diagnostics.timeline.snapshot()) <= 40
                 assert measured.maximum_gap(time.monotonic()) <= HEARTBEAT_DEADLINE_SECONDS
                 samples.append(_sample("steady", [], client, coordinator))
+                record_progress()
                 await asyncio.sleep(interval)
-            elapsed = time.monotonic() - started
-            gap = measured.maximum_gap(time.monotonic())
-            assert gap <= HEARTBEAT_DEADLINE_SECONDS
+            assert measured.maximum_gap(time.monotonic()) <= HEARTBEAT_DEADLINE_SECONDS
             assert measured.deliveries >= seconds / 10
             assert changes >= 2
             assert not sample_errors(samples, phases=("steady",))
+            record_progress()
+            report["stage"] = "cleanup"
+            checkpoint()
             assert await hass.config_entries.async_unload(entry.entry_id)
             await hass.async_block_till_done()
             assert not client.connected
             assert not runtime.heartbeat.running
             assert not coordinator._listeners
             assert runtime.control._flush_task is None
-            return {"seconds": seconds, "elapsed": elapsed, "recoveries": recoveries,
-                    "heartbeats": measured.deliveries, "heartbeat_max_gap": gap,
-                    "measurement_changes": changes, "transport": "serial_loopback", "samples": samples}
         finally:
+            if report["stage"] != "cleanup":
+                record_progress()
             if hass is not None:
                 await hass.async_stop()
             await server.shutdown()
@@ -148,6 +173,12 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                 await serving
             tracemalloc.stop()
 
-    report = asyncio.run(asyncio.wait_for(run(), seconds + 90))
-    if destination := os.environ.get("AMTRON_STEADY_REPORT"):
-        Path(destination).write_text(json.dumps(report, indent=2) + "\n")
+    try:
+        asyncio.run(asyncio.wait_for(run(), seconds + 90))
+    except BaseException as err:
+        report.update(status="failed", failure_type=type(err).__name__)
+        checkpoint()
+        raise
+    else:
+        report.update(status="passed", stage="complete")
+        checkpoint()
