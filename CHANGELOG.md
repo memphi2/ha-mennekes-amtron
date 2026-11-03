@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Verify the downloaded SBOM dependency inventory, versions, extras and
+  relationships against the approved manifest even when checksums are consistent.
 - Read a fresh charging state before switching phases; reject unknown status
   instead of skipping the required pause based on missing or stale readback.
 - Ignore old current readback from polls that overlap a write, including

@@ -56,6 +56,11 @@ and NOTICE included. `--archive PATH` also verifies a local package. The release
 workflow runs the published check after uploading the assets, in addition to
 its existing SPDX schema and attestation verification before publication.
 
+The downloaded SBOM must also list exactly the manifest's dependencies,
+including extras and version constraints, with unique package IDs and matching
+dependency relationships. Recomputing checksums cannot hide missing, additional
+or changed dependency declarations from this check.
+
 Publication first uploads a draft, downloads and validates all four assets,
 and only then makes it public. A repeated run verifies existing files without
 replacing them; any difference stops publication. Metadata and the SBOM use
