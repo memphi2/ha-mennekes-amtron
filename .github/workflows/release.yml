@@ -11,6 +11,11 @@ on:
         required: false
         type: string
 
+# Serialize publication for a tag, including manual reruns. Never cancel a publisher.
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 permissions:
   actions: read
   contents: read
@@ -25,6 +30,7 @@ jobs:
   validate:
     name: release validate (${{ matrix.name }})
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -51,6 +57,10 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            ${{ matrix.requirements-lock }}
+            custom_components/mennekes_amtron_rtu/manifest.json
       - name: Install Python validation tools
         env:
           HA_TARGET: ${{ matrix.homeassistant }}
@@ -75,6 +85,7 @@ jobs:
   hacs:
     name: release hacs
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -88,6 +99,7 @@ jobs:
   hassfest:
     name: release hassfest
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -99,6 +111,7 @@ jobs:
   main-validation:
     name: main validation gate
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       actions: read
       contents: read
@@ -150,6 +163,7 @@ jobs:
 
   publish:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     needs:
       - validate
       - hacs
@@ -167,6 +181,10 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            custom_components/mennekes_amtron_rtu/manifest.json
       - name: Install release validation tools
         run: |
           python -m pip install -r requirements-dev.txt

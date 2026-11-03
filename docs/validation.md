@@ -66,6 +66,12 @@ repaired by overwriting them; corrections require a new version.
 
 ## Stable and preview compatibility
 
+Superseded PR validation runs are cancelled. Main, scheduled and manual runs
+keep their evidence; release publication is serialized per tag and never
+cancelled by another publisher. Jobs have explicit time limits. Python jobs
+cache pip downloads by dependency lock and integration manifest, while still
+resolving and verifying the current latest stable HA on every run.
+
 PR and release validation each have exactly two HA targets: the fixed minimum
 from `project-versions.json` and the automatically resolved latest stable release.
 Both run the full test suite; latest stable also runs strict typing. After tool

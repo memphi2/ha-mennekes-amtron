@@ -8,12 +8,18 @@ on:
     - cron: "43 5 * * 2"
   workflow_dispatch:
 
+# Superseded PR heads can stop; main and scheduled evidence must complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
 jobs:
   validate:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -41,6 +47,10 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            ${{ matrix.requirements-lock }}
+            custom_components/mennekes_amtron_rtu/manifest.json
       - name: Install Python validation tools
         env:
           HA_TARGET: ${{ matrix.homeassistant }}
@@ -68,6 +78,7 @@ jobs:
     name: next-ha (early warning)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -75,6 +86,10 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            custom_components/mennekes_amtron_rtu/manifest.json
       - name: Install the next Home Assistant
         run: |
           python -m pip install --pre --upgrade homeassistant
@@ -100,6 +115,10 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            custom_components/mennekes_amtron_rtu/manifest.json
       - name: Install latest stable HA and validation tools
         run: |
           python -m pip install --upgrade homeassistant
@@ -123,6 +142,10 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            custom_components/mennekes_amtron_rtu/manifest.json
       - name: Install latest stable HA and validation tools
         run: |
           python -m pip install --upgrade homeassistant
@@ -160,6 +183,7 @@ jobs:
 
   dependabot:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Dependabot configuration
@@ -170,6 +194,7 @@ jobs:
 
   hacs:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: HACS validation
@@ -179,6 +204,7 @@ jobs:
 
   hassfest:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Hassfest

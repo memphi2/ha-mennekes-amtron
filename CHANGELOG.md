@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Fixed
+
+- Preserve write intervals and pause/resume hysteresis across entry reloads.
+  On first setup or a full HA restart, guard current writes for five seconds
+  and pause/resume/phase changes for five minutes while timing history is unknown.
+- Measure register write intervals after transport completion, including
+  delayed, uncertain and cancelled transactions.
+- Retain pause protection when readback or a write acknowledgement is lost.
+- Verify release drafts before publishing; never replace published assets.
+  Generate reproducible metadata and SBOM identifiers from the source commit.
+
+### Added
+
+- Suggest Recorder exclusions with actual registered entity IDs, including
+  renamed sensors and multiple wallboxes, without modifying configuration or history.
+- Measure continuously loaded runtime resources; run an hourly-duration soak
+  on weekly/manual CI alongside the existing lifecycle and Recorder tests.
+
+### Changed
+
+- Type the Modbus transport boundary and share write timing state across reloads.
+- Cancel superseded PR validation, add job time limits and cache dependency
+  downloads. Required HA validation remains minimum plus latest stable.
+
 ## 0.3.0 — 2026-11-02
 
 ### Added
