@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-from typing import Any
 
 from pymodbus.exceptions import ConnectionException, ModbusException
 from pymodbus.pdu import ExceptionResponse
@@ -23,6 +22,7 @@ from .client_errors import (
 )
 from .decode import encode_register
 from .registers import RegisterSpec
+from .transport import ModbusTransport
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def validate_write(spec: RegisterSpec, value: float) -> None:
 
 
 async def write_register(
-    client: Any,
+    client: ModbusTransport,
     *,
     spec: RegisterSpec,
     value: float,

@@ -129,6 +129,11 @@ the result. Some vehicles abort the session and require further intervention.
 
 ## Actions
 
+For a Recorder exclusion list matching your actual entity IDs, use
+`mennekes_amtron_rtu.get_recorder_exclusions`. Select the wallboxes and a
+history profile, then merge the returned YAML into your configuration.
+See [Recorder profiles](recorder.md#configure-history-retention-and-detail-exclusions).
+
 Most automations should use the entities. The additional action
 `mennekes_amtron_rtu.set_charging_current` offers an explicit unlimited option:
 

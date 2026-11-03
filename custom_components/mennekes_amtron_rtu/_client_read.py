@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 from pymodbus.exceptions import ConnectionException, ModbusException, ModbusIOException
 from pymodbus.pdu import ExceptionResponse
@@ -23,12 +22,13 @@ from .client_errors import (
 )
 from .decode import RegisterValue, decode_block, decode_register
 from .register_blocks import RegisterBlock
+from .transport import ModbusTransport
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def read_words(
-    client: Any,
+    client: ModbusTransport,
     *,
     address: int,
     count: int,
@@ -75,7 +75,7 @@ async def read_words(
 
 
 async def read_block(
-    client: Any,
+    client: ModbusTransport,
     *,
     block: RegisterBlock,
     device_id: int,

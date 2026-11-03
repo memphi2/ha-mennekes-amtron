@@ -16,6 +16,8 @@ client_errors.py      bus error types and Modbus exception mapping
 _client_read.py       block reads with a single-register fallback
 _client_write.py      writes, write rate limiting, value validation
 client.py             the pymodbus client, the bus lock, the only transport
+transport.py          typed transport and response interfaces
+write_state.py        shared write guards retained across entry reloads
 identity.py           the read-once device facts
 coordinator.py        the poll
 heartbeat.py          the heartbeat task
@@ -27,7 +29,8 @@ options_flow.py       control mode, poll interval, current cap
 sensor.py             + sensor_descriptions.py
 binary_sensor.py      + binary_sensor_descriptions.py
 number.py select.py switch.py button.py
-services.py           the one action that cannot be an entity
+services.py           explicit current action and service registration
+recorder_profile.py   read-only Recorder suggestions using registered IDs
 diagnostics.py        allowlist dump + raw register image
 repairs.py            + repair_issues.py
 ```
