@@ -156,7 +156,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python scripts/check_ha_channel.py
-      - name: Measure one hour without reloading the entry
+      - name: Measure one hour of serial operation and Recorder maintenance
         run: python scripts/check_runtime_steady.py --seconds 3600 --json-output /tmp/amtron-steady.json
       - name: Retain measurements
         if: always()

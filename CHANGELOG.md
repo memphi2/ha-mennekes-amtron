@@ -40,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Run the continuous serial soak with real SQLite Recorder: measure row and
+  attribute growth, queue backlog, database/WAL sizes and heartbeat gaps while
+  reconnects overlap purge/repack; verify actual VACUUM and database integrity.
 - Suggest Recorder exclusions with actual registered entity IDs, including
   renamed sensors and multiple wallboxes, without modifying configuration or history.
 - Measure continuously loaded runtime resources; run an hourly-duration soak

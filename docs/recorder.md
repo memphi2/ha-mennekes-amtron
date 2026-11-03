@@ -207,7 +207,23 @@ This checks retention mechanics, not a six-day wall-clock soak or the nightly
 scheduler. It neither proves a fixed database size nor covers host disk
 exhaustion, external databases, backups or other integrations.
 
+## Continuous operation with serial reconnects
+
+The continuous serial soak now runs real Recorder at the same time:
+
+```bash
+.venv/bin/python scripts/check_runtime_steady.py --seconds 3600 --json-output /tmp/amtron-steady.json
+```
+
+It measures state/attribute growth, database and WAL sizes, queue depth and
+heartbeat gaps while serial reconnects overlap Recorder purge/repack. It
+verifies completed SQLite `VACUUM`, database integrity and retained energy and
+power readings. Its disposable test database uses deliberately short retention;
+the budgets and limitations are described in [Maintenance validation](validation.md).
+It does not change the configuration or history of a running Home Assistant.
+
 ## Monitor free space on the database disk
+
 
 Add [System Monitor](https://www.home-assistant.io/integrations/systemmonitor/)
 and enable **Disk free** for the mount containing your Recorder database.

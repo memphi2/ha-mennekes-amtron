@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from scripts.check_runtime_soak import LIMITS
+from scripts.recorder_soak_checks import DATABASE_LIMIT, WAL_LIMIT
 from tests import test_runtime_steady as harness
 
 
@@ -17,7 +18,18 @@ def measured_report():
         "status": "passed", "stage": "complete", "seconds": 10, "elapsed": 10.1,
         "heartbeats": 2, "recoveries": 1, "heartbeat_max_gap": 5,
         "transport": "serial_loopback", "measurement_changes": 2,
-        "samples": [dict.fromkeys((*LIMITS, "retained_clients"), 0) | {"phase": "steady"}
+        "recorder": {
+            "entities": 44, "queue_peak": 20, "queue_after_drain": 0,
+            "database_peak_bytes": 500000, "wal_peak_bytes": 100000,
+            "purges": 1, "vacuums": 1, "deleted_rows": 10,
+            "maintenance_max_seconds": 0.1, "integrity": "ok",
+        },
+        "samples": [dict.fromkeys((*LIMITS, "retained_clients"), 0) | {
+            "phase": "steady", "serial_recoveries": 1, "recorder_inserted": 20,
+            "recorder_states": 50, "recorder_attribute_growth": 0,
+            "recorded_energy_rows": 3, "recorded_power_rows": 3,
+            "database_bytes": 500000, "wal_bytes": 100000,
+        }
                     for _ in range(3)],
     }
 
@@ -107,6 +119,44 @@ def test_invalid_measurements_fail_and_remain_reviewable(monkeypatch, tmp_path, 
     assert result == 1
     assert report["status"] == "failed"
     assert report["validation_errors"]
+
+
+@pytest.mark.parametrize(("key", "value"), [
+    ("entities", 0), ("purges", 0), ("vacuums", 0), ("deleted_rows", 0),
+    ("integrity", "corrupt"), ("queue_peak", 257), ("queue_after_drain", 1),
+    ("database_peak_bytes", DATABASE_LIMIT + 1), ("wal_peak_bytes", WAL_LIMIT + 1),
+    ("maintenance_max_seconds", float("inf")), ("maintenance_max_seconds", 0),
+])
+def test_recorder_maintenance_and_backlog_failures_reject_the_run(monkeypatch, tmp_path, key, value):
+    data = measured_report()
+    data["recorder"][key] = value
+    result, report = runner(monkeypatch, tmp_path, data)
+    assert result == 1
+    assert report["status"] == "failed"
+    assert report["validation_errors"]
+
+
+@pytest.mark.parametrize(("key", "value"), [
+    ("recorder_inserted", 10000), ("recorder_inserted", None),
+    ("recorder_attribute_growth", 3), ("serial_recoveries", -1),
+    ("recorder_states", 0), ("recorded_energy_rows", 0), ("recorded_power_rows", 0),
+    ("database_bytes", DATABASE_LIMIT + 1), ("wal_bytes", WAL_LIMIT + 1),
+])
+def test_recorder_growth_and_lost_history_fail_even_after_a_later_good_sample(monkeypatch, tmp_path, key, value):
+    data = measured_report()
+    data["samples"][1][key] = value
+    result, report = runner(monkeypatch, tmp_path, data)
+    assert result == 1
+    assert report["status"] == "failed"
+    assert report["validation_errors"]
+
+
+def test_missing_recorder_cannot_pass_a_healthy_serial_run(monkeypatch, tmp_path):
+    data = measured_report()
+    del data["recorder"]
+    result, report = runner(monkeypatch, tmp_path, data)
+    assert result == 1
+    assert "Recorder measurements are missing" in report["validation_errors"]
 
 
 def test_real_harness_checkpoints_and_reports_failure(monkeypatch, tmp_path, request):

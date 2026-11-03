@@ -21,8 +21,10 @@ from custom_components.mennekes_amtron_rtu.const import (
 from custom_components.mennekes_amtron_rtu.decode import encode_register
 from custom_components.mennekes_amtron_rtu.enums import EvseState
 from scripts.check_runtime_soak import sample_errors
+from scripts.recorder_soak_checks import recorder_errors
 from tests.fakes import device_bank
 from tests.heartbeat_measurement import HeartbeatMeasurement
+from tests.recorder_steady import RecorderMeasurement
 from tests.test_home_assistant_smoke import _boot, _start_wallbox
 from tests.test_runtime_soak import _sample
 from tests.test_serial_loopback import _virtual_serial_link
@@ -53,6 +55,8 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
 
         server, serving = await _start_wallbox(device_port, device_bank(), action=slow_reads)
         hass = None
+        recorder = None
+        maintenance = None
         samples = report["samples"]
         recoveries = 0
         changes = 0
@@ -60,6 +64,8 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
         started = None
 
         def record_progress():
+            if recorder is not None:
+                report["recorder"] = recorder.report()
             if started is not None:
                 now = time.monotonic()
                 report.update(elapsed=now - started, recoveries=recoveries,
@@ -72,6 +78,7 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
 
         try:
             hass = await _boot(tmp_path / "config")
+            recorder = await RecorderMeasurement.start(hass, tmp_path / "steady.db")
             flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
             await hass.config_entries.flow.async_configure(flow["flow_id"], {
                 "port": client_port, "device_id": 50, "baudrate": 57600,
@@ -94,6 +101,7 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
             client.async_write_register = observed_write
             await coordinator.async_refresh()
             await asyncio.sleep(min(5, seconds))
+            await recorder.baseline(entry)
             load_enabled = True
             tracemalloc.start()
             started = time.monotonic()
@@ -102,6 +110,11 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
             interval = min(5, seconds / 4)
             while time.monotonic() - started < seconds or len(samples) < 3:
                 if time.monotonic() >= next_recovery:
+                    # Recorder keeps committing, purging and vacuuming while
+                    # the serial transport reconnects and the heartbeat runs.
+                    maintenance = asyncio.create_task(
+                        recorder.maintain(min(15, max(1, seconds / 8)))
+                    )
                     # Exercise the driver's connection-lost path: it really
                     # closes the FD and pymodbus reconnects in the background.
                     transport = client._client
@@ -123,6 +136,8 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                     assert coordinator.last_update_success
                     assert client._client is transport
                     assert transport.ctx.transport is not link
+                    await maintenance
+                    maintenance = None
                     recoveries += 1
                     next_recovery = time.monotonic() + 30
                 index = len(samples)
@@ -148,14 +163,18 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                 assert runtime.heartbeat.running
                 assert len(runtime.diagnostics.timeline.snapshot()) <= 40
                 assert measured.maximum_gap(time.monotonic()) <= HEARTBEAT_DEADLINE_SECONDS
-                samples.append(_sample("steady", [], client, coordinator))
+                database = await recorder.sample()
+                samples.append(_sample("steady", [], client, coordinator) | database
+                               | {"serial_recoveries": recoveries})
                 record_progress()
                 await asyncio.sleep(interval)
             assert measured.maximum_gap(time.monotonic()) <= HEARTBEAT_DEADLINE_SECONDS
             assert measured.deliveries >= seconds / 10
             assert changes >= 2
             assert not sample_errors(samples, phases=("steady",))
+            await recorder.finish()
             record_progress()
+            assert not recorder_errors(report), recorder_errors(report)
             report["stage"] = "cleanup"
             checkpoint()
             assert await hass.config_entries.async_unload(entry.entry_id)
@@ -167,6 +186,12 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
         finally:
             if report["stage"] != "cleanup":
                 record_progress()
+            if maintenance is not None:
+                maintenance.cancel()
+                with suppress(asyncio.CancelledError):
+                    await maintenance
+            if recorder is not None:
+                await recorder.close()
             if hass is not None:
                 await hass.async_stop()
             await server.shutdown()

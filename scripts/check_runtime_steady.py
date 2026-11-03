@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from check_runtime_soak import ROOT, sample_errors
+from recorder_soak_checks import recorder_errors
 
 
 def measurement_errors(data: dict[str, Any], seconds: float) -> list[str]:
@@ -22,6 +23,7 @@ def measurement_errors(data: dict[str, Any], seconds: float) -> list[str]:
         errors = ["invalid resource samples"]
     else:
         errors = sample_errors(samples, phases=("steady",))
+    errors.extend(recorder_errors(data))
 
     def number(key: str) -> float:
         value = data.get(key)
