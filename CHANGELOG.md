@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Recognize all documented variants of the three supported RTU families,
+  with a sourced model matrix and a separate user-reported hardware-test status.
 - Run the continuous serial soak with real SQLite Recorder: measure row and
   attribute growth, queue backlog, database/WAL sizes and heartbeat gaps while
   reconnects overlap purge/repack; verify actual VACUUM and database integrity.

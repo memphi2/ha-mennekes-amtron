@@ -7,9 +7,14 @@ Local Home Assistant integration for MENNEKES AMTRON wallboxes over
 **Modbus RTU / RS-485**. Monitor charging, power and energy, adjust the
 charging current, pause charging and use PV surplus automations.
 
-Developed for the **AMTRON 4You 310 11 C2**. Validation uses Home Assistant
-and simulated RTU devices; physical-wallbox validation is still outstanding.
-See [compatibility and limitations](docs/user-guide.md#compatibility-and-limitations).
+| Model family | Variants | Hardware test |
+|---|---|---|
+| Amtron 4You 300 | 310: 7.4, 11 and 22 kW; 11 kW PV bundle | Successful operation reported for 310 11 C2 |
+| Amtron Compact 2.0s | 7.4, 11 and 22 kW; 11 kW PV bundle | Not yet reported |
+| Amtron Start 2.0s | 7.4 and 22 kW, including T2S | Not yet reported |
+
+See the [full compatibility matrix](docs/compatibility.md) for model recognition,
+manufacturer sources and the scope of the hardware report.
 
 ## Installation
 

@@ -7,6 +7,7 @@ local Modbus RTU.
 
 | I want to… | Read |
 |---|---|
+| check models and hardware test status | [Device compatibility](compatibility.md) |
 | prepare the installation with an electrician | [Hardware installation](hardware.md) |
 | install, update or remove the integration | [Installation and updates](installation.md) |
 | add the wallbox and test the first charge | [Quick start](quickstart.md) |

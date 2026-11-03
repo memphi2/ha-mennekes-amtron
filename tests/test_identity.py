@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -10,10 +11,52 @@ from custom_components.mennekes_amtron_rtu.client import (
     SerialConfig,
 )
 from custom_components.mennekes_amtron_rtu.client_errors import AmtronBusError
-from custom_components.mennekes_amtron_rtu.identity import async_read_identity
+from custom_components.mennekes_amtron_rtu.identity import (
+    async_read_identity,
+    model_name,
+)
+from custom_components.mennekes_amtron_rtu.models import ARTICLE_MODELS
 from tests.fakes import FakeModbusClient, device_bank
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)
+
+
+@pytest.mark.parametrize(("articles", "model"), [
+    (("1313207205", "1313207205BK"), "Amtron 4You 310 7.4 C2"),
+    (("1313201205", "1313201205BK"), "Amtron 4You 310 11 C2"),
+    (("1313202205", "1313202205BK"), "Amtron 4You 310 22 C2"),
+    (("1313201265", "1313201265BK"), "Amtron 4You 310 11 C2 PV-Bundle"),
+    (("1321307205",), "Amtron Compact 2.0s 7.4 C2"),
+    (("1321301205",), "Amtron Compact 2.0s 11 C2"),
+    (("1321302205",), "Amtron Compact 2.0s 22 C2"),
+    (("1321301265",), "Amtron Compact 2.0s 11 C2 PV-Bundle"),
+    (("1331307405",), "Amtron Start 2.0s 7.4"),
+    (("1331307605",), "Amtron Start 2.0s 7.4 T2S"),
+    (("1331302405",), "Amtron Start 2.0s 22"),
+    (("1331302605",), "Amtron Start 2.0s 22 T2S"),
+])
+def test_supported_models_match_complete_padded_articles(
+    articles: tuple[str, ...], model: str,
+) -> None:
+    for article in articles:
+        assert model_name(article) == model
+        assert model_name(article.rjust(16, "_")) == model
+        assert model_name(f"{article}OTHER") == "Amtron"
+
+
+@pytest.mark.parametrize("article", ["1311201205BK", "1321101205", "1315001205BK"])
+def test_similarly_named_families_are_not_identified_as_supported(article: str) -> None:
+    assert model_name(article) == "Amtron"
+
+
+def test_the_compatibility_matrix_covers_the_model_mapping() -> None:
+    document = (Path(__file__).resolve().parents[1] / "docs/compatibility.md").read_text()
+    rows = [line.split("|") for line in document.splitlines() if line.startswith("| Amtron ")]
+    documented = {
+        article.strip().strip("`"): row[1].strip()
+        for row in rows for article in row[2].split(",")
+    }
+    assert documented == ARTICLE_MODELS
 
 
 async def _identity(transport: FakeModbusClient) -> object:
