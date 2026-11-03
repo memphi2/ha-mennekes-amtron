@@ -25,7 +25,7 @@ def test_the_input_accepts_zero_for_no_limit() -> None:
     async def run() -> None:
         number, _entry, _transport = await _number()
         assert number.native_min_value == 0.0
-        assert number.mode == NumberMode.BOX
+        assert number.mode == NumberMode.SLIDER
         assert number.native_max_value == 16.0
         assert number.native_step == 0.1
         assert number.native_value == 16.0

@@ -256,7 +256,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             await hass.async_block_till_done()
             assert hass.states.get(number).state == "0.0"
             assert hass.states.get(number).attributes["min"] == 0
-            assert hass.states.get(number).attributes["mode"] == "box"
+            assert hass.states.get(number).attributes["mode"] == "slider"
             assert await entry.runtime_data.client.async_read_register(R.CHARGING_CURRENT_EMS) == 0
 
             # Reconfiguring starts from the entry, not from the factory values.

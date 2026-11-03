@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Show the charging-current limit as a slider, retaining 0 A for no limit and
+  the separate charging-pause switch.
+
 - Allow pause and resume after the five-second current-write interval instead
   of imposing a five-minute manual-control lockout. Phase switching keeps its
   own five-minute guard; PV automation hysteresis retains its six-minute default.

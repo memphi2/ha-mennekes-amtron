@@ -22,7 +22,7 @@ bus access.
 | **Recover from error** | Runs the documented sequence for a lost energy-manager heartbeat. It may release and resume charging. |
 | **Restart** | Restarts the wallbox only when it reports idle. |
 
-**0 A turns the limit off.** The wallbox's own limits still apply; the extra
+The current control is a slider. **0 A turns the limit off.** The wallbox's own limits still apply; the extra
 current cap in the integration options is bypassed. Enter 6 A or more to
 enable a limit again. Values between 0 and 6 A are rejected. Use
 **Charging paused** to stop a charge.

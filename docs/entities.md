@@ -119,6 +119,6 @@ and templates see.
 
 ## The action
 
-`mennekes_amtron_rtu.set_charging_current` writes the charging-current limit
-and is the only way to reach the "no limitation" value. See
+`mennekes_amtron_rtu.set_charging_current` writes the charging-current limit.
+Both the action and the slider accept 0 A to remove the limit. See
 [user-guide.md](user-guide.md#actions).
