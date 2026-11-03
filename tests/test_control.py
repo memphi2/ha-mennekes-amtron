@@ -58,7 +58,7 @@ class Harness:
             phase_options_hw=phase_options,
             max_evse_current=16.0,
         )
-        self.snapshot = WallboxData(values=dict(values or {}))
+        self.snapshot = WallboxData(values=dict(values if values is not None else {"charging_current_ems": 16.0}))
         self.refreshes = 0
         self.slept: list[float] = []
         self.control = AmtronControl(
@@ -624,6 +624,47 @@ def test_a_setpoint_change_cannot_undo_a_pause_early() -> None:
     assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
 
 
+@pytest.mark.parametrize("missing", [None, float("nan"), "invalid", "old_snapshot"])
+@pytest.mark.parametrize("command", ["current", "unlimited", "recovery"])
+def test_lost_or_old_readback_cannot_lift_a_confirmed_pause(missing, command):
+    harness = Harness(values={"charging_current_ems": 8.0})
+
+    async def run():
+        control = await harness.connect()
+        await control.async_pause_charging()
+        if missing != "old_snapshot":
+            harness.snapshot = WallboxData(values={"charging_current_ems": missing})
+        harness.clock[0] += 6
+        assert control.is_paused is True
+        action = (control.async_recover_from_error() if command == "recovery" else
+                  control.async_set_charging_current(
+                      0 if command == "unlimited" else 8, allow_unlimited=True))
+        with pytest.raises(ServiceValidationError) as error:
+            await action
+        assert error.value.translation_placeholders == {"seconds": "294"}
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        harness.clock[0] += 294
+        await control.async_set_charging_current(8)
+        assert control.is_paused is False
+
+    asyncio.run(run())
+
+
+def test_unknown_pause_state_keeps_the_startup_guard():
+    harness = Harness(values={})
+
+    async def run():
+        control = await harness.connect()
+        harness.client.write_state.mode_change_at = harness.clock[0]
+        assert control.is_paused is None
+        harness.clock[0] += 6
+        with pytest.raises(ServiceValidationError):
+            await control.async_set_charging_current(8)
+        assert not harness.transport.writes
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("rejection", ["cooldown", "device"])
 def test_rejected_setpoint_does_not_change_the_later_resume(rejection: str) -> None:
     harness = Harness(values={"charging_current_ems": 8.0})
@@ -824,5 +865,26 @@ def test_phase_switch_rate_limit_reports_a_translated_wait(charging: bool) -> No
         await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
         assert harness.written(R.REQUESTED_PHASES) == [[1], [0]]
         assert bool(harness.written(R.CHARGING_CURRENT_EMS)) == charging
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("outcome", ["lost_reply", "cancelled"])
+def test_uncertain_pause_keeps_hysteresis_even_with_old_readback(outcome):
+    harness = Harness(values={"charging_current_ems": 8.0})
+
+    async def run():
+        control = await harness.connect()
+        error = asyncio.CancelledError() if outcome == "cancelled" else raise_connection_error()
+        harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = error
+        with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError):
+            await control.async_pause_charging()
+        harness.transport.write_exceptions.clear()
+        harness.clock[0] += 6
+        assert control.is_paused is None
+        with pytest.raises(ServiceValidationError) as limited:
+            await control.async_set_charging_current(8)
+        assert limited.value.translation_placeholders == {"seconds": "294"}
+        assert not harness.written(R.CHARGING_CURRENT_EMS)
 
     asyncio.run(run())
