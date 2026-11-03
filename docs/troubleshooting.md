@@ -59,7 +59,8 @@ these cases.
 The wallbox did not receive a usable heartbeat in time. In master mode, the
 integration recovers automatically once heartbeat delivery resumes and a
 fresh read confirms error 200. It runs the documented heartbeat → charging
-release → current sequence, respects a pause or device lock, and retains the
+release → current sequence, respects a pause, device lock or explicitly disabled
+charging release, and retains the
 current limit. An unlimited setting is restored after the five-second write
 interval. Recovery can release and resume charging.
 

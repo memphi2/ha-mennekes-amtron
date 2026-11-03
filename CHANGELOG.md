@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Recover error 200 automatically in master mode once heartbeat delivery
   resumes, with at most three attempts per persistent fault. Respect pause,
-  device lock, current limits and the five-second write floor; restore an
+  device lock, explicitly disabled charging release, current limits and the
+  five-second write floor; restore an
   unlimited setting through the existing replaceable command queue.
 - Add a diagnostic Heartbeat problem sensor in master mode. It detects a
   missed ten-second acknowledgement deadline or stopped task independently
@@ -19,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Remember an explicitly disabled charging release across entry reloads and
+  Home Assistant restarts. Automatic recovery cannot override it, including
+  after an unconfirmed block command or a failed enable command.
 - Read the error and current before recovery. A healthy wallbox receives no
   recovery commands, other faults are rejected and a missing saved setpoint
   no longer raises a live 6 A limit to the device maximum.

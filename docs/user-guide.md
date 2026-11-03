@@ -104,7 +104,8 @@ before relying on unattended charging.
 The **Heartbeat** diagnostic sensor shows OK or a problem without recording
 every heartbeat. After a restart or temporary interruption, error 200 is
 recovered automatically once heartbeat delivery resumes. Automatic recovery
-respects a pause or device lock and retains the current setting. It stops
+respects a pause, device lock or explicitly disabled charging release and
+retains the current setting. It stops
 after three attempts if the fault persists; see
 [heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable).
 

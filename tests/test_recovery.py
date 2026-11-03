@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 from unittest.mock import patch
 
 import pytest
@@ -278,6 +279,45 @@ def test_a_new_command_supersedes_queued_unlimited_restoration():
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("when", ["before", "queued"])
+def test_an_explicitly_blocked_release_prevents_automatic_recovery(when):
+    async def run():
+        runtime, recovery, transport, _clock = await _runtime()
+        if when == "queued":
+            recovery.start()
+            task = recovery._task
+        await runtime.control.async_set_charging_release(False)
+        if when == "before":
+            recovery.start()
+            assert recovery._task is None
+        else:
+            await asyncio.wait_for(task, 10)
+        assert transport.writes == [(R.CHARGING_RELEASE.address, [0])]
+        assert runtime.diagnostics.recoveries == 0
+        assert recovery._retry is None
+        # Explicitly restoring release permits automatic recovery again.
+        await runtime.control.async_set_charging_release(True)
+        recovery.async_check()
+        await _finish(recovery)
+        assert runtime.diagnostics.recoveries == 1
+        await recovery.async_stop()
+        await runtime.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_manual_recovery_can_explicitly_restore_charging_release():
+    async def run():
+        runtime, recovery, _transport, _clock = await _runtime()
+        await runtime.control.async_set_charging_release(False)
+        assert await runtime.control.async_recover_from_error()
+        assert runtime.control.charging_release_requested is True
+        await recovery.async_stop()
+        await runtime.client.async_close()
+
+    asyncio.run(run())
+
+
 def test_unload_cancels_pending_recovery_and_releases_listeners():
     async def run():
         runtime, recovery, transport, _clock = await _runtime()
@@ -459,6 +499,80 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
                 assert await hass.config_entries.async_unload(entry.entry_id)
                 assert runtime.recovery._remove == []
                 assert runtime.recovery._retry is None
+            finally:
+                await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))
+
+
+def test_blocked_release_survives_a_real_home_assistant_restart(tmp_path):
+    from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+    from tests.test_home_assistant_smoke import _boot
+
+    async def run():
+        target = tmp_path / "config"
+        transport = FakeModbusClient(device_bank(charging_current=8))
+        with patch(
+            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            return_value=transport,
+        ):
+            hass = await _boot(target)
+            try:
+                flow = await hass.config_entries.flow.async_init(
+                    DOMAIN, context={"source": "user"}
+                )
+                await hass.config_entries.flow.async_configure(
+                    flow["flow_id"],
+                    {
+                        "port": "/dev/fake",
+                        "device_id": 50,
+                        "baudrate": 57600,
+                        "frame": "8n2",
+                        "search": "off",
+                    },
+                )
+                await hass.async_block_till_done()
+                entry = hass.config_entries.async_entries(DOMAIN)[0]
+                hass.config_entries.async_update_entry(
+                    entry, options={"control_mode": CONTROL_MODE_MASTER}
+                )
+                await hass.async_block_till_done()
+                entity_id = "switch.mennekes_amtron_charging_release"
+                await hass.services.async_call(
+                    "switch", "turn_off", {"entity_id": entity_id}, blocking=True
+                )
+                await hass.async_block_till_done()
+                assert entry.runtime_data.control.charging_release_requested is False
+                assert (
+                    "charging_release_requested"
+                    not in hass.states.get(entity_id).attributes
+                )
+            finally:
+                await hass.async_stop()
+
+            # Restart with new runtime objects, the same HA storage and a
+            # fault acquired during the downtime. The bus is still synthetic.
+            shutil.rmtree(target / "custom_components" / DOMAIN)
+            put(transport.bank, R.ERROR_CODE, 200)
+            transport.writes.clear()
+            hass = await _boot(target)
+            try:
+                entry = hass.config_entries.async_entries(DOMAIN)[0]
+                assert await hass.config_entries.async_setup(entry.entry_id)
+                await hass.async_block_till_done()
+                runtime = entry.runtime_data
+                assert runtime.control.charging_release_requested is False
+                assert runtime.heartbeat.healthy is True
+                assert runtime.recovery._task is None
+                assert runtime.recovery._retry is None
+                assert runtime.diagnostics.recoveries == 0
+                assert await runtime.client.async_read_register(R.CHARGING_RELEASE) == 0
+                assert all(
+                    address == R.HEARTBEAT.address for address, _ in transport.writes
+                )
+                assert await hass.config_entries.async_reload(entry.entry_id)
+                await hass.async_block_till_done()
+                assert entry.runtime_data.control.charging_release_requested is False
             finally:
                 await hass.async_stop()
 

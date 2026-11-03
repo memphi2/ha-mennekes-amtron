@@ -366,7 +366,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Die Wallbox meldet Fehler 200 nach einem ausgebliebenen Heartbeat. Im Modbus-Master-Modus läuft die Wiederherstellung automatisch, sobald der Heartbeat wieder ankommt, sofern das Laden nicht pausiert oder die Wallbox gesperrt ist. Mit dem Bestätigen startest du einen manuellen Versuch: Heartbeat, Ladefreigabe und mindestens 6 A werden geschrieben; das Laden kann dabei fortgesetzt werden. Ein bereits behobener Fehler wird ohne weitere Befehle geschlossen.",
+            "description": "Die Wallbox meldet Fehler 200 nach einem ausgebliebenen Heartbeat. Im Modbus-Master-Modus läuft die Wiederherstellung automatisch, sobald der Heartbeat wieder ankommt, sofern das Laden nicht pausiert, die Wallbox gesperrt oder die Ladefreigabe bewusst ausgeschaltet ist. Mit dem Bestätigen startest du einen manuellen Versuch: Heartbeat, Ladefreigabe und mindestens 6 A werden geschrieben; das Laden kann dabei fortgesetzt werden. Ein bereits behobener Fehler wird ohne weitere Befehle geschlossen.",
             "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
           }
         },

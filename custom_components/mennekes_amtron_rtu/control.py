@@ -112,6 +112,16 @@ class AmtronControl:
         self._write_state.charging_setpoint = value
 
     @property
+    def charging_release_requested(self) -> bool | None:
+        """Return explicit release intent, independently of fault readback."""
+
+        return self._write_state.charging_release_requested
+
+    @charging_release_requested.setter
+    def charging_release_requested(self, value: bool | None) -> None:
+        self._write_state.charging_release_requested = value
+
+    @property
     def options(self) -> ControlOptions:
         """Return the active control options."""
 
@@ -216,7 +226,17 @@ class AmtronControl:
         """Open or close the charging relay through 0x0D05."""
 
         self._require_write_access()
-        await self._async_write(CHARGING_RELEASE, int(released))
+        async with self._current_lock:
+            previous = self.charging_release_requested
+            self.charging_release_requested = released
+            try:
+                await self._async_write(CHARGING_RELEASE, int(released))
+            except (HomeAssistantError, asyncio.CancelledError):
+                # A failed block command still expresses the user's intent.
+                # A failed enable must never erase a previously blocked state.
+                if released:
+                    self.charging_release_requested = previous
+                raise
 
     async def async_set_lock_evse(self, locked: bool) -> None:
         """Lock or unlock the wallbox through 0x0D06."""
@@ -271,6 +291,8 @@ class AmtronControl:
 
         self._require_write_access()
         async with self._current_lock:
+            if automatic and self.charging_release_requested is False:
+                return False
             try:
                 error = await self._client.async_read_register(ERROR_CODE)
                 if error == 0:
@@ -320,6 +342,8 @@ class AmtronControl:
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
             await self._async_write(CHARGING_RELEASE, 1)
+            if not automatic:
+                self.charging_release_requested = True
             await self._async_request_current_locked(
                 max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current)),
                 # Recovery only changes charging mode if it lifts a pause.

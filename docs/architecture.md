@@ -100,7 +100,11 @@ recovery, rather than growing the event history on every retry.
 
 The recovery worker subscribes to heartbeat health and coordinator changes.
 It runs only for a confirmed error 200, healthy heartbeat delivery and an
-unpaused, unlocked device in master mode. It reads the error, current and
+unpaused, unlocked device in master mode whose charging release has not been
+explicitly disabled. Release intent is retained in WriteState across reloads
+and in the switch's extra restore data across HA restarts; it is not a Recorder
+attribute. Fault readback cannot overwrite that intent. Release commands use
+the same current-command lock as recovery. It reads the error, current and
 lock again under the current-command lock, then uses the normal write path.
 The live limit is never increased to a missing/default saved setpoint. Zero
 is restored through the replaceable current queue after the required >=6 A

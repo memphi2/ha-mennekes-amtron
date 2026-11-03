@@ -42,6 +42,7 @@ class HeartbeatRecovery:
         return bool(
             not self._stopped
             and not runtime.control.read_only
+            and runtime.control.charging_release_requested is not False
             and runtime.heartbeat is not None
             and runtime.heartbeat.healthy is True
             and runtime.coordinator.last_update_success

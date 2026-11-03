@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
@@ -74,7 +76,17 @@ class AmtronPauseSwitch(MennekesAmtronEntity, SwitchEntity):
         await self.runtime_data.control.async_resume_charging()
 
 
-class AmtronChargingReleaseSwitch(MennekesAmtronEntity, SwitchEntity):
+@dataclass(frozen=True)
+class ChargingReleaseRestoreData(ExtraStoredData):
+    """Persist intent without adding a changing entity attribute to Recorder."""
+
+    requested: bool | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"charging_release_requested": self.requested}
+
+
+class AmtronChargingReleaseSwitch(MennekesAmtronEntity, SwitchEntity, RestoreEntity):
     """The energy-manager charging release in 0x0D05.
 
     This opens and closes the wallbox relay. For everyday pausing use the
@@ -110,6 +122,32 @@ class AmtronChargingReleaseSwitch(MennekesAmtronEntity, SwitchEntity):
         """Block charging."""
 
         await self.runtime_data.control.async_set_charging_release(False)
+
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData:
+        """Keep explicit intent separate from relay readback during a fault."""
+
+        return ChargingReleaseRestoreData(
+            self.runtime_data.control.charging_release_requested
+        )
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        control = self.runtime_data.control
+        if control.charging_release_requested is not None:
+            return
+        if extra := await self.async_get_last_extra_data():
+            values = extra.as_dict()
+            requested = values.get("charging_release_requested")
+            if "charging_release_requested" in values and (
+                requested is None or isinstance(requested, bool)
+            ):
+                control.charging_release_requested = requested
+                return
+        # Older versions did not store intent separately. Preserve an old off
+        # state conservatively rather than enabling charging during an upgrade.
+        if (state := await self.async_get_last_state()) is not None and state.state == "off":
+            control.charging_release_requested = False
 
 
 class AmtronLockSwitch(MennekesAmtronEntity, SwitchEntity):

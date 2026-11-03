@@ -20,6 +20,7 @@ class WriteState:
     mode_change_at: float | None = None
     confirmed_current: float | None = None
     charging_setpoint: float | None = None
+    charging_release_requested: bool | None = None
     current_write_generation: int = 0
 
     @classmethod
