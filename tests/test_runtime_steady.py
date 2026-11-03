@@ -64,6 +64,8 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
                 now = time.monotonic()
                 report.update(elapsed=now - started, recoveries=recoveries,
                               heartbeats=measured.deliveries,
+                              heartbeat_failures=runtime.diagnostics.heartbeats_failed,
+                              heartbeats_late=runtime.diagnostics.heartbeats_late,
                               heartbeat_max_gap=measured.maximum_gap(now),
                               measurement_changes=changes)
             checkpoint()

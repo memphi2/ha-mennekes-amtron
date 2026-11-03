@@ -29,6 +29,7 @@ from .client_errors import AmtronBusError
 from .const import (
     HEARTBEAT_DEADLINE_SECONDS,
     HEARTBEAT_INTERVAL_SECONDS,
+    HEARTBEAT_RETRY_INTERVAL_SECONDS,
     HEARTBEAT_VALUE,
 )
 from .data import WriteDiagnostics
@@ -103,7 +104,13 @@ class HeartbeatTask:
             finished = self._monotonic()
             if delivered:
                 self._note_delivery(finished)
-            await self._sleep(max(0.0, self._interval - (finished - started)))
+            # A single failed scheduled write followed by another full five
+            # seconds would already exhaust the wallbox's ten-second deadline.
+            # Only this idempotent heartbeat gets a shorter retry cadence.
+            interval = self._interval if delivered else min(
+                self._interval, HEARTBEAT_RETRY_INTERVAL_SECONDS
+            )
+            await self._sleep(max(0.0, interval - (finished - started)))
 
     def start(self) -> None:
         """Start the heartbeat as an asyncio task."""

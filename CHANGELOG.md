@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Retry failed heartbeats on a one-second interval so a brief serial reconnect
+  does not consume the entire ten-second delivery deadline.
 - Retain continuous-soak measurements on failures and timeouts, and upload
   diagnostic reports even when the CI test fails.
 - Verify the downloaded SBOM dependency inventory, versions, extras and

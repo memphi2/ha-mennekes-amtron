@@ -47,7 +47,9 @@ previous section: this integration must not share that bus, even read-only.
 ## The heartbeat, and what happens without it
 
 In master mode the integration writes `0x0D00 = 0x55AA` every five seconds.
-The wallbox expects it at least every ten seconds. If it stops:
+A failed heartbeat is retried on a one-second interval until delivery resumes.
+The wallbox expects it at least every ten seconds. Longer connection outages
+can still miss this deadline. If the heartbeat stops:
 
 - with no energy-manager fallback configured (`0x030E = 0`), the wallbox keeps
   charging with the last values it received;

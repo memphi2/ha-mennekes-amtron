@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from itertools import pairwise
 
 import pytest
 
@@ -274,3 +275,78 @@ def test_a_failed_beat_does_not_count_as_delivered() -> None:
     asyncio.run(run())
     assert diagnostics.heartbeats_failed >= 3
     assert diagnostics.heartbeats_late == 0
+
+
+@pytest.mark.parametrize("failure_duration", [0.01, 1.1])
+def test_brief_disconnect_at_due_time_does_not_lose_the_next_deadline(failure_duration):
+    """A brief outage at t=5 must not delay delivery until t=10 plus jitter."""
+    transport = FakeModbusClient(device_bank())
+    diagnostics = WriteDiagnostics()
+    clock = [0.0]
+    deliveries = []
+    attempts = 0
+    sleeps = []
+    original = transport.write_register
+
+    async def write(address, value, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            clock[0] += failure_duration
+            raise raise_connection_error()
+        clock[0] += 0.01
+        result = await original(address, value, **kwargs)
+        deliveries.append(clock[0])
+        return result
+
+    transport.write_register = write
+
+    async def run():
+        client = _client(transport)
+        await client.async_connect()
+
+        async def sleep(delay):
+            sleeps.append(delay)
+            clock[0] += delay + 0.005  # Event-loop wakeup is never perfectly exact.
+            if len(deliveries) >= 3:
+                heartbeat._stopping = True
+            await asyncio.sleep(0)
+
+        heartbeat = HeartbeatTask(client, diagnostics, sleep=sleep, monotonic=lambda: clock[0])
+        await heartbeat.async_run()
+        await client.async_close()
+
+    asyncio.run(run())
+    assert diagnostics.heartbeats_failed == 1
+    assert diagnostics.heartbeats_late == 0
+    assert all(later - earlier < 10 for earlier, later in pairwise(deliveries))
+    assert deliveries[-1] - deliveries[-2] == pytest.approx(5.005)
+    assert sleeps[1] <= 1
+
+
+def test_persistent_failure_retries_without_spinning_or_accumulating_events():
+    transport = FakeModbusClient(device_bank())
+    transport.write_exceptions[R.HEARTBEAT.address] = raise_connection_error()
+    diagnostics = WriteDiagnostics()
+    clock = [0.0]
+    sleeps = []
+
+    async def run():
+        client = _client(transport)
+        await client.async_connect()
+
+        async def sleep(delay):
+            sleeps.append(delay)
+            clock[0] += delay
+            if len(sleeps) >= 5:
+                heartbeat._stopping = True
+            await asyncio.sleep(0)
+
+        heartbeat = HeartbeatTask(client, diagnostics, sleep=sleep, monotonic=lambda: clock[0])
+        await heartbeat.async_run()
+        await client.async_close()
+
+    asyncio.run(run())
+    assert sleeps == [1.0] * 5
+    assert diagnostics.heartbeats_failed == 5
+    assert len(diagnostics.timeline.snapshot()) == 1

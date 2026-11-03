@@ -84,6 +84,14 @@ a delivered beat closes a gap, and a gap past the deadline raises a warning
 and increments `heartbeats_late` in the diagnostics, because the wallbox
 reports the resulting fault without saying why.
 
+After a failed heartbeat, its task uses a one-second retry interval, still
+subtracting the time spent on the failed attempt. Once delivery succeeds it
+returns to five seconds. This avoids spending the entire ten-second deadline
+on one brief disconnect. Only the heartbeat's fixed, idempotent value receives
+this treatment; control writes retain their existing intervals and are never
+automatically replayed. Repeated failures produce one failure event until
+recovery, rather than growing the event history on every retry.
+
 ### One choke point for writes
 
 `control.py` is the only module that may change device state. It exists

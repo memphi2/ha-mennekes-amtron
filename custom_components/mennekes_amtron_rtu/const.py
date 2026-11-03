@@ -51,9 +51,10 @@ def frame_display(bytesize: int, parity: str, stopbits: int) -> str:
 DEFAULT_TIMEOUT: Final = 1.0
 DEFAULT_RETRIES: Final = 2
 
-# The vendor requires a heartbeat at least every 10 s. Half of that keeps one
-# lost frame from reaching the deadline.
+# The vendor requires a heartbeat at least every 10 s. Keep scheduling margin
+# and retry a failed heartbeat sooner instead of spending the entire margin.
 HEARTBEAT_INTERVAL_SECONDS: Final = 5.0
+HEARTBEAT_RETRY_INTERVAL_SECONDS: Final = 1.0
 HEARTBEAT_DEADLINE_SECONDS: Final = 10.0
 
 DEFAULT_SCAN_INTERVAL_SECONDS: Final = 5
