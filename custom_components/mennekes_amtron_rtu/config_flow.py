@@ -52,7 +52,7 @@ from .const import (
 )
 from .data import DeviceIdentity
 from .entry_types import MennekesAmtronConfigEntry
-from .identity import async_read_identity
+from .identity import async_read_identity, display_identifier
 from .options_flow import MennekesAmtronOptionsFlow
 from .registers import VALIDATED_LAYOUT, layout_label
 
@@ -262,7 +262,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                     "baudrate": str(result.config.baudrate),
                     "frame": _frame(result.config),
                     "layout": layout_label(result.identity.layout_version),
-                    "serial_number": result.identity.serial_number or "-",
+                    "serial_number": display_identifier(result.identity.serial_number) or "-",
                     "attempts": str(result.attempts),
                 },
             )

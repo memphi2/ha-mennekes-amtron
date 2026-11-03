@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError
+from .const import DEFAULT_MODEL
 from .data import DeviceIdentity
 from .registers import (
     ARTICLE_NUMBER,
@@ -20,6 +21,30 @@ from .registers import (
     SERIAL_NUMBER,
     RegisterSpec,
 )
+
+
+def display_identifier(value: str | None) -> str | None:
+    """Remove leading device padding for display, never for registry keys.
+
+    Existing entries and entities use the raw serial as their stable identity.
+    Cleaning that key would create new devices and lose entity associations.
+    Embedded underscores and leading zeroes are part of the identifier.
+    """
+
+    return value.lstrip("_") or None if value else None
+
+
+def model_name(article_number: str | None) -> str:
+    """Resolve verified article numbers without guessing from a prefix.
+
+    The RTU v2.5 specification names 1313201205; the manufacturer's product
+    sheet identifies the complete 1313201205BK variant. See the source links
+    in docs/user-guide.md. Other articles keep a generic model plus model_id.
+    """
+
+    if display_identifier(article_number) in ("1313201205", "1313201205BK"):
+        return "Amtron 4You 310 11 C2"
+    return DEFAULT_MODEL
 
 
 async def async_read_identity(client: MennekesModbusClient) -> DeviceIdentity:

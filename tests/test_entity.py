@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from custom_components.mennekes_amtron_rtu.const import CONF_SERIAL_NUMBER, DOMAIN
 from custom_components.mennekes_amtron_rtu.entity import (
     MennekesAmtronEntity,
@@ -30,10 +32,46 @@ def test_device_info_carries_the_identity() -> None:
         info = entry_device_info(entry)
         assert info["identifiers"] == {(DOMAIN, "ABC123456789")}
         assert info["manufacturer"] == "MENNEKES"
-        assert info["model"] == "1313201205"
+        assert info["model"] == "Amtron 4You 310 11 C2"
         assert info["sw_version"] == "2023.21.11024"
         assert info["serial_number"] == "ABC123456789"
         assert info["model_id"] == "1313201205"
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("article", ["______1313201205", "____1313201205BK"])
+def test_padding_is_removed_only_from_display_and_known_articles_are_mapped(article: str) -> None:
+    async def run() -> None:
+        _hass, entry, _transport = await build_runtime()
+        serial = "____00TEST_123"
+        entry.data[CONF_SERIAL_NUMBER] = serial
+        entry.runtime_data.identity.serial_number = serial
+        entry.runtime_data.identity.article_number = article
+        info = entry_device_info(entry)
+        assert info["serial_number"] == "00TEST_123"
+        assert info["model"] == "Amtron 4You 310 11 C2"
+        assert info["model_id"] == article.lstrip("_")
+        assert info["identifiers"] == {(DOMAIN, serial)}
+        assert entry_entity_unique_id(entry, "evse_state") == f"{serial}_evse_state"
+        assert entry.runtime_data.identity.serial_number == serial
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("article", ["__UNKNOWN_123", "1313201205OTHER", "____________", None])
+def test_unknown_articles_are_not_mistaken_for_a_known_model(article: str | None) -> None:
+    async def run() -> None:
+        _hass, entry, _transport = await build_runtime()
+        entry.runtime_data.identity.article_number = article
+        entry.runtime_data.identity.serial_number = "________________"
+        info = entry_device_info(entry)
+        assert info["model"] == "AMTRON"
+        assert "serial_number" not in info
+        if article and article.lstrip("_"):
+            assert info["model_id"] == article.lstrip("_")
+        else:
+            assert "model_id" not in info
 
     asyncio.run(run())
 

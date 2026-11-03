@@ -7,11 +7,12 @@ from typing import TYPE_CHECKING
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_SERIAL_NUMBER, DEFAULT_MODEL, DOMAIN, MANUFACTURER
+from .const import CONF_SERIAL_NUMBER, DOMAIN, MANUFACTURER
 from .coordinator import MennekesAmtronCoordinator
 from .data import WallboxData
 from .decode import RegisterValue
 from .entry_types import MennekesAmtronConfigEntry
+from .identity import display_identifier, model_name
 
 if TYPE_CHECKING:
     from .data import MennekesAmtronRuntimeData
@@ -46,15 +47,15 @@ def entry_device_info(entry: MennekesAmtronConfigEntry) -> DeviceInfo:
     info = DeviceInfo(
         identifiers={(DOMAIN, entry_device_key(entry))},
         manufacturer=MANUFACTURER,
-        model=identity.article_number or DEFAULT_MODEL,
+        model=model_name(identity.article_number),
         name=entry.title,
     )
     if identity.firmware_version:
         info["sw_version"] = identity.firmware_version
-    if identity.serial_number:
-        info["serial_number"] = identity.serial_number
-    if identity.article_number:
-        info["model_id"] = identity.article_number
+    if serial_number := display_identifier(identity.serial_number):
+        info["serial_number"] = serial_number
+    if article_number := display_identifier(identity.article_number):
+        info["model_id"] = article_number
     return info
 
 

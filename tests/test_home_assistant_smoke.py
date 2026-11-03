@@ -178,7 +178,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             )[0]
             assert device.serial_number == SERIAL_NUMBER
             assert device.sw_version == "2023.21.11024"
-            assert device.model == "1313201205"
+            assert device.model == "Amtron 4You 310 11 C2"
             assert device.identifiers == {("mennekes_amtron_rtu", SERIAL_NUMBER)}
 
             # A wallbox in error state 200 without a configured fallback.

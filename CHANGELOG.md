@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Remove leading underscore padding from displayed serial/article numbers and
+  map the verified 1313201205 article to Amtron 4You 310 11 C2. Keep existing
+  device identifiers and entity unique IDs unchanged.
 - Isolate package staging per build and replace the output ZIP atomically;
   overlapping or failed builds cannot leave a partial archive.
 - Reject growing or missing listener counts in loaded and continuous soak

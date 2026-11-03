@@ -41,6 +41,15 @@ Check the slider and current cap before resuming.
 
 ## Understand the readings
 
+The device page shows the model separately from the article number. The
+article `1313201205` (including its `BK` variant) maps to **Amtron 4You 310 11 C2**,
+using the [MENNEKES RTU specification](https://www.mennekes.de/fileadmin/MEN-Deutschland/emobility/01_documents/04_installer/Modbus_RTU_Specification_AMTRON_4You300_Compact_2.0s_Start_2.0s-v2.5.pdf)
+and [manufacturer's product sheet](https://www.mennekes.de/fileadmin/products_media/medien_sge2/produktdatenblaetter/20241218/1313201205BK_de.pdf).
+Unknown articles keep the generic Amtron model and their own article number;
+the integration does not infer capabilities from that name. Leading underscore
+padding is hidden in displayed serial/article numbers. Existing device and
+entity identifiers stay unchanged, preserving automations and history.
+
 - **Vehicle connected** means a cable/vehicle is detected; it does not mean
   charging has started. Authorization, vehicle settings and release still matter.
 - **Charging** and **EVSE state** describe the wallbox's state.
