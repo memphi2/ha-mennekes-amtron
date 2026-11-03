@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.4.0 — 2026-11-03
+
 ### Fixed
 
 - Use Mennekes Amtron as the default device name, including existing default
