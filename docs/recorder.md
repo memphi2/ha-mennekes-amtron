@@ -27,6 +27,20 @@ new history and statistics. Existing statistics are retained.
 
 ## Configure history retention and detail exclusions
 
+To generate the exclusions with your actual entity IDs, open **Developer
+tools → Actions → Mennekes Amtron RTU: Suggest Recorder exclusions**
+(`mennekes_amtron_rtu.get_recorder_exclusions`). Select your wallbox or
+wallboxes and choose **Less detail** or **Energy and power statistics only**.
+Run the action and copy the returned `yaml` suggestion. Renamed entities and
+multiple wallboxes are resolved from the entity registry. The action also
+works in read-only mode and sends no commands to the wallbox.
+
+Merge the returned `entities` list into your existing `recorder.exclude.entities`;
+do not replace your existing configuration. **Full history** returns an empty
+suggestion and does not undo existing exclusions. No profile modifies Recorder,
+deletes history, or changes the retention settings automatically. Regenerate
+the suggestion after renaming entities or adding wallboxes.
+
 Back up your configuration, then merge this into your existing `recorder:`
 section in `configuration.yaml`; there may only be one such section. Keep your existing filters and database
 connection settings. Retention and commit settings affect **all** recorded

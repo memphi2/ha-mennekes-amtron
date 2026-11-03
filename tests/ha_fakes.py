@@ -86,7 +86,7 @@ class FakeServices:
         return (domain, service) in self.registered
 
     def async_register(
-        self, domain: str, service: str, handler: Any, schema: Any = None
+        self, domain: str, service: str, handler: Any, schema: Any = None, **kwargs: Any
     ) -> None:
         """Register a service handler."""
 

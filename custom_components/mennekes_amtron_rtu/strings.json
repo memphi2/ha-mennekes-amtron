@@ -406,6 +406,13 @@
         "full": "Search every address, baud rate and frame, several minutes",
         "off": "Do not search, just report the error"
       }
+    },
+    "recorder_profile": {
+      "options": {
+        "full": "Full history",
+        "detail": "Less detail",
+        "lean": "Energy and power statistics only"
+      }
     }
   },
   "services": {
@@ -426,6 +433,20 @@
         }
       },
       "name": "Set charging current"
+    },
+    "get_recorder_exclusions": {
+      "name": "Suggest Recorder exclusions",
+      "description": "Return a YAML suggestion using the actual entity IDs. Does not change Recorder or delete history. Merge the list into your existing configuration.",
+      "fields": {
+        "device_id": {
+          "name": "Wallboxes",
+          "description": "Wallboxes to include in the suggestion."
+        },
+        "profile": {
+          "name": "History profile",
+          "description": "Keep all history, reduce detail, or keep only energy and power statistics."
+        }
+      }
     }
   }
 }
