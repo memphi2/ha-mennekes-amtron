@@ -417,7 +417,7 @@ def test_the_phase_switch_skips_the_pause_when_idle() -> None:
 
 
 def test_recovery_writes_the_documented_sequence_in_order() -> None:
-    harness = Harness(error_code=200, )
+    harness = Harness(error_code=200)
 
     async def run() -> None:
         control = await harness.connect()
@@ -847,7 +847,7 @@ def test_deferred_zero_preserves_the_write_floor_and_replaces_a_pending_limit() 
 
 def test_recovery_cannot_bypass_the_current_write_interval() -> None:
     async def run() -> None:
-        harness = Harness(error_code=200, )
+        harness = Harness(error_code=200)
         control = await harness.connect()
         await control.async_set_charging_current(6)
         harness.transport.bank[R.CHARGING_RELEASE.address] = 0

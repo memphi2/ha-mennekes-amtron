@@ -184,9 +184,11 @@ def test_recovery_has_a_bounded_retry_budget(failure):
     asyncio.run(run())
 
 
-def test_unlimited_is_restored_through_the_guarded_replaceable_queue():
+@pytest.mark.parametrize("remembered", [None, 0, 8, 16])
+def test_unlimited_is_restored_through_the_guarded_replaceable_queue(remembered):
     async def run():
         runtime, recovery, _transport, clock = await _runtime(current=0)
+        runtime.control.charging_setpoint = remembered
         slept = []
 
         async def sleep(delay):

@@ -278,7 +278,9 @@ class AmtronControl:
                 if error != ERROR_CODE_EMS_UNAVAILABLE:
                     raise service_validation_error("recovery_not_applicable")
                 current = await self._client.async_read_register(CHARGING_CURRENT_EMS)
-                locked = await self._client.async_read_register(LOCK_EVSE) if automatic else 0
+                locked = (
+                    await self._client.async_read_register(LOCK_EVSE) if automatic else 0
+                )
             except AmtronBusError as err:
                 raise service_validation_error("recovery_state_unknown") from err
             if not isinstance(current, (int, float)) or not math.isfinite(current) or current < 0:
@@ -303,12 +305,18 @@ class AmtronControl:
                     "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
                 ) from err
             remembered = self.charging_setpoint
-            if current >= CHARGING_CURRENT_MINIMUM:
-                target = min(current, remembered) if remembered is not None and remembered >= CHARGING_CURRENT_MINIMUM else current
+            if current == CHARGING_CURRENT_UNLIMITED:
+                target = CHARGING_CURRENT_UNLIMITED
+            elif current >= CHARGING_CURRENT_MINIMUM:
+                target = (
+                    min(current, remembered)
+                    if remembered is not None and remembered >= CHARGING_CURRENT_MINIMUM
+                    else current
+                )
             elif remembered is not None:
                 target = remembered
             else:
-                target = CHARGING_CURRENT_UNLIMITED if current == 0 else CHARGING_CURRENT_MINIMUM
+                target = CHARGING_CURRENT_MINIMUM
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
             await self._async_write(CHARGING_RELEASE, 1)
