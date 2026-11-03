@@ -255,21 +255,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release-tag.outputs.tag }}
         run: |
-          assets=(
-            "$RELEASE_ZIP"
-            "$RELEASE_SHA256SUMS"
-            "$RELEASE_METADATA"
-            "$RELEASE_SBOM"
-          )
-          notes_file=".github/release-notes/${RELEASE_TAG}.md"
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
-          else
-            gh release create "$RELEASE_TAG" "${assets[@]}" \
-              --title "$RELEASE_TAG" \
-              --notes-file "$notes_file" \
-              --verify-tag
-          fi
+          python scripts/publish_release.py --tag "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
       - name: Verify the published release against the approved source
         env:
           GH_TOKEN: ${{ github.token }}

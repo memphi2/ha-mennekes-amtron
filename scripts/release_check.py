@@ -71,8 +71,8 @@ def remote_commit(repository: str, tag: str) -> str:
     raise ValueError("release tag does not resolve to a commit")
 
 
-def verify_release(release: dict[str, Any], tag: str, notes: str) -> None:
-    if release.get("tag_name") != tag or release.get("draft") or release.get("prerelease"):
+def verify_release(release: dict[str, Any], tag: str, notes: str, *, draft: bool = False) -> None:
+    if release.get("tag_name") != tag or release.get("draft") is not draft or release.get("prerelease"):
         raise ValueError("expected the published stable release")
     if str(release.get("body", "")).replace("\r\n", "\n").strip() != notes.strip():
         raise ValueError("release notes differ from the approved source")

@@ -42,6 +42,14 @@ and NOTICE included. `--archive PATH` also verifies a local package. The release
 workflow runs the published check after uploading the assets, in addition to
 its existing SPDX schema and attestation verification before publication.
 
+Publication first uploads a draft, downloads and validates all four assets,
+and only then makes it public. A repeated run verifies existing files without
+replacing them; any difference stops publication. Metadata and the SBOM use
+the source commit timestamp (`source_date`) and a deterministic document
+identifier, so the same source and ZIP produce identical verification files.
+An incomplete draft remains private for inspection. Published files are never
+repaired by overwriting them; corrections require a new version.
+
 ## Stable and preview compatibility
 
 PR and release validation each have exactly two HA targets: the fixed minimum
