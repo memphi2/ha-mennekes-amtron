@@ -1,6 +1,6 @@
 """Actions of the MENNEKES AMTRON integration.
 
-Only one action exists, and it exists because its dangerous argument cannot
+The current action exists because its dangerous argument cannot
 be offered safely as an entity: writing 0 A to 0x0302 removes the charging
 limit instead of stopping the charge. The number entity therefore never
 reaches 0 A, and a user who really wants "no limitation" has to say so
@@ -28,6 +28,7 @@ from .const import (
 from .control import AmtronControl
 from .entity import entry_entity_unique_id
 from .exceptions import service_validation_error
+from .recorder_profile import async_setup_recorder_service
 
 SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
     {
@@ -44,6 +45,7 @@ SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
 def async_setup_services(hass: HomeAssistant) -> None:
     """Register the integration's actions once per Home Assistant start."""
 
+    async_setup_recorder_service(hass)
     if hass.services.has_service(DOMAIN, SERVICE_SET_CHARGING_CURRENT):
         return
 

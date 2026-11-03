@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import subprocess
 import sys
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -92,6 +97,45 @@ def test_the_build_is_reproducible(tmp_path: Path) -> None:
     first = _build(tmp_path / "a").read_bytes()
     second = _build(tmp_path / "b").read_bytes()
     assert first == second
+
+
+@pytest.mark.parametrize("same_destination", [False, True])
+def test_overlapping_builds_have_independent_staging(monkeypatch, tmp_path, same_destination):
+    builder = importlib.import_module("build_hacs_release")
+    expected = _build(tmp_path / "expected").read_bytes()
+    barrier = Barrier(2)
+    staged = []
+    original = builder._prepare_package
+
+    def prepare(package):
+        original(package)
+        staged.append(package)
+        barrier.wait(timeout=5)
+
+    monkeypatch.setattr(builder, "_prepare_package", prepare)
+    outputs = [tmp_path / "a" / builder.HACS_ZIP_NAME,
+               tmp_path / ("a" if same_destination else "b") / builder.HACS_ZIP_NAME]
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        list(executor.map(builder.build_archive, outputs))
+    assert len(set(staged)) == 2
+    assert all(not package.parent.exists() for package in staged)
+    assert all(output.read_bytes() == expected for output in outputs)
+
+
+def test_failed_build_preserves_existing_archive_and_removes_staging(monkeypatch, tmp_path):
+    builder = importlib.import_module("build_hacs_release")
+    output = _build(tmp_path)
+    previous = output.read_bytes()
+
+    def fail(archive, _package):
+        archive.write_bytes(b"partial")
+        raise OSError("simulated output failure")
+
+    monkeypatch.setattr(builder, "_write_zip", fail)
+    with pytest.raises(OSError, match="simulated output failure"):
+        builder.build_archive(output)
+    assert output.read_bytes() == previous
+    assert list(tmp_path.iterdir()) == [output]
 
 
 def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:

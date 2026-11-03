@@ -20,13 +20,63 @@ verify exclusive port release and zero descriptor growth.
 
 `scripts/check_runtime_soak.py` defines the growth budgets. Measurements compare
 equivalent phases; unloaded entries must leave no owned tasks, listeners or
-open clients. A successful subprocess without a valid report cannot pass.
+open clients. Listener counts must not grow in any measured phase after warmup,
+including continuous operation; a temporary peak also fails the check.
+A successful subprocess without a valid report cannot pass.
 CI runs 30 cycles, while the ordinary suite uses three for a quicker regression
 check. The serial simulator also closes its relay threads and descriptors.
 This bounded stress test does not replace physical-wallbox validation, a
 wall-clock soak lasting days, or the separate Recorder retention tests.
 
+For continuously loaded operation, run:
+
+```bash
+.venv/bin/python scripts/check_runtime_steady.py --seconds 3600 --json-output /tmp/amtron-steady.json
+```
+
+This separate test uses real elapsed time, a real Modbus RTU client and server
+connected through virtual serial ports, and active polling and heartbeat timers.
+It closes and reopens the actual serial transport every 30 seconds without
+reloading the entry. Measurements change while delayed replies and concurrent
+reads exercise the bus scheduler. Every delivered-heartbeat gap, including a
+silent tail at the end, must stay within ten seconds. It measures the same
+resource budgets approximately every five seconds and checks
+cleanup afterwards. The normal suite exercises a short version; scheduled
+and manual CI runs measure one hour on latest stable HA. This adds no required
+HA version to the minimum/latest matrix. The wallbox register values are simulated; it
+does not replace hardware tests.
+
+The same run also starts real Recorder with a disposable SQLite database and
+full history. On each reconnect, Recorder concurrently purges old test history
+and repacks the database. The test observes actual `DELETE` row counts and
+`VACUUM` completion, verifies database integrity, and checks that energy and
+power readings remain recorded. A short history window (up to 15 seconds)
+keeps this stress scenario bounded; it does not simulate normal user retention
+or replace the separate statistics and multi-day retention tests.
+
+Every sample includes state inserts, retained state rows, attribute growth,
+database size and WAL size. Queue depth and file-size peaks are also sampled
+every 250 ms, and the queue must drain at the end. The scenario allows at most
+eight state inserts per measurement iteration, plus two availability changes
+per enabled entity and reconnect. Attribute growth is limited to two rows;
+database/WAL peaks to 8/16 MiB and queue depth to 256 items. These are regression
+budgets for one synthetic wallbox, not limits imposed on a user's database.
+`scripts/recorder_soak_checks.py` owns these checks and rejects incomplete
+Recorder measurements even when the serial test itself succeeds.
+
+The continuous run checkpoints its measurements after each sample. Reports
+include completion status, the last test stage and failure categories; a
+test failure or timeout retains the available samples. CI uploads this report
+even when the test fails. With `--json-output`, checkpoints are written directly
+to the artifact path so they also survive interruption of the runner itself.
+A partial report cannot pass validation.
+
 ## Published release verification
+
+Local HACS builds use an independent temporary staging directory per invocation.
+The final ZIP appears only after the build completes; a failed build preserves
+an existing archive. Concurrent builds, including those sharing an output path,
+are covered by regression tests.
 
 ```bash
 .venv/bin/python scripts/release_check.py --ref v0.2.3 --published
@@ -42,7 +92,26 @@ and NOTICE included. `--archive PATH` also verifies a local package. The release
 workflow runs the published check after uploading the assets, in addition to
 its existing SPDX schema and attestation verification before publication.
 
+The downloaded SBOM must also list exactly the manifest's dependencies,
+including extras and version constraints, with unique package IDs and matching
+dependency relationships. Recomputing checksums cannot hide missing, additional
+or changed dependency declarations from this check.
+
+Publication first uploads a draft, downloads and validates all four assets,
+and only then makes it public. A repeated run verifies existing files without
+replacing them; any difference stops publication. Metadata and the SBOM use
+the source commit timestamp (`source_date`) and a deterministic document
+identifier, so the same source and ZIP produce identical verification files.
+An incomplete draft remains private for inspection. Published files are never
+repaired by overwriting them; corrections require a new version.
+
 ## Stable and preview compatibility
+
+Superseded PR validation runs are cancelled. Main, scheduled and manual runs
+keep their evidence; release publication is serialized per tag and never
+cancelled by another publisher. Jobs have explicit time limits. Python jobs
+cache pip downloads by dependency lock and integration manifest, while still
+resolving and verifying the current latest stable HA on every run.
 
 PR and release validation each have exactly two HA targets: the fixed minimum
 from `project-versions.json` and the automatically resolved latest stable release.

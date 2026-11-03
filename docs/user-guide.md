@@ -13,7 +13,7 @@ bus access.
 
 | Control | How to use it |
 |---|---|
-| **Charging current limit** | Set a limit from 6 A up to the displayed maximum. The wallbox and vehicle may draw less. Changing it while paused can resume charging. |
+| **Charging current limit** | Enter **0 A** to turn the limit off, or **6 A** up to the displayed maximum to set a limit. Changing it while paused can resume charging. |
 | **Charging paused** | **On** pauses; **off** resumes using the remembered current. Use this for ordinary start/stop and tariff schedules. |
 | **Charging release** | Controls the charging release/relay. Leave this out of frequent surplus adjustments; use the pause switch. |
 | **Wallbox locked** | Prevents charging while locked. |
@@ -22,20 +22,25 @@ bus access.
 | **Recover from error** | Runs the documented sequence for a lost energy-manager heartbeat. It may release and resume charging. |
 | **Restart** | Restarts the wallbox only when it reports idle. |
 
-**0 A is not a stop command.** It removes the energy-manager limit. The
-slider excludes it; use **Charging paused** to stop a charge.
+**0 A turns the limit off.** The wallbox's own limits still apply; the extra
+current cap in the integration options is bypassed. Enter 6 A or more to
+enable a limit again. Values between 0 and 6 A are rejected. Use
+**Charging paused** to stop a charge.
 
 Current requests closer than five seconds are deferred, with the newest
 accepted request taking precedence. Pause/resume requests inside the
 five-minute waiting interval are rejected with the remaining wait time;
 they are not queued for later. Allow more than five minutes in automations.
-The timing guards restart when the entry reloads, so do not use a reload to
-bypass a waiting interval.
+Timing guards survive an entry reload. After a full Home Assistant restart
+or the first setup, current writes wait five seconds and pause/resume and
+phase changes wait five minutes from setup. This protects the wallbox when
+the previous write history is unknown. Reading and the heartbeat continue.
 
-While paused, the slider shows the remembered setpoint, not a measured
-current. The integration restores that setpoint when available after a
-restart. If none can be restored, resuming uses the configured maximum.
-Check the slider and current cap before resuming.
+While paused, the current field shows the remembered setting, including 0
+for no limit. Resuming restores that setting. The integration restores it
+after a restart when available; otherwise, resuming uses the configured maximum.
+Check the current field before resuming. Active PV or other current-control
+automations can set a new limit again; disable them if you want to keep it off.
 
 ## Understand the readings
 
@@ -127,6 +132,11 @@ the result. Some vehicles abort the session and require further intervention.
 
 ## Actions
 
+For a Recorder exclusion list matching your actual entity IDs, use
+`mennekes_amtron_rtu.get_recorder_exclusions`. Select the wallboxes and a
+history profile, then merge the returned YAML into your configuration.
+See [Recorder profiles](recorder.md#configure-history-retention-and-detail-exclusions).
+
 Most automations should use the entities. The additional action
 `mennekes_amtron_rtu.set_charging_current` offers an explicit unlimited option:
 
@@ -151,17 +161,11 @@ Removing the limit also bypasses the integration's extra current cap. Hardware
 limits still apply. Values between 0 and 6 A are not accepted by this action;
 use the pause switch instead.
 
-## Compatibility and limitations
+**Recover from error** follows the manufacturer's recovery sequence with a
+limit of at least 6 A. After recovering from an error, set the current to 0
+again if you want the limit off.
 
-| Device | Validation status |
-|---|---|
-| AMTRON 4You 310 11 C2, article `1313201205` | Development target; automated tests use simulated device data and virtual RTU |
-| AMTRON 4You 300, Compact 2.0s, Start 2.0s | Covered by the same RTU specification; physical behavior unverified |
+## Compatible devices
 
-Entities depend on the reported register layout and hardware capabilities.
-Physical-wallbox validation remains outstanding, including on the development
-target. This integration is for **Modbus RTU over RS-485**, not Modbus TCP.
-Use one entry per wallbox and exclusive access to each serial bus.
-
-For a problem, start with [Troubleshooting](troubleshooting.md). See
-[Safety and limitations](safety.md) before enabling control.
+See the [device compatibility matrix](compatibility.md) for supported models
+and reported hardware tests.

@@ -18,7 +18,6 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
 from pymodbus import FramerType
 from pymodbus.client import AsyncModbusSerialClient
@@ -43,10 +42,12 @@ from .const import (
 from .decode import RegisterValue, decode_register
 from .register_blocks import RegisterBlock
 from .registers import RegisterSpec
+from .transport import ModbusTransport
+from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
 
-type ClientFactory = Callable[["SerialConfig"], Any]
+type ClientFactory = Callable[["SerialConfig"], ModbusTransport]
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,18 +96,20 @@ class MennekesModbusClient:
         *,
         client_factory: ClientFactory = create_serial_client,
         monotonic: Callable[[], float] = time.monotonic,
+        write_state: WriteState | None = None,
     ) -> None:
         self._config = config
         self._client_factory = client_factory
         self._monotonic = monotonic
-        self._client: Any | None = None
+        self._client: ModbusTransport | None = None
         self._lock = asyncio.Lock()
         # Bulk users queue behind this gate before they reach the bus, so at
         # most one of them is ever waiting on the bus itself. The heartbeat
         # skips the gate: it is the one transaction with a deadline, and
         # queueing it behind every reader is how it misses that deadline.
         self._queue = asyncio.Lock()
-        self._rate_limiter = _client_write.WriteRateLimiter()
+        self.write_state = write_state if write_state is not None else WriteState()
+        self._rate_limiter = self.write_state.limiter
 
     @property
     def config(self) -> SerialConfig:
@@ -120,7 +123,7 @@ class MennekesModbusClient:
 
         if self._client is None:
             return False
-        return bool(getattr(self._client, "connected", False))
+        return self._client.connected
 
     async def async_connect(self) -> None:
         """Open the serial port, or raise when the port cannot be used."""
@@ -256,7 +259,7 @@ class MennekesModbusClient:
         async with self._lock:
             self.check_write_interval(spec, min_interval=min_interval)
             client = self._require_client()
-            self._rate_limiter.record(spec.key, now=self._monotonic())
+            rejected = False
             try:
                 await _client_write.write_register(
                     client,
@@ -269,9 +272,18 @@ class MennekesModbusClient:
                 # reply or transport failure may follow an applied write, so
                 # those retain the interval, as does cancellation.
                 self._rate_limiter.forget(spec.key)
+                rejected = True
                 raise
+            finally:
+                if not rejected:
+                    if spec.key == "charging_current_ems":
+                        self.write_state.current_write_generation += 1
+                    # Connect/send/response delays belong to this transaction.
+                    # Even cancellation can follow an applied write. Measuring
+                    # from completion conservatively protects the wire interval.
+                    self._rate_limiter.record(spec.key, now=self._monotonic())
 
-    def _require_client(self) -> Any:
+    def _require_client(self) -> ModbusTransport:
         if self._client is None:
             raise AmtronConnectionError(f"{self._config.port} is not connected")
         return self._client

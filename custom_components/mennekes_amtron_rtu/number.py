@@ -1,13 +1,12 @@
 """Number platform for the MENNEKES AMTRON integration.
 
-The charging-current limit is the one entity a user will touch daily, and it
-is also the register with the dangerous zero. The entity therefore never
-offers a value below 6 A: pausing has its own switch, and "no limitation"
-has its own action.
+Zero disables the EMS limit; 6 A and above set a limit. The invalid band in
+between is rejected by the control layer. Pausing has its own switch.
 """
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from homeassistant.components.number import (
@@ -24,6 +23,7 @@ from .const import (
     CHARGING_CURRENT_DECIMALS,
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_STEP,
+    CHARGING_CURRENT_UNLIMITED,
 )
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
@@ -50,9 +50,9 @@ class AmtronChargingCurrentNumber(MennekesAmtronEntity, NumberEntity, RestoreEnt
     _attr_translation_key = "charging_current_limit"
     _attr_device_class = NumberDeviceClass.CURRENT
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
-    _attr_native_min_value = CHARGING_CURRENT_MINIMUM
+    _attr_native_min_value = CHARGING_CURRENT_UNLIMITED
     _attr_native_step = CHARGING_CURRENT_STEP
-    _attr_mode = NumberMode.SLIDER
+    _attr_mode = NumberMode.BOX
 
     def __init__(
         self, entry: MennekesAmtronConfigEntry, coordinator: Any
@@ -72,15 +72,17 @@ class AmtronChargingCurrentNumber(MennekesAmtronEntity, NumberEntity, RestoreEnt
 
     @property
     def native_value(self) -> float | None:
-        """Return the active limit, or the stored setpoint while paused.
+        """Return the active limit, 0 when unlimited, or the paused setpoint.
 
         While charging is paused the register holds the documented pause
-        value of 1 A, which is below this entity's minimum. Showing the
-        stored setpoint instead keeps the slider where the user left it.
+        value of 1 A. Showing the stored setpoint instead keeps the current
+        input where the user left it, including 0 for no limitation.
         """
 
         value = self.register_value
-        if isinstance(value, (int, float)) and value >= CHARGING_CURRENT_MINIMUM:
+        if isinstance(value, (int, float)) and (
+            value == CHARGING_CURRENT_UNLIMITED or value >= CHARGING_CURRENT_MINIMUM
+        ):
             # The register is a float32, so a 10 A limit comes back as
             # 9.999999... The entity cannot offer more resolution than its own
             # step, and recording more of it only costs database rows.
@@ -101,10 +103,14 @@ class AmtronChargingCurrentNumber(MennekesAmtronEntity, NumberEntity, RestoreEnt
             restored = float(last_state.state)
         except (TypeError, ValueError):
             return
-        if restored >= CHARGING_CURRENT_MINIMUM:
+        if math.isfinite(restored) and (
+            restored == CHARGING_CURRENT_UNLIMITED or restored >= CHARGING_CURRENT_MINIMUM
+        ):
             control.charging_setpoint = min(restored, control.max_charging_current)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the charging-current limit."""
+        """Set a limit or explicitly disable it by entering zero."""
 
-        await self.runtime_data.control.async_set_charging_current(value)
+        await self.runtime_data.control.async_set_charging_current(
+            value, allow_unlimited=value == CHARGING_CURRENT_UNLIMITED
+        )

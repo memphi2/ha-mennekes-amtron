@@ -47,7 +47,9 @@ previous section: this integration must not share that bus, even read-only.
 ## The heartbeat, and what happens without it
 
 In master mode the integration writes `0x0D00 = 0x55AA` every five seconds.
-The wallbox expects it at least every ten seconds. If it stops:
+A failed heartbeat is retried on a one-second interval until delivery resumes.
+The wallbox expects it at least every ten seconds. Longer connection outages
+can still miss this deadline. If the heartbeat stops:
 
 - with no energy-manager fallback configured (`0x030E = 0`), the wallbox keeps
   charging with the last values it received;
@@ -71,10 +73,12 @@ restart has a defined outcome. The integration raises a repair issue when
 | `0.01 … 5.99` | Invalid — signals 0 A, the documented way to pause |
 | `≥ 6` | A real limit, clamped to the wallbox's own maximum |
 
-A naive `number` entity with `min: 0` therefore requests *full load* when
-dragged to zero. The number entity in this integration starts at 6 A, pausing
-has its own switch, and 0 A can only be written through the
-`mennekes_amtron_rtu.set_charging_current` action with `allow_unlimited: true`.
+The **Charging current limit** number input accepts 0 A to deliberately
+disable the EMS limit. It displays 0 while unlimited; 6 A or more enables a
+limit again. The invalid band between 0 and 6 A is rejected. Pausing has its
+own switch. Direct `mennekes_amtron_rtu.set_charging_current` action calls
+still require `allow_unlimited: true` for 0 A. Unlimited mode also bypasses
+the integration's extra current cap, while hardware limits remain in force.
 
 ## Manufacturer rate limits
 
@@ -83,10 +87,21 @@ has its own switch, and 0 A can only be written through the
   interval has passed.
 - Keep pause, resume and phase switches **more than 5 minutes** apart and
   use hysteresis. The integration enforces a five-minute floor and rejects
-  faster changes with an explanatory error. The timing guards are in memory and restart on an
-  entry reload; keep the waiting interval in your automation too.
+  faster changes with an explanatory error. Timing guards survive an entry
+  reload in memory, without Recorder writes. The remembered current before a
+  pause also survives reloads; resuming still respects a newly lowered current
+  cap. After a full Home Assistant
+  restart (or the first setup), the previous timing is unknown: current
+  writes wait five seconds, and pause/resume and phase changes wait five
+  minutes from setup. Reading and the heartbeat remain available. Keep the
+  waiting interval in your automation too.
 
 ## Phase switching can abort a charge
+
+Before a phase request, the integration reads the charging state directly
+from the wallbox. A missing, invalid or failed status reply rejects the
+request before any register is written. Cached dashboard state is not used
+to decide whether charging must first be paused.
 
 Dynamic phase switching exists only on 11 kW hardware that reports phase
 option 2. Even there:
@@ -100,18 +115,29 @@ option 2. Even there:
 - not every vehicle tolerates phase switching at all. Check your vehicle's
   documentation before you automate it.
 
+## Error recovery
+
+Recovery checks known current-write and pause/resume cooldowns before sending
+its heartbeat/release/current sequence. A cooldown rejection therefore does
+not change the charging release. A transport failure during the sequence can
+still leave a partial operation; it is reported as a failed recovery.
+
 ## Restart
 
 `0x0D19` may only be used while the wallbox is idle. The restart button
-refuses to act in any other state.
+reads the current state immediately before the command. It refuses to act
+in any other state or when that fresh read fails or returns an unknown value.
 
 ## What is validated, and what is not
 
 Automated tests exercise real Home Assistant with simulated register data
-and a virtual Modbus RTU server, using the AMTRON 4You 310 11 C2 on layout
-v01.03 as the development target. **No physical-wallbox validation is claimed**,
-including for that model. The [compatibility audit](ha-2026-11-validation.md)
-records tested software versions and remaining checks.
+and a virtual Modbus RTU server, using the Amtron 4You 310 11 C2 on layout
+v01.03 as the development target. The owner reported successful operation of
+the released integration on that model on 2026-11-03. Firmware and a detailed
+test checklist were not supplied; this does not validate later development
+changes. See the [hardware-test scope and model matrix](compatibility.md).
+The [software compatibility audit](ha-2026-11-validation.md) records tested
+software versions and remaining checks.
 
 Entities are filtered by reported layout version and hardware capability.
 This reduces unsupported operations but does not establish correct behavior

@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError
+from .const import DEFAULT_MODEL
 from .data import DeviceIdentity
+from .models import ARTICLE_MODELS
 from .registers import (
     ARTICLE_NUMBER,
     FIRMWARE_VERSION,
@@ -20,6 +22,27 @@ from .registers import (
     SERIAL_NUMBER,
     RegisterSpec,
 )
+
+
+def display_identifier(value: str | None) -> str | None:
+    """Remove leading device padding for display, never for registry keys.
+
+    Existing entries and entities use the raw serial as their stable identity.
+    Cleaning that key would create new devices and lose entity associations.
+    Embedded underscores and leading zeroes are part of the identifier.
+    """
+
+    return value.lstrip("_") or None if value else None
+
+
+def model_name(article_number: str | None) -> str:
+    """Resolve verified article numbers without guessing from a prefix.
+
+    See the manufacturer sources in docs/compatibility.md. Other articles
+    keep a generic model plus model_id.
+    """
+
+    return ARTICLE_MODELS.get(display_identifier(article_number) or "", DEFAULT_MODEL)
 
 
 async def async_read_identity(client: MennekesModbusClient) -> DeviceIdentity:

@@ -80,11 +80,15 @@ def test_current_action_respects_user_permissions(
                 )
                 if group == GROUP_ID_USER:
                     await call
+                    if pending := entry.runtime_data.control._flush_task:
+                        await pending
                 else:
                     with pytest.raises(
                         UnknownUser if group == "unknown" else Unauthorized
                     ):
                         await call
+                    if pending := entry.runtime_data.control._flush_task:
+                        await pending
                 writes = [
                     words
                     for client in clients

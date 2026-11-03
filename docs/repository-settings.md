@@ -170,11 +170,10 @@ configuration, because they are prose rather than protection. They are:
 - **Description** — `Unofficial Home Assistant integration for MENNEKES AMTRON wallboxes over local Modbus RTU`
 - **Topics** — `amtron`, `ev-charging`, `hacs`, `home-assistant`, `homeassistant`, `mennekes`, `modbus`, `modbus-rtu`, `rs485`, `wallbox`
 
-## Not yet verified on hardware
+## Hardware validation status
 
-The integration writes to a wallbox and nothing in it has been measured on
-real hardware. That is a caveat on the release, not a reason to keep the
-source closed: the README and the release notes say so plainly, new entries
-start read-only, and the on-device verification in
-[quickstart.md](quickstart.md) and [safety.md](safety.md) is the step that
-closes the gap.
+Successful operation of the released integration on an Amtron 4You 310 11 C2
+was reported by its owner on 2026-11-03. The [compatibility matrix](compatibility.md)
+records the scope and remaining unverified variants. Automated tests cover
+Home Assistant and virtual RTU devices; new changes still require on-device
+verification using [quickstart.md](quickstart.md) and [safety.md](safety.md).

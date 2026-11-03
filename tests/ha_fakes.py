@@ -53,6 +53,11 @@ class FakeConfigEntries:
 
         return self.entries.get(entry_id)
 
+    def async_update_entry(self, entry: Any, *, title: str) -> None:
+        """Apply a generated display title update."""
+
+        entry.title = title
+
     async def async_forward_entry_setups(
         self, entry: Any, platforms: Iterable[Any]
     ) -> None:
@@ -86,7 +91,7 @@ class FakeServices:
         return (domain, service) in self.registered
 
     def async_register(
-        self, domain: str, service: str, handler: Any, schema: Any = None
+        self, domain: str, service: str, handler: Any, schema: Any = None, **kwargs: Any
     ) -> None:
         """Register a service handler."""
 

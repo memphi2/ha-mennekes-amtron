@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any
 from zipfile import BadZipFile, ZipFile
 
+from packaging.requirements import Requirement
+
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = "custom_components/mennekes_amtron_rtu/"
 ZIP_NAME = "ha-mennekes-amtron.zip"
@@ -71,8 +73,8 @@ def remote_commit(repository: str, tag: str) -> str:
     raise ValueError("release tag does not resolve to a commit")
 
 
-def verify_release(release: dict[str, Any], tag: str, notes: str) -> None:
-    if release.get("tag_name") != tag or release.get("draft") or release.get("prerelease"):
+def verify_release(release: dict[str, Any], tag: str, notes: str, *, draft: bool = False) -> None:
+    if release.get("tag_name") != tag or release.get("draft") is not draft or release.get("prerelease"):
         raise ValueError("expected the published stable release")
     if str(release.get("body", "")).replace("\r\n", "\n").strip() != notes.strip():
         raise ValueError("release notes differ from the approved source")
@@ -112,7 +114,38 @@ def verify_assets(directory: Path, release: dict[str, Any], repository: str,
             or packages[0].get("licenseDeclared") != "Apache-2.0"
             or packages[0].get("checksums") != [{"algorithm": "SHA256", "checksumValue": digests[ZIP_NAME]}]):
         raise ValueError("SBOM does not describe this release archive")
+    verify_sbom_dependencies(sbom, json.loads(files["manifest.json"]).get("requirements", []))
     verify_archive(directory / ZIP_NAME, files)
+
+
+def verify_sbom_dependencies(sbom: dict[str, Any], requirements: list[str]) -> None:
+    """Bind every package and dependency edge to the approved manifest."""
+    packages = sbom.get("packages", [])
+    identities = [package.get("SPDXID") for package in packages]
+    if any(not isinstance(identity, str) or not identity.startswith("SPDXRef-") for identity in identities):
+        raise ValueError("SBOM package identity is missing or invalid")
+    if len(set(identities)) != len(identities):
+        raise ValueError("SBOM contains duplicate package identities")
+    integration = [package for package in packages if package.get("name") == "ha-mennekes-amtron"]
+    if len(integration) != 1:
+        raise ValueError("SBOM integration package is ambiguous")
+    dependencies = [package for package in packages if package is not integration[0]]
+    expected = {str(Requirement(requirement)) for requirement in requirements}
+    actual = {
+        str(Requirement(package["name"] + ("" if package.get("versionInfo") == "NOASSERTION" else package["versionInfo"])))
+        for package in dependencies
+    }
+    if actual != expected or len(dependencies) != len(expected):
+        raise ValueError("SBOM dependencies differ from the approved manifest")
+    root = integration[0]["SPDXID"]
+    expected_edges = {("SPDXRef-DOCUMENT", "DESCRIBES", root)} | {
+        (root, "DEPENDS_ON", package["SPDXID"]) for package in dependencies
+    }
+    relationships = sbom.get("relationships", [])
+    edges = {(edge.get("spdxElementId"), edge.get("relationshipType"), edge.get("relatedSpdxElement"))
+             for edge in relationships}
+    if edges != expected_edges or len(relationships) != len(expected_edges):
+        raise ValueError("SBOM dependency relationships differ from the approved manifest")
 
 
 def main() -> int:

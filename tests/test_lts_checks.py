@@ -76,3 +76,28 @@ def test_minimum_identity_is_checked_without_network(monkeypatch, installed):
         pytest.fail("The fixed minimum does not need a release API request")
     monkeypatch.setattr(check_ha_channel.subprocess, "run", no_network)
     assert check_ha(["--expected", "2026.9.0"]) == int(installed != "2026.9.0")
+
+
+def test_ci_cancels_only_superseded_prs_and_serializes_release_publication():
+    validate = yaml.safe_load(Path(".github/workflows/validate.yml").read_text())
+    release = yaml.safe_load(Path(".github/workflows/release.yml").read_text())
+    assert validate["concurrency"]["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
+    assert "github.run_id" in validate["concurrency"]["group"]
+    assert release["concurrency"]["cancel-in-progress"] is False
+    assert "github.event.inputs.tag || github.ref_name" in release["concurrency"]["group"]
+    for workflow in (validate, release):
+        assert all(job.get("timeout-minutes", 0) > 0 for job in workflow["jobs"].values())
+
+
+@pytest.mark.parametrize("job_name", ["validate", "publish"])
+def test_tag_release_jobs_cannot_share_dependency_caches(job_name):
+    """A moved tag must not feed cached executables to a privileged publisher."""
+
+    release = yaml.safe_load(Path(".github/workflows/release.yml").read_text())
+    assert release["env"]["PIP_NO_CACHE_DIR"] == "1"
+    steps = release["jobs"][job_name]["steps"]
+    assert any(step.get("uses", "").startswith("actions/setup-python@") for step in steps)
+    for step in steps:
+        assert not step.get("uses", "").startswith("actions/cache")
+        if step.get("uses", "").startswith("actions/setup-python@"):
+            assert not step.get("with", {}).get("cache")

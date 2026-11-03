@@ -9,7 +9,6 @@ import json
 import re
 import subprocess
 import sys
-import uuid
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +32,7 @@ def main() -> int:
 
     version = read_integration_version()
     commit = _git_commit()
+    source_date = _source_date()
     zip_digest = _sha256(args.zip)
 
     args.metadata.write_text(
@@ -44,7 +44,7 @@ def main() -> int:
                 "git_commit": commit,
                 "zip_sha256": zip_digest,
                 "zip_entries": _zip_entries(args.zip),
-                "built_at": datetime.now(UTC).isoformat(),
+                "source_date": source_date,
             },
             indent=2,
             sort_keys=True,
@@ -53,7 +53,7 @@ def main() -> int:
         encoding="utf-8",
     )
     args.sbom.write_text(
-        json.dumps(_sbom(args, version, zip_digest), indent=2, sort_keys=True) + "\n",
+        json.dumps(_sbom(args, version, zip_digest, commit, source_date), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     _write_sha256sums(args)
@@ -70,7 +70,7 @@ def _write_sha256sums(args: argparse.Namespace) -> None:
 
 
 def _sbom(
-    args: argparse.Namespace, version: str, zip_digest: str
+    args: argparse.Namespace, version: str, zip_digest: str, commit: str, source_date: str
 ) -> dict[str, object]:
     manifest = json.loads(
         (ROOT / "custom_components" / "mennekes_amtron_rtu" / "manifest.json").read_text(
@@ -125,10 +125,10 @@ def _sbom(
         "SPDXID": "SPDXRef-DOCUMENT",
         "name": f"ha-mennekes-amtron-{version}",
         "documentNamespace": (
-            f"https://github.com/{args.repository}/spdx/{uuid.uuid4()}"
+            f"https://github.com/{args.repository}/spdx/{commit}-{zip_digest}"
         ),
         "creationInfo": {
-            "created": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "created": source_date,
             "creators": ["Tool: scripts/write_release_assets.py"],
         },
         "packages": packages,
@@ -158,6 +158,15 @@ def _git_commit() -> str:
         text=True,
     )
     return result.stdout.strip() or "unknown"
+
+
+def _source_date() -> str:
+    """Use the source commit time so a rerun produces identical metadata."""
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "show", "-s", "--format=%ct", "HEAD"],
+        capture_output=True, check=True, text=True,
+    )
+    return datetime.fromtimestamp(int(result.stdout.strip()), UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _sha256(path: Path) -> str:

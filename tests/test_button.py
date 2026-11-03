@@ -35,11 +35,13 @@ def test_the_restart_button_refuses_outside_idle() -> None:
     async def run() -> None:
         buttons, entry, transport = await _buttons()
         entry.runtime_data.coordinator.data.values["evse_state"] = EvseState.CHARGING
+        transport.bank[R.EVSE_STATE.address] = int(EvseState.CHARGING)
         with pytest.raises(ServiceValidationError):
             await buttons["restart"].async_press()
         assert transport.writes == []
 
         entry.runtime_data.coordinator.data.values["evse_state"] = EvseState.IDLE
+        transport.bank[R.EVSE_STATE.address] = int(EvseState.IDLE)
         await buttons["restart"].async_press()
         assert dict(transport.writes)[R.SYSTEM_RESTART.address] == [0xBB]
 

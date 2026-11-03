@@ -1,3 +1,20 @@
+get_recorder_exclusions:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: mennekes_amtron_rtu
+          multiple: true
+    profile:
+      default: detail
+      selector:
+        select:
+          options:
+            - full
+            - detail
+            - lean
+          translation_key: recorder_profile
 set_charging_current:
   fields:
     device_id:

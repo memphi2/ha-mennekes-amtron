@@ -3,13 +3,18 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.9%2B-41BDF5.svg)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Local Home Assistant integration for MENNEKES AMTRON wallboxes over
+Local Home Assistant integration for Mennekes Amtron wallboxes over
 **Modbus RTU / RS-485**. Monitor charging, power and energy, adjust the
 charging current, pause charging and use PV surplus automations.
 
-Developed for the **AMTRON 4You 310 11 C2**. Validation uses Home Assistant
-and simulated RTU devices; physical-wallbox validation is still outstanding.
-See [compatibility and limitations](docs/user-guide.md#compatibility-and-limitations).
+## Supported device families
+
+- **Amtron 4You 300**
+- **Amtron Compact 2.0s**
+- **Amtron Start 2.0s**
+
+See the [compatibility matrix](docs/compatibility.md) for individual models
+and hardware-test status.
 
 ## Installation
 
@@ -37,7 +42,7 @@ For HACS on HA 2026.9/2026.10, updates or an existing installation, see
 
 | Task | Control or guide |
 |---|---|
-| Set the charging current | **Charging current limit**, from 6 A to the configured cap |
+| Set the charging current | **Charging current limit**: 0 A disables the limit; 6 A up to the configured cap sets a limit |
 | Pause or resume charging | **Charging paused**; resume follows the required waiting interval |
 | Track consumption | **Total energy** in the Energy dashboard |
 | Charge from PV surplus | [PV blueprints](docs/blueprints.md) |

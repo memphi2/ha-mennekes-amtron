@@ -3,7 +3,12 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+from homeassistant.components.number import NumberMode
+from homeassistant.exceptions import ServiceValidationError
+
 from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.decode import decode_register
 from custom_components.mennekes_amtron_rtu.number import async_setup_entry
 from tests.fakes import device_bank
 from tests.ha_fakes import build_runtime, collect
@@ -16,10 +21,11 @@ async def _number(**kwargs: object):
     return added["charging_current_limit"], entry, transport
 
 
-def test_the_slider_never_reaches_the_dangerous_values() -> None:
+def test_the_input_accepts_zero_for_no_limit() -> None:
     async def run() -> None:
         number, _entry, _transport = await _number()
-        assert number.native_min_value == 6.0
+        assert number.native_min_value == 0.0
+        assert number.mode == NumberMode.BOX
         assert number.native_max_value == 16.0
         assert number.native_step == 0.1
         assert number.native_value == 16.0
@@ -27,36 +33,40 @@ def test_the_slider_never_reaches_the_dangerous_values() -> None:
     asyncio.run(run())
 
 
-def test_setting_a_value_writes_the_register() -> None:
+@pytest.mark.parametrize("value", [0.0, 6.0, 10.0])
+def test_setting_a_value_writes_the_register(value: float) -> None:
     async def run() -> None:
         number, _entry, transport = await _number()
-        await number.async_set_native_value(10.0)
-        assert any(
-            address == R.CHARGING_CURRENT_EMS.address
-            for address, _ in transport.writes
-        )
+        await number.async_set_native_value(value)
+        assert [
+            decode_register(R.CHARGING_CURRENT_EMS, words)
+            for address, words in transport.writes
+            if address == R.CHARGING_CURRENT_EMS.address
+        ] == [value]
 
     asyncio.run(run())
 
 
-def test_while_paused_the_stored_setpoint_is_shown() -> None:
+@pytest.mark.parametrize("remembered", [0.0, 12.0])
+def test_while_paused_the_stored_setpoint_is_shown(remembered: float) -> None:
     async def run() -> None:
         number, entry, _transport = await _number(
             bank=device_bank(charging_current=1.0)
         )
         assert number.native_value is None
-        entry.runtime_data.control.charging_setpoint = 12.0
-        assert number.native_value == 12.0
+        entry.runtime_data.control.charging_setpoint = remembered
+        assert number.native_value == remembered
 
     asyncio.run(run())
 
 
-def test_the_setpoint_is_restored_from_the_previous_run() -> None:
+@pytest.mark.parametrize("remembered", [0.0, 11.0])
+def test_the_setpoint_is_restored_from_the_previous_run(remembered: float) -> None:
     async def run() -> None:
         number, entry, _transport = await _number()
-        number.async_get_last_state = _last_state("11.0")
+        number.async_get_last_state = _last_state(str(remembered))
         await number.async_added_to_hass()
-        assert entry.runtime_data.control.charging_setpoint == 11.0
+        assert entry.runtime_data.control.charging_setpoint == remembered
 
     asyncio.run(run())
 
@@ -74,7 +84,7 @@ def test_a_restored_value_is_clamped_to_the_device_maximum() -> None:
 def test_an_unusable_restored_state_is_ignored() -> None:
     async def run() -> None:
         number, entry, _transport = await _number()
-        for state in (None, "unknown", "1.0"):
+        for state in (None, "unknown", "1.0", "nan", "inf", "-1.0"):
             entry.runtime_data.control.charging_setpoint = None
             number.async_get_last_state = _last_state(state)
             await number.async_added_to_hass()
@@ -90,6 +100,39 @@ def test_an_existing_setpoint_is_not_overwritten() -> None:
         number.async_get_last_state = _last_state("15.0")
         await number.async_added_to_hass()
         assert entry.runtime_data.control.charging_setpoint == 7.0
+
+    asyncio.run(run())
+
+
+def test_unlimited_readback_shows_zero_instead_of_a_remembered_limit() -> None:
+    async def run() -> None:
+        number, entry, _transport = await _number(bank=device_bank(charging_current=0.0))
+        assert number.native_value == 0.0
+        entry.runtime_data.control.charging_setpoint = 12.0
+        assert number.native_value == 0.0
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("value", [0.1, 1.0, 5.9, -1.0, float("nan"), float("inf")])
+def test_invalid_number_values_never_pause_the_device(value: float) -> None:
+    async def run() -> None:
+        number, _entry, transport = await _number()
+        with pytest.raises(ServiceValidationError) as error:
+            await number.async_set_native_value(value)
+        assert error.value.translation_key == "charging_current_invalid"
+        assert not transport.writes
+
+    asyncio.run(run())
+
+
+def test_zero_still_requires_write_access() -> None:
+    async def run() -> None:
+        number, _entry, transport = await _number(read_only=True)
+        with pytest.raises(ServiceValidationError) as error:
+            await number.async_set_native_value(0)
+        assert error.value.translation_key == "read_only_mode"
+        assert not transport.writes
 
     asyncio.run(run())
 

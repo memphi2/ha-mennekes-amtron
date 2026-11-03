@@ -99,17 +99,20 @@ those results, rather than a hard-coded zero-miss claim, are the evidence.
 
 Coverage is not the claim, though. The tests that matter are the ones that
 pin the device's dangerous semantics: that `0x0302` can never be written with
-0 A without an explicit opt-in, that the invalid 0.01-5.99 A band is refused
-even with it, that the heartbeat keeps running while the poll fails, that the
+0 A through a direct action without an explicit opt-in, that the number input
+accepts 0 for no limit while the invalid 0.01-5.99 A band is refused, that the
+heartbeat keeps running while the poll fails, that the
 bus lock serializes every transaction, and that the recovery sequence writes
 its three registers in the documented order.
 
 ## What is still open
 
-Nothing in the quality scale. What is open is the device: no value in this
-integration has been measured against real hardware yet. The verification
-steps in [quickstart.md](quickstart.md) and [safety.md](safety.md) are what
-close that gap.
+The owner reported successful operation of the released integration on an
+Amtron 4You 310 11 C2 on 2026-11-03. This is a user report, without a firmware
+version or measurements for each feature; it does not cover subsequent code
+changes or other models. The [compatibility matrix](compatibility.md) tracks
+that scope. Use the verification steps in [quickstart.md](quickstart.md) and
+[safety.md](safety.md) when testing another installation or version.
 
 GitHub settings and published artifacts need separate live verification.
 On 2026-11-01 the required checks were verified to include the November

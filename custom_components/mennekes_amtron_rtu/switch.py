@@ -58,7 +58,7 @@ class AmtronPauseSwitch(MennekesAmtronEntity, SwitchEntity):
         )
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
         """Return true while the EMS limit holds the pause value."""
 
         return self.runtime_data.control.is_paused

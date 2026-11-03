@@ -82,6 +82,9 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         return self._monotonic() - self._slow_read_at >= SLOW_BLOCK_INTERVAL_SECONDS
 
     async def _async_update_data(self) -> WallboxData:
+        # A poll spans multiple bus transactions. If a current write overlaps
+        # any part of it, its old readback must not undo the accepted command.
+        generation = self._client.write_state.current_write_generation
         # Configuration registers change when somebody reconfigures the
         # wallbox, not while it charges, so they are carried forward between
         # the slow reads instead of occupying the bus every few seconds.
@@ -143,7 +146,10 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
             values.pop(key, None)
         values.update(read)
         self._log_available()
-        return WallboxData(values=values, failed_blocks=tuple(sorted(failed)))
+        return WallboxData(
+            values=values, failed_blocks=tuple(sorted(failed)),
+            current_write_generation=generation,
+        )
 
     def _log_unavailable(self, err: Exception) -> None:
         changed = self._connection_state.record(False)

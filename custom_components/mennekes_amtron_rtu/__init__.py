@@ -7,6 +7,8 @@ focused modules next to it.
 
 from __future__ import annotations
 
+import time
+
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -31,6 +33,7 @@ from .const import (
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
     DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
+    DEFAULT_NAME,
     DEFAULT_PARITY,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_STOPBITS,
@@ -50,6 +53,7 @@ from .identity import async_read_identity
 from .options_flow import control_mode_is_master
 from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
+from .write_state import WriteState
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -75,7 +79,12 @@ async def async_setup_entry(
 ) -> bool:
     """Set up one wallbox from a config entry."""
 
-    client = MennekesModbusClient(_serial_config(entry))
+    states: dict[str, WriteState] = hass.data.setdefault(f"{DOMAIN}_write_states", {})
+    if entry.entry_id not in states:
+        states[entry.entry_id] = WriteState.cold_start(time.monotonic())
+    client = MennekesModbusClient(
+        _serial_config(entry), write_state=states[entry.entry_id]
+    )
     try:
         await client.async_connect()
         identity = await async_read_identity(client)
@@ -84,6 +93,11 @@ async def async_setup_entry(
         if isinstance(err, AmtronBusError):
             raise ConfigEntryNotReady(str(err)) from err
         raise
+
+    # Update only the former generated title. HA preserves device names chosen
+    # by the user separately, and existing registry entity IDs do not change.
+    if entry.title == "MENNEKES AMTRON":
+        hass.config_entries.async_update_entry(entry, title=DEFAULT_NAME)
 
     diagnostics = WriteDiagnostics()
     connection_state = ConnectionState()
@@ -170,6 +184,7 @@ async def async_remove_entry(
 ) -> None:
     """Remove repairs owned by a deleted entry, also on HA before 2026.11."""
 
+    hass.data.get(f"{DOMAIN}_write_states", {}).pop(entry.entry_id, None)
     prefix = f"{entry.entry_id}_"
     for domain, issue_id in tuple(ir.async_get(hass).issues):
         if domain == DOMAIN and issue_id.startswith(prefix):

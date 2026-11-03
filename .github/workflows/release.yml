@@ -11,11 +11,19 @@ on:
         required: false
         type: string
 
+# Serialize publication for a tag, including manual reruns. Never cancel a publisher.
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 permissions:
   actions: read
   contents: read
 
 env:
+  # Tag refs can move. Never reuse or populate dependency caches across runs
+  # that may later execute with publication and attestation permissions.
+  PIP_NO_CACHE_DIR: "1"
   RELEASE_ZIP: .release/ha-mennekes-amtron.zip
   RELEASE_SHA256SUMS: .release/SHA256SUMS
   RELEASE_METADATA: .release/build-metadata.json
@@ -25,6 +33,7 @@ jobs:
   validate:
     name: release validate (${{ matrix.name }})
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -75,6 +84,7 @@ jobs:
   hacs:
     name: release hacs
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -88,6 +98,7 @@ jobs:
   hassfest:
     name: release hassfest
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -99,6 +110,7 @@ jobs:
   main-validation:
     name: main validation gate
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       actions: read
       contents: read
@@ -150,6 +162,7 @@ jobs:
 
   publish:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     needs:
       - validate
       - hacs
@@ -255,21 +268,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release-tag.outputs.tag }}
         run: |
-          assets=(
-            "$RELEASE_ZIP"
-            "$RELEASE_SHA256SUMS"
-            "$RELEASE_METADATA"
-            "$RELEASE_SBOM"
-          )
-          notes_file=".github/release-notes/${RELEASE_TAG}.md"
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
-          else
-            gh release create "$RELEASE_TAG" "${assets[@]}" \
-              --title "$RELEASE_TAG" \
-              --notes-file "$notes_file" \
-              --verify-tag
-          fi
+          python scripts/publish_release.py --tag "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
       - name: Verify the published release against the approved source
         env:
           GH_TOKEN: ${{ github.token }}

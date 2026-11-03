@@ -340,6 +340,12 @@
     },
     "write_rate_limited": {
       "message": "Die Wallbox akzeptiert diese Änderung erst in {seconds} s wieder. Der Hersteller verlangt für Pause, Fortsetzen und Phasenwechsel eine Hysterese und Abstände von mehr als fünf Minuten."
+    },
+    "phase_state_unknown": {
+      "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurden keine Phasen umgeschaltet. Prüfe die Verbindung und versuche es erneut."
+    },
+    "restart_state_unknown": {
+      "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurde kein Neustart ausgelöst. Prüfe die Verbindung und versuche es erneut."
     }
   },
   "issues": {
@@ -406,6 +412,13 @@
         "full": "Alle Adressen, Baudraten und Frames durchsuchen, mehrere Minuten",
         "off": "Nicht suchen, nur den Fehler melden"
       }
+    },
+    "recorder_profile": {
+      "options": {
+        "full": "Vollständige Historie",
+        "detail": "Weniger Details",
+        "lean": "Nur Energie- und Leistungsstatistiken"
+      }
     }
   },
   "services": {
@@ -426,6 +439,20 @@
         }
       },
       "name": "Ladestrom setzen"
+    },
+    "get_recorder_exclusions": {
+      "name": "Recorder-Ausschlüsse vorschlagen",
+      "description": "Gibt einen YAML-Vorschlag mit den tatsächlichen Entity-IDs zurück. Ändert weder Recorder noch gespeicherte Historie. Ergänze die Liste in deiner bestehenden Konfiguration.",
+      "fields": {
+        "device_id": {
+          "name": "Wallboxen",
+          "description": "Wallboxen für den Vorschlag."
+        },
+        "profile": {
+          "name": "Historienprofil",
+          "description": "Alle Daten, weniger Details oder nur Energie- und Leistungsstatistiken behalten."
+        }
+      }
     }
   }
 }

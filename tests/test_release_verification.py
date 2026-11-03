@@ -17,7 +17,7 @@ from scripts.release_check import (
 
 
 def bundle(tmp_path):
-    files = {"manifest.json": b'{"version":"0.2.3"}', "LICENSE": b"license", "NOTICE": b"notice"}
+    files = {"manifest.json": b'{"version":"0.2.3","requirements":["pymodbus[serial]==3.13.1"]}', "LICENSE": b"license", "NOTICE": b"notice"}
     with ZipFile(tmp_path / ZIP_NAME, "w") as archive:
         for name, value in files.items():
             archive.writestr(name, value)
@@ -25,9 +25,14 @@ def bundle(tmp_path):
     metadata = {"release_tag": "v0.2.3", "repository": "owner/repo", "git_commit": "a" * 40,
                 "integration_version": "0.2.3", "zip_entries": len(files), "zip_sha256": digest}
     (tmp_path / "build-metadata.json").write_text(json.dumps(metadata))
-    sbom = {"spdxVersion": "SPDX-2.3", "packages": [{"name": "ha-mennekes-amtron",
+    sbom = {"spdxVersion": "SPDX-2.3", "packages": [{"name": "ha-mennekes-amtron", "SPDXID": "SPDXRef-Package-Integration",
             "versionInfo": "0.2.3", "licenseDeclared": "Apache-2.0",
             "checksums": [{"algorithm": "SHA256", "checksumValue": digest}]}]}
+    sbom["packages"].append({"SPDXID": "SPDXRef-Dependency", "name": "pymodbus[serial]", "versionInfo": "==3.13.1"})
+    sbom["relationships"] = [
+        {"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package-Integration"},
+        {"spdxElementId": "SPDXRef-Package-Integration", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Dependency"},
+    ]
     (tmp_path / "sbom.spdx.json").write_text(json.dumps(sbom))
     sums = "".join(f"{hashlib.sha256((tmp_path / name).read_bytes()).hexdigest()}  {name}\n"
                    for name in sorted(ASSETS - {"SHA256SUMS"}))
@@ -109,4 +114,43 @@ def test_self_consistent_downloads_still_need_correct_release_identity(tmp_path,
         content = (tmp_path / asset["name"]).read_bytes()
         asset.update(size=len(content), digest="sha256:" + hashlib.sha256(content).hexdigest())
     with pytest.raises(ValueError, match=r"metadata|SBOM|checksum"):
+        verify_assets(tmp_path, release, "owner/repo", "a" * 40, "0.2.3", files)
+
+
+@pytest.mark.parametrize("change", ["missing", "version", "extras", "extra", "duplicate", "identity", "missing_identity", "missing_edge", "wrong_edge", "duplicate_edge"])
+def test_self_consistent_sbom_must_match_manifest_dependencies(tmp_path, change):
+    files, release = bundle(tmp_path)
+    path = tmp_path / "sbom.spdx.json"
+    sbom = json.loads(path.read_text())
+    dependency = sbom["packages"][1]
+    if change == "missing":
+        sbom["packages"].pop()
+        sbom["relationships"].pop()
+    elif change == "version":
+        dependency["versionInfo"] = "==0.0.1"
+    elif change == "extras":
+        dependency["name"] = "pymodbus"
+    elif change == "extra":
+        sbom["packages"].append({"SPDXID": "SPDXRef-Extra", "name": "unexpected", "versionInfo": "==1.0"})
+    elif change == "duplicate":
+        sbom["packages"].append(dependency | {"SPDXID": "SPDXRef-Duplicate"})
+    elif change == "identity":
+        dependency["SPDXID"] = sbom["packages"][0]["SPDXID"]
+    elif change == "missing_identity":
+        dependency.pop("SPDXID")
+    elif change == "missing_edge":
+        sbom["relationships"].pop()
+    elif change == "wrong_edge":
+        sbom["relationships"][-1]["relatedSpdxElement"] = "SPDXRef-Nonexistent"
+    else:
+        sbom["relationships"].append(sbom["relationships"][-1])
+    path.write_text(json.dumps(sbom))
+    (tmp_path / "SHA256SUMS").write_text("".join(
+        f"{hashlib.sha256((tmp_path / name).read_bytes()).hexdigest()}  {name}\n"
+        for name in sorted(ASSETS - {"SHA256SUMS"})
+    ))
+    for asset in release["assets"]:
+        content = (tmp_path / asset["name"]).read_bytes()
+        asset.update(size=len(content), digest="sha256:" + hashlib.sha256(content).hexdigest())
+    with pytest.raises(ValueError, match="SBOM"):
         verify_assets(tmp_path, release, "owner/repo", "a" * 40, "0.2.3", files)

@@ -75,14 +75,17 @@ async def _boot(config_dir: Path) -> Any:
 
 
 async def _start_wallbox(
-    port: str, bank: dict[int, int], *, device_id: int = 50
+    port: str, bank: dict[int, int], *, device_id: int = 50, action: Any = None
 ) -> Any:
     from pymodbus import FramerType
     from pymodbus.server import ModbusSerialServer
 
     words = [_signed(bank.get(address, 0)) for address in range(REGISTER_COUNT)]
+    devices = _server_context(words, device_id)
+    if action is not None:
+        devices[0].action = action
     server = ModbusSerialServer(
-        _server_context(words, device_id),
+        devices,
         framer=FramerType.RTU,
         port=port,
         baudrate=57600,
@@ -146,7 +149,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
 
             # The title becomes the device name and prefixes every entity id,
             # so it carries no serial number.
-            assert entry.title == "MENNEKES AMTRON"
+            assert entry.title == "Mennekes Amtron"
             assert entry.unique_id == SERIAL_NUMBER
 
             registry = er.async_get(hass)
@@ -175,8 +178,25 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             )[0]
             assert device.serial_number == SERIAL_NUMBER
             assert device.sw_version == "2023.21.11024"
-            assert device.model == "1313201205"
+            assert device.model == "Amtron 4You 310 11 C2"
             assert device.identifiers == {("mennekes_amtron_rtu", SERIAL_NUMBER)}
+
+            # Upgrade an old default title without replacing registered entities
+            # or overwriting a device name explicitly chosen by its owner.
+            original_ids = {entity.entity_id: entity.unique_id for entity in entities}
+            await hass.config_entries.async_unload(entry.entry_id)
+            dr.async_get(hass).async_update_device(device.id, name_by_user="Garage")
+            hass.config_entries.async_update_entry(entry, title="MENNEKES AMTRON")
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+            assert entry.title == "Mennekes Amtron"
+            updated_device = dr.async_get(hass).async_get(device.id)
+            assert updated_device.name == "Mennekes Amtron"
+            assert updated_device.name_by_user == "Garage"
+            assert original_ids == {
+                entity.entity_id: entity.unique_id
+                for entity in er.async_entries_for_config_entry(registry, entry.entry_id)
+            }
 
             # A wallbox in error state 200 without a configured fallback.
             issues = {
@@ -219,7 +239,25 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
                 blocking=True,
             )
             await hass.async_block_till_done()
+            if pending := entry.runtime_data.control._flush_task:
+                await pending
+            await entry.runtime_data.coordinator.async_refresh()
+            await hass.async_block_till_done()
             assert hass.states.get(number).state == "10.0"
+
+            # The public number service accepts zero, observes the write floor,
+            # and displays the register's unlimited mode as zero.
+            await hass.services.async_call(
+                "number", "set_value", {"entity_id": number, "value": 0}, blocking=True
+            )
+            if pending := entry.runtime_data.control._flush_task:
+                await pending
+            await entry.runtime_data.coordinator.async_refresh()
+            await hass.async_block_till_done()
+            assert hass.states.get(number).state == "0.0"
+            assert hass.states.get(number).attributes["min"] == 0
+            assert hass.states.get(number).attributes["mode"] == "box"
+            assert await entry.runtime_data.client.async_read_register(R.CHARGING_CURRENT_EMS) == 0
 
             # Reconfiguring starts from the entry, not from the factory values.
             reconfigure = await hass.config_entries.flow.async_init(
@@ -446,10 +484,8 @@ def test_the_bundled_blueprints_run_as_automations(
             assert all(state.state == "on" for state in automations)
 
             # and the surplus one really drives the wallbox
-            # Unlimited with no restored setpoint is available but unknown.
-            assert hass.states.get(number).state == (
-                "unknown" if initial_limit == 0 else "16.0"
-            )
+            # Unlimited is shown as zero, even without a restored setpoint.
+            assert hass.states.get(number).state == str(float(initial_limit))
             assert hass.states.get(number).attributes["max"] == 16
             hass.states.async_set(
                 surplus,
@@ -458,6 +494,10 @@ def test_the_bundled_blueprints_run_as_automations(
             )
             await hass.async_block_till_done()
             await asyncio.sleep(0.5)
+            await hass.async_block_till_done()
+            if pending := entry.runtime_data.control._flush_task:
+                await pending
+            await entry.runtime_data.coordinator.async_refresh()
             await hass.async_block_till_done()
             # 5000 W / 230 V / 3 phases, through a float32 register
             assert float(hass.states.get(number).state) == pytest.approx(7.2)

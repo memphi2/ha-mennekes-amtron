@@ -14,14 +14,15 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 LIMITS = {"integration_bytes": 512 * 1024, "traced_bytes": 8 * 1024**2,
-          "rss_bytes": 32 * 1024**2, "tasks": 2, "timers": 4, "fds": 2}
+          "rss_bytes": 32 * 1024**2, "tasks": 2, "timers": 4, "fds": 2,
+          "listeners": 0}
 PHASES = ("loaded", "recovered", "idle", "unloaded")
 
 
-def sample_errors(samples: list[dict[str, Any]]) -> list[str]:
+def sample_errors(samples: list[dict[str, Any]], *, phases: tuple[str, ...] = PHASES) -> list[str]:
     """Compare equivalent phases after warmup and reject retained resources."""
     errors = []
-    for phase in PHASES:
+    for phase in phases:
         group = [sample for sample in samples if sample.get("phase") == phase]
         if len(group) < 3:
             errors.append(f"{phase}: insufficient samples")

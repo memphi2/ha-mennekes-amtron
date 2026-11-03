@@ -16,6 +16,8 @@ client_errors.py      bus error types and Modbus exception mapping
 _client_read.py       block reads with a single-register fallback
 _client_write.py      writes, write rate limiting, value validation
 client.py             the pymodbus client, the bus lock, the only transport
+transport.py          typed transport and response interfaces
+write_state.py        shared write guards retained across entry reloads
 identity.py           the read-once device facts
 coordinator.py        the poll
 heartbeat.py          the heartbeat task
@@ -27,7 +29,8 @@ options_flow.py       control mode, poll interval, current cap
 sensor.py             + sensor_descriptions.py
 binary_sensor.py      + binary_sensor_descriptions.py
 number.py select.py switch.py button.py
-services.py           the one action that cannot be an entity
+services.py           explicit current action and service registration
+recorder_profile.py   read-only Recorder suggestions using registered IDs
 diagnostics.py        allowlist dump + raw register image
 repairs.py            + repair_issues.py
 ```
@@ -35,6 +38,13 @@ repairs.py            + repair_issues.py
 ## Six decisions worth explaining
 
 ### One lock, because Modbus RTU has one master
+
+Poll snapshots carry an internal current-write generation. A current write
+with a successful or uncertain outcome advances that generation under the
+bus lock. A poll that started earlier cannot overwrite the controller's
+confirmed current or pause state. The generation survives entry reloads,
+is excluded from snapshot equality, and is never an entity attribute or
+Recorder value. A later poll in the current generation can confirm the state.
 
 Every transaction — poll, heartbeat and write — goes through a single
 `asyncio.Lock` in `client.py`. Modbus RTU is a single-master protocol; two overlapping
@@ -73,6 +83,14 @@ grew past the deadline. What the device actually saw is also measured — only
 a delivered beat closes a gap, and a gap past the deadline raises a warning
 and increments `heartbeats_late` in the diagnostics, because the wallbox
 reports the resulting fault without saying why.
+
+After a failed heartbeat, its task uses a one-second retry interval, still
+subtracting the time spent on the failed attempt. Once delivery succeeds it
+returns to five seconds. This avoids spending the entire ten-second deadline
+on one brief disconnect. Only the heartbeat's fixed, idempotent value receives
+this treatment; control writes retain their existing intervals and are never
+automatically replayed. Repeated failures produce one failure event until
+recovery, rather than growing the event history on every retry.
 
 ### One choke point for writes
 

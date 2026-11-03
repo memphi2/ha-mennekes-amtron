@@ -33,3 +33,17 @@ def test_unmeasured_resource_is_not_zero():
     data = samples()
     data[0]["fds"] = None
     assert sample_errors(data)
+
+
+@pytest.mark.parametrize("counts", [(44, 144, 244), (44, 45, 44), (44, None, 44)])
+@pytest.mark.parametrize("phase", ["loaded", "steady"])
+def test_listener_growth_or_missing_measurements_fail_in_loaded_phases(counts, phase):
+    data = [dict.fromkeys((*LIMITS, "retained_clients"), 0)
+            | {"phase": phase, "listeners": count} for count in counts]
+    assert sample_errors(data, phases=(phase,))
+
+
+def test_stable_loaded_listeners_are_allowed():
+    data = [dict.fromkeys((*LIMITS, "retained_clients"), 0)
+            | {"phase": "steady", "listeners": 44} for _ in range(3)]
+    assert sample_errors(data, phases=("steady",)) == []

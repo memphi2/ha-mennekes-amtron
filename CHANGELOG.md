@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.4.0 — 2026-11-03
+
+### Fixed
+
+- Disable dependency caching throughout tag-release validation and publication
+  so a moved tag cannot feed cached executables to the privileged publisher.
+- Use Mennekes Amtron as the default device name, including existing default
+  titles; preserve custom names and registered entity IDs.
+- Remove leading underscore padding from displayed serial/article numbers and
+  map the verified 1313201205 article to Amtron 4You 310 11 C2. Keep existing
+  device identifiers and entity unique IDs unchanged.
+- Isolate package staging per build and replace the output ZIP atomically;
+  overlapping or failed builds cannot leave a partial archive.
+- Reject growing or missing listener counts in loaded and continuous soak
+  measurements, including peaks that disappear again before unload.
+- Check recovery cooldowns before writing heartbeat or charging release,
+  so an already blocked current command cannot leave a partial recovery.
+- Confirm a fresh idle state before restarting the wallbox; missing, invalid
+  or non-idle device status prevents the restart command.
+- Preserve the pre-pause current across entry reloads for resume and recovery,
+  while still applying the current cap configured after the reload.
+- Retry failed heartbeats on a one-second interval so a brief serial reconnect
+  does not consume the entire ten-second delivery deadline.
+- Retain continuous-soak measurements on failures and timeouts, and upload
+  diagnostic reports even when the CI test fails.
+- Verify the downloaded SBOM dependency inventory, versions, extras and
+  relationships against the approved manifest even when checksums are consistent.
+- Read a fresh charging state before switching phases; reject unknown status
+  instead of skipping the required pause based on missing or stale readback.
+- Ignore old current readback from polls that overlap a write, including
+  uncertain or cancelled writes, so a delayed poll cannot lift pause protection.
+- Preserve write intervals and pause/resume hysteresis across entry reloads.
+  On first setup or a full HA restart, guard current writes for five seconds
+  and pause/resume/phase changes for five minutes while timing history is unknown.
+- Measure register write intervals after transport completion, including
+  delayed, uncertain and cancelled transactions.
+- Retain pause protection when readback or a write acknowledgement is lost.
+- Verify release drafts before publishing; never replace published assets.
+  Generate reproducible metadata and SBOM identifiers from the source commit.
+
+### Added
+
+- Include the Amtron 4You 310 11 T2S socket variant, article 1313201605/BK,
+  in model recognition and the compatibility matrix alongside Start 2.0s T2S.
+- Allow 0 A in the charging-current number input to disable the EMS limit;
+  display unlimited mode as 0 and preserve it across pause/resume and reloads.
+  Reject values between 0 and 6 A and retain write and pause/resume guards.
+- Recognize all documented variants of the three supported RTU families,
+  with a sourced model matrix and a separate user-reported hardware-test status.
+- Run the continuous serial soak with real SQLite Recorder: measure row and
+  attribute growth, queue backlog, database/WAL sizes and heartbeat gaps while
+  reconnects overlap purge/repack; verify actual VACUUM and database integrity.
+- Suggest Recorder exclusions with actual registered entity IDs, including
+  renamed sensors and multiple wallboxes, without modifying configuration or history.
+- Measure continuously loaded runtime resources; run an hourly-duration soak
+  on weekly/manual CI alongside the existing lifecycle and Recorder tests.
+
+### Changed
+
+- Record the owner's successful hardware test of the released integration on
+  Amtron 4You 310 11 C2 separately from automated and unreleased validation.
+- Exercise real serial transport reconnects, changing readings and delayed
+  replies in the continuous soak; check maximum heartbeat gaps, not only totals.
+- Type the Modbus transport boundary and share write timing state across reloads.
+- Cancel superseded PR validation, add job time limits and cache dependency
+  downloads. Required HA validation remains minimum plus latest stable.
+
 ## 0.3.0 — 2026-11-02
 
 ### Added

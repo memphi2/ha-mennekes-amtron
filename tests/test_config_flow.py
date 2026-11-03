@@ -148,8 +148,8 @@ def test_the_offered_frames_are_the_ones_the_device_documents() -> None:
 def test_the_entry_title_carries_no_serial_number() -> None:
     """The title becomes the device name, and that prefixes every entity id."""
 
-    assert _entry_title(IDENTITY) == "MENNEKES AMTRON"
-    assert _entry_title(DeviceIdentity()) == "MENNEKES AMTRON"
+    assert _entry_title(IDENTITY) == "Mennekes Amtron"
+    assert _entry_title(DeviceIdentity()) == "Mennekes Amtron"
     assert IDENTITY.serial_number not in _entry_title(IDENTITY)
     assert IDENTITY.article_number not in _entry_title(IDENTITY)
 

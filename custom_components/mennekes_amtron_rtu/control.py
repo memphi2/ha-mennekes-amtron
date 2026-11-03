@@ -8,9 +8,8 @@ of them are dangerous.
     0.01 - 5.99  invalid -- the wallbox signals 0 A, the documented pause
     >= 6         a real charging-current limit
 
-A plain number entity with ``min: 0`` would therefore request full load when
-a user drags the slider to zero. The only way to reach either special value
-is an explicitly named call below.
+The current-limit input explicitly accepts zero as "limit off". Direct action
+calls require allow_unlimited; pausing uses the dedicated pause command.
 """
 
 from __future__ import annotations
@@ -27,7 +26,12 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .capabilities import phase_switch_is_supported
 from .client import MennekesModbusClient
-from .client_errors import AmtronBusError, AmtronRateLimitedError
+from .client_errors import (
+    AmtronBusError,
+    AmtronIllegalAddressError,
+    AmtronRateLimitedError,
+    AmtronWriteRejectedError,
+)
 from .const import (
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_UNLIMITED,
@@ -43,6 +47,7 @@ from .exceptions import home_assistant_error, service_validation_error
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
+    EVSE_STATE,
     HEARTBEAT,
     LOCK_EVSE,
     REQUESTED_PHASES,
@@ -91,8 +96,17 @@ class AmtronControl:
         self._pending_current: float | None = None
         self._current_lock = asyncio.Lock()
         self._flush_task: asyncio.Task[None] | None = None
-        self._mode_change_at: float | None = None
-        self.charging_setpoint: float | None = None
+        self._write_state = client.write_state
+
+    @property
+    def charging_setpoint(self) -> float | None:
+        """Return the remembered resume target, retained across entry reloads."""
+
+        return self._write_state.charging_setpoint
+
+    @charging_setpoint.setter
+    def charging_setpoint(self, value: float | None) -> None:
+        self._write_state.charging_setpoint = value
 
     @property
     def options(self) -> ControlOptions:
@@ -128,12 +142,17 @@ class AmtronControl:
         return min(limits)
 
     @property
-    def is_paused(self) -> bool:
-        """Return true while the EMS limit holds the documented pause value."""
+    def is_paused(self) -> bool | None:
+        """Keep confirmed state across failed polls; unknown is not running."""
 
-        value = self._state().get(CHARGING_CURRENT_EMS.key)
-        if not isinstance(value, (int, float)):
-            return False
+        snapshot = self._state()
+        if snapshot.current_write_generation == self._write_state.current_write_generation:
+            current = snapshot.get(CHARGING_CURRENT_EMS.key)
+            if isinstance(current, (int, float)) and math.isfinite(current) and current >= 0:
+                self._write_state.confirmed_current = float(current)
+        value = self._write_state.confirmed_current
+        if value is None:
+            return None
         return CHARGING_CURRENT_UNLIMITED < float(value) < CHARGING_CURRENT_MINIMUM
 
     async def async_set_charging_current(
@@ -155,10 +174,7 @@ class AmtronControl:
         if current == CHARGING_CURRENT_UNLIMITED:
             if not allow_unlimited:
                 raise service_validation_error("charging_current_zero")
-            _LOGGER.warning(
-                "Writing 0 A to 0x0302: the wallbox will signal its maximum "
-                "current, not a charging stop"
-            )
+            _LOGGER.info("Disabling the EMS current limit (0 A)")
         elif not math.isfinite(current) or current < CHARGING_CURRENT_MINIMUM:
             raise service_validation_error(
                 "charging_current_invalid",
@@ -173,7 +189,7 @@ class AmtronControl:
         # explicit 0 A, and while the pause value is active both of them
         # resume the charge, whatever the caller meant by it. So they answer
         # to the same hysteresis the pause switch does.
-        await self._async_request_current(current, mode_change=self.is_paused)
+        await self._async_request_current(current)
 
     async def async_pause_charging(self) -> None:
         """Pause charging the documented way, by signalling 0 A to the EV."""
@@ -185,11 +201,13 @@ class AmtronControl:
         """Resume charging with the setpoint that was active before the pause."""
 
         self._require_write_access()
-        target = self.charging_setpoint or self.max_charging_current
-        await self._async_request_current(
-            max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current)),
-            mode_change=True,
-        )
+        async with self._current_lock:
+            target = self.charging_setpoint
+            if target is None:
+                target = self.max_charging_current
+            elif target != CHARGING_CURRENT_UNLIMITED:
+                target = max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current))
+            await self._async_request_current_locked(target, mode_change=True)
 
     async def async_set_charging_release(self, released: bool) -> None:
         """Open or close the charging relay through 0x0D05."""
@@ -225,7 +243,8 @@ class AmtronControl:
                 self._client.check_write_interval(
                     REQUESTED_PHASES, min_interval=MIN_MODE_CHANGE_INTERVAL_SECONDS
                 )
-                if self._state().get("evse_state") == EvseState.CHARGING:
+                state = await self._async_current_evse_state("phase_state_unknown")
+                if state == EvseState.CHARGING:
                     await self._async_request_current_locked(
                         CHARGING_PAUSE_CURRENT, mode_change=True, defer=False
                     )
@@ -248,8 +267,24 @@ class AmtronControl:
         """
 
         self._require_write_access()
-        target = self.charging_setpoint or self.max_charging_current
         async with self._current_lock:
+            # Refuse known cooldowns before changing charging release. The
+            # final current write still rechecks after the awaited bus calls.
+            if self.is_paused is not False:
+                self._check_mode_change_interval()
+            try:
+                self._client.check_write_interval(
+                    CHARGING_CURRENT_EMS, min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS
+                )
+            except AmtronRateLimitedError as err:
+                self._diagnostics.writes_rate_limited += 1
+                self._diagnostics.timeline.record(
+                    EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
+                )
+                raise service_validation_error(
+                    "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
+                ) from err
+            target = self.charging_setpoint or self.max_charging_current
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
             await self._async_write(CHARGING_RELEASE, 1)
@@ -257,7 +292,7 @@ class AmtronControl:
                 max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current)),
                 # Recovery only changes charging mode if it lifts a pause.
                 # Its final write must finish before recovery reports success.
-                mode_change=self.is_paused,
+                mode_change=self.is_paused is not False,
                 defer=False,
             )
         self._diagnostics.recoveries += 1
@@ -267,10 +302,22 @@ class AmtronControl:
         """Restart the wallbox through 0x0D19, which needs the idle state."""
 
         self._require_write_access()
-        state = self._state().get("evse_state")
-        if state != EvseState.IDLE:
-            raise service_validation_error("restart_requires_idle")
-        await self._async_write(SYSTEM_RESTART, SYSTEM_RESTART_VALUE)
+        async with self._current_lock:
+            state = await self._async_current_evse_state("restart_state_unknown")
+            if state != EvseState.IDLE:
+                raise service_validation_error("restart_requires_idle")
+            await self._async_write(SYSTEM_RESTART, SYSTEM_RESTART_VALUE)
+
+    async def _async_current_evse_state(self, error_key: str) -> EvseState:
+        """Confirm the device state immediately before a guarded operation."""
+
+        try:
+            state = await self._client.async_read_register(EVSE_STATE)
+        except AmtronBusError as err:
+            raise service_validation_error(error_key) from err
+        if not isinstance(state, int) or state not in EvseState:
+            raise service_validation_error(error_key)
+        return EvseState(state)
 
     async def async_shutdown(self) -> None:
         """Cancel a deferred charging-current write during unload."""
@@ -307,7 +354,7 @@ class AmtronControl:
 
         async with self._current_lock:
             await self._async_request_current_locked(
-                value, mode_change=mode_change or self.is_paused
+                value, mode_change=mode_change
             )
 
     async def _async_request_current_locked(
@@ -315,17 +362,11 @@ class AmtronControl:
     ) -> None:
         """Serialize a new command against any deferred setpoint."""
 
-        previous = self._state().get(CHARGING_CURRENT_EMS.key)
+        paused = self.is_paused
+        mode_change = mode_change or paused is not False
+        previous = self._write_state.confirmed_current
         if mode_change:
-            remaining = self._mode_change_remaining()
-            if remaining > 0:
-                self._diagnostics.writes_rate_limited += 1
-                self._diagnostics.timeline.record(
-                    EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
-                )
-                raise service_validation_error(
-                    "write_rate_limited", {"seconds": f"{remaining:.0f}"}
-                )
+            self._check_mode_change_interval()
         try:
             await self._async_write(
                 CHARGING_CURRENT_EMS,
@@ -341,35 +382,57 @@ class AmtronControl:
                     {"seconds": f"{err.retry_after:.0f}"},
                 ) from err
             self._pending_current = value
-            if value >= CHARGING_CURRENT_MINIMUM:
-                self.charging_setpoint = value
+            self.charging_setpoint = value
             self._ensure_flush_task()
             return
+        except (HomeAssistantError, asyncio.CancelledError) as err:
+            if mode_change and not isinstance(
+                err.__cause__, (AmtronWriteRejectedError, AmtronIllegalAddressError)
+            ):
+                # A lost acknowledgement/cancellation may follow an applied
+                # pause or resume. Unknown outcome must not remove hysteresis.
+                self._write_state.confirmed_current = None
+                self._write_state.mode_change_at = self._monotonic()
+            raise
         # A successful command supersedes every older deferred setpoint,
         # including one whose background task is currently sleeping.
         self._pending_current = None
+        self._write_state.confirmed_current = value
         # Publish accepted bookkeeping before coordinator callbacks read it.
         # Rejected commands never alter the setpoint; pauses retain the actual
         # previous limit, whether requested manually or by a phase change.
-        if value >= CHARGING_CURRENT_MINIMUM:
+        if value == CHARGING_CURRENT_UNLIMITED or value >= CHARGING_CURRENT_MINIMUM:
             self.charging_setpoint = value
         elif (
             value == CHARGING_PAUSE_CURRENT
             and isinstance(previous, (int, float))
-            and previous >= CHARGING_CURRENT_MINIMUM
+            and (previous == CHARGING_CURRENT_UNLIMITED or previous >= CHARGING_CURRENT_MINIMUM)
         ):
             self.charging_setpoint = float(previous)
         if mode_change:
-            self._mode_change_at = self._monotonic()
+            self._write_state.mode_change_at = self._monotonic()
         if self._request_refresh is not None:
             await self._request_refresh()
+
+    def _check_mode_change_interval(self) -> None:
+        """Reject a known pause/resume cooldown before any operation writes."""
+
+        remaining = self._mode_change_remaining()
+        if remaining > 0:
+            self._diagnostics.writes_rate_limited += 1
+            self._diagnostics.timeline.record(
+                EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
+            )
+            raise service_validation_error(
+                "write_rate_limited", {"seconds": f"{remaining:.0f}"}
+            )
 
     def _mode_change_remaining(self) -> float:
         """Return the seconds left of the pause and resume hysteresis."""
 
-        if self._mode_change_at is None:
+        if self._write_state.mode_change_at is None:
             return 0.0
-        waited = self._monotonic() - self._mode_change_at
+        waited = self._monotonic() - self._write_state.mode_change_at
         return max(0.0, MIN_MODE_CHANGE_INTERVAL_SECONDS - waited)
 
     def _ensure_flush_task(self) -> None:
@@ -388,11 +451,17 @@ class AmtronControl:
                     if value is None:
                         return
                     try:
-                        await self._async_write(
-                            CHARGING_CURRENT_EMS,
-                            value,
-                            min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
-                        )
+                        if self.is_paused is not False:
+                            await self._async_request_current_locked(
+                                value, mode_change=True, defer=False
+                            )
+                        else:
+                            await self._async_write(
+                                CHARGING_CURRENT_EMS,
+                                value,
+                                min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
+                            )
+                            self._write_state.confirmed_current = value
                     except AmtronRateLimitedError as err:
                         retry_after = err.retry_after
                     except HomeAssistantError:

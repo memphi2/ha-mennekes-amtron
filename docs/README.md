@@ -7,6 +7,7 @@ local Modbus RTU.
 
 | I want to… | Read |
 |---|---|
+| check models and hardware test status | [Device compatibility](compatibility.md) |
 | prepare the installation with an electrician | [Hardware installation](hardware.md) |
 | install, update or remove the integration | [Installation and updates](installation.md) |
 | add the wallbox and test the first charge | [Quick start](quickstart.md) |
@@ -45,5 +46,6 @@ share it. Read-only mode still sends requests. See [safety.md](safety.md).
 
 **0 A does not mean "stop".** Writing 0 A to the charging-current register
 removes the limit and makes the wallbox signal its *maximum*. The integration
-keeps that value out of reach; it is worth knowing why. See
+accepts 0 in **Charging current limit** to turn the limit off. Use
+**Charging paused** to stop charging. See
 [safety.md](safety.md#the-0-a-trap).

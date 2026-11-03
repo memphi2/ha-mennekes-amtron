@@ -45,7 +45,10 @@ class Harness:
         values: dict[str, object] | None = None,
         clock: list[float] | None = None,
     ) -> None:
-        self.transport = FakeModbusClient(device_bank())
+        self.transport = FakeModbusClient(device_bank(
+            evse_state=(values or {}).get("evse_state", EvseState.IDLE),
+            charging_current=(values or {}).get("charging_current_ems", 16.0),
+        ))
         self.clock = clock if clock is not None else [1000.0]
         self.client = MennekesModbusClient(
             CONFIG,
@@ -58,7 +61,7 @@ class Harness:
             phase_options_hw=phase_options,
             max_evse_current=16.0,
         )
-        self.snapshot = WallboxData(values=dict(values or {}))
+        self.snapshot = WallboxData(values=dict(values if values is not None else {"charging_current_ems": 16.0}))
         self.refreshes = 0
         self.slept: list[float] = []
         self.control = AmtronControl(
@@ -487,6 +490,8 @@ def test_recovery_that_resumes_a_pause_obeys_and_restarts_hysteresis() -> None:
         assert err.value.translation_key == "write_rate_limited"
         assert err.value.translation_placeholders == {"seconds": "285"}
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        assert harness.written(R.HEARTBEAT) == []
+        assert harness.written(R.CHARGING_RELEASE) == []
         assert harness.diagnostics.recoveries == 0
 
         harness.clock[0] += 285
@@ -624,6 +629,47 @@ def test_a_setpoint_change_cannot_undo_a_pause_early() -> None:
     assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
 
 
+@pytest.mark.parametrize("missing", [None, float("nan"), "invalid", "old_snapshot"])
+@pytest.mark.parametrize("command", ["current", "unlimited", "recovery"])
+def test_lost_or_old_readback_cannot_lift_a_confirmed_pause(missing, command):
+    harness = Harness(values={"charging_current_ems": 8.0})
+
+    async def run():
+        control = await harness.connect()
+        await control.async_pause_charging()
+        if missing != "old_snapshot":
+            harness.snapshot = WallboxData(values={"charging_current_ems": missing})
+        harness.clock[0] += 6
+        assert control.is_paused is True
+        action = (control.async_recover_from_error() if command == "recovery" else
+                  control.async_set_charging_current(
+                      0 if command == "unlimited" else 8, allow_unlimited=True))
+        with pytest.raises(ServiceValidationError) as error:
+            await action
+        assert error.value.translation_placeholders == {"seconds": "294"}
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        harness.clock[0] += 294
+        await control.async_set_charging_current(8)
+        assert control.is_paused is False
+
+    asyncio.run(run())
+
+
+def test_unknown_pause_state_keeps_the_startup_guard():
+    harness = Harness(values={})
+
+    async def run():
+        control = await harness.connect()
+        harness.client.write_state.mode_change_at = harness.clock[0]
+        assert control.is_paused is None
+        harness.clock[0] += 6
+        with pytest.raises(ServiceValidationError):
+            await control.async_set_charging_current(8)
+        assert not harness.transport.writes
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("rejection", ["cooldown", "device"])
 def test_rejected_setpoint_does_not_change_the_later_resume(rejection: str) -> None:
     harness = Harness(values={"charging_current_ems": 8.0})
@@ -728,7 +774,7 @@ def test_the_unlimited_opt_in_cannot_undo_a_pause_early_either() -> None:
     assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
 
 
-@pytest.mark.parametrize("newer", ["pause", "setpoint"])
+@pytest.mark.parametrize("newer", ["pause", "setpoint", "unlimited"])
 def test_an_accepted_command_supersedes_a_deferred_current(newer: str) -> None:
     """A stale slider write must never resume a later pause."""
     from custom_components.mennekes_amtron_rtu.decode import decode_register
@@ -741,6 +787,8 @@ def test_an_accepted_command_supersedes_a_deferred_current(newer: str) -> None:
         harness.clock[0] += 6
         if newer == "pause":
             await control.async_pause_charging()
+        elif newer == "unlimited":
+            await control.async_set_charging_current(0, allow_unlimited=True)
         else:
             await control.async_set_charging_current(16)
         for _ in range(20):
@@ -748,8 +796,49 @@ def test_an_accepted_command_supersedes_a_deferred_current(newer: str) -> None:
         assert [
             decode_register(R.CHARGING_CURRENT_EMS, words)
             for words in harness.written(R.CHARGING_CURRENT_EMS)
-        ] == [6.0, 1.0 if newer == "pause" else 16.0]
+        ] == [6.0, {"pause": 1.0, "setpoint": 16.0, "unlimited": 0.0}[newer]]
         await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("initial", [0.0, 12.0])
+def test_pause_and_resume_preserve_unlimited_mode(initial: float) -> None:
+    async def run() -> None:
+        harness = Harness(values={"charging_current_ems": initial}, current_cap=10)
+        control = await harness.connect()
+        control.charging_setpoint = 8  # An old limit must not replace unlimited.
+        if initial != 0:
+            await control.async_set_charging_current(0, allow_unlimited=True)
+            assert control.charging_setpoint == 0
+            harness.clock[0] += 5
+        await control.async_pause_charging()
+        assert control.charging_setpoint == 0
+        with pytest.raises(ServiceValidationError) as error:
+            await control.async_resume_charging()
+        assert error.value.translation_key == "write_rate_limited"
+        harness.clock[0] += 300
+        await control.async_resume_charging()
+        assert control.charging_setpoint == 0
+        assert harness.written(R.CHARGING_CURRENT_EMS)[-1] == [0, 0]
+        assert control.is_paused is False
+
+    asyncio.run(run())
+
+
+def test_deferred_zero_preserves_the_write_floor_and_replaces_a_pending_limit() -> None:
+    async def run() -> None:
+        harness = Harness()
+        control = await harness.connect()
+        await control.async_set_charging_current(10)
+        await control.async_set_charging_current(8)
+        await control.async_set_charging_current(0, allow_unlimited=True)
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        assert control.charging_setpoint == 0
+        await control._flush_task
+        assert harness.clock[0] == 1005
+        assert harness.written(R.CHARGING_CURRENT_EMS)[-1] == [0, 0]
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
 
     asyncio.run(run())
 
@@ -759,6 +848,7 @@ def test_recovery_cannot_bypass_the_current_write_interval() -> None:
         harness = Harness()
         control = await harness.connect()
         await control.async_set_charging_current(6)
+        harness.transport.bank[R.CHARGING_RELEASE.address] = 0
         harness.clock[0] += 4
         with pytest.raises(ServiceValidationError) as err:
             await control.async_recover_from_error()
@@ -768,10 +858,14 @@ def test_recovery_cannot_bypass_the_current_write_interval() -> None:
         for _ in range(10):
             await asyncio.sleep(0)
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        assert harness.written(R.HEARTBEAT) == []
+        assert harness.written(R.CHARGING_RELEASE) == []
+        assert harness.transport.bank[R.CHARGING_RELEASE.address] == 0
+        assert harness.diagnostics.writes_rate_limited == 1
         assert harness.diagnostics.recoveries == 0
         await control.async_shutdown()
         assert [event["event"] for event in harness.diagnostics.timeline.snapshot()] == [
-            "recovery_started", "write_rate_limited",
+            "write_rate_limited",
         ]
 
     asyncio.run(run())
@@ -813,6 +907,7 @@ def test_phase_switch_rate_limit_reports_a_translated_wait(charging: bool) -> No
         harness.clock[0] += 15
         if charging:
             harness.snapshot.values["evse_state"] = EvseState.CHARGING
+            harness.transport.bank[R.EVSE_STATE.address] = int(EvseState.CHARGING)
         with pytest.raises(ServiceValidationError) as error:
             await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
         assert error.value.translation_key == "write_rate_limited"
@@ -824,5 +919,94 @@ def test_phase_switch_rate_limit_reports_a_translated_wait(charging: bool) -> No
         await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
         assert harness.written(R.REQUESTED_PHASES) == [[1], [0]]
         assert bool(harness.written(R.CHARGING_CURRENT_EMS)) == charging
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("outcome", ["lost_reply", "cancelled"])
+def test_uncertain_pause_keeps_hysteresis_even_with_old_readback(outcome):
+    harness = Harness(values={"charging_current_ems": 8.0})
+
+    async def run():
+        control = await harness.connect()
+        error = asyncio.CancelledError() if outcome == "cancelled" else raise_connection_error()
+        harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = error
+        with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError):
+            await control.async_pause_charging()
+        harness.transport.write_exceptions.clear()
+        harness.clock[0] += 6
+        assert control.is_paused is None
+        with pytest.raises(ServiceValidationError) as limited:
+            await control.async_set_charging_current(8)
+        assert limited.value.translation_placeholders == {"seconds": "294"}
+        assert not harness.written(R.CHARGING_CURRENT_EMS)
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("cached", "actual", "pause"), [
+    (EvseState.IDLE, EvseState.CHARGING, True),
+    (None, EvseState.CHARGING, True),
+    (EvseState.CHARGING, EvseState.IDLE, False),
+])
+def test_phase_switch_uses_fresh_device_status(cached, actual, pause):
+    harness = Harness(values={"charging_current_ems": 8.0})
+    harness.snapshot.values["evse_state"] = cached
+    harness.transport.bank[R.EVSE_STATE.address] = int(actual)
+
+    async def run():
+        control = await harness.connect()
+        await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        assert bool(harness.written(R.CHARGING_CURRENT_EMS)) == pause
+        assert harness.written(R.REQUESTED_PHASES) == [[1]]
+        assert harness.transport.reads[0] == (R.EVSE_STATE.address, 1)
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("operation", ["phase", "restart"])
+@pytest.mark.parametrize("failure", ["missing", "protocol", "invalid"])
+def test_guarded_operations_refuse_unconfirmed_status_without_writes(operation, failure):
+    harness = Harness(values={"evse_state": EvseState.IDLE})
+    if failure == "invalid":
+        harness.transport.bank[R.EVSE_STATE.address] = 99
+    else:
+        harness.transport.read_exceptions[R.EVSE_STATE.address] = (
+            raise_connection_error() if failure == "missing" else 4
+        )
+
+    async def run():
+        control = await harness.connect()
+        action = (control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+                  if operation == "phase" else control.async_restart())
+        with pytest.raises(ServiceValidationError) as error:
+            await action
+        assert error.value.translation_key == f"{operation}_state_unknown"
+        assert not harness.transport.writes
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("cached", "actual"), [
+    (EvseState.IDLE, EvseState.CHARGING),
+    (EvseState.IDLE, EvseState.EV_CONNECTED),
+    (EvseState.CHARGING, EvseState.IDLE),
+    (None, EvseState.IDLE),
+])
+def test_restart_uses_fresh_device_status(cached, actual):
+    harness = Harness(values={"evse_state": EvseState.IDLE})
+    harness.snapshot.values["evse_state"] = cached
+    harness.transport.bank[R.EVSE_STATE.address] = int(actual)
+
+    async def run():
+        control = await harness.connect()
+        if actual == EvseState.IDLE:
+            await control.async_restart()
+        else:
+            with pytest.raises(ServiceValidationError) as error:
+                await control.async_restart()
+            assert error.value.translation_key == "restart_requires_idle"
+        assert bool(harness.written(R.SYSTEM_RESTART)) == (actual == EvseState.IDLE)
+        assert harness.transport.reads == [(R.EVSE_STATE.address, 1)]
 
     asyncio.run(run())
