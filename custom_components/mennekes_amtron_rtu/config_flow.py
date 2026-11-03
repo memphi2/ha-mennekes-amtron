@@ -39,11 +39,10 @@ from .const import (
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
     DEFAULT_FRAME,
-    DEFAULT_MODEL,
+    DEFAULT_NAME,
     DEFAULT_PARITY,
     DEFAULT_STOPBITS,
     DOMAIN,
-    MANUFACTURER,
     SEARCH_FULL,
     SEARCH_OFF,
     frame_display,
@@ -394,4 +393,4 @@ def _entry_title(identity: DeviceIdentity) -> str:
     """
 
     del identity
-    return f"{MANUFACTURER} {DEFAULT_MODEL}"
+    return DEFAULT_NAME

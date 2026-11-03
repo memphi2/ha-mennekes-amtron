@@ -149,7 +149,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
 
             # The title becomes the device name and prefixes every entity id,
             # so it carries no serial number.
-            assert entry.title == "MENNEKES AMTRON"
+            assert entry.title == "Mennekes Amtron"
             assert entry.unique_id == SERIAL_NUMBER
 
             registry = er.async_get(hass)
@@ -180,6 +180,23 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             assert device.sw_version == "2023.21.11024"
             assert device.model == "Amtron 4You 310 11 C2"
             assert device.identifiers == {("mennekes_amtron_rtu", SERIAL_NUMBER)}
+
+            # Upgrade an old default title without replacing registered entities
+            # or overwriting a device name explicitly chosen by its owner.
+            original_ids = {entity.entity_id: entity.unique_id for entity in entities}
+            await hass.config_entries.async_unload(entry.entry_id)
+            dr.async_get(hass).async_update_device(device.id, name_by_user="Garage")
+            hass.config_entries.async_update_entry(entry, title="MENNEKES AMTRON")
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+            assert entry.title == "Mennekes Amtron"
+            updated_device = dr.async_get(hass).async_get(device.id)
+            assert updated_device.name == "Mennekes Amtron"
+            assert updated_device.name_by_user == "Garage"
+            assert original_ids == {
+                entity.entity_id: entity.unique_id
+                for entity in er.async_entries_for_config_entry(registry, entry.entry_id)
+            }
 
             # A wallbox in error state 200 without a configured fallback.
             issues = {

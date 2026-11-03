@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Use Mennekes Amtron as the default device name, including existing default
+  titles; preserve custom names and registered entity IDs.
 - Remove leading underscore padding from displayed serial/article numbers and
   map the verified 1313201205 article to Amtron 4You 310 11 C2. Keep existing
   device identifiers and entity unique IDs unchanged.

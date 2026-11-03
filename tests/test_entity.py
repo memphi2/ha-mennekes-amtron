@@ -31,7 +31,7 @@ def test_device_info_carries_the_identity() -> None:
         _hass, entry, _transport = await build_runtime()
         info = entry_device_info(entry)
         assert info["identifiers"] == {(DOMAIN, "ABC123456789")}
-        assert info["manufacturer"] == "MENNEKES"
+        assert info["manufacturer"] == "Mennekes"
         assert info["model"] == "Amtron 4You 310 11 C2"
         assert info["sw_version"] == "2023.21.11024"
         assert info["serial_number"] == "ABC123456789"
@@ -66,7 +66,7 @@ def test_unknown_articles_are_not_mistaken_for_a_known_model(article: str | None
         entry.runtime_data.identity.article_number = article
         entry.runtime_data.identity.serial_number = "________________"
         info = entry_device_info(entry)
-        assert info["model"] == "AMTRON"
+        assert info["model"] == "Amtron"
         assert "serial_number" not in info
         if article and article.lstrip("_"):
             assert info["model_id"] == article.lstrip("_")
@@ -83,7 +83,7 @@ def test_device_info_falls_back_to_a_generic_model() -> None:
         entry.runtime_data.identity.firmware_version = None
         entry.runtime_data.identity.serial_number = None
         info = entry_device_info(entry)
-        assert info["model"] == "AMTRON"
+        assert info["model"] == "Amtron"
         assert "sw_version" not in info
         assert "serial_number" not in info
 

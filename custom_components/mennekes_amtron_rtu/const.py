@@ -6,8 +6,9 @@ from typing import Final
 
 DOMAIN: Final = "mennekes_amtron_rtu"
 
-MANUFACTURER: Final = "MENNEKES"
-DEFAULT_MODEL: Final = "AMTRON"
+MANUFACTURER: Final = "Mennekes"
+DEFAULT_MODEL: Final = "Amtron"
+DEFAULT_NAME: Final = f"{MANUFACTURER} {DEFAULT_MODEL}"
 
 # Vendor bus defaults. All of them are changeable with the MENNEKES
 # configuration tool, so every one of them is a config-flow field.

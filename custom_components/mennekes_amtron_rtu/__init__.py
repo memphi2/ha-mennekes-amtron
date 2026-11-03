@@ -33,6 +33,7 @@ from .const import (
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
     DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
+    DEFAULT_NAME,
     DEFAULT_PARITY,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_STOPBITS,
@@ -92,6 +93,11 @@ async def async_setup_entry(
         if isinstance(err, AmtronBusError):
             raise ConfigEntryNotReady(str(err)) from err
         raise
+
+    # Update only the former generated title. HA preserves device names chosen
+    # by the user separately, and existing registry entity IDs do not change.
+    if entry.title == "MENNEKES AMTRON":
+        hass.config_entries.async_update_entry(entry, title=DEFAULT_NAME)
 
     diagnostics = WriteDiagnostics()
     connection_state = ConnectionState()

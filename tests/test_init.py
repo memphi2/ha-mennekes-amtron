@@ -93,17 +93,20 @@ def test_options_drive_the_interval_and_the_control_options() -> None:
     assert options.current_cap == 12.5
 
 
+@pytest.mark.parametrize("title", ["MENNEKES AMTRON", "Garage", "Mennekes Amtron"])
 def test_a_master_entry_loads_and_unloads_cleanly(
     monkeypatch: pytest.MonkeyPatch,
+    title: str,
 ) -> None:
     async def run() -> None:
         hass = FakeHass()
-        entry = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
+        entry = FakeConfigEntry(title=title, options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
         transport = FakeModbusClient(device_bank())
         _patch_client(monkeypatch, transport)
         _patch_issues(monkeypatch)
 
         assert await async_setup_entry(hass, entry)
+        assert entry.title == ("Mennekes Amtron" if title == "MENNEKES AMTRON" else title)
         assert entry.runtime_data.identity.serial_number == "ABC123456789"
         assert entry.runtime_data.heartbeat is not None
         assert entry.runtime_data.heartbeat.running
