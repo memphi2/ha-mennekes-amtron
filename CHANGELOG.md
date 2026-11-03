@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Disable dependency caching throughout tag-release validation and publication
+  so a moved tag cannot feed cached executables to the privileged publisher.
 - Use Mennekes Amtron as the default device name, including existing default
   titles; preserve custom names and registered entity IDs.
 - Remove leading underscore padding from displayed serial/article numbers and

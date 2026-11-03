@@ -87,3 +87,17 @@ def test_ci_cancels_only_superseded_prs_and_serializes_release_publication():
     assert "github.event.inputs.tag || github.ref_name" in release["concurrency"]["group"]
     for workflow in (validate, release):
         assert all(job.get("timeout-minutes", 0) > 0 for job in workflow["jobs"].values())
+
+
+@pytest.mark.parametrize("job_name", ["validate", "publish"])
+def test_tag_release_jobs_cannot_share_dependency_caches(job_name):
+    """A moved tag must not feed cached executables to a privileged publisher."""
+
+    release = yaml.safe_load(Path(".github/workflows/release.yml").read_text())
+    assert release["env"]["PIP_NO_CACHE_DIR"] == "1"
+    steps = release["jobs"][job_name]["steps"]
+    assert any(step.get("uses", "").startswith("actions/setup-python@") for step in steps)
+    for step in steps:
+        assert not step.get("uses", "").startswith("actions/cache")
+        if step.get("uses", "").startswith("actions/setup-python@"):
+            assert not step.get("with", {}).get("cache")
