@@ -55,6 +55,11 @@ A partial report cannot pass validation.
 
 ## Published release verification
 
+Local HACS builds use an independent temporary staging directory per invocation.
+The final ZIP appears only after the build completes; a failed build preserves
+an existing archive. Concurrent builds, including those sharing an output path,
+are covered by regression tests.
+
 ```bash
 .venv/bin/python scripts/release_check.py --ref v0.2.3 --published
 ```

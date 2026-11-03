@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Isolate package staging per build and replace the output ZIP atomically;
+  overlapping or failed builds cannot leave a partial archive.
 - Reject growing or missing listener counts in loaded and continuous soak
   measurements, including peaks that disappear again before unload.
 - Check recovery cooldowns before writing heartbeat or charging release,

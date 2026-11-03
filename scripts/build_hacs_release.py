@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -21,7 +22,6 @@ ROOT = Path(__file__).resolve().parents[1]
 DOMAIN = "mennekes_amtron_rtu"
 COMPONENT_SRC = ROOT / "custom_components" / DOMAIN
 RELEASE_ROOT = ROOT / ".release"
-PACKAGE_ROOT = RELEASE_ROOT / "package"
 HACS_ZIP_NAME = "ha-mennekes-amtron.zip"
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 
@@ -44,34 +44,41 @@ def main() -> int:
     args = parser.parse_args()
 
     version = read_integration_version()
-    _prepare_package()
     output_dir = args.output_dir or RELEASE_ROOT
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     hacs_zip = output_dir / HACS_ZIP_NAME
-    _write_zip(hacs_zip)
+    build_archive(hacs_zip)
     sys.stdout.write(f"Built {hacs_zip} for version {version}\n")
     return 0
 
 
-def _prepare_package() -> None:
-    if PACKAGE_ROOT.exists():
-        shutil.rmtree(PACKAGE_ROOT)
+def build_archive(output: Path) -> None:
+    """Stage each build independently and publish only a complete local ZIP."""
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".amtron-build-", dir=output.parent) as temporary:
+        package = Path(temporary) / "package"
+        archive = Path(temporary) / HACS_ZIP_NAME
+        _prepare_package(package)
+        _write_zip(archive, package)
+        archive.replace(output)
+
+
+def _prepare_package(package: Path) -> None:
     shutil.copytree(
         COMPONENT_SRC,
-        PACKAGE_ROOT,
+        package,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
     for name in PACKAGE_METADATA:
-        shutil.copyfile(ROOT / name, PACKAGE_ROOT / name)
+        shutil.copyfile(ROOT / name, package / name)
 
 
-def _write_zip(output: Path) -> None:
+def _write_zip(output: Path, package: Path) -> None:
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for path in sorted(PACKAGE_ROOT.rglob("*")):
+        for path in sorted(package.rglob("*")):
             if not path.is_file():
                 continue
-            name = str(path.relative_to(PACKAGE_ROOT))
+            name = str(path.relative_to(package))
             archive.writestr(_zip_info(name), path.read_bytes())
 
 
