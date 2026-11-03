@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Preserve the pre-pause current across entry reloads for resume and recovery,
+  while still applying the current cap configured after the reload.
 - Retry failed heartbeats on a one-second interval so a brief serial reconnect
   does not consume the entire ten-second delivery deadline.
 - Retain continuous-soak measurements on failures and timeouts, and upload

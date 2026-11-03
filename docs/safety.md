@@ -86,7 +86,9 @@ has its own switch, and 0 A can only be written through the
 - Keep pause, resume and phase switches **more than 5 minutes** apart and
   use hysteresis. The integration enforces a five-minute floor and rejects
   faster changes with an explanatory error. Timing guards survive an entry
-  reload in memory, without Recorder writes. After a full Home Assistant
+  reload in memory, without Recorder writes. The remembered current before a
+  pause also survives reloads; resuming still respects a newly lowered current
+  cap. After a full Home Assistant
   restart (or the first setup), the previous timing is unknown: current
   writes wait five seconds, and pause/resume and phase changes wait five
   minutes from setup. Reading and the heartbeat remain available. Keep the

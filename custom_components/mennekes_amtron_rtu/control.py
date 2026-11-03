@@ -98,7 +98,16 @@ class AmtronControl:
         self._current_lock = asyncio.Lock()
         self._flush_task: asyncio.Task[None] | None = None
         self._write_state = client.write_state
-        self.charging_setpoint: float | None = None
+
+    @property
+    def charging_setpoint(self) -> float | None:
+        """Return the remembered resume target, retained across entry reloads."""
+
+        return self._write_state.charging_setpoint
+
+    @charging_setpoint.setter
+    def charging_setpoint(self, value: float | None) -> None:
+        self._write_state.charging_setpoint = value
 
     @property
     def options(self) -> ControlOptions:
