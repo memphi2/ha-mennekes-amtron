@@ -26,6 +26,20 @@ check. The serial simulator also closes its relay threads and descriptors.
 This bounded stress test does not replace physical-wallbox validation, a
 wall-clock soak lasting days, or the separate Recorder retention tests.
 
+For continuously loaded operation, run:
+
+```bash
+.venv/bin/python scripts/check_runtime_steady.py --seconds 3600 --json-output /tmp/amtron-steady.json
+```
+
+This separate test uses real elapsed time, active polling and heartbeat timers,
+and injected connection loss/recovery every 30 seconds without reloading the
+entry. It measures the same resource budgets every five seconds and checks
+cleanup afterwards. The normal suite exercises a short version; scheduled
+and manual CI runs measure one hour on latest stable HA. This adds no required
+HA version to the minimum/latest matrix. It uses simulated Modbus replies and
+does not replace the separate SQLite Recorder retention tests or hardware tests.
+
 ## Published release verification
 
 ```bash

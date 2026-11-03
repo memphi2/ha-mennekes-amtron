@@ -113,6 +113,35 @@ jobs:
       - name: Measure repeated lifecycle, recovery and serial cleanup
         run: python scripts/check_runtime_soak.py --cycles 30 --idle-seconds 10
 
+  runtime-steady:
+    name: continuous runtime soak
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Install latest stable HA and validation tools
+        run: |
+          python -m pip install --upgrade homeassistant
+          python -m pip install -r requirements-dev.txt
+          python scripts/check_pymodbus_pin.py --install
+          python -m pip check
+      - name: Verify latest stable HA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/check_ha_channel.py
+      - name: Measure one hour without reloading the entry
+        run: python scripts/check_runtime_steady.py --seconds 3600 --json-output /tmp/amtron-steady.json
+      - name: Retain measurements
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: amtron-steady-runtime
+          path: /tmp/amtron-steady.json
+          if-no-files-found: error
+
   public-privacy:
     name: public privacy audit
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
