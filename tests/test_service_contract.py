@@ -222,7 +222,8 @@ def test_every_remote_action_uses_the_shared_service(tmp_path, method, value):
 
 
 @pytest.mark.parametrize("cap", [6, 16])
-def test_remote_resume_respects_the_local_current_cap(tmp_path, cap):
+@pytest.mark.parametrize("unknown_target", [False, True])
+def test_remote_resume_respects_the_local_current_cap(tmp_path, cap, unknown_target):
     async def run():
         service, transport, clock = await service_fixture(tmp_path)
         try:
@@ -241,8 +242,13 @@ def test_remote_resume_respects_the_local_current_cap(tmp_path, cap):
                 )
                 await control.async_pause_charging()
                 clock[0] += 6
+                if unknown_target:
+                    service.control.charging_setpoint = None
+                    await remote.update()
                 await control.async_resume_charging()
-                assert current_writes(transport) == [1, min(8, cap)]
+                assert current_writes(transport) == [
+                    1, cap if unknown_target else min(8, cap)
+                ]
                 with pytest.raises(ServiceValidationError):
                     await control.async_set_charging_current(float("nan"))
         finally:

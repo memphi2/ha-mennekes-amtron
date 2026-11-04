@@ -426,7 +426,7 @@ class RemoteControl(AmtronControl):
     @ha_command
     async def async_resume_charging(self) -> None:
         target = self.charging_setpoint
-        if target is not None and target > self.max_charging_current:
+        if target is None or target > self.max_charging_current:
             await self._command("set_current", value=self.max_charging_current)
         else:
             await self._command("resume")
