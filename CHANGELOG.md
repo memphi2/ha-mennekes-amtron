@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Sync the saved control-intent file and its containing directory before
+  acknowledging a successful service command; failed syncs remain retryable.
 - Wait for the wallbox to confirm manual heartbeat recovery for up to ten seconds,
   avoiding a premature "fault still active" message while firmware clears error
   200. Confirmation reads do not repeat charging commands or lift a pause.

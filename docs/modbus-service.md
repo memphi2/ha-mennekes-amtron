@@ -138,7 +138,8 @@ check the wallbox's fallback behavior.
 Only pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. The file is atomically replaced
 with owner-only permissions when those settings change. It contains no growing
-history. Heartbeats and polls do not create state-file entries or Recorder rows.
+history. Both the file and its directory are synced before a save is considered
+complete. Heartbeats and polls do not create state-file entries or Recorder rows.
 Include the app's data directory in backups; protect its options file/token.
 
 The service enforces the same current-write floor, phase-switch guards, device
