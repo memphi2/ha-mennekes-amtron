@@ -12,6 +12,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from ._flow_connect import async_test_connection
 from ._flow_search import (
@@ -22,12 +23,14 @@ from ._flow_search import (
     search_space,
 )
 from ._flow_serial import list_by_id_ports, list_comports, merge_port_options
-from .client import SerialConfig
-from .client_errors import AmtronBusError, AmtronConnectionError
-from .config_schemas import user_schema
-from .const import (
+from .config_schemas import service_schema, user_schema
+from .data import DeviceIdentity
+from .device.client import SerialConfig
+from .device.client_errors import AmtronBusError, AmtronConnectionError
+from .device.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
+    CONF_CONTROL_MODE,
     CONF_DEVICE_ID,
     CONF_FRAME,
     CONF_PARITY,
@@ -35,6 +38,8 @@ from .const import (
     CONF_SEARCH,
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
+    CONTROL_MODE_MASTER,
+    CONTROL_MODE_READ_ONLY,
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
@@ -49,11 +54,11 @@ from .const import (
     frame_label,
     frame_parts,
 )
-from .data import DeviceIdentity
+from .device.identity import async_read_identity, display_identifier
+from .device.registers import VALIDATED_LAYOUT, layout_label
 from .entry_types import MennekesAmtronConfigEntry
-from .identity import async_read_identity, display_identifier
 from .options_flow import MennekesAmtronOptionsFlow
-from .registers import VALIDATED_LAYOUT, layout_label
+from .remote import CONF_SERVER_TOKEN, CONF_SERVER_URL, RemoteClient, server_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,21 +82,84 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self._search_result: SearchResult | None = None
         self._search_error = "not_found"
         self._pending_input: dict[str, Any] | None = None
-        self._pending_step: str = "user"
+        self._pending_step: str = "serial"
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ask for the serial parameters and verify them on the bus."""
+        """Choose the independent service or a direct serial connection."""
+        return self.async_show_menu(step_id="user", menu_options=["server", "serial"])
 
-        return await self._async_serial_step("user", user_input)
+    async def async_step_serial(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self._async_serial_step("serial", user_input)
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Change the serial parameters of an existing entry."""
+        return self.async_show_menu(
+            step_id="reconfigure", menu_options=["server", "serial_reconfigure"]
+        )
 
-        return await self._async_serial_step("reconfigure", user_input)
+    async def async_step_serial_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self._async_serial_step("serial_reconfigure", user_input)
+
+    async def async_step_server(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Probe the service without sending any charging commands."""
+        errors: dict[str, str] = {}
+        reconfigure = self.context.get("source") == "reconfigure"
+        entry = self._get_reconfigure_entry() if reconfigure else None
+        if user_input is not None:
+            try:
+                url = server_url(str(user_input[CONF_SERVER_URL]))
+                token = str(user_input[CONF_SERVER_TOKEN])
+                if len(token) < 32:
+                    raise ValueError("invalid token")
+                client = RemoteClient(async_get_clientsession(self.hass), url, token)
+                try:
+                    await client.async_connect()
+                    identity = client.identity
+                    if identity.serial_number:
+                        unique_id = identity.serial_number
+                    elif entry is not None:
+                        return self.async_abort(
+                            reason="service_migration_requires_serial"
+                        )
+                    else:
+                        unique_id = f"{DOMAIN}_{url}"
+                    await self.async_set_unique_id(unique_id)
+                    data = {CONF_SERVER_URL: url, CONF_SERVER_TOKEN: token}
+                    if identity.serial_number:
+                        data[CONF_SERIAL_NUMBER] = identity.serial_number
+                    if entry is not None:
+                        self._abort_if_unique_id_mismatch()
+                        if not entry.update_listeners:
+                            return self.async_update_reload_and_abort(entry, data=data)
+                        return self.async_update_and_abort(entry, data=data)
+                    self._abort_if_unique_id_configured()
+                    mode = (
+                        CONTROL_MODE_READ_ONLY
+                        if client.snapshot["control"]["read_only"]
+                        else CONTROL_MODE_MASTER
+                    )
+                    return self.async_create_entry(
+                        title=DEFAULT_NAME, data=data, options={CONF_CONTROL_MODE: mode}
+                    )
+                finally:
+                    await client.async_close()
+            except ValueError, AmtronBusError:
+                errors["base"] = "cannot_connect_service"
+        defaults = user_input or (dict(entry.data) if entry is not None else {})
+        return self.async_show_form(
+            step_id="server",
+            data_schema=self.add_suggested_values_to_schema(service_schema(), defaults),
+            errors=errors,
+        )
 
     async def _async_serial_step(
         self,
@@ -121,7 +189,11 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _async_test_and_finish(
         self, step_id: str, user_input: dict[str, Any], config: SerialConfig
     ) -> ConfigFlowResult:
-        entry = self._get_reconfigure_entry() if step_id == "reconfigure" else None
+        entry = (
+            self._get_reconfigure_entry()
+            if step_id in ("reconfigure", "serial_reconfigure")
+            else None
+        )
         loaded = entry is not None and entry.state is ConfigEntryState.LOADED
         if loaded and entry is not None and config == entry.runtime_data.client.config:
             # The existing client owns the exclusive port and serializes reads
@@ -149,7 +221,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> SearchResult | None:
         entry = (
             self._get_reconfigure_entry()
-            if self._pending_step == "reconfigure"
+            if self._pending_step in ("reconfigure", "serial_reconfigure")
             else None
         )
         loaded = entry is not None and entry.state is ConfigEntryState.LOADED
@@ -210,9 +282,14 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             progress_task=self._search_task,
             description_placeholders={
                 "candidates": str(candidates),
-                "minutes": str(max(1, math.ceil(
-                    candidates * PROBE_TIMEOUT * (PROBE_RETRIES + 1) / 60
-                ))),
+                "minutes": str(
+                    max(
+                        1,
+                        math.ceil(
+                            candidates * PROBE_TIMEOUT * (PROBE_RETRIES + 1) / 60
+                        ),
+                    )
+                ),
             },
         )
 
@@ -261,7 +338,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                     "baudrate": str(result.config.baudrate),
                     "frame": _frame(result.config),
                     "layout": layout_label(result.identity.layout_version),
-                    "serial_number": display_identifier(result.identity.serial_number) or "-",
+                    "serial_number": display_identifier(result.identity.serial_number)
+                    or "-",
                     "attempts": str(result.attempts),
                 },
             )
@@ -288,15 +366,15 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             # only stable thing that distinguishes two wallboxes.
             await self.async_set_unique_id(f"{DOMAIN}_{config.port}")
 
-        if step_id == "reconfigure":
+        if step_id in ("reconfigure", "serial_reconfigure"):
             self._abort_if_unique_id_mismatch()
             entry = self._get_reconfigure_entry()
             if not entry.update_listeners:
                 # An unloaded or failed setup has no listener to start it.
-                return self.async_update_reload_and_abort(entry, data_updates=data)
+                return self.async_update_reload_and_abort(entry, data=data)
             # The entry's update listener owns reloading, including options.
             # A second reload here races it and is rejected from HA 2026.12.
-            return self.async_update_and_abort(entry, data_updates=data)
+            return self.async_update_and_abort(entry, data=data)
 
         self._abort_if_unique_id_configured()
         return self.async_create_entry(title=_entry_title(identity), data=data)
@@ -315,7 +393,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             return dict(user_input)
-        if step_id == "reconfigure":
+        if step_id in ("reconfigure", "serial_reconfigure"):
             data = dict(self._get_reconfigure_entry().data)
             config = _serial_config(data)
             return {

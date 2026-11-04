@@ -1,84 +1,21 @@
-"""Runtime data structures for the MENNEKES AMTRON integration."""
+"""Home Assistant runtime ownership, separate from the device driver."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from .decode import RegisterValue
-from .registers import LAYOUT_V01_00
-from .runtime_events import EventTimeline
+from .device.data import ConnectionState as ConnectionState
+from .device.data import DeviceIdentity as DeviceIdentity
+from .device.data import WallboxData as WallboxData
+from .device.data import WriteDiagnostics as WriteDiagnostics
 
 if TYPE_CHECKING:
-    from .client import MennekesModbusClient
     from .control import AmtronControl
     from .coordinator import MennekesAmtronCoordinator
-    from .heartbeat import HeartbeatTask
+    from .device.client import MennekesModbusClient
+    from .device.heartbeat import HeartbeatTask
     from .recovery import HeartbeatRecovery
-
-
-@dataclass(slots=True)
-class DeviceIdentity:
-    """Immutable device facts read once during setup."""
-
-    layout_version: int = LAYOUT_V01_00
-    firmware_version: str | None = None
-    serial_number: str | None = None
-    article_number: str | None = None
-    phase_options_hw: int | None = None
-    max_evse_current: float | None = None
-
-
-@dataclass(slots=True)
-class WallboxData:
-    """One coordinator snapshot of the device."""
-
-    values: dict[str, RegisterValue] = field(default_factory=dict)
-    failed_blocks: tuple[str, ...] = ()
-    # Internal ordering only: never make a poll notify entities merely because
-    # its generation changed, and never expose this in entity attributes.
-    current_write_generation: int = field(default=0, compare=False, repr=False)
-
-    def get(self, key: str) -> RegisterValue:
-        """Return one decoded register value, or ``None`` when unavailable."""
-
-        return self.values.get(key)
-
-    def has(self, key: str) -> bool:
-        """Return true when this snapshot carries a value for a key."""
-
-        return self.values.get(key) is not None
-
-
-@dataclass(slots=True)
-class WriteDiagnostics:
-    """Counters describing how the integration behaved on the bus."""
-
-    heartbeats_sent: int = 0
-    heartbeats_failed: int = 0
-    heartbeats_late: int = 0
-    writes_sent: int = 0
-    writes_rejected: int = 0
-    write_errors: set[str] = field(default_factory=set)
-    writes_rate_limited: int = 0
-    recoveries: int = 0
-    last_error: str | None = None
-    timeline: EventTimeline = field(default_factory=EventTimeline)
-
-
-@dataclass(slots=True)
-class ConnectionState:
-    """Availability of the serial connection, tracked for log hygiene."""
-
-    available: bool = True
-    logged_unavailable: bool = False
-
-    def record(self, available: bool) -> bool:
-        """Store availability and return true when the state changed."""
-
-        changed = available != self.available
-        self.available = available
-        return changed
 
 
 @dataclass(slots=True)

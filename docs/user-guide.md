@@ -19,7 +19,7 @@ bus access.
 | **Wallbox locked** | Prevents charging while locked. |
 | **Solar charging mode** | Changes the mode shown by the wallbox; it does not calculate or follow PV surplus. It requires DIP 7 as described in the hardware guide. |
 | **Requested phases** | Available only on capable hardware. See phase switching below. |
-| **Recover from error** | Runs the documented sequence for a lost energy-manager heartbeat. It may release and resume charging. |
+| **Recover from error** | Reasserts the existing controls after a lost heartbeat. It keeps a pause, device lock or disabled charging release in effect. |
 | **Restart** | Restarts the wallbox only when it reports idle. |
 
 The current control is a slider. **0 A turns the limit off.** The wallbox's own limits still apply; the extra
@@ -171,10 +171,10 @@ Removing the limit also bypasses the integration's extra current cap. Hardware
 limits still apply. Values between 0 and 6 A are not accepted by this action;
 use the pause switch instead.
 
-The manual **Recover from error** button follows the manufacturer's recovery
-sequence with a limit of at least 6 A. After manual recovery, set the current
-to 0 again if you want the limit off. Automatic recovery restores a previous
-0 A setting after the five-second write interval.
+Both automatic recovery and **Recover from error** keep the current setting,
+including 0 A for unlimited mode. A deliberate pause is remembered across HA
+restarts and remains active during recovery. Resume charging explicitly with
+**Charging paused**, or select a new current limit when you want to resume.
 
 ## Compatible devices
 

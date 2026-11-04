@@ -5,6 +5,44 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+## 0.5.0b1 — 2026-11-04
+
+### Added
+
+- Independent Modbus service with a shared HA-free driver, authenticated local
+  API, durable control intent, Python package and local Supervisor app/container
+  build. It keeps the heartbeat and last charging state through HA Core restarts,
+  including indefinite HA outages; reconnecting HA sends no charging commands.
+- Service setup and reconfiguration preserve existing device/entity identities.
+  Direct serial mode remains available. The service is distributed as a beta app and multi-architecture container,
+  with a separate stable catalog and no automatic migration of existing entries.
+
+### Fixed
+
+- Pin app installations to the attested container digest, preventing later
+  registry tag changes from substituting a different image.
+- Bind container attestations to the validated native build digests, including
+  existing version tags and tag-replacement races; matching OCI labels alone
+  cannot authorize publication.
+- Sync the saved control-intent file and its containing directory before
+  acknowledging a successful service command; failed syncs remain retryable.
+- Wait for the wallbox to confirm manual heartbeat recovery for up to ten seconds,
+  avoiding a premature "fault still active" message while firmware clears error
+  200. Confirmation reads do not repeat charging commands or lift a pause.
+- Apply the HA current cap at the service's write boundary when a remote resume
+  target is unknown or has changed since HA last polled, and update
+  remote write-rejection repairs even when all polled register values are unchanged.
+- Recover error 200 while charging is paused, locked or explicitly not released.
+  Both automatic recovery and the manual repair reassert the existing controls
+  instead of enabling charging or forcing a temporary current of at least 6 A.
+- Restore deliberate pause intent across entry reloads and Home Assistant
+  restarts, independently of changed wallbox readback, and keep the saved
+  resume current. No additional Recorder attribute or heartbeat history is added.
+- Keep an uncertain pause request after a lost acknowledgement or cancellation;
+  discard older queued current writes that could otherwise undo that pause.
+
 ## 0.4.1 — 2026-11-03
 
 ### Added

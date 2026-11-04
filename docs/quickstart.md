@@ -4,6 +4,9 @@ This walkthrough takes you from an installed adapter to the first controlled
 charge. Normal setup uses the Home Assistant UI; a command-line bus check is
 optional.
 
+This guide covers direct serial setup. For the independent service and a
+heartbeat that survives HA Core restarts, follow [service setup](modbus-service.md).
+
 ## 1. Check the hardware
 
 Have a qualified electrician prepare the wallbox using its installation
@@ -23,7 +26,7 @@ HACS on 2026.9/2026.10. That guide includes the custom-repository fallback and
 explains when a restart is needed.
 
 For an existing **0.1.0** installation, follow [Upgrading](upgrading.md) first.
-Existing **0.2.x** entries can be kept.
+Existing **0.2.x through 0.4.x** entries can be kept.
 
 ## 3. Make the adapter available
 
@@ -47,7 +50,7 @@ control. Keep the vehicle disconnected during the initial control setup.
 ## 5. Add the wallbox
 
 Open **Settings → Devices & services → Add integration → Mennekes Amtron RTU**.
-Select the adapter and enter the configured bus settings.
+Choose **Direct serial connection**, then select the adapter and enter the configured bus settings.
 Factory defaults are:
 
 | Setting | Value |
@@ -84,7 +87,7 @@ and adds the controls. Resolve any repair messages before charging.
 4. Raise the limit as appropriate. Faster changes are deferred to respect the
    five-second write interval.
 5. Test **Charging paused**: on pauses; off resumes after the waiting interval.
-   Allow more than five minutes between pause and resume. Do not set 0 A to stop.
+   Allow at least five seconds between manual pause and resume. Do not set 0 A to stop.
 
 Once basic operation is verified, follow the [user guide](user-guide.md),
 choose a [Recorder profile](recorder.md#keep-only-energy-and-power-statistics) and add [blueprint automations](blueprints.md).

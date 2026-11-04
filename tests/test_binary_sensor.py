@@ -8,9 +8,9 @@ from unittest.mock import patch
 from homeassistant.components.recorder import get_instance
 from homeassistant.setup import async_setup_component
 
-from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu.binary_sensor import async_setup_entry
-from custom_components.mennekes_amtron_rtu.enums import EvseState
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.enums import EvseState
 from tests.ha_fakes import FakeHass, build_runtime, collect
 
 
@@ -72,7 +72,10 @@ def test_capability_gating_hides_unsupported_binary_sensors() -> None:
 
 
 def test_heartbeat_uses_actual_health_and_records_only_transitions(tmp_path):
-    from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+    from custom_components.mennekes_amtron_rtu.device.const import (
+        CONTROL_MODE_MASTER,
+        DOMAIN,
+    )
     from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
     from tests.test_home_assistant_smoke import _boot
 
@@ -80,7 +83,7 @@ def test_heartbeat_uses_actual_health_and_records_only_transitions(tmp_path):
         target = tmp_path / "config"
         transport = FakeModbusClient(device_bank())
         with patch(
-            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             return_value=transport,
         ):
             hass = await _boot(target)
@@ -93,6 +96,7 @@ def test_heartbeat_uses_actual_health_and_records_only_transitions(tmp_path):
                                  "auto_purge": False, "commit_interval": 1},
                 })
                 flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(flow["flow_id"], {
                     "port": "/dev/fake", "device_id": 50, "baudrate": 57600,
                     "frame": "8n2", "search": "off",

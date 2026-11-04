@@ -22,8 +22,8 @@ from typing import Any
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.const import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_BAUDRATE,
     CONF_CONTROL_MODE,
     CONF_DEVICE_ID,
@@ -130,7 +130,8 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             flow = await hass.config_entries.flow.async_init(
                 DOMAIN, context={"source": "user"}
             )
-            assert flow["step_id"] == "user"
+            flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
+            assert flow["step_id"] == "serial"
             result = await hass.config_entries.flow.async_configure(
                 flow["flow_id"],
                 {
@@ -145,7 +146,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]
             assert entry.domain == "mennekes_amtron_rtu"
-            assert entry.runtime_data.coordinator._measurement_interval == 30
+            assert entry.runtime_data.coordinator._poller._measurement_interval == 30
 
             # The title becomes the device name and prefixes every entity id,
             # so it carries no serial number.
@@ -225,7 +226,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             assert {"number", "switch", "select", "button"} <= {
                 entity.domain for entity in entities
             }
-            assert entry.runtime_data.coordinator._measurement_interval == 60
+            assert entry.runtime_data.coordinator._poller._measurement_interval == 60
             assert entry.runtime_data.heartbeat is not None
             assert entry.runtime_data.heartbeat.running
 
@@ -264,6 +265,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
                 DOMAIN,
                 context={"source": "reconfigure", "entry_id": entry.entry_id},
             )
+            reconfigure = await hass.config_entries.flow.async_configure(reconfigure["flow_id"], {"next_step_id": "serial_reconfigure"})
             suggested = {
                 str(marker): (marker.description or {}).get("suggested_value")
                 for marker in reconfigure["data_schema"].schema
@@ -309,6 +311,7 @@ def test_the_flow_finds_a_wallbox_on_an_unknown_address(tmp_path: Path, request:
             flow = await hass.config_entries.flow.async_init(
                 DOMAIN, context={"source": "user"}
             )
+            flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
             result = await hass.config_entries.flow.async_configure(
                 flow["flow_id"],
                 {
@@ -379,6 +382,7 @@ def test_the_bundled_blueprints_run_as_automations(
             flow = await hass.config_entries.flow.async_init(
                 DOMAIN, context={"source": "user"}
             )
+            flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
             await hass.config_entries.flow.async_configure(
                 flow["flow_id"],
                 {

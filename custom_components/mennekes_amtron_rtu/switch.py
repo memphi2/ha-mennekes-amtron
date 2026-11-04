@@ -10,9 +10,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 
+from .device.registers import CHARGING_CURRENT_EMS, CHARGING_RELEASE, LOCK_EVSE
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
-from .registers import CHARGING_CURRENT_EMS, CHARGING_RELEASE, LOCK_EVSE
 
 if TYPE_CHECKING:
     from homeassistant.components.switch.const import SwitchDeviceClass
@@ -39,7 +39,17 @@ async def async_setup_entry(
     )
 
 
-class AmtronPauseSwitch(MennekesAmtronEntity, SwitchEntity):
+@dataclass(frozen=True)
+class PauseRestoreData(ExtraStoredData):
+    """Persist pause intent outside Recorder and register readback."""
+
+    requested: bool | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"pause_requested": self.requested}
+
+
+class AmtronPauseSwitch(MennekesAmtronEntity, SwitchEntity, RestoreEntity):
     """Pause and resume charging the documented way.
 
     Turning this on writes the vendor's pause value to 0x0302 so the wallbox
@@ -74,6 +84,26 @@ class AmtronPauseSwitch(MennekesAmtronEntity, SwitchEntity):
         """Resume charging with the stored setpoint."""
 
         await self.runtime_data.control.async_resume_charging()
+
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData:
+        return PauseRestoreData(self.runtime_data.control.pause_requested)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        control = self.runtime_data.control
+        if control.pause_requested is not None:
+            return
+        if extra := await self.async_get_last_extra_data():
+            values = extra.as_dict()
+            requested = values.get("pause_requested")
+            if "pause_requested" in values and (
+                requested is None or isinstance(requested, bool)
+            ):
+                control.pause_requested = requested
+                return
+        if (state := await self.async_get_last_state()) is not None and state.state == "on":
+            control.pause_requested = True
 
 
 @dataclass(frozen=True)

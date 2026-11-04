@@ -18,8 +18,8 @@ from unittest.mock import patch
 from homeassistant.components.recorder import get_instance
 from homeassistant.setup import async_setup_component
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.const import DOMAIN
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
 from tests.test_home_assistant_smoke import _boot
 
@@ -43,7 +43,7 @@ async def measure(
     interval = 5
     transport = FakeModbusClient(device_bank())
     with patch(
-        "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+        "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
         return_value=transport,
     ):
         hass = await _boot(target)
@@ -68,6 +68,7 @@ async def measure(
             flow = await hass.config_entries.flow.async_init(
                 DOMAIN, context={"source": "user"}
             )
+            flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
             result = await hass.config_entries.flow.async_configure(
                 flow["flow_id"],
                 {
@@ -85,10 +86,10 @@ async def measure(
             coordinator.update_interval = None
             coordinator.async_set_updated_data(coordinator.data)
             now = 0
-            coordinator._monotonic = lambda: now
-            coordinator._slow_read_at = None
-            coordinator._active_read_at = None
-            coordinator._measurement_interval = measurement_interval
+            coordinator._poller._monotonic = lambda: now
+            coordinator._poller._slow_read_at = None
+            coordinator._poller._active_read_at = None
+            coordinator._poller._measurement_interval = measurement_interval
             recorder = get_instance(hass)
             await recorder.async_block_till_done()
 

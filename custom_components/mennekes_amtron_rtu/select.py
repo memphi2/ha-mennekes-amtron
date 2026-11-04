@@ -8,16 +8,16 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .capabilities import capability_is_supported
-from .entity import MennekesAmtronEntity
-from .entry_types import MennekesAmtronConfigEntry
-from .enums import (
+from .device.capabilities import capability_is_supported
+from .device.enums import (
     RequestedPhases,
     SolarChargingMode,
     enum_option,
     enum_options,
 )
-from .registers import REQUESTED_PHASES, SOLAR_CHARGING_MODE
+from .device.registers import REQUESTED_PHASES, SOLAR_CHARGING_MODE
+from .entity import MennekesAmtronEntity
+from .entry_types import MennekesAmtronConfigEntry
 
 PARALLEL_UPDATES = 1
 

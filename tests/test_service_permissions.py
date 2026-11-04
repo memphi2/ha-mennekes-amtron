@@ -13,7 +13,10 @@ from homeassistant.core import Context
 from homeassistant.exceptions import Unauthorized, UnknownUser
 from homeassistant.helpers import device_registry as dr
 
-from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+from custom_components.mennekes_amtron_rtu.device.const import (
+    CONTROL_MODE_MASTER,
+    DOMAIN,
+)
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import _boot
 
@@ -32,7 +35,7 @@ def test_current_action_respects_user_permissions(
             return client
 
         with patch(
-            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             side_effect=factory,
         ):
             hass = await _boot(tmp_path / "config")
@@ -46,6 +49,7 @@ def test_current_action_respects_user_permissions(
                 flow = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "user"}
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(
                     flow["flow_id"],
                     {

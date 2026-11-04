@@ -12,14 +12,14 @@ from contextlib import suppress
 from pathlib import Path
 from unittest.mock import patch
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.const import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.const import (
     CONTROL_MODE_MASTER,
     DOMAIN,
     HEARTBEAT_DEADLINE_SECONDS,
 )
-from custom_components.mennekes_amtron_rtu.decode import encode_register
-from custom_components.mennekes_amtron_rtu.enums import EvseState
+from custom_components.mennekes_amtron_rtu.device.decode import encode_register
+from custom_components.mennekes_amtron_rtu.device.enums import EvseState
 from scripts.check_runtime_soak import sample_errors
 from scripts.recorder_soak_checks import recorder_errors
 from tests.fakes import device_bank
@@ -80,6 +80,7 @@ def test_continuously_loaded_resources_stay_bounded(tmp_path, request):
             hass = await _boot(tmp_path / "config")
             recorder = await RecorderMeasurement.start(hass, tmp_path / "steady.db")
             flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+            flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
             await hass.config_entries.flow.async_configure(flow["flow_id"], {
                 "port": client_port, "device_id": 50, "baudrate": 57600,
                 "frame": "8n2", "search": "off",

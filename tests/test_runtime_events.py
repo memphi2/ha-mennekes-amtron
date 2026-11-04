@@ -4,10 +4,10 @@ import asyncio
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu.data import WriteDiagnostics
-from custom_components.mennekes_amtron_rtu.heartbeat import HeartbeatTask
-from custom_components.mennekes_amtron_rtu.runtime_events import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
+from custom_components.mennekes_amtron_rtu.device.runtime_events import (
     MAX_EVENTS,
     EventTimeline,
     EventType,

@@ -10,7 +10,7 @@ repository does not vendor it. Register addresses, data types and enumerated
 values are facts restated here so the code can be reviewed; the
 specification's explanatory prose is not reproduced.
 
-`custom_components/mennekes_amtron_rtu/registers.py` is the machine-readable
+`custom_components/mennekes_amtron_rtu/device/registers.py` is the machine-readable
 version of this table and the single source of truth in the code.
 `scripts/check_register_map.py` fails the build when the two drift apart: it
 compares every address, span, data type, access mode, layout version, unit,
@@ -193,7 +193,9 @@ block.
   every ten seconds, the charging release at `0x0D05 = 1`, and a charging
   current of at least 6 A at `0x0302`.
 - **Recovery** from the error state after a reboot or a lost heartbeat means
-  writing `0x0D00`, `0x0D05` and `0x0302`, in that order.
+  writing `0x0D00`, `0x0D05` and `0x0302`, in that order. The integration
+  reasserts the intended release and current, including a pause or unlimited
+  mode. It does not use the charging-start example as a command to resume.
 - **Values are clamped by the wallbox**, to the smallest of the energy-manager
   current, the downgrade current, the maximum EVSE current and the maximum
   house-connection current.

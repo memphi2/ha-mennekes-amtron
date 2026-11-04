@@ -13,10 +13,10 @@ from .binary_sensor_descriptions import (
     BINARY_SENSOR_DESCRIPTIONS,
     AmtronBinarySensorEntityDescription,
 )
-from .capabilities import capability_is_supported
+from .device.capabilities import capability_is_supported
+from .device.heartbeat import HeartbeatTask
 from .entity import MennekesAmtronEntity, entry_device_info, entry_entity_unique_id
 from .entry_types import MennekesAmtronConfigEntry
-from .heartbeat import HeartbeatTask
 
 if TYPE_CHECKING:
     from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass

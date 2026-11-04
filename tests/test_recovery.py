@@ -8,8 +8,9 @@ from unittest.mock import patch
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.heartbeat import HeartbeatTask
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.decode import decode_register
+from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
 from custom_components.mennekes_amtron_rtu.recovery import HeartbeatRecovery
 from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
 from tests.ha_fakes import build_runtime
@@ -54,7 +55,7 @@ async def _retry(recovery, clock, seconds=31):
     await _finish(recovery)
 
 
-@pytest.mark.parametrize("current", [6, 8, 16])
+@pytest.mark.parametrize("current", [0, 1, 6, 8, 16])
 def test_recovery_preserves_the_current_and_clears_the_fault(current):
     async def run():
         runtime, recovery, transport, _clock = await _runtime(current=current)
@@ -85,8 +86,6 @@ def test_recovery_preserves_the_current_and_clears_the_fault(current):
         "healthy",
         "different_error",
         "read_only",
-        "paused",
-        "locked",
         "heartbeat_down",
         "no_heartbeat",
         "poll_failed",
@@ -95,7 +94,7 @@ def test_recovery_preserves_the_current_and_clears_the_fault(current):
 def test_automatic_recovery_only_runs_when_it_is_appropriate(condition):
     async def run():
         runtime, recovery, transport, _clock = await _runtime(
-            current=1 if condition == "paused" else 8,
+            current=8,
             error=0
             if condition == "healthy"
             else 2011
@@ -103,10 +102,7 @@ def test_automatic_recovery_only_runs_when_it_is_appropriate(condition):
             else 200,
             read_only=condition == "read_only",
         )
-        if condition == "locked":
-            put(transport.bank, R.LOCK_EVSE, 1)
-            await runtime.coordinator.async_refresh()
-        elif condition == "heartbeat_down":
+        if condition == "heartbeat_down":
             runtime.heartbeat._set_healthy(False)
         elif condition == "no_heartbeat":
             runtime.heartbeat = None
@@ -122,17 +118,11 @@ def test_automatic_recovery_only_runs_when_it_is_appropriate(condition):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("changed", ["cleared", "paused", "locked"])
-def test_fresh_device_state_wins_over_an_eligible_cached_snapshot(changed):
+def test_a_freshly_cleared_fault_receives_no_recovery_writes():
     async def run():
         runtime, recovery, transport, _clock = await _runtime()
         recovery.start()
-        if changed == "cleared":
-            put(transport.bank, R.ERROR_CODE, 0)
-        elif changed == "paused":
-            put(transport.bank, R.CHARGING_CURRENT_EMS, 1)
-        else:
-            put(transport.bank, R.LOCK_EVSE, 1)
+        put(transport.bank, R.ERROR_CODE, 0)
         await _finish(recovery)
         assert transport.writes == []
         assert recovery._retry is None
@@ -162,9 +152,12 @@ def test_startup_write_floor_is_retried_without_manual_confirmation():
 
 
 @pytest.mark.parametrize("failure", ["persistent_error", "read", "write"])
-def test_recovery_has_a_bounded_retry_budget(failure):
+@pytest.mark.parametrize("current", [1, 8])
+def test_recovery_has_a_bounded_retry_budget(failure, current):
     async def run():
-        runtime, recovery, transport, clock = await _runtime(clear_error=False)
+        runtime, recovery, transport, clock = await _runtime(
+            clear_error=False, current=current
+        )
         if failure == "read":
             transport.read_exceptions[R.ERROR_CODE.address] = raise_connection_error()
         elif failure == "write":
@@ -179,6 +172,12 @@ def test_recovery_has_a_bounded_retry_budget(failure):
         assert recovery._retry is None
         recovery.async_check()
         assert recovery._task is None
+        if current == 1:
+            assert all(
+                decode_register(R.CHARGING_CURRENT_EMS, words) == 1
+                for addr, words in transport.writes
+                if addr == R.CHARGING_CURRENT_EMS.address
+            )
         await recovery.async_stop()
         await runtime.client.async_close()
 
@@ -186,7 +185,7 @@ def test_recovery_has_a_bounded_retry_budget(failure):
 
 
 @pytest.mark.parametrize("remembered", [None, 0, 8, 16])
-def test_unlimited_is_restored_through_the_guarded_replaceable_queue(remembered):
+def test_recovery_reasserts_unlimited_without_an_intermediate_limit(remembered):
     async def run():
         runtime, recovery, _transport, clock = await _runtime(current=0)
         runtime.control.charging_setpoint = remembered
@@ -202,7 +201,8 @@ def test_unlimited_is_restored_through_the_guarded_replaceable_queue(remembered)
         await _finish(recovery)
         if task := runtime.control._flush_task:
             await task
-        assert slept == [5]
+        assert slept == []
+        assert runtime.control._flush_task is None
         assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == 0
         assert runtime.control.charging_setpoint == 0
         await recovery.async_stop()
@@ -242,26 +242,17 @@ def test_a_different_fresh_fault_is_not_reset():
     asyncio.run(run())
 
 
-def test_a_new_command_supersedes_queued_unlimited_restoration():
+def test_recovery_has_no_delayed_unlimited_write_that_can_lift_a_later_pause():
     async def run():
         runtime, recovery, transport, clock = await _runtime(current=0)
-        sleeping, proceed = asyncio.Event(), asyncio.Event()
-
-        async def sleep(_delay):
-            sleeping.set()
-            await proceed.wait()
-
-        runtime.control._sleep = sleep
         recovery.start()
         await _finish(recovery)
-        await asyncio.wait_for(sleeping.wait(), 10)
-        flush = runtime.control._flush_task
+        assert runtime.control._flush_task is None
         clock[0] += 5
-        await runtime.control.async_set_charging_current(10)
-        proceed.set()
-        await asyncio.wait_for(flush, 10)
-        assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == 10
-        assert runtime.control.charging_setpoint == 10
+        await runtime.control.async_pause_charging()
+        assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == 1
+        assert runtime.control.charging_setpoint == 0
+        assert runtime.control.pause_requested is True
         assert (
             len(
                 [
@@ -279,8 +270,46 @@ def test_a_new_command_supersedes_queued_unlimited_restoration():
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("current", [0, 1, 8])
+def test_saved_pause_wins_over_changed_current_readback(current):
+    async def run():
+        runtime, recovery, transport, _clock = await _runtime(current=current)
+        runtime.control.pause_requested = True
+        runtime.control.charging_setpoint = 10
+        recovery.start()
+        await _finish(recovery)
+        assert runtime.control.charging_setpoint == 10
+        assert runtime.control.pause_requested is True
+        assert runtime.control.is_paused is True
+        assert [
+            decode_register(R.CHARGING_CURRENT_EMS, words)
+            for addr, words in transport.writes
+            if addr == R.CHARGING_CURRENT_EMS.address
+        ] == [1]
+        await recovery.async_stop()
+        await runtime.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_a_device_lock_is_not_removed_or_used_to_skip_recovery():
+    async def run():
+        runtime, recovery, transport, _clock = await _runtime()
+        put(transport.bank, R.LOCK_EVSE, 1)
+        await runtime.coordinator.async_refresh()
+        recovery.start()
+        await _finish(recovery)
+        assert await runtime.client.async_read_register(R.LOCK_EVSE) == 1
+        assert not any(addr == R.LOCK_EVSE.address for addr, _ in transport.writes)
+        assert runtime.coordinator.current_data().get("error_code") == 0
+        await recovery.async_stop()
+        await runtime.client.async_close()
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("when", ["before", "queued"])
-def test_an_explicitly_blocked_release_prevents_automatic_recovery(when):
+def test_recovery_reasserts_a_blocked_release_instead_of_enabling_it(when):
     async def run():
         runtime, recovery, transport, _clock = await _runtime()
         if when == "queued":
@@ -289,29 +318,29 @@ def test_an_explicitly_blocked_release_prevents_automatic_recovery(when):
         await runtime.control.async_set_charging_release(False)
         if when == "before":
             recovery.start()
-            assert recovery._task is None
-        else:
-            await asyncio.wait_for(task, 10)
-        assert transport.writes == [(R.CHARGING_RELEASE.address, [0])]
-        assert runtime.diagnostics.recoveries == 0
-        assert recovery._retry is None
-        # Explicitly restoring release permits automatic recovery again.
-        await runtime.control.async_set_charging_release(True)
-        recovery.async_check()
-        await _finish(recovery)
+            task = recovery._task
+        await asyncio.wait_for(task, 10)
+        assert [
+            values
+            for addr, values in transport.writes
+            if addr == R.CHARGING_RELEASE.address
+        ] == [[0], [0]]
         assert runtime.diagnostics.recoveries == 1
+        assert recovery._retry is None
+        assert runtime.control.charging_release_requested is False
         await recovery.async_stop()
         await runtime.client.async_close()
 
     asyncio.run(run())
 
 
-def test_manual_recovery_can_explicitly_restore_charging_release():
+def test_manual_repair_is_not_an_explicit_charging_release():
     async def run():
         runtime, recovery, _transport, _clock = await _runtime()
         await runtime.control.async_set_charging_release(False)
         assert await runtime.control.async_recover_from_error()
-        assert runtime.control.charging_release_requested is True
+        assert runtime.control.charging_release_requested is False
+        assert await runtime.client.async_read_register(R.CHARGING_RELEASE) == 0
         await recovery.async_stop()
         await runtime.client.async_close()
 
@@ -346,11 +375,15 @@ def test_unload_cancels_pending_recovery_and_releases_listeners():
     asyncio.run(run())
 
 
-def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
+@pytest.mark.parametrize("clear_delay", [0, 2])
+def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path, clear_delay):
     from homeassistant.components.repairs import issue_handler
     from homeassistant.helpers import issue_registry as ir
 
-    from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+    from custom_components.mennekes_amtron_rtu.device.const import (
+        CONTROL_MODE_MASTER,
+        DOMAIN,
+    )
     from tests.test_home_assistant_smoke import _boot
 
     async def run():
@@ -361,12 +394,17 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
         async def write(address, values, **kwargs):
             result = await original(address, values, **kwargs)
             if clear_error and address == R.CHARGING_CURRENT_EMS.address:
-                put(transport.bank, R.ERROR_CODE, 0)
+                if clear_delay:
+                    asyncio.get_running_loop().call_later(
+                        clear_delay, put, transport.bank, R.ERROR_CODE, 0
+                    )
+                else:
+                    put(transport.bank, R.ERROR_CODE, 0)
             return result
 
         transport.write_registers = write
         with patch(
-            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             return_value=transport,
         ):
             hass = await _boot(tmp_path / "config")
@@ -377,6 +415,7 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
                 flow = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "user"}
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(
                     flow["flow_id"],
                     {
@@ -505,15 +544,63 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
     asyncio.run(asyncio.wait_for(run(), 60))
 
 
-def test_blocked_release_survives_a_real_home_assistant_restart(tmp_path):
-    from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+@pytest.mark.parametrize(
+    ("blocked", "reset_current"),
+    [("pause", 1), ("pause", 0), ("pause", 8), ("release", 8)],
+)
+def test_paused_restart_and_manual_repair_never_allow_charging(
+    tmp_path, blocked, reset_current
+):
+    from homeassistant.components.repairs import issue_handler
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.mennekes_amtron_rtu.device.const import (
+        CONTROL_MODE_MASTER,
+        DOMAIN,
+    )
     from tests.test_home_assistant_smoke import _boot
 
     async def run():
         target = tmp_path / "config"
         transport = FakeModbusClient(device_bank(charging_current=8))
+        original_write = transport._write
+        seen = set()
+        permitted = []
+        required = {
+            R.HEARTBEAT.address,
+            R.CHARGING_RELEASE.address,
+            R.CHARGING_CURRENT_EMS.address,
+        }
+
+        def current():
+            return decode_register(
+                R.CHARGING_CURRENT_EMS,
+                [
+                    transport.bank[R.CHARGING_CURRENT_EMS.address + offset]
+                    for offset in range(2)
+                ],
+            )
+
+        def write(address, words, function):
+            result = original_write(address, words, function)
+            if transport.bank[R.ERROR_CODE.address] == 200:
+                seen.add(address)
+                # Model reinitialisation on receipt of all three EMS commands.
+                # Firmware acceptance of a paused recovery still needs hardware
+                # verification; command safety is checked at every transaction.
+                if address == R.CHARGING_CURRENT_EMS.address and required <= seen:
+                    put(transport.bank, R.ERROR_CODE, 0)
+            permitted.append(
+                transport.bank[R.ERROR_CODE.address] == 0
+                and transport.bank[R.CHARGING_RELEASE.address] == 1
+                and transport.bank[R.LOCK_EVSE.address] == 0
+                and (current() == 0 or current() >= 6)
+            )
+            return result
+
+        transport._write = write
         with patch(
-            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             return_value=transport,
         ):
             hass = await _boot(target)
@@ -521,6 +608,7 @@ def test_blocked_release_survives_a_real_home_assistant_restart(tmp_path):
                 flow = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "user"}
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(
                     flow["flow_id"],
                     {
@@ -537,42 +625,113 @@ def test_blocked_release_survives_a_real_home_assistant_restart(tmp_path):
                     entry, options={"control_mode": CONTROL_MODE_MASTER}
                 )
                 await hass.async_block_till_done()
-                entity_id = "switch.mennekes_amtron_charging_release"
+                runtime = entry.runtime_data
+                clock = [runtime.control._monotonic() + 6]
+                runtime.control._monotonic = runtime.client._monotonic = lambda: clock[
+                    0
+                ]
+                entity_id = "switch.mennekes_amtron_" + (
+                    "charging_paused" if blocked == "pause" else "charging_release"
+                )
+                intent_key = (
+                    "pause_requested"
+                    if blocked == "pause"
+                    else "charging_release_requested"
+                )
                 await hass.services.async_call(
-                    "switch", "turn_off", {"entity_id": entity_id}, blocking=True
+                    "switch",
+                    "turn_on" if blocked == "pause" else "turn_off",
+                    {"entity_id": entity_id},
+                    blocking=True,
                 )
                 await hass.async_block_till_done()
-                assert entry.runtime_data.control.charging_release_requested is False
-                assert (
-                    "charging_release_requested"
-                    not in hass.states.get(entity_id).attributes
+                assert getattr(runtime.control, intent_key) is (blocked == "pause")
+                assert intent_key not in hass.states.get(entity_id).attributes
+                assert await hass.config_entries.async_reload(entry.entry_id)
+                await hass.async_block_till_done()
+                assert getattr(entry.runtime_data.control, intent_key) is (
+                    blocked == "pause"
                 )
             finally:
                 await hass.async_stop()
 
-            # Restart with new runtime objects, the same HA storage and a
-            # fault acquired during the downtime. The bus is still synthetic.
             shutil.rmtree(target / "custom_components" / DOMAIN)
             put(transport.bank, R.ERROR_CODE, 200)
+            put(transport.bank, R.CHARGING_CURRENT_EMS, reset_current)
             transport.writes.clear()
+            permitted.clear()
+            seen.clear()
             hass = await _boot(target)
             try:
                 entry = hass.config_entries.async_entries(DOMAIN)[0]
                 assert await hass.config_entries.async_setup(entry.entry_id)
                 await hass.async_block_till_done()
                 runtime = entry.runtime_data
-                assert runtime.control.charging_release_requested is False
-                assert runtime.heartbeat.healthy is True
-                assert runtime.recovery._task is None
-                assert runtime.recovery._retry is None
-                assert runtime.diagnostics.recoveries == 0
-                assert await runtime.client.async_read_register(R.CHARGING_RELEASE) == 0
-                assert all(
-                    address == R.HEARTBEAT.address for address, _ in transport.writes
-                )
-                assert await hass.config_entries.async_reload(entry.entry_id)
+                assert getattr(runtime.control, intent_key) is (blocked == "pause")
+                complete = asyncio.Event()
+
+                def check():
+                    if runtime.coordinator.current_data().get("error_code") == 0:
+                        complete.set()
+
+                remove = runtime.coordinator.async_add_listener(check)
+                try:
+                    check()
+                    await asyncio.wait_for(complete.wait(), 15)
+                finally:
+                    remove()
+                if task := runtime.recovery._task:
+                    await asyncio.wait_for(task, 10)
                 await hass.async_block_till_done()
-                assert entry.runtime_data.control.charging_release_requested is False
+                assert runtime.diagnostics.recoveries == 1
+                assert not any(permitted)
+                assert runtime.recovery._retry is None
+                assert hass.states.get(entity_id).state == (
+                    "on" if blocked == "pause" else "off"
+                )
+                if blocked == "pause":
+                    assert current() == 1
+                    assert runtime.control.charging_setpoint == 8
+                    assert all(
+                        decode_register(R.CHARGING_CURRENT_EMS, words) == 1
+                        for addr, words in transport.writes
+                        if addr == R.CHARGING_CURRENT_EMS.address
+                    )
+
+                # The same stopped state must survive an explicit repair too.
+                await runtime.recovery.async_stop()
+                clock = [runtime.control._monotonic() + 30]
+                runtime.control._monotonic = runtime.client._monotonic = lambda: clock[
+                    0
+                ]
+                put(transport.bank, R.ERROR_CODE, 200)
+                seen.clear()
+                await runtime.coordinator.async_refresh()
+                issue_id = f"{entry.entry_id}_ems_heartbeat_lost"
+                hass.data.setdefault("repairs", {})
+                issue_handler.async_setup(hass)
+                manager = hass.data["repairs"]["flow_manager"]
+                flow = await manager.async_init(
+                    DOMAIN, context={"issue_id": issue_id}, data={"issue_id": issue_id}
+                )
+                result = await manager.async_configure(flow["flow_id"], {})
+                assert result["type"] == "create_entry"
+                assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+                assert not any(permitted)
+                assert getattr(runtime.control, intent_key) is (blocked == "pause")
+
+                # Only an explicit resume/release action permits charging.
+                clock[0] += 6
+                await hass.services.async_call(
+                    "switch",
+                    "turn_off" if blocked == "pause" else "turn_on",
+                    {"entity_id": entity_id},
+                    blocking=True,
+                )
+                assert permitted[-1] is True
+                if blocked == "pause":
+                    assert current() == 8
+                    assert runtime.control.pause_requested is False
             finally:
                 await hass.async_stop()
 

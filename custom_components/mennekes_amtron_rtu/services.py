@@ -19,13 +19,13 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
-from .const import (
+from .control import AmtronControl
+from .device.const import (
     ATTR_ALLOW_UNLIMITED,
     ATTR_CURRENT,
     DOMAIN,
     SERVICE_SET_CHARGING_CURRENT,
 )
-from .control import AmtronControl
 from .entity import entry_entity_unique_id
 from .exceptions import service_validation_error
 from .recorder_profile import async_setup_recorder_service

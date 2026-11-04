@@ -26,8 +26,8 @@ from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 from sqlalchemy import event
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.const import DOMAIN
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
 from tests.recorder_replay import DETAILS, EXTRAS
 from tests.test_home_assistant_smoke import _boot
@@ -46,7 +46,7 @@ def test_repeated_retention_cycles_keep_history_bounded_and_energy_statistics(
         with (
             patch("homeassistant.core.time", clock),
             patch("homeassistant.helpers.entity.timer", side_effect=clock.time),
-            patch("custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            patch("custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
                   return_value=transport),
         ):
             hass = await _boot(tmp_path / "config")
@@ -63,6 +63,7 @@ def test_repeated_retention_cycles_keep_history_bounded_and_energy_statistics(
                     }
                 })
                 flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 result = await hass.config_entries.flow.async_configure(flow["flow_id"], {
                     "port": "/dev/fake", "device_id": 50, "baudrate": 57600,
                     "frame": "8n2", "search": "off",
@@ -97,8 +98,8 @@ def test_repeated_retention_cycles_keep_history_bounded_and_energy_statistics(
                         put(transport.bank, R.ENERGY_TOTAL, 1234.5 + day + sample / 120)
                         put(transport.bank, R.POWER_TOTAL, 1000 + sample)
                         put(transport.bank, R.VOLTAGE_L1, 230 + sample % 3)
-                        coordinator._slow_read_at = None
-                        coordinator._active_read_at = None
+                        coordinator._poller._slow_read_at = None
+                        coordinator._poller._active_read_at = None
                         coordinator.async_set_updated_data(await coordinator._async_update_data())
                         await hass.async_block_till_done()
                     await committed()

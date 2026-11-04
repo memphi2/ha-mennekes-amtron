@@ -15,6 +15,7 @@ from typing import Any
 from zipfile import BadZipFile, ZipFile
 
 from packaging.requirements import Requirement
+from release_version import is_prerelease, validate_version
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = "custom_components/mennekes_amtron_rtu/"
@@ -74,8 +75,9 @@ def remote_commit(repository: str, tag: str) -> str:
 
 
 def verify_release(release: dict[str, Any], tag: str, notes: str, *, draft: bool = False) -> None:
-    if release.get("tag_name") != tag or release.get("draft") is not draft or release.get("prerelease"):
-        raise ValueError("expected the published stable release")
+    if (release.get("tag_name") != tag or release.get("draft") is not draft
+            or release.get("prerelease") is not is_prerelease(tag)):
+        raise ValueError("release identity, draft state or prerelease channel differs")
     if str(release.get("body", "")).replace("\r\n", "\n").strip() != notes.strip():
         raise ValueError("release notes differ from the approved source")
     assets = release.get("assets", [])
@@ -164,8 +166,9 @@ def main() -> int:
         files = source_files(commit)
         manifest = json.loads(files["manifest.json"])
         version = manifest["version"]
-        if not re.fullmatch(r"\d+\.\d+\.\d+", version) or manifest["domain"] != "mennekes_amtron_rtu":
-            raise ValueError("invalid stable version or integration domain")
+        validate_version(version)
+        if manifest["domain"] != "mennekes_amtron_rtu":
+            raise ValueError("invalid integration domain")
         tag = f"v{version}"
         notes = run("git", "show", f"{commit}:.github/release-notes/{tag}.md").decode()
         if not notes.strip():

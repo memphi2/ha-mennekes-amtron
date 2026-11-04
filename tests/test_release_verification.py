@@ -6,6 +6,7 @@ import stat
 from zipfile import ZipFile, ZipInfo
 
 import pytest
+from packaging.version import Version
 
 from scripts.release_check import (
     ASSETS,
@@ -16,31 +17,79 @@ from scripts.release_check import (
 )
 
 
-def bundle(tmp_path):
-    files = {"manifest.json": b'{"version":"0.2.3","requirements":["pymodbus[serial]==3.13.1"]}', "LICENSE": b"license", "NOTICE": b"notice"}
+def bundle(tmp_path, version="0.2.3"):
+    files = {
+        "manifest.json": json.dumps(
+            {"version": version, "requirements": ["pymodbus[serial]==3.13.1"]}
+        ).encode(),
+        "LICENSE": b"license",
+        "NOTICE": b"notice",
+    }
     with ZipFile(tmp_path / ZIP_NAME, "w") as archive:
         for name, value in files.items():
             archive.writestr(name, value)
     digest = hashlib.sha256((tmp_path / ZIP_NAME).read_bytes()).hexdigest()
-    metadata = {"release_tag": "v0.2.3", "repository": "owner/repo", "git_commit": "a" * 40,
-                "integration_version": "0.2.3", "zip_entries": len(files), "zip_sha256": digest}
+    metadata = {
+        "release_tag": f"v{version}",
+        "repository": "owner/repo",
+        "git_commit": "a" * 40,
+        "integration_version": version,
+        "zip_entries": len(files),
+        "zip_sha256": digest,
+    }
     (tmp_path / "build-metadata.json").write_text(json.dumps(metadata))
-    sbom = {"spdxVersion": "SPDX-2.3", "packages": [{"name": "ha-mennekes-amtron", "SPDXID": "SPDXRef-Package-Integration",
-            "versionInfo": "0.2.3", "licenseDeclared": "Apache-2.0",
-            "checksums": [{"algorithm": "SHA256", "checksumValue": digest}]}]}
-    sbom["packages"].append({"SPDXID": "SPDXRef-Dependency", "name": "pymodbus[serial]", "versionInfo": "==3.13.1"})
+    sbom = {
+        "spdxVersion": "SPDX-2.3",
+        "packages": [
+            {
+                "name": "ha-mennekes-amtron",
+                "SPDXID": "SPDXRef-Package-Integration",
+                "versionInfo": version,
+                "licenseDeclared": "Apache-2.0",
+                "checksums": [{"algorithm": "SHA256", "checksumValue": digest}],
+            }
+        ],
+    }
+    sbom["packages"].append(
+        {
+            "SPDXID": "SPDXRef-Dependency",
+            "name": "pymodbus[serial]",
+            "versionInfo": "==3.13.1",
+        }
+    )
     sbom["relationships"] = [
-        {"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package-Integration"},
-        {"spdxElementId": "SPDXRef-Package-Integration", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Dependency"},
+        {
+            "spdxElementId": "SPDXRef-DOCUMENT",
+            "relationshipType": "DESCRIBES",
+            "relatedSpdxElement": "SPDXRef-Package-Integration",
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-Integration",
+            "relationshipType": "DEPENDS_ON",
+            "relatedSpdxElement": "SPDXRef-Dependency",
+        },
     ]
     (tmp_path / "sbom.spdx.json").write_text(json.dumps(sbom))
-    sums = "".join(f"{hashlib.sha256((tmp_path / name).read_bytes()).hexdigest()}  {name}\n"
-                   for name in sorted(ASSETS - {"SHA256SUMS"}))
+    sums = "".join(
+        f"{hashlib.sha256((tmp_path / name).read_bytes()).hexdigest()}  {name}\n"
+        for name in sorted(ASSETS - {"SHA256SUMS"})
+    )
     (tmp_path / "SHA256SUMS").write_text(sums)
-    release = {"tag_name": "v0.2.3", "draft": False, "prerelease": False, "body": "Release notes",
-               "assets": [{"name": name, "size": (tmp_path / name).stat().st_size,
-                           "digest": "sha256:" + hashlib.sha256((tmp_path / name).read_bytes()).hexdigest()}
-                          for name in sorted(ASSETS)]}
+    release = {
+        "tag_name": f"v{version}",
+        "draft": False,
+        "prerelease": Version(version).is_prerelease,
+        "body": "Release notes",
+        "assets": [
+            {
+                "name": name,
+                "size": (tmp_path / name).stat().st_size,
+                "digest": "sha256:"
+                + hashlib.sha256((tmp_path / name).read_bytes()).hexdigest(),
+            }
+            for name in sorted(ASSETS)
+        ],
+    }
     return files, release
 
 
@@ -58,7 +107,9 @@ def test_changed_download_is_rejected(tmp_path, name):
         verify_assets(tmp_path, release, "owner/repo", "a" * 40, "0.2.3", files)
 
 
-@pytest.mark.parametrize("change", ["tag", "notes", "draft", "prerelease", "extra_asset"])
+@pytest.mark.parametrize(
+    "change", ["tag", "notes", "draft", "prerelease", "extra_asset"]
+)
 def test_release_metadata_must_match_approved_source(tmp_path, change):
     _, release = bundle(tmp_path)
     if change == "tag":
@@ -73,7 +124,9 @@ def test_release_metadata_must_match_approved_source(tmp_path, change):
         verify_release(release, "v0.2.3", "Release notes")
 
 
-@pytest.mark.parametrize("change", ["changed", "extra", "missing", "symlink", "duplicate"])
+@pytest.mark.parametrize(
+    "change", ["changed", "extra", "missing", "symlink", "duplicate"]
+)
 def test_unsafe_or_wrong_archive_cannot_match_the_tree(tmp_path, change):
     path = tmp_path / "release.zip"
     files = {"a.py": b"original", "LICENSE": b"license"}
@@ -84,7 +137,9 @@ def test_unsafe_or_wrong_archive_cannot_match_the_tree(tmp_path, change):
             info.external_attr = (stat.S_IFLNK | 0o777) << 16
             archive.writestr(info, files["a.py"])
         elif change != "missing":
-            archive.writestr("a.py", b"changed!" if change == "changed" else files["a.py"])
+            archive.writestr(
+                "a.py", b"changed!" if change == "changed" else files["a.py"]
+            )
         if change == "extra":
             archive.writestr("../unexpected.py", b"bad")
         if change == "duplicate":
@@ -95,7 +150,9 @@ def test_unsafe_or_wrong_archive_cannot_match_the_tree(tmp_path, change):
 
 
 @pytest.mark.parametrize("target", ["metadata", "sbom", "sums"])
-def test_self_consistent_downloads_still_need_correct_release_identity(tmp_path, target):
+def test_self_consistent_downloads_still_need_correct_release_identity(
+    tmp_path, target
+):
     files, release = bundle(tmp_path)
     if target == "metadata":
         path = tmp_path / "build-metadata.json"
@@ -107,17 +164,37 @@ def test_self_consistent_downloads_still_need_correct_release_identity(tmp_path,
         data = json.loads(path.read_text())
         data["packages"][0]["versionInfo"] = "9.0.0"
         path.write_text(json.dumps(data))
-    sums = "".join(f"{hashlib.sha256((tmp_path / name).read_bytes()).hexdigest()}  {name}\n"
-                   for name in sorted(ASSETS - {"SHA256SUMS"}))
-    (tmp_path / "SHA256SUMS").write_text(sums if target != "sums" else sums + sums.splitlines()[0] + "\n")
+    sums = "".join(
+        f"{hashlib.sha256((tmp_path / name).read_bytes()).hexdigest()}  {name}\n"
+        for name in sorted(ASSETS - {"SHA256SUMS"})
+    )
+    (tmp_path / "SHA256SUMS").write_text(
+        sums if target != "sums" else sums + sums.splitlines()[0] + "\n"
+    )
     for asset in release["assets"]:
         content = (tmp_path / asset["name"]).read_bytes()
-        asset.update(size=len(content), digest="sha256:" + hashlib.sha256(content).hexdigest())
+        asset.update(
+            size=len(content), digest="sha256:" + hashlib.sha256(content).hexdigest()
+        )
     with pytest.raises(ValueError, match=r"metadata|SBOM|checksum"):
         verify_assets(tmp_path, release, "owner/repo", "a" * 40, "0.2.3", files)
 
 
-@pytest.mark.parametrize("change", ["missing", "version", "extras", "extra", "duplicate", "identity", "missing_identity", "missing_edge", "wrong_edge", "duplicate_edge"])
+@pytest.mark.parametrize(
+    "change",
+    [
+        "missing",
+        "version",
+        "extras",
+        "extra",
+        "duplicate",
+        "identity",
+        "missing_identity",
+        "missing_edge",
+        "wrong_edge",
+        "duplicate_edge",
+    ],
+)
 def test_self_consistent_sbom_must_match_manifest_dependencies(tmp_path, change):
     files, release = bundle(tmp_path)
     path = tmp_path / "sbom.spdx.json"
@@ -131,7 +208,9 @@ def test_self_consistent_sbom_must_match_manifest_dependencies(tmp_path, change)
     elif change == "extras":
         dependency["name"] = "pymodbus"
     elif change == "extra":
-        sbom["packages"].append({"SPDXID": "SPDXRef-Extra", "name": "unexpected", "versionInfo": "==1.0"})
+        sbom["packages"].append(
+            {"SPDXID": "SPDXRef-Extra", "name": "unexpected", "versionInfo": "==1.0"}
+        )
     elif change == "duplicate":
         sbom["packages"].append(dependency | {"SPDXID": "SPDXRef-Duplicate"})
     elif change == "identity":
@@ -145,12 +224,16 @@ def test_self_consistent_sbom_must_match_manifest_dependencies(tmp_path, change)
     else:
         sbom["relationships"].append(sbom["relationships"][-1])
     path.write_text(json.dumps(sbom))
-    (tmp_path / "SHA256SUMS").write_text("".join(
-        f"{hashlib.sha256((tmp_path / name).read_bytes()).hexdigest()}  {name}\n"
-        for name in sorted(ASSETS - {"SHA256SUMS"})
-    ))
+    (tmp_path / "SHA256SUMS").write_text(
+        "".join(
+            f"{hashlib.sha256((tmp_path / name).read_bytes()).hexdigest()}  {name}\n"
+            for name in sorted(ASSETS - {"SHA256SUMS"})
+        )
+    )
     for asset in release["assets"]:
         content = (tmp_path / asset["name"]).read_bytes()
-        asset.update(size=len(content), digest="sha256:" + hashlib.sha256(content).hexdigest())
+        asset.update(
+            size=len(content), digest="sha256:" + hashlib.sha256(content).hexdigest()
+        )
     with pytest.raises(ValueError, match="SBOM"):
         verify_assets(tmp_path, release, "owner/repo", "a" * 40, "0.2.3", files)

@@ -4,7 +4,10 @@ import asyncio
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.const import CONF_SERIAL_NUMBER, DOMAIN
+from custom_components.mennekes_amtron_rtu.device.const import (
+    CONF_SERIAL_NUMBER,
+    DOMAIN,
+)
 from custom_components.mennekes_amtron_rtu.entity import (
     MennekesAmtronEntity,
     entry_device_info,

@@ -17,7 +17,7 @@ from homeassistant.helpers.selector import (
 )
 
 from ._flow_serial import PortOption
-from .const import (
+from .device.const import (
     CONF_BAUDRATE,
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
@@ -89,64 +89,72 @@ def options_schema(
     current: dict[str, Any],
     *,
     max_current: float,
+    service_mode: bool = False,
 ) -> probatio.Schema:
     """Return the options schema, bounded by what the device allows."""
 
-    return probatio.Schema(
-        {
-            probatio.Required(
-                CONF_CONTROL_MODE,
-                default=current.get(CONF_CONTROL_MODE, DEFAULT_CONTROL_MODE),
-            ): SelectSelector(
-                SelectSelectorConfig(
-                    options=list(CONTROL_MODES),
-                    translation_key="control_mode",
-                    mode=SelectSelectorMode.LIST,
-                )
+    fields: dict[Any, Any] = {
+        probatio.Required(
+            CONF_CONTROL_MODE,
+            default=current.get(CONF_CONTROL_MODE, DEFAULT_CONTROL_MODE),
+        ): SelectSelector(
+            SelectSelectorConfig(
+                options=list(CONTROL_MODES),
+                translation_key="service_control_mode"
+                if service_mode
+                else "control_mode",
+                mode=SelectSelectorMode.LIST,
+            )
+        ),
+        probatio.Required(
+            CONF_SCAN_INTERVAL_SECONDS,
+            default=current.get(
+                CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS
             ),
-            probatio.Required(
-                CONF_SCAN_INTERVAL_SECONDS,
-                default=current.get(
-                    CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS
-                ),
-            ): NumberSelector(
-                NumberSelectorConfig(
-                    min=MIN_SCAN_INTERVAL_SECONDS,
-                    max=MAX_SCAN_INTERVAL_SECONDS,
-                    step=1,
-                    unit_of_measurement="s",
-                    mode=NumberSelectorMode.BOX,
-                )
-            ),
-            probatio.Required(
+        ): NumberSelector(
+            NumberSelectorConfig(
+                min=MIN_SCAN_INTERVAL_SECONDS,
+                max=MAX_SCAN_INTERVAL_SECONDS,
+                step=1,
+                unit_of_measurement="s",
+                mode=NumberSelectorMode.BOX,
+            )
+        ),
+        probatio.Required(
+            CONF_MEASUREMENT_INTERVAL_SECONDS,
+            default=current.get(
                 CONF_MEASUREMENT_INTERVAL_SECONDS,
-                default=current.get(
-                    CONF_MEASUREMENT_INTERVAL_SECONDS,
-                    DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
-                ),
-            ): NumberSelector(
-                NumberSelectorConfig(
-                    min=MIN_SCAN_INTERVAL_SECONDS,
-                    max=MAX_SCAN_INTERVAL_SECONDS,
-                    step=1,
-                    unit_of_measurement="s",
-                    mode=NumberSelectorMode.BOX,
-                )
+                DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
             ),
-            probatio.Required(
-                CONF_CURRENT_LIMIT,
-                default=current.get(CONF_CURRENT_LIMIT, max_current),
-            ): NumberSelector(
-                NumberSelectorConfig(
-                    min=6,
-                    max=max(max_current, 6),
-                    step=0.1,
-                    unit_of_measurement="A",
-                    mode=NumberSelectorMode.BOX,
-                )
-            ),
+        ): NumberSelector(
+            NumberSelectorConfig(
+                min=MIN_SCAN_INTERVAL_SECONDS,
+                max=MAX_SCAN_INTERVAL_SECONDS,
+                step=1,
+                unit_of_measurement="s",
+                mode=NumberSelectorMode.BOX,
+            )
+        ),
+        probatio.Required(
+            CONF_CURRENT_LIMIT,
+            default=current.get(CONF_CURRENT_LIMIT, max_current),
+        ): NumberSelector(
+            NumberSelectorConfig(
+                min=6,
+                max=max(max_current, 6),
+                step=0.1,
+                unit_of_measurement="A",
+                mode=NumberSelectorMode.BOX,
+            )
+        ),
+    }
+    if service_mode:
+        fields = {
+            marker: selector
+            for marker, selector in fields.items()
+            if marker.schema != CONF_MEASUREMENT_INTERVAL_SECONDS
         }
-    )
+    return probatio.Schema(fields)
 
 
 def _port_selector(ports: list[PortOption]) -> Any:
@@ -155,10 +163,31 @@ def _port_selector(ports: list[PortOption]) -> Any:
     return SelectSelector(
         SelectSelectorConfig(
             options=[
-                SelectOptionDict(value=port.value, label=port.label)
-                for port in ports
+                SelectOptionDict(value=port.value, label=port.label) for port in ports
             ],
             custom_value=True,
             mode=SelectSelectorMode.DROPDOWN,
         )
+    )
+
+
+def service_schema() -> probatio.Schema:
+    """Connection details for the independent service."""
+    from homeassistant.helpers.selector import (
+        TextSelector,
+        TextSelectorConfig,
+        TextSelectorType,
+    )
+
+    from .remote import CONF_SERVER_TOKEN, CONF_SERVER_URL
+
+    return probatio.Schema(
+        {
+            probatio.Required(CONF_SERVER_URL): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.URL)
+            ),
+            probatio.Required(CONF_SERVER_TOKEN): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.PASSWORD)
+            ),
+        }
     )

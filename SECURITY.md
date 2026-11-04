@@ -15,8 +15,9 @@ version of your wallbox and the smallest reproduction you have.
 
 ## Threat Model
 
-This integration talks to a wallbox over a local serial bus. It has no cloud
-component, no inbound network listener and no credentials.
+The wallbox uses a local serial bus. Direct mode has no inbound network
+listener. The independent Modbus service adds an authenticated HTTP API and
+a bearer credential; neither mode requires a cloud component.
 
 What matters for security here is different from a cloud integration:
 
@@ -29,11 +30,25 @@ What matters for security here is different from a cloud integration:
   Setup, discovery and the smoke test also require exclusive bus access.
 - **Write authority.** In master mode the integration can release charging,
   lock the wallbox and restart it. Home Assistant user permissions are the
-  only thing between a Home Assistant account and those actions.
+  boundary for HA accounts. A holder of the independent service token can
+  also send named commands directly; protect it as a charging-control credential.
 - **Hardware limits are not ours to enforce.** The §14a downgrade, the
   installation current and the EVSE maximum are enforced inside the wallbox.
   The integration cannot raise them and must never be described as if it
   could.
+
+- **Service boundary.** The API requires a token of at least 32 characters,
+  uses constant-time comparison, bounds request bodies and supports only named
+  commands and approved diagnostic reads. It exposes no arbitrary write tunnel
+  or shutdown action. `/health` reveals process liveness only. Redirects are not
+  followed by the client. Use a trusted private network or an HTTPS reverse proxy;
+  the service does not terminate TLS itself. Never publish its port to the Internet.
+- **Independent lifetime.** HA disconnecting does not stop charging or the
+  heartbeat. The last state is retained indefinitely by explicit design. USB,
+  host and service failures still require the wallbox's configured fallback.
+- **Private state.** The service saves bounded intent with atomic owner-only
+  files. Protect HA configuration, service options and backups, which hold the
+  credential. Diagnostics do not include service URLs or credentials.
 
 ## Out of Scope
 

@@ -15,13 +15,15 @@ from custom_components.mennekes_amtron_rtu._flow_search import (
     async_search,
     search_space,
 )
-from custom_components.mennekes_amtron_rtu.client import SerialConfig
-from custom_components.mennekes_amtron_rtu.client_errors import AmtronConnectionError
-from custom_components.mennekes_amtron_rtu.const import (
+from custom_components.mennekes_amtron_rtu.data import DeviceIdentity
+from custom_components.mennekes_amtron_rtu.device.client import SerialConfig
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronConnectionError,
+)
+from custom_components.mennekes_amtron_rtu.device.const import (
     SUPPORTED_BAUDRATES,
     SUPPORTED_PARITY_STOPBITS,
 )
-from custom_components.mennekes_amtron_rtu.data import DeviceIdentity
 from tests.fakes import FakeModbusClient, device_bank
 
 BASE = SerialConfig(
@@ -164,7 +166,7 @@ def test_cancelled_connect_closes_the_probe(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def _client(config: SerialConfig, transport: FakeModbusClient) -> object:
-    from custom_components.mennekes_amtron_rtu.client import MennekesModbusClient
+    from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 
     return MennekesModbusClient(config, client_factory=lambda _c: transport)
 

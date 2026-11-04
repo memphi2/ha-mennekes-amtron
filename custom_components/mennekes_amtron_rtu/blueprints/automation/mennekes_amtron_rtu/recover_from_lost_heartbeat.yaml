@@ -3,7 +3,7 @@ blueprint:
   description: >-
     Legacy automation: the integration now recovers error 200 automatically
     in master mode. Disable this automation to avoid duplicate attempts.
-    Unlike built-in recovery, this manual-button action can lift a pause.
+    Recovery preserves a pause, device lock and disabled charging release.
 
     Presses the recovery button when the wallbox reports that the energy
     manager is unavailable.

@@ -9,12 +9,17 @@ import pytest
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components import mennekes_amtron_rtu as integration
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.client import MennekesModbusClient
-from custom_components.mennekes_amtron_rtu.client_errors import AmtronRateLimitedError
-from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
 from custom_components.mennekes_amtron_rtu.data import WallboxData
-from custom_components.mennekes_amtron_rtu.enums import RequestedPhases
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronRateLimitedError,
+)
+from custom_components.mennekes_amtron_rtu.device.const import (
+    CONTROL_MODE_MASTER,
+    DOMAIN,
+)
+from custom_components.mennekes_amtron_rtu.device.enums import RequestedPhases
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_init import _patch_issues
@@ -74,7 +79,10 @@ def test_cold_start_and_real_entry_reload_preserve_write_guards_and_setpoint(
         clock[0] += 3
         await getattr(runtime.control, resume_action)()
         expected = new_cap or initial or 6
-        if initial == 0 and resume_action == "async_resume_charging":
+        if resume_action == "async_recover_from_error":
+            expected = 1
+            assert runtime.control.charging_setpoint == initial
+        elif initial == 0:
             expected = 0
         assert await runtime.client.async_read_register(R.CHARGING_CURRENT_EMS) == expected
         assert await integration.async_unload_entry(hass, entry)

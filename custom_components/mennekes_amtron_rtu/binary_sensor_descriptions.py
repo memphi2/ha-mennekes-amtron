@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 from homeassistant.components.binary_sensor import BinarySensorEntityDescription
 from homeassistant.const import EntityCategory
 
-from .decode import RegisterValue
-from .enums import (
+from .device.decode import RegisterValue
+from .device.enums import (
     DowngradeStatus,
     EvseState,
     PhaseOptionsHardware,

@@ -7,9 +7,9 @@ import pytest
 from homeassistant.core import Context
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu import services
-from custom_components.mennekes_amtron_rtu.const import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.const import (
     ATTR_ALLOW_UNLIMITED,
     ATTR_CURRENT,
     DOMAIN,

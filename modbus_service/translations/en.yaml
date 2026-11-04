@@ -1,0 +1,36 @@
+configuration:
+  serial_port:
+    name: Serial adapter
+    description: Exclusive RS-485 adapter, preferably its stable /dev/serial/by-id path.
+  device_id:
+    name: Wallbox address
+    description: Modbus address configured in the wallbox.
+  baudrate:
+    name: Baud rate
+    description: Must match the wallbox's serial configuration.
+  frame:
+    name: Serial frame
+    description: Data bits, parity and stop bits configured in the wallbox.
+  token:
+    name: Access token
+    description: Random secret of at least 32 characters; use the same token in the HA integration.
+  read_only:
+    name: Read-only
+    description: Disables charging commands and the service heartbeat; Modbus reads remain active.
+  current_cap:
+    name: Current cap
+    description: Maximum requested EMS current in amperes. Explicit 0 A commands remove the EMS limit.
+  scan_interval:
+    name: Status interval
+    description: Seconds between status polls. The heartbeat runs independently.
+  measurement_interval:
+    name: Measurement interval
+    description: Seconds between measurement polls; 30 seconds limits Recorder traffic.
+  listen:
+    name: API listen address
+    description: Keep 0.0.0.0 for access through the app's private network.
+  port:
+    name: Internal API port
+    description: Fixed at 8765; host port publication is optional and normally unnecessary.
+network:
+  8765/tcp: Authenticated service API; internal access needs no host port.

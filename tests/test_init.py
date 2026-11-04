@@ -19,8 +19,8 @@ from custom_components.mennekes_amtron_rtu import (
     async_unload_entry,
     repairs,
 )
-from custom_components.mennekes_amtron_rtu.client import MennekesModbusClient
-from custom_components.mennekes_amtron_rtu.const import (
+from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
+from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_DEVICE_ID,

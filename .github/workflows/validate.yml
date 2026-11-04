@@ -72,6 +72,40 @@ jobs:
       - name: Validation gates
         run: python scripts/check_validate.py ${{ matrix.validate-arguments }}
 
+  modbus-service:
+    name: standalone Modbus service (${{ matrix.architecture }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Build and install the standalone package without Home Assistant
+        run: |
+          python -m pip wheel --no-deps . --wheel-dir /tmp/amtron-wheel
+          python -m venv /tmp/amtron-service
+          /tmp/amtron-service/bin/python -m pip install /tmp/amtron-wheel/*.whl -r requirements-service.txt
+          /tmp/amtron-service/bin/python -m pip check
+          /tmp/amtron-service/bin/python -c 'import importlib.util; import amtron_device.server; assert importlib.util.find_spec("homeassistant") is None'
+          /tmp/amtron-service/bin/amtron-modbus-service --help
+      - name: Build the local Supervisor app context and verify its entrypoint
+        run: |
+          python scripts/build_service_app.py --output /tmp/amtron-app
+          docker build -t amtron-service:test /tmp/amtron-app
+          docker run --rm amtron-service:test amtron-modbus-service --help
+          docker run --rm amtron-service:test python -m pip check
+          python -m pip install -r requirements-dev.txt
+          python scripts/service_image.py smoke --image amtron-service:test
+
   # Preview checks are maintenance signals, not part of the PR/release matrix.
   # Resolve the newest available prerelease instead of keeping an old beta pin.
   next-ha:

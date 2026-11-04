@@ -17,8 +17,8 @@ from homeassistant.helpers.recorder import async_initialize_recorder
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.const import DOMAIN
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
 from tests.recorder_replay import DETAILS, EXTRAS
 from tests.test_home_assistant_smoke import _boot
@@ -44,7 +44,7 @@ def test_hourly_statistics_and_recorder_exclusions(
             patch("homeassistant.core.time", clock),
             patch("homeassistant.helpers.entity.timer", side_effect=clock.time),
             patch(
-                "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+                "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
                 return_value=transport,
             ),
         ):
@@ -67,6 +67,7 @@ def test_hourly_statistics_and_recorder_exclusions(
                 flow = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "user"}
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 result = await hass.config_entries.flow.async_configure(
                     flow["flow_id"],
                     {
@@ -87,8 +88,8 @@ def test_hourly_statistics_and_recorder_exclusions(
                 timestamp += 150
                 put(transport.bank, R.ENERGY_TOTAL, 1234.75)
                 put(transport.bank, R.POWER_TOTAL, 1000.0)
-                coordinator._slow_read_at = None
-                coordinator._active_read_at = None
+                coordinator._poller._slow_read_at = None
+                coordinator._poller._active_read_at = None
                 coordinator.async_set_updated_data(
                     await coordinator._async_update_data()
                 )

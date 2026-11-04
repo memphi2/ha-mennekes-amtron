@@ -6,13 +6,13 @@ from itertools import pairwise
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.client import (
+from custom_components.mennekes_amtron_rtu.data import WriteDiagnostics
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
 )
-from custom_components.mennekes_amtron_rtu.data import WriteDiagnostics
-from custom_components.mennekes_amtron_rtu.heartbeat import HeartbeatTask
+from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)

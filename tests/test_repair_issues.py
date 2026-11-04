@@ -5,7 +5,10 @@ from custom_components.mennekes_amtron_rtu.data import (
     WallboxData,
     WriteDiagnostics,
 )
-from custom_components.mennekes_amtron_rtu.registers import LAYOUT_V01_02, LAYOUT_V01_03
+from custom_components.mennekes_amtron_rtu.device.registers import (
+    LAYOUT_V01_02,
+    LAYOUT_V01_03,
+)
 from custom_components.mennekes_amtron_rtu.repair_issues import (
     fallback_not_configured,
     heartbeat_lost,

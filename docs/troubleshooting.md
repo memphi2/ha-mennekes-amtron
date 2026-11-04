@@ -54,6 +54,10 @@ conflicting bus access. A rate-limit error instead names the waiting interval;
 wait before retrying it. Use the exact error and repair message to distinguish
 these cases.
 
+With an independent service, an HA Core restart does not stop its heartbeat.
+Check the service process and serial connection separately; reconnecting HA
+does not replay old settings. See [service setup](modbus-service.md).
+
 ## Error 200, "Energy manager unavailable"
 
 The wallbox did not receive a usable heartbeat in time. In master mode, the
@@ -61,8 +65,8 @@ integration recovers automatically once heartbeat delivery resumes and a
 fresh read confirms error 200. It runs the documented heartbeat → charging
 release → current sequence, respects a pause, device lock or explicitly disabled
 charging release, and retains the
-current limit. An unlimited setting is restored after the five-second write
-interval. Recovery can release and resume charging.
+current limit. Paused and unlimited settings are reasserted directly without a
+temporary charging limit. A deliberate pause is remembered across HA restarts.
 
 There are at most three attempts, 30 seconds apart, while the fault persists.
 The repair issue disappears after a poll confirms the fault has cleared. A
@@ -71,9 +75,11 @@ extra recovery automation is needed; disable an older recovery blueprint to
 avoid duplicate attempts.
 
 If automatic recovery cannot complete, **Recover from error** or the repair
-issue's **Fix** remains available. Manual recovery can lift a pause; check the
-intended current first. The dialog explains connection problems, write
-cooldowns or a still-active fault instead of closing prematurely.
+issue's **Fix** remains available. It preserves the stopped state too; use the
+pause or charging-release switch explicitly to resume. After the recovery writes,
+the dialog waits up to ten seconds for the wallbox to clear error 200. The heartbeat
+continues during this check, and the charging commands are sent only once. A
+persistent fault, a different error or a connection problem keeps the dialog open.
 
 If the error returns, investigate the cause:
 
@@ -116,7 +122,7 @@ limited feature coverage.
 | Observation | Check |
 |---|---|
 | A new setting is delayed | Current writes have a five-second floor. The latest accepted request is written after that interval. |
-| Pause/resume or phase switching is refused just after startup | After a full HA restart or first setup, these commands wait five minutes because previous timing is unknown. The error reports the remaining wait. Entry reloads preserve the existing guard. |
+| Pause/resume or phase switching is refused just after startup | After a full HA restart or first setup, current/pause commands wait five seconds and phase changes wait five minutes because previous timing is unknown. The error reports the remaining wait. Entry reloads preserve the existing guard. |
 | The offered current is lower than requested | Wallbox/installation limits and an active downgrade can lower **Signaled current**. The vehicle can draw less again. |
 | A current change is rejected while paused | A normal current command would resume charging and must respect the pause/resume interval. Switching the pause control off obeys the same interval; it is not a bypass. |
 | The current field shows a value while charging is paused | It shows the remembered setting, including 0 for no limit. Check **Charging paused**, **Signaled current** and **Total power** for the actual charging state. |

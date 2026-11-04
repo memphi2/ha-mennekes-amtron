@@ -10,8 +10,11 @@ import pytest
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.const import (
+    CONTROL_MODE_MASTER,
+    DOMAIN,
+)
 from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
 from tests.test_home_assistant_smoke import _boot
 
@@ -22,7 +25,7 @@ def test_identical_polls_are_quiet_but_changes_failures_and_repairs_are_visible(
     async def run() -> None:
         transport = FakeModbusClient(device_bank())
         with patch(
-            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             return_value=transport,
         ):
             hass = await _boot(tmp_path / "config")
@@ -30,6 +33,7 @@ def test_identical_polls_are_quiet_but_changes_failures_and_repairs_are_visible(
                 flow = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "user"}
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(
                     flow["flow_id"],
                     {

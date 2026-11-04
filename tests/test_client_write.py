@@ -4,13 +4,13 @@ import asyncio
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu._client_write import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device._client_write import (
     WriteRateLimiter,
     validate_write,
     write_register,
 )
-from custom_components.mennekes_amtron_rtu.client_errors import (
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
     AmtronProtocolError,
     AmtronWriteRejectedError,

@@ -7,8 +7,8 @@ import asyncio
 import pytest
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device import registers as R
 from tests.fakes import device_bank, put, raise_connection_error
 from tests.ha_fakes import build_runtime
 

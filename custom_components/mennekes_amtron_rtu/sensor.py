@@ -17,11 +17,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from .capabilities import capability_is_supported
-from .decode import enum_option
+from .device.capabilities import capability_is_supported
+from .device.decode import enum_option
+from .device.registers import REGISTERS_BY_KEY
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
-from .registers import REGISTERS_BY_KEY
 from .sensor_descriptions import (
     SENSOR_DESCRIPTIONS,
     AmtronSensorEntityDescription,

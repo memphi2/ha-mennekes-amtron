@@ -13,11 +13,14 @@ from collections import deque
 from pathlib import Path
 from unittest.mock import patch
 
-from custom_components.mennekes_amtron_rtu.client import (
+from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
 )
-from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+from custom_components.mennekes_amtron_rtu.device.const import (
+    CONTROL_MODE_MASTER,
+    DOMAIN,
+)
 from scripts.check_runtime_soak import sample_errors
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 from tests.test_home_assistant_smoke import _boot
@@ -62,7 +65,7 @@ def test_lifecycle_resources_stay_bounded(tmp_path):
 
         # Pytest retains exception LogRecords (and their client frames) until
         # the test ends. Expected injected poll failures must not become fake leaks.
-        with patch("custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+        with patch("custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
                    side_effect=transport_factory), patch.object(
                        logging.getLogger("custom_components.mennekes_amtron_rtu.coordinator"),
                        "disabled", True,
@@ -71,6 +74,7 @@ def test_lifecycle_resources_stay_bounded(tmp_path):
             tracemalloc.start()
             try:
                 flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(flow["flow_id"], {
                     "port": "/dev/fake", "device_id": 50, "baudrate": 57600,
                     "frame": "8n2", "search": "off",

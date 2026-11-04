@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 from homeassistant.helpers import issue_registry as ir
 
-from custom_components.mennekes_amtron_rtu.const import DOMAIN
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import _boot
 
@@ -34,7 +34,7 @@ def test_reconfigure_reloads_once_only_when_changed(
             return client
 
         with patch(
-            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             side_effect=factory,
         ):
             hass = await _boot(tmp_path / "config")
@@ -49,6 +49,7 @@ def test_reconfigure_reloads_once_only_when_changed(
                 flow = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "user"}
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(flow["flow_id"], data)
                 await hass.async_block_till_done()
                 entry = hass.config_entries.async_entries(DOMAIN)[0]
@@ -60,6 +61,7 @@ def test_reconfigure_reloads_once_only_when_changed(
                     DOMAIN,
                     context={"source": "reconfigure", "entry_id": entry.entry_id},
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial_reconfigure"})
                 if changed:
                     data["baudrate"] = 38400
                 with patch.object(
@@ -92,7 +94,7 @@ def test_reconfigure_reloads_once_only_when_changed(
 def test_removing_entry_clears_only_its_repair_issues(tmp_path: Path) -> None:
     async def run() -> None:
         with patch(
-            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             return_value=FakeModbusClient(
                 device_bank(error_code=200, fallback_current=0)
             ),
@@ -102,6 +104,7 @@ def test_removing_entry_clears_only_its_repair_issues(tmp_path: Path) -> None:
                 flow = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "user"}
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(
                     flow["flow_id"],
                     {

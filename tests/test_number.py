@@ -7,8 +7,8 @@ import pytest
 from homeassistant.components.number import NumberMode
 from homeassistant.exceptions import ServiceValidationError
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.decode import decode_register
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.number import async_setup_entry
 from tests.fakes import device_bank
 from tests.ha_fakes import build_runtime, collect

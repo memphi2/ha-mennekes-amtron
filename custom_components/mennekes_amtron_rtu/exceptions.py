@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from .const import DOMAIN
+from .device.const import DOMAIN
 
 
 def service_validation_error(

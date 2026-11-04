@@ -19,15 +19,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import (
+from .device.const import (
     CHARGING_CURRENT_DECIMALS,
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_STEP,
     CHARGING_CURRENT_UNLIMITED,
 )
+from .device.registers import CHARGING_CURRENT_EMS
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
-from .registers import CHARGING_CURRENT_EMS
 
 PARALLEL_UPDATES = 1
 

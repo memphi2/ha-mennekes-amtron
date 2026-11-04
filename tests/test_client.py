@@ -6,19 +6,19 @@ import pytest
 from pymodbus.exceptions import ModbusIOException
 from pymodbus.pdu import ExceptionResponse
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.client import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
     create_serial_client,
 )
-from custom_components.mennekes_amtron_rtu.client_errors import (
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronBusError,
     AmtronConnectionError,
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
 )
-from custom_components.mennekes_amtron_rtu.register_blocks import REGISTER_BLOCKS
+from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTER_BLOCKS
 from tests.fakes import FakeModbusClient, device_bank
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)

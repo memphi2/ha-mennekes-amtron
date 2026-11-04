@@ -23,7 +23,7 @@ from tempfile import NamedTemporaryFile
 
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .device.const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

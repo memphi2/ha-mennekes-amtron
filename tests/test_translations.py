@@ -49,7 +49,7 @@ def test_no_translation_is_empty(language: str) -> None:
 def test_every_exception_translation_key_is_used() -> None:
     declared = set(_load(COMPONENT / "strings.json")["exceptions"])
     sources = "\n".join(
-        path.read_text(encoding="utf-8") for path in COMPONENT.glob("*.py")
+        path.read_text(encoding="utf-8") for path in COMPONENT.rglob("*.py")
     )
     unused = sorted(key for key in declared if f'"{key}"' not in sources)
     assert unused == []
@@ -60,10 +60,10 @@ def test_every_raised_translation_key_is_declared() -> None:
 
     declared = set(_load(COMPONENT / "strings.json")["exceptions"])
     pattern = re.compile(
-        r"(?:service_validation_error|home_assistant_error)\(\s*\n?\s*\"([a-z_]+)\""
+        r"(?:service_validation_error|home_assistant_error|validation_error|device_error|DeviceError|DeviceValidationError)\(\s*\n?\s*\"([a-z_]+)\""
     )
     raised: set[str] = set()
-    for path in COMPONENT.glob("*.py"):
+    for path in COMPONENT.rglob("*.py"):
         raised |= set(pattern.findall(path.read_text(encoding="utf-8")))
     assert raised
     assert raised <= declared
