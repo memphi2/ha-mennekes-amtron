@@ -3,7 +3,8 @@
 The diagnostics download includes `runtime_events`, a passive history of the
 last 40 connection transitions, heartbeat failures/recoveries, late heartbeats,
 write rejections/cooldowns and error-recovery attempts. Times are seconds since
-the entry was loaded. Events contain predefined names and optional register
+the entry was loaded, or since service startup in service mode. Service events
+are fetched from the app only when downloading diagnostics. Events contain predefined names and optional register
 addresses, never raw error text, serial paths, serial numbers or register values.
 The history is kept only in memory and resets on reload/restart. It adds no
 entities, Recorder rows, polling, file writes or background tasks.

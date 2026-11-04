@@ -29,6 +29,7 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
     DeviceValidationError,
 )
 from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTER_BLOCKS
+from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
@@ -363,6 +364,7 @@ def test_write_diagnostics_endpoint_requires_auth_and_performs_no_bus_io(tmp_pat
         service, transport, _clock = await service_fixture(tmp_path)
         try:
             await service.heartbeat.async_stop()
+            service.diagnostics.timeline.record(EventType.CONNECTION_LOST)
             before = (list(transport.reads), list(transport.writes))
             async with TestServer(create_app(service)) as server, ClientSession() as session:
                 url = server.make_url("/v1/diagnostics")
@@ -370,7 +372,10 @@ def test_write_diagnostics_endpoint_requires_auth_and_performs_no_bus_io(tmp_pat
                     assert response.status == 401
                 async with session.get(url, headers={"Authorization": f"Bearer {TOKEN}"}) as response:
                     assert response.status == 200
-                    assert await response.json() == {"write_transactions": []}
+                    assert await response.json() == {
+                        "write_transactions": [],
+                        "runtime_events": service.diagnostics.timeline.snapshot(),
+                    }
             assert (transport.reads, transport.writes) == before
         finally:
             await service.stop()

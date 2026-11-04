@@ -54,7 +54,10 @@ def create_app(service: ModbusService) -> web.Application:
 
     async def diagnostics(_request: web.Request) -> web.Response:
         # Passive RAM snapshot: no serial reads, writes or file access.
-        return web.json_response({"write_transactions": service.client.write_trace.snapshot()})
+        return web.json_response({
+            "write_transactions": service.client.write_trace.snapshot(),
+            "runtime_events": service.diagnostics.timeline.snapshot(),
+        })
 
     async def body(request: web.Request) -> dict[str, Any]:
         if request.content_type != "application/json":

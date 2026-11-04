@@ -100,10 +100,21 @@ def test_remote_write_diagnostics_are_optional_and_allowlisted(monkeypatch, fail
             remote.request = AsyncMock(side_effect=AmtronConnectionError("private-token"))
         else:
             rows = [{"secret": "private-token"}] if failure == "invalid" else []
-            remote.request = AsyncMock(return_value={"write_transactions": rows, "secret": "private-token"})
+            events = [{"event": "private-token"}] if failure == "invalid" else [{
+                "seconds_since_load": 5.0,
+                "event": "heartbeat_failed",
+                "register_address": None,
+            }]
+            remote.request = AsyncMock(return_value={
+                "write_transactions": rows, "runtime_events": events, "secret": "private-token",
+            })
         entry.runtime_data.client = remote
         dump = await async_get_config_entry_diagnostics(hass, entry)
         assert dump["write_transactions"] == ([] if failure == "valid" else None)
+        if failure == "valid":
+            assert dump["runtime_events"] == events
+        else:
+            assert dump["runtime_events"] is None
         assert "private-token" not in repr(dump)
         remote.request.assert_awaited_once_with("GET", "/v1/diagnostics", update_connection=False)
         await original.async_close()

@@ -24,6 +24,7 @@ from .device.const import (
     CONF_STOPBITS,
 )
 from .device.registers import REGISTERS_BY_KEY, layout_label
+from .device.runtime_events import sanitize_events
 from .device.write_trace import sanitize_snapshot
 from .entry_types import MennekesAmtronConfigEntry
 from .remote import RemoteClient
@@ -47,10 +48,13 @@ async def async_get_config_entry_diagnostics(
         try:
             trace = await client.request("GET", "/v1/diagnostics", update_connection=False)
             write_transactions = sanitize_snapshot(trace.get("write_transactions"))
+            runtime_events = sanitize_events(trace.get("runtime_events"))
         except AmtronBusError:
             write_transactions = None
+            runtime_events = None
     else:
         write_transactions = client.write_trace.snapshot()
+        runtime_events = runtime_data.diagnostics.timeline.snapshot()
 
     payload = {
         "bus": {
@@ -107,7 +111,7 @@ async def async_get_config_entry_diagnostics(
                 )
             ),
         },
-        "runtime_events": runtime_data.diagnostics.timeline.snapshot(),
+        "runtime_events": runtime_events,
         "write_transactions": write_transactions,
         "values": decoded_values(data.values),
         "registers": await async_raw_registers(entry),

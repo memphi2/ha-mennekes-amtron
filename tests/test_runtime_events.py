@@ -11,6 +11,7 @@ from custom_components.mennekes_amtron_rtu.device.runtime_events import (
     MAX_EVENTS,
     EventTimeline,
     EventType,
+    sanitize_events,
 )
 from tests.fakes import FakeModbusClient, device_bank, raise_connection_error
 from tests.test_heartbeat import _client
@@ -28,6 +29,44 @@ def test_history_is_bounded_copied_and_entry_local():
     snapshot.clear()
     assert len(history.snapshot()) == MAX_EVENTS
     assert WriteDiagnostics().timeline.snapshot() == []
+
+
+def test_remote_history_accepts_only_the_bounded_schema_and_copies_rows():
+    history = EventTimeline(lambda: 3.0)
+    for index, event in enumerate(EventType):
+        history.record(event, register=None if index % 2 else 0x0D00)
+    source = history.snapshot()
+    result = sanitize_events(source)
+    assert result == source
+    assert result is not source
+    result[0]["event"] = "changed"
+    assert source[0]["event"] == "connection_lost"
+    assert sanitize_events([]) == []
+    row = source[0]
+    assert len(sanitize_events([row] * MAX_EVENTS)) == MAX_EVENTS
+    assert sanitize_events([row] * (MAX_EVENTS + 1)) is None
+    assert sanitize_events([{**row, "seconds_since_load": 1}]) is not None
+    assert sanitize_events([{**row, "register_address": 65535}]) is not None
+
+
+@pytest.mark.parametrize("value", [None, {}, "private", [None], [[1]], [{"secret": "token"}]])
+def test_remote_history_rejects_non_schema_containers(value):
+    assert sanitize_events(value) is None
+
+
+@pytest.mark.parametrize(("key", "value"), [
+    ("seconds_since_load", -1), ("seconds_since_load", -0.5),
+    ("seconds_since_load", float("nan")), ("seconds_since_load", float("inf")),
+    ("seconds_since_load", True), ("seconds_since_load", "1"),
+    ("event", "/dev/private"), ("event", None), ("event", {}),
+    ("register_address", -1), ("register_address", 65536),
+    ("register_address", True), ("register_address", "3328"),
+    ("register_address", 1.0), ("secret", "token"),
+])
+def test_remote_history_rejects_unsafe_or_invalid_metadata(key, value):
+    row = {"seconds_since_load": 1.5, "event": "heartbeat_failed", "register_address": 3328}
+    row[key] = value
+    assert sanitize_events([row]) is None
 
 
 @pytest.mark.parametrize("register", [-1, 65536, True, "/dev/private"])

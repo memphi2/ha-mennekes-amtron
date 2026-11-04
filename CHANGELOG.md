@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Include the independent service's connection, heartbeat and recovery timeline
+  in HA diagnostics instead of the separate HA client's local event history.
+
 - Add bounded, in-memory write diagnostics with bus-wait/transaction timing and
   packet callback counts for failed writes and subsequent confirmations. Fetch
   service diagnostics only on demand; add no Recorder state or persistent logs.
