@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import gc
+import weakref
 
 import pytest
 from pymodbus.exceptions import ModbusIOException
@@ -22,6 +24,19 @@ from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTE
 from tests.fakes import FakeModbusClient, device_bank
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)
+
+
+def test_default_client_factory_does_not_retain_its_owner():
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        client = MennekesModbusClient(CONFIG)
+        reference = weakref.ref(client)
+        del client
+        assert reference() is None
+    finally:
+        if enabled:
+            gc.enable()
 
 
 def test_failed_write_separates_bus_wait_from_transaction_time():

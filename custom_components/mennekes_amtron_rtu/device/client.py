@@ -18,6 +18,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 
 from pymodbus import FramerType
 from pymodbus.client import AsyncModbusSerialClient
@@ -110,8 +111,9 @@ class MennekesModbusClient:
             clock=monotonic, packet_trace=client_factory is create_serial_client
         )
         self._client_factory: ClientFactory = (
-            lambda config: create_serial_client(config, trace_packet=self.write_trace.packet)
-        ) if client_factory is create_serial_client else client_factory
+            partial(create_serial_client, trace_packet=self.write_trace.packet)
+            if client_factory is create_serial_client else client_factory
+        )
         self._client: ModbusTransport | None = None
         self._lock = asyncio.Lock()
         # Bulk users queue behind this gate before they reach the bus, so at
