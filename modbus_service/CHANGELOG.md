@@ -1,5 +1,15 @@
 # Changes
 
+## 0.5.0b3
+
+- Supervise the heartbeat worker; unexpected exits stop the service and release
+  the adapter so the enabled Supervisor watchdog can restart it.
+- Include bounded service events and failed-write timing in downloaded diagnostics,
+  without packet contents, credentials or additional Recorder writes.
+- Release unloaded serial clients without waiting for cyclic garbage collection.
+- Pair with integration 0.5.0b3 for automatic app lookup, current credentials on
+  setup retry and clearer connection errors. Update both components.
+
 ## 0.5.0b2
 
 - Fix startup with the baudrate strings saved by Supervisor selection fields.
