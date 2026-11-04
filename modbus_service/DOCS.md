@@ -10,6 +10,8 @@ heartbeat and use the wallbox's configured fallback.
 Install the matching **0.5.0b1** integration first. Enable **Pre-release** for
 its Marketplace repository on HA 2026.11+, or beta releases in HACS on older
 supported versions. The integration and this app are installed separately.
+Supervisor may show **Building** while it creates the local app image from the
+verified download. No Python source is compiled or dependencies installed locally.
 
 1. Note the pause, current limit and charging-release settings and disconnect
    the vehicle for the first handover. Disable the existing direct-serial

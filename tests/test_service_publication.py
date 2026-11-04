@@ -244,6 +244,40 @@ def test_catalogs_are_separate_and_allowlist_only_distributable_files(version, c
         path.endswith((".py", ".zip")) or path.startswith(".github/") for path in files
     )
     assert json.loads(files["release.json"])["digest"] == DIGEST
+    config = yaml.safe_load(files["mennekes_amtron_modbus/config.yaml"])
+    assert "image" not in config  # Supervisor must select the build path.
+    assert files["mennekes_amtron_modbus/Dockerfile"] == (
+        f"FROM {INFO['image']}@{DIGEST}\n".encode()
+    )
+    assert f"{INFO['image']}@{DIGEST}".encode() in files["README.md"]
+
+
+@pytest.mark.parametrize("digest", ["latest", "sha256:short", DIGEST + "\nRUN evil"])
+def test_catalog_rejects_unpinned_or_injected_image_references(digest):
+    with pytest.raises(ValueError, match="image or digest"):
+        catalog.catalog_files(INFO, digest)
+
+
+def test_catalog_rejects_a_different_registry_image():
+    with pytest.raises(ValueError, match="image or digest"):
+        catalog.catalog_files({**INFO, "image": "ghcr.io/other/image"}, DIGEST)
+
+
+def test_release_smokes_the_digest_bound_supervisor_build(monkeypatch):
+    from pathlib import Path
+
+    def run(*args):
+        assert args[:5] == ("docker", "build", "--pull", "--tag", "amtron-app:verify")
+        assert (Path(args[5]) / "Dockerfile").read_bytes() == (
+            catalog.catalog_files(INFO, DIGEST)["mennekes_amtron_modbus/Dockerfile"]
+        )
+        return b""
+
+    exercised = []
+    monkeypatch.setattr(images, "run", run)
+    monkeypatch.setattr(images, "smoke", exercised.append)
+    images.verify_app_install(INFO, DIGEST)
+    assert exercised == ["amtron-app:verify"]
 
 
 @pytest.mark.parametrize("change", ["downgrade", "digest", "source", "channel"])

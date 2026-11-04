@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Pin app installations to the attested container digest, preventing later
+  registry tag changes from substituting a different image.
 - Bind container attestations to the validated native build digests, including
   existing version tags and tag-replacement races; matching OCI labels alone
   cannot authorize publication.

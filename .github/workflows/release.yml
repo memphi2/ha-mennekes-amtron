@@ -265,6 +265,7 @@ jobs:
         run: |
           gh attestation verify "oci://$RELEASE_IMAGE@$RELEASE_DIGEST" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --source-ref "refs/tags/$RELEASE_TAG" --source-digest "$RELEASE_COMMIT"
           python scripts/service_image.py public --tag "$RELEASE_TAG" --digest "$RELEASE_DIGEST"
+          python scripts/service_image.py app --tag "$RELEASE_TAG" --digest "$RELEASE_DIGEST"
 
   publish:
     runs-on: ubuntu-24.04

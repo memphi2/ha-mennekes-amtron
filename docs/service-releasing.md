@@ -34,6 +34,15 @@ merging. Tag only the validated main commit with `v<VERSION>`.
    notices to the matching catalog branch. This happens after the image and
    GitHub release exist. A catalog cannot move backwards or replace a version.
 
+The catalog's Dockerfile contains only `FROM image@sha256:<attested-index>`;
+its config deliberately has no `image` key. Supervisor's supported local-build
+path downloads that immutable image and adds app metadata. It does not build
+the service from source or resolve a mutable version tag. The release gate
+builds and smoke-tests this same wrapper before publishing. A later GHCR tag
+replacement cannot change an app installation; deletion causes installation
+to fail instead of silently substituting code. Standalone Docker users get the
+same digest reference in the generated catalog README.
+
 The catalog updater makes an ordinary commit on its generated branch, without
 force and without opening another PR. Source branches remain untouched. Keep
 catalog URLs stable: Supervisor derives the app identity from the repository

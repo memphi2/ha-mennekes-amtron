@@ -33,8 +33,10 @@ Alternatively, under **Settings → Apps → Install app → Repositories**, add
 https://github.com/memphi2/ha-mennekes-amtron#apps-beta
 ```
 
-Install **Mennekes Amtron Modbus Service**. Supervisor downloads a prebuilt image
-for amd64 or aarch64. Enable **Start on boot** and **Watchdog**. The app starts
+Install **Mennekes Amtron Modbus Service**. Supervisor downloads the verified image
+for amd64 or aarch64 and creates the local app image. The installation may show
+**Building**; it does not compile Python or install dependencies on your device.
+Enable **Start on boot** and **Watchdog**. The app starts
 independently of Core. Its watchdog checks process liveness; a wallbox connection
 fault is retried without repeatedly restarting the app.
 
@@ -72,9 +74,13 @@ Keep a backup and the old app until the handover is verified.
 
 ## Standalone container or Python service
 
-Use the published image `ghcr.io/memphi2/ha-mennekes-amtron-service:0.5.0b1`.
-The same image supports Linux amd64 and arm64. Pin the version; avoid tracking
-a moving development tag.
+Copy the **standalone container reference** from the
+[published beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta).
+Check that its release version matches your integration. Use the complete
+`ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference, including the digest,
+as your Docker image. It selects the verified release even if a registry tag is
+later changed. The same reference supports Linux amd64 and arm64. Save it with
+your configuration; choose a new matching reference deliberately when updating.
 
 Create a private data directory containing `options.json`. Its structure is:
 
@@ -173,7 +179,7 @@ python scripts/build_service_app.py --output /tmp/mennekes-amtron-app
 ```
 
 Copy this directory to HA's local app directory and install the local app.
-The export deliberately removes the published image reference so Supervisor
+The export includes the source and development Dockerfile so Supervisor
 builds the checkout. Alternatively run `docker build -t amtron-modbus-service:local .`
 from the repository root. A local app and an app from the published catalog are
 different installations; stop the current serial owner before switching.

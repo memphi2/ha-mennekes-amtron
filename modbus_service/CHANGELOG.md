@@ -9,5 +9,7 @@
 - Resume applies each HA client's current cap to the latest service setpoint
   under the current-write lock.
 - Published container images are tested before the app catalog is updated.
+- App installations use the verified image digest, so later tag changes cannot
+  substitute a different container.
 
 Physical wallbox and Supervisor acceptance testing is pending.

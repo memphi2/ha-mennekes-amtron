@@ -1,6 +1,5 @@
 name: Mennekes Amtron Modbus Service
 version: 0.5.0b1
-image: ghcr.io/memphi2/ha-mennekes-amtron-service
 url: https://github.com/memphi2/ha-mennekes-amtron
 slug: mennekes_amtron_modbus
 description: Independent Modbus connection and heartbeat for Mennekes Amtron

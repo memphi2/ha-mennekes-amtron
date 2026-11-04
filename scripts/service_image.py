@@ -40,7 +40,7 @@ def release_info(repository: str, tag: str) -> dict[str, str]:
     image = f"ghcr.io/{repository}-service"
     if config["version"] != version or project["version"] != version:
         raise ValueError("service, package and integration versions must agree")
-    if config.get("image") != image or set(config["arch"]) != ARCHITECTURES:
+    if "image" in config or set(config["arch"]) != ARCHITECTURES:
         raise ValueError("app image or architecture contract differs")
     commit = run("git", "rev-parse", "HEAD").decode().strip()
     return {
@@ -324,6 +324,27 @@ def publish(info: dict[str, str], directory: Path) -> str:
     return digest
 
 
+def app_dockerfile(info: dict[str, str], digest: str) -> bytes:
+    """Bind Supervisor installs to the attested image, never a mutable tag."""
+    image = info["image"]
+    if image != "ghcr.io/memphi2/ha-mennekes-amtron-service" or not DIGEST.fullmatch(
+        digest
+    ):
+        raise ValueError("invalid app image or digest")
+    # Supervisor appends :version to config.image, so digest references must
+    # use its supported local-build path. No source is compiled on the host.
+    return f"FROM {image}@{digest}\n".encode()
+
+
+def verify_app_install(info: dict[str, str], digest: str) -> None:
+    """Build and exercise exactly the Dockerfile consumed by Supervisor."""
+    with tempfile.TemporaryDirectory(prefix="amtron-app-install-") as temporary:
+        context = Path(temporary)
+        (context / "Dockerfile").write_bytes(app_dockerfile(info, digest))
+        run("docker", "build", "--pull", "--tag", "amtron-app:verify", temporary)
+        smoke("amtron-app:verify")
+
+
 def verify_public(info: dict[str, str], digest: str) -> None:
     """A catalog may reference only images that users can pull without a login."""
     if not DIGEST.fullmatch(digest):
@@ -345,7 +366,7 @@ def verify_public(info: dict[str, str], digest: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("prepare", "build", "publish", "public", "smoke")
+        "action", choices=("prepare", "build", "publish", "public", "app", "smoke")
     )
     parser.add_argument("--repository", default="memphi2/ha-mennekes-amtron")
     parser.add_argument("--tag")
@@ -365,6 +386,8 @@ def main() -> int:
             info["digest"] = publish(info, args.path)
         elif args.action == "public" and args.digest:
             verify_public(info, args.digest)
+        elif args.action == "app" and args.digest:
+            verify_app_install(info, args.digest)
         elif args.action != "prepare":
             raise ValueError("missing action arguments")
         if output := os.environ.get("GITHUB_OUTPUT"):

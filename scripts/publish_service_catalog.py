@@ -13,7 +13,7 @@ import yaml
 from packaging.version import Version
 from release_check import remote_commit, run
 from release_version import catalog_branch
-from service_image import ROOT, release_info, verify_public
+from service_image import ROOT, app_dockerfile, release_info, verify_public
 
 
 def api(
@@ -53,6 +53,10 @@ def catalog_files(info: dict[str, str], digest: str) -> dict[str, bytes]:
         prefix + name: (app / name).read_bytes()
         for name in ("config.yaml", "README.md", "DOCS.md", "CHANGELOG.md")
     }
+    config = yaml.safe_load(files[prefix + "config.yaml"])
+    if "image" in config:
+        raise ValueError("app config must use the digest-pinned Dockerfile")
+    files[prefix + "Dockerfile"] = app_dockerfile(info, digest)
     for language in ("en", "de"):
         files[f"{prefix}translations/{language}.yaml"] = (
             app / "translations" / f"{language}.yaml"
@@ -69,6 +73,7 @@ def catalog_files(info: dict[str, str], digest: str) -> dict[str, bytes]:
     files["README.md"] = (
         f"# {title}\n\nInstall the Modbus service from `{url}`.\n\n"
         f"Release: [{info['version']}](https://github.com/{info['repository']}/releases/tag/v{info['version']}).\n"
+        f"\nStandalone container reference for this release:\n\n```text\n{info['image']}@{digest}\n```\n\n"
         "This branch is generated after publication; source changes belong on main.\n"
     ).encode()
     files["release.json"] = (
