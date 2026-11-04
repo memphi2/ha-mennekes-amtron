@@ -32,10 +32,10 @@ For Home Assistant 2026.11 and newer:
 1. Open **Settings → Marketplace** and accept the community-content notice
    when requested.
 2. Search for **Mennekes Amtron RTU** by **memphi2**.
-3. If it is not listed, open the repository using the button below. While
-   [catalog PR #11749](https://github.com/hacs/default/pull/11749) is pending,
-   add it as a custom repository, category **Integration**. Custom repositories
-   require a GitHub connection in the Marketplace.
+3. Open the repository using the button below if the search catalog has not
+   refreshed yet. The integration is included in the default catalog;
+   [catalog PR #11749](https://github.com/hacs/default/pull/11749) was merged on
+   November 4, 2026. Catalog changes may take several hours to appear.
 4. Install the integration.
 5. Open **Settings → Devices & services → Add integration** and select
    **Mennekes Amtron RTU**. Follow the
@@ -56,8 +56,9 @@ and [installation behavior](https://contributors.home-assistant.io/marketplace/g
 ## HACS on Home Assistant 2026.9 and 2026.10
 
 1. Open HACS and search for **Mennekes Amtron RTU** by **memphi2**.
-2. If it is not listed, open the three-dot menu → **Custom repositories**.
-   Add `https://github.com/memphi2/ha-mennekes-amtron` with category **Integration**.
+2. If it is not listed yet, refresh the catalog or wait for the catalog update.
+   As a temporary fallback, use the three-dot menu → **Custom repositories**
+   and add `https://github.com/memphi2/ha-mennekes-amtron`, category **Integration**.
 3. Download the integration and restart Home Assistant.
 4. Add **Mennekes Amtron RTU** under **Settings → Devices & services**
    and follow the [wallbox setup](quickstart.md#5-add-the-wallbox).

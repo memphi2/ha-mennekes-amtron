@@ -22,9 +22,8 @@ For **Home Assistant 2026.11 and newer**:
 
 [![Open your Home Assistant instance and open this repository in the Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=memphi2&repository=ha-mennekes-amtron&category=integration)
 
-1. Open the repository using the button above. If prompted, connect GitHub
-   and add `https://github.com/memphi2/ha-mennekes-amtron` as a custom
-   repository with category **Integration**.
+1. Open the repository using the button above, or search the Marketplace for
+   **Mennekes Amtron RTU** by **memphi2**.
 2. Install **Mennekes Amtron RTU** and accept the community-content notice.
 3. Under **Settings → Devices & services → Add integration**, select
    **Mennekes Amtron RTU** and choose the connection to your wallbox.
@@ -53,15 +52,12 @@ limit**; use **Charging paused** to stop charging.
 
 ## Keep the heartbeat running during HA restarts
 
-The optional [Modbus service](docs/modbus-service.md) runs independently of HA
-and keeps the last charging state, including a deliberate pause. **0.5.0b1 is a
-test release**; install the matching integration beta before switching over.
-
-[![Add the Mennekes Amtron beta app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps-beta)
-
-On HA OS, install the service from the app repository above. For HA Container,
-use the published Docker image. Follow the [handover guide](docs/modbus-service.md)
-to retain your existing device and entity IDs.
+An optional [Modbus service](docs/modbus-service.md) is being prepared for
+**0.5.0b1**. It runs independently of HA and keeps the last charging state,
+including a deliberate pause. **This version is not published yet.**
+The planned HA app and Docker image will have a handover procedure that retains
+existing device and entity IDs. Continue using the published integration until
+the service release is available.
 
 ## Documentation and help
 

@@ -1,5 +1,9 @@
 # Independent Modbus service
 
+**Preview for the unpublished 0.5.0b1.** Publication is on hold. The app catalog
+and container installation below will be available after a release is approved;
+continue using the published integration until then.
+
 The service owns the USB RS-485 adapter and keeps the heartbeat running while
 Home Assistant Core restarts. Home Assistant connects to its authenticated API;
 it no longer opens the serial port. This uses the same separation of hardware
