@@ -251,6 +251,64 @@ def test_remote_resume_respects_the_local_current_cap(tmp_path, cap, unknown_tar
                 ]
                 with pytest.raises(ServiceValidationError):
                     await control.async_set_charging_current(float("nan"))
+                for invalid_cap in (5, float("nan")):
+                    with pytest.raises(ServiceValidationError):
+                        await control.async_resume_charging(current_cap=invalid_cap)
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("cap", [None, True, 5, 33, float("nan"), float("inf")])
+def test_service_rejects_invalid_resume_caps_before_any_write(tmp_path, cap):
+    async def run():
+        service, transport, _clock = await service_fixture(tmp_path)
+        try:
+            with pytest.raises(ValueError, match="numeric value"):
+                await service.command({"command": "resume", "current_cap": cap})
+            assert not current_writes(transport)
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("cached", "fresh", "cap", "expected"), [
+    (6, 16, 6, 6),
+    (16, 6, 16, 6),
+    (6, 0, 6, 0),
+])
+def test_remote_resume_uses_fresh_service_intent_with_the_ha_cap(
+    tmp_path, cached, fresh, cap, expected
+):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path, current=cached)
+        try:
+            async with (
+                TestServer(create_app(service)) as server,
+                ClientSession() as session,
+            ):
+                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                await remote.async_connect()
+                control = RemoteControl(
+                    remote,
+                    diagnostics=WriteDiagnostics(),
+                    options=ControlOptions(False, cap),
+                    state=lambda: WallboxData(values=remote.snapshot["values"]),
+                    request_refresh=remote.update,
+                )
+                # Another authenticated client changes the service while HA's
+                # last snapshot still contains the previous resume current.
+                await service.command({
+                    "command": "set_current", "value": fresh, "allow_unlimited": True
+                })
+                clock[0] += 6
+                await service.command({"command": "pause"})
+                clock[0] += 6
+                assert control.charging_setpoint == cached
+                await control.async_resume_charging()
+                assert current_writes(transport) == [fresh, 1, expected]
         finally:
             await service.stop()
 

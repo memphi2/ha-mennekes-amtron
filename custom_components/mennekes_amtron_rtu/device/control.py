@@ -218,16 +218,27 @@ class AmtronControl:
         self._require_write_access()
         await self._async_request_current(CHARGING_PAUSE_CURRENT, mode_change=True)
 
-    async def async_resume_charging(self) -> None:
+    def _resume_current_maximum(self, current_cap: float | None) -> float:
+        if current_cap is None:
+            return self.max_charging_current
+        if not math.isfinite(current_cap) or current_cap < CHARGING_CURRENT_MINIMUM:
+            raise validation_error(
+                "charging_current_invalid",
+                {"value": str(current_cap), "minimum": str(CHARGING_CURRENT_MINIMUM)},
+            )
+        return min(current_cap, self.max_charging_current)
+
+    async def async_resume_charging(self, *, current_cap: float | None = None) -> None:
         """Resume charging with the setpoint that was active before the pause."""
 
         self._require_write_access()
         async with self._current_lock:
+            maximum = self._resume_current_maximum(current_cap)
             target = self.charging_setpoint
             if target is None:
-                target = self.max_charging_current
+                target = maximum
             elif target != CHARGING_CURRENT_UNLIMITED:
-                target = max(CHARGING_CURRENT_MINIMUM, min(target, self.max_charging_current))
+                target = max(CHARGING_CURRENT_MINIMUM, min(target, maximum))
             await self._async_request_current_locked(target, mode_change=True)
 
     async def async_set_charging_release(self, released: bool) -> None:

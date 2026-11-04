@@ -224,7 +224,7 @@ class ModbusService:
         }
 
     async def command(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if payload.keys() - {"command", "value", "allow_unlimited"}:
+        if payload.keys() - {"command", "value", "allow_unlimited", "current_cap"}:
             raise ValueError("unknown command field")
         async with self._command_lock:
             control = self.control
@@ -243,7 +243,11 @@ class ModbusService:
                 elif command == "pause":
                     await control.async_pause_charging()
                 elif command == "resume":
-                    await control.async_resume_charging()
+                    await control.async_resume_charging(
+                        current_cap=number(
+                            payload.get("current_cap", self.config.current_cap), 6, 32
+                        )
+                    )
                 elif command in ("release", "lock"):
                     if not isinstance(value, bool):
                         raise ValueError("value must be boolean")

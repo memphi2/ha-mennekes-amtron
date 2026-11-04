@@ -49,8 +49,8 @@ class AmtronControl(DeviceControl):
         await super().async_pause_charging()
 
     @ha_command
-    async def async_resume_charging(self) -> None:
-        await super().async_resume_charging()
+    async def async_resume_charging(self, *, current_cap: float | None = None) -> None:
+        await super().async_resume_charging(current_cap=current_cap)
 
     @ha_command
     async def async_set_charging_release(self, released: bool) -> None:
