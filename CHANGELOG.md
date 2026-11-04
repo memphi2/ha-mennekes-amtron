@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Reuse Supervisor app discovery when selecting the service connection manually;
+  URL and token fields are reserved for separately hosted services. Keep wallbox
+  identity checks during migration and distinguish authentication, unavailable
+  wallbox data, invalid API responses and network failures in setup messages.
+- Accept unknown uint16 hardware phase codes as readings without exposing phase
+  switching controls; an unfamiliar optional capability no longer rejects the
+  entire service connection.
+
 - Supervise the service heartbeat task: an unexpected exit now stops the service
   and releases the serial port, allowing Supervisor's watchdog to restart it.
   Ordinary missed replies still use the existing heartbeat retry cadence.

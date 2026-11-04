@@ -211,7 +211,7 @@ def test_invalid_discovery_never_sends_credentials(tmp_path, change):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("existing", ["new", "remote", "direct", "disabled"])
+@pytest.mark.parametrize("existing", ["new", "new_from_menu", "remote", "direct", "disabled", "reconfigure", "wrong_device"])
 def test_real_ha_discovery_connects_without_url_or_token_fields_and_keeps_ids(
     tmp_path, monkeypatch, existing
 ):
@@ -229,7 +229,7 @@ def test_real_ha_discovery_connects_without_url_or_token_fields_and_keeps_ids(
                 monkeypatch.setattr(config_flow, "RemoteClient", LoopbackRemote)
                 monkeypatch.setattr(integration, "RemoteClient", LoopbackRemote)
                 entry = None
-                if existing != "new":
+                if existing not in ("new", "new_from_menu"):
                     flow = await hass.config_entries.flow.async_init(
                         DOMAIN, context={"source": "user"}
                     )
@@ -251,7 +251,7 @@ def test_real_ha_discovery_connects_without_url_or_token_fields_and_keeps_ids(
                         )
                     }
                     assert before
-                    if existing in ("direct", "disabled"):
+                    if existing in ("direct", "disabled", "reconfigure", "wrong_device"):
                         await hass.config_entries.async_unload(entry.entry_id)
                         hass.config_entries.async_update_entry(
                             entry,
@@ -272,9 +272,26 @@ def test_real_ha_discovery_connects_without_url_or_token_fields_and_keeps_ids(
                         hass.config_entries.async_update_entry(
                             entry, data={**entry.data, "server_token": "old" * 16}
                         )
-                result = await hass.config_entries.flow.async_init(
-                    DOMAIN, context={"source": "hassio"}, data=discovery_info()
-                )
+                if existing in ("new_from_menu", "reconfigure", "wrong_device"):
+                    from unittest.mock import AsyncMock
+
+                    monkeypatch.setattr(config_flow, "async_app_discoveries", AsyncMock(return_value=[discovery_info()]))
+                    if existing == "wrong_device":
+                        service.identity.serial_number = "OTHER-WALLBOX"
+                    context = {"source": "user"} if existing == "new_from_menu" else {
+                        "source": "reconfigure", "entry_id": entry.entry_id,
+                    }
+                    result = await hass.config_entries.flow.async_init(DOMAIN, context=context)
+                    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "server"})
+                    if existing == "wrong_device":
+                        assert result["reason"] == "unique_id_mismatch"
+                        assert entry.data["port"] == "/dev/previous"
+                        assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+                        return
+                else:
+                    result = await hass.config_entries.flow.async_init(
+                        DOMAIN, context={"source": "hassio"}, data=discovery_info()
+                    )
                 if existing == "remote":
                     assert result["type"] == "abort"
                 else:
@@ -285,7 +302,7 @@ def test_real_ha_discovery_connects_without_url_or_token_fields_and_keeps_ids(
                         result["flow_id"], {}
                     )
                     assert result["type"] == (
-                        "create_entry" if existing == "new" else "abort"
+                        "create_entry" if existing in ("new", "new_from_menu") else "abort"
                     )
                 await hass.async_block_till_done()
                 entries = hass.config_entries.async_entries(DOMAIN)
@@ -385,7 +402,7 @@ def test_discovery_handles_incomplete_setup_and_identity_safely(
                     return
                 assert result["type"] == "form"
                 if scenario in ("unready", "new_credentials"):
-                    assert result["errors"] == {"base": "cannot_connect_service"}
+                    assert result["errors"] == {"base": "service_not_ready" if scenario == "unready" else "service_auth_failed"}
                 elif scenario == "no_serial":
                     assert result["errors"] == {
                         "base": "service_discovery_requires_serial"

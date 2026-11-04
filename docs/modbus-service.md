@@ -66,6 +66,14 @@ HA Core restarts. If the wallbox is not ready yet, check the app log and retry
 the discovery confirmation. Standalone Docker/Python services still use manual
 URL and token setup.
 
+Selecting **Add integration → Mennekes Amtron RTU → Connect to the Modbus service**
+also looks up the running Supervisor app before showing a manual form. If more
+than one app is announced, use the matching discovery card. Setup distinguishes
+an unreachable API, rejected authentication, unavailable wallbox data and an
+invalid response. For rejected authentication, restarting the app announces its
+current credentials again. Invalid responses name the affected data section in
+the HA log without printing tokens or response contents.
+
 The integration's service options control only HA's access and refresh interval.
 Read-only there disables HA commands while the service keeps its heartbeat and
 charging state. Set Modbus polling/measurement cadence and the service's write

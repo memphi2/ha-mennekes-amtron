@@ -1,6 +1,9 @@
 {
   "domain": "mennekes_amtron_rtu",
   "name": "Mennekes Amtron RTU",
+  "after_dependencies": [
+    "hassio"
+  ],
   "categories": [
     "energy.ev_charging"
   ],

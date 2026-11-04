@@ -77,6 +77,7 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
     ("field", "value"),
     [
         ("api_version", 2),
+        ("api_version", True),
         ("values", []),
         ("values", {"x": float("nan")}),
         ("control.read_only", None),
@@ -87,7 +88,8 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
         ("identity.layout_version", 0),
         ("identity.serial_number", 123),
         ("identity.max_evse_current", -1),
-        ("identity.phase_options_hw", 4),
+        ("identity.phase_options_hw", 65536),
+        ("identity.phase_options_hw", True),
         ("heartbeat", {}),
         ("diagnostics", []),
         ("diagnostics.recoveries", -1),
@@ -174,7 +176,7 @@ def test_large_or_streamed_replies_are_bounded():
         app.router.add_get("/v1/state", oversized)
         async with TestServer(app) as server, ClientSession() as session:
             remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
-            with pytest.raises(AmtronConnectionError, match="cannot communicate"):
+            with pytest.raises(AmtronConnectionError, match="service response too large"):
                 await remote.update()
 
     asyncio.run(run())

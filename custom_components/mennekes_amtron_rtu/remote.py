@@ -25,6 +25,7 @@ from .device.errors import DeviceError, DeviceValidationError
 from .device.heartbeat import HeartbeatTask
 from .device.register_blocks import REGISTER_BLOCKS
 from .device.registers import ERROR_CODE, RegisterSpec
+from .remote_errors import ServiceConnectionError
 
 CONF_SERVER_URL = "server_url"
 CONF_SERVER_TOKEN = "server_token"  # noqa: S105 - configuration key, not a credential
@@ -86,17 +87,20 @@ class RemoteClient(MennekesModbusClient):
                 allow_redirects=False,
             ) as response:
                 if response.status in (401, 403):
-                    raise AmtronConnectionError("service authentication failed")
+                    raise ServiceConnectionError("service_auth_failed", "service authentication failed")
                 raw = bytearray()
                 async for chunk in response.content.iter_chunked(16384):
                     raw.extend(chunk)
                     if len(raw) > 131072:
-                        raise AmtronConnectionError("service response too large")
+                        raise ServiceConnectionError("service_invalid_response", "service response too large")
                 import json
 
-                data = json.loads(raw)
+                try:
+                    data = json.loads(raw)
+                except ValueError as err:
+                    raise ServiceConnectionError("service_invalid_response", "service response is not JSON") from err
                 if not isinstance(data, dict):
-                    raise ValueError("invalid response")
+                    raise ServiceConnectionError("service_invalid_response", "service response is not an object")
                 if response.status == 409:
                     key = data.get("error")
                     placeholders = data.get("placeholders")
@@ -125,6 +129,8 @@ class RemoteClient(MennekesModbusClient):
                 self._connected = False
                 if self.on_update is not None:
                     self.on_update()
+            if isinstance(err, ServiceConnectionError):
+                raise
             raise AmtronConnectionError(
                 "cannot communicate with the Modbus service"
             ) from err
@@ -135,9 +141,11 @@ class RemoteClient(MennekesModbusClient):
             return self.apply_snapshot(payload)
 
     def apply_snapshot(self, payload: dict[str, Any]) -> WallboxData:
+        section = "api_version"
         try:
-            if payload.get("api_version") != 1:
+            if type(payload.get("api_version")) is not int or payload["api_version"] != 1:
                 raise ValueError("unsupported API version")
+            section = "values"
             values = payload["values"]
             control = payload["control"]
             if not isinstance(values, dict) or not all(
@@ -151,10 +159,12 @@ class RemoteClient(MennekesModbusClient):
                 for k, v in values.items()
             ):
                 raise ValueError("invalid values")
+            section = "control"
             if not isinstance(control, dict) or not isinstance(
                 control.get("read_only"), bool
             ):
                 raise ValueError("invalid controls")
+            section = "identity"
             identity = DeviceIdentity(**payload["identity"])
             if (
                 type(identity.layout_version) is not int
@@ -168,16 +178,19 @@ class RemoteClient(MennekesModbusClient):
             ):
                 if text is not None and (not isinstance(text, str) or len(text) > 128):
                     raise ValueError("invalid identity text")
+            section = "identity.max_evse_current"
             if identity.max_evse_current is not None and (
                 type(identity.max_evse_current) not in (float, int)
                 or not 6 <= identity.max_evse_current <= 32
             ):
                 raise ValueError("invalid device current")
+            section = "identity.phase_options_hw"
             if identity.phase_options_hw is not None and (
                 type(identity.phase_options_hw) is not int
-                or identity.phase_options_hw not in (0, 1, 2)
+                or not 0 <= identity.phase_options_hw <= 65535
             ):
                 raise ValueError("invalid device phases")
+            section = "control.limits"
             for key in ("max_charging_current", "current_cap"):
                 value = control.get(key)
                 if (
@@ -186,6 +199,7 @@ class RemoteClient(MennekesModbusClient):
                     or not 6 <= value <= 32
                 ):
                     raise ValueError("invalid service limits")
+            section = "heartbeat"
             heartbeat = payload["heartbeat"]
             if (
                 not isinstance(heartbeat, dict)
@@ -196,16 +210,19 @@ class RemoteClient(MennekesModbusClient):
                 )
             ):
                 raise ValueError("invalid heartbeat state")
+            section = "diagnostics"
             diagnostics = payload["diagnostics"]
             if not isinstance(diagnostics, dict) or not all(
                 type(value) is int and value >= 0 for value in diagnostics.values()
             ):
                 raise ValueError("invalid diagnostics")
+            section = "write_errors"
             errors = payload["write_errors"]
             if not isinstance(errors, list) or not all(
                 isinstance(value, str) for value in errors
             ):
                 raise ValueError("invalid write errors")
+            section = "control.intent"
             for key in ("pause_requested", "charging_release_requested"):
                 value = control.get(key)
                 if value is not None and not isinstance(value, bool):
@@ -216,11 +233,13 @@ class RemoteClient(MennekesModbusClient):
                 or not (current == 0 or 6 <= current <= 32)
             ):
                 raise ValueError("invalid setpoint")
+            section = "failed_blocks"
             failed = payload["failed_blocks"]
             if not isinstance(failed, list) or not all(
                 isinstance(item, str) for item in failed
             ):
                 raise ValueError("invalid failed blocks")
+            section = "current_write_generation"
             generation = payload["current_write_generation"]
             if type(generation) is not int or generation < 0:
                 raise ValueError("invalid generation")
@@ -228,7 +247,9 @@ class RemoteClient(MennekesModbusClient):
             self._connected = False
             if self.on_update is not None:
                 self.on_update()
-            raise AmtronConnectionError("invalid service snapshot") from err
+            raise ServiceConnectionError(
+                "service_invalid_response", f"invalid service snapshot ({section})"
+            ) from err
         self.identity = identity
         self.snapshot = payload
         self._connected = True
@@ -242,7 +263,7 @@ class RemoteClient(MennekesModbusClient):
         if self.on_update is not None:
             self.on_update()
         if payload.get("available") is not True:
-            raise AmtronConnectionError("wallbox is unavailable at the service")
+            raise ServiceConnectionError("service_not_ready", "wallbox is unavailable at the service")
         return WallboxData(
             values=values,
             failed_blocks=tuple(failed),
