@@ -145,6 +145,18 @@ def smoke(image: str) -> None:
                 != 0
             ):
                 raise ValueError("container did not shut down cleanly")
+            lifecycle_log = run("docker", "logs", container).decode(errors="replace")
+            if token in lifecycle_log or any(
+                message not in lifecycle_log
+                for message in (
+                    "Starting Mennekes Amtron Modbus service",
+                    "Service API ready",
+                    "Opening serial connection",
+                    "SIGTERM received",
+                    "Modbus service shutdown complete",
+                )
+            ):
+                raise ValueError("container lifecycle logs are missing or expose credentials")
         finally:
             run("docker", "rm", "--force", container)
 

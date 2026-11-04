@@ -153,6 +153,20 @@ check the wallbox's fallback behavior.
 
 ## State, diagnostics and failures
 
+The app log reports process start, accepted bus settings, API readiness, serial
+connection, heartbeat start/stop and clean shutdown. Heartbeat acknowledgement
+and connection failures are logged on state changes, not on every beat or poll.
+Read-only mode explicitly reports that its heartbeat is disabled. Tokens and
+wallbox/adapter serial numbers are not included in these lifecycle messages.
+
+If the app stops immediately, look for **Invalid or unreadable service
+configuration**: the message identifies the startup phase and invalid option.
+A missing or disconnected serial device is retried while the API stays running.
+An unexpected worker exit is reported and closes the serial connection; a fatal
+process failure reports its error class and errno. Supervisor's Watchdog can
+restart the app after a process failure, but repeated failures need their logged
+cause corrected.
+
 Only pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. The file is atomically replaced
 with owner-only permissions when those settings change. It contains no growing

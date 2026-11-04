@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Log service/API/serial/heartbeat lifecycle and health transitions, name invalid
+  configuration fields, and close serial ownership on unexpected worker exits.
 - Accept the baudrate strings produced by Supervisor selection fields; valid
   saved app options no longer terminate the service with a configuration error.
 - Discover the Supervisor app automatically with its address and token, reuse

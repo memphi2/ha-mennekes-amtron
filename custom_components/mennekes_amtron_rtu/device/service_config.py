@@ -67,7 +67,7 @@ class ServerConfig:
             str(rate) for rate in SUPPORTED_BAUDRATES
         }:
             baudrate_value = int(baudrate_value)
-        baudrate = integer(baudrate_value, 9600, 57600)
+        baudrate = _integer_option(baudrate_value, "baudrate", 9600, 57600)
         if baudrate not in SUPPORTED_BAUDRATES:
             raise ValueError("unsupported baudrate")
         frame = values.get("frame", "8n2")
@@ -87,15 +87,17 @@ class ServerConfig:
                 bits,
                 parity,
                 stops,
-                integer(values.get("device_id", 50), 10, 50),
+                _integer_option(values.get("device_id", 50), "device_id", 10, 50),
             ),
             token,
             read_only,
-            number(values.get("current_cap", 6), 6, 32),
-            number(values.get("scan_interval", 5), 2, 300),
-            number(values.get("measurement_interval", 30), 2, 300),
+            _number_option(values.get("current_cap", 6), "current_cap", 6, 32),
+            _number_option(values.get("scan_interval", 5), "scan_interval", 2, 300),
+            _number_option(
+                values.get("measurement_interval", 30), "measurement_interval", 2, 300
+            ),
             listen,
-            integer(values.get("port", 8765), 1, 65535),
+            _integer_option(values.get("port", 8765), "port", 1, 65535),
         )
 
 
@@ -113,3 +115,17 @@ def integer(value: Any, minimum: int, maximum: int) -> int:
     if type(value) is not int or not minimum <= value <= maximum:
         raise ValueError("integer value is outside the allowed range")
     return value
+
+
+def _integer_option(value: Any, name: str, minimum: int, maximum: int) -> int:
+    try:
+        return integer(value, minimum, maximum)
+    except ValueError as error:
+        raise ValueError(f"{name}: {error}") from None
+
+
+def _number_option(value: Any, name: str, minimum: float, maximum: float) -> float:
+    try:
+        return number(value, minimum, maximum)
+    except ValueError as error:
+        raise ValueError(f"{name}: {error}") from None

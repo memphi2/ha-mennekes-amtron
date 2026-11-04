@@ -37,6 +37,12 @@ or its heartbeat. To relinquish Modbus control, stop the app.
 
 ## Options and state
 
+The log shows service/API start, the serial connection, heartbeat start/stop
+and shutdown. Read-only mode reports that heartbeat delivery is disabled.
+Connection and heartbeat health are logged only when they change. An immediate
+configuration failure names the invalid option; check that message before
+restarting again. A missing serial device is retried without exiting the app.
+
 The default current cap is 6 A. Explicitly selecting 0 A in the integration
 removes the EMS limit; use the pause control to pause. A first-time migration
 of an already paused device uses 6 A as its resume target if no saved target

@@ -148,7 +148,7 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
             if process.returncode is None:
                 process.terminate()
             try:
-                await asyncio.wait_for(process.communicate(), 20)
+                stdout, stderr = await asyncio.wait_for(process.communicate(), 20)
             finally:
                 if process.returncode is None:
                     process.kill()
@@ -158,5 +158,21 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
                 with suppress(asyncio.CancelledError):
                     await serving
         assert process.returncode == 0
+        log = (stdout + stderr).decode()
+        for message in (
+            "Starting Mennekes Amtron Modbus service",
+            "Configuration accepted",
+            "Service API ready",
+            "Serial connection established",
+            "Heartbeat started",
+            "Heartbeat acknowledged",
+            "SIGTERM received",
+            "Heartbeat stopped",
+            "Serial connection closed",
+            "Modbus service shutdown complete",
+        ):
+            assert message in log
+        assert log.count("Heartbeat acknowledged") == 1
+        assert TOKEN not in log
 
     asyncio.run(asyncio.wait_for(run(), 90))
