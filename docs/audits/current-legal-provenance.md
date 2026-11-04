@@ -5,8 +5,8 @@ independent [Modbus service](../modbus-service.md), including an authenticated
 HTTP listener, stored credentials and an `aiohttp` dependency. Its current
 boundaries are documented in [SECURITY](../../SECURITY.md),
 [PRIVACY](../../PRIVACY.md) and [legal](../legal.md). The older no-listener
-statement below applies to direct serial mode. No service image has been
-published or verified on the physical wallbox as part of this development work.
+statement below applies to direct serial mode. Service image publication now has its own native-container and provenance
+gates. Physical wallbox and Supervisor acceptance remain separate checks.
 
 Audit date: 2026-11-02
 

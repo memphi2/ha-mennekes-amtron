@@ -1,5 +1,5 @@
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", "scripts"]
 testpaths = ["tests"]
 addopts = "-q"
 
@@ -82,7 +82,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mennekes-amtron-modbus-service"
-version = "0.1.0.dev0"
+version = "0.5.0b1"
 description = "Independent Modbus RTU owner for Mennekes Amtron wallboxes"
 requires-python = ">=3.14"
 license = "Apache-2.0"

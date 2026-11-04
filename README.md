@@ -51,12 +51,17 @@ For HACS on HA 2026.9/2026.10, updates or an existing installation, see
 Controls are available in **Modbus master** mode. **0 A removes the current
 limit**; use **Charging paused** to stop charging.
 
-## Independent Modbus service (development)
+## Keep the heartbeat running during HA restarts
 
-The optional [Modbus service](docs/modbus-service.md) keeps the heartbeat and
-selected charging state running through Home Assistant Core restarts. It runs
-as a separate app or container; HA connects to it without owning the serial
-port. This is not included in the published 0.4.1 release yet.
+The optional [Modbus service](docs/modbus-service.md) runs independently of HA
+and keeps the last charging state, including a deliberate pause. **0.5.0b1 is a
+test release**; install the matching integration beta before switching over.
+
+[![Add the Mennekes Amtron beta app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps-beta)
+
+On HA OS, install the service from the app repository above. For HA Container,
+use the published Docker image. Follow the [handover guide](docs/modbus-service.md)
+to retain your existing device and entity IDs.
 
 ## Documentation and help
 

@@ -30,6 +30,7 @@ local Modbus RTU.
 | [Architecture](architecture.md) | How the code is laid out and the four decisions behind it |
 | [Quality scale](quality-scale.md) | The Home Assistant quality-scale status, rule by rule |
 | [Maintenance validation](validation.md) | Resource measurements, release integrity, compatibility, privacy and serial fault checks |
+| [Service publication](service-releasing.md) | Container publication, beta/stable app channels and release recovery |
 | [Repository settings](repository-settings.md) | Branch protection and the security options, declared as code |
 | [Legal notes](legal.md) | Licence, trademarks, and why no vendor document is in this repository |
 | [Provenance audit](audits/current-legal-provenance.md) | Source and licensing evidence |
@@ -37,8 +38,8 @@ local Modbus RTU.
 
 ## Before you start
 
-**Read-only first.** A new config entry never writes and never sends the
-heartbeat. Look at the sensors, confirm they match the wallbox display, and
+**Read-only first.** A new direct-serial entry never writes or sends the
+heartbeat. The independent service has its own read-only setting. Look at the sensors, confirm they match the wallbox display, and
 only then switch the control mode to *Modbus master*. See
 [quickstart.md](quickstart.md).
 

@@ -19,6 +19,7 @@ from release_check import (
     verify_assets,
     verify_release,
 )
+from release_version import VERSION_PATTERN, is_prerelease
 
 
 def find_release(repository: str, tag: str) -> dict[str, Any] | None:
@@ -44,7 +45,8 @@ def publish(repository: str, tag: str, directory: Path) -> None:
     assets = [{"name": name, "size": (directory / name).stat().st_size,
                "digest": f"sha256:{hashlib.sha256((directory / name).read_bytes()).hexdigest()}"}
               for name in sorted(ASSETS)]
-    candidate = {"tag_name": tag, "draft": True, "prerelease": False,
+    prerelease = is_prerelease(tag)
+    candidate = {"tag_name": tag, "draft": True, "prerelease": prerelease,
                  "body": notes, "assets": assets}
     verify_release(candidate, tag, notes, draft=True)
     verify_assets(directory, candidate, repository, commit, version, files)
@@ -55,6 +57,7 @@ def publish(repository: str, tag: str, directory: Path) -> None:
             notes_path.write_text(notes)
             run("gh", "release", "create", tag, "--repo", repository, "--draft",
                 "--verify-tag", "--title", tag, "--notes-file", str(notes_path),
+                *(("--prerelease", "--latest=false") if prerelease else ()),
                 *(str(directory / name) for name in sorted(ASSETS)))
         release = find_release(repository, tag)
     if release is None:
@@ -72,7 +75,8 @@ def publish(repository: str, tag: str, directory: Path) -> None:
         # Recheck the tag after network operations, immediately before publishing.
         if remote_commit(repository, tag) != commit:
             raise ValueError("tag changed while verifying the draft")
-        run("gh", "release", "edit", tag, "--repo", repository, "--draft=false")
+        run("gh", "release", "edit", tag, "--repo", repository, "--draft=false",
+            *(("--latest=false",) if prerelease else ()))
 
 
 def main() -> int:
@@ -81,8 +85,8 @@ def main() -> int:
     parser.add_argument("--tag", required=True)
     parser.add_argument("--directory", type=Path, default=Path(".release"))
     args = parser.parse_args()
-    if not re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) or not re.fullmatch(r"v\d+\.\d+\.\d+", args.tag):
-        parser.error("expected owner/repository and stable vX.Y.Z tag")
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) or not re.fullmatch(f"v{VERSION_PATTERN}", args.tag):
+        parser.error("expected owner/repository and vX.Y.Z, vX.Y.ZbN or vX.Y.ZrcN tag")
     try:
         publish(args.repo, args.tag, args.directory)
     except (OSError, ValueError, KeyError, TypeError):

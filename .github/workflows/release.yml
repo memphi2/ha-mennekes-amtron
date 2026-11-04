@@ -109,6 +109,8 @@ jobs:
 
   main-validation:
     name: main validation gate
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -120,6 +122,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref_name }}
       - name: Require the tag to be the validated main commit
+        id: source
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
@@ -134,6 +137,8 @@ jobs:
             echo "::error::Release tag $RELEASE_TAG points to $tag_sha, but origin/main is $main_sha"
             exit 1
           fi
+
+          echo "commit=$tag_sha" >> "$GITHUB_OUTPUT"
 
           for attempt in $(seq 1 90); do
             conclusion="$(gh api \
@@ -160,6 +165,107 @@ jobs:
           echo "::error::Timed out waiting for Validate on main for $tag_sha"
           exit 1
 
+  service-images:
+    name: service image (${{ matrix.architecture }})
+    needs: [validate, hacs, hassfest, main-validation]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: aarch64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.main-validation.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - run: python -m pip install -r requirements-dev.txt
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build, smoke-test and push the native image candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: python scripts/service_image.py build --tag "$RELEASE_TAG" --architecture "$ARCHITECTURE" --path ".release/image-$ARCHITECTURE.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: service-image-${{ matrix.architecture }}
+          path: .release/image-${{ matrix.architecture }}.json
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: true
+
+  service-manifest:
+    name: publish service image
+    needs: [service-images, main-validation]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
+      channel: ${{ steps.image.outputs.channel }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.main-validation.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - run: python -m pip install -r requirements-dev.txt
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: service-image-*
+          merge-multiple: true
+          path: .release/images
+      - name: Publish or verify the immutable multi-architecture version
+        id: image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: python scripts/service_image.py publish --tag "$RELEASE_TAG" --path .release/images
+      - name: Attest the published container
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.image.outputs.image }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+      - name: Verify provenance and anonymous access before advertising an update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          RELEASE_IMAGE: ${{ steps.image.outputs.image }}
+          RELEASE_DIGEST: ${{ steps.image.outputs.digest }}
+          RELEASE_COMMIT: ${{ needs.main-validation.outputs.commit }}
+        run: |
+          gh attestation verify "oci://$RELEASE_IMAGE@$RELEASE_DIGEST" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --source-ref "refs/tags/$RELEASE_TAG" --source-digest "$RELEASE_COMMIT"
+          python scripts/service_image.py public --tag "$RELEASE_TAG" --digest "$RELEASE_DIGEST"
+
   publish:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -168,6 +274,7 @@ jobs:
       - hacs
       - hassfest
       - main-validation
+      - service-manifest
     permissions:
       contents: write
       attestations: write
@@ -176,7 +283,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          ref: ${{ needs.main-validation.outputs.commit }}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
@@ -220,6 +327,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ha-mennekes-amtron-release
+          include-hidden-files: true
           path: |
             ${{ env.RELEASE_ZIP }}
             ${{ env.RELEASE_SHA256SUMS }}
@@ -274,3 +382,30 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_COMMIT: ${{ steps.release-tag.outputs.commit }}
         run: python scripts/release_check.py --ref "$RELEASE_COMMIT" --published --repo "$GITHUB_REPOSITORY"
+
+  service-catalog:
+    name: publish app catalog
+    needs: [publish, service-manifest, main-validation]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: service-catalog-${{ needs.service-manifest.outputs.channel }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.main-validation.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - run: python -m pip install -r requirements-dev.txt
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Advance only the matching app channel after release verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          RELEASE_DIGEST: ${{ needs.service-manifest.outputs.digest }}
+        run: python scripts/publish_service_catalog.py --tag "$RELEASE_TAG" --digest "$RELEASE_DIGEST"

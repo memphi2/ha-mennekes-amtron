@@ -21,13 +21,23 @@ def export(destination: Path) -> None:
         "NOTICE",
     ):
         shutil.copy2(ROOT / filename, destination / filename)
-    shutil.copy2(ROOT / "modbus_service/config.yaml", destination / "config.yaml")
+    # Local exports build this checkout, even after published images exist.
+    config = (ROOT / "modbus_service/config.yaml").read_text()
+    (destination / "config.yaml").write_text(
+        "".join(
+            line
+            for line in config.splitlines(keepends=True)
+            if not line.startswith("image:")
+        )
+    )
     (destination / "README.md").write_text(
         (ROOT / "modbus_service/README.md")
         .read_text()
         .replace("../docs/modbus-service.md", "DOCS.md")
     )
-    shutil.copy2(ROOT / "docs/modbus-service.md", destination / "DOCS.md")
+    shutil.copy2(ROOT / "modbus_service/DOCS.md", destination / "DOCS.md")
+    shutil.copy2(ROOT / "modbus_service/CHANGELOG.md", destination / "CHANGELOG.md")
+    shutil.copytree(ROOT / "modbus_service/translations", destination / "translations")
     target = destination / "custom_components/mennekes_amtron_rtu/device"
     target.mkdir(parents=True)
     for source in (ROOT / "custom_components/mennekes_amtron_rtu/device").glob("*.py"):

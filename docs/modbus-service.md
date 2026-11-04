@@ -14,56 +14,55 @@ A host restart, service restart, power loss or USB fault can still interrupt the
 heartbeat. The wallbox's configured fallback applies in that case. See
 [Safety](safety.md#the-heartbeat-and-what-happens-without-it).
 
-## Development status
+## Install the beta on Home Assistant OS
 
-The service and integration changes are local development work, not part of the
-published 0.4.1 release. There is no published app image yet. The instructions
-below build the current checkout. Installation and wallbox activation are
-separate steps; building and testing do not change your running HA instance.
+Use the **0.5.0b1** integration release, with beta versions enabled in HACS.
+The service is an additional HA app; HACS installs only the integration.
 
-## Local Home Assistant OS app
+[![Add the Mennekes Amtron beta app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps-beta)
 
-Export a self-contained app build directory from the repository:
+Alternatively, under **Settings → Apps → Install app → Repositories**, add:
 
-```bash
-python scripts/build_service_app.py --output /tmp/mennekes-amtron-app
+```text
+https://github.com/memphi2/ha-mennekes-amtron#apps-beta
 ```
 
-Copy that directory into your HA local apps/add-ons directory, refresh the app
-store, and install **Mennekes Amtron Modbus Service**. The export includes the
-Dockerfile and shared driver; it does not download a separate unpublished image.
-The app starts in the `services` boot stage, independently of Core. Enable
-**Start on boot** and the watchdog. The watchdog checks process liveness; a
-wallbox connection fault is retried without repeatedly restarting the app.
+Install **Mennekes Amtron Modbus Service**. Supervisor downloads a prebuilt image
+for amd64 or aarch64. Enable **Start on boot** and **Watchdog**. The app starts
+independently of Core. Its watchdog checks process liveness; a wallbox connection
+fault is retried without repeatedly restarting the app.
 
 Configure:
 
-- **serial_port:** the stable adapter path, preferably `/dev/serial/by-id/...`.
-- **device_id**, **baudrate**, **frame:** the wallbox's existing settings.
-- **token:** a randomly generated secret of at least 32 characters, for example
-  generated with `python -c 'import secrets; print(secrets.token_urlsafe(32))'`.
-- **read_only:** initially `true`; set to `false` when ready for the service to
-  maintain the heartbeat and accept charging commands.
-- **current_cap:** the installation's permitted EMS current cap. The default is
-  6 A. As with direct mode, an explicitly selected 0 A disables the EMS limit.
+- **Serial adapter:** the stable adapter path, preferably `/dev/serial/by-id/...`.
+- **Wallbox address**, **baud rate**, **serial frame:** the existing wallbox settings.
+- **Access token:** a randomly generated secret of at least 32 characters.
+  Use the same token in the integration and keep it private.
+- **Read-only:** initially enabled; disable it when the service should maintain
+  the heartbeat and accept charging commands.
+- **Current cap:** the installation's permitted EMS current cap. The default is
+  6 A. Explicitly selecting 0 A disables the EMS limit.
 
 The API uses port 8765 on the app's internal network. Host port publication is
 disabled by default. Use the app hostname shown by Supervisor as the integration's
-service URL, for example `http://APP_HOSTNAME:8765`. Keep the token private.
+service URL, for example `http://APP_HOSTNAME:8765`.
 
 The integration's service options control only HA's access and refresh interval.
-Selecting read-only there disables HA commands while the service keeps its
-heartbeat and charging state. Set the actual Modbus polling/measurement cadence
-and the service's write permission in the service configuration. HA's optional
-current cap can further restrict commands; it cannot raise the service's cap.
+Read-only there disables HA commands while the service keeps its heartbeat and
+charging state. Set Modbus polling/measurement cadence and the service's write
+permission in the app configuration. HA's current cap can further restrict
+commands; it cannot raise the service's cap.
+
+The beta and stable catalogs use `#apps-beta` and `#apps`, respectively. They
+are different apps to Supervisor. When switching channels, copy the options,
+stop the old app before starting the new one, and reconfigure HA's service URL.
+Keep a backup and the old app until the handover is verified.
 
 ## Standalone container or Python service
 
-Build the image from the repository root:
-
-```bash
-docker build -t amtron-modbus-service:local .
-```
+Use the published image `ghcr.io/memphi2/ha-mennekes-amtron-service:0.5.0b1`.
+The same image supports Linux amd64 and arm64. Pin the version; avoid tracking
+a moving development tag.
 
 Create a private data directory containing `options.json`. Its structure is:
 
@@ -146,3 +145,17 @@ authentication and version checking. It offers no arbitrary register-write or
 remote-shutdown endpoint. `/health` reveals process liveness only. If the service
 or wallbox becomes unreachable, HA marks its readings unavailable; reconnecting
 does not replay HA restore values.
+
+## Build a local development checkout
+
+To test source changes without using the published image:
+
+```bash
+python scripts/build_service_app.py --output /tmp/mennekes-amtron-app
+```
+
+Copy this directory to HA's local app directory and install the local app.
+The export deliberately removes the published image reference so Supervisor
+builds the checkout. Alternatively run `docker build -t amtron-modbus-service:local .`
+from the repository root. A local app and an app from the published catalog are
+different installations; stop the current serial owner before switching.

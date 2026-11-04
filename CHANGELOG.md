@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.5.0b1 — 2026-11-04
+
 ### Added
 
 - Independent Modbus service with a shared HA-free driver, authenticated local
@@ -14,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   build. It keeps the heartbeat and last charging state through HA Core restarts,
   including indefinite HA outages; reconnecting HA sends no charging commands.
 - Service setup and reconfiguration preserve existing device/entity identities.
-  Direct serial mode remains available. The service is local development work;
-  no container image or new integration release has been published yet.
+  Direct serial mode remains available. The service is distributed as a beta app and multi-architecture container,
+  with a separate stable catalog and no automatic migration of existing entries.
 
 ### Fixed
 

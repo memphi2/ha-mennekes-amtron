@@ -125,6 +125,7 @@ def main() -> int:
     failures.extend(check_tracked_runtime_artifacts())
     failures.extend(check_json_files())
     failures.extend(check_release_metadata())
+    failures.extend(check_service_distribution())
     failures.extend(check_hacs_metadata())
     failures.extend(check_requirement_pins())
     failures.extend(check_direct_dependency_locks())
@@ -198,6 +199,17 @@ def check_release_metadata() -> list[str]:
     if f"## {expected}" not in changelog:
         failures.append(f"CHANGELOG.md has no section for release {expected}")
     return failures
+
+
+def check_service_distribution() -> list[str]:
+    """Keep all published components on one reviewed version and image name."""
+    from service_image import release_info
+
+    try:
+        release_info("memphi2/ha-mennekes-amtron", f"v{VERSION_CONFIG['integration_version']}")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return [f"service distribution metadata: {error}"]
+    return []
 
 
 def check_hacs_metadata() -> list[str]:
