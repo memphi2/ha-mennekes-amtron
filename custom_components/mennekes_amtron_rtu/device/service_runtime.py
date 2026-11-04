@@ -57,6 +57,8 @@ class ModbusService:
         self._logged_unavailable = False
         self._command_lock = asyncio.Lock()
         self._task: asyncio.Task[None] | None = None
+        self._heartbeat_task: asyncio.Task[None] | None = None
+        self._heartbeat_started = asyncio.Event()
         self._success = False
         self._attempts = 0
         self._retry_at = 0.0
@@ -122,12 +124,48 @@ class ModbusService:
         self.control = control
         _LOGGER.info("Serial connection established; wallbox initialized")
         if not self.config.read_only:
-            self.heartbeat.start()
+            self._heartbeat_task = self.heartbeat.start()
+            self._heartbeat_started.set()
             _LOGGER.info("Heartbeat started")
         else:
             _LOGGER.info("Heartbeat disabled in read-only mode")
 
     async def _run(self) -> None:
+        """Fail the service if its independent heartbeat writer exits."""
+        if self.config.read_only:
+            await self._polling_loop()
+            return
+        polling = asyncio.create_task(self._polling_loop(), name="amtron_polling")
+        ready = asyncio.create_task(self._heartbeat_started.wait())
+        try:
+            done, _pending = await asyncio.wait(
+                (polling, ready), return_when=asyncio.FIRST_COMPLETED
+            )
+            if polling in done:
+                await polling
+                return
+            heartbeat = self._heartbeat_task
+            if heartbeat is None:
+                raise RuntimeError("Heartbeat task was not started")
+            done, _pending = await asyncio.wait(
+                (polling, heartbeat), return_when=asyncio.FIRST_COMPLETED
+            )
+            if heartbeat in done:
+                self._success = False
+                reason = "cancelled" if heartbeat.cancelled() else "normal return"
+                if not heartbeat.cancelled() and (error := heartbeat.exception()) is not None:
+                    reason = type(error).__name__
+                _LOGGER.error("Heartbeat task stopped unexpectedly (%s)", reason)
+                raise RuntimeError("Heartbeat task stopped unexpectedly")
+            await polling
+        finally:
+            # The owner stops the heartbeat separately, after the polling task
+            # has finished any shielded state save. Never orphan a poller.
+            for task in (polling, ready):
+                task.cancel()
+            await asyncio.gather(polling, ready, return_exceptions=True)
+
+    async def _polling_loop(self) -> None:
         while True:
             try:
                 if self.control is None:

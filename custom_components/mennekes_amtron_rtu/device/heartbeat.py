@@ -160,15 +160,15 @@ class HeartbeatTask:
             self._cancel_deadline()
             self._set_healthy(False)
 
-    def start(self) -> None:
-        """Start the heartbeat as an asyncio task."""
+    def start(self) -> asyncio.Task[None]:
+        """Start or return the writer so its lifetime can be supervised."""
 
-        if self.running:
-            return
-        self._stopping = False
-        self._task = asyncio.get_running_loop().create_task(
-            self.async_run(), name="mennekes_amtron_rtu_heartbeat"
-        )
+        if self._task is None or self._task.done():
+            self._stopping = False
+            self._task = asyncio.get_running_loop().create_task(
+                self.async_run(), name="mennekes_amtron_rtu_heartbeat"
+            )
+        return self._task
 
     def attach(self, task: asyncio.Task[None]) -> None:
         """Adopt a task created by Home Assistant's entry task helper."""

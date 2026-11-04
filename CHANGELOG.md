@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Supervise the service heartbeat task: an unexpected exit now stops the service
+  and releases the serial port, allowing Supervisor's watchdog to restart it.
+  Ordinary missed replies still use the existing heartbeat retry cadence.
+
 - Include the independent service's connection, heartbeat and recovery timeline
   in HA diagnostics instead of the separate HA client's local event history.
 

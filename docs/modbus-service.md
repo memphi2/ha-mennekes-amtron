@@ -176,6 +176,11 @@ process failure reports its error class and errno. Supervisor's Watchdog can
 restart the app after a process failure, but repeated failures need their logged
 cause corrected.
 
+The heartbeat writer is supervised separately from polling. If it unexpectedly
+exits, the service closes down so Watchdog can restart it; a working API can no
+longer conceal a permanently stopped heartbeat. A normal missing response is
+retried by the heartbeat task and does not trigger this process restart.
+
 Only pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. The file is atomically replaced
 with owner-only permissions when those settings change. It contains no growing
