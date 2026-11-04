@@ -21,9 +21,11 @@ merging. Tag only the validated main commit with `v<VERSION>`.
 1. Revalidate the source and require successful canonical main CI.
 2. Build native images, exercise their API/authentication and clean shutdown,
    then push unique candidate tags. There is no wallbox connected in these tests.
-3. Verify both candidates' platforms and source labels. Create the versioned
-   multi-architecture image once. Reruns verify the existing version and never
-   replace it with a new build.
+3. Take each candidate digest from the build runner's local push result. Match
+   both platform digests to those trusted build results before attesting the
+   multi-architecture index. OCI labels alone are not proof of origin. Resolve
+   the version tag once and verify the exact immutable digest to be attested.
+   Reruns require the same native build digests and never replace an existing tag.
 4. Attest the image, verify its provenance and check that it is anonymously
    pullable. Only image publishers have `packages: write` permission.
 5. Publish and independently download/verify the HACS release. Betas are marked
@@ -54,6 +56,9 @@ catalog version request is a stop condition, not permission to overwrite it.
 A genuine correction after publication needs a new version. A network failure,
 private first package or interrupted catalog update can be retried on the same
 approved source. Never delete/recreate tags to make a check pass.
+Use **Re-run failed jobs** to retain the successful native build artifacts.
+Rebuilding all jobs can produce different image digests; those must not replace
+an existing version, even when their source labels match.
 
 Stable 0.5.0 follows beta installation and hardware acceptance: deliberate pause,
 charging-release blocks, HA-Core restart, service restart, USB recovery and

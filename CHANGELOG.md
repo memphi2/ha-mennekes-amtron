@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Bind container attestations to the validated native build digests, including
+  existing version tags and tag-replacement races; matching OCI labels alone
+  cannot authorize publication.
 - Sync the saved control-intent file and its containing directory before
   acknowledging a successful service command; failed syncs remain retryable.
 - Wait for the wallbox to confirm manual heartbeat recovery for up to ten seconds,

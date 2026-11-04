@@ -170,19 +170,25 @@ def build(info: dict[str, str], architecture: str, output: Path) -> None:
     if remote_commit(info["repository"], f"v{info['version']}") != info["commit"]:
         raise ValueError("release tag changed before pushing image candidates")
     subprocess.run(["docker", "push", candidate], check=True)
-    digest = (
+    # Read the push result from the local daemon. A registry writer may replace
+    # the staging tag, so resolving that mutable remote tag is not build evidence.
+    pushed = json.loads(
         run(
-            "docker",
-            "buildx",
-            "imagetools",
-            "inspect",
-            candidate,
-            "--format",
-            "{{.Manifest.Digest}}",
+            "docker", "image", "inspect", candidate, "--format", "{{json .RepoDigests}}"
         )
-        .decode()
-        .strip()
     )
+    if not isinstance(pushed, list) or not all(
+        isinstance(item, str) for item in pushed
+    ):
+        raise ValueError("invalid local image push result")
+    digests = [
+        item.removeprefix(f"{info['image']}@")
+        for item in pushed
+        if item.startswith(f"{info['image']}@")
+    ]
+    if len(digests) != 1:
+        raise ValueError("local image push result is missing or ambiguous")
+    digest = digests[0]
     if not DIGEST.fullmatch(digest):
         raise ValueError("invalid candidate image digest")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -232,12 +238,15 @@ def inspect_index(reference: str, *, missing_ok: bool = False) -> dict[str, Any]
     return data
 
 
-def verify_index(index: dict[str, Any], info: dict[str, str]) -> None:
-    """Verify both native images, source labels and release version before reuse."""
+def verify_index(
+    index: dict[str, Any], info: dict[str, str], candidates: dict[str, str]
+) -> None:
+    """Match native build digests before trusting an index or its source labels."""
     manifests = index.get("manifests", [])
     if len(manifests) != 2:
         raise ValueError("expected two platform manifests")
     architectures = set()
+    expected = {OCI_ARCH[arch]: digest for arch, digest in candidates.items()}
     for descriptor in manifests:
         arch = descriptor["platform"]["architecture"]
         digest = descriptor.get("digest", "")
@@ -246,8 +255,9 @@ def verify_index(index: dict[str, Any], info: dict[str, str]) -> None:
             or arch in architectures
             or descriptor["platform"].get("os") != "linux"
             or not DIGEST.fullmatch(digest)
+            or digest != expected.get(arch)
         ):
-            raise ValueError("invalid image platform descriptor")
+            raise ValueError("image platform or digest differs from validated builds")
         architectures.add(arch)
         reference = f"{info['image']}@{digest}"
         run("docker", "pull", "--platform", f"linux/{arch}", reference)
@@ -280,7 +290,7 @@ def publish(info: dict[str, str], directory: Path) -> str:
             }
             for arch, digest in sorted(candidates.items())
         ]
-        verify_index({"manifests": descriptors}, info)
+        verify_index({"manifests": descriptors}, info, candidates)
         run(
             "docker",
             "buildx",
@@ -290,10 +300,6 @@ def publish(info: dict[str, str], directory: Path) -> str:
             reference,
             *(f"{info['image']}@{digest}" for digest in candidates.values()),
         )
-        index = inspect_index(reference)
-    if index is None:
-        raise ValueError("published manifest was not confirmed")
-    verify_index(index, info)
     digest = (
         run(
             "docker",
@@ -309,6 +315,12 @@ def publish(info: dict[str, str], directory: Path) -> str:
     )
     if not DIGEST.fullmatch(digest):
         raise ValueError("invalid published image digest")
+    # Resolve the mutable tag once, then verify exactly the immutable digest
+    # that the workflow will attest. Never attest merely matching OCI labels.
+    index = inspect_index(f"{info['image']}@{digest}")
+    if index is None:
+        raise ValueError("published manifest was not confirmed")
+    verify_index(index, info, candidates)
     return digest
 
 

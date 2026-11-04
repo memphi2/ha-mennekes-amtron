@@ -68,7 +68,9 @@ def test_publication_rerun_verifies_existing_version_without_replacing_it(
     monkeypatch.setattr(images, "inspect_index", lambda *_, **__: index)
     verified = []
     monkeypatch.setattr(
-        images, "verify_index", lambda value, info: verified.append((value, info))
+        images,
+        "verify_index",
+        lambda value, info, builds: verified.append((value, info, builds)),
     )
     commands = []
 
@@ -79,7 +81,7 @@ def test_publication_rerun_verifies_existing_version_without_replacing_it(
 
     monkeypatch.setattr(images, "run", run)
     assert images.publish(INFO, tmp_path) == DIGEST
-    assert verified == [(index, INFO)]
+    assert verified == [(index, INFO, {"amd64": DIGEST, "aarch64": OTHER_DIGEST})]
     assert len(commands) == 1
 
 
@@ -88,6 +90,73 @@ def test_changed_tag_cannot_publish_an_image(monkeypatch, tmp_path):
     monkeypatch.setattr(images, "remote_commit", lambda *_: "d" * 40)
     with pytest.raises(ValueError, match="tag changed"):
         images.publish(INFO, tmp_path)
+
+
+@pytest.mark.parametrize("replaced_after_lookup", [False, True])
+def test_existing_image_cannot_gain_provenance_from_copied_source_labels(
+    monkeypatch, tmp_path, replaced_after_lookup
+):
+    candidates(tmp_path)
+    monkeypatch.setattr(images, "remote_commit", lambda *_: INFO["commit"])
+    good = {
+        "manifests": [
+            {"digest": DIGEST, "platform": {"os": "linux", "architecture": "amd64"}},
+            {
+                "digest": OTHER_DIGEST,
+                "platform": {"os": "linux", "architecture": "arm64"},
+            },
+        ]
+    }
+    forged = deepcopy(good)
+    forged["manifests"][0]["digest"] = "sha256:" + "e" * 64
+    index_digest = "sha256:" + "f" * 64
+    lookups = []
+
+    def inspect(reference, **_kwargs):
+        lookups.append(reference)
+        if replaced_after_lookup and reference.endswith(":0.5.0b1"):
+            return good
+        return forged
+
+    def run(*args):
+        assert args[:4] == ("docker", "buildx", "imagetools", "inspect")
+        # A mutable tag can change after the initial index lookup. Returning
+        # this digest for attestation without inspecting it would bless a forgery.
+        return index_digest.encode()
+
+    monkeypatch.setattr(images, "inspect_index", inspect)
+    monkeypatch.setattr(images, "run", run)
+    with pytest.raises(ValueError, match="differs from validated builds"):
+        images.publish(INFO, tmp_path)
+    assert lookups[-1] == f"{INFO['image']}@{index_digest}"
+
+
+def test_build_evidence_uses_the_local_push_digest_not_the_remote_tag(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+    monkeypatch.setattr(images, "remote_commit", lambda *_: INFO["commit"])
+    monkeypatch.setattr(images, "smoke", lambda *_: None)
+    monkeypatch.setattr(
+        images.subprocess,
+        "run",
+        lambda *args, **_kw: subprocess.CompletedProcess(args, 0),
+    )
+    inspected = []
+
+    def run(*args):
+        assert "imagetools" not in args
+        if args[:3] == ("docker", "image", "inspect"):
+            inspected.append(args[3])
+            return json.dumps([f"{INFO['image']}@{DIGEST}"]).encode()
+        return b""
+
+    monkeypatch.setattr(images, "run", run)
+    output = tmp_path / "image-amd64.json"
+    images.build(INFO, "amd64", output)
+    assert json.loads(output.read_text())["digest"] == DIGEST
+    assert inspected == [f"{INFO['image']}:build-123-1-amd64"]
 
 
 @pytest.mark.parametrize(
@@ -144,7 +213,7 @@ def test_existing_image_must_match_source_and_both_platforms(monkeypatch, change
 
     monkeypatch.setattr(images, "run", run)
     with pytest.raises(ValueError, match=r"platform|source"):
-        images.verify_index(index, INFO)
+        images.verify_index(index, INFO, {"amd64": DIGEST, "aarch64": OTHER_DIGEST})
 
 
 def test_public_access_is_verified_without_build_credentials(monkeypatch):
