@@ -7,10 +7,10 @@ setup instead of producing an entry with no entities.
 
 from __future__ import annotations
 
-from .client import MennekesModbusClient, SerialConfig
-from .client_errors import AmtronBusError
 from .data import DeviceIdentity
-from .identity import async_read_identity
+from .device.client import MennekesModbusClient, SerialConfig
+from .device.client_errors import AmtronBusError
+from .device.identity import async_read_identity
 
 
 async def async_test_connection(config: SerialConfig) -> DeviceIdentity:

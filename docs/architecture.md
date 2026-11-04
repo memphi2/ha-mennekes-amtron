@@ -1,5 +1,40 @@
 # Architecture
 
+## Independent service
+
+The `device/` package has no Home Assistant imports. It contains the shared
+register map, serial transport, poll cadence, heartbeat and control rules.
+`control.py` at integration level adapts its errors into HA translations.
+The same source is packaged as `amtron_device` for the independent service;
+there is no copied driver implementation to keep in sync.
+
+```mermaid
+flowchart LR
+    HA[Home Assistant integration] <-->|Authenticated HTTP| Service[Modbus service]
+    Service <-->|Single serial owner| Wallbox[Mennekes Amtron]
+```
+
+`remote.py` maps service snapshots and named commands onto the existing HA
+entities. API reconnects are read-only; HA restore values cannot overwrite
+service intent. The service serializes commands independently of client lifetime
+and keeps heartbeat and polling active without HA. Its state file only changes
+with control intent. Named commands retain device guards; the API has no raw
+register-write endpoint. Current telemetry retains its existing cadence and
+rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
+
+Direct serial mode remains available for existing installations. A service
+entry never opens the serial adapter or starts a local heartbeat/recovery task.
+All entries preserve the domain and entity unique IDs. See
+[setup and migration](modbus-service.md) for the one-owner handover.
+
+`tests/test_service_process.py` runs the server in a separate process over a
+virtual serial Modbus bus while a real HA instance stops and starts. It checks
+continued heartbeat delivery, unchanged pause and absence of replayed commands.
+The other service tests cover migration identity, API validation, bounded queues,
+recovery and atomic state persistence. These simulations do not validate the
+physical wallbox's firmware or the Supervisor/container runtime. CI separately
+builds the standalone wheel and app container and checks their entrypoints.
+
 ## Shape
 
 Small, single-purpose modules; a leading `_` marks a module that only its
@@ -7,22 +42,27 @@ sibling may import. `__init__.py` is a facade that assembles runtime data and
 tears it down again — no device rule lives there.
 
 ```text
-registers.py          the register map, single source of truth
-register_blocks.py    declared contiguous read ranges + their consistency rule
-enums.py              device enumerations, member name = HA state option
-decode.py             register words <-> Python values
-capabilities.py       what this device's layout and hardware support
-client_errors.py      bus error types and Modbus exception mapping
-_client_read.py       block reads with a single-register fallback
-_client_write.py      writes, write rate limiting, value validation
-client.py             the pymodbus client, the bus lock, the only transport
-transport.py          typed transport and response interfaces
-write_state.py        shared write guards retained across entry reloads
-identity.py           the read-once device facts
+device/registers.py          the register map, single source of truth
+device/register_blocks.py    declared contiguous read ranges + their consistency rule
+device/enums.py              device enumerations, member name = HA state option
+device/decode.py             register words <-> Python values
+device/capabilities.py       what this device's layout and hardware support
+device/client_errors.py      bus error types and Modbus exception mapping
+device/_client_read.py       block reads with a single-register fallback
+device/_client_write.py      writes, write rate limiting, value validation
+device/client.py             the pymodbus client, the bus lock, the only transport
+device/transport.py          typed transport and response interfaces
+device/write_state.py        shared write guards retained across entry reloads
+device/identity.py           the read-once device facts
 coordinator.py        the poll
-heartbeat.py          the heartbeat task
+device/heartbeat.py          the heartbeat task
 recovery.py           bounded recovery of a confirmed heartbeat fault
-control.py            the only write path
+device/control.py     the only write path
+device/poller.py      shared cadence-aware polling
+device/service_*.py   service runtime, API, options and intent storage
+device/server.py      standalone process entrypoint
+remote.py             HA service client
+control.py            HA command error adapter
 exceptions.py         translated Home Assistant errors
 entity.py             entity base: unique id, device info, availability
 config_flow.py        + _flow_serial.py, _flow_connect.py, config_schemas.py

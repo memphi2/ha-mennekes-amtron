@@ -56,9 +56,13 @@ def test_marketplace_installs_and_updates_the_release(
     archive_bytes = archive_path.read_bytes()
     downloads: list[str] = []
 
-    async def download(url: str, **kwargs: object) -> bytes:
+    async def download(url: object, **kwargs: object) -> bytes:
         """Only the remote transport is replaced, unexpected requests fail."""
 
+        if not isinstance(url, str):
+            from homeassistant.components.marketplace.profiles import Endpoint
+            host = "raw.githubusercontent.com" if url.endpoint is Endpoint.RAW else "github.com"
+            url = f"https://{host}/{url.path}"
         downloads.append(url)
         files = {
             f"https://raw.githubusercontent.com/{REPOSITORY}/{version}/hacs.json": hacs_json,

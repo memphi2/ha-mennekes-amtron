@@ -70,7 +70,7 @@ def main() -> int:
 def check_addresses() -> list[str]:
     """Reject duplicate keys and overlapping register ranges."""
 
-    from custom_components.mennekes_amtron_rtu.registers import REGISTERS
+    from custom_components.mennekes_amtron_rtu.device.registers import REGISTERS
 
     failures: list[str] = []
     seen_keys: set[str] = set()
@@ -94,7 +94,7 @@ def check_addresses() -> list[str]:
 def check_layouts() -> list[str]:
     """Reject register layout versions the specification does not define."""
 
-    from custom_components.mennekes_amtron_rtu.registers import (
+    from custom_components.mennekes_amtron_rtu.device.registers import (
         LAYOUT_VERSIONS,
         REGISTERS,
     )
@@ -109,7 +109,7 @@ def check_layouts() -> list[str]:
 def check_blocks() -> list[str]:
     """Reject read blocks that disagree with the register map."""
 
-    from custom_components.mennekes_amtron_rtu.register_blocks import (
+    from custom_components.mennekes_amtron_rtu.device.register_blocks import (
         block_consistency_failures,
     )
 
@@ -125,8 +125,10 @@ def check_register_document() -> list[str]:
     the old one in the other indefinitely.
     """
 
-    from custom_components.mennekes_amtron_rtu.register_blocks import REGISTER_BLOCKS
-    from custom_components.mennekes_amtron_rtu.registers import (
+    from custom_components.mennekes_amtron_rtu.device.register_blocks import (
+        REGISTER_BLOCKS,
+    )
+    from custom_components.mennekes_amtron_rtu.device.registers import (
         REGISTERS,
         REGISTERS_BY_KEY,
         layout_label,
@@ -400,7 +402,7 @@ def _entity_keys() -> dict[str, set[str]]:
 
 
 def _enum_states() -> dict[tuple[str, str], tuple[str, ...]]:
-    from custom_components.mennekes_amtron_rtu.enums import (
+    from custom_components.mennekes_amtron_rtu.device.enums import (
         RequestedPhases,
         SolarChargingMode,
         enum_options,

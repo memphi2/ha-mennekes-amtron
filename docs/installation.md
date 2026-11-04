@@ -4,12 +4,17 @@ Install **Mennekes Amtron RTU** from
 **memphi2/ha-mennekes-amtron**. This is a community integration for Modbus RTU
 wallboxes, using the domain `mennekes_amtron_rtu`.
 
+For a heartbeat that continues through HA Core restarts, use the
+[independent Modbus service](modbus-service.md). Existing direct entries remain
+supported and can be reconfigured without recreating entities.
+
 ## Requirements
 
 - Home Assistant **2026.9.0** or newer. Use the Marketplace on **2026.11+**,
   or HACS on **2026.9/2026.10**.
 - A USB RS-485 adapter available to Home Assistant, preferably through a
-  stable `/dev/serial/by-id/` path.
+  stable `/dev/serial/by-id/` path. With the independent service, pass the adapter
+  to that service instead of HA.
 - A wallbox configured as a Modbus satellite and exclusive access to its
   Modbus RTU bus. Read-only mode also sends requests.
 
@@ -75,7 +80,8 @@ entry. For polling intervals and control mode, use its options.
 
 1. Back up Home Assistant and read the offered release notes.
 2. Account for the heartbeat interruption before restarting: master mode
-   stops sending it while HA is down. See [fallback behavior](safety.md).
+   in direct serial mode stops sending it while HA is down. A separate service
+   continues through a Core restart. See [fallback behavior](safety.md).
 3. On 2026.11+, install the update under **Settings → Updates**. On older
    supported Home Assistant versions, update through HACS.
 4. Complete the requested Home Assistant restart.
@@ -96,15 +102,17 @@ while waiting; reinstalling it is not needed. See the
    configured energy-manager fallback before stopping its heartbeat; see
    [safety and limitations](safety.md).
 2. Under **Settings → Devices & services**, delete the AMTRON RTU entries you
-   intend to remove. This stops their heartbeat, closes the port and removes
-   their entities. Update dashboards and automations that used them.
+   intend to remove. Direct entries stop their heartbeat and close the port.
+   Service entries disconnect; the independent service continues running. Both
+   remove their entities. Update dashboards and automations that used them.
 3. To remove the integration files too, uninstall **memphi2/ha-mennekes-amtron**
    from the Marketplace, or from HACS on older Home Assistant versions. Keep
    the files while other AMTRON RTU entries still use them.
 4. Complete the requested Home Assistant restart.
 
 An entry removal does not reset wallbox registers. The wallbox applies its
-configured fallback when the heartbeat expires. Removing integration files
+configured fallback when the heartbeat expires. Stop the independent service
+separately if you intend to relinquish control. Removing integration files
 also leaves installed blueprints and Recorder history in place; remove
 blueprint copies only after no automation uses them.
 

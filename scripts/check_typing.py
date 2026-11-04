@@ -21,7 +21,7 @@ def strict_targets() -> list[str]:
 
     modules = sorted(
         str(path.relative_to(ROOT))
-        for path in COMPONENT.glob("*.py")
+        for path in COMPONENT.rglob("*.py")
     )
     scripts = sorted(
         str(path.relative_to(ROOT))

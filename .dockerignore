@@ -1,0 +1,10 @@
+**
+!Dockerfile
+!pyproject.toml
+!requirements-service.txt
+!LICENSE
+!NOTICE
+!custom_components/
+!custom_components/mennekes_amtron_rtu/
+!custom_components/mennekes_amtron_rtu/device/
+!custom_components/mennekes_amtron_rtu/device/*.py

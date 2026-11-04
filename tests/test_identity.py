@@ -5,17 +5,17 @@ from pathlib import Path
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.client import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
 )
-from custom_components.mennekes_amtron_rtu.client_errors import AmtronBusError
-from custom_components.mennekes_amtron_rtu.identity import (
+from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
+from custom_components.mennekes_amtron_rtu.device.identity import (
     async_read_identity,
     model_name,
 )
-from custom_components.mennekes_amtron_rtu.models import ARTICLE_MODELS
+from custom_components.mennekes_amtron_rtu.device.models import ARTICLE_MODELS
 from tests.fakes import FakeModbusClient, device_bank
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)

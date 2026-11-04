@@ -21,14 +21,14 @@ import threading
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.capabilities import supported_blocks
-from custom_components.mennekes_amtron_rtu.client import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.capabilities import supported_blocks
+from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
 )
-from custom_components.mennekes_amtron_rtu.const import HEARTBEAT_VALUE
-from custom_components.mennekes_amtron_rtu.identity import async_read_identity
+from custom_components.mennekes_amtron_rtu.device.const import HEARTBEAT_VALUE
+from custom_components.mennekes_amtron_rtu.device.identity import async_read_identity
 from tests.fakes import device_bank
 
 # The simulator is what lets this test answer its own requests. Every Home

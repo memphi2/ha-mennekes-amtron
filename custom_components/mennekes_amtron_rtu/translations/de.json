@@ -2,41 +2,39 @@
   "config": {
     "abort": {
       "already_configured": "Diese Wallbox ist bereits konfiguriert.",
-      "reconfigure_successful": "Die Busparameter wurden aktualisiert.",
-      "unique_id_mismatch": "Dieser Port gehört zu einer anderen Wallbox."
+      "reconfigure_successful": "Die Verbindung wurde aktualisiert.",
+      "unique_id_mismatch": "Dieser Port gehört zu einer anderen Wallbox.",
+      "service_migration_requires_serial": "Ohne auslesbare Seriennummer ist keine automatische Zuordnung zum bestehenden Gerät möglich."
     },
     "error": {
       "cannot_connect": "Der serielle Port konnte nicht geöffnet werden oder die Wallbox hat nicht geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -), den Port und die Busparameter.",
       "invalid_response": "Das Gerät hat geantwortet, aber keine Modbus-Layout-Version gemeldet. Prüfe die Geräteadresse und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen.",
-      "not_found": "Auf diesem Port hat keine Wallbox geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -, GND verbunden) und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen und die Wallbox danach neu gestartet wurde."
+      "not_found": "Auf diesem Port hat keine Wallbox geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -, GND verbunden) und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen und die Wallbox danach neu gestartet wurde.",
+      "cannot_connect_service": "Dienst nicht erreichbar, nicht bereit oder Zugriffstoken ungültig. Prüfe Adresse, Token und Dienstprotokoll."
     },
     "progress": {
       "searching": "Der Bus wird nach einer Wallbox abgesucht: bis zu {candidates} Kombinationen, etwa {minutes} Minuten zuzüglich Verbindungsprüfungen. Es werden keine Register geschrieben. Beim Neukonfigurieren pausieren die bisherige Verbindung und der Heartbeat; das konfigurierte Ausfallverhalten der Wallbox greift."
     },
     "step": {
       "reconfigure": {
-        "data": {
-          "baudrate": "Baudrate",
-          "device_id": "Modbus-Geräteadresse",
-          "frame": "Frame",
-          "port": "Serieller Port",
-          "search": "Wenn diese Werte nicht funktionieren"
-        },
-        "data_description": {
-          "baudrate": "Werkseinstellung ist 57600.",
-          "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
-          "frame": "Die Wallbox dokumentiert genau diese drei. Werkseinstellung sind 8 Datenbits, keine Parität, 2 Stoppbits.",
-          "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
-          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Die Suche sendet Leseanfragen. Nur auf einem Bus ohne anderen Modbus-Master verwenden."
-        },
-        "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
-        "title": "Mennekes Amtron RTU"
+        "title": "Verbindung ändern",
+        "menu_options": {
+          "server": "Zum Modbus-Dienst wechseln",
+          "serial_reconfigure": "Serielle Verbindung ändern"
+        }
       },
       "search_result": {
         "description": "Nach {attempts} Versuchen hat eine Wallbox geantwortet:\n\n- Geräteadresse: **{device_id}**\n- Bus: **{baudrate} Baud, {frame}**\n- Modbus-Layout: **{layout}**\n- Seriennummer: **{serial_number}**\n\nMit Absenden wird die Wallbox mit diesen Werten eingerichtet.",
         "title": "Wallbox gefunden"
       },
       "user": {
+        "title": "Verbindung zur Wallbox",
+        "menu_options": {
+          "server": "Modbus-Dienst (übersteht HA-Neustarts)",
+          "serial": "Direkt über seriellen Port"
+        }
+      },
+      "serial": {
         "data": {
           "baudrate": "Baudrate",
           "device_id": "Modbus-Geräteadresse",
@@ -53,6 +51,32 @@
         },
         "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
         "title": "Mennekes Amtron RTU"
+      },
+      "serial_reconfigure": {
+        "data": {
+          "baudrate": "Baudrate",
+          "device_id": "Modbus-Geräteadresse",
+          "frame": "Frame",
+          "port": "Serieller Port",
+          "search": "Wenn diese Werte nicht funktionieren"
+        },
+        "data_description": {
+          "baudrate": "Werkseinstellung ist 57600.",
+          "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
+          "frame": "Die Wallbox dokumentiert genau diese drei. Werkseinstellung sind 8 Datenbits, keine Parität, 2 Stoppbits.",
+          "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
+          "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Die Suche sendet Leseanfragen. Nur auf einem Bus ohne anderen Modbus-Master verwenden."
+        },
+        "description": "Die Wallbox muss als Modbus-Satellite konfiguriert sein: DIP-Schalter 4 und 5 auf Bank S1 auf ON, danach die Wallbox neu starten. Diese Integration ist gegen das Register-Layout {validated_layout} validiert.",
+        "title": "Mennekes Amtron RTU"
+      },
+      "server": {
+        "title": "Modbus-Dienst verbinden",
+        "description": "Starte zuerst den unabhängigen Modbus-Dienst. Er hält den Heartbeat und deinen Ladezustand auch während eines HA-Neustarts. Beim Wechsel von direktem Modbus die bisherige Integration zuerst deaktivieren, damit der serielle Port frei ist.",
+        "data": {
+          "server_url": "Dienst-URL",
+          "server_token": "Zugriffstoken"
+        }
       }
     }
   },
@@ -355,6 +379,9 @@
     },
     "recovery_state_unknown": {
       "message": "Der aktuelle Fehler- oder Stromzustand konnte nicht bestätigt werden. Es wurden keine Wiederherstellungsbefehle gesendet."
+    },
+    "service_unavailable": {
+      "message": "Der Modbus-Dienst ist nicht erreichbar oder konnte den Befehl nicht bestätigen. Prüfe den aktuellen Zustand, bevor du den Befehl erneut sendest."
     }
   },
   "issues": {
@@ -406,6 +433,19 @@
           "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon."
         },
         "title": "Optionen"
+      },
+      "service": {
+        "title": "Dienst-Optionen",
+        "data": {
+          "control_mode": "Steuermodus",
+          "current_limit": "Obergrenze des Ladestroms",
+          "scan_interval_seconds": "Statusintervall"
+        },
+        "data_description": {
+          "control_mode": "Legt nur fest, ob Home Assistant Steuerbefehle senden darf. Der eigenständige Dienst hält den Heartbeat und den letzten Ladezustand auch bei „Nur lesen“ weiter. Die Schreibfreigabe des Dienstes wird separat in dessen Konfiguration eingestellt.",
+          "current_limit": "Zusätzliche Obergrenze für von Home Assistant angeforderte Ladestromwerte. Die Obergrenze des Dienstes bleibt wirksam. Bewusst gewählte 0 A schalten die EMS-Begrenzung aus.",
+          "scan_interval_seconds": "Wie oft Home Assistant den gespeicherten Status vom Dienst abruft. Modbus-Messintervall und Heartbeat-Takt werden dadurch nicht verändert."
+        }
       }
     }
   },
@@ -435,6 +475,12 @@
         "full": "Vollständige Historie",
         "detail": "Weniger Details",
         "lean": "Nur Energie- und Leistungsstatistiken"
+      }
+    },
+    "service_control_mode": {
+      "options": {
+        "read_only": "Nur lesen in Home Assistant",
+        "master": "Steuerung durch Home Assistant erlauben"
       }
     }
   },

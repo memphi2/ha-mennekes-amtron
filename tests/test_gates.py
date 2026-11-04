@@ -248,7 +248,7 @@ def test_the_typing_gate_covers_every_module() -> None:
 
     targets = set(check_typing.strict_targets())
     assert "custom_components/mennekes_amtron_rtu/control.py" in targets
-    assert "custom_components/mennekes_amtron_rtu/registers.py" in targets
+    assert "custom_components/mennekes_amtron_rtu/device/registers.py" in targets
     assert "scripts/check_repo.py" in targets
 
 

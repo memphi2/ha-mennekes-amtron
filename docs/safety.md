@@ -46,7 +46,7 @@ previous section: this integration must not share that bus, even read-only.
 
 ## The heartbeat, and what happens without it
 
-In master mode the integration writes `0x0D00 = 0x55AA` every five seconds.
+In master mode the active bus owner writes `0x0D00 = 0x55AA` every five seconds.
 A failed heartbeat is retried on a one-second interval until delivery resumes.
 The wallbox expects it at least every ten seconds. Longer connection outages
 can still miss this deadline. If the heartbeat stops:
@@ -59,8 +59,11 @@ can still miss this deadline. If the heartbeat stops:
   200 and will not start a session until `0x0D00`, `0x0D05` and `0x0302` are
   written again.
 
-Configure a fallback with the MENNEKES configuration tool so a Home Assistant
-restart has a defined outcome. The integration raises a repair issue when
+With direct serial mode, an HA restart stops the heartbeat. With the independent
+service, HA can remain offline indefinitely while the last charging state is held;
+a deliberate pause remains active. Service, host and USB failures still stop the
+heartbeat. Configure a fallback with the MENNEKES configuration tool so those
+interruptions have a defined outcome. The integration raises a repair issue when
 `0x030E` is 0.
 
 ## The 0 A trap
@@ -92,10 +95,12 @@ the integration's extra current cap, while hardware limits remain in force.
   separate five-minute guard. Timing guards survive an entry
   reload in memory, without Recorder writes. The remembered current before a
   pause also survives reloads; resuming still respects a newly lowered current
-  cap. After a full Home Assistant
+  cap. In direct mode, after a full Home Assistant
   restart (or the first setup), the previous timing is unknown: current
   writes and pause/resume wait five seconds, and phase changes wait five
-  minutes from setup. Reading and the heartbeat remain available.
+  minutes from setup. The independent service keeps these guards through an
+  HA restart; they reset only when the service itself restarts. Reading and
+  the heartbeat remain available.
 
 ## Phase switching can abort a charge
 

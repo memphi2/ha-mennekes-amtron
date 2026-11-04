@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from typing import Final
 
-from .const import ERROR_CODE_EMS_UNAVAILABLE
 from .data import DeviceIdentity, WallboxData, WriteDiagnostics
-from .registers import VALIDATED_LAYOUT, layout_label
+from .device.const import ERROR_CODE_EMS_UNAVAILABLE
+from .device.registers import VALIDATED_LAYOUT, layout_label
 
 ISSUE_EMS_HEARTBEAT_LOST: Final = "ems_heartbeat_lost"
 ISSUE_EMS_FALLBACK_NOT_CONFIGURED: Final = "ems_fallback_not_configured"

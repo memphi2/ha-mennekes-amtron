@@ -9,12 +9,17 @@ import pytest
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components import mennekes_amtron_rtu as integration
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.client import MennekesModbusClient
-from custom_components.mennekes_amtron_rtu.client_errors import AmtronRateLimitedError
-from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
 from custom_components.mennekes_amtron_rtu.data import WallboxData
-from custom_components.mennekes_amtron_rtu.enums import RequestedPhases
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronRateLimitedError,
+)
+from custom_components.mennekes_amtron_rtu.device.const import (
+    CONTROL_MODE_MASTER,
+    DOMAIN,
+)
+from custom_components.mennekes_amtron_rtu.device.enums import RequestedPhases
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_init import _patch_issues

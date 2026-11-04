@@ -8,9 +8,9 @@ from unittest.mock import patch
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.decode import decode_register
-from custom_components.mennekes_amtron_rtu.heartbeat import HeartbeatTask
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.decode import decode_register
+from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
 from custom_components.mennekes_amtron_rtu.recovery import HeartbeatRecovery
 from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
 from tests.ha_fakes import build_runtime
@@ -379,7 +379,10 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
     from homeassistant.components.repairs import issue_handler
     from homeassistant.helpers import issue_registry as ir
 
-    from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+    from custom_components.mennekes_amtron_rtu.device.const import (
+        CONTROL_MODE_MASTER,
+        DOMAIN,
+    )
     from tests.test_home_assistant_smoke import _boot
 
     async def run():
@@ -395,7 +398,7 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
 
         transport.write_registers = write
         with patch(
-            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             return_value=transport,
         ):
             hass = await _boot(tmp_path / "config")
@@ -406,6 +409,7 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
                 flow = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "user"}
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(
                     flow["flow_id"],
                     {
@@ -544,7 +548,10 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
     from homeassistant.components.repairs import issue_handler
     from homeassistant.helpers import issue_registry as ir
 
-    from custom_components.mennekes_amtron_rtu.const import CONTROL_MODE_MASTER, DOMAIN
+    from custom_components.mennekes_amtron_rtu.device.const import (
+        CONTROL_MODE_MASTER,
+        DOMAIN,
+    )
     from tests.test_home_assistant_smoke import _boot
 
     async def run():
@@ -587,7 +594,7 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
 
         transport._write = write
         with patch(
-            "custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient",
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
             return_value=transport,
         ):
             hass = await _boot(target)
@@ -595,6 +602,7 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                 flow = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "user"}
                 )
+                flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                 await hass.config_entries.flow.async_configure(
                     flow["flow_id"],
                     {

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.decode import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.decode import (
     decode_block,
     decode_register,
     encode_register,
     enum_option,
 )
-from custom_components.mennekes_amtron_rtu.register_blocks import REGISTER_BLOCKS
+from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTER_BLOCKS
 
 
 def test_float32_is_decoded_big_endian() -> None:

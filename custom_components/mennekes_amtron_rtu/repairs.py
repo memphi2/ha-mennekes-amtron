@@ -9,10 +9,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 
-from .client_errors import AmtronBusError
-from .const import DOMAIN, ERROR_CODE_EMS_UNAVAILABLE
+from .device.client_errors import AmtronBusError
+from .device.const import DOMAIN, ERROR_CODE_EMS_UNAVAILABLE
+from .device.registers import ERROR_CODE
 from .entry_types import MennekesAmtronConfigEntry
-from .registers import ERROR_CODE
 from .repair_issues import (
     ISSUE_EMS_FALLBACK_NOT_CONFIGURED,
     ISSUE_EMS_HEARTBEAT_LOST,

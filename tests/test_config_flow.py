@@ -10,17 +10,18 @@ from homeassistant.config_entries import ConfigEntryState
 from custom_components.mennekes_amtron_rtu import config_flow
 from custom_components.mennekes_amtron_rtu._flow_connect import async_test_connection
 from custom_components.mennekes_amtron_rtu._flow_search import SearchResult
-from custom_components.mennekes_amtron_rtu.client import SerialConfig
-from custom_components.mennekes_amtron_rtu.client_errors import (
-    AmtronBusError,
-    AmtronConnectionError,
-)
 from custom_components.mennekes_amtron_rtu.config_flow import (
     MennekesAmtronConfigFlow,
     _entry_title,
     _serial_config,
 )
-from custom_components.mennekes_amtron_rtu.const import (
+from custom_components.mennekes_amtron_rtu.data import DeviceIdentity
+from custom_components.mennekes_amtron_rtu.device.client import SerialConfig
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronBusError,
+    AmtronConnectionError,
+)
+from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_DEVICE_ID,
@@ -31,7 +32,6 @@ from custom_components.mennekes_amtron_rtu.const import (
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
 )
-from custom_components.mennekes_amtron_rtu.data import DeviceIdentity
 from custom_components.mennekes_amtron_rtu.options_flow import MennekesAmtronOptionsFlow
 from tests.fakes import FakeModbusClient, device_bank
 from tests.ha_fakes import FakeConfigEntry, FakeHass, build_runtime
@@ -78,9 +78,9 @@ class Flow(MennekesAmtronConfigFlow):
         return self.reconfigure_entry
 
     def async_update_and_abort(
-        self, entry: Any, *, data_updates: dict[str, Any]
+        self, entry: Any, *, data: dict[str, Any]
     ) -> dict[str, Any]:
-        self.updates = data_updates
+        self.updates = data
         return {"type": "abort", "reason": "reconfigure_successful"}
 
     async_update_reload_and_abort = async_update_and_abort
@@ -121,7 +121,7 @@ def test_a_stored_entry_still_describes_its_bus() -> None:
 
 
 def test_every_offered_frame_round_trips() -> None:
-    from custom_components.mennekes_amtron_rtu.const import (
+    from custom_components.mennekes_amtron_rtu.device.const import (
         SUPPORTED_FRAMES,
         frame_label,
         frame_parts,
@@ -134,7 +134,7 @@ def test_every_offered_frame_round_trips() -> None:
 
 
 def test_the_offered_frames_are_the_ones_the_device_documents() -> None:
-    from custom_components.mennekes_amtron_rtu.const import (
+    from custom_components.mennekes_amtron_rtu.device.const import (
         SUPPORTED_FRAMES,
         SUPPORTED_PARITY_STOPBITS,
         frame_parts,
@@ -156,9 +156,9 @@ def test_the_entry_title_carries_no_serial_number() -> None:
 
 def test_the_first_step_shows_a_form() -> None:
     async def run() -> None:
-        result = await Flow(FakeHass()).async_step_user()
+        result = await Flow(FakeHass()).async_step_serial()
         assert result["type"] == "form"
-        assert result["step_id"] == "user"
+        assert result["step_id"] == "serial"
         assert result["description_placeholders"]["validated_layout"] == "v01.03"
 
     asyncio.run(run())
@@ -168,7 +168,7 @@ def test_a_good_connection_creates_the_entry(monkeypatch: pytest.MonkeyPatch) ->
     async def run() -> None:
         _patch_connection(monkeypatch, IDENTITY)
         flow = Flow(FakeHass())
-        result = await flow.async_step_user(dict(USER_INPUT))
+        result = await flow.async_step_serial(dict(USER_INPUT))
         assert result["type"] == "create_entry"
         assert result["data"][CONF_SERIAL_NUMBER] == "ABC123456789"
         assert flow.set_unique_id == "ABC123456789"
@@ -183,7 +183,7 @@ def test_a_device_without_a_serial_number_falls_back_to_the_port(
     async def run() -> None:
         _patch_connection(monkeypatch, DeviceIdentity(layout_version=0x0100))
         flow = Flow(FakeHass())
-        result = await flow.async_step_user(dict(USER_INPUT))
+        result = await flow.async_step_serial(dict(USER_INPUT))
         assert CONF_SERIAL_NUMBER not in result["data"]
         assert flow.set_unique_id == "mennekes_amtron_rtu_/dev/fake"
         assert result["data"][CONF_PORT] == "/dev/fake"
@@ -194,7 +194,7 @@ def test_a_device_without_a_serial_number_falls_back_to_the_port(
 def test_a_dead_port_shows_cannot_connect(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         _patch_connection(monkeypatch, AmtronConnectionError("no port"))
-        result = await Flow(FakeHass()).async_step_user(dict(USER_INPUT))
+        result = await Flow(FakeHass()).async_step_serial(dict(USER_INPUT))
         assert result["errors"] == {"base": "cannot_connect"}
 
     asyncio.run(run())
@@ -208,7 +208,7 @@ def test_a_failed_attempt_keeps_what_the_user_typed(
     async def run() -> None:
         _patch_connection(monkeypatch, AmtronConnectionError("no port"))
         typed = {**USER_INPUT, CONF_DEVICE_ID: 23, CONF_BAUDRATE: 19200}
-        result = await Flow(FakeHass()).async_step_user(dict(typed))
+        result = await Flow(FakeHass()).async_step_serial(dict(typed))
         assert _suggested(result) == {
             CONF_PORT: " /dev/fake ",
             CONF_DEVICE_ID: 23,
@@ -232,7 +232,7 @@ def test_reconfigure_starts_from_the_entry_not_the_factory_defaults() -> None:
                 CONF_STOPBITS: 1,
             }
         )
-        result = await flow.async_step_reconfigure()
+        result = await flow.async_step_serial_reconfigure()
         suggested = _suggested(result)
         assert suggested[CONF_DEVICE_ID] == 23
         assert suggested[CONF_BAUDRATE] == 19200
@@ -258,7 +258,7 @@ def test_a_silent_device_shows_invalid_response(
 ) -> None:
     async def run() -> None:
         _patch_connection(monkeypatch, AmtronBusError("no layout"))
-        result = await Flow(FakeHass()).async_step_user(dict(USER_INPUT))
+        result = await Flow(FakeHass()).async_step_serial(dict(USER_INPUT))
         assert result["errors"] == {"base": "invalid_response"}
 
     asyncio.run(run())
@@ -270,9 +270,9 @@ def test_reconfigure_updates_the_bus_parameters(
     async def run() -> None:
         _patch_connection(monkeypatch, IDENTITY)
         flow = Flow(FakeHass())
-        form = await flow.async_step_reconfigure()
-        assert form["step_id"] == "reconfigure"
-        result = await flow.async_step_reconfigure(dict(USER_INPUT))
+        form = await flow.async_step_serial_reconfigure()
+        assert form["step_id"] == "serial_reconfigure"
+        result = await flow.async_step_serial_reconfigure(dict(USER_INPUT))
         assert result["reason"] == "reconfigure_successful"
         assert flow.updates[CONF_DEVICE_ID] == 50
         assert flow.aborted == ["mismatch"]
@@ -377,7 +377,7 @@ class SearchFlow(Flow):
 async def _drive_search(flow: SearchFlow, user_input: dict[str, Any]) -> Any:
     """Run the search the way Home Assistant drives a progress step."""
 
-    result = await flow.async_step_user(user_input)
+    result = await flow.async_step_serial(user_input)
     assert result["type"] == "progress"
     assert result["progress_action"] == "searching"
     assert int(result["description_placeholders"]["candidates"]) > 0
@@ -475,7 +475,7 @@ def test_searching_is_skipped_when_it_is_switched_off(
     async def run() -> None:
         _patch_connection(monkeypatch, AmtronConnectionError("no port"))
         flow = SearchFlow(FakeHass())
-        result = await flow.async_step_user({**USER_INPUT, CONF_SEARCH: "off"})
+        result = await flow.async_step_serial({**USER_INPUT, CONF_SEARCH: "off"})
         assert result["type"] == "form"
         assert result["errors"] == {"base": "cannot_connect"}
 

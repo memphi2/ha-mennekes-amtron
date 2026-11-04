@@ -21,8 +21,8 @@ from homeassistant.const import (
     UnitOfTime,
 )
 
-from .decode import RegisterValue
-from .enums import (
+from .device.decode import RegisterValue
+from .device.enums import (
     AuthorizationStatus,
     CableLockStatus,
     CpState,
@@ -40,7 +40,7 @@ from .enums import (
     enum_options,
     error_category,
 )
-from .registers import layout_label
+from .device.registers import layout_label
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -2,25 +2,36 @@
 
 ## What this integration collects
 
-Nothing leaves the local network. The integration speaks Modbus RTU over a
-serial port and makes no outbound network request at all.
+There is no cloud service or telemetry. Direct mode speaks Modbus RTU over a
+local serial port. Service mode exchanges wallbox readings and control commands
+with the configured Modbus service URL. Keep that service on a trusted private
+network, or protect the connection with HTTPS.
 
 ## What is stored in Home Assistant
 
 - The serial port path, bus parameters and Modbus device address, in the
-  config entry.
+  config entry for direct mode. Service mode instead stores the service URL
+  and access token in the config entry; protect HA backups accordingly.
 - The wallbox serial number, if the firmware exposes it, as the config entry's
   unique id and in the device registry.
 - Register values, as entity states and in Home Assistant's recorder database
   like any other entity.
 
+## What the independent service stores
+
+The service configuration contains its serial settings and access token. Its
+small `intent.json` file stores the wallbox identity, pause/release intent and
+resume current. It is replaced only when intent changes, with no growing history.
+Heartbeats and polls are not persisted. Protect service data and backups.
+
 ## What diagnostics contain
 
 The diagnostics download is built from an allowlist. It deliberately omits:
 
+- the service access token and URL;
 - the serial port path — a `/dev/serial/by-id/...` path contains the USB
-  adapter's serial number. Only a category (`by-id`, `tty`, `other`) is
-  reported.
+  adapter's serial number. Direct mode reports only a category (`by-id`, `tty`,
+  `other`); service mode reports the connection type.
 - the wallbox serial number — only a stable FNV-1a 64 hash of it. The raw serial-number
   register block is omitted too. This hash is a pseudonymous support
   identifier, not a cryptographic anonymization guarantee.

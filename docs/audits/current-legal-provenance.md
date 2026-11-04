@@ -1,5 +1,13 @@
 # Current Legal and Provenance Audit Snapshot
 
+The v0.3.0 evidence below is historical. Development on 2026-11-04 adds the
+independent [Modbus service](../modbus-service.md), including an authenticated
+HTTP listener, stored credentials and an `aiohttp` dependency. Its current
+boundaries are documented in [SECURITY](../../SECURITY.md),
+[PRIVACY](../../PRIVACY.md) and [legal](../legal.md). The older no-listener
+statement below applies to direct serial mode. No service image has been
+published or verified on the physical wallbox as part of this development work.
+
 Audit date: 2026-11-02
 
 This is a technical repository audit for v0.3.0, following the published

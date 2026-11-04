@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Added
+
+- Independent Modbus service with a shared HA-free driver, authenticated local
+  API, durable control intent, Python package and local Supervisor app/container
+  build. It keeps the heartbeat and last charging state through HA Core restarts,
+  including indefinite HA outages; reconnecting HA sends no charging commands.
+- Service setup and reconfiguration preserve existing device/entity identities.
+  Direct serial mode remains available. The service is local development work;
+  no container image or new integration release has been published yet.
+
 ### Fixed
 
 - Recover error 200 while charging is paused, locked or explicitly not released.

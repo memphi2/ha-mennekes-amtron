@@ -13,7 +13,7 @@ from homeassistant.exceptions import Unauthorized, UnknownUser
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
-from custom_components.mennekes_amtron_rtu.const import DOMAIN
+from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.entity import entry_entity_unique_id
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import _boot
@@ -28,11 +28,12 @@ def test_profiles_use_actual_ids_and_read_permissions_without_writes(tmp_path):
             transports.append(transport)
             return transport
 
-        with patch("custom_components.mennekes_amtron_rtu.client.AsyncModbusSerialClient", side_effect=factory):
+        with patch("custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient", side_effect=factory):
             hass = await _boot(tmp_path / "config")
             try:
                 for index in (1, 2):
                     flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+                    flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "serial"})
                     await hass.config_entries.flow.async_configure(flow["flow_id"], {
                         "port": f"/dev/fake{index}", "device_id": 50, "baudrate": 57600,
                         "frame": "8n2", "search": "off",

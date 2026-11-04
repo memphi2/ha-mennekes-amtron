@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_SERIAL_NUMBER, DOMAIN, MANUFACTURER
 from .coordinator import MennekesAmtronCoordinator
 from .data import WallboxData
-from .decode import RegisterValue
+from .device.const import CONF_SERIAL_NUMBER, DOMAIN, MANUFACTURER
+from .device.decode import RegisterValue
+from .device.identity import display_identifier, model_name
 from .entry_types import MennekesAmtronConfigEntry
-from .identity import display_identifier, model_name
 
 if TYPE_CHECKING:
     from .data import MennekesAmtronRuntimeData

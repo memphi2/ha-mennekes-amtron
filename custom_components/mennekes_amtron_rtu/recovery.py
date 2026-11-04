@@ -10,7 +10,7 @@ from contextlib import suppress
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from .const import ERROR_CODE_EMS_UNAVAILABLE, MIN_CURRENT_WRITE_INTERVAL_SECONDS
+from .device.const import ERROR_CODE_EMS_UNAVAILABLE, MIN_CURRENT_WRITE_INTERVAL_SECONDS
 from .entry_types import MennekesAmtronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)

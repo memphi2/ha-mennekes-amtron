@@ -7,7 +7,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 
 from .config_schemas import options_schema
-from .const import (
+from .device.const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
@@ -15,6 +15,7 @@ from .const import (
     CONTROL_MODE_MASTER,
     DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
 )
+from .remote import CONF_SERVER_URL
 
 
 class MennekesAmtronOptionsFlow(OptionsFlow):
@@ -24,15 +25,31 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Show and store the entry options."""
+        step_id = "service" if CONF_SERVER_URL in self.config_entry.data else "init"
+        return await self._async_options(step_id, user_input)
+
+    async def async_step_service(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure HA access without changing the service's bus ownership."""
+        return await self._async_options("service", user_input)
+
+    async def _async_options(
+        self, step_id: str, user_input: dict[str, Any] | None
+    ) -> ConfigFlowResult:
 
         if user_input is not None:
-            return self.async_create_entry(data=_normalized(user_input))
+            options = _normalized(user_input)
+            if step_id == "service":
+                options.pop(CONF_MEASUREMENT_INTERVAL_SECONDS, None)
+            return self.async_create_entry(data=options)
 
         return self.async_show_form(
-            step_id="init",
+            step_id=step_id,
             data_schema=options_schema(
                 dict(self.config_entry.options),
                 max_current=_max_current(self.config_entry),
+                service_mode=step_id == "service",
             ),
         )
 

@@ -6,7 +6,7 @@ from custom_components.mennekes_amtron_rtu.data import (
     WallboxData,
     WriteDiagnostics,
 )
-from custom_components.mennekes_amtron_rtu.registers import LAYOUT_V01_00
+from custom_components.mennekes_amtron_rtu.device.registers import LAYOUT_V01_00
 
 
 def test_snapshot_reports_missing_values() -> None:

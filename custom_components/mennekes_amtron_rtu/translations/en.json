@@ -2,41 +2,39 @@
   "config": {
     "abort": {
       "already_configured": "This wallbox is already configured.",
-      "reconfigure_successful": "The bus parameters were updated.",
-      "unique_id_mismatch": "This port belongs to a different wallbox."
+      "reconfigure_successful": "The connection was updated.",
+      "unique_id_mismatch": "This port belongs to a different wallbox.",
+      "service_migration_requires_serial": "The wallbox needs a readable serial number to match the existing device during migration."
     },
     "error": {
       "cannot_connect": "Could not open the serial port or the wallbox did not answer. Check the cabling (Modbus A is +, B is -), the port and the bus parameters.",
       "invalid_response": "The device answered but did not report a Modbus layout version. Check the device address and whether DIP 4 and DIP 5 on bank S1 are on.",
-      "not_found": "No wallbox answered on this port. Check the wiring (Modbus A is +, B is -, GND connected) and that DIP 4 and DIP 5 on bank S1 are on, with the wallbox restarted afterwards."
+      "not_found": "No wallbox answered on this port. Check the wiring (Modbus A is +, B is -, GND connected) and that DIP 4 and DIP 5 on bank S1 are on, with the wallbox restarted afterwards.",
+      "cannot_connect_service": "The service is unreachable, not ready or the token is invalid. Check the address, token and service logs."
     },
     "progress": {
       "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes plus connection checks. No registers are written. During reconfiguration, the existing connection and heartbeat are paused; the wallbox's configured fallback applies."
     },
     "step": {
       "reconfigure": {
-        "data": {
-          "baudrate": "Baud rate",
-          "device_id": "Modbus device address",
-          "frame": "Frame",
-          "port": "Serial port",
-          "search": "If these values do not work"
-        },
-        "data_description": {
-          "baudrate": "Factory default is 57600.",
-          "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
-          "frame": "The wallbox documents exactly these three. Factory default is 8 data bits, no parity, 2 stop bits.",
-          "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
-          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching sends read requests. Only use it on a bus without another Modbus master."
-        },
-        "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
-        "title": "Mennekes Amtron RTU"
+        "title": "Change connection",
+        "menu_options": {
+          "server": "Connect to the Modbus service",
+          "serial_reconfigure": "Change serial connection"
+        }
       },
       "search_result": {
         "description": "A wallbox answered after {attempts} attempts:\n\n- Device address: **{device_id}**\n- Bus: **{baudrate} baud, {frame}**\n- Modbus layout: **{layout}**\n- Serial number: **{serial_number}**\n\nSubmit to set the wallbox up with these values.",
         "title": "Wallbox found"
       },
       "user": {
+        "title": "Connect to your wallbox",
+        "menu_options": {
+          "server": "Modbus service (survives HA restarts)",
+          "serial": "Direct serial connection"
+        }
+      },
+      "serial": {
         "data": {
           "baudrate": "Baud rate",
           "device_id": "Modbus device address",
@@ -53,6 +51,32 @@
         },
         "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
         "title": "Mennekes Amtron RTU"
+      },
+      "serial_reconfigure": {
+        "data": {
+          "baudrate": "Baud rate",
+          "device_id": "Modbus device address",
+          "frame": "Frame",
+          "port": "Serial port",
+          "search": "If these values do not work"
+        },
+        "data_description": {
+          "baudrate": "Factory default is 57600.",
+          "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
+          "frame": "The wallbox documents exactly these three. Factory default is 8 data bits, no parity, 2 stop bits.",
+          "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
+          "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching sends read requests. Only use it on a bus without another Modbus master."
+        },
+        "description": "The wallbox has to be configured as a Modbus satellite: DIP switches 4 and 5 on bank S1 on, then restart the wallbox. This integration is validated against register layout {validated_layout}.",
+        "title": "Mennekes Amtron RTU"
+      },
+      "server": {
+        "title": "Connect to the Modbus service",
+        "description": "Start the independent Modbus service first. It maintains the heartbeat and charging state while Home Assistant restarts. When migrating from direct Modbus, disable the existing integration first to release the serial port.",
+        "data": {
+          "server_url": "Service URL",
+          "server_token": "Access token"
+        }
       }
     }
   },
@@ -355,6 +379,9 @@
     },
     "recovery_state_unknown": {
       "message": "The current error or charging-current state could not be confirmed. No recovery commands were sent."
+    },
+    "service_unavailable": {
+      "message": "The Modbus service is unavailable or could not confirm the command. Check the current state before repeating it."
     }
   },
   "issues": {
@@ -406,6 +433,19 @@
           "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently."
         },
         "title": "Options"
+      },
+      "service": {
+        "title": "Service options",
+        "data": {
+          "control_mode": "Control mode",
+          "current_limit": "Charging current cap",
+          "scan_interval_seconds": "Status polling interval"
+        },
+        "data_description": {
+          "control_mode": "Only controls whether Home Assistant may send commands. The independent service keeps its heartbeat and last charging state even when HA is read-only. Configure the service itself separately to change its write permission.",
+          "current_limit": "Additional cap for currents requested by Home Assistant. The service cap still applies. Explicitly selecting 0 A disables the EMS limit.",
+          "scan_interval_seconds": "How often Home Assistant reads the service state. This changes neither Modbus measurement polling nor the heartbeat interval."
+        }
       }
     }
   },
@@ -435,6 +475,12 @@
         "full": "Full history",
         "detail": "Less detail",
         "lean": "Energy and power statistics only"
+      }
+    },
+    "service_control_mode": {
+      "options": {
+        "read_only": "Read-only in Home Assistant",
+        "master": "Allow Home Assistant controls"
       }
     }
   },

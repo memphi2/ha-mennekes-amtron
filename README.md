@@ -27,7 +27,7 @@ For **Home Assistant 2026.11 and newer**:
    repository with category **Integration**.
 2. Install **Mennekes Amtron RTU** and accept the community-content notice.
 3. Under **Settings → Devices & services → Add integration**, select
-   **Mennekes Amtron RTU** and enter the serial adapter and wallbox settings.
+   **Mennekes Amtron RTU** and choose the connection to your wallbox.
    Follow the [quick start](docs/quickstart.md) for setup and the first charge.
 
 Use an **exclusive RS-485 bus**, including in read-only mode. Start read-only
@@ -50,6 +50,13 @@ For HACS on HA 2026.9/2026.10, updates or an existing installation, see
 
 Controls are available in **Modbus master** mode. **0 A removes the current
 limit**; use **Charging paused** to stop charging.
+
+## Independent Modbus service (development)
+
+The optional [Modbus service](docs/modbus-service.md) keeps the heartbeat and
+selected charging state running through Home Assistant Core restarts. It runs
+as a separate app or container; HA connects to it without owning the serial
+port. This is not included in the published 0.4.1 release yet.
 
 ## Documentation and help
 

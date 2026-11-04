@@ -14,12 +14,21 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .blueprint_installer import async_install_blueprints
-from .client import MennekesModbusClient, SerialConfig
-from .client_errors import AmtronBusError
-from .const import (
+from .control import AmtronControl, ControlOptions
+from .coordinator import MennekesAmtronCoordinator
+from .data import (
+    ConnectionState,
+    MennekesAmtronRuntimeData,
+    WallboxData,
+    WriteDiagnostics,
+)
+from .device.client import MennekesModbusClient, SerialConfig
+from .device.client_errors import AmtronBusError
+from .device.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_CURRENT_LIMIT,
@@ -39,22 +48,22 @@ from .const import (
     DEFAULT_STOPBITS,
     DOMAIN,
 )
-from .control import AmtronControl, ControlOptions
-from .coordinator import MennekesAmtronCoordinator
-from .data import (
-    ConnectionState,
-    MennekesAmtronRuntimeData,
-    WallboxData,
-    WriteDiagnostics,
-)
+from .device.heartbeat import HeartbeatTask
+from .device.identity import async_read_identity
+from .device.write_state import WriteState
 from .entry_types import MennekesAmtronConfigEntry
-from .heartbeat import HeartbeatTask
-from .identity import async_read_identity
 from .options_flow import control_mode_is_master
 from .recovery import HeartbeatRecovery
+from .remote import (
+    CONF_SERVER_TOKEN,
+    CONF_SERVER_URL,
+    RemoteClient,
+    RemoteControl,
+    RemoteCoordinator,
+    RemoteHeartbeat,
+)
 from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
-from .write_state import WriteState
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -80,15 +89,33 @@ async def async_setup_entry(
 ) -> bool:
     """Set up one wallbox from a config entry."""
 
-    states: dict[str, WriteState] = hass.data.setdefault(f"{DOMAIN}_write_states", {})
-    if entry.entry_id not in states:
-        states[entry.entry_id] = WriteState.cold_start(time.monotonic())
-    client = MennekesModbusClient(
-        _serial_config(entry), write_state=states[entry.entry_id]
-    )
+    remote = CONF_SERVER_URL in entry.data
+    client: MennekesModbusClient
+    if remote:
+        # Direct-mode intent must not return after a later switch back from
+        # the service, which has since owned the authoritative charging state.
+        hass.data.get(f"{DOMAIN}_write_states", {}).pop(entry.entry_id, None)
+        client = RemoteClient(
+            async_get_clientsession(hass),
+            str(entry.data[CONF_SERVER_URL]),
+            str(entry.data[CONF_SERVER_TOKEN]),
+        )
+    else:
+        states: dict[str, WriteState] = hass.data.setdefault(
+            f"{DOMAIN}_write_states", {}
+        )
+        if entry.entry_id not in states:
+            states[entry.entry_id] = WriteState.cold_start(time.monotonic())
+        client = MennekesModbusClient(
+            _serial_config(entry), write_state=states[entry.entry_id]
+        )
     try:
         await client.async_connect()
-        identity = await async_read_identity(client)
+        identity = (
+            client.identity
+            if isinstance(client, RemoteClient)
+            else await async_read_identity(client)
+        )
     except BaseException as err:
         await client.async_close()
         if isinstance(err, AmtronBusError):
@@ -102,7 +129,8 @@ async def async_setup_entry(
 
     diagnostics = WriteDiagnostics()
     connection_state = ConnectionState()
-    coordinator = MennekesAmtronCoordinator(
+    coordinator_type = RemoteCoordinator if remote else MennekesAmtronCoordinator
+    coordinator = coordinator_type(
         hass,
         entry,
         client=client,
@@ -116,15 +144,24 @@ async def async_setup_entry(
             )
         ),
     )
-    control = AmtronControl(
-        client,
-        diagnostics=diagnostics,
-        identity=identity,
-        options=_control_options(entry),
-        state=coordinator.current_data,
-        request_refresh=coordinator.async_request_refresh,
-        notify_write_error=lambda: async_check_repairs(hass, entry),
-    )
+    if isinstance(client, RemoteClient):
+        control: AmtronControl = RemoteControl(
+            client,
+            diagnostics=diagnostics,
+            options=_control_options(entry),
+            state=coordinator.current_data,
+            request_refresh=coordinator.async_refresh,
+        )
+    else:
+        control = AmtronControl(
+            client,
+            diagnostics=diagnostics,
+            identity=identity,
+            options=_control_options(entry),
+            state=coordinator.current_data,
+            request_refresh=coordinator.async_request_refresh,
+            notify_write_error=lambda: async_check_repairs(hass, entry),
+        )
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -135,7 +172,30 @@ async def async_setup_entry(
     )
 
     try:
-        if not control.read_only:
+        if isinstance(client, RemoteClient):
+            heartbeat = RemoteHeartbeat(client, diagnostics)
+            entry.runtime_data.heartbeat = heartbeat
+
+            def update_remote() -> None:
+                heartbeat.update()
+                counters = client.snapshot.get("diagnostics", {})
+                for name in (
+                    "heartbeats_sent",
+                    "heartbeats_failed",
+                    "heartbeats_late",
+                    "writes_sent",
+                    "writes_rejected",
+                    "writes_rate_limited",
+                    "recoveries",
+                ):
+                    value = counters.get(name)
+                    if type(value) is int and value >= 0:
+                        setattr(diagnostics, name, value)
+                diagnostics.write_errors = set(client.snapshot.get("write_errors", []))
+
+            client.on_update = update_remote
+            update_remote()
+        elif not control.read_only:
             entry.runtime_data.heartbeat = _start_heartbeat(
                 hass, entry, client, diagnostics
             )
@@ -145,7 +205,7 @@ async def async_setup_entry(
         )
         entry.async_on_unload(entry.add_update_listener(async_reload_entry))
         async_setup_repairs(hass, entry)
-        if not control.read_only:
+        if not control.read_only and not remote:
             entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)
             entry.runtime_data.recovery.start()
     except BaseException:

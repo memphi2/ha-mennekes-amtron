@@ -7,7 +7,7 @@ import pytest
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.restore_state import RestoredExtraData
 
-from custom_components.mennekes_amtron_rtu import registers as R
+from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.switch import async_setup_entry
 from tests.fakes import device_bank, raise_connection_error
 from tests.ha_fakes import build_runtime, collect

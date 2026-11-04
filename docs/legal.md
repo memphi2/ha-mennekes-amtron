@@ -87,6 +87,12 @@ owning the resolved version. `scripts/check_pymodbus_pin.py` enforces that.
 pymodbus is published on PyPI under the BSD-3-Clause license; it is not
 vendored into this repository.
 
+The standalone service additionally depends on `aiohttp`; Home Assistant
+already provides it for the integration client. Python packages and their
+license notices are installed from their upstream distributions. The container
+build uses `requirements-service.txt`; the shared project-owned driver is not
+a third-party vendored payload.
+
 ## Repository gate
 
 `scripts/check_repo.py` is the local and CI gate for repository hygiene, and

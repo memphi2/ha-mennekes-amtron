@@ -68,9 +68,30 @@ known-first-party = ["custom_components.mennekes_amtron_rtu"]
 
 [tool.coverage.run]
 branch = true
+patch = ["subprocess"]
 
 [tool.coverage.report]
 exclude_also = [
   "if TYPE_CHECKING:",
   "raise NotImplementedError",
 ]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mennekes-amtron-modbus-service"
+version = "0.1.0.dev0"
+description = "Independent Modbus RTU owner for Mennekes Amtron wallboxes"
+requires-python = ">=3.14"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+dependencies = ["pymodbus[serial]==3.13.1", "aiohttp>=3.14.5,<4"]
+
+[project.scripts]
+amtron-modbus-service = "amtron_device.server:main"
+
+[tool.setuptools]
+packages = ["amtron_device"]
+package-dir = {amtron_device = "custom_components/mennekes_amtron_rtu/device"}

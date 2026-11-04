@@ -11,7 +11,7 @@ from custom_components.mennekes_amtron_rtu.config_schemas import (
     options_schema,
     user_schema,
 )
-from custom_components.mennekes_amtron_rtu.const import (
+from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
@@ -71,8 +71,7 @@ def test_the_form_defaults_to_the_stored_options() -> None:
         result = await Flow(entry).async_step_init()
         assert result["type"] == "form"
         defaults = {
-            marker.schema: marker.default()
-            for marker in result["data_schema"].schema
+            marker.schema: marker.default() for marker in result["data_schema"].schema
         }
         assert defaults[CONF_CONTROL_MODE] == CONTROL_MODE_MASTER
         assert defaults[CONF_SCAN_INTERVAL_SECONDS] == 10
@@ -94,6 +93,42 @@ def test_submitting_normalises_the_values() -> None:
             CONF_SCAN_INTERVAL_SECONDS: 7,
             CONF_MEASUREMENT_INTERVAL_SECONDS: 30,
             CONF_CURRENT_LIMIT: 11.5,
+        }
+
+    asyncio.run(run())
+
+
+def test_service_options_configure_only_ha_access_and_cache_refresh() -> None:
+    async def run() -> None:
+        entry = FakeConfigEntry(data={"server_url": "http://service:8765"})
+        flow = Flow(entry)
+        result = await flow.async_step_init()
+        assert result["step_id"] == "service"
+        assert (await flow.async_step_service())["step_id"] == "service"
+        fields = {
+            marker.schema: selector
+            for marker, selector in result["data_schema"].schema.items()
+        }
+        assert set(fields) == {
+            CONF_CONTROL_MODE,
+            CONF_CURRENT_LIMIT,
+            CONF_SCAN_INTERVAL_SECONDS,
+        }
+        assert (
+            fields[CONF_CONTROL_MODE].config["translation_key"]
+            == "service_control_mode"
+        )
+        result = await flow.async_step_service(
+            {
+                CONF_CONTROL_MODE: CONTROL_MODE_READ_ONLY,
+                CONF_CURRENT_LIMIT: 8,
+                CONF_SCAN_INTERVAL_SECONDS: 10,
+            }
+        )
+        assert result["data"] == {
+            CONF_CONTROL_MODE: CONTROL_MODE_READ_ONLY,
+            CONF_CURRENT_LIMIT: 8,
+            CONF_SCAN_INTERVAL_SECONDS: 10,
         }
 
     asyncio.run(run())

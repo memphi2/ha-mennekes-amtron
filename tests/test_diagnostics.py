@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 
+from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
 from custom_components.mennekes_amtron_rtu.diagnostics import (
     async_get_config_entry_diagnostics,
     decoded_values,
     fnv1a64,
 )
-from custom_components.mennekes_amtron_rtu.runtime_events import EventType
 from tests.ha_fakes import build_runtime
 
 

@@ -16,17 +16,6 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
 
-from custom_components.mennekes_amtron_rtu import registers as R
-from custom_components.mennekes_amtron_rtu.client import (
-    MennekesModbusClient,
-    SerialConfig,
-)
-from custom_components.mennekes_amtron_rtu.const import (
-    CONF_CONTROL_MODE,
-    CONF_PORT,
-    CONF_SERIAL_NUMBER,
-    CONTROL_MODE_MASTER,
-)
 from custom_components.mennekes_amtron_rtu.control import AmtronControl, ControlOptions
 from custom_components.mennekes_amtron_rtu.coordinator import MennekesAmtronCoordinator
 from custom_components.mennekes_amtron_rtu.data import (
@@ -34,6 +23,17 @@ from custom_components.mennekes_amtron_rtu.data import (
     DeviceIdentity,
     MennekesAmtronRuntimeData,
     WriteDiagnostics,
+)
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client import (
+    MennekesModbusClient,
+    SerialConfig,
+)
+from custom_components.mennekes_amtron_rtu.device.const import (
+    CONF_CONTROL_MODE,
+    CONF_PORT,
+    CONF_SERIAL_NUMBER,
+    CONTROL_MODE_MASTER,
 )
 from tests.fakes import FakeModbusClient, device_bank
 

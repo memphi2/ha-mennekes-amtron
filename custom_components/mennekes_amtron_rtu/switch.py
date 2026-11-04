@@ -10,9 +10,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 
+from .device.registers import CHARGING_CURRENT_EMS, CHARGING_RELEASE, LOCK_EVSE
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
-from .registers import CHARGING_CURRENT_EMS, CHARGING_RELEASE, LOCK_EVSE
 
 if TYPE_CHECKING:
     from homeassistant.components.switch.const import SwitchDeviceClass

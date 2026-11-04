@@ -9,13 +9,13 @@ from contextlib import contextmanager
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu import registers as R
 from custom_components.mennekes_amtron_rtu._flow_search import async_probe, async_search
-from custom_components.mennekes_amtron_rtu.client import (
+from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
 )
-from custom_components.mennekes_amtron_rtu.client_errors import (
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronProtocolError,
     AmtronRateLimitedError,
 )

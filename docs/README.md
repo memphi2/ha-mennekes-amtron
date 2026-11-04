@@ -1,5 +1,7 @@
 # Documentation
 
+- [Independent Modbus service](modbus-service.md): keep heartbeat and charging state through HA Core restarts.
+
 An unofficial Home Assistant integration for MENNEKES AMTRON wallboxes over
 local Modbus RTU.
 
