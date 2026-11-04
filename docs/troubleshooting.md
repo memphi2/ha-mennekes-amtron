@@ -76,8 +76,10 @@ avoid duplicate attempts.
 
 If automatic recovery cannot complete, **Recover from error** or the repair
 issue's **Fix** remains available. It preserves the stopped state too; use the
-pause or charging-release switch explicitly to resume. The dialog explains connection problems, write
-cooldowns or a still-active fault instead of closing prematurely.
+pause or charging-release switch explicitly to resume. After the recovery writes,
+the dialog waits up to ten seconds for the wallbox to clear error 200. The heartbeat
+continues during this check, and the charging commands are sent only once. A
+persistent fault, a different error or a connection problem keeps the dialog open.
 
 If the error returns, investigate the cause:
 

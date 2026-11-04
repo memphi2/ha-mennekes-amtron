@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
@@ -9,6 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 
+from .device.client import MennekesModbusClient
 from .device.client_errors import AmtronBusError
 from .device.const import DOMAIN, ERROR_CODE_EMS_UNAVAILABLE
 from .device.registers import ERROR_CODE
@@ -28,6 +30,27 @@ from .repair_issues import (
 LEARN_MORE_URL = (
     "https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/safety.md"
 )
+RECOVERY_CONFIRM_SECONDS = 10.0
+RECOVERY_CONFIRM_INTERVAL = 1.0
+
+
+async def _async_confirm_recovery(client: MennekesModbusClient) -> str | None:
+    """Allow firmware to leave error 200 after acknowledging the writes.
+
+    Read only the error register during this bounded confirmation window. The
+    heartbeat continues independently; no charging command is repeated.
+    """
+    try:
+        async with asyncio.timeout(RECOVERY_CONFIRM_SECONDS):
+            while True:
+                error = await client.async_read_register(ERROR_CODE)
+                if error == 0:
+                    return None
+                if error != ERROR_CODE_EMS_UNAVAILABLE:
+                    return "different_error"
+                await asyncio.sleep(RECOVERY_CONFIRM_INTERVAL)
+    except TimeoutError:
+        return "still_active"
 
 
 @callback
@@ -137,7 +160,8 @@ class HeartbeatRecoveryRepairFlow(RepairsFlow):
             if error != ERROR_CODE_EMS_UNAVAILABLE:
                 return self._show_error("different_error")
             await runtime.control.async_recover_from_error()
-            error = await runtime.client.async_read_register(ERROR_CODE)
+            if failure := await _async_confirm_recovery(runtime.client):
+                return self._show_error(failure)
         except ServiceValidationError as err:
             return self._show_error(
                 "read_only" if err.translation_key == "read_only_mode"
@@ -146,8 +170,6 @@ class HeartbeatRecoveryRepairFlow(RepairsFlow):
             )
         except (AmtronBusError, HomeAssistantError):
             return self._show_error("recovery_failed")
-        if error != 0:
-            return self._show_error("still_active")
         runtime.repair_state[ISSUE_EMS_HEARTBEAT_LOST] = None
         return self.async_create_entry(data={})
 

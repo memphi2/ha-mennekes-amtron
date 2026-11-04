@@ -190,8 +190,11 @@ def test_the_fix_flow_tolerates_a_missing_entry() -> None:
     ("different_error", "different_error"),
     ("still_active", "still_active"),
 ])
-def test_expected_repair_failures_stay_in_the_dialog(scenario, error):
+def test_expected_repair_failures_stay_in_the_dialog(monkeypatch, scenario, error):
     import time
+
+    monkeypatch.setattr(repairs, "RECOVERY_CONFIRM_SECONDS", 0.04)
+    monkeypatch.setattr(repairs, "RECOVERY_CONFIRM_INTERVAL", 0.01)
 
     async def run():
         hass, entry, transport = await build_runtime(
@@ -215,7 +218,10 @@ def test_expected_repair_failures_stay_in_the_dialog(scenario, error):
     asyncio.run(run())
 
 
-def test_repair_finishes_only_after_the_wallbox_confirms_recovery():
+@pytest.mark.parametrize("delay", [0, 0.02])
+def test_repair_finishes_only_after_the_wallbox_confirms_recovery(monkeypatch, delay):
+    monkeypatch.setattr(repairs, "RECOVERY_CONFIRM_INTERVAL", 0.01)
+
     async def run():
         hass, entry, transport = await build_runtime(bank=device_bank(error_code=200))
         original = transport.write_registers
@@ -223,18 +229,44 @@ def test_repair_finishes_only_after_the_wallbox_confirms_recovery():
         async def write(address, values, **kwargs):
             response = await original(address, values, **kwargs)
             if address == R.CHARGING_CURRENT_EMS.address:
-                put(transport.bank, R.ERROR_CODE, 0)
+                asyncio.get_running_loop().call_later(
+                    delay, put, transport.bank, R.ERROR_CODE, 0
+                )
             return response
 
         transport.write_registers = write
         flow = await repairs.async_create_fix_flow(hass, "x", {"entry_id": entry.entry_id})
         flow.hass = hass
         flow.async_create_entry = lambda **kwargs: {"type": "create_entry", **kwargs}
+        flow.async_show_form = lambda **kwargs: {"type": "form", **kwargs}
         result = await flow.async_step_confirm({})
         assert result["type"] == "create_entry"
         assert [address for address, _ in transport.writes] == [
             R.HEARTBEAT.address, R.CHARGING_RELEASE.address, R.CHARGING_CURRENT_EMS.address,
         ]
+        await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_a_different_fault_during_confirmation_is_not_treated_as_recovered():
+    async def run():
+        hass, entry, transport = await build_runtime(bank=device_bank(error_code=200))
+        original = transport.write_registers
+
+        async def write(address, values, **kwargs):
+            response = await original(address, values, **kwargs)
+            if address == R.CHARGING_CURRENT_EMS.address:
+                put(transport.bank, R.ERROR_CODE, 2011)
+            return response
+
+        transport.write_registers = write
+        flow = await repairs.async_create_fix_flow(hass, "x", {"entry_id": entry.entry_id})
+        flow.hass = hass
+        flow.async_show_form = lambda **kwargs: {"type": "form", **kwargs}
+        result = await flow.async_step_confirm({})
+        assert result["errors"] == {"base": "different_error"}
+        assert entry.runtime_data.diagnostics.recoveries == 1
         await entry.runtime_data.client.async_close()
 
     asyncio.run(run())

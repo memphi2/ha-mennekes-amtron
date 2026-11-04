@@ -375,7 +375,8 @@ def test_unload_cancels_pending_recovery_and_releases_listeners():
     asyncio.run(run())
 
 
-def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
+@pytest.mark.parametrize("clear_delay", [0, 2])
+def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path, clear_delay):
     from homeassistant.components.repairs import issue_handler
     from homeassistant.helpers import issue_registry as ir
 
@@ -393,7 +394,12 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path):
         async def write(address, values, **kwargs):
             result = await original(address, values, **kwargs)
             if clear_error and address == R.CHARGING_CURRENT_EMS.address:
-                put(transport.bank, R.ERROR_CODE, 0)
+                if clear_delay:
+                    asyncio.get_running_loop().call_later(
+                        clear_delay, put, transport.bank, R.ERROR_CODE, 0
+                    )
+                else:
+                    put(transport.bank, R.ERROR_CODE, 0)
             return result
 
         transport.write_registers = write
