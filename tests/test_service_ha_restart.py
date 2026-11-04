@@ -8,15 +8,69 @@ from unittest.mock import patch
 
 import pytest
 from aiohttp.test_utils import TestServer
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
 
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
+from custom_components.mennekes_amtron_rtu.device.registers import CHARGING_RELEASE
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
+
+
+def test_remote_write_repairs_change_without_register_or_entity_updates(tmp_path):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        hass = await _boot(tmp_path / "ha")
+        assert await async_setup_component(hass, "network", {})
+        try:
+            async with TestServer(create_app(service)) as server:
+                flow = await hass.config_entries.flow.async_init(
+                    DOMAIN, context={"source": "user"}
+                )
+                flow = await hass.config_entries.flow.async_configure(
+                    flow["flow_id"], {"next_step_id": "server"}
+                )
+                await hass.config_entries.flow.async_configure(
+                    flow["flow_id"],
+                    {"server_url": str(server.make_url("/")), "server_token": TOKEN},
+                )
+                await hass.async_block_till_done()
+                entry = hass.config_entries.async_entries(DOMAIN)[0]
+                runtime = entry.runtime_data
+                issue = (DOMAIN, f"{entry.entry_id}_write_rejected")
+                registry = ir.async_get(hass)
+                updates = []
+                unsubscribe = runtime.coordinator.async_add_listener(
+                    lambda: updates.append(1)
+                )
+                try:
+                    transport.write_exceptions[CHARGING_RELEASE.address] = "error"
+                    with pytest.raises(HomeAssistantError):
+                        await runtime.control.async_set_charging_release(True)
+                    await runtime.coordinator.async_refresh()
+                    assert issue in registry.issues
+                    assert not updates
+                    await runtime.coordinator.async_refresh()
+                    assert issue in registry.issues
+                    assert not updates
+
+                    transport.write_exceptions.clear()
+                    clock[0] += 6
+                    await runtime.control.async_set_charging_release(True)
+                    assert issue not in registry.issues
+                    assert not updates
+                finally:
+                    unsubscribe()
+        finally:
+            await hass.async_stop()
+            await service.stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))
 
 
 @pytest.mark.parametrize("paused", [False, True])

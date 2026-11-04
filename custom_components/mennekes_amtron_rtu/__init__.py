@@ -191,7 +191,10 @@ async def async_setup_entry(
                     value = counters.get(name)
                     if type(value) is int and value >= 0:
                         setattr(diagnostics, name, value)
-                diagnostics.write_errors = set(client.snapshot.get("write_errors", []))
+                write_errors = set(client.snapshot.get("write_errors", []))
+                if write_errors != diagnostics.write_errors:
+                    diagnostics.write_errors = write_errors
+                    async_check_repairs(hass, entry)
 
             client.on_update = update_remote
             update_remote()
