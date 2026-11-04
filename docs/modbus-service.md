@@ -70,8 +70,9 @@ Selecting **Add integration → Mennekes Amtron RTU → Connect to the Modbus se
 also looks up the running Supervisor app before showing a manual form. If more
 than one app is announced, use the matching discovery card. Setup distinguishes
 an unreachable API, rejected authentication, unavailable wallbox data and an
-invalid response. For rejected authentication, restarting the app announces its
-current credentials again. Invalid responses name the affected data section in
+invalid response. Confirming again retrieves the current credentials directly
+from Supervisor; an app restart is not needed to refresh a stale setup flow.
+Invalid responses name the affected data section in
 the HA log without printing tokens or response contents.
 
 The integration's service options control only HA's access and refresh interval.

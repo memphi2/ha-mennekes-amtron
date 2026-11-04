@@ -16,7 +16,7 @@
       "not_found": "No wallbox answered on this port. Check the wiring (Modbus A is +, B is -, GND connected) and that DIP 4 and DIP 5 on bank S1 are on, with the wallbox restarted afterwards.",
       "cannot_connect_service": "The app cannot be reached over the network. Check that it is running and accepting connections on port 8765.",
       "service_discovery_requires_serial": "The app has not read a serial number yet. Check its wallbox connection and try again.",
-      "service_auth_failed": "The app rejected authentication. Restart it so Supervisor announces its current credentials again. Automatic discovery requires no manual token entry.",
+      "service_auth_failed": "The app rejected authentication. Confirm again to retrieve its current credentials from Supervisor. For a separately hosted service, check the configured token.",
       "service_not_ready": "Authentication to the app succeeded, but wallbox data is not available yet. Check the app log and try again.",
       "service_invalid_response": "The app responds, but its data was not accepted. Update the integration and app to the same version. The Home Assistant log identifies the affected data section."
     },

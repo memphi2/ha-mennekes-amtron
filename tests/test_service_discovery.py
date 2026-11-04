@@ -347,6 +347,8 @@ def test_real_ha_discovery_connects_without_url_or_token_fields_and_keeps_ids(
         "ignored",
         "ignored_unready",
         "new_credentials",
+        "stale_credentials_retry",
+        "invalid_refreshed_credentials",
     ],
 )
 def test_discovery_handles_incomplete_setup_and_identity_safely(
@@ -391,7 +393,7 @@ def test_discovery_handles_incomplete_setup_and_identity_safely(
                     service._success = False
                 data = (
                     discovery_info(token="old" * 16)
-                    if scenario == "new_credentials"
+                    if scenario in ("new_credentials", "stale_credentials_retry", "invalid_refreshed_credentials")
                     else discovery_info()
                 )
                 result = await hass.config_entries.flow.async_init(
@@ -401,7 +403,7 @@ def test_discovery_handles_incomplete_setup_and_identity_safely(
                     assert result["reason"] == "already_configured"
                     return
                 assert result["type"] == "form"
-                if scenario in ("unready", "new_credentials"):
+                if scenario in ("unready", "new_credentials", "stale_credentials_retry", "invalid_refreshed_credentials"):
                     assert result["errors"] == {"base": "service_not_ready" if scenario == "unready" else "service_auth_failed"}
                 elif scenario == "no_serial":
                     assert result["errors"] == {
@@ -417,6 +419,16 @@ def test_discovery_handles_incomplete_setup_and_identity_safely(
                     return
                 service._success = True
                 service.identity.serial_number = serial
+                if scenario in ("stale_credentials_retry", "invalid_refreshed_credentials"):
+                    from unittest.mock import AsyncMock
+
+                    refreshed = discovery_info(host="untrusted.invalid") if scenario == "invalid_refreshed_credentials" else discovery_info()
+                    monkeypatch.setattr(config_flow, "async_app_discoveries", AsyncMock(return_value=[refreshed]))
+                    if scenario == "invalid_refreshed_credentials":
+                        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+                        assert result["reason"] == "invalid_service_discovery"
+                        assert not hass.config_entries.async_entries(DOMAIN)
+                        return
                 if scenario == "new_credentials":
                     old_flow = result["flow_id"]
                     result = await hass.config_entries.flow.async_init(

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Refresh pending app-discovery credentials from Supervisor when confirming or
+  retrying setup, so a missed token-change announcement cannot leave the flow
+  permanently using a stale token.
+
 - Reuse Supervisor app discovery when selecting the service connection manually;
   URL and token fields are reserved for separately hosted services. Keep wallbox
   identity checks during migration and distinguish authentication, unavailable

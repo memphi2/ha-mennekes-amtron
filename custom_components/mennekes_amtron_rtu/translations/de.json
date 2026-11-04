@@ -16,7 +16,7 @@
       "not_found": "Auf diesem Port hat keine Wallbox geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -, GND verbunden) und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen und die Wallbox danach neu gestartet wurde.",
       "cannot_connect_service": "Die App ist über das Netzwerk nicht erreichbar. Prüfe, ob sie läuft und auf Port 8765 Verbindungen annimmt.",
       "service_discovery_requires_serial": "Die App hat noch keine Seriennummer gelesen. Prüfe die Verbindung zur Wallbox und versuche es erneut.",
-      "service_auth_failed": "Die App hat die Anmeldung abgelehnt. Starte die App neu, damit Supervisor ihre aktuellen Zugangsdaten erneut meldet. Bei automatischer Erkennung ist keine manuelle Token-Eingabe nötig.",
+      "service_auth_failed": "Die App hat die Anmeldung abgelehnt. Bestätige erneut, um die aktuellen Zugangsdaten von Supervisor zu übernehmen. Prüfe bei einem separat betriebenen Dienst den konfigurierten Token.",
       "service_not_ready": "Die Anmeldung an der App funktioniert, aber die Wallbox-Daten sind noch nicht verfügbar. Prüfe das App-Protokoll und versuche es erneut.",
       "service_invalid_response": "Die App antwortet, aber ihre Daten werden nicht akzeptiert. Aktualisiere Integration und App auf dieselbe Version. Das Home-Assistant-Protokoll nennt den betroffenen Datenbereich."
     },
