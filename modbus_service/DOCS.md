@@ -7,6 +7,10 @@ heartbeat and use the wallbox's configured fallback.
 
 ## First setup
 
+Install the matching **0.5.0b1** integration first. Enable **Pre-release** for
+its Marketplace repository on HA 2026.11+, or beta releases in HACS on older
+supported versions. The integration and this app are installed separately.
+
 1. Disable the existing direct-serial integration entry to release the adapter.
    Keep the entry so the wallbox and entity IDs can be retained.
 2. Set the serial adapter path, address, baudrate and frame to match your wallbox.
@@ -31,6 +35,9 @@ The default current cap is 6 A. Explicitly selecting 0 A in the integration
 removes the EMS limit; use the pause control to pause. A first-time migration
 of an already paused device uses 6 A as its resume target if no saved target
 exists. Existing app state retains the previously accepted target.
+The integration may impose a lower current cap. The app applies it when
+resuming, using its latest saved target; an explicitly unlimited target stays
+unlimited.
 
 The app saves only changed pause/release intent and the resume current in its
 data directory. This is a small replaced file, not a history database. Include
@@ -48,4 +55,4 @@ Supervisor treats these as different apps. When moving between channels,
 copy the options, stop the old app before starting the other one, and reconfigure
 HA's service URL. Keep the original app and its backup until migration is verified.
 
-[Full setup and migration guide](https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/modbus-service.md)
+[Full setup and migration guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0b1/docs/modbus-service.md)

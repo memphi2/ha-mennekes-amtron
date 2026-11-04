@@ -26,7 +26,7 @@ HACS on 2026.9/2026.10. That guide includes the custom-repository fallback and
 explains when a restart is needed.
 
 For an existing **0.1.0** installation, follow [Upgrading](upgrading.md) first.
-Existing **0.2.x** entries can be kept.
+Existing **0.2.x through 0.4.x** entries can be kept.
 
 ## 3. Make the adapter available
 

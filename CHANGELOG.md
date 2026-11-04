@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
-## 0.5.0b1 — Unreleased
+## 0.5.0b1 — 2026-11-04
 
 ### Added
 
@@ -24,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Wait for the wallbox to confirm manual heartbeat recovery for up to ten seconds,
   avoiding a premature "fault still active" message while firmware clears error
   200. Confirmation reads do not repeat charging commands or lift a pause.
-- Apply the HA current cap when a remote resume target is unknown, and update
+- Apply the HA current cap at the service's write boundary when a remote resume
+  target is unknown or has changed since HA last polled, and update
   remote write-rejection repairs even when all polled register values are unchanged.
 - Recover error 200 while charging is paused, locked or explicitly not released.
   Both automatic recovery and the manual repair reassert the existing controls

@@ -23,7 +23,7 @@ Use a published release for normal operation. The [support policy](../SUPPORT.md
 distinguishes stable support from November beta validation.
 
 **Upgrading from 0.1.0:** follow the [domain migration guide](upgrading.md)
-first. The steps for keeping an existing entry below apply to **0.2.x and 0.3.x**.
+first. The steps for keeping an existing entry below apply to **0.2.x through 0.4.x**.
 
 ## Home Assistant Marketplace
 
@@ -65,7 +65,7 @@ and [installation behavior](https://contributors.home-assistant.io/marketplace/g
 
 ## Existing installations
 
-For **0.2.x and 0.3.x**, keep your config entries, devices, entity IDs and automations.
+For **0.2.x through 0.4.x**, keep your config entries, devices, entity IDs and automations.
 Moving from HACS to the Marketplace does not change this integration's
 repository or domain and does not require adding the wallbox again.
 
@@ -76,6 +76,17 @@ separate and still requires the [migration steps](upgrading.md).
 
 If the serial port or bus settings change, use **Reconfigure** on the existing
 entry. For polling intervals and control mode, use its options.
+
+## Beta releases
+
+**0.5.0b1** adds the optional independent Modbus service. On HA 2026.11+,
+enable **Pre-release** for this repository in the Marketplace. On older supported
+HA versions, enable beta releases in HACS. Install the matching integration
+and follow the [service installation and handover](modbus-service.md).
+The service app is installed separately through Supervisor; HA Container users
+run its Docker image. Stable users remain on **0.4.1**.
+
+See the official [pre-release guidance](https://contributors.home-assistant.io/marketplace/guides/releases/#pre-releases).
 
 ## Updates
 

@@ -52,12 +52,18 @@ limit**; use **Charging paused** to stop charging.
 
 ## Keep the heartbeat running during HA restarts
 
-An optional [Modbus service](docs/modbus-service.md) is being prepared for
-**0.5.0b1**. It runs independently of HA and keeps the last charging state,
-including a deliberate pause. **This version is not published yet.**
-The planned HA app and Docker image will have a handover procedure that retains
-existing device and entity IDs. Continue using the published integration until
-the service release is available.
+The optional [Modbus service](docs/modbus-service.md) runs independently of HA
+and keeps the last charging state, including a deliberate pause. It is available
+in **0.5.0b1**, a beta for installation and hardware testing. Enable
+**Pre-release** for this repository in the Marketplace, or beta releases in HACS,
+and install the matching integration version before switching over.
+
+[![Add the Mennekes Amtron beta app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps-beta)
+
+On HA OS, install the service from this app repository. HACS and the Marketplace
+install the integration; the app is installed separately. For HA Container,
+use the published Docker image. Follow the [handover guide](docs/modbus-service.md)
+to retain existing device and entity IDs. **0.4.1 remains the stable release.**
 
 ## Documentation and help
 

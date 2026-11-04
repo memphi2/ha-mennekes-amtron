@@ -6,6 +6,8 @@
 - Keeps the heartbeat and last charging state through Home Assistant Core restarts.
 - Preserves intentional pause, charging release and remembered resume current.
 - Authenticated API, bounded requests and change-only persistent control intent.
+- Resume applies each HA client's current cap to the latest service setpoint
+  under the current-write lock.
 - Published container images are tested before the app catalog is updated.
 
 Physical wallbox and Supervisor acceptance testing is pending.

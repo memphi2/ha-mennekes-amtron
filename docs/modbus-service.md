@@ -1,8 +1,8 @@
 # Independent Modbus service
 
-**Preview for the unpublished 0.5.0b1.** Publication is on hold. The app catalog
-and container installation below will be available after a release is approved;
-continue using the published integration until then.
+**0.5.0b1 is a beta for installation and hardware testing.** The integration
+and service use the same version. Existing stable installations keep direct
+serial mode until you explicitly switch them to the service.
 
 The service owns the USB RS-485 adapter and keeps the heartbeat running while
 Home Assistant Core restarts. Home Assistant connects to its authenticated API;
@@ -20,8 +20,10 @@ heartbeat. The wallbox's configured fallback applies in that case. See
 
 ## Install the beta on Home Assistant OS
 
-Use the **0.5.0b1** integration release, with beta versions enabled in HACS.
-The service is an additional HA app; HACS installs only the integration.
+Install the **0.5.0b1** integration release first. On HA 2026.11+, enable the
+repository's **Pre-release** switch in the Marketplace; on HA 2026.9/2026.10,
+enable beta releases in HACS. The service is an additional HA app installed
+through Supervisor. HACS and the Marketplace install only the integration.
 
 [![Add the Mennekes Amtron beta app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps-beta)
 
@@ -44,8 +46,12 @@ Configure:
   Use the same token in the integration and keep it private.
 - **Read-only:** initially enabled; disable it when the service should maintain
   the heartbeat and accept charging commands.
-- **Current cap:** the installation's permitted EMS current cap. The default is
-  6 A. Explicitly selecting 0 A disables the EMS limit.
+- **Current cap:** the service's EMS current cap, from 6 to 32 A. The default is
+  6 A. Stay within the installation's permitted current.
+
+Selecting **0 A** on the integration's current slider explicitly removes the
+EMS limit, including its extra current cap; the wallbox's hardware limit remains.
+Use **Charging paused** to stop charging.
 
 The API uses port 8765 on the app's internal network. Host port publication is
 disabled by default. Use the app hostname shown by Supervisor as the integration's
@@ -55,7 +61,9 @@ The integration's service options control only HA's access and refresh interval.
 Read-only there disables HA commands while the service keeps its heartbeat and
 charging state. Set Modbus polling/measurement cadence and the service's write
 permission in the app configuration. HA's current cap can further restrict
-commands; it cannot raise the service's cap.
+limited-current commands; it cannot raise the service's cap. On resume, the
+service applies HA's cap to its latest remembered setpoint while holding the
+current-write lock. An explicitly selected unlimited setting remains unlimited.
 
 The beta and stable catalogs use `#apps-beta` and `#apps`, respectively. They
 are different apps to Supervisor. When switching channels, copy the options,
