@@ -11,18 +11,21 @@ Install the matching **0.5.0b1** integration first. Enable **Pre-release** for
 its Marketplace repository on HA 2026.11+, or beta releases in HACS on older
 supported versions. The integration and this app are installed separately.
 
-1. Disable the existing direct-serial integration entry to release the adapter.
-   Keep the entry so the wallbox and entity IDs can be retained.
+1. Note the pause, current limit and charging-release settings and disconnect
+   the vehicle for the first handover. Disable the existing direct-serial
+   integration entry to release the adapter. Keep the entry to retain its IDs.
 2. Set the serial adapter path, address, baudrate and frame to match your wallbox.
 3. Set a random access token of at least 32 characters. Keep it private and use
    the same token when connecting the integration.
-4. Start with **Read-only** enabled and check the app log. Set the permitted
-   current cap, then disable **Read-only** when the service should maintain
-   the heartbeat and accept commands.
+4. Start with **Read-only** enabled and check the app log.
 5. Enable **Start on boot** and **Watchdog**. In the existing integration,
    choose **Reconfigure → Connect to the Modbus service** and enter the app's
    internal hostname, port 8765 and token. Re-enable the entry if necessary.
-6. Verify the readings and pause state, then test a Home Assistant Core restart.
+6. Verify the readings while still read-only. Set the app's permitted current
+   cap and disable **Read-only**. Set the integration's **Control mode** to
+   **Modbus master** and its HA current cap; both permissions must allow writes.
+7. Reapply and verify the noted pause, current and charging-release settings
+   before reconnecting the vehicle. Test a Home Assistant Core restart.
 
 Only this app may own the serial adapter. The default API port is available
 inside the Supervisor network; there is no need to publish a host port.
@@ -35,6 +38,9 @@ The default current cap is 6 A. Explicitly selecting 0 A in the integration
 removes the EMS limit; use the pause control to pause. A first-time migration
 of an already paused device uses 6 A as its resume target if no saved target
 exists. Existing app state retains the previously accepted target.
+On first installation the app reads the wallbox's current state. If fallback
+changed it during the handover, it cannot infer the previous HA intention;
+verify and reapply your settings before reconnecting the vehicle.
 The integration may impose a lower current cap. The app applies it when
 resuming, using its latest saved target; an explicitly unlimited target stays
 unlimited.

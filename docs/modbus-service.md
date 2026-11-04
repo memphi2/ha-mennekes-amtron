@@ -112,19 +112,24 @@ manager with access to the serial device and state directory.
 
 ## Move an existing wallbox
 
-1. Note the current pause, current limit and charging-release settings. In
-   particular, note the resume current if the wallbox is paused.
+1. Note the current pause, current limit and charging-release settings, including
+   the resume current if paused. Disconnect the vehicle for the first handover:
+   the existing heartbeat stops while the adapter changes owners, and the
+   wallbox may apply its fallback before the new service can read its state.
 2. Disable the existing HA integration entry so it releases the serial port.
    Do not delete the entry: it retains the device and entity IDs.
-3. Start the service with the same bus settings, initially read-only. Check its
-   status, then configure its current cap and enable control as described above.
+3. Start the service with the same bus settings and **Read-only** enabled.
 4. Reconfigure the existing integration and choose **Connect to the Modbus
    service**. Enter the URL and token. The serial number must match the existing
-   entry. Re-enable the entry if it remains disabled.
-5. Check the readings, pause and current slider. The service reads the current
-   wallbox state. On its first setup, an already paused wallbox without a saved
-   resume limit uses a conservative 6 A resume target. If needed, resume explicitly
-   and set the previously noted current when you intend to charge again.
+   entry. Re-enable the entry if it remains disabled and compare its readings
+   with the wallbox while the service is still read-only.
+5. Configure the service's current cap, disable its **Read-only** option, and
+   set the integration's **Control mode** to **Modbus master** with the desired
+   HA current cap. These are separate write permissions. Reapply and verify the
+   noted pause, current and charging-release settings before reconnecting the
+   vehicle. The service first reads the wallbox's current state; it cannot infer
+   an earlier HA intention from a changed fallback readback. A currently paused
+   wallbox without saved service intent uses 6 A as its first resume target.
 6. Restart **Home Assistant Core** and verify that the service remains running,
    its heartbeat stays healthy and the selected pause/current is unchanged.
 
