@@ -1,5 +1,13 @@
 # Changes
 
+## 0.5.0b2
+
+- Fix startup with the baudrate strings saved by Supervisor selection fields.
+- Discover the app in Home Assistant automatically, including URL and token.
+- Generate and persist a private token when the app token is empty.
+- Log service, API, serial and heartbeat lifecycle and name invalid options.
+- Close serial ownership when a background worker exits unexpectedly.
+
 ## 0.5.0b1
 
 - First beta of the independent Modbus service for amd64 and aarch64.

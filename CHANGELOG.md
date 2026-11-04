@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.5.0b2 — 2026-11-04
+
 - Log service/API/serial/heartbeat lifecycle and health transitions, name invalid
   configuration fields, and close serial ownership on unexpected worker exits.
 - Accept the baudrate strings produced by Supervisor selection fields; valid
