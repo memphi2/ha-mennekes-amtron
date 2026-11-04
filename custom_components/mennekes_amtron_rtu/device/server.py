@@ -6,32 +6,66 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import signal
+import sys
+from contextlib import suppress
 from pathlib import Path
 
 from aiohttp import web
 
 from .service_config import ServerConfig
+from .service_discovery import app_token, publish_discovery
 from .service_http import create_app
 from .service_runtime import ModbusService
 
+_LOGGER = logging.getLogger(__name__)
 
-async def run(config: ServerConfig, state: Path) -> None:
+
+async def run(config: ServerConfig, state: Path, supervisor_token: str = "") -> None:
     service = ModbusService(config, state)
     runner = web.AppRunner(create_app(service), access_log=None)
     await runner.setup()
     site = web.TCPSite(runner, config.listen, config.port)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
+    discovery: asyncio.Task[None] | None = None
+    stopping: asyncio.Task[bool] | None = None
+
+    def request_stop(sig: signal.Signals) -> None:
+        _LOGGER.info("%s received; stopping Modbus service", sig.name)
+        stop.set()
+
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, stop.set)
+        loop.add_signal_handler(sig, request_stop, sig)
     try:
+        _LOGGER.info("Starting service API on port %s", config.port)
         await site.start()
-        service.start()
-        await stop.wait()
+        _LOGGER.info("Service API ready on port %s", config.port)
+        worker = service.start()
+        if supervisor_token:
+            discovery = asyncio.create_task(publish_discovery(config, supervisor_token))
+        stopping = asyncio.create_task(stop.wait())
+        done, _pending = await asyncio.wait(
+            (stopping, worker), return_when=asyncio.FIRST_COMPLETED
+        )
+        if worker in done:
+            _LOGGER.error("Modbus worker stopped unexpectedly")
+            await worker
+            raise RuntimeError("Modbus worker stopped")
     finally:
-        await runner.cleanup()
-        await service.stop()
+        try:
+            for task in (discovery, stopping):
+                if task is not None:
+                    task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await task
+        finally:
+            try:
+                await runner.cleanup()
+            finally:
+                await service.stop()
+                _LOGGER.info("Modbus service shutdown complete")
 
 
 def main() -> None:
@@ -39,17 +73,49 @@ def main() -> None:
     parser.add_argument("--config", type=Path, default=Path("/data/options.json"))
     parser.add_argument("--state", type=Path, default=Path("/data/intent.json"))
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        stream=sys.stdout,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+    _LOGGER.info("Starting Mennekes Amtron Modbus service")
+    supervisor_token = os.environ.get("SUPERVISOR_TOKEN", "")
+    phase = "reading options"
     try:
         values = json.loads(args.config.read_text())
         if not isinstance(values, dict):
             raise ValueError("configuration must be an object")
+        if supervisor_token:
+            phase = "loading or generating private app credentials"
+            values["token"] = app_token(args.state.with_name("service-token"))
+        phase = "validating options"
         config = ServerConfig.from_dict(values)
-    except ValueError, OSError:
+    except (ValueError, OSError) as err:
+        detail = str(err) if phase == "validating options" else type(err).__name__
         parser.exit(
-            2, "Invalid or unreadable service configuration; check the options.\n"
+            2,
+            f"Invalid or unreadable service configuration during {phase}: {detail}.\n",
         )
-    asyncio.run(run(config, args.state))
+    _LOGGER.info(
+        "Configuration accepted: mode=%s, Modbus address=%s, baudrate=%s, frame=%s%s%s",
+        "read-only" if config.read_only else "master",
+        config.serial.device_id,
+        config.serial.baudrate,
+        config.serial.bytesize,
+        config.serial.parity,
+        config.serial.stopbits,
+    )
+    try:
+        asyncio.run(run(config, args.state, supervisor_token))
+    except Exception as err:  # noqa: BLE001 - sanitize fatal errors at the process boundary
+        # Exception messages can include private paths or credentials. Report
+        # the failure class and errno; lifecycle messages identify the phase.
+        _LOGGER.error(
+            "Modbus service terminated (%s, errno=%s)",
+            type(err).__name__,
+            getattr(err, "errno", None),
+        )
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

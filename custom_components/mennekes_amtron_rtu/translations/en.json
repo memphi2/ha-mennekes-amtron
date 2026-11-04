@@ -4,13 +4,17 @@
       "already_configured": "This wallbox is already configured.",
       "reconfigure_successful": "The connection was updated.",
       "unique_id_mismatch": "This port belongs to a different wallbox.",
-      "service_migration_requires_serial": "The wallbox needs a readable serial number to match the existing device during migration."
+      "service_migration_requires_serial": "The wallbox needs a readable serial number to match the existing device during migration.",
+      "invalid_service_discovery": "The app reported invalid connection details.",
+      "service_identity_changed": "The discovered wallbox changed. Start setup again.",
+      "service_discovery_updated": "The existing integration now uses the discovered app connection."
     },
     "error": {
       "cannot_connect": "Could not open the serial port or the wallbox did not answer. Check the cabling (Modbus A is +, B is -), the port and the bus parameters.",
       "invalid_response": "The device answered but did not report a Modbus layout version. Check the device address and whether DIP 4 and DIP 5 on bank S1 are on.",
       "not_found": "No wallbox answered on this port. Check the wiring (Modbus A is +, B is -, GND connected) and that DIP 4 and DIP 5 on bank S1 are on, with the wallbox restarted afterwards.",
-      "cannot_connect_service": "The service is unreachable, not ready or the token is invalid. Check the address, token and service logs."
+      "cannot_connect_service": "The service is unreachable, not ready or the token is invalid. Check the address, token and service logs.",
+      "service_discovery_requires_serial": "The app has not read a serial number yet. Check its wallbox connection and try again."
     },
     "progress": {
       "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes plus connection checks. No registers are written. During reconfiguration, the existing connection and heartbeat are paused; the wallbox's configured fallback applies."
@@ -77,6 +81,10 @@
           "server_url": "Service URL",
           "server_token": "Access token"
         }
+      },
+      "hassio_confirm": {
+        "title": "Connect the Modbus app",
+        "description": "The Modbus app was discovered automatically. Its address and access token are supplied for you. Confirm the connection. An existing entry for this wallbox keeps its device and entity IDs. A disabled entry remains disabled until you enable it again."
       }
     }
   },

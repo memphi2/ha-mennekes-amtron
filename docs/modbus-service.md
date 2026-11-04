@@ -1,6 +1,6 @@
 # Independent Modbus service
 
-**0.5.0b1 is a beta for installation and hardware testing.** The integration
+**0.5.0b2 is a beta for installation and hardware testing.** The integration
 and service use the same version. Existing stable installations keep direct
 serial mode until you explicitly switch them to the service.
 
@@ -20,7 +20,7 @@ heartbeat. The wallbox's configured fallback applies in that case. See
 
 ## Install the beta on Home Assistant OS
 
-Install the **0.5.0b1** integration release first. On HA 2026.11+, enable the
+Install the **0.5.0b2** integration release first. On HA 2026.11+, enable the
 repository's **Pre-release** switch in the Marketplace; on HA 2026.9/2026.10,
 enable beta releases in HACS. The service is an additional HA app installed
 through Supervisor. HACS and the Marketplace install only the integration.
@@ -44,8 +44,6 @@ Configure:
 
 - **Serial adapter:** the stable adapter path, preferably `/dev/serial/by-id/...`.
 - **Wallbox address**, **baud rate**, **serial frame:** the existing wallbox settings.
-- **Access token:** a randomly generated secret of at least 32 characters.
-  Use the same token in the integration and keep it private.
 - **Read-only:** initially enabled; disable it when the service should maintain
   the heartbeat and accept charging commands.
 - **Current cap:** the service's EMS current cap, from 6 to 32 A. The default is
@@ -55,9 +53,18 @@ Selecting **0 A** on the integration's current slider explicitly removes the
 EMS limit, including its extra current cap; the wallbox's hardware limit remains.
 Use **Charging paused** to stop charging.
 
+The app manages its own private access token. There is no manual token option;
+Home Assistant receives the credential through Supervisor discovery. When
+upgrading from beta 1, update the integration first: the app replaces the old
+manually configured credential and HA learns the new one automatically.
+
 The API uses port 8765 on the app's internal network. Host port publication is
-disabled by default. Use the app hostname shown by Supervisor as the integration's
-service URL, for example `http://APP_HOSTNAME:8765`.
+disabled by default. After starting the app, open **Settings → Devices & services**
+and configure the discovered **Mennekes Amtron** entry. Supervisor supplies its
+address and token; there is no service URL to type. Discovery is restored after
+HA Core restarts. If the wallbox is not ready yet, check the app log and retry
+the discovery confirmation. Standalone Docker/Python services still use manual
+URL and token setup.
 
 The integration's service options control only HA's access and refresh interval.
 Read-only there disables HA commands while the service keeps its heartbeat and
@@ -69,7 +76,7 @@ current-write lock. An explicitly selected unlimited setting remains unlimited.
 
 The beta and stable catalogs use `#apps-beta` and `#apps`, respectively. They
 are different apps to Supervisor. When switching channels, copy the options,
-stop the old app before starting the new one, and reconfigure HA's service URL.
+stop the old app before starting the new one, and confirm the newly discovered app.
 Keep a backup and the old app until the handover is verified.
 
 ## Standalone container or Python service
@@ -125,8 +132,10 @@ manager with access to the serial device and state directory.
 2. Disable the existing HA integration entry so it releases the serial port.
    Do not delete the entry: it retains the device and entity IDs.
 3. Start the service with the same bus settings and **Read-only** enabled.
-4. Reconfigure the existing integration and choose **Connect to the Modbus
-   service**. Enter the URL and token. The serial number must match the existing
+4. For the Supervisor app, confirm its discovered entry under **Devices & services**.
+   The matching wallbox entry is reused automatically. For standalone services,
+   reconfigure the existing integration, choose **Connect to the Modbus service**
+   and enter the URL and token. The serial number must match the existing
    entry. Re-enable the entry if it remains disabled and compare its readings
    with the wallbox while the service is still read-only.
 5. Configure the service's current cap, disable its **Read-only** option, and
@@ -145,6 +154,20 @@ To relinquish control, stop the service or configure its read-only mode and
 check the wallbox's fallback behavior.
 
 ## State, diagnostics and failures
+
+The app log reports process start, accepted bus settings, API readiness, serial
+connection, heartbeat start/stop and clean shutdown. Heartbeat acknowledgement
+and connection failures are logged on state changes, not on every beat or poll.
+Read-only mode explicitly reports that its heartbeat is disabled. Tokens and
+wallbox/adapter serial numbers are not included in these lifecycle messages.
+
+If the app stops immediately, look for **Invalid or unreadable service
+configuration**: the message identifies the startup phase and invalid option.
+A missing or disconnected serial device is retried while the API stays running.
+An unexpected worker exit is reported and closes the serial connection; a fatal
+process failure reports its error class and errno. Supervisor's Watchdog can
+restart the app after a process failure, but repeated failures need their logged
+cause corrected.
 
 Only pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. The file is atomically replaced

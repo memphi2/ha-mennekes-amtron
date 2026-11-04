@@ -7,12 +7,14 @@ import math
 from typing import Any
 
 from homeassistant.config_entries import (
+    ConfigEntry,
     ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from ._flow_connect import async_test_connection
 from ._flow_search import (
@@ -56,6 +58,8 @@ from .device.const import (
 )
 from .device.identity import async_read_identity, display_identifier
 from .device.registers import VALIDATED_LAYOUT, layout_label
+from .device.service_config import validate_token
+from .device.service_discovery import APP_HOSTNAME
 from .entry_types import MennekesAmtronConfigEntry
 from .options_flow import MennekesAmtronOptionsFlow
 from .remote import CONF_SERVER_TOKEN, CONF_SERVER_URL, RemoteClient, server_url
@@ -83,6 +87,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self._search_error = "not_found"
         self._pending_input: dict[str, Any] | None = None
         self._pending_step: str = "serial"
+        self._discovered_service: dict[str, Any] | None = None
+        self._discovered_serial: str | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -159,6 +165,110 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="server",
             data_schema=self.add_suggested_values_to_schema(service_schema(), defaults),
             errors=errors,
+        )
+
+    async def async_step_hassio(
+        self, discovery_info: HassioServiceInfo
+    ) -> ConfigFlowResult:
+        """Use Supervisor's authenticated app identity, never a supplied URL."""
+        hostname = discovery_info.slug.replace("_", "-")
+        try:
+            if (
+                not APP_HOSTNAME.fullmatch(hostname)
+                or discovery_info.config.get("host") != hostname
+                or type(discovery_info.config.get("port")) is not int
+                or discovery_info.config["port"] != 8765
+            ):
+                raise ValueError("invalid app discovery")
+            token = validate_token(discovery_info.config.get("token"))
+        except ValueError:
+            return self.async_abort(reason="invalid_service_discovery")
+        self._discovered_service = {
+            CONF_SERVER_URL: f"http://{hostname}:8765",
+            CONF_SERVER_TOKEN: token,
+        }
+        # A new app announcement may replace credentials in an unfinished
+        # discovery. Keep one prompt and discard the stale private payload.
+        for flow in self._async_in_progress():
+            if (flow["context"].get("title_placeholders") or {}).get(
+                "app"
+            ) == discovery_info.slug:
+                self.hass.config_entries.flow.async_abort(flow["flow_id"])
+        entry = await self.async_set_unique_id(f"{DOMAIN}_{hostname}")
+        if entry is not None and entry.source == "ignore":
+            return self.async_abort(reason="already_configured")
+        self.context["title_placeholders"] = {
+            "name": DEFAULT_NAME,
+            "app": discovery_info.slug,
+        }
+        return await self.async_step_hassio_confirm()
+
+    async def async_step_hassio_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Confirm a new connection or migration without copying URL or token."""
+        data = self._discovered_service
+        if data is None:
+            return self.async_abort(reason="invalid_service_discovery")
+        errors: dict[str, str] = {}
+        client = RemoteClient(
+            async_get_clientsession(self.hass),
+            data[CONF_SERVER_URL],
+            data[CONF_SERVER_TOKEN],
+        )
+        try:
+            await client.async_connect()
+            serial = client.identity.serial_number
+            if not serial:
+                errors["base"] = "service_discovery_requires_serial"
+            elif (
+                self._discovered_serial is not None
+                and self._discovered_serial != serial
+            ):
+                return self.async_abort(reason="service_identity_changed")
+            else:
+                self._discovered_serial = serial
+                entry = await self.async_set_unique_id(serial)
+                if entry is not None and entry.source == "ignore":
+                    return self.async_abort(reason="already_configured")
+                complete = {**data, CONF_SERIAL_NUMBER: serial}
+                if (
+                    entry is not None
+                    and entry.data.get(CONF_SERVER_URL) == data[CONF_SERVER_URL]
+                ):
+                    if dict(entry.data) != complete:
+                        return self._update_discovered_entry(entry, complete)
+                    return self.async_abort(reason="already_configured")
+                if user_input is not None:
+                    if entry is not None:
+                        return self._update_discovered_entry(entry, complete)
+                    return self.async_create_entry(
+                        title=DEFAULT_NAME,
+                        data=complete,
+                        options={
+                            CONF_CONTROL_MODE: (
+                                CONTROL_MODE_READ_ONLY
+                                if client.snapshot["control"]["read_only"]
+                                else CONTROL_MODE_MASTER
+                            )
+                        },
+                    )
+        except AmtronBusError:
+            errors["base"] = "cannot_connect_service"
+        finally:
+            await client.async_close()
+        return self.async_show_form(step_id="hassio_confirm", errors=errors)
+
+    def _update_discovered_entry(
+        self, entry: ConfigEntry, data: dict[str, Any]
+    ) -> ConfigFlowResult:
+        """Preserve IDs/options and let the existing listener reload exactly once."""
+        if entry.update_listeners:
+            return self.async_update_and_abort(
+                entry, data=data, reason="service_discovery_updated"
+            )
+        return self.async_update_reload_and_abort(
+            entry, data=data, reason="service_discovery_updated"
         )
 
     async def _async_serial_step(

@@ -4,13 +4,17 @@
       "already_configured": "Diese Wallbox ist bereits konfiguriert.",
       "reconfigure_successful": "Die Verbindung wurde aktualisiert.",
       "unique_id_mismatch": "Dieser Port gehört zu einer anderen Wallbox.",
-      "service_migration_requires_serial": "Ohne auslesbare Seriennummer ist keine automatische Zuordnung zum bestehenden Gerät möglich."
+      "service_migration_requires_serial": "Ohne auslesbare Seriennummer ist keine automatische Zuordnung zum bestehenden Gerät möglich.",
+      "invalid_service_discovery": "Die App hat ungültige Verbindungsdaten gemeldet.",
+      "service_identity_changed": "Die erkannte Wallbox hat sich geändert. Starte die Einrichtung erneut.",
+      "service_discovery_updated": "Die vorhandene Integration verwendet jetzt die erkannte App-Verbindung."
     },
     "error": {
       "cannot_connect": "Der serielle Port konnte nicht geöffnet werden oder die Wallbox hat nicht geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -), den Port und die Busparameter.",
       "invalid_response": "Das Gerät hat geantwortet, aber keine Modbus-Layout-Version gemeldet. Prüfe die Geräteadresse und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen.",
       "not_found": "Auf diesem Port hat keine Wallbox geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -, GND verbunden) und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen und die Wallbox danach neu gestartet wurde.",
-      "cannot_connect_service": "Dienst nicht erreichbar, nicht bereit oder Zugriffstoken ungültig. Prüfe Adresse, Token und Dienstprotokoll."
+      "cannot_connect_service": "Dienst nicht erreichbar, nicht bereit oder Zugriffstoken ungültig. Prüfe Adresse, Token und Dienstprotokoll.",
+      "service_discovery_requires_serial": "Die App hat noch keine Seriennummer gelesen. Prüfe die Verbindung zur Wallbox und versuche es erneut."
     },
     "progress": {
       "searching": "Der Bus wird nach einer Wallbox abgesucht: bis zu {candidates} Kombinationen, etwa {minutes} Minuten zuzüglich Verbindungsprüfungen. Es werden keine Register geschrieben. Beim Neukonfigurieren pausieren die bisherige Verbindung und der Heartbeat; das konfigurierte Ausfallverhalten der Wallbox greift."
@@ -77,6 +81,10 @@
           "server_url": "Dienst-URL",
           "server_token": "Zugriffstoken"
         }
+      },
+      "hassio_confirm": {
+        "title": "Modbus-App verbinden",
+        "description": "Die Modbus-App wurde automatisch erkannt. Adresse und Zugriffstoken werden übernommen. Bestätige die Verbindung. Ein vorhandener Eintrag derselben Wallbox wird mit seinen Geräte- und Entitäts-IDs weiterverwendet. Ein deaktivierter Eintrag bleibt deaktiviert, bis du ihn wieder aktivierst."
       }
     }
   },

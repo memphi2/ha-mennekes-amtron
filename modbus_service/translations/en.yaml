@@ -11,9 +11,6 @@ configuration:
   frame:
     name: Serial frame
     description: Data bits, parity and stop bits configured in the wallbox.
-  token:
-    name: Access token
-    description: Random secret of at least 32 characters; use the same token in the HA integration.
   read_only:
     name: Read-only
     description: Disables charging commands and the service heartbeat; Modbus reads remain active.

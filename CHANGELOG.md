@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.5.0b2 — 2026-11-04
+
+- Log service/API/serial/heartbeat lifecycle and health transitions, name invalid
+  configuration fields, and close serial ownership on unexpected worker exits.
+- Accept the baudrate strings produced by Supervisor selection fields; valid
+  saved app options no longer terminate the service with a configuration error.
+- Discover the Supervisor app automatically with its address and token, reuse
+  existing wallbox entries, and manage persistent private app tokens automatically.
+  Remove the beta-1 manual app-token option without a legacy fallback.
+
 ## 0.5.0b1 — 2026-11-04
 
 ### Added

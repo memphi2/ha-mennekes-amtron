@@ -61,18 +61,36 @@ class ModbusService:
         self._attempts = 0
         self._retry_at = 0.0
         self._updated_at: float | None = None
+        self._stopping = False
+        self._phase = "opening serial connection"
+        self.heartbeat.async_add_listener(self._log_heartbeat_health)
 
-    def start(self) -> None:
+    def start(self) -> asyncio.Task[None]:
+        _LOGGER.info("Opening serial connection to the wallbox")
         self._task = asyncio.create_task(self._run(), name="amtron_service")
+        return self._task
+
+    def _log_heartbeat_health(self) -> None:
+        if self._stopping:
+            return
+        if self.heartbeat.healthy is True:
+            _LOGGER.info("Heartbeat acknowledged by the wallbox")
+        elif self.heartbeat.healthy is False:
+            _LOGGER.warning(
+                "Heartbeat acknowledgement missing; checking the serial connection"
+            )
 
     async def _initialize(self) -> None:
+        self._phase = "opening serial connection"
         await self.client.async_connect()
+        self._phase = "reading wallbox identity"
         identity = await async_read_identity(self.client)
         store = IntentStore(
             self.state_path,
             identity.serial_number
             or f"{self.config.serial.port}:{self.config.serial.device_id}",
         )
+        self._phase = "loading saved control intent"
         await asyncio.to_thread(store.load, self.client.write_state)
         self.identity = identity
         self._store = store
@@ -102,8 +120,12 @@ class ModbusService:
                 )
         await self._persist()
         self.control = control
+        _LOGGER.info("Serial connection established; wallbox initialized")
         if not self.config.read_only:
             self.heartbeat.start()
+            _LOGGER.info("Heartbeat started")
+        else:
+            _LOGGER.info("Heartbeat disabled in read-only mode")
 
     async def _run(self) -> None:
         while True:
@@ -114,16 +136,24 @@ class ModbusService:
                     await self.refresh()
                 await self._recover()
                 await self._persist()
+                if self._logged_unavailable:
+                    _LOGGER.info("Wallbox communication restored")
                 self._logged_unavailable = False
-            except AmtronBusError, DeviceError, OSError, ValueError:
+            except (AmtronBusError, DeviceError, OSError, ValueError) as err:
                 self._success = False
                 if not self._logged_unavailable:
-                    _LOGGER.warning("Wallbox service is unavailable; retrying")
+                    _LOGGER.warning(
+                        "Wallbox unavailable during %s (%s); retrying every %.0f seconds",
+                        self._phase,
+                        type(err).__name__,
+                        self.config.scan_interval,
+                    )
                     self._logged_unavailable = True
             await asyncio.sleep(self.config.scan_interval)
 
     async def refresh(self) -> None:
         async with self._poll_lock:
+            self._phase = "polling the wallbox"
             if self._poller is None:
                 raise DeviceError("service_unavailable")
             try:
@@ -137,6 +167,7 @@ class ModbusService:
             self._updated_at = time.monotonic()
 
     async def _recover(self) -> None:
+        self._phase = "recovering the wallbox error"
         if self.data.get("error_code") == 0:
             self._attempts = 0
         if (
@@ -169,6 +200,7 @@ class ModbusService:
     async def _persist(self) -> None:
         if self._store is not None:
             async with self._store_lock:
+                self._phase = "saving control intent"
                 original = self.client.write_state
                 state = WriteState(
                     charging_setpoint=original.charging_setpoint,
@@ -303,14 +335,21 @@ class ModbusService:
         raise ValueError("unsupported read")
 
     async def stop(self) -> None:
-        if self._task is not None:
-            self._task.cancel()
-            with suppress(asyncio.CancelledError):
-                await self._task
-        await self.heartbeat.async_stop()
-        if self.control is not None:
-            await self.control.async_shutdown()
+        self._stopping = True
         try:
-            await self._persist()
+            try:
+                if self._task is not None:
+                    self._task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await self._task
+            finally:
+                heartbeat_running = self.heartbeat.running
+                await self.heartbeat.async_stop()
+                if heartbeat_running:
+                    _LOGGER.info("Heartbeat stopped")
+                if self.control is not None:
+                    await self.control.async_shutdown()
+                await self._persist()
         finally:
             await self.client.async_close()
+            _LOGGER.info("Serial connection closed")

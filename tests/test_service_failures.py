@@ -268,3 +268,87 @@ def test_service_shutdown_releases_the_port_even_if_state_cannot_be_saved(
         assert not service.heartbeat.running
 
     asyncio.run(run())
+
+
+def test_unexpected_worker_exit_stops_heartbeat_serial_and_discovery(
+    tmp_path, monkeypatch, caplog
+):
+    from dataclasses import replace
+
+    from custom_components.mennekes_amtron_rtu.device import server
+
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        cancelled = asyncio.Event()
+
+        async def failed_worker():
+            await asyncio.sleep(0.01)
+            raise RuntimeError("unexpected worker failure")
+
+        async def pending_discovery(*_args):
+            try:
+                await asyncio.Future()
+            finally:
+                cancelled.set()
+
+        monkeypatch.setattr(service, "_run", failed_worker)
+        monkeypatch.setattr(server, "ModbusService", lambda *_: service)
+        monkeypatch.setattr(server, "publish_discovery", pending_discovery)
+        with pytest.raises(RuntimeError, match="unexpected worker failure"):
+            await asyncio.wait_for(
+                server.run(
+                    replace(service.config, port=0),
+                    tmp_path / "intent.json",
+                    "supervisor-private",
+                ),
+                2,
+            )
+        assert cancelled.is_set()
+        assert not service.client.connected
+        assert not service.heartbeat.running
+        assert "Modbus worker stopped unexpectedly" in caplog.text
+
+    asyncio.run(run())
+
+
+def test_fatal_cli_error_is_actionable_and_does_not_echo_private_details(
+    tmp_path, monkeypatch, caplog
+):
+    from custom_components.mennekes_amtron_rtu.device import server
+
+    path = tmp_path / "options.json"
+    path.write_text(
+        json.dumps({"serial_port": "/dev/fake", "token": TOKEN, "baudrate": "57600"})
+    )
+    monkeypatch.setattr("sys.argv", ["amtron-modbus-service", "--config", str(path)])
+
+    async def fail(*_args):
+        raise OSError(98, f"sensitive bind error {TOKEN}")
+
+    monkeypatch.setattr(server, "run", fail)
+    with pytest.raises(SystemExit) as error:
+        server.main()
+    assert error.value.code == 1
+    assert "Modbus service terminated (OSError, errno=98)" in caplog.text
+    assert TOKEN not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("key", "value"), [("baudrate", "bad"), ("device_id", 51), ("current_cap", 100)]
+)
+def test_cli_configuration_error_names_the_invalid_field(
+    tmp_path, monkeypatch, capsys, key, value
+):
+    from custom_components.mennekes_amtron_rtu.device import server
+
+    path = tmp_path / "options.json"
+    path.write_text(
+        json.dumps({"serial_port": "/dev/fake", "token": TOKEN, key: value})
+    )
+    monkeypatch.setattr("sys.argv", ["amtron-modbus-service", "--config", str(path)])
+    with pytest.raises(SystemExit) as error:
+        server.main()
+    assert error.value.code == 2
+    log = capsys.readouterr().err
+    assert f"validating options: {key}:" in log
+    assert TOKEN not in log

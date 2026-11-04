@@ -9,6 +9,20 @@ from .client import SerialConfig
 from .const import SUPPORTED_BAUDRATES, frame_parts
 
 
+def validate_token(value: Any) -> str:
+    """Validate credentials without including them in error messages."""
+    if (
+        not isinstance(value, str)
+        or len(value) < 32
+        or not value.isascii()
+        or any(char.isspace() for char in value)
+    ):
+        raise ValueError(
+            "token must contain at least 32 ASCII characters without whitespace"
+        )
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class ServerConfig:
     serial: SerialConfig
@@ -37,16 +51,7 @@ class ServerConfig:
         }
         if values.keys() - allowed:
             raise ValueError("unknown service configuration option")
-        token = values.get("token")
-        if (
-            not isinstance(token, str)
-            or len(token) < 32
-            or not token.isascii()
-            or any(char.isspace() for char in token)
-        ):
-            raise ValueError(
-                "token must contain at least 32 ASCII characters without whitespace"
-            )
+        token = validate_token(values.get("token"))
         serial_port = values.get("serial_port")
         if (
             not isinstance(serial_port, str)
@@ -54,7 +59,15 @@ class ServerConfig:
             or "\x00" in serial_port
         ):
             raise ValueError("serial_port must be a local /dev/ device")
-        baudrate = integer(values.get("baudrate", 57600), 9600, 57600)
+        baudrate_value = values.get("baudrate", 57600)
+        # Supervisor list(...) options are serialized as strings, including
+        # digit-only choices. Accept only the documented choices, not arbitrary
+        # numeric coercions (booleans, fractional rates or surrounding text).
+        if isinstance(baudrate_value, str) and baudrate_value in {
+            str(rate) for rate in SUPPORTED_BAUDRATES
+        }:
+            baudrate_value = int(baudrate_value)
+        baudrate = _integer_option(baudrate_value, "baudrate", 9600, 57600)
         if baudrate not in SUPPORTED_BAUDRATES:
             raise ValueError("unsupported baudrate")
         frame = values.get("frame", "8n2")
@@ -74,15 +87,17 @@ class ServerConfig:
                 bits,
                 parity,
                 stops,
-                integer(values.get("device_id", 50), 10, 50),
+                _integer_option(values.get("device_id", 50), "device_id", 10, 50),
             ),
             token,
             read_only,
-            number(values.get("current_cap", 6), 6, 32),
-            number(values.get("scan_interval", 5), 2, 300),
-            number(values.get("measurement_interval", 30), 2, 300),
+            _number_option(values.get("current_cap", 6), "current_cap", 6, 32),
+            _number_option(values.get("scan_interval", 5), "scan_interval", 2, 300),
+            _number_option(
+                values.get("measurement_interval", 30), "measurement_interval", 2, 300
+            ),
             listen,
-            integer(values.get("port", 8765), 1, 65535),
+            _integer_option(values.get("port", 8765), "port", 1, 65535),
         )
 
 
@@ -100,3 +115,17 @@ def integer(value: Any, minimum: int, maximum: int) -> int:
     if type(value) is not int or not minimum <= value <= maximum:
         raise ValueError("integer value is outside the allowed range")
     return value
+
+
+def _integer_option(value: Any, name: str, minimum: int, maximum: int) -> int:
+    try:
+        return integer(value, minimum, maximum)
+    except ValueError as error:
+        raise ValueError(f"{name}: {error}") from None
+
+
+def _number_option(value: Any, name: str, minimum: float, maximum: float) -> float:
+    try:
+        return number(value, minimum, maximum)
+    except ValueError as error:
+        raise ValueError(f"{name}: {error}") from None
