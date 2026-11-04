@@ -62,3 +62,36 @@ def test_normal_bus_failures_and_read_only_do_not_stop_worker(tmp_path, read_onl
         assert not any(task.get_name() == "amtron_polling" for task in asyncio.all_tasks())
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("stage", ["before_monitor", "after_monitor", "read_only"])
+def test_unexpected_poll_failure_propagates_and_does_not_orphan_tasks(tmp_path, stage):
+    async def run():
+        service, transport, _clock = await service_fixture(tmp_path, read_only=stage == "read_only")
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def broken_refresh():
+            entered.set()
+            await release.wait()
+            raise RuntimeError("unexpected polling failure")
+
+        service.refresh = broken_refresh
+        if stage != "after_monitor":
+            release.set()
+        worker = service.start()
+        try:
+            await entered.wait()
+            if stage == "after_monitor":
+                await asyncio.sleep(0)
+                await asyncio.sleep(0)
+                release.set()
+            with pytest.raises(RuntimeError, match="unexpected polling failure"):
+                await asyncio.wait_for(worker, 1)
+        finally:
+            with pytest.raises(RuntimeError, match="unexpected polling failure"):
+                await service.stop()
+        assert not service.heartbeat.running
+        assert not transport.connected
+        assert not any(task.get_name() == "amtron_polling" for task in asyncio.all_tasks())
+
+    asyncio.run(run())
