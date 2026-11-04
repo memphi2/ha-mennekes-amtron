@@ -72,7 +72,7 @@ def test_generated_app_token_is_private_persistent_and_not_rewritten(tmp_path):
 
 
 @pytest.mark.parametrize("configured", [False, True])
-def test_app_cli_generates_only_missing_credentials_and_passes_supervisor_identity(
+def test_app_cli_owns_credentials_and_ignores_legacy_manual_tokens(
     tmp_path, monkeypatch, configured
 ):
     from custom_components.mennekes_amtron_rtu.device import server
@@ -97,11 +97,8 @@ def test_app_cli_generates_only_missing_credentials_and_passes_supervisor_identi
     server.main()
     assert calls[0] == calls[1]
     assert calls[0][1:] == (state, "supervisor-private")
-    if configured:
-        assert calls[0][0] == TOKEN
-        assert not (tmp_path / "service-token").exists()
-    else:
-        assert calls[0][0] == (tmp_path / "service-token").read_text()
+    assert calls[0][0] == (tmp_path / "service-token").read_text()
+    assert calls[0][0] != TOKEN
 
 
 def test_discovery_rejects_foreign_app_hostname_and_cancels_promptly(monkeypatch):

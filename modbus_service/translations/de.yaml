@@ -11,9 +11,6 @@ configuration:
   frame:
     name: Serielles Format
     description: In der Wallbox eingestellte Datenbits, Parität und Stoppbits.
-  token:
-    name: Zugriffstoken
-    description: Leer lassen für einen automatisch erzeugten, dauerhaft gespeicherten Token. Alternativ mindestens 32 Zeichen. Home Assistant übernimmt ihn über die automatische App-Erkennung.
   read_only:
     name: Nur lesen
     description: Schaltet Steuerbefehle und den Heartbeat des Dienstes ab; Modbus-Leseanfragen bleiben aktiv.

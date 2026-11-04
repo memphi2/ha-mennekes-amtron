@@ -19,8 +19,8 @@ network, or protect the connection with HTTPS.
 
 ## What the independent service stores
 
-The service configuration contains its serial settings and any manually supplied
-access token. The Supervisor app can instead generate a token in an owner-only
+Standalone service configuration contains its serial settings and access token.
+The Supervisor app exclusively manages its own token in an owner-only
 `service-token` file, reused across restarts. Supervisor stores the app's discovery
 address and token and transfers them locally to Home Assistant; no network
 broadcast or cloud discovery is involved. Protect Supervisor backups as well. Its

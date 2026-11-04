@@ -44,9 +44,6 @@ Configure:
 
 - **Serial adapter:** the stable adapter path, preferably `/dev/serial/by-id/...`.
 - **Wallbox address**, **baud rate**, **serial frame:** the existing wallbox settings.
-- **Access token:** leave empty for automatic generation and persistent storage.
-  An existing token remains valid. A manually chosen token needs at least 32
-  ASCII characters without whitespace. Home Assistant receives it automatically.
 - **Read-only:** initially enabled; disable it when the service should maintain
   the heartbeat and accept charging commands.
 - **Current cap:** the service's EMS current cap, from 6 to 32 A. The default is
@@ -55,6 +52,11 @@ Configure:
 Selecting **0 A** on the integration's current slider explicitly removes the
 EMS limit, including its extra current cap; the wallbox's hardware limit remains.
 Use **Charging paused** to stop charging.
+
+The app manages its own private access token. There is no manual token option;
+Home Assistant receives the credential through Supervisor discovery. When
+upgrading from beta 1, update the integration first: the app replaces the old
+manually configured credential and HA learns the new one automatically.
 
 The API uses port 8765 on the app's internal network. Host port publication is
 disabled by default. After starting the app, open **Settings → Devices & services**

@@ -11,9 +11,6 @@ configuration:
   frame:
     name: Serial frame
     description: Data bits, parity and stop bits configured in the wallbox.
-  token:
-    name: Access token
-    description: Leave empty to generate and persist a token automatically. Alternatively enter at least 32 characters. Home Assistant receives it through automatic app discovery.
   read_only:
     name: Read-only
     description: Disables charging commands and the service heartbeat; Modbus reads remain active.

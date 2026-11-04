@@ -17,8 +17,8 @@ verified download. No Python source is compiled or dependencies installed locall
    the vehicle for the first handover. Disable the existing direct-serial
    integration entry to release the adapter. Keep the entry to retain its IDs.
 2. Set the serial adapter path, address, baudrate and frame to match your wallbox.
-3. Leave **Access token** empty to generate and store it automatically, or keep
-   your existing token. No copying into the integration is needed.
+3. No access token needs configuring: the app creates and stores its own
+   private credential and sends it to Home Assistant through Supervisor.
 4. Start with **Read-only** enabled and check the app log.
 5. Enable **Start on boot** and **Watchdog**. Under **Settings → Devices & services**,
    configure the discovered **Mennekes Amtron** entry. Address and token are

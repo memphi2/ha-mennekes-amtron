@@ -85,7 +85,7 @@ def main() -> None:
         values = json.loads(args.config.read_text())
         if not isinstance(values, dict):
             raise ValueError("configuration must be an object")
-        if supervisor_token and values.get("token", "") == "":
+        if supervisor_token:
             phase = "loading or generating private app credentials"
             values["token"] = app_token(args.state.with_name("service-token"))
         phase = "validating options"

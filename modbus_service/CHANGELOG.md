@@ -4,7 +4,7 @@
 
 - Fix startup with the baudrate strings saved by Supervisor selection fields.
 - Discover the app in Home Assistant automatically, including URL and token.
-- Generate and persist a private token when the app token is empty.
+- Remove the manual app-token option; the app exclusively manages its private token.
 - Log service, API, serial and heartbeat lifecycle and name invalid options.
 - Close serial ownership when a background worker exits unexpectedly.
 
