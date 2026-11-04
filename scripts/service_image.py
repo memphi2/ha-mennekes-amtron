@@ -74,6 +74,10 @@ def smoke(image: str) -> None:
                 "docker",
                 "run",
                 "--detach",
+                # Match the owner of the private bind mount without granting
+                # DAC override to container root or weakening the token file.
+                "--user",
+                f"{os.getuid()}:{os.getgid()}",
                 "--read-only",
                 "--cap-drop=ALL",
                 "--security-opt=no-new-privileges",
@@ -103,7 +107,16 @@ def smoke(image: str) -> None:
                             break
                 except OSError, urllib.error.URLError:
                     if time.monotonic() >= deadline:
-                        raise ValueError("container API did not become ready") from None
+                        logs = subprocess.run(
+                            ["docker", "logs", "--tail", "40", container],
+                            capture_output=True,
+                            check=False,
+                        )
+                        detail = (logs.stdout + logs.stderr).decode(errors="replace")
+                        raise ValueError(
+                            "container API did not become ready: "
+                            + detail.replace(token, "<redacted>")
+                        ) from None
                 time.sleep(0.25)
             try:
                 urllib.request.urlopen(base + "/v1/state", timeout=2)  # noqa: S310 - fixed loopback HTTP

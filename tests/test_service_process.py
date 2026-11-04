@@ -29,6 +29,14 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
     tmp_path, request
 ):
+    # Mirror the standalone wheel's package layout. Running inside the HA
+    # platform directory shadows the stdlib select module on some Python builds.
+    service_root = tmp_path / "service"
+    shutil.copytree(
+        ROOT / "custom_components" / DOMAIN / "device",
+        service_root / "amtron_device",
+    )
+
     async def run():
         device_port, client_port = _virtual_serial_link(request)
         wallbox, serving = await _start_wallbox(
@@ -52,12 +60,12 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
         process = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
-            "device.server",
+            "amtron_device.server",
             "--config",
             str(config_path),
             "--state",
             str(tmp_path / "intent.json"),
-            cwd=ROOT / "custom_components" / DOMAIN,
+            cwd=service_root,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
