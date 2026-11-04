@@ -11,9 +11,6 @@ configuration:
   frame:
     name: Serielles Format
     description: In der Wallbox eingestellte Datenbits, Parität und Stoppbits.
-  token:
-    name: Zugriffstoken
-    description: Zufälliges Geheimnis mit mindestens 32 Zeichen; denselben Wert in der HA-Integration verwenden.
   read_only:
     name: Nur lesen
     description: Schaltet Steuerbefehle und den Heartbeat des Dienstes ab; Modbus-Leseanfragen bleiben aktiv.

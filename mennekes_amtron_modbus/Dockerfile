@@ -1,1 +1,1 @@
-FROM ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:05fba7a6640828760e82043127ce4530f3a6183155219ef9d5a396ba426f5b0e
+FROM ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:a0221effb2c9814fe6e2bb4ad4d727c6992eb1e2f0f2b10f55bd2bd19b5200d0
