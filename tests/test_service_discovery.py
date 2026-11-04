@@ -323,7 +323,14 @@ def test_real_ha_discovery_connects_without_url_or_token_fields_and_keeps_ids(
 
 @pytest.mark.parametrize(
     "scenario",
-    ["unready", "no_serial", "changed_identity", "ignored", "new_credentials"],
+    [
+        "unready",
+        "no_serial",
+        "changed_identity",
+        "ignored",
+        "ignored_unready",
+        "new_credentials",
+    ],
 )
 def test_discovery_handles_incomplete_setup_and_identity_safely(
     tmp_path, monkeypatch, scenario
@@ -342,12 +349,25 @@ def test_discovery_handles_incomplete_setup_and_identity_safely(
                 monkeypatch.setattr(config_flow, "RemoteClient", LoopbackRemote)
                 monkeypatch.setattr(integration, "RemoteClient", LoopbackRemote)
                 serial = service.identity.serial_number
-                if scenario == "ignored":
+                if scenario in ("ignored", "ignored_unready"):
                     await hass.config_entries.flow.async_init(
                         DOMAIN,
                         context={"source": "ignore"},
-                        data={"unique_id": serial, "title": "Ignored wallbox"},
+                        data={
+                            "unique_id": f"{DOMAIN}_{HOST}"
+                            if scenario == "ignored_unready"
+                            else serial,
+                            "title": "Ignored wallbox",
+                        },
                     )
+                    if scenario == "ignored_unready":
+                        monkeypatch.setattr(
+                            config_flow,
+                            "RemoteClient",
+                            lambda *_: pytest.fail(
+                                "ignored discovery must not probe the service"
+                            ),
+                        )
                 if scenario == "no_serial":
                     service.identity.serial_number = None
                 if scenario == "unready":
@@ -360,7 +380,7 @@ def test_discovery_handles_incomplete_setup_and_identity_safely(
                 result = await hass.config_entries.flow.async_init(
                     DOMAIN, context={"source": "hassio"}, data=data
                 )
-                if scenario == "ignored":
+                if scenario in ("ignored", "ignored_unready"):
                     assert result["reason"] == "already_configured"
                     return
                 assert result["type"] == "form"

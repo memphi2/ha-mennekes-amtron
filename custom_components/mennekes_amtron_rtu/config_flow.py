@@ -194,7 +194,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 "app"
             ) == discovery_info.slug:
                 self.hass.config_entries.flow.async_abort(flow["flow_id"])
-        await self.async_set_unique_id(f"{DOMAIN}_{hostname}")
+        entry = await self.async_set_unique_id(f"{DOMAIN}_{hostname}")
+        if entry is not None and entry.source == "ignore":
+            return self.async_abort(reason="already_configured")
         self.context["title_placeholders"] = {
             "name": DEFAULT_NAME,
             "app": discovery_info.slug,
