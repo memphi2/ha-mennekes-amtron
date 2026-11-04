@@ -54,7 +54,7 @@ limit**; use **Charging paused** to stop charging.
 
 The optional [Modbus service](docs/modbus-service.md) runs independently of HA
 and keeps the last charging state, including a deliberate pause. It is available
-in **0.5.0b2**, a beta for installation and hardware testing. Enable
+in **0.5.0b3**, a beta for installation and hardware testing. Enable
 **Pre-release** for this repository in the Marketplace, or beta releases in HACS,
 and install the matching integration version before switching over.
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.5.0b3 — 2026-11-05
+
 - Refresh pending app-discovery credentials from Supervisor when confirming or
   retrying setup, so a missed token-change announcement cannot leave the flow
   permanently using a stale token.
@@ -25,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Include the independent service's connection, heartbeat and recovery timeline
   in HA diagnostics instead of the separate HA client's local event history.
+- Release unloaded serial clients promptly by avoiding a client-factory reference
+  cycle.
 
 - Add bounded, in-memory write diagnostics with bus-wait/transaction timing and
   packet callback counts for failed writes and subsequent confirmations. Fetch
