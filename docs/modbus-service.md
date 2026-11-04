@@ -155,6 +155,13 @@ check the wallbox's fallback behavior.
 
 ## State, diagnostics and failures
 
+The integration's diagnostics download fetches the app's bounded
+`write_transactions` history on demand. It records failed writes and the next
+confirmation per affected register, including time waiting for the bus and
+send/receive callback timing. It remains in RAM only, resets when the app
+restarts, and adds no Recorder entries or regular polling traffic. See
+[isolated heartbeat timeouts](troubleshooting.md#an-occasional-no-response-received-after-0-retries).
+
 The app log reports process start, accepted bus settings, API readiness, serial
 connection, heartbeat start/stop and clean shutdown. Heartbeat acknowledgement
 and connection failures are logged on state changes, not on every beat or poll.

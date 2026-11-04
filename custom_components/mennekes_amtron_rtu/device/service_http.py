@@ -52,6 +52,10 @@ def create_app(service: ModbusService) -> web.Application:
     async def state(_request: web.Request) -> web.Response:
         return web.json_response(service.snapshot())
 
+    async def diagnostics(_request: web.Request) -> web.Response:
+        # Passive RAM snapshot: no serial reads, writes or file access.
+        return web.json_response({"write_transactions": service.client.write_trace.snapshot()})
+
     async def body(request: web.Request) -> dict[str, Any]:
         if request.content_type != "application/json":
             raise web.HTTPUnsupportedMediaType
@@ -74,6 +78,7 @@ def create_app(service: ModbusService) -> web.Application:
 
     app.router.add_get("/health", health)
     app.router.add_get("/v1/state", state)
+    app.router.add_get("/v1/diagnostics", diagnostics)
     app.router.add_post("/v1/command", command)
     app.router.add_post("/v1/read", read)
     return app

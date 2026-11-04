@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Add bounded, in-memory write diagnostics with bus-wait/transaction timing and
+  packet callback counts for failed writes and subsequent confirmations. Fetch
+  service diagnostics only on demand; add no Recorder state or persistent logs.
+- Clarify that missing heartbeat acknowledgements leave delivery uncertain,
+  and document how to investigate isolated timeout messages.
+
 ## 0.5.0b2 — 2026-11-04
 
 - Log service/API/serial/heartbeat lifecycle and health transitions, name invalid

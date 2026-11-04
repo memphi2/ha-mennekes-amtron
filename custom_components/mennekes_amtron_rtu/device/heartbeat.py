@@ -110,7 +110,7 @@ class HeartbeatTask:
         return self._task is not None and not self._task.done()
 
     async def async_beat_once(self) -> bool:
-        """Write one heartbeat and return whether it reached the device."""
+        """Write one heartbeat and return whether its acknowledgement arrived."""
 
         try:
             await self._client.async_write_register(
@@ -191,10 +191,10 @@ class HeartbeatTask:
             await task
 
     def _note_delivery(self, now: float) -> None:
-        """Record a delivered heartbeat and report a missed deadline.
+        """Record an acknowledged heartbeat and report a confirmation gap.
 
-        A failed write never reached the device, so only delivered beats
-        count towards the gap the wallbox actually saw.
+        A missing reply leaves delivery uncertain. The gap measures confirmed
+        heartbeats and does not prove when the wallbox received the writes.
         """
 
         previous = self._delivered_at
@@ -207,8 +207,8 @@ class HeartbeatTask:
         self._diagnostics.heartbeats_late += 1
         self._diagnostics.timeline.record(EventType.HEARTBEAT_LATE)
         _LOGGER.warning(
-            "The heartbeat reached %s %.1f s apart, more than the %.0f s the "
-            "wallbox allows; it may report the energy-manager error",
+            "Heartbeat acknowledgements from %s were %.1f s apart, more than the "
+            "%.0f s heartbeat deadline; delivery during the gap is uncertain",
             self._client.config.port,
             gap,
             self._deadline,

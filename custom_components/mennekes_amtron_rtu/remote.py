@@ -73,7 +73,8 @@ class RemoteClient(MennekesModbusClient):
         self._connected = False
 
     async def request(
-        self, method: str, path: str, payload: dict[str, Any] | None = None
+        self, method: str, path: str, payload: dict[str, Any] | None = None,
+        *, update_connection: bool = True,
     ) -> dict[str, Any]:
         try:
             async with self._session.request(
@@ -120,9 +121,10 @@ class RemoteClient(MennekesModbusClient):
                     raise AmtronConnectionError("service request failed")
                 return data
         except (ClientError, TimeoutError, ValueError, AmtronConnectionError) as err:
-            self._connected = False
-            if self.on_update is not None:
-                self.on_update()
+            if update_connection:
+                self._connected = False
+                if self.on_update is not None:
+                    self.on_update()
             raise AmtronConnectionError(
                 "cannot communicate with the Modbus service"
             ) from err

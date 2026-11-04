@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import AsyncMock
 
+import pytest
+
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronConnectionError,
+)
 from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
 from custom_components.mennekes_amtron_rtu.diagnostics import (
     async_get_config_entry_diagnostics,
     decoded_values,
     fnv1a64,
 )
+from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from tests.ha_fakes import build_runtime
 
 
@@ -45,6 +52,9 @@ def test_the_dump_carries_no_port_path_and_no_serial_number() -> None:
         assert "ABC123456789" not in text
         assert dump["bus"]["port_category"] == "other"
         assert dump["bus"]["device_id"] == 50
+        assert dump["bus"]["response_timeout_seconds"] == 1.0
+        assert dump["bus"]["write_retries"] == 0
+        assert dump["write_transactions"] == []
         assert dump["device"]["layout_version"] == "v01.03"
         assert dump["device"]["serial_number_hash"]
         assert dump["control"]["read_only"] is False
@@ -75,5 +85,27 @@ def test_diagnostics_do_not_expose_identifiers_as_words_or_errors() -> None:
         assert "/dev/fake" not in repr(dump)
         transport.close()
         await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", ["unavailable", "invalid", "valid"])
+def test_remote_write_diagnostics_are_optional_and_allowlisted(monkeypatch, failure):
+    async def run():
+        hass, entry, _transport = await build_runtime()
+        original = entry.runtime_data.client
+        remote = RemoteClient(None, "http://service.invalid:8765", "private-token")
+        remote.async_read_words = original.async_read_words
+        if failure == "unavailable":
+            remote.request = AsyncMock(side_effect=AmtronConnectionError("private-token"))
+        else:
+            rows = [{"secret": "private-token"}] if failure == "invalid" else []
+            remote.request = AsyncMock(return_value={"write_transactions": rows, "secret": "private-token"})
+        entry.runtime_data.client = remote
+        dump = await async_get_config_entry_diagnostics(hass, entry)
+        assert dump["write_transactions"] == ([] if failure == "valid" else None)
+        assert "private-token" not in repr(dump)
+        remote.request.assert_awaited_once_with("GET", "/v1/diagnostics", update_connection=False)
+        await original.async_close()
 
     asyncio.run(run())

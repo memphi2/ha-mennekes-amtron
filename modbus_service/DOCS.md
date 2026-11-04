@@ -30,6 +30,11 @@ verified download. No Python source is compiled or dependencies installed locall
 7. Reapply and verify the noted pause, current and charging-release settings
    before reconnecting the vehicle. Test a Home Assistant Core restart.
 
+For intermittent write or heartbeat faults, download the integration diagnostics
+before restarting the app. The app keeps the last 20 failed write/recovery
+records in RAM, containing timings and callback counts without packet contents.
+This history adds no Recorder rows or persistent logs.
+
 Only this app may own the serial adapter. The default API port is available
 inside the Supervisor network; there is no need to publish a host port.
 Read-only in the HA integration blocks HA commands, but does not stop this app
