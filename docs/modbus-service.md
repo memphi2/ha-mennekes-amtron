@@ -44,8 +44,9 @@ Configure:
 
 - **Serial adapter:** the stable adapter path, preferably `/dev/serial/by-id/...`.
 - **Wallbox address**, **baud rate**, **serial frame:** the existing wallbox settings.
-- **Access token:** a randomly generated secret of at least 32 characters.
-  Use the same token in the integration and keep it private.
+- **Access token:** leave empty for automatic generation and persistent storage.
+  An existing token remains valid. A manually chosen token needs at least 32
+  ASCII characters without whitespace. Home Assistant receives it automatically.
 - **Read-only:** initially enabled; disable it when the service should maintain
   the heartbeat and accept charging commands.
 - **Current cap:** the service's EMS current cap, from 6 to 32 A. The default is
@@ -56,8 +57,12 @@ EMS limit, including its extra current cap; the wallbox's hardware limit remains
 Use **Charging paused** to stop charging.
 
 The API uses port 8765 on the app's internal network. Host port publication is
-disabled by default. Use the app hostname shown by Supervisor as the integration's
-service URL, for example `http://APP_HOSTNAME:8765`.
+disabled by default. After starting the app, open **Settings → Devices & services**
+and configure the discovered **Mennekes Amtron** entry. Supervisor supplies its
+address and token; there is no service URL to type. Discovery is restored after
+HA Core restarts. If the wallbox is not ready yet, check the app log and retry
+the discovery confirmation. Standalone Docker/Python services still use manual
+URL and token setup.
 
 The integration's service options control only HA's access and refresh interval.
 Read-only there disables HA commands while the service keeps its heartbeat and
@@ -69,7 +74,7 @@ current-write lock. An explicitly selected unlimited setting remains unlimited.
 
 The beta and stable catalogs use `#apps-beta` and `#apps`, respectively. They
 are different apps to Supervisor. When switching channels, copy the options,
-stop the old app before starting the new one, and reconfigure HA's service URL.
+stop the old app before starting the new one, and confirm the newly discovered app.
 Keep a backup and the old app until the handover is verified.
 
 ## Standalone container or Python service
@@ -125,8 +130,10 @@ manager with access to the serial device and state directory.
 2. Disable the existing HA integration entry so it releases the serial port.
    Do not delete the entry: it retains the device and entity IDs.
 3. Start the service with the same bus settings and **Read-only** enabled.
-4. Reconfigure the existing integration and choose **Connect to the Modbus
-   service**. Enter the URL and token. The serial number must match the existing
+4. For the Supervisor app, confirm its discovered entry under **Devices & services**.
+   The matching wallbox entry is reused automatically. For standalone services,
+   reconfigure the existing integration, choose **Connect to the Modbus service**
+   and enter the URL and token. The serial number must match the existing
    entry. Re-enable the entry if it remains disabled and compare its readings
    with the wallbox while the service is still read-only.
 5. Configure the service's current cap, disable its **Read-only** option, and

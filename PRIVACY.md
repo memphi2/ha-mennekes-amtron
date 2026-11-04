@@ -19,7 +19,11 @@ network, or protect the connection with HTTPS.
 
 ## What the independent service stores
 
-The service configuration contains its serial settings and access token. Its
+The service configuration contains its serial settings and any manually supplied
+access token. The Supervisor app can instead generate a token in an owner-only
+`service-token` file, reused across restarts. Supervisor stores the app's discovery
+address and token and transfers them locally to Home Assistant; no network
+broadcast or cloud discovery is involved. Protect Supervisor backups as well. Its
 small `intent.json` file stores the wallbox identity, pause/release intent and
 resume current. It is replaced only when intent changes, with no growing history.
 Heartbeats and polls are not persisted. Protect service data and backups.

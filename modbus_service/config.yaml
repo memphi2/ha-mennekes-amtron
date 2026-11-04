@@ -12,6 +12,8 @@ init: true
 uart: true
 udev: true
 apparmor: true
+discovery:
+  - mennekes_amtron_rtu
 ports:
   8765/tcp: null
 ports_description:

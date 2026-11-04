@@ -17,12 +17,13 @@ verified download. No Python source is compiled or dependencies installed locall
    the vehicle for the first handover. Disable the existing direct-serial
    integration entry to release the adapter. Keep the entry to retain its IDs.
 2. Set the serial adapter path, address, baudrate and frame to match your wallbox.
-3. Set a random access token of at least 32 characters. Keep it private and use
-   the same token when connecting the integration.
+3. Leave **Access token** empty to generate and store it automatically, or keep
+   your existing token. No copying into the integration is needed.
 4. Start with **Read-only** enabled and check the app log.
-5. Enable **Start on boot** and **Watchdog**. In the existing integration,
-   choose **Reconfigure → Connect to the Modbus service** and enter the app's
-   internal hostname, port 8765 and token. Re-enable the entry if necessary.
+5. Enable **Start on boot** and **Watchdog**. Under **Settings → Devices & services**,
+   configure the discovered **Mennekes Amtron** entry. Address and token are
+   supplied automatically, and an existing entry for this wallbox keeps its IDs.
+   Re-enable the existing entry if it was disabled for the handover.
 6. Verify the readings while still read-only. Set the app's permitted current
    cap and disable **Read-only**. Set the integration's **Control mode** to
    **Modbus master** and its HA current cap; both permissions must allow writes.
@@ -60,7 +61,7 @@ Clearing error 200 while paused still needs firmware confirmation.
 
 The beta repository URL ends in `#apps-beta`; stable releases use `#apps`.
 Supervisor treats these as different apps. When moving between channels,
-copy the options, stop the old app before starting the other one, and reconfigure
-HA's service URL. Keep the original app and its backup until migration is verified.
+copy the options, stop the old app before starting the other one, and confirm the
+newly discovered app. Keep the original app and its backup until migration is verified.
 
 [Full setup and migration guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0b1/docs/modbus-service.md)

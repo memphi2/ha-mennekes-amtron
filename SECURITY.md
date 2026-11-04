@@ -43,6 +43,12 @@ What matters for security here is different from a cloud integration:
   or shutdown action. `/health` reveals process liveness only. Redirects are not
   followed by the client. Use a trusted private network or an HTTPS reverse proxy;
   the service does not terminate TLS itself. Never publish its port to the Internet.
+- **App discovery.** Supervisor transfers the service credentials locally using
+  its authenticated discovery API. The integration validates the app slug and
+  restricts discovery connections to that app's internal hostname and port 8765.
+  Credentials never travel in a broadcast. App discovery needs no additional
+  Supervisor administration permission. Blank app tokens are generated once and
+  stored privately; standalone services still require an explicit token.
 - **Independent lifetime.** HA disconnecting does not stop charging or the
   heartbeat. The last state is retained indefinitely by explicit design. USB,
   host and service failures still require the wallbox's configured fallback.

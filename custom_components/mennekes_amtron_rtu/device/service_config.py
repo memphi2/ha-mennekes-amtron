@@ -9,6 +9,20 @@ from .client import SerialConfig
 from .const import SUPPORTED_BAUDRATES, frame_parts
 
 
+def validate_token(value: Any) -> str:
+    """Validate credentials without including them in error messages."""
+    if (
+        not isinstance(value, str)
+        or len(value) < 32
+        or not value.isascii()
+        or any(char.isspace() for char in value)
+    ):
+        raise ValueError(
+            "token must contain at least 32 ASCII characters without whitespace"
+        )
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class ServerConfig:
     serial: SerialConfig
@@ -37,16 +51,7 @@ class ServerConfig:
         }
         if values.keys() - allowed:
             raise ValueError("unknown service configuration option")
-        token = values.get("token")
-        if (
-            not isinstance(token, str)
-            or len(token) < 32
-            or not token.isascii()
-            or any(char.isspace() for char in token)
-        ):
-            raise ValueError(
-                "token must contain at least 32 ASCII characters without whitespace"
-            )
+        token = validate_token(values.get("token"))
         serial_port = values.get("serial_port")
         if (
             not isinstance(serial_port, str)

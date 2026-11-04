@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Discover the Supervisor app automatically with its address and token, reuse
+  existing wallbox entries, and generate persistent private app tokens when empty.
+
 ## 0.5.0b1 — 2026-11-04
 
 ### Added
