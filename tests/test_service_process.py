@@ -31,10 +31,12 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
 ):
     # Mirror the standalone wheel's package layout. Running inside the HA
     # platform directory shadows the stdlib select module on some Python builds.
+    # A symlink also lets subprocess coverage resolve the actual source files.
     service_root = tmp_path / "service"
-    shutil.copytree(
+    service_root.mkdir()
+    (service_root / "amtron_device").symlink_to(
         ROOT / "custom_components" / DOMAIN / "device",
-        service_root / "amtron_device",
+        target_is_directory=True,
     )
 
     async def run():

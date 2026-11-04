@@ -71,6 +71,7 @@ branch = true
 patch = ["subprocess"]
 
 [tool.coverage.report]
+precision = 2
 exclude_also = [
   "if TYPE_CHECKING:",
   "raise NotImplementedError",
