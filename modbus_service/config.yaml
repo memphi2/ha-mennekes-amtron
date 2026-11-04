@@ -22,7 +22,7 @@ watchdog: http://[HOST]:[PORT:8765]/health
 options:
   serial_port: /dev/ttyUSB0
   device_id: 50
-  baudrate: 57600
+  baudrate: "57600"
   frame: 8n2
   token: ""
   read_only: true

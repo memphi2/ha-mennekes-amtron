@@ -15,7 +15,10 @@ from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu import config_flow
 from custom_components.mennekes_amtron_rtu.device import service_discovery as discovery
 from custom_components.mennekes_amtron_rtu.device.client import SerialConfig
-from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
+from custom_components.mennekes_amtron_rtu.device.const import (
+    DOMAIN,
+    SUPPORTED_BAUDRATES,
+)
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient
@@ -25,6 +28,24 @@ from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 SLUG = "a87b2ffe_mennekes_amtron_modbus"
 HOST = SLUG.replace("_", "-")
 URL = f"http://{HOST}:8765"
+
+
+@pytest.mark.parametrize("baudrate", SUPPORTED_BAUDRATES)
+def test_supervisor_baudrate_choices_are_accepted_as_text(baudrate):
+    config = ServerConfig.from_dict(
+        {"serial_port": "/dev/fake", "token": TOKEN, "baudrate": str(baudrate)}
+    )
+    assert config.serial.baudrate == baudrate
+
+
+@pytest.mark.parametrize(
+    "baudrate", [True, 57600.5, "57600.0", "57600x", " 57600", "115200"]
+)
+def test_invalid_baudrates_remain_rejected(baudrate):
+    with pytest.raises(ValueError, match=r"integer|baudrate"):
+        ServerConfig.from_dict(
+            {"serial_port": "/dev/fake", "token": TOKEN, "baudrate": baudrate}
+        )
 
 
 def discovery_info(**changes):

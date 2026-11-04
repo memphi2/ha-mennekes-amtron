@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Accept the baudrate strings produced by Supervisor selection fields; valid
+  saved app options no longer terminate the service with a configuration error.
 - Discover the Supervisor app automatically with its address and token, reuse
   existing wallbox entries, and generate persistent private app tokens when empty.
 

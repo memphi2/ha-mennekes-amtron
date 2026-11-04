@@ -62,6 +62,8 @@ def smoke(image: str) -> None:
             json.dumps(
                 {
                     "serial_port": "/dev/amtron-test-absent",
+                    # Supervisor's list(...) selector serializes numbers as text.
+                    "baudrate": "57600",
                     "token": token,
                     "read_only": True,
                     "listen": "0.0.0.0",  # noqa: S104 - container is published on loopback only

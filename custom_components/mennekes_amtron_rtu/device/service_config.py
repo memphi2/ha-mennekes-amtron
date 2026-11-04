@@ -59,7 +59,15 @@ class ServerConfig:
             or "\x00" in serial_port
         ):
             raise ValueError("serial_port must be a local /dev/ device")
-        baudrate = integer(values.get("baudrate", 57600), 9600, 57600)
+        baudrate_value = values.get("baudrate", 57600)
+        # Supervisor list(...) options are serialized as strings, including
+        # digit-only choices. Accept only the documented choices, not arbitrary
+        # numeric coercions (booleans, fractional rates or surrounding text).
+        if isinstance(baudrate_value, str) and baudrate_value in {
+            str(rate) for rate in SUPPORTED_BAUDRATES
+        }:
+            baudrate_value = int(baudrate_value)
+        baudrate = integer(baudrate_value, 9600, 57600)
         if baudrate not in SUPPORTED_BAUDRATES:
             raise ValueError("unsupported baudrate")
         frame = values.get("frame", "8n2")
