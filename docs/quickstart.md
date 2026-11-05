@@ -7,6 +7,9 @@ Choose how Home Assistant should reach the wallbox:
 | **Independent Modbus service** | Recommended on Home Assistant OS: its app keeps the heartbeat running through HA Core restarts. A standalone service is also available for other installations. |
 | **Direct serial connection** | Supported without an additional service. Home Assistant owns the adapter; a Core restart interrupts the heartbeat. |
 
+Either connection owner can also use a [LAN-to-RS-485 adapter](network-gateway.md)
+instead of USB. No USB device is needed on the HA or service host.
+
 The service is optional. If your wallbox is already configured, keep its entry.
 For a change to the service, follow the [handover guide](modbus-service.md#move-an-existing-wallbox)
 instead of adding it again.
@@ -31,6 +34,10 @@ Give the USB RS-485 adapter to the selected connection owner: the service app
 or standalone service, or Home Assistant for direct serial mode. Prefer a stable
 `/dev/serial/by-id/...` path. If the adapter is missing, check
 [USB passthrough and permissions](hardware.md#making-the-adapter-visible-to-home-assistant).
+
+For LAN, make the gateway reachable from that host and match its operating mode,
+TCP port and wallbox serial settings. Follow [LAN setup](network-gateway.md);
+USB passthrough does not apply.
 
 ## 4. Check fallback behavior
 
@@ -67,6 +74,15 @@ The form verifies communication before creating an entry. If the settings are
 unknown, use its search option. A search across all bus settings can take several
 minutes. New direct entries start read-only, with controls and heartbeat disabled.
 
+### Direct LAN adapter connection
+
+Choose **Direct LAN adapter connection**. Enter the protocol matching your
+gateway (**RTU over TCP** or translating **Modbus TCP**), its hostname/IP,
+TCP port (default **502**) and the wallbox address. Baud rate and frame are
+configured on the adapter. Use **Reconfigure** for an existing wallbox.
+The [LAN guide](network-gateway.md) explains the protocol choice and trusted-network
+requirements. Do not enter a gateway address in the **Service URL** field.
+
 ## 6. Check readings, then enable control
 
 Compare the readings with the wallbox before allowing writes. Set an appropriate
@@ -75,7 +91,7 @@ current cap, then enable control in the place that owns the serial connection:
 | Connection | Enable control |
 |---|---|
 | Service | Disable **Read-only** in the app or service configuration, save and restart the service. HA controls become available after the next status refresh. There is no second HA write switch. |
-| Direct serial | In the integration entry's options, change **Control mode** to **Modbus master**. The entry reloads, starts the heartbeat and adds controls. |
+| Direct USB or LAN | In the integration entry's options, change **Control mode** to **Modbus master**. The entry reloads, starts the heartbeat and adds controls. |
 
 For the service, HA's entry options offer an additional current cap. Resolve
 any repair messages and check the **Heartbeat** sensor before charging.

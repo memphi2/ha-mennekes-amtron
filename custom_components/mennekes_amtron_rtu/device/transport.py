@@ -25,7 +25,7 @@ class ModbusResponse(Protocol):
 
 
 class ModbusTransport(Protocol):
-    """Only the serial operations the integration is permitted to perform."""
+    """Only the Modbus operations the integration is permitted to perform."""
 
     @property
     def connected(self) -> bool: ...

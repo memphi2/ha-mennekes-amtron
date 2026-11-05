@@ -6,7 +6,7 @@ For deployment outside HA OS, see [Docker/Python setup](service-standalone.md).
 
 ## Connection and permission model
 
-The service owns the serial adapter, polling, heartbeat and charging intent.
+The service owns the USB or LAN gateway connection, polling, heartbeat and charging intent.
 HA connects to its authenticated HTTP API and never opens the adapter in service
 mode. This separates the hardware process from HA, as with Z-Wave JS, using HTTP
 instead of WebSocket. The shared driver has no Home Assistant dependency; see
@@ -16,7 +16,18 @@ The service's read-only flag is authoritative for HA write permission. HA keeps
 control entities registered and checks fresh connection/readiness state before
 allowing commands. Changing permission notifies HA even when the register values
 are unchanged. It sends no HA commands or restored values to the service.
-Direct serial entries retain their separate HA control-mode option.
+Direct USB and LAN entries retain their separate HA control-mode option.
+
+`connection_type` selects `serial` (the default), `rtu_over_tcp` or `modbus_tcp`.
+USB uses `serial_port`, `baudrate` and `frame`. LAN uses `host` and `tcp_port`
+(default 502); UART settings belong on the adapter. `device_id` remains the
+wallbox address from 10 to 50. The HTTP API's `port` is independent and defaults
+to 8765. Neither LAN mode expands the supported RTU register/model scope.
+
+The app's serial-device schema is optional, with no default device path, so a
+LAN-only installation needs no `/dev/ttyUSB0`. Existing saved USB settings remain
+valid; the runtime validates connection-specific required fields. Optional schema
+fields follow [Supervisor's options rules](https://contributors.home-assistant.io/apps/guides/options/).
 
 Service settings are read only at startup: save configuration changes and restart
 the service to apply them. This briefly interrupts the heartbeat; HA does not need
@@ -51,9 +62,13 @@ local app image. The **Building** phase does not compile Python or install
 runtime dependencies on the device. Catalogs use immutable image digests;
 standalone users can use the same published digest.
 
-The `#apps-beta` and `#apps` catalogs are different installations to Supervisor.
-Changing channel requires a deliberate one-owner handover, preserving a backup
-and stopping the old app before starting the new one.
+Stable releases are published with the same source and image digest to `#apps`
+and `#apps-beta`, unless the beta catalog already contains a newer prerelease.
+Thus a beta-app installation can receive the stable release as an ordinary
+update, preserving its token and state. Prereleases are offered only in `#apps-beta`.
+The two catalogs still create different apps in Supervisor. An optional channel
+change requires a deliberate one-owner handover, preserving a backup and stopping
+the old app before starting the new one.
 
 ## Logs and diagnostics
 

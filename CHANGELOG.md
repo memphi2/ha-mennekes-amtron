@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.5.0 — 2026-11-05
+
+- Release the optional independent Modbus service as stable. It keeps heartbeat
+  and the selected charging state, including pause, through HA Core restarts.
+  HA OS discovers the app and its credentials automatically; direct connections
+  remain supported. The app's Read-only setting controls service write access.
+
+- Add LAN-to-RS485 adapters to both direct Home Assistant connections and the
+  independent Modbus service. Select transparent RTU-over-TCP or a translating
+  Modbus TCP gateway, with separate host, TCP port and wallbox address settings.
+  USB remains available; LAN installations do not require a local serial device.
+- Preserve the shared heartbeat, write limits and recovery behavior across
+  transports. Keep uncertain writes from being retried, and redact network
+  endpoints from downloaded diagnostics without adding Recorder activity.
+- Document gateway setup, transport selection, network access restrictions and
+  migration while retaining existing wallbox identities and control settings.
+- Provide English, German, French, Dutch and Italian in the integration and app,
+  with an updated installation guide and HACS/Marketplace installation buttons.
+- Improve reconnect cleanup, pause-current preservation after a lost reply,
+  slider updates after service limit changes, setup validation and diagnostics.
+  Existing beta apps receive the stable app
+  update in place, preserving their configuration, credentials and saved intent.
+
 ## 0.5.0b5 — 2026-11-05
 
 - Make the app's Read-only switch the sole write-permission setting for service

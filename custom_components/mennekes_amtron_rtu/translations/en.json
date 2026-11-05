@@ -3,7 +3,7 @@
     "abort": {
       "already_configured": "This wallbox is already configured.",
       "reconfigure_successful": "The connection was updated.",
-      "unique_id_mismatch": "This port belongs to a different wallbox.",
+      "unique_id_mismatch": "This connection belongs to a different wallbox.",
       "service_migration_requires_serial": "The wallbox needs a readable serial number to match the existing device during migration.",
       "invalid_service_discovery": "The app reported invalid connection details.",
       "service_identity_changed": "The discovered wallbox changed. Start setup again.",
@@ -18,7 +18,10 @@
       "service_discovery_requires_serial": "The app has not read a serial number yet. Check its wallbox connection and try again.",
       "service_auth_failed": "The app rejected authentication. Confirm again to retrieve its current credentials from Supervisor. For a separately hosted service, check the configured token.",
       "service_not_ready": "Authentication to the app succeeded, but wallbox data is not available yet. Check the app log and try again.",
-      "service_invalid_response": "The app responds, but its data was not accepted. Update the integration and app to the same version. The Home Assistant log identifies the affected data section."
+      "service_invalid_response": "The app responds, but its data was not accepted. Update the integration and app to the same version. The Home Assistant log identifies the affected data section.",
+      "invalid_network_config": "Enter a host name or IP address without a URL scheme, a TCP port from 1 to 65535 and the matching connection protocol.",
+      "cannot_connect_network": "Could not reach the LAN adapter or the wallbox did not answer. Check the host, port, protocol and the serial settings configured on the adapter.",
+      "invalid_network_response": "The adapter answered but no valid Modbus layout was reported. Check the wallbox address, adapter protocol and satellite configuration."
     },
     "progress": {
       "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes plus connection checks. No registers are written. During reconfiguration, the existing connection and heartbeat are paused; the wallbox's configured fallback applies."
@@ -28,7 +31,8 @@
         "title": "Change connection",
         "menu_options": {
           "server": "Connect to the Modbus service",
-          "serial_reconfigure": "Change serial connection"
+          "serial_reconfigure": "Change serial connection",
+          "network_reconfigure": "Change LAN adapter connection"
         }
       },
       "search_result": {
@@ -39,7 +43,8 @@
         "title": "Connect to your wallbox",
         "menu_options": {
           "server": "Modbus service (survives HA restarts)",
-          "serial": "Direct serial connection"
+          "serial": "Direct serial connection",
+          "network": "Direct LAN adapter connection"
         }
       },
       "serial": {
@@ -80,15 +85,50 @@
       },
       "server": {
         "title": "Connect to the Modbus service",
-        "description": "Supervisor apps connect automatically without entering a URL or token. This form is for a separately hosted service. When migrating from direct Modbus, disable the previous integration entry first to release the serial port.",
+        "description": "Supervisor apps connect automatically without entering a URL or token. This form is for a separately hosted service. When migrating from direct Modbus, disable the previous integration entry first to release the Modbus connection.",
         "data": {
           "server_url": "Service URL",
           "server_token": "Access token"
+        },
+        "data_description": {
+          "server_url": "HTTP address of the independent Modbus service, normally on port 8765. Do not enter the Modbus LAN adapter address here."
         }
       },
       "hassio_confirm": {
         "title": "Connect the Modbus app",
         "description": "The Modbus app was discovered automatically. Its address and access token are supplied for you. Confirm the connection. An existing entry for this wallbox keeps its device and entity IDs. A disabled entry remains disabled until you enable it again."
+      },
+      "network": {
+        "title": "Connect through a LAN adapter",
+        "description": "Connect a supported RTU wallbox through an Ethernet-to-RS-485 adapter. Select transparent RTU over TCP or a gateway that translates Modbus TCP to RTU. Configure baud rate and frame on the adapter. Use a trusted private network and exclusive access to the bus. Validated register layout: {validated_layout}.",
+        "data": {
+          "connection_type": "Connection protocol",
+          "host": "Adapter host",
+          "tcp_port": "Adapter TCP port",
+          "device_id": "Modbus device address"
+        },
+        "data_description": {
+          "connection_type": "Match the adapter mode: transparent RTU over TCP or translating Modbus TCP to RTU.",
+          "host": "Host name or IP address of the LAN adapter, without http:// or any URL path.",
+          "tcp_port": "TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.",
+          "device_id": "Wallbox address behind the adapter; factory default 50, supported range 10–50."
+        }
+      },
+      "network_reconfigure": {
+        "title": "Connect through a LAN adapter",
+        "description": "Connect a supported RTU wallbox through an Ethernet-to-RS-485 adapter. Select transparent RTU over TCP or a gateway that translates Modbus TCP to RTU. Configure baud rate and frame on the adapter. Use a trusted private network and exclusive access to the bus. Validated register layout: {validated_layout}.",
+        "data": {
+          "connection_type": "Connection protocol",
+          "host": "Adapter host",
+          "tcp_port": "Adapter TCP port",
+          "device_id": "Modbus device address"
+        },
+        "data_description": {
+          "connection_type": "Match the adapter mode: transparent RTU over TCP or translating Modbus TCP to RTU.",
+          "host": "Host name or IP address of the LAN adapter, without http:// or any URL path.",
+          "tcp_port": "TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.",
+          "device_id": "Wallbox address behind the adapter; factory default 50, supported range 10–50."
+        }
       }
     }
   },
@@ -366,7 +406,7 @@
       "message": "This wallbox cannot switch between one and three phases. Dynamic phase switching needs an 11 kW device that reports phase option 2."
     },
     "read_only_mode": {
-      "message": "This wallbox is in read-only mode. For a service connection, disable Read-only in the app, save and restart the app. For a direct serial connection, select Modbus master in the integration options."
+      "message": "This wallbox is in read-only mode. For a service connection, disable Read-only in the app, save and restart the app. For a direct USB or LAN connection, select Modbus master in the integration options."
     },
     "restart_requires_idle": {
       "message": "The wallbox may only be restarted while it is idle. Unplug the vehicle first."
@@ -412,7 +452,7 @@
         "error": {
           "entry_unavailable": "The integration is not loaded. Restore its connection before retrying.",
           "different_error": "The wallbox reports a different error. Heartbeat recovery does not reset that error.",
-          "read_only": "Disable Read-only in the app, save and restart the app before requesting recovery. For a direct serial connection, enable Modbus master mode in the integration options instead.",
+          "read_only": "Disable Read-only in the app, save and restart the app before requesting recovery. For a direct USB or LAN connection, enable Modbus master mode in the integration options instead.",
           "write_rate_limited": "A recent command is still inside its minimum write interval. Wait briefly and try again.",
           "recovery_failed": "The recovery could not be confirmed. Check the connection and retry.",
           "still_active": "The recovery commands were sent, but the wallbox still reports an error. Wait for its status to update; check the connection if the error persists."
@@ -425,7 +465,7 @@
       "title": "Wallbox uses an older Modbus register layout"
     },
     "write_rejected": {
-      "description": "A write was not confirmed. Check the serial connection and the wallbox satellite configuration. This issue clears after the affected command succeeds. Historical failures remain in the diagnostic counter.",
+      "description": "A write was not confirmed. Check the USB or LAN connection and the wallbox satellite configuration. This issue clears after the affected command succeeds. Historical failures remain in the diagnostic counter.",
       "title": "Wallbox refused a write"
     }
   },
@@ -486,6 +526,12 @@
         "full": "Full history",
         "detail": "Less detail",
         "lean": "Energy and power statistics only"
+      }
+    },
+    "connection_type": {
+      "options": {
+        "rtu_over_tcp": "RTU over TCP (transparent adapter)",
+        "modbus_tcp": "Modbus TCP (translating gateway)"
       }
     }
   },

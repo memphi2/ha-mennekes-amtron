@@ -257,6 +257,7 @@ def test_catalogs_are_separate_and_allowlist_only_distributable_files(version, c
         path.endswith((".py", ".zip")) or path.startswith(".github/") for path in files
     )
     assert json.loads(files["release.json"])["digest"] == DIGEST
+    assert json.loads(files["release.json"])["catalog_channel"] == channel
     config = yaml.safe_load(files["mennekes_amtron_modbus/config.yaml"])
     assert "image" not in config  # Supervisor must select the build path.
     assert files["mennekes_amtron_modbus/Dockerfile"] == (
@@ -318,6 +319,162 @@ def test_catalog_same_version_is_idempotent_and_newer_version_can_advance():
         )
         is True
     )
+
+
+def test_stable_promotion_keeps_provenance_and_catalog_identity_separate():
+    info = {**INFO, "version": "0.5.0", "channel": "apps"}
+    stable = catalog.catalog_files(info, DIGEST, branch="apps")
+    preview = catalog.catalog_files(info, DIGEST, branch="apps-beta")
+    assert stable["mennekes_amtron_modbus/Dockerfile"] == preview["mennekes_amtron_modbus/Dockerfile"]
+    assert stable["mennekes_amtron_modbus/config.yaml"] == preview["mennekes_amtron_modbus/config.yaml"]
+    assert yaml.safe_load(preview["repository.yaml"])["url"].endswith("#apps-beta")
+    metadata = json.loads(preview["release.json"])
+    assert metadata == {**info, "digest": DIGEST, "catalog_channel": "apps-beta"}
+    assert catalog.check_forward({**INFO, "digest": DIGEST}, info, DIGEST, branch="apps-beta")
+    assert not catalog.check_forward(metadata, info, DIGEST, branch="apps-beta")
+    assert catalog.check_forward(metadata, {**INFO, "version": "0.6.0b1"}, OTHER_DIGEST)
+
+
+@pytest.mark.parametrize("version", ["0.5.0b1", "0.5.0rc1"])
+def test_prereleases_cannot_be_rendered_into_the_stable_catalog(version):
+    with pytest.raises(ValueError, match="not allowed"):
+        catalog.catalog_files({**INFO, "version": version}, DIGEST, branch="apps")
+
+
+def catalog_repository(monkeypatch, initial):
+    """Simulate the Git API, including immutable commits and failed ref updates."""
+    references, commits, trees = {}, {}, {}
+    events, published, fail_once = [], [], set()
+    serial = 0
+
+    def new_sha():
+        nonlocal serial
+        serial += 1
+        return f"{serial:040x}"
+
+    for branch, metadata in initial.items():
+        sha = new_sha()
+        references[branch] = sha
+        commits[sha] = deepcopy(metadata)
+
+    def api(_repository, endpoint, payload=None, **_kwargs):
+        events.append((endpoint, payload))
+        if endpoint.startswith("git/ref/heads/"):
+            sha = references.get(endpoint.removeprefix("git/ref/heads/"))
+            return {"object": {"sha": sha}} if sha is not None else None
+        if endpoint.startswith("contents/release.json?ref="):
+            metadata = commits[endpoint.split("=", 1)[1]]
+            return {"content": base64.b64encode(json.dumps(metadata).encode()).decode()}
+        if endpoint == "git/trees":
+            sha = new_sha()
+            trees[sha] = json.loads(next(
+                item["content"] for item in payload["tree"] if item["path"] == "release.json"
+            ))
+            return {"sha": sha}
+        if endpoint == "git/commits":
+            sha = new_sha()
+            commits[sha] = trees[payload["tree"]]
+            return {"sha": sha}
+        if endpoint == "git/refs":
+            branch = payload["ref"].removeprefix("refs/heads/")
+            assert branch not in references
+            references[branch] = payload["sha"]
+            published.append(branch)
+            return {"object": {"sha": payload["sha"]}}
+        assert endpoint == "git/blobs"
+        return {"sha": new_sha()}
+
+    def patch(command, **kwargs):
+        assert command[3] == "PATCH"
+        branch = command[4].rsplit("/", 1)[1]
+        payload = json.loads(kwargs["input"])
+        assert payload["force"] is False
+        if branch in fail_once:
+            fail_once.remove(branch)
+            return subprocess.CompletedProcess(command, 1, b"", b"interrupted")
+        references[branch] = payload["sha"]
+        published.append(branch)
+        return subprocess.CompletedProcess(command, 0, b"{}", b"")
+
+    monkeypatch.setattr(catalog, "remote_commit", lambda *_: INFO["commit"])
+    monkeypatch.setattr(catalog, "run", lambda *_: DIGEST.encode())
+    monkeypatch.setattr(catalog, "verify_public", lambda *_: events.append(("verified", None)))
+    monkeypatch.setattr(catalog, "api", api)
+    monkeypatch.setattr(catalog.subprocess, "run", patch)
+    return references, commits, events, published, fail_once
+
+
+def test_stable_publication_updates_both_catalogs_from_the_same_verified_image(monkeypatch):
+    refs, commits, events, published, _fail = catalog_repository(monkeypatch, {})
+    info = {**INFO, "version": "0.5.0", "channel": "apps"}
+    catalog.publish(info, DIGEST)
+    assert published == ["apps", "apps-beta"]
+    assert events[0] == ("verified", None)
+    for branch in published:
+        assert commits[refs[branch]] == {**info, "digest": DIGEST, "catalog_channel": branch}
+    # Both references were read before creating even the first blob or tree.
+    assert [endpoint for endpoint, _ in events[1:3]] == [
+        "git/ref/heads/apps", "git/ref/heads/apps-beta"
+    ]
+
+
+def test_beta_publication_never_accesses_the_stable_catalog(monkeypatch):
+    initial = {**INFO, "version": "0.4.1", "channel": "apps", "digest": OTHER_DIGEST}
+    refs, commits, events, published, _fail = catalog_repository(monkeypatch, {"apps": initial})
+    old_stable = refs["apps"]
+    catalog.publish(INFO, DIGEST)
+    assert published == ["apps-beta"]
+    assert refs["apps"] == old_stable
+    assert commits[old_stable] == initial
+    assert "git/ref/heads/apps" not in [endpoint for endpoint, _ in events]
+
+
+def test_partial_promotion_can_retry_without_republishing_the_completed_catalog(monkeypatch):
+    initial = {
+        "apps": {**INFO, "version": "0.4.1", "channel": "apps", "digest": OTHER_DIGEST},
+        "apps-beta": {**INFO, "digest": OTHER_DIGEST},
+    }
+    refs, commits, _events, published, fail = catalog_repository(monkeypatch, initial)
+    fail.add("apps-beta")
+    info = {**INFO, "version": "0.5.0", "channel": "apps"}
+    with pytest.raises(ValueError, match="concurrently"):
+        catalog.publish(info, DIGEST)
+    completed = refs["apps"]
+    assert published == ["apps"]
+    catalog.publish(info, DIGEST)
+    assert refs["apps"] == completed
+    assert published == ["apps", "apps-beta"]
+    assert commits[refs["apps-beta"]] == {**info, "digest": DIGEST, "catalog_channel": "apps-beta"}
+    catalog.publish(info, DIGEST)
+    assert published == ["apps", "apps-beta"]
+
+
+def test_stable_maintenance_update_keeps_a_newer_preview_catalog(monkeypatch):
+    initial = {"apps-beta": {**INFO, "version": "0.6.0b1", "digest": OTHER_DIGEST}}
+    refs, commits, _events, published, _fail = catalog_repository(monkeypatch, initial)
+    preview = refs["apps-beta"]
+    catalog.publish({**INFO, "version": "0.5.0", "channel": "apps"}, DIGEST)
+    assert published == ["apps"]
+    assert refs["apps-beta"] == preview
+    assert commits[preview] == initial["apps-beta"]
+
+
+@pytest.mark.parametrize("failure", ["downgrade", "source", "channel"])
+def test_invalid_catalog_preflight_prevents_every_target_mutation(monkeypatch, failure):
+    info = {**INFO, "version": "0.5.0", "channel": "apps"}
+    if failure == "downgrade":
+        initial = {"apps": {**info, "version": "0.5.1", "digest": OTHER_DIGEST}}
+    else:
+        preview = {**info, "digest": DIGEST, "catalog_channel": "apps-beta"}
+        preview["commit" if failure == "source" else "catalog_channel"] = "different"
+        initial = {"apps-beta": preview}
+    refs, _commits, events, published, _fail = catalog_repository(monkeypatch, initial)
+    old_refs = dict(refs)
+    with pytest.raises(ValueError, match=r"downgrade|differs"):
+        catalog.publish(info, DIGEST)
+    assert not published
+    assert refs == old_refs
+    assert all(payload is None for _, payload in events)
 
 
 def test_unavailable_image_prevents_all_catalog_mutations(monkeypatch):
@@ -392,3 +549,4 @@ def test_release_pipeline_orders_image_release_and_catalog_publication():
     assert "publish" in jobs["service-catalog"]["needs"]
     assert "service-manifest" in jobs["service-catalog"]["needs"]
     assert jobs["service-catalog"]["concurrency"]["cancel-in-progress"] is False
+    assert jobs["service-catalog"]["concurrency"]["group"] == "service-catalog"

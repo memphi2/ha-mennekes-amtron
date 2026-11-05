@@ -1,5 +1,5 @@
 name: Mennekes Amtron Modbus Service
-version: 0.5.0b5
+version: 0.5.0
 url: https://github.com/memphi2/ha-mennekes-amtron
 slug: mennekes_amtron_modbus
 description: Independent Modbus connection and heartbeat for Mennekes Amtron
@@ -20,7 +20,8 @@ ports_description:
   8765/tcp: Authenticated service API (internal network by default)
 watchdog: http://[HOST]:[PORT:8765]/health
 options:
-  serial_port: /dev/ttyUSB0
+  connection_type: serial
+  tcp_port: 502
   device_id: 50
   baudrate: "57600"
   frame: 8n2
@@ -31,7 +32,10 @@ options:
   listen: 0.0.0.0
   port: 8765
 schema:
-  serial_port: device(subsystem=tty)
+  connection_type: list(serial|rtu_over_tcp|modbus_tcp)
+  serial_port: device(subsystem=tty)?
+  host: str?
+  tcp_port: port
   device_id: int(10,50)
   baudrate: list(9600|14400|19200|28800|38400|56000|57600)
   frame: list(8n2|8e1|8o1)

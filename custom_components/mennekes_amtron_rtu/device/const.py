@@ -85,6 +85,14 @@ HEARTBEAT_VALUE: Final = 0x55AA
 SYSTEM_RESTART_VALUE: Final = 0xBB
 
 CONF_PORT: Final = "port"
+CONF_CONNECTION_TYPE: Final = "connection_type"
+CONF_HOST: Final = "host"
+CONF_TCP_PORT: Final = "tcp_port"
+CONNECTION_SERIAL: Final = "serial"
+CONNECTION_RTU_OVER_TCP: Final = "rtu_over_tcp"
+CONNECTION_MODBUS_TCP: Final = "modbus_tcp"
+NETWORK_CONNECTION_TYPES: Final = (CONNECTION_RTU_OVER_TCP, CONNECTION_MODBUS_TCP)
+DEFAULT_TCP_PORT: Final = 502
 CONF_BAUDRATE: Final = "baudrate"
 CONF_BYTESIZE: Final = "bytesize"
 CONF_PARITY: Final = "parity"

@@ -20,7 +20,7 @@ class AmtronBusError(Exception):
 
 
 class AmtronConnectionError(AmtronBusError):
-    """The serial port or the device did not answer at all."""
+    """The connection or the device did not answer at all."""
 
 
 class AmtronProtocolError(AmtronBusError):

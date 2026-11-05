@@ -28,16 +28,21 @@ from .data import (
 )
 from .device.client import MennekesModbusClient, SerialConfig
 from .device.client_errors import AmtronBusError
+from .device.connection import ConnectionConfig, NetworkConfig
 from .device.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
+    CONF_CONNECTION_TYPE,
     CONF_CURRENT_LIMIT,
     CONF_DEVICE_ID,
+    CONF_HOST,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_PARITY,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_STOPBITS,
+    CONF_TCP_PORT,
+    CONNECTION_SERIAL,
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
@@ -46,6 +51,7 @@ from .device.const import (
     DEFAULT_PARITY,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_STOPBITS,
+    DEFAULT_TCP_PORT,
     DOMAIN,
 )
 from .device.heartbeat import HeartbeatTask
@@ -107,7 +113,7 @@ async def async_setup_entry(
         if entry.entry_id not in states:
             states[entry.entry_id] = WriteState.cold_start(time.monotonic())
         client = MennekesModbusClient(
-            _serial_config(entry), write_state=states[entry.entry_id]
+            _connection_config(entry), write_state=states[entry.entry_id]
         )
     try:
         await client.async_connect()
@@ -287,6 +293,21 @@ def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:
     if CONF_SERVER_URL in entry.data or control_mode_is_master(dict(entry.options)):
         platforms.extend(CONTROL_PLATFORMS)
     return platforms
+
+
+def _connection_config(entry: MennekesAmtronConfigEntry) -> ConnectionConfig:
+    """Load direct transport settings, retaining serial as the legacy default."""
+
+    data = entry.data
+    connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_SERIAL)
+    if connection_type != CONNECTION_SERIAL:
+        return NetworkConfig(
+            host=data.get(CONF_HOST, ""),
+            tcp_port=data.get(CONF_TCP_PORT, DEFAULT_TCP_PORT),
+            connection_type=connection_type,
+            device_id=data.get(CONF_DEVICE_ID, DEFAULT_DEVICE_ID),
+        )
+    return _serial_config(entry)
 
 
 def _serial_config(entry: MennekesAmtronConfigEntry) -> SerialConfig:

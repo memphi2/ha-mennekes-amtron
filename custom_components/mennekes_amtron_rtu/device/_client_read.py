@@ -45,7 +45,7 @@ async def read_words(
             )
             break
         except ConnectionException as err:
-            raise AmtronConnectionError(str(err) or "serial connection failed") from err
+            raise AmtronConnectionError(str(err) or "Modbus connection failed") from err
         except ModbusIOException as err:
             # pymodbus 3.13 wraps cancellation in ModbusIOException. Preserve
             # task cancellation instead of treating it as another read timeout.

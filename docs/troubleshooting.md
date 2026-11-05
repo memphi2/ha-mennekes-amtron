@@ -1,14 +1,15 @@
 # Troubleshooting
 
-Start with the symptom that matches your setup. **Direct serial** means the
-integration opens the USB/RS-485 adapter. **Service** means the Modbus app opens
-it and HA connects to the app.
+Start with the symptom that matches your setup. **Direct** means HA connects to
+the USB/RS-485 or LAN adapter. **Service** means the Modbus app owns that
+connection and HA connects to the app's HTTP API.
 
 | What went wrong? | Start here |
 |---|---|
 | Controls are missing or greyed out | [Controls and write access](#entities-are-missing) |
 | App discovery asks for credentials or reports an error | [App connection and discovery](#app-connection-and-discovery) |
 | The serial connection cannot find the wallbox | [Serial connection](#the-config-flow-cannot-connect) |
+| The LAN adapter cannot find the wallbox | [LAN protocol, port and gateway settings](network-gateway.md#network-access-and-troubleshooting) |
 | Heartbeat is unhealthy or error 200 appears | [Heartbeat recovery](#error-200-energy-manager-unavailable) |
 | Charging does not follow the slider or pause switch | [Charging current](#the-charging-current-does-not-follow) |
 | Sensors became unavailable | [Missing readings](#some-sensors-became-unavailable) |
@@ -18,7 +19,7 @@ For installation, downloads and updates, see [Installation and updates](installa
 
 ## Entities are missing
 
-**Direct serial:** open the integration entry's options and set **Control mode**
+**Direct USB or LAN:** open the integration entry's options and set **Control mode**
 to **Modbus master**. New direct entries start **Read only**, with readings but
 without controls. Check the sensor readings and exclusive bus access first.
 
@@ -61,6 +62,11 @@ Supervisor. Confirm the discovered device under **Settings → Devices & service
 you normally do not enter a URL or token. A separately hosted service uses manual
 connection details; see [standalone setup](service-standalone.md).
 
+The **Service URL** is our HTTP service, usually on port **8765**. A LAN-to-RS-485
+gateway uses separate **host/TCP port** fields, default port **502**, and no
+service token. Choose **Direct LAN adapter connection** for a gateway used by HA
+itself, or configure those fields in the app when the service owns it.
+
 | Message or symptom | What to check |
 |---|---|
 | No discovery, or the integration asks for URL and token | Confirm the app is installed and running, then check Devices & services again. Verify that both app and integration are current. If you have multiple Modbus apps, select the matching discovered app. |
@@ -77,7 +83,9 @@ Check the last completed step instead of repeatedly restarting everything.
 
 ## The config flow cannot connect
 
-For a direct connection, check the adapter and bus before starting a broad search.
+For direct USB, check the adapter and bus before starting a broad search. For
+LAN, follow the [gateway checks](network-gateway.md#network-access-and-troubleshooting);
+there is no serial-parameter search over the network.
 The same bus checks apply to the app's serial connection:
 
 1. Confirm that the process using the adapter can open it. For a virtual machine
@@ -134,7 +142,7 @@ resume a deliberately stopped charge.
 
 If the error returns, check what interrupted the heartbeat:
 
-- **Direct serial:** HA Core restarts, entry reloads and read-only mode stop it.
+- **Direct USB or LAN:** HA Core restarts, entry reloads and read-only mode stop it.
 - **Service:** an HA Core restart leaves it running. An app shutdown, app
   read-only mode, host restart or serial failure can interrupt it.
 - **Either connection:** bus conflicts, USB disconnects, wiring problems, slow

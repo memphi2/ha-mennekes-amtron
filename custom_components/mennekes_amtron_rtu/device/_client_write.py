@@ -93,7 +93,7 @@ async def write_register(
                 spec.address, words, device_id=device_id
             )
     except ConnectionException as err:
-        raise AmtronConnectionError(str(err) or "serial connection failed") from err
+        raise AmtronConnectionError(str(err) or "Modbus connection failed") from err
     except ModbusException as err:
         if isinstance(err.__cause__, asyncio.CancelledError):
             raise err.__cause__ from None

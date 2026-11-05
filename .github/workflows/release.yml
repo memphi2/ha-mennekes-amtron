@@ -390,7 +390,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     concurrency:
-      group: service-catalog-${{ needs.service-manifest.outputs.channel }}
+      group: service-catalog
       cancel-in-progress: false
     permissions:
       contents: write
@@ -404,7 +404,7 @@ jobs:
           python-version: "3.14"
       - run: python -m pip install -r requirements-dev.txt
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Advance only the matching app channel after release verification
+      - name: Advance app catalogs after release verification
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}

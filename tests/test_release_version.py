@@ -2,7 +2,12 @@
 
 import pytest
 
-from scripts.release_version import catalog_branch, is_prerelease, validate_version
+from scripts.release_version import (
+    catalog_branch,
+    catalog_branches,
+    is_prerelease,
+    validate_version,
+)
 
 
 @pytest.mark.parametrize("version", ["0.5.0", "1.12.30", "0.5.0b1", "0.5.0rc2"])
@@ -11,6 +16,7 @@ def test_release_channels(version):
     beta = "b" in version or "rc" in version
     assert is_prerelease(f"v{version}") is beta
     assert catalog_branch(version) == ("apps-beta" if beta else "apps")
+    assert catalog_branches(version) == (("apps-beta",) if beta else ("apps", "apps-beta"))
 
 
 @pytest.mark.parametrize(

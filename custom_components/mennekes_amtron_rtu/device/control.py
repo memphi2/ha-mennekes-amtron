@@ -460,6 +460,10 @@ class AmtronControl:
                 if 0 < value < CHARGING_CURRENT_MINIMUM:
                     self.pause_requested = True
                     self._pending_current = None
+                    # The wallbox may already be paused. Keep the known
+                    # pre-pause current so a later resume cannot silently
+                    # fall back to the configured maximum after a lost ACK.
+                    self._remember_pause_setpoint(previous, preserve_setpoint)
             raise
         # A successful command supersedes every older deferred setpoint,
         # including one whose background task is currently sleeping.
@@ -471,17 +475,25 @@ class AmtronControl:
         # previous limit, whether requested manually or by a phase change.
         if value == CHARGING_CURRENT_UNLIMITED or value >= CHARGING_CURRENT_MINIMUM:
             self.charging_setpoint = value
-        elif (
-            value == CHARGING_PAUSE_CURRENT
-            and (not preserve_setpoint or self.charging_setpoint is None)
-            and isinstance(previous, (int, float))
-            and (previous == CHARGING_CURRENT_UNLIMITED or previous >= CHARGING_CURRENT_MINIMUM)
-        ):
-            self.charging_setpoint = float(previous)
+        elif value == CHARGING_PAUSE_CURRENT:
+            self._remember_pause_setpoint(previous, preserve_setpoint)
         if mode_change:
             self._write_state.mode_change_at = self._monotonic()
         if self._request_refresh is not None:
             await self._request_refresh()
+
+    def _remember_pause_setpoint(
+        self, previous: float | None, preserve_setpoint: bool
+    ) -> None:
+        """Retain the confirmed current even when the pause acknowledgement is lost."""
+
+        if (
+            (not preserve_setpoint or self.charging_setpoint is None)
+            and previous is not None
+            and math.isfinite(previous)
+            and (previous == CHARGING_CURRENT_UNLIMITED or previous >= CHARGING_CURRENT_MINIMUM)
+        ):
+            self.charging_setpoint = float(previous)
 
     def _check_mode_change_interval(self) -> None:
         """Reject a known pause/resume cooldown before any operation writes."""

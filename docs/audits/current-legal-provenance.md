@@ -1,5 +1,14 @@
 # Current Legal and Provenance Audit Snapshot
 
+Development on 2026-11-05 also adds outgoing connections through transparent
+RTU-over-TCP adapters and translating Modbus TCP-to-RTU gateways. This changes
+the network trust boundary without expanding the documented RTU wallbox/model
+scope. Gateway Modbus traffic is unauthenticated and unencrypted; the service's
+authenticated HTTP API remains a separate connection. See the current
+[security model](../../SECURITY.md), [privacy policy](../../PRIVACY.md) and
+[LAN guide](../network-gateway.md). The historical validation counts below do not
+cover these changes or establish hardware verification of LAN adapters.
+
 The v0.3.0 evidence below is historical. Development on 2026-11-04 adds the
 independent [Modbus service](../modbus-service.md), including an authenticated
 HTTP listener, stored credentials and an `aiohttp` dependency. Its current

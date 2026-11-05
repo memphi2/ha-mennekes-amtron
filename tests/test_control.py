@@ -397,10 +397,12 @@ def test_a_rejected_pause_keeps_the_previously_accepted_setpoint() -> None:
     async def run() -> None:
         control = await harness.connect()
         control.charging_setpoint = 10.0
+        control.pause_requested = False
         harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = 3
         with pytest.raises(HomeAssistantError):
             await control.async_pause_charging()
         assert control.charging_setpoint == 10.0
+        assert control.pause_requested is False
 
     asyncio.run(run())
 
@@ -1042,5 +1044,63 @@ def test_restart_uses_fresh_device_status(cached, actual):
             assert error.value.translation_key == "restart_requires_idle"
         assert bool(harness.written(R.SYSTEM_RESTART)) == (actual == EvseState.IDLE)
         assert harness.transport.reads == [(R.EVSE_STATE.address, 1)]
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("previous", [0.0, 8.0])
+@pytest.mark.parametrize("outcome", ["lost_reply", "cancelled"])
+def test_an_uncertain_pause_retains_the_actual_resume_current(previous, outcome):
+    async def run():
+        harness = Harness(values={"charging_current_ems": previous})
+        control = await harness.connect()
+        assert control.charging_setpoint is None
+        original = harness.transport.write_registers
+
+        async def apply_without_confirmation(address, values, **kwargs):
+            await original(address, values, **kwargs)
+            if outcome == "cancelled":
+                raise asyncio.CancelledError
+            raise raise_connection_error()
+
+        harness.transport.write_registers = apply_without_confirmation
+        with pytest.raises(
+            asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError
+        ):
+            await control.async_pause_charging()
+        assert control.pause_requested is True
+        assert control.charging_setpoint == previous
+        harness.transport.write_registers = original
+        harness.snapshot = WallboxData(
+            values={"charging_current_ems": 1.0},
+            current_write_generation=harness.client.write_state.current_write_generation,
+        )
+        harness.clock[0] += 5
+        await control.async_resume_charging()
+        assert [
+            decode_register(R.CHARGING_CURRENT_EMS, words)
+            for words in harness.written(R.CHARGING_CURRENT_EMS)
+        ] == [1.0, previous]
+        await control.async_shutdown()
+        await harness.client.async_close()
+
+    asyncio.run(run())
+
+
+def test_uncertain_paused_recovery_retains_intent_over_fallback_current():
+    async def run():
+        harness = Harness(values={"charging_current_ems": 16.0}, error_code=200)
+        control = await harness.connect()
+        control.pause_requested = True
+        control.charging_setpoint = 8.0
+        harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = (
+            raise_connection_error()
+        )
+        with pytest.raises(HomeAssistantError):
+            await control.async_recover_from_error()
+        assert control.pause_requested is True
+        assert control.charging_setpoint == 8.0
+        await control.async_shutdown()
+        await harness.client.async_close()
 
     asyncio.run(run())

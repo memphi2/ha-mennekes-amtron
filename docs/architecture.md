@@ -11,7 +11,7 @@ there is no copied driver implementation to keep in sync.
 ```mermaid
 flowchart LR
     HA[Home Assistant integration] <-->|Authenticated HTTP| Service[Modbus service]
-    Service <-->|Single serial owner| Wallbox[Mennekes Amtron]
+    Service <-->|USB or LAN gateway / RS-485| Wallbox[Mennekes Amtron]
 ```
 
 `remote.py` maps service snapshots and named commands onto the existing HA
@@ -22,7 +22,7 @@ with control intent. Named commands retain device guards; the API has no raw
 register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 
-Direct serial mode remains available for existing installations. A service
+Direct USB and LAN modes remain available without the service. A service
 entry never opens the serial adapter or starts a local heartbeat/recovery task.
 All entries preserve the domain and entity unique IDs. See
 [setup and migration](modbus-service.md) for the one-owner handover.
@@ -32,7 +32,14 @@ permission. HA has no separate permission selector. Control platforms remain
 loaded, preserving entity IDs, while entity availability and command guards
 follow the service's read-only flag and current connection/readiness state.
 Permission transitions send no charging commands and do not replay HA restore
-data. Direct serial entries retain their own explicit control mode.
+data. Direct USB and LAN entries retain their own explicit control mode.
+
+The shared transport supports local USB/serial, transparent RTU frames over TCP
+and Modbus TCP via a translating TCP-to-RTU gateway. Both the service and direct
+HA mode use the same driver and register model. LAN configuration stores protocol,
+host, TCP port and device address; serial baud/frame are configured on the
+gateway. HA-to-service HTTP remains a separate connection. See
+[LAN setup](network-gateway.md) and the [security boundary](../SECURITY.md#threat-model).
 
 `tests/test_service_process.py` runs the server in a separate process over a
 virtual serial Modbus bus while a real HA instance stops and starts. It checks

@@ -35,7 +35,8 @@ def test_supervisor_baudrate_choices_are_accepted_as_text(baudrate):
     config = ServerConfig.from_dict(
         {"serial_port": "/dev/fake", "token": TOKEN, "baudrate": str(baudrate)}
     )
-    assert config.serial.baudrate == baudrate
+    assert isinstance(config.connection, SerialConfig)
+    assert config.connection.baudrate == baudrate
 
 
 @pytest.mark.parametrize(

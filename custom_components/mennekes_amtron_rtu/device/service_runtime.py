@@ -1,4 +1,4 @@
-"""Own the serial port and control lifetime independently of every API client."""
+"""Own the Modbus connection and control lifetime independently of API clients."""
 
 from __future__ import annotations
 
@@ -40,8 +40,13 @@ class ModbusService:
         client: MennekesModbusClient | None = None,
     ) -> None:
         self.config = config
+        self._connection_name = {
+            "serial": "serial",
+            "rtu_over_tcp": "RTU-over-TCP",
+            "modbus_tcp": "Modbus TCP",
+        }[config.connection.connection_type]
         self.client = client or MennekesModbusClient(
-            config.serial, write_state=WriteState.cold_start(time.monotonic())
+            config.connection, write_state=WriteState.cold_start(time.monotonic())
         )
         self.state_path = state_path
         self.identity = DeviceIdentity()
@@ -64,11 +69,11 @@ class ModbusService:
         self._retry_at = 0.0
         self._updated_at: float | None = None
         self._stopping = False
-        self._phase = "opening serial connection"
+        self._phase = f"opening {self._connection_name} connection"
         self.heartbeat.async_add_listener(self._log_heartbeat_health)
 
     def start(self) -> asyncio.Task[None]:
-        _LOGGER.info("Opening serial connection to the wallbox")
+        _LOGGER.info("Opening %s connection to the wallbox", self._connection_name)
         self._task = asyncio.create_task(self._run(), name="amtron_service")
         return self._task
 
@@ -79,18 +84,19 @@ class ModbusService:
             _LOGGER.info("Heartbeat acknowledged by the wallbox")
         elif self.heartbeat.healthy is False:
             _LOGGER.warning(
-                "Heartbeat acknowledgement missing; checking the serial connection"
+                "Heartbeat acknowledgement missing; checking the %s connection",
+                self._connection_name,
             )
 
     async def _initialize(self) -> None:
-        self._phase = "opening serial connection"
+        self._phase = f"opening {self._connection_name} connection"
         await self.client.async_connect()
         self._phase = "reading wallbox identity"
         identity = await async_read_identity(self.client)
         store = IntentStore(
             self.state_path,
             identity.serial_number
-            or f"{self.config.serial.port}:{self.config.serial.device_id}",
+            or f"{self.config.connection.port}:{self.config.connection.device_id}",
         )
         self._phase = "loading saved control intent"
         await asyncio.to_thread(store.load, self.client.write_state)
@@ -122,7 +128,10 @@ class ModbusService:
                 )
         await self._persist()
         self.control = control
-        _LOGGER.info("Serial connection established; wallbox initialized")
+        _LOGGER.info(
+            "%s connection established; wallbox initialized",
+            self._connection_name[0].upper() + self._connection_name[1:],
+        )
         if not self.config.read_only:
             self._heartbeat_task = self.heartbeat.start()
             self._heartbeat_started.set()
@@ -390,4 +399,7 @@ class ModbusService:
                 await self._persist()
         finally:
             await self.client.async_close()
-            _LOGGER.info("Serial connection closed")
+            _LOGGER.info(
+                "%s connection closed",
+                self._connection_name[0].upper() + self._connection_name[1:],
+            )
