@@ -5,14 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.5.0b5 — 2026-11-05
 
 - Make the app's Read-only switch the sole write-permission setting for service
   connections. Remove the duplicate HA option, ignore old HA-only mode settings,
   and keep control entities registered with stable IDs. A fresh writable service
   response enables them; read-only, disconnected or unavailable service state
   blocks commands. Permission changes notify HA even when register values are
-  unchanged, without sending commands or adding per-poll Recorder history.
+  unchanged, without HA sending commands or adding per-poll Recorder history.
+- Rewrite the user documentation around installation, daily charging and
+  troubleshooting. Present the optional service as the preferred connection,
+  explain which settings belong in the app or integration, and move API,
+  deployment and validation details into dedicated reference pages.
+- Add French, Dutch and Italian translations for the integration and app,
+  including setup, controls, errors and repairs. Publish all app translations
+  in the catalog and check translation keys, placeholders and packaged files.
+- Unload the platforms belonging to the active runtime when connection settings
+  or control mode change. Avoid ignored-unload warnings on current HA, failed
+  unloads on minimum HA and leftover active controls after disabling master mode.
 
 ## 0.5.0b4 — 2026-11-05
 

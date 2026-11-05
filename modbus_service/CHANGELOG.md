@@ -1,5 +1,21 @@
 # Changes
 
+## 0.5.0b5
+
+- Add French, Dutch and Italian app settings alongside English and German.
+- Simplify installation and everyday guidance, with the optional service as
+  the preferred connection and separate technical reference pages.
+- Pair with integration 0.5.0b5: the app's **Read-only** setting is now the sole
+  write-permission switch for service connections. HA controls stay registered
+  and become available after fresh writable status; changing permission sends
+  no HA charging commands. Both current caps still constrain limited-current
+  commands; deliberately selected 0 A remains unlimited.
+- Update the integration first and restart Home Assistant Core. The running
+  beta-4 app already provides the required status; keep the existing entry.
+  The app update is offered separately and briefly interrupts the heartbeat.
+- Minimum/latest HA validation passed with coverage above 99%, including permission
+  changes through real HA and HTTP. Hardware verification of this fix is pending.
+
 ## 0.5.0b4
 
 - Treat unusable optional maximum-EVSE-current readings as an unknown capability
