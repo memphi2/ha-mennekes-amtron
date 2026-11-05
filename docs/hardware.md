@@ -1,6 +1,6 @@
 # Hardware Installation
 
-Wiring, DIP switches and making the adapter visible to Home Assistant.
+Wiring, DIP switches and connecting a USB or LAN adapter.
 
 > **Have an electrician do the work on the wallbox.** Opening an AMTRON means
 > working on a fixed electrical installation. De-energize it first, follow the
@@ -33,6 +33,12 @@ claim.
 - **Shielded twisted-pair cable** for the A/B pair, with a third conductor or
   the shield as the ground reference.
 - Possibly **two 120 Ω termination resistors**, see below.
+
+Instead of USB, use a [LAN-to-RS-485 adapter](network-gateway.md) in transparent
+RTU-over-TCP mode or a gateway that translates Modbus TCP to RTU. This needs no
+USB device on the HA/service host. Configure the serial baud rate/frame on the
+adapter and keep its Modbus port on a trusted private network. The RS-485 wiring,
+satellite setting and single-master rule below still apply.
 
 ## Connecting the bus
 

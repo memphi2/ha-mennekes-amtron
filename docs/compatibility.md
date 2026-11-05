@@ -74,3 +74,8 @@ Other Amtron families, including 4You 100/400/500, Compact 2.0 without the
 **s**, and Modbus TCP products, are outside this documented RTU compatibility
 scope. Similar names or access through the same configuration tool do not
 establish compatibility. Use one entry per wallbox and one master per serial bus.
+
+A [LAN-to-RS-485 adapter](network-gateway.md) only changes how this integration
+reaches those supported RTU models. Transparent RTU over TCP and translating
+Modbus TCP-to-RTU gateways do not add compatibility with other native Modbus TCP
+wallbox families or their different register maps.

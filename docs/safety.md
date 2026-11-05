@@ -25,6 +25,12 @@ If another master is present, stop the service or disable the direct serial
 entry and use a separate supported interface or obtain the readings from the
 existing master. Disabling a service-connected HA entry does not stop the app.
 
+A LAN-to-RS-485 gateway does not make the bus multi-master. Give only the selected
+HA instance or independent service access to it. Both supported LAN protocols
+are unencrypted and unauthenticated: restrict the gateway to a trusted private
+network and never expose its Modbus port to the Internet. The service API's token
+does not protect that separate port. See [LAN setup](network-gateway.md).
+
 ## §14a EnWG is enforced in hardware
 
 The grid operator's dimming signal reaches the wallbox through its own
@@ -60,9 +66,9 @@ can still miss this deadline. If the heartbeat stops:
   200 and will not start a session until `0x0D00`, `0x0D05` and `0x0302` are
   written again.
 
-With direct serial mode, an HA restart stops the heartbeat. With the independent
+With direct USB or LAN mode, an HA restart stops the heartbeat. With the independent
 service, HA can remain offline indefinitely while the last charging state is held;
-a deliberate pause remains active. Service, host and USB failures still stop the
+a deliberate pause remains active. Service, host, USB and LAN/gateway failures can stop the
 heartbeat. Configure a fallback with the MENNEKES configuration tool so those
 interruptions have a defined outcome. The integration raises a repair issue when
 `0x030E` is 0.

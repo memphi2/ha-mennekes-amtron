@@ -15,7 +15,8 @@ Keep your existing entry, devices and automations.
 - Home Assistant **2026.9.0 or newer**.
 - A [supported wallbox](compatibility.md) prepared for Modbus RTU by a qualified
   electrician, including its heartbeat fallback settings.
-- A USB RS-485 adapter and **exclusive access to the bus**. The integration,
+- A USB RS-485 adapter or [LAN-to-RS-485 gateway](network-gateway.md), with
+  **exclusive access to the bus**. The integration,
   service and another energy manager must never use it at the same time.
 
 Follow the [hardware guide](hardware.md) for wiring, wallbox settings and USB
@@ -23,26 +24,31 @@ passthrough. Leave the vehicle disconnected during the first control setup.
 
 ## 1. Choose your connection
 
-| | Independent service | Direct serial |
+| | Independent service | Direct USB or LAN |
 |---|---|---|
 | Best fit | **Recommended** for a heartbeat that survives HA Core restarts | An installation without an extra app |
 | What to install | Integration + service app on HA OS, or a separate service container | Integration only |
-| USB adapter belongs to | Service | Home Assistant |
+| USB adapter or LAN gateway is used by | Service | Home Assistant |
 | Enable writing in | App configuration → **Read-only** off | Integration options → **Control mode: Modbus master** |
 | During a Core restart | Last charging state and heartbeat continue | Heartbeat is interrupted; wallbox fallback applies |
-| Availability | **0.5.0b5 beta**, optional | Stable **0.4.1** or beta |
+| Availability | **0.5.0**, optional | **0.5.0**; existing USB entries remain supported |
+
+Both connection owners support USB and LAN; see
+[LAN adapter setup](network-gateway.md). A LAN connection
+needs no local USB device, and does not change the supported RTU wallbox models.
 
 The service keeps an intentional pause, disabled charging release and selected
 current even if HA stays offline. HA automations cannot make new decisions while
 HA is down. Restarting the app or host, or losing USB, can still interrupt the
-heartbeat. See [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
+heartbeat, as can a gateway or network outage. See
+[fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
 
 With the service, the connection looks like this:
 
 ```mermaid
 flowchart LR
     HA["Home Assistant"] --> APP["Modbus service"]
-    APP --> USB["USB / RS-485"] --> WB["Mennekes Amtron"]
+    APP --> LINK["USB or LAN / RS-485"] --> WB["Mennekes Amtron"]
 ```
 
 The service continues running when the Home Assistant part restarts.
@@ -56,8 +62,7 @@ The service continues running when the Home Assistant part restarts.
 1. Open the repository with the button, or search **Settings → Marketplace**
    for **Mennekes Amtron RTU** by **memphi2**.
 2. Accept the community-content notice when prompted.
-3. **For the service:** enable **Pre-release** for this repository and select
-   **0.5.0b5**. You do not need a beta version of Home Assistant itself.
+3. Select the stable **0.5.0** release. Pre-release access is not required.
 4. Install the integration and follow any restart request.
 
 The first Marketplace installation can be used without a Core restart.
@@ -67,8 +72,7 @@ Replacing code already loaded by HA needs a restart; see
 ### Home Assistant 2026.9 and 2026.10
 
 1. Open **HACS** and search for **Mennekes Amtron RTU** by **memphi2**.
-2. **For the service:** enable beta releases for this repository and select
-   **0.5.0b5**. Otherwise, choose the stable release.
+2. Select the stable **0.5.0** release; beta releases are not required.
 3. Download the integration and restart Home Assistant.
 
 If the repository is missing from the catalog, add
@@ -82,6 +86,7 @@ If the repository is missing from the catalog, add
 | **Service on HA OS** | [Install the app](modbus-service.md), start it read-only and confirm the discovered integration. URL and token are supplied automatically. |
 | **Service with HA Container** | [Run the standalone service](service-standalone.md), then enter its URL and token in the integration. |
 | **Direct serial** | [Add the wallbox](quickstart.md#5-add-the-wallbox): choose **Direct serial connection**, then select the adapter and bus settings. |
+| **Direct LAN adapter** | [LAN setup](network-gateway.md): choose **Direct LAN adapter connection**, then select the adapter protocol, host, TCP port and wallbox address. |
 
 Start by comparing the readings with the wallbox. Then set an appropriate
 current cap and enable writing in the place shown above. Test charging, pause
@@ -101,15 +106,14 @@ your existing device or entity IDs.
 4. Confirm current readings, the intended pause/release settings and heartbeat
    health. Keep the existing integration entry.
 
-**Updating to 0.5.0b5:** update the integration first and restart Core. A running
-beta-4 app already supplies the required status, so the controls can become
-available immediately when its **Read-only** switch is off. There is no second
-HA write-permission switch. Update the app separately to keep both versions
-aligned.
+**Updating to 0.5.0:** update the integration first and restart Core. Update the
+service separately if you use it. Existing USB settings remain valid; switching
+to LAN is optional. Existing beta-app installations receive the stable release
+through their existing catalog too: update normally, without reinstalling or
+changing repositories. See [service updates](modbus-service.md#updates).
 
-For beta updates, keep **Pre-release** enabled in the Marketplace or beta
-releases enabled in HACS. Stable users stay on **0.4.1**. Updates can take time
-to appear; use **Check for updates** in the app store for app updates. See
+Updates can take time to appear; use **Check for updates** in the app store for
+app updates. See
 [Home Assistant's release guidance](https://contributors.home-assistant.io/marketplace/guides/releases/#pre-releases).
 
 Moving from HACS to the Marketplace does not require a second installation or
@@ -122,6 +126,9 @@ If coming from **0.1.0**, follow the separate
 
 - **Direct serial:** use **Reconfigure** for the adapter and bus settings;
   use the integration options for write permission, intervals and current cap.
+- **Direct LAN:** use **Reconfigure** for protocol, host, TCP port and wallbox
+  address; the integration options control writes, intervals and current cap.
+  Set serial baud rate/frame on the gateway itself.
 - **Service:** use the app configuration for the adapter, bus settings, write
   permission and measurement interval. The integration options contain the HA
   status interval and an additional current cap.

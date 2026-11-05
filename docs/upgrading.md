@@ -32,7 +32,7 @@ adapter handover and connection change. Follow those steps before starting the
 app; both connections must not operate the bus together.
 
 After the move, write permission follows the app's **Read-only** switch. HA has
-no additional control-mode selector for service entries. With a direct serial
+no additional control-mode selector for service entries. With a direct USB or LAN
 connection, enable writes using **Control mode → Modbus master** in the entry
 options. See [First setup](quickstart.md#6-check-readings-then-enable-control)
 for checking readings and enabling control.

@@ -3,6 +3,9 @@
 Connect your wallbox, control charging and track its energy use in Home
 Assistant. Communication stays local over RS-485.
 
+Reach the RS-485 bus through USB or a [LAN adapter](network-gateway.md).
+A LAN connection requires no local USB device.
+
 ## Get started
 
 1. Check your model in the [compatibility matrix](compatibility.md) and prepare
@@ -34,7 +37,7 @@ configured fallback.
 ## Three settings worth knowing
 
 - **0 A removes the current limit.** Use **Charging paused** to stop charging.
-- **Write access has one setting.** With direct serial, select **Modbus master**
+- **Write access has one setting.** With direct USB or LAN, select **Modbus master**
   in the integration options. With the service, disable **Read-only** in the
   app configuration, save and restart the app. HA follows its next status update
   without a Core restart.
@@ -46,6 +49,7 @@ configured fallback.
 | Document | What you will find |
 |---|---|
 | [Standalone service](service-standalone.md) | Run the service outside a Home Assistant app |
+| [LAN adapter setup](network-gateway.md) | Transparent RTU over TCP or a translating Modbus TCP-to-RTU gateway |
 | [Service reference](service-reference.md) | Service configuration and technical details |
 | [Upgrading older installations](upgrading.md) | Migration notes for the former integration domain |
 | [Modbus register map](modbus-registers.md) | Register meanings, values and read blocks |

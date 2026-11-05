@@ -9,7 +9,7 @@ body:
       value: |
         Thanks for reporting a problem. Please fill in the fields below so the issue can be analyzed without repeated back-and-forth.
 
-        The diagnostics download is safe to attach: it contains no serial port path and no wallbox serial number, only a hash of it. Do not paste anything else that identifies your installation.
+        Diagnostics omit adapter addresses and serial paths, and replace the wallbox serial number with a hash. Check attachments before sharing; never paste an access token or identifying installation details.
 
   - type: dropdown
     id: affected_area
@@ -35,8 +35,8 @@ body:
     id: integration_version
     attributes:
       label: Integration version
-      description: "Example: 0.1.0"
-      placeholder: "0.1.0"
+      description: "Example: 0.5.0"
+      placeholder: "0.5.0"
     validations:
       required: true
 
@@ -54,12 +54,35 @@ body:
     attributes:
       label: Installation method
       options:
+        - Home Assistant Marketplace
         - HACS
         - Manual custom_components copy
         - Development checkout
         - Other
     validations:
       required: true
+
+  - type: dropdown
+    id: connection_type
+    attributes:
+      label: Wallbox connection
+      description: Select who owns the bus and which adapter protocol is used.
+      options:
+        - Direct USB
+        - Direct LAN - RTU over TCP
+        - Direct LAN - Modbus TCP gateway
+        - Service/app - USB
+        - Service/app - RTU over TCP
+        - Service/app - Modbus TCP gateway
+    validations:
+      required: true
+
+  - type: input
+    id: service_version
+    attributes:
+      label: Service/app version
+      description: If using the optional service, report its version separately from the integration.
+      placeholder: "0.5.0"
 
   - type: input
     id: model
@@ -83,7 +106,7 @@ body:
     id: control_mode
     attributes:
       label: Control mode
-      description: Found in the config entry options.
+      description: Direct connections use the integration's Control mode; service connections use the app's Read-only setting.
       options:
         - Read only
         - Modbus master
@@ -94,7 +117,7 @@ body:
     id: bus_parameters
     attributes:
       label: Bus parameters
-      description: Baud rate, frame and Modbus device address as configured in the entry.
+      description: Baud rate, serial frame and wallbox address. For LAN, use the gateway's RS-485 settings and include its make/model and TCP port, without a private hostname or IP.
       placeholder: "57600, 8N2, device address 50"
     validations:
       required: true

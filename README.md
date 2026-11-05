@@ -5,7 +5,8 @@
 
 Your Mennekes Amtron in Home Assistant: adjust the charging current, pause
 charging, follow energy use and charge from your solar surplus. Communication
-stays local over **Modbus RTU / RS-485**.
+stays local over **Modbus RTU / RS-485**, through USB or a
+[LAN-to-RS-485 adapter](docs/network-gateway.md).
 
 **[Get started](docs/installation.md)** · **[Everyday use](docs/user-guide.md)** · **[Get help](docs/troubleshooting.md)**
 
@@ -22,37 +23,42 @@ and hardware-test status.
 
 ## Choose how to connect
 
-| Connection | What you get | Release |
-|---|---|---|
-| **Independent Modbus service — recommended, optional** | The app keeps the heartbeat and last charging state through Home Assistant Core restarts. HA discovers the app automatically on HA OS. | **0.5.0b5 beta** |
-| **Direct serial connection** | Home Assistant owns the USB adapter. No extra app; its heartbeat stops while HA restarts. | Available in stable **0.4.1** and the beta |
+| Connection | What you get |
+|---|---|
+| **Independent Modbus service — recommended, optional** | The app keeps the heartbeat and last charging state through Home Assistant Core restarts. HA discovers the app automatically on HA OS. |
+| **Direct Home Assistant connection** | No extra app; Home Assistant owns the connection and its heartbeat stops while HA restarts. |
 
-The service is our preferred setup for everyday use, and is currently being
-tested as a beta. Direct serial mode remains supported; existing installations
-are never switched automatically. Both offer the same charging controls.
+Both support **USB and LAN** from **0.5.0**. LAN adapters can use transparent
+RTU-over-TCP or a translating Modbus TCP-to-RTU gateway; see [LAN setup](docs/network-gateway.md).
+
+The service is our preferred setup for everyday use. Direct mode remains
+supported; existing installations are never switched automatically.
+Both offer the same charging controls.
 A host or service restart can still interrupt the heartbeat.
 
 ## Install
 
 [![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=memphi2&repository=ha-mennekes-amtron&category=integration)
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=memphi2&repository=ha-mennekes-amtron&category=integration)
 
 1. Install **Mennekes Amtron RTU** by **memphi2**. Use the Marketplace on
    HA **2026.11+**, or HACS on **2026.9/2026.10**.
-2. For the service, enable beta releases and follow the
+2. For the service, follow the
    **[app installation guide](docs/modbus-service.md)**. The app supplies its
-   address and token automatically on HA OS. For direct serial mode, follow
-   **[Quick start](docs/quickstart.md)**.
+   address and token automatically on HA OS. For a direct connection, follow
+   **[Quick start](docs/quickstart.md)** or **[LAN setup](docs/network-gateway.md)**.
 3. Check the readings, enable control and try your first charge.
 
-[![Add the Mennekes Amtron beta app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps-beta)
+[![Add the Mennekes Amtron app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps)
 
 The integration and service app are separate installations. On HA Container,
 run the service as a [separate container](docs/service-standalone.md).
 Already using the integration? **Keep your existing entry** and follow
 [Updates and switching connections](docs/upgrading.md).
 
-You need a compatible wallbox, a USB RS-485 adapter and exclusive access to its
-bus. Have the [hardware and fallback settings](docs/hardware.md) prepared before
+You need a compatible wallbox, a USB RS-485 adapter or supported LAN gateway,
+and exclusive access to its bus. LAN needs no USB device on the HA/service host.
+Have the [hardware and fallback settings](docs/hardware.md) prepared before
 enabling control. Read-only mode also needs exclusive bus access.
 
 ## Ready for everyday use
@@ -69,7 +75,7 @@ enabling control. Read-only mode also needs exclusive bus access.
 
 **Where do I enable control?** With the service, turn off **Read-only** in the
 app configuration, save and restart the app. HA controls follow automatically. With
-direct serial mode, select **Modbus master** in the integration options.
+direct USB or LAN mode, select **Modbus master** in the integration options.
 
 ## Find your way
 

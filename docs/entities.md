@@ -21,7 +21,7 @@ failed read makes an existing entity unavailable until communication recovers.
 
 | Connection | When controls are available |
 |---|---|
-| **Direct serial** | Select **Control mode → Modbus master** in the integration options. Read-only entries provide readings without adding controls. |
+| **Direct USB or LAN** | Select **Control mode → Modbus master** in the integration options. Read-only entries provide readings without adding controls. |
 | **Modbus service** | Disable **Read-only** in the app configuration, save and restart the app. Controls become available after fresh service status arrives; HA needs no restart for this switch. Their IDs stay registered while the service is read-only, disconnected or not ready. |
 
 ## Controls

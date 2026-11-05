@@ -4,24 +4,29 @@ Keep the wallbox heartbeat running through Home Assistant Core restarts.
 This optional app is the preferred way to operate the integration: it holds
 the last charging state, including a deliberate pause, while HA is offline.
 
-**Beta 0.5.0b5 · amd64 and aarch64 · separate integration required**
+**Version 0.5.0 · amd64 and aarch64 · separate integration required**
+
+LAN-to-RS-485 adapters are supported without local USB.
+See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0/docs/network-gateway.md)
+for transparent RTU over TCP versus translating Modbus TCP-to-RTU gateways.
 
 [First setup](#first-setup) · [Daily use](#daily-use) ·
 [Updates](#updates) · [Help](#help)
 
 ## First setup
 
-Install the **0.5.0b5 Mennekes Amtron RTU integration** first and restart Home
-Assistant Core. Enable **Pre-release** in the Marketplace on HA 2026.11+, or beta
-releases in HACS on older supported versions. The integration and this app are
+Install the **0.5.0 Mennekes Amtron RTU integration** first and restart Home
+Assistant Core. Use the stable release in the Marketplace on HA 2026.11+, or
+HACS on older supported versions. The integration and this app are
 separate installations.
 
 1. **Prepare an existing wallbox.** Note its pause, current limit, resume current
    and charging-release settings. Disconnect the vehicle for the first handover.
    Disable the existing direct-serial integration entry to release the adapter;
    keep the entry so its device and entity IDs are retained.
-2. **Configure the app.** Select the adapter and match the wallbox's address,
-   baud rate and frame. Leave **Read-only on** initially; see the table below.
+2. **Configure the app.** Choose USB (`serial`) or the matching LAN protocol.
+   Enter the wallbox address and connection settings below. For LAN, configure
+   baud rate/frame on the gateway. Leave **Read-only on** initially.
 3. **Start the app.** Enable **Start on boot** and **Watchdog**. Check the log for
    its serial connection. Read-only mode deliberately leaves the heartbeat off.
 4. **Connect HA.** Under **Settings → Devices & services**, configure the
@@ -38,16 +43,23 @@ separate installations.
 
 | App option | Initial setting |
 |---|---|
-| Serial adapter | Your USB RS-485 adapter; prefer `/dev/serial/by-id/...`. |
+| Wallbox connection | `serial` (USB), `rtu_over_tcp` (transparent LAN adapter), or `modbus_tcp` (translating gateway). |
+| Serial adapter | USB only: select the adapter; prefer `/dev/serial/by-id/...`. Leave unset for LAN. |
+| Adapter host / TCP port | LAN only: hostname/IP without a URL scheme, and gateway port; default **502**. |
 | Wallbox address | Match the wallbox; factory default **50**. |
-| Baud rate / frame | Match the wallbox; factory defaults **57600 / 8n2**. |
+| Baud rate / frame | USB only: match the wallbox, factory defaults **57600 / 8n2**. For LAN, configure these on the gateway. |
 | Read-only | **On** until readings are checked. |
 | Current cap | Default **6 A**; set within your installation's permitted current. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. |
 
-Leave network settings at their defaults. No host port needs publishing and no
-token needs configuring. Only this app may own the serial adapter, even when
-read-only.
+If **Serial adapter** or **Adapter host** is hidden, enable **Show unused optional
+configuration options** on the Configuration tab. Fill only the field your
+connection needs.
+
+Leave the app's API settings at their defaults: HTTP port **8765** is separate
+from a LAN adapter's Modbus port. No host port needs publishing and no service
+token needs configuring. Use a trusted private LAN for gateways. Only this app
+may control the bus through its USB or LAN adapter, even when read-only.
 
 On first installation, the app reads the wallbox's current state. If fallback
 changed that state during handover, it cannot infer your earlier intention.
@@ -69,7 +81,7 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
 
 HA can remain offline indefinitely while the app holds the last charging state.
 Automations cannot produce new settings during that outage. **App, host, power
-or USB failures still interrupt the heartbeat** and use the wallbox's configured
+or USB/LAN/gateway failures still interrupt the heartbeat** and use the wallbox's configured
 fallback. Switching the app to read-only also stops the heartbeat.
 
 To give the serial bus to another master, stop the app. Disabling the HA entry
@@ -83,14 +95,18 @@ Update the integration first and restart Home Assistant Core; the running app
 continues its heartbeat. Use **Check for updates** in the app store to obtain the
 separate app update. **Updating this app briefly interrupts the heartbeat.**
 
-From beta 4, the existing **0.5.0b4** app already supplies the status needed by
-the **0.5.0b5** integration. HA controls therefore follow its **Read-only** switch
-before you update the app. Keep the existing entry; no new setup is needed.
+Keep the existing HA integration entry and app when updating. Stable 0.5.0 is
+offered in both app catalogs, so a beta-app installation can update normally
+without a reinstall or repository change. Its token and saved charging state
+are retained. Existing USB settings remain valid; switching to LAN is optional.
 
-The beta repository ends in `#apps-beta`; the stable repository uses `#apps`.
-Supervisor treats them as different apps. To change channels, back up the data,
+The beta repository ends in `#apps-beta` and also offers future prereleases;
+the stable-only repository uses `#apps`. Switching catalogs is optional and
+creates a different app in Supervisor. For that change, back up the data,
 copy the options, stop the old app before starting the new one, and confirm its
 discovery. Keep the old app and backup until the handover is verified.
+The new app has separate saved state: note and verify pause, current and release
+settings as in the first setup before reconnecting the vehicle.
 
 ## Help
 
@@ -107,8 +123,8 @@ Diagnostics include the last 20 failed write/recovery records in RAM, with timin
 information and no packet contents or credentials. They add no Recorder rows and
 are lost when the app restarts.
 
-This beta still needs hardware testing, including deliberate pause, HA restart,
-app restart and reconnection. Error-200 recovery while paused needs confirmation
-on the wallbox firmware.
+Verify deliberate pause, HA restart, app restart and reconnection on your own
+hardware. Error-200 recovery while paused and particular LAN gateways still need
+confirmation on the actual hardware; automated tests do not establish that.
 
-[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0b5/docs/modbus-service.md)
+[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0/docs/modbus-service.md)

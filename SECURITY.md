@@ -15,9 +15,10 @@ version of your wallbox and the smallest reproduction you have.
 
 ## Threat Model
 
-The wallbox uses a local serial bus. Direct mode has no inbound network
-listener. The independent Modbus service adds an authenticated HTTP API and
-a bearer credential; neither mode requires a cloud component.
+The wallbox uses a local RS-485 bus, reached through USB or a LAN-to-RS-485
+adapter. Direct mode opens an outbound connection and has no inbound network
+listener. The independent Modbus service adds an authenticated HTTP API and a
+bearer credential; neither mode requires a cloud component.
 
 What matters for security here is different from a cloud integration:
 
@@ -28,6 +29,13 @@ What matters for security here is different from a cloud integration:
   transmits read requests in both control modes. Read-only disables register
   writes and heartbeat, but does not make sharing with another master safe.
   Setup, discovery and the smoke test also require exclusive bus access.
+- **LAN adapter access.** Transparent RTU over TCP and translating Modbus TCP
+  gateways add an unauthenticated, unencrypted Modbus network connection. Anyone
+  who can reach that port may be able to send charging commands independently of
+  HA permissions. Use a trusted private network, restrict gateway access to the
+  selected HA/service host, and never expose it to the Internet. A service token
+  protects the separate HTTP API, not the gateway's Modbus port. Multiple TCP
+  clients do not remove the single-master requirement on the RS-485 bus.
 - **Write authority.** In master mode the integration can release charging,
   lock the wallbox and restart it. Home Assistant user permissions are the
   boundary for HA accounts. A holder of the independent service token can
@@ -50,12 +58,15 @@ What matters for security here is different from a cloud integration:
   Supervisor administration permission. App tokens are generated once and
   stored privately. The app has no manual-token mode or fallback; standalone
   services still require an explicit token.
-- **Independent lifetime.** HA disconnecting does not stop charging or the
-  heartbeat. The last state is retained indefinitely by explicit design. USB,
-  host and service failures still require the wallbox's configured fallback.
+- **Independent lifetime.** HA disconnecting from the service does not stop
+  charging or its heartbeat. The last state is retained indefinitely by explicit
+  design. USB, LAN/gateway, host and service failures still require the wallbox's
+  configured fallback. A direct HA connection, whether USB or LAN, stops its
+  heartbeat during a Core restart.
 - **Private state.** The service saves bounded intent with atomic owner-only
   files. Protect HA configuration, service options and backups, which hold the
-  credential. Diagnostics do not include service URLs or credentials.
+  credential. Diagnostics do not include service URLs, credentials or gateway
+  hostnames/IP addresses.
 
 ## Out of Scope
 

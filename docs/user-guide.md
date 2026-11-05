@@ -41,7 +41,7 @@ The setting depends on how you connect the wallbox:
 
 | Connection | Where to enable writes | What you see in HA |
 |---|---|---|
-| **Direct serial** — the integration uses the USB/RS-485 adapter | Integration entry **options → Control mode → Modbus master**. New entries start **Read only**. | Controls are added in master mode. |
+| **Direct USB or LAN** — the integration connects to the adapter | Integration entry **options → Control mode → Modbus master**. New entries start **Read only**. | Controls are added in master mode. |
 | **Modbus service** — the app uses the adapter | In the app configuration, disable **Read-only**, save and restart the app. | Controls become available after HA receives fresh service status. There is no second HA write switch. |
 
 In service mode, enabling **Read-only** makes the controls unavailable; their
@@ -71,10 +71,11 @@ the exact state values available to templates.
 
 ## Configuration and options
 
-| Setting | Direct serial connection | Modbus service connection |
+| Setting | Direct USB or LAN connection | Modbus service connection |
 |---|---|---|
 | Write permission | Integration options: **Control mode** | App configuration: **Read-only** |
-| Serial adapter, address and baud rate | Integration entry: **Reconfigure** | App configuration |
+| USB adapter, or LAN protocol/host/TCP port, and wallbox address | Integration entry: **Reconfigure** | App configuration |
+| Baud rate and frame | USB: **Reconfigure**; LAN: gateway configuration | USB: app configuration; LAN: gateway configuration |
 | Status and measurement polling | Integration options | App configuration |
 | How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
 | Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
@@ -100,7 +101,7 @@ the last charging state while HA is offline, including an active pause. HA
 reconnects to that state without replaying old charging commands. HA automations
 are still offline during a Core restart.
 
-With a **direct serial connection**, a Core restart or entry reload interrupts
+With a **direct USB or LAN connection**, a Core restart or entry reload interrupts
 the heartbeat. Once communication returns, error 200 recovery runs
 automatically. It preserves a deliberate pause, lock, disabled charging release
 and current setting. If recovery cannot complete, follow
