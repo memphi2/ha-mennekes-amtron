@@ -66,9 +66,12 @@ def test_snapshot_and_command_use_the_same_freshness_boundary(
     tmp_path, monkeypatch, scan_interval, offset
 ):
     async def run():
+        # Use an exactly representable origin: adding and subtracting the
+        # runner's real uptime can round an exact deadline just past the limit.
+        now = [1000.0]
+        monkeypatch.setattr(service_runtime, "time", SimpleNamespace(monotonic=lambda: now[0]))
         service, transport, _clock = await service_fixture(tmp_path)
-        now = service._updated_at + max(30, scan_interval * 3) + offset
-        monkeypatch.setattr(service_runtime, "time", SimpleNamespace(monotonic=lambda: now))
+        now[0] += max(30, scan_interval * 3) + offset
         service.config = replace(service.config, scan_interval=scan_interval)
         available = offset <= 0
         try:
