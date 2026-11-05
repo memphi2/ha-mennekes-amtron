@@ -31,8 +31,11 @@ merging. Tag only the validated main commit with `v<VERSION>`.
 5. Publish and independently download/verify the HACS release. Betas are marked
    as prereleases and never replace the latest stable GitHub release.
 6. Publish an allowlist of app metadata, documentation, artwork and license
-   notices to the matching catalog branch. This happens after the image and
-   GitHub release exist. A catalog cannot move backwards or replace a version.
+   notices after the image and GitHub release exist. Prereleases update only
+   `apps-beta`; stable releases update both `apps` and `apps-beta` with the same
+   source commit and immutable image digest. A catalog cannot move backwards
+   or replace a version. If `apps-beta` already offers a newer preview, it stays
+   on that version while the stable catalog advances.
 
 The catalog's Dockerfile contains only `FROM image@sha256:<attested-index>`;
 its config deliberately has no `image` key. Supervisor's supported local-build
@@ -43,11 +46,18 @@ replacement cannot change an app installation; deletion causes installation
 to fail instead of silently substituting code. Standalone Docker users get the
 same digest reference in the generated catalog README.
 
-The catalog updater makes an ordinary commit on its generated branch, without
-force and without opening another PR. Source branches remain untouched. Keep
+The catalog updater validates every target before changing a branch, then makes
+ordinary commits without force or another PR. Both channels share one workflow
+concurrency group. After a partial failure, rerunning skips already completed
+targets and finishes the remaining promotion. In `release.json`, `channel`
+identifies the release's canonical channel and `catalog_channel` identifies the
+actual branch; promotion does not rewrite build provenance. Source branches
+remain untouched. Keep
 catalog URLs stable: Supervisor derives the app identity from the repository
-URL including the branch. Changing between beta and stable is a deliberate
-handover between two app installations.
+URL including the branch. Existing beta installations receive the stable release
+as a normal update, preserving app data and credentials. A deliberate switch
+to the stable-only repository still requires handing over between two app
+installations; it is unnecessary for receiving the stable version.
 
 ## First GHCR publication
 

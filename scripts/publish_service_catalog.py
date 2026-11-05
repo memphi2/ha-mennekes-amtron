@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 from packaging.version import Version
 from release_check import remote_commit, run
-from release_version import catalog_branch
+from release_version import catalog_branch, catalog_branches
 from service_image import ROOT, app_dockerfile, release_info, verify_public
 
 
@@ -42,11 +42,23 @@ def api(
     return data
 
 
-def catalog_files(info: dict[str, str], digest: str) -> dict[str, bytes]:
-    """Publish an allowlist of metadata and documentation, never development files."""
-    branch = catalog_branch(info["version"])
-    if info["channel"] != branch:
+def _release_metadata(
+    info: dict[str, str], digest: str, branch: str
+) -> dict[str, str]:
+    """Keep the release's provenance channel distinct from its catalog branch."""
+    if info["channel"] != catalog_branch(info["version"]):
         raise ValueError("catalog channel differs from the release version")
+    if branch not in catalog_branches(info["version"]):
+        raise ValueError("release is not allowed in this catalog channel")
+    return {**info, "digest": digest, "catalog_channel": branch}
+
+
+def catalog_files(
+    info: dict[str, str], digest: str, *, branch: str | None = None
+) -> dict[str, bytes]:
+    """Publish an allowlist of metadata and documentation, never development files."""
+    branch = branch or info["channel"]
+    metadata = _release_metadata(info, digest, branch)
     prefix = "mennekes_amtron_modbus/"
     app = ROOT / "modbus_service"
     files = {
@@ -75,30 +87,43 @@ def catalog_files(info: dict[str, str], digest: str) -> dict[str, bytes]:
         "This branch is generated after publication; source changes belong on main.\n"
     ).encode()
     files["release.json"] = (
-        json.dumps({**info, "digest": digest}, sort_keys=True, indent=2) + "\n"
+        json.dumps(metadata, sort_keys=True, indent=2) + "\n"
     ).encode()
     return files
 
 
-def check_forward(previous: dict[str, Any], info: dict[str, str], digest: str) -> bool:
+def check_forward(
+    previous: dict[str, Any], info: dict[str, str], digest: str,
+    *, branch: str | None = None,
+) -> bool:
     """Refuse downgrades and any changed content under an existing version."""
+    branch = branch or info["channel"]
+    metadata = _release_metadata(info, digest, branch)
+    # Catalogs predating stable promotion used one channel field for both roles.
+    previous = {"catalog_channel": previous.get("channel"), **previous}
     if (
-        previous.get("channel") != info["channel"]
+        previous.get("catalog_channel") != branch
+        or previous.get("channel") != catalog_branch(previous["version"])
+        or branch not in catalog_branches(previous["version"])
         or previous.get("repository") != info["repository"]
     ):
         raise ValueError("existing catalog identity differs")
     old, new = Version(previous["version"]), Version(info["version"])
     if old > new:
+        # A maintenance stable release must not replace an already newer beta
+        # (or stable release) in the preview catalog. Its own channel still advances.
+        if branch == "apps-beta" and info["channel"] == "apps":
+            return False
         raise ValueError("refusing to downgrade an app catalog")
     if old == new:
-        if previous != {**info, "digest": digest}:
+        if previous != metadata:
             raise ValueError("existing catalog release differs; refusing replacement")
         return False
     return True
 
 
 def publish(info: dict[str, str], digest: str) -> None:
-    repository, branch = info["repository"], info["channel"]
+    repository = info["repository"]
     if remote_commit(repository, f"v{info['version']}") != info["commit"]:
         raise ValueError("release tag changed before catalog publication")
     actual = (
@@ -117,17 +142,32 @@ def publish(info: dict[str, str], digest: str) -> None:
     if actual != digest:
         raise ValueError("release image tag changed before catalog publication")
     verify_public(info, digest)
-    files = catalog_files(info, digest)
-    current = api(repository, f"git/ref/heads/{branch}", missing_ok=True)
-    parent: list[str] = []
-    if current is not None:
-        parent = [current["object"]["sha"]]
-        contents = api(repository, f"contents/release.json?ref={parent[0]}")
-        if contents is None:
-            raise ValueError("existing catalog has no release identity")
-        previous = json.loads(base64.b64decode(contents["content"]))
-        if not check_forward(previous, info, digest):
-            return
+    updates: list[tuple[str, dict[str, bytes], str | None]] = []
+    # Inspect every target before the first mutation. An invalid identity or a
+    # downgrade must not leave the other catalog partially advanced.
+    for branch in catalog_branches(info["version"]):
+        files = catalog_files(info, digest, branch=branch)
+        current = api(repository, f"git/ref/heads/{branch}", missing_ok=True)
+        parent = current["object"]["sha"] if current is not None else None
+        if parent is not None:
+            contents = api(repository, f"contents/release.json?ref={parent}")
+            if contents is None:
+                raise ValueError("existing catalog has no release identity")
+            previous = json.loads(base64.b64decode(contents["content"]))
+            if not isinstance(previous, dict):
+                raise ValueError("existing catalog has an invalid release identity")
+            if not check_forward(previous, info, digest, branch=branch):
+                continue
+        updates.append((branch, files, parent))
+    for branch, files, parent in updates:
+        _publish_catalog(info, branch, files, parent)
+
+
+def _publish_catalog(
+    info: dict[str, str], branch: str, files: dict[str, bytes], parent: str | None
+) -> None:
+    """Advance one reviewed target; completed targets are skipped on a rerun."""
+    repository = info["repository"]
     tree_items = []
     for path, content in sorted(files.items()):
         item = {"path": path, "mode": "100644", "type": "blob"}
@@ -152,12 +192,12 @@ def publish(info: dict[str, str], digest: str) -> None:
         {
             "message": f"Publish Modbus service {info['version']}",
             "tree": tree["sha"],
-            "parents": parent,
+            "parents": [parent] if parent is not None else [],
         },
     )
     if commit is None:
         raise ValueError("catalog commit was not created")
-    if current is None:
+    if parent is None:
         api(
             repository,
             "git/refs",
@@ -199,7 +239,8 @@ def main() -> int:
     except (ValueError, OSError, KeyError, TypeError) as error:
         sys.stderr.write(f"Catalog publication stopped: {error}\n")
         return 1
-    sys.stdout.write(f"Published {info['channel']} for {info['version']}\n")
+    channels = ", ".join(catalog_branches(info["version"]))
+    sys.stdout.write(f"Catalogs verified or advanced ({channels}) for {info['version']}\n")
     return 0
 
 

@@ -22,5 +22,10 @@ def is_prerelease(tag: str) -> bool:
 
 
 def catalog_branch(version: str) -> str:
-    """Beta builds must never update the stable app catalog."""
+    """Return the release's canonical channel for build/provenance metadata."""
     return "apps-beta" if is_prerelease(f"v{version}") else "apps"
+
+
+def catalog_branches(version: str) -> tuple[str, ...]:
+    """Offer stable updates to existing beta installs without moving their data."""
+    return ("apps-beta",) if is_prerelease(f"v{version}") else ("apps", "apps-beta")
