@@ -1,16 +1,16 @@
 configuration:
   serial_port:
     name: Adattatore seriale
-    description: 'Solo per serial: seleziona l’adattatore USB RS-485 esclusivo, preferibilmente tramite /dev/serial/by-id. Lascia vuoto per LAN.'
+    description: "Solo per USB / RS-485: seleziona l’adattatore USB RS-485 esclusivo, preferibilmente tramite /dev/serial/by-id. Lascia vuoto per LAN."
   device_id:
     name: Indirizzo della wallbox
     description: Indirizzo Modbus configurato nella wallbox.
   baudrate:
     name: Velocità in baud
-    description: 'Solo per serial: deve corrispondere alla wallbox. Per LAN, imposta la velocità sull’adattatore.'
+    description: "Solo per USB / RS-485: deve corrispondere alla wallbox. Per LAN, imposta la velocità sull’adattatore."
   frame:
     name: Formato seriale
-    description: 'Solo per serial: bit dati, parità e bit di stop della wallbox. Per LAN, impostali sull’adattatore.'
+    description: "Solo per USB / RS-485: bit dati, parità e bit di stop della wallbox. Per LAN, impostali sull’adattatore."
   read_only:
     name: Sola lettura
     description: Disabilita i comandi di ricarica, compresi i controlli di Home Assistant, e l'heartbeat del servizio; le letture Modbus rimangono attive.
@@ -31,10 +31,10 @@ configuration:
     description: Fissa a 8765; esporre la porta sull'host è facoltativo e normalmente non necessario.
   connection_type:
     name: Connessione wallbox
-    description: 'serial: USB/RS-485 locale; rtu_over_tcp: adattatore LAN trasparente; modbus_tcp: gateway che traduce Modbus TCP in RTU. Le modalità LAN non richiedono un dispositivo USB.'
+    description: "USB / RS-485: adattatore locale. LAN: Modbus RTU (TCP): adattatore di rete trasparente. LAN: Modbus TCP: gateway che traduce TCP in RTU. I vecchi valori serial, rtu_over_tcp e modbus_tcp restano validi per le configurazioni esistenti."
   host:
-    name: Host adattatore
-    description: 'Per LAN: nome host o indirizzo IP dell’adattatore, senza schema o percorso URL. Usa una rete privata affidabile.'
+    name: Host / indirizzo IP adattatore
+    description: "Obbligatorio per LAN: nome host o indirizzo IP dell’adattatore, senza schema o percorso URL. Lascia vuoto per USB / RS-485. Usa una rete privata affidabile."
   tcp_port:
     name: Porta TCP adattatore
     description: Porta TCP configurata sull’adattatore; valore predefinito 502. Non è la porta HTTP 8765 del servizio indipendente.
