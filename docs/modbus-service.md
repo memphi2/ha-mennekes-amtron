@@ -1,6 +1,6 @@
 # Independent Modbus service
 
-**0.5.0b3 is a beta for installation and hardware testing.** The integration
+**0.5.0b4 is a beta for installation and hardware testing.** The integration
 and service use the same version. Existing stable installations keep direct
 serial mode until you explicitly switch them to the service.
 
@@ -20,7 +20,7 @@ heartbeat. The wallbox's configured fallback applies in that case. See
 
 ## Install the beta on Home Assistant OS
 
-Install the **0.5.0b3** integration release first. On HA 2026.11+, enable the
+Install the **0.5.0b4** integration release first. On HA 2026.11+, enable the
 repository's **Pre-release** switch in the Marketplace; on HA 2026.9/2026.10,
 enable beta releases in HACS. The service is an additional HA app installed
 through Supervisor. HACS and the Marketplace install only the integration.
@@ -74,6 +74,10 @@ invalid response. Confirming again retrieves the current credentials directly
 from Supervisor; an app restart is not needed to refresh a stale setup flow.
 Invalid responses name the affected data section in
 the HA log without printing tokens or response contents.
+
+An unusable optional maximum-current reading is treated as an unknown hardware
+capability rather than blocking setup. Its raw reading remains available for
+diagnosis. The app and integration still enforce their configured current caps.
 
 The integration's service options control only HA's access and refresh interval.
 Read-only there disables HA commands while the service keeps its heartbeat and

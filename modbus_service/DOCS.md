@@ -7,7 +7,7 @@ heartbeat and use the wallbox's configured fallback.
 
 ## First setup
 
-Install the matching **0.5.0b3** integration first. Enable **Pre-release** for
+Install the matching **0.5.0b4** integration first. Enable **Pre-release** for
 its Marketplace repository on HA 2026.11+, or beta releases in HACS on older
 supported versions. The integration and this app are installed separately.
 Supervisor may show **Building** while it creates the local app image from the
@@ -66,7 +66,7 @@ records health transitions rather than every heartbeat.
 
 ## Beta channel
 
-Version 0.5.0b3 is for hardware testing. Test installation, deliberate pause,
+Version 0.5.0b4 is for hardware testing. Test installation, deliberate pause,
 HA restart, service restart and reconnection before relying on it unattended.
 Clearing error 200 while paused still needs firmware confirmation.
 
@@ -75,4 +75,4 @@ Supervisor treats these as different apps. When moving between channels,
 copy the options, stop the old app before starting the other one, and confirm the
 newly discovered app. Keep the original app and its backup until migration is verified.
 
-[Full setup and migration guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0b3/docs/modbus-service.md)
+[Full setup and migration guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0b4/docs/modbus-service.md)

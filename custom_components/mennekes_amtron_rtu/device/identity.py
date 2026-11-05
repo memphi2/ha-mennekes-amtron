@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError
-from .const import DEFAULT_MODEL
+from .const import CHARGING_CURRENT_MINIMUM, DEFAULT_MODEL
 from .data import DeviceIdentity
 from .models import ARTICLE_MODELS
 from .registers import (
@@ -45,6 +45,16 @@ def model_name(article_number: str | None) -> str:
     return ARTICLE_MODELS.get(display_identifier(article_number) or "", DEFAULT_MODEL)
 
 
+def usable_max_evse_current(value: float | None) -> float | None:
+    """Treat an unusable optional hardware limit as unknown, not a command.
+
+    Raw register telemetry remains available in the polled values. Commands
+    continue to use the configured current cap when this capability is absent.
+    """
+
+    return value if value is not None and CHARGING_CURRENT_MINIMUM <= value <= 32 else None
+
+
 async def async_read_identity(client: MennekesModbusClient) -> DeviceIdentity:
     """Read the device identity, raising only when the layout is unreadable.
 
@@ -62,7 +72,9 @@ async def async_read_identity(client: MennekesModbusClient) -> DeviceIdentity:
     identity.serial_number = await _optional_text(client, SERIAL_NUMBER, layout)
     identity.article_number = await _optional_text(client, ARTICLE_NUMBER, layout)
     identity.phase_options_hw = await _optional_int(client, PHASE_OPTIONS_HW, layout)
-    identity.max_evse_current = await _optional_float(client, MAX_EVSE_CURRENT, layout)
+    identity.max_evse_current = usable_max_evse_current(
+        await _optional_float(client, MAX_EVSE_CURRENT, layout)
+    )
     return identity
 
 

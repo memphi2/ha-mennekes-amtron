@@ -1,5 +1,13 @@
 # Changes
 
+## 0.5.0b4
+
+- Treat unusable optional maximum-EVSE-current readings as an unknown capability
+  while retaining the raw measurement and enforcing configured command limits.
+- Pair with integration 0.5.0b4 to fix setup rejected with
+  `invalid service snapshot (identity.max_evse_current)`. The updated integration
+  also accepts these readings from an already-running beta-3 app.
+
 ## 0.5.0b3
 
 - Supervise the heartbeat worker; unexpected exits stop the service and release
