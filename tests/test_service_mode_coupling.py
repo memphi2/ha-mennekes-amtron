@@ -32,15 +32,17 @@ CONTROL_ENTITY_IDS = (
 
 
 @pytest.mark.parametrize("initial_read_only", [False, True])
+@pytest.mark.parametrize("initial_current", [1, 8])
 def test_service_permission_controls_real_ha_entities_and_commands(
-    tmp_path, initial_read_only
+    tmp_path, initial_read_only, initial_current
 ):
     """Old HA read-only options cannot override the app's live permission."""
 
     async def run():
         service, transport, _clock = await service_fixture(
-            tmp_path, read_only=initial_read_only
+            tmp_path, read_only=initial_read_only, current=initial_current
         )
+        service.control.charging_setpoint = 8
         hass = await _boot(tmp_path / "ha")
         fault = None
         commands = []
@@ -131,6 +133,10 @@ def test_service_permission_controls_real_ha_entities_and_commands(
 
                 initial_ids = entity_ids()
                 measurements = deepcopy(runtime.coordinator.data.values)
+                updates = []
+                remove_listener = runtime.coordinator.async_add_listener(
+                    lambda: updates.append(None)
+                )
                 assert_controls(initial_read_only)
                 power = hass.states.get("sensor.mennekes_amtron_total_power")
                 assert power is not None
@@ -161,6 +167,49 @@ def test_service_permission_controls_real_ha_entities_and_commands(
                 ]
                 number = hass.states.get(CONTROL_ENTITY_IDS[0])
                 assert number.attributes["max"] == 10
+
+                # An app restart can change its configured cap while all
+                # register values and its write permission stay identical.
+                for cap in (6, 16):
+                    service.config = replace(service.config, current_cap=cap)
+                    service.control._options = replace(
+                        service.control.options, current_cap=cap
+                    )
+                    before = len(updates)
+                    await refresh()
+                    assert len(updates) == before + 1
+                    number = hass.states.get(CONTROL_ENTITY_IDS[0])
+                    assert number.attributes["max"] == min(10, cap)
+                    assert hass.states.get(power.entity_id).last_updated == power.last_updated
+
+                if initial_current == 1:
+                    # Another client can change and pause a current between
+                    # HA polls. The pause register stays 1 A, but the slider
+                    # must display the service's new retained resume value.
+                    for setpoint in (6, 0, 8):
+                        service.control.charging_setpoint = setpoint
+                        before = len(updates)
+                        await refresh()
+                        assert len(updates) == before + 1
+                        number = hass.states.get(CONTROL_ENTITY_IDS[0])
+                        assert float(number.state) == setpoint
+
+                # Healthy heartbeats and internal generations still must not
+                # cause coordinator callbacks or changing entity attributes.
+                before = len(updates)
+                number = hass.states.get(CONTROL_ENTITY_IDS[0])
+                for _ in range(3):
+                    service.diagnostics.heartbeats_sent += 1
+                    service.diagnostics.writes_sent += 1
+                    service.data = replace(
+                        service.data,
+                        current_write_generation=service.data.current_write_generation + 1,
+                    )
+                    await refresh()
+                    assert len(updates) == before
+                    assert hass.states.get(number.entity_id).last_updated == number.last_updated
+                    assert hass.states.get(power.entity_id).last_updated == power.last_updated
+                remove_listener()
 
                 for fault in ("offline", "not_ready", "malformed"):
                     await refresh()

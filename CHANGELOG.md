@@ -24,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Provide English, German, French, Dutch and Italian in the integration and app,
   with an updated installation guide and HACS/Marketplace installation buttons.
 - Improve reconnect cleanup, pause-current preservation after a lost reply,
-  setup validation and diagnostics. Existing beta apps receive the stable app
+  slider updates after service limit changes, setup validation and diagnostics.
+  Existing beta apps receive the stable app
   update in place, preserving their configuration, credentials and saved intent.
 
 ## 0.5.0b5 — 2026-11-05

@@ -277,6 +277,8 @@ class RemoteClient(MennekesModbusClient):
             failed_blocks=tuple(failed),
             current_write_generation=generation,
             service_read_only=control["read_only"],
+            service_max_charging_current=control["max_charging_current"],
+            service_charging_setpoint=current,
         )
 
     async def execute(self, command: str, **values: Any) -> None:

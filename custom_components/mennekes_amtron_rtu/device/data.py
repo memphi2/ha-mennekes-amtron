@@ -33,6 +33,10 @@ class WallboxData:
     # A service permission change must notify controls even with identical
     # register values. This is internal metadata, never an entity attribute.
     service_read_only: bool | None = field(default=None, repr=False)
+    # The service can change the slider range or retained paused setpoint
+    # without changing a register. Compare these stable control values too.
+    service_max_charging_current: float | None = field(default=None, repr=False)
+    service_charging_setpoint: float | None = field(default=None, repr=False)
 
     def get(self, key: str) -> RegisterValue:
         """Return one decoded register value, or ``None`` when unavailable."""
