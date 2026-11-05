@@ -1,5 +1,18 @@
 # Changes
 
+## 0.5.0
+
+- Connect to a LAN-to-RS485 adapter using transparent RTU-over-TCP or a
+  translating Modbus TCP gateway. Choose the connection type, adapter host,
+  TCP port and wallbox address in the app settings; USB is still supported.
+- Make the serial-device setting optional for LAN installations. The gateway's
+  TCP port is separate from the app's HTTP API port; HA app discovery is unchanged.
+- Keep heartbeat and charging control in the independent service for either
+  connection type, including through Home Assistant Core restarts.
+- Stable release with automatic HA OS discovery and five UI languages. Existing
+  beta installations receive 0.5.0 through their usual app update.
+- Improve connection recovery, configuration validation and pause-state handling.
+
 ## 0.5.0b5
 
 - Add French, Dutch and Italian app settings alongside English and German.
