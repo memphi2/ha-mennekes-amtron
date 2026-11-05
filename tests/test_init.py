@@ -13,7 +13,6 @@ from custom_components.mennekes_amtron_rtu import (
     _entry_platforms,
     _scan_interval,
     _serial_config,
-    async_migrate_entry,
     async_reload_entry,
     async_setup,
     async_setup_entry,
@@ -252,16 +251,6 @@ def test_reload_asks_home_assistant_to_reload(
         entry = FakeConfigEntry()
         await async_reload_entry(hass, entry)
         assert hass.config_entries.reloaded == [entry.entry_id]
-
-    asyncio.run(run())
-
-
-def test_only_the_known_entry_version_is_accepted() -> None:
-    async def run() -> None:
-        entry = FakeConfigEntry()
-        assert await async_migrate_entry(FakeHass(), entry)
-        entry.version = 2
-        assert not await async_migrate_entry(FakeHass(), entry)
 
     asyncio.run(run())
 

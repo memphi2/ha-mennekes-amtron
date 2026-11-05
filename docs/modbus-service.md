@@ -194,7 +194,7 @@ Keep the old app and backup until the handover is verified.
 | Symptom | First check |
 |---|---|
 | HA asks for a URL or token | Confirm that the app is running, then use its discovery card or **Connect to the Modbus service**. Manual credentials are for standalone services. |
-| App not ready / token rejected | Check the app log and retry discovery confirmation. HA retrieves the current credentials; no app restart is needed just to refresh them. |
+| App not ready / token rejected | Check the app log. During setup, retry discovery confirmation. For an existing connection with an authentication notice, [renew service access](troubleshooting.md#renew-service-access); HA retrieves the current credentials without a manual token. |
 | Controls are unavailable | Check the app's **Read-only** switch and serial connection. After changing app settings, save and restart the app, then wait for fresh status. |
 | App exits immediately | Look for **Invalid or unreadable service configuration** in its log; the message names the invalid option or startup phase. |
 | App runs but cannot reach the wallbox | Check adapter path, bus settings and exclusive bus ownership. A missing serial device is retried. |

@@ -30,11 +30,7 @@ def export(destination: Path) -> None:
             if not line.startswith("image:")
         )
     )
-    (destination / "README.md").write_text(
-        (ROOT / "modbus_service/README.md")
-        .read_text()
-        .replace("../docs/modbus-service.md", "DOCS.md")
-    )
+    shutil.copy2(ROOT / "modbus_service/README.md", destination / "README.md")
     shutil.copy2(ROOT / "modbus_service/DOCS.md", destination / "DOCS.md")
     shutil.copy2(ROOT / "modbus_service/CHANGELOG.md", destination / "CHANGELOG.md")
     shutil.copytree(ROOT / "modbus_service/translations", destination / "translations")

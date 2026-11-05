@@ -8,7 +8,8 @@
       "invalid_service_discovery": "De app heeft ongeldige verbindingsgegevens doorgegeven.",
       "service_identity_changed": "De gevonden wallbox is gewijzigd. Begin de configuratie opnieuw.",
       "service_discovery_updated": "De bestaande integratie gebruikt nu de verbinding met de gevonden app.",
-      "multiple_service_apps": "Er zijn meerdere Modbus-apps gevonden. Selecteer de juiste gevonden app onder Apparaten & diensten."
+      "multiple_service_apps": "Er zijn meerdere Modbus-apps gevonden. Selecteer de juiste gevonden app onder Apparaten & diensten.",
+      "reauth_not_supported": "Een directe Modbus-verbinding heeft geen toegangsgegevens om te vernieuwen."
     },
     "error": {
       "cannot_connect": "De seriële poort kon niet worden geopend of de wallbox antwoordde niet. Controleer de bekabeling (Modbus A is +, B is -), de poort en de businstellingen.",
@@ -16,12 +17,13 @@
       "not_found": "Er heeft geen wallbox op deze poort geantwoord. Controleer de bedrading (Modbus A is +, B is -, GND aangesloten) en of DIP-schakelaars 4 en 5 op bank S1 aan staan. Herstart de wallbox na het wijzigen van de schakelaars.",
       "cannot_connect_service": "De app is niet bereikbaar via het netwerk. Controleer of deze draait en verbindingen op poort 8765 accepteert.",
       "service_discovery_requires_serial": "De app heeft nog geen serienummer uitgelezen. Controleer de verbinding met de wallbox en probeer het opnieuw.",
-      "service_auth_failed": "De app heeft de aanmelding geweigerd. Bevestig opnieuw om de huidige toegangsgegevens bij Supervisor op te halen. Controleer bij een afzonderlijk gehoste service het ingestelde token.",
+      "service_auth_failed": "De Modbus-dienst heeft de authenticatie geweigerd. Bevestig bij een Supervisor-app opnieuw om de huidige toegangsgegevens op te halen. Voer bij een afzonderlijk gehoste dienst het huidige toegangstoken in.",
       "service_not_ready": "De aanmelding bij de app is gelukt, maar er zijn nog geen wallboxgegevens beschikbaar. Controleer het logboek van de app en probeer het opnieuw.",
       "service_invalid_response": "De app antwoordt, maar de gegevens zijn niet geaccepteerd. Werk de integratie en de app bij naar dezelfde versie. Het Home Assistant-logboek vermeldt welk onderdeel van de gegevens is afgewezen.",
       "invalid_network_config": "Voer een hostnaam of IP-adres zonder URL-schema in, een TCP-poort van 1 tot 65535 en het juiste verbindingsprotocol.",
       "cannot_connect_network": "De LAN-adapter is niet bereikbaar of de wallbox antwoordt niet. Controleer host, poort, protocol en de seriële instellingen op de adapter.",
-      "invalid_network_response": "De adapter antwoordde, maar meldde geen geldige Modbus-registerindeling. Controleer het wallboxadres, het adapterprotocol en de satellietinstelling."
+      "invalid_network_response": "De adapter antwoordde, maar meldde geen geldige Modbus-registerindeling. Controleer het wallboxadres, het adapterprotocol en de satellietinstelling.",
+      "service_discovery_unavailable": "De huidige toegangsgegevens van deze app konden niet worden opgehaald. Controleer de app en Supervisor, start of herstart de app indien nodig en bevestig opnieuw."
     },
     "progress": {
       "searching": "De bus wordt doorzocht naar een wallbox: maximaal {candidates} combinaties, ongeveer {minutes} minuten plus verbindingscontroles. Er wordt niet naar registers geschreven. Tijdens het opnieuw configureren worden de bestaande verbinding en heartbeat onderbroken; het ingestelde gedrag van de wallbox bij uitval is dan van toepassing."
@@ -129,6 +131,17 @@
           "tcp_port": "TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.",
           "device_id": "Adres van de wallbox achter de adapter; standaard 50, ondersteund bereik 10–50."
         }
+      },
+      "reauth_confirm": {
+        "title": "Toegang tot de dienst vernieuwen",
+        "description": "Voer het huidige toegangstoken van je afzonderlijk gehoste Modbus-dienst in. De dienst-URL en de bestaande laadpaalconfiguratie blijven behouden.",
+        "data": {
+          "server_token": "Toegangstoken"
+        }
+      },
+      "reauth_app": {
+        "title": "Toegang tot de app vernieuwen",
+        "description": "Bevestig om de huidige toegangsgegevens van deze Modbus-app bij Supervisor op te halen. De app moet actief zijn. Je hoeft geen token in te voeren."
       }
     }
   },
@@ -434,6 +447,9 @@
     },
     "service_unavailable": {
       "message": "De Modbus-service is niet beschikbaar of kon de opdracht niet bevestigen. Controleer de huidige status voordat je de opdracht herhaalt."
+    },
+    "service_auth_failed": {
+      "message": "De Modbus-dienst heeft de authenticatie geweigerd. Vernieuw de toegang via Instellingen > Apparaten & diensten."
     }
   },
   "issues": {

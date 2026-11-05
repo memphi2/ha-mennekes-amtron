@@ -1,121 +1,131 @@
-# Home Assistant Quality Scale
+# Home Assistant quality scale
 
 Target: Platinum.
 
-Current status: Platinum (local self-assessment; no official Home Assistant
-certification). Open rules: none — all 52 official rules are
-answered, 43 as `done` and 9 as `exempt`, each exemption with a reason.
+Current status: Platinum **(local self-assessment)**. This community integration
+has not been awarded a tier by Home Assistant. The README badge links here so
+its scope, evidence and exceptions remain visible.
 
-`custom_components/mennekes_amtron_rtu/quality_scale.yaml` is the
-machine-readable status. `scripts/check_quality_scale.py` fails the build when
-it drifts from this document, when a rule is missing or unknown, and when any
-rule goes back to `todo` without being documented as a blocker here.
+The assessment follows the [official quality-scale rules](https://contributors.home-assistant.io/core/quality-scale/)
+reviewed on **2026-11-05**: 20 Bronze, 10 Silver, 21 Gold and 3 Platinum rules.
+Open rules: none in this local assessment. Distribution-specific adaptations
+for this custom integration are explained below; they do not establish approval
+for inclusion in Home Assistant Core.
 
-## What the tiers cost, and what was done
+| Status | Count |
+|---|---|
+| done | 50 |
+| exempt | 4 |
+| todo | 0 |
+| total | 54 |
 
-**Bronze** wants a config flow that is actually tested against the device. The
-flow opens the serial port and reads the Modbus layout version and the serial
-number before an entry exists, so a wrong port, baud rate or device address
-fails during setup instead of producing an empty device.
+The [quality-scale file](../custom_components/mennekes_amtron_rtu/quality_scale.yaml)
+records each rule and its rationale. [The quality gate](../scripts/check_quality_scale.py)
+checks the rule inventory, counts, exemptions and this document. An open rule
+must be recorded as a blocker; a missing rule cannot silently pass.
 
-**Silver** wants the integration to behave when the device does not. A failed
-connect or identity read raises `ConfigEntryNotReady`; entities go unavailable
-when the poll fails *and* when their own register is missing from the
-snapshot; the coordinator logs a loss and a recovery exactly once per state
-change; command platforms set `PARALLEL_UPDATES` to 1 because RS-485 carries
-one transaction at a time.
+## Evidence by tier
 
-**Gold** wants the integration to be usable and documented. Every entity has a
-translated name, every enumerated state has a translated value in English and
-German, every entity has an icon, every error the user can trigger is a
-translated exception, and four repair issues explain the four ways this device
-gets stuck. `scripts/check_register_map.py` fails the build if any of that
-drifts from the register map.
+| Tier | What is implemented | Evidence |
+|---|---|---|
+| Bronze | UI setup validates wallbox identity before creating an entry. USB, transparent RTU-over-TCP, translating Modbus TCP gateways and the independent service have explicit connection paths. Unique IDs prevent duplicate wallboxes; actions are registered once. | [Config flow](../custom_components/mennekes_amtron_rtu/config_flow.py), [flow tests](../tests/test_config_flow.py), [service flow tests](../tests/test_service_flow.py), [installation](installation.md) |
+| Silver | Failed setup retries, disconnected entities become unavailable, unload closes the resources actually loaded, and authentication failures start an access-renewal flow. The manifest names the public maintainer `@memphi2`; the test gate requires 99% combined statement/branch coverage. | [Lifecycle tests](../tests/test_platform_lifecycle.py), [reauthentication tests](../tests/test_service_reauth.py), [coverage gate](../scripts/check_coverage.py), [support policy](../SUPPORT.md) |
+| Gold | Supervisor discovers the service app and refreshes an existing entry without replacing its devices or entities. Names, enumerated states and user-facing errors are translated into English, German, French, Dutch and Italian. Diagnostics, repairs, connection changes and user guides cover supported functions and limitations. | [Discovery tests](../tests/test_service_discovery.py), [translations](../custom_components/mennekes_amtron_rtu/translations), [register/translation gate](../scripts/check_register_map.py), [user guide](user-guide.md), [troubleshooting](troubleshooting.md) |
+| Platinum | Modbus and service HTTP requests use asynchronous clients. HA supplies its shared web session to the service client. Strict typing covers integration and tooling code against the current supported HA annotations. | [Device client](../custom_components/mennekes_amtron_rtu/device/client.py), [remote client](../custom_components/mennekes_amtron_rtu/remote.py), [typing gate](../scripts/check_typing.py), [validation guide](validation.md) |
 
-**Platinum** wants a fully typed, fully asynchronous integration.
-`scripts/check_typing.py` runs `mypy --strict` over every module and every
-script, and pymodbus' async serial client is used throughout.
+The heartbeat entity subscribes when added to HA and unregisters its listener
+when removed. It therefore satisfies `entity-event-setup`; using a coordinator
+does not make that rule inapplicable. Service entries also make `discovery`,
+`discovery-update-info`, `reauthentication-flow` and `inject-websession`
+applicable, even though direct Modbus connections have no credentials.
 
-## Exempt rules, and why
+For an authentication failure, HA retrieves the existing app's current
+credentials from Supervisor automatically. If that fails, HA OS users confirm
+the access prompt after checking the app. Standalone users enter their current
+service token. Entries bound to a serial number require the same serial number;
+standalone entries originally added without one retain their URL-based identity.
+That fallback does not independently verify the physical wallbox. Both paths
+keep the existing entry. See [Renew service access](troubleshooting.md#renew-service-access).
 
-- `brands`: the Home Assistant Brands repository serves core integrations.
-  This one is installed through HACS, which serves the project-owned brand
-  assets from the repository. `docs/legal.md` pins their hash.
-- `entity-event-setup`: all entities derive from the coordinator. There is no
-  device-side event stream to subscribe to in an entity lifecycle callback.
-- `integration-owner`: the repository deliberately ships no personal metadata,
-  so `manifest.json` keeps an empty `codeowners` list. The maintenance scope
-  is documented in `SUPPORT.md` instead.
-- `reauthentication-flow`: a serial bus has no credentials to re-enter.
-- `discovery` and `discovery-update-info`: a USB RS-485 adapter cannot be
-  identified as this wallbox. The config flow offers a port list, which is
-  honest, instead of claiming a discovery it cannot perform.
-- `dynamic-devices` and `stale-devices`: one config entry models exactly one
-  wallbox.
-- `inject-websession`: the integration speaks serial Modbus RTU and makes no
-  HTTP request.
+## Custom-integration scope
 
-## Rules this integration earns that a push integration cannot
+The official scale is a Core review process. Its documentation rules refer to
+pages on home-assistant.io; this custom integration publishes the corresponding
+installation, usage, action and troubleshooting guides in this repository.
+The local assessment evaluates those guides. It does not claim an official
+Home Assistant integration page or a Core-team review.
 
-- `appropriate-polling`: the device has no push channel, so polling is the
-  correct model. Status is polled every five seconds by default; measurements
-  every 30 seconds, and idle measurements/configuration at least a minute apart.
-  Reads use eighteen contiguous ranges; the heartbeat runs independently.
-- `test-before-configure`: the config flow reads the device before an entry is
-  created.
-- `log-when-unavailable`: the serial connection is held open, so a loss and a
-  recovery are each logged once.
+The official [`brands` rule](https://contributors.home-assistant.io/core/quality-scale/brands/)
+requires assets in the Home Assistant Brands repository and lists no exceptions.
+For custom integrations, Home Assistant's separate
+[brand-image guidance](https://contributors.home-assistant.io/core/integrations/brands/#brand-images-for-custom-integrations)
+requires local `brand/` images from HA 2026.3 onward. We mark `brands` as `done`
+for that custom-integration equivalent: the package contains project-owned
+icons and logos, checked by the [legal/provenance gate](../scripts/check_legal_audit.py).
+This is **not** a claim that our assets have been accepted into the upstream
+Brands repository. A future Core submission would require that separate step.
+See [asset provenance](legal.md#project-owned-generic-artwork).
 
-## Static analysis
+## Exempt rules
 
-`ruff` runs with explicit rule families selected, every one of them a ruleset the
-integration passes completely — including `S`, the bandit security rules,
-`BLE` for blind excepts, `ASYNC` for blocking calls in async code, `SLF` for
-private-member access and `PTH` for `os.path` use. They are selected rather
-than left off so that a regression fails the build instead of being a matter
-of taste. `tests/` and `scripts/` carry narrow, documented exceptions:
-tests assert and reach into private helpers on purpose, and the gate scripts
-run fixed developer commands as subprocesses.
+Only these four rules are exempt; the same reasons are recorded in the YAML:
 
-CodeQL runs as well, now that the repository is public: code scanning uploads
-need a public repository, and the Python security rules above run in every CI
-job regardless, on every matrix entry. See
-[repository-settings.md](repository-settings.md).
+- `docs-conditions`: the integration defines no custom automation conditions.
+  Automations can use HA's standard entity-state and numeric-state conditions.
+- `docs-triggers`: the integration defines no custom automation triggers.
+  Its blueprints use HA's standard triggers instead.
+- `dynamic-devices`: one config entry represents one wallbox. It does not
+  discover or add child devices at runtime.
+- `stale-devices`: the entry has no dynamically discovered child devices to
+  remove. Removing the entry uses HA's normal device/entity lifecycle.
 
-`mypy --strict` covers all integration modules and tooling scripts.
-It runs against the latest stable Home Assistant and the weekly preview.
-Home Assistant moved its own config-flow and action annotations from
-voluptuous to `probatio` in 2026.10,
-so no single source file can satisfy `--strict` against both ends of the
-supported range; the minimum matrix entry runs the whole test suite instead
-and proves the integration works there. See [SUPPORT.md](../SUPPORT.md).
+The two documentation exemptions follow the official
+[conditions](https://contributors.home-assistant.io/core/quality-scale/docs-conditions/)
+and [triggers](https://contributors.home-assistant.io/core/quality-scale/docs-triggers/)
+rules. The other two concern integrations that add and remove devices within
+an existing entry.
 
-## Coverage
+## Reproducible checks
 
-The enforced statement/branch coverage threshold is 99 percent, above the
-Platinum target of 95. It is not a claim of complete coverage. The validation
-command prints uncovered statements and branch paths for the exact checkout;
-those results, rather than a hard-coded zero-miss claim, are the evidence.
+Run the [maintenance validation](validation.md) for the exact checkout:
 
-Coverage is not the claim, though. The tests that matter are the ones that
-pin the device's dangerous semantics: that `0x0302` can never be written with
-0 A through a direct action without an explicit opt-in, that the number input
-accepts 0 for no limit while the invalid 0.01-5.99 A band is refused, that the
-heartbeat keeps running while the poll fails, that the
-bus lock serializes every transaction, and that the recovery sequence writes
-its three registers in the documented order.
+```bash
+.venv/bin/python scripts/check_validate.py
+```
 
-## What is still open
+Required CI validates the supported **minimum and latest stable HA** versions.
+Latest stable also runs strict typing; minimum HA uses `--skip-typing` because
+HA's flow/action type annotations changed in 2026.10. Scheduled preview checks
+are additional compatibility evidence. See the [support policy](../SUPPORT.md).
 
-The owner reported successful operation of the released integration on an
-Amtron 4You 310 11 C2 on 2026-11-03. This is a user report, without a firmware
-version or measurements for each feature; it does not cover subsequent code
-changes or other models. The [compatibility matrix](compatibility.md) tracks
-that scope. Use the verification steps in [quickstart.md](quickstart.md) and
-[safety.md](safety.md) when testing another installation or version.
+The suite enforces **at least 99% overall**, **more than 95% per production
+integration module**, and **100% in the six configuration-flow modules**,
+counting statements and branches together. Checks use unrounded counters and
+report the remaining gaps; see [coverage requirements](validation.md#coverage-requirements).
+Neither these percentages nor this badge mean every possible fault has been tested.
+Ruff, dependency checks, legal/provenance checks, security scanning and the
+required security-review gate complement behavior tests. Their current status
+is visible in the PR and workflow results, not inferred from this page.
 
-GitHub settings and published artifacts need separate live verification.
-On 2026-11-01 the required checks were verified to include the November
-preview and the current-head Codex security-review gate. Its event workflow
-becomes automatic when the introducing PR reaches the default branch. See
-[repository-settings.md](repository-settings.md).
+Behavior tests cover unlimited-current opt-in, refusal of the invalid
+0.01–5.99 A range, pause preservation, register-write intervals, serialized bus
+access and heartbeat recovery. Real HA lifecycle and HTTP tests cover service
+access, reconnection and unloading. Recorder tests check state-change filtering,
+statistics and retention; see [database validation](recorder-validation.md).
+
+## What this assessment does not prove
+
+The owner reported successful operation on an **Amtron 4You 310 11 C2** on
+2026-11-03. That report did not record a firmware version or verify every
+feature. It does not validate later code changes, other models or physical LAN
+gateways. The [compatibility matrix](compatibility.md) records that boundary.
+
+Automated tests use simulated wallbox replies. A physical installation still
+needs the [quick-start checks](quickstart.md) and the manufacturer's electrical
+and [fallback requirements](safety.md). A separate service survives HA Core
+restarts, but its own restart, host failure or lost bus connection can interrupt
+the heartbeat. The quality badge makes no charging-availability guarantee.
+
+GitHub rules, catalog updates and published artifact provenance require live
+checks at release time. Local validation alone does not prove publication or
+installation on a user's Home Assistant instance.

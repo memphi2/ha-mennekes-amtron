@@ -118,8 +118,7 @@ app updates. See
 
 Moving from HACS to the Marketplace does not require a second installation or
 adding the wallbox again; [HA carries over the existing repositories](https://contributors.home-assistant.io/marketplace/how-it-works/#before-home-assistant-202611).
-If coming from **0.1.0**, follow the separate
-[migration steps](upgrading.md) first. For blueprint changes, follow
+For blueprint changes, follow
 [Updating existing automations](blueprints.md#updating-existing-blueprint-automations).
 
 ## Change settings later

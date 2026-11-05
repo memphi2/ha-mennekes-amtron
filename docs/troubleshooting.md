@@ -71,7 +71,7 @@ itself, or configure those fields in the app when the service owns it.
 |---|---|
 | No discovery, or the integration asks for URL and token | Confirm the app is installed and running, then check Devices & services again. Verify that both app and integration are current. If you have multiple Modbus apps, select the matching discovered app. |
 | **App cannot be reached** | Check that the app stays running. For a separate service, also check its host, network and port 8765. |
-| **Token invalid / authentication failed** | Confirm the discovered flow again to retrieve the app's current credentials from Supervisor. For a separate service, compare the configured tokens. Do not post the token in an issue. |
+| **Token invalid / authentication failed** | During setup, confirm discovery again or check the standalone token. For an existing entry, follow [Renew service access](#renew-service-access). Do not post tokens in an issue. |
 | **Not ready** | Authentication succeeded, but usable wallbox data is not available yet. Check the app log for serial connection and initialization, then retry. Changing the token will not fix this. |
 | **No serial number yet** | The app has not read the serial number needed to match the wallbox. Check the wallbox connection and supported register layout. |
 | **App responds, but its data was not accepted** / `invalid service snapshot` | Update the integration and app to matching versions. If it persists, copy the field named in parentheses in the HA log, such as `identity.max_evse_current`, and download diagnostics. This is a data-validation error, not proof of a bad token. |
@@ -80,6 +80,31 @@ itself, or configure those fields in the app when the service owns it.
 An app that starts successfully can still be waiting for the wallbox. The log
 separates API startup, serial connection, heartbeat start/stop and shutdown.
 Check the last completed step instead of repeatedly restarting everything.
+
+### Renew service access
+
+If an existing connection rejects authentication, Home Assistant starts access
+renewal. For a Supervisor app, it first tries the current credentials
+automatically. If a prompt remains, open it under **Settings → Devices &
+services** for the existing **Mennekes Amtron RTU** entry:
+
+- **Home Assistant OS app:** confirm the prompt. HA retrieves fresh credentials
+  from Supervisor; there is no token to copy. If retrieval fails, check that the
+  app and Supervisor are running, then try again. Restart the app only if needed
+  to restore it; restarting the app briefly interrupts its heartbeat.
+- **Separately hosted service:** enter the service's current access token. Its
+  saved URL stays unchanged. To move to another URL, use **Reconfigure** instead.
+
+The existing service URL stays unchanged. If the entry was identified by a serial
+number, the service must report the same one. For entries added without a readable
+serial number, HA can retain the URL but cannot independently confirm the physical
+wallbox's identity.
+
+The device, entity IDs and options are kept; do not delete and add the integration
+again. A successful confirmation reloads the integration without restarting HA.
+HA does not replay old charging commands. The independent service can still
+recover heartbeat error 200 using its saved charging state, including a pause.
+Direct USB and LAN connections have no service token and do not use this flow.
 
 ## The config flow cannot connect
 

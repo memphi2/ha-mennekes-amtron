@@ -8,7 +8,8 @@
       "invalid_service_discovery": "Die App hat ungültige Verbindungsdaten gemeldet.",
       "service_identity_changed": "Die erkannte Wallbox hat sich geändert. Starte die Einrichtung erneut.",
       "service_discovery_updated": "Die vorhandene Integration verwendet jetzt die erkannte App-Verbindung.",
-      "multiple_service_apps": "Mehrere Modbus-Apps wurden gefunden. Wähle die passende erkannte App unter Geräte & Dienste."
+      "multiple_service_apps": "Mehrere Modbus-Apps wurden gefunden. Wähle die passende erkannte App unter Geräte & Dienste.",
+      "reauth_not_supported": "Eine direkte Modbus-Verbindung hat keine Zugangsdaten, die erneuert werden können."
     },
     "error": {
       "cannot_connect": "Der serielle Port konnte nicht geöffnet werden oder die Wallbox hat nicht geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -), den Port und die Busparameter.",
@@ -16,12 +17,13 @@
       "not_found": "Auf diesem Port hat keine Wallbox geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -, GND verbunden) und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen und die Wallbox danach neu gestartet wurde.",
       "cannot_connect_service": "Die App ist über das Netzwerk nicht erreichbar. Prüfe, ob sie läuft und auf Port 8765 Verbindungen annimmt.",
       "service_discovery_requires_serial": "Die App hat noch keine Seriennummer gelesen. Prüfe die Verbindung zur Wallbox und versuche es erneut.",
-      "service_auth_failed": "Die App hat die Anmeldung abgelehnt. Bestätige erneut, um die aktuellen Zugangsdaten von Supervisor zu übernehmen. Prüfe bei einem separat betriebenen Dienst den konfigurierten Token.",
+      "service_auth_failed": "Der Modbus-Dienst hat die Anmeldung abgelehnt. Bestätige bei einer Supervisor-App erneut, um ihre aktuellen Zugangsdaten abzurufen. Gib bei einem separat betriebenen Dienst dessen aktuellen Zugangstoken ein.",
       "service_not_ready": "Die Anmeldung an der App funktioniert, aber die Wallbox-Daten sind noch nicht verfügbar. Prüfe das App-Protokoll und versuche es erneut.",
       "service_invalid_response": "Die App antwortet, aber ihre Daten werden nicht akzeptiert. Aktualisiere Integration und App auf dieselbe Version. Das Home-Assistant-Protokoll nennt den betroffenen Datenbereich.",
       "invalid_network_config": "Gib einen Hostnamen oder eine IP-Adresse ohne URL-Schema, einen TCP-Port von 1 bis 65535 und das passende Verbindungsprotokoll an.",
       "cannot_connect_network": "Der LAN-Adapter ist nicht erreichbar oder die Wallbox antwortet nicht. Prüfe Host, Port, Protokoll und die am Adapter eingestellten seriellen Parameter.",
-      "invalid_network_response": "Der Adapter hat geantwortet, aber kein gültiges Modbus-Layout geliefert. Prüfe Wallbox-Adresse, Adapterprotokoll und Satellite-Konfiguration."
+      "invalid_network_response": "Der Adapter hat geantwortet, aber kein gültiges Modbus-Layout geliefert. Prüfe Wallbox-Adresse, Adapterprotokoll und Satellite-Konfiguration.",
+      "service_discovery_unavailable": "Die aktuellen Zugangsdaten dieser App konnten nicht abgerufen werden. Prüfe App und Supervisor, starte die App bei Bedarf oder starte sie neu und bestätige erneut."
     },
     "progress": {
       "searching": "Der Bus wird nach einer Wallbox abgesucht: bis zu {candidates} Kombinationen, etwa {minutes} Minuten zuzüglich Verbindungsprüfungen. Es werden keine Register geschrieben. Beim Neukonfigurieren pausieren die bisherige Verbindung und der Heartbeat; das konfigurierte Ausfallverhalten der Wallbox greift."
@@ -129,6 +131,17 @@
           "tcp_port": "Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.",
           "device_id": "Adresse der Wallbox hinter dem Adapter; Werkseinstellung 50, unterstützter Bereich 10–50."
         }
+      },
+      "reauth_confirm": {
+        "title": "Dienstzugang erneuern",
+        "description": "Gib den aktuellen Zugangstoken deines separat betriebenen Modbus-Dienstes ein. Die Dienst-URL und der vorhandene Wallbox-Eintrag bleiben erhalten.",
+        "data": {
+          "server_token": "Zugangstoken"
+        }
+      },
+      "reauth_app": {
+        "title": "App-Zugang erneuern",
+        "description": "Bestätige, um die aktuellen Zugangsdaten dieser Modbus-App vom Supervisor abzurufen. Die App muss laufen. Du musst keinen Token eingeben."
       }
     }
   },
@@ -434,6 +447,9 @@
     },
     "service_unavailable": {
       "message": "Der Modbus-Dienst ist nicht erreichbar oder konnte den Befehl nicht bestätigen. Prüfe den aktuellen Zustand, bevor du den Befehl erneut sendest."
+    },
+    "service_auth_failed": {
+      "message": "Der Modbus-Dienst hat die Anmeldung abgelehnt. Erneuere den Zugang unter Einstellungen > Geräte & Dienste."
     }
   },
   "issues": {

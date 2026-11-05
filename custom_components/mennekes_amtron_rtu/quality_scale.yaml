@@ -1,140 +1,254 @@
+# Audited against https://contributors.home-assistant.io/core/quality-scale/rules/
+# Local custom-integration assessment; not an official Home Assistant grade.
 rules:
   action-setup:
     status: done
-    comment: The single action is registered in async_setup, not per entry.
+    comment: Actions are registered once in [async_setup](custom_components/mennekes_amtron_rtu/__init__.py#async_setup);
+      [action tests](tests/test_services.py) cover validation and exceptions.
   appropriate-polling:
     status: done
-    comment: >-
-      The device has no push channel. The coordinator polls the supported
-      register blocks every five seconds by default, and the heartbeat runs in
-      its own task so a slow poll cannot starve it.
+    comment: Status, measurements and idle polling have separate intervals; heartbeat scheduling is independent.
+      See [poller](custom_components/mennekes_amtron_rtu/device/poller.py) and [Recorder tests](tests/test_recorder.py).
   brands:
-    status: exempt
-    comment: >-
-      The Home Assistant Brands repository serves core integrations. This is a
-      custom integration installed through HACS, which serves the
-      project-owned brand assets from custom_components/mennekes_amtron_rtu/brand/
-      instead. docs/legal.md pins their hash and the legal gate fails if it
-      changes. The rule becomes relevant again with a core submission.
-  common-modules: done
+    status: done
+    comment: 'Custom-integration adaptation: Home Assistant supports packaged brand/ assets for custom
+      integrations since 2026.3. The [local icon](custom_components/mennekes_amtron_rtu/brand/icon.png)
+      and [legal provenance](docs/legal.md) satisfy this distribution path. The official core rule still
+      requires the Brands repository; this local assessment does not claim that core submission or official
+      grading. See https://contributors.home-assistant.io/core/integrations/brands/#brand-images-for-custom-integrations.'
+  common-modules:
+    status: done
+    comment: Shared logic lives in [coordinator](custom_components/mennekes_amtron_rtu/coordinator.py)
+      and [entity](custom_components/mennekes_amtron_rtu/entity.py).
+  config-flow:
+    status: done
+    comment: The [config flow](custom_components/mennekes_amtron_rtu/config_flow.py) offers USB, explicit
+      LAN framing and the independent service, with user-facing field descriptions in [strings](custom_components/mennekes_amtron_rtu/strings.json).
   config-flow-test-coverage:
     status: done
-    comment: >-
-      Tests cover the happy path, a failing port, a device without a layout
-      version, reconfigure and the options flow.
-  config-flow: done
+    comment: Serial, LAN, service, discovery, reconfiguration, options and authentication paths are exercised
+      by [config-flow tests](tests/test_config_flow.py), [LAN flow tests](tests/test_network_flow.py)
+      and [service discovery tests](tests/test_service_discovery.py). Coverage is measured by the release
+      gates; this comment does not replace the report.
   dependency-transparency:
     status: done
-    comment: >-
-      pymodbus is published on PyPI and declared as a minimum so Home
-      Assistant Core keeps owning the resolved version; a dedicated gate
-      checks that the minimum stays below what Core resolves.
-  docs-actions: done
-  docs-high-level-description: done
-  docs-installation-instructions: done
-  docs-removal-instructions: done
-  entity-event-setup:
+    comment: The open-source pymodbus requirement is declared in the [manifest](custom_components/mennekes_amtron_rtu/manifest.json);
+      [dependency policy](docs/architecture.md) and [Core compatibility gate](scripts/check_pymodbus_pin.py)
+      describe and validate resolution.
+  docs-actions:
+    status: done
+    comment: The [user guide](docs/user-guide.md) documents the set_charging_current action, parameters
+      and explicit unlimited-current opt-in.
+  docs-conditions:
     status: exempt
-    comment: >-
-      Entities derive from the coordinator; there is no device-side event
-      stream to subscribe to.
-  entity-unique-id: done
-  has-entity-name: done
-  runtime-data: done
+    comment: No integration-specific conditions are registered. Users combine standard Home Assistant
+      conditions with entities, as shown in [automations](docs/automations.md).
+  docs-high-level-description:
+    status: done
+    comment: The [README](README.md) describes the supported wallbox families, local control and optional
+      independent service.
+  docs-installation-instructions:
+    status: done
+    comment: The [installation guide](docs/installation.md) covers Marketplace, HACS, prerequisites and
+      direct/service setup.
+  docs-removal-instructions:
+    status: done
+    comment: The [installation guide](docs/installation.md) explains removing the integration and stopping
+      the independent writer safely.
+  docs-triggers:
+    status: exempt
+    comment: No integration-specific triggers are registered. [Automation examples](docs/automations.md)
+      use standard state and numeric-state triggers.
+  entity-event-setup:
+    status: done
+    comment: The [heartbeat entity lifecycle](custom_components/mennekes_amtron_rtu/binary_sensor.py#AmtronHeartbeatSensor.async_added_to_hass)
+      subscribes only after addition and registers cleanup with async_on_remove; coordinator entities
+      use the HA lifecycle. [Heartbeat entity tests](tests/test_binary_sensor.py) exercise transitions
+      and removal.
+  entity-unique-id:
+    status: done
+    comment: The [entity identity helper](custom_components/mennekes_amtron_rtu/entity.py#entry_entity_unique_id)
+      uses the persisted device key and entity key; [identity tests](tests/test_entity.py) cover serial
+      and fallback identities.
+  has-entity-name:
+    status: done
+    comment: The [shared entity base](custom_components/mennekes_amtron_rtu/entity.py#MennekesAmtronEntity)
+      and [heartbeat entity](custom_components/mennekes_amtron_rtu/binary_sensor.py#AmtronHeartbeatSensor)
+      enable contextual entity names.
+  runtime-data:
+    status: done
+    comment: Typed [runtime data](custom_components/mennekes_amtron_rtu/data.py) belongs to each [config
+      entry](custom_components/mennekes_amtron_rtu/entry_types.py), assembled during setup.
   test-before-configure:
     status: done
-    comment: >-
-      The config flow opens the port and reads the Modbus layout version and
-      serial number before an entry is created.
+    comment: Direct [connection probing](custom_components/mennekes_amtron_rtu/_flow_connect.py#async_test_connection)
+      reads identity before creating an entry. The [service flow](custom_components/mennekes_amtron_rtu/config_flow.py#MennekesAmtronConfigFlow.async_step_server)
+      validates an authenticated snapshot.
   test-before-setup:
     status: done
-    comment: A failed connect or identity read raises ConfigEntryNotReady.
+    comment: '[Setup](custom_components/mennekes_amtron_rtu/__init__.py#async_setup_entry) validates the
+      live connection and identity before forwarding platforms; [setup failure tests](tests/test_init.py)
+      assert cleanup and retry behavior.'
   unique-config-entry:
     status: done
-    comment: The entry is unique by device serial number, or by port path.
-
-  action-exceptions: done
-  config-entry-unloading: done
-  docs-configuration-parameters: done
-  docs-installation-parameters: done
+    comment: The [config flow](custom_components/mennekes_amtron_rtu/config_flow.py) uses the wallbox
+      serial, or a transport-specific endpoint and unit ID where no serial exists. [Discovery tests](tests/test_service_discovery.py)
+      preserve existing entries instead of duplicating devices.
+  action-exceptions:
+    status: done
+    comment: The [HA command boundary](custom_components/mennekes_amtron_rtu/control.py) maps device failures
+      to translated HA errors; [action tests](tests/test_services.py) exercise rejected writes.
+  config-entry-unloading:
+    status: done
+    comment: '[Unload](custom_components/mennekes_amtron_rtu/__init__.py#async_unload_entry) stops recovery
+      and heartbeat, shuts down controls and closes the client after unloading the platforms actually
+      loaded. [Lifecycle tests](tests/test_platform_lifecycle.py) cover mode changes.'
+  docs-configuration-parameters:
+    status: done
+    comment: Direct and service [options](docs/user-guide.md) explain current caps, polling and write
+      permission ownership.
+  docs-installation-parameters:
+    status: done
+    comment: '[USB/service installation](docs/installation.md) and [LAN setup](docs/network-gateway.md)
+      explain every connection field, including protocol, unit ID and separate TCP/API ports.'
   entity-unavailable:
     status: done
-    comment: >-
-      Entities go unavailable when the poll fails and when their own register
-      is missing from the snapshot.
+    comment: '[Entity availability](custom_components/mennekes_amtron_rtu/entity.py#MennekesAmtronEntity.available)
+      requires a successful update and its register; controls also require current write permission. [Service-mode
+      tests](tests/test_service_mode_coupling.py) verify permission changes.'
   integration-owner:
-    status: exempt
-    comment: >-
-      The repository deliberately ships no personal metadata, so
-      manifest.json keeps an empty codeowners list. Maintenance scope is
-      documented in SUPPORT.md instead.
+    status: done
+    comment: The public project maintainer is listed in the [manifest](custom_components/mennekes_amtron_rtu/manifest.json);
+      ownership and support scope are documented in [SUPPORT](SUPPORT.md).
   log-when-unavailable:
     status: done
-    comment: >-
-      The connection is held open, so the coordinator logs a loss and a
-      recovery once per state change.
+    comment: '[Coordinator](custom_components/mennekes_amtron_rtu/coordinator.py) and [service runtime](custom_components/mennekes_amtron_rtu/device/service_runtime.py)
+      log loss and recovery on transitions; [runtime tests](tests/test_runtime_soak.py) cover bounded
+      recurring failure behavior.'
   parallel-updates:
     status: done
-    comment: >-
-      Read platforms use the coordinator; command platforms set
-      PARALLEL_UPDATES to 1 because Modbus RTU uses a single master.
+    comment: 'All six [entity platforms](docs/entities.md) declare PARALLEL_UPDATES: reads use coordinator
+      updates, controls serialize operations. The [bus client](custom_components/mennekes_amtron_rtu/device/client.py)
+      also locks each transaction.'
   reauthentication-flow:
-    status: exempt
-    comment: The serial bus has no credentials.
+    status: done
+    comment: The authenticated [service config flow](custom_components/mennekes_amtron_rtu/config_flow.py)
+      supports replacing rejected credentials while retaining the same wallbox identity. Direct serial/LAN
+      modes have no authentication credentials.
   test-coverage:
     status: done
-    comment: >-
-      The ratchet is 99 percent, above the Platinum target of 95. The suite
-      leaves no statement of the integration uncovered, and the config flow,
-      the options flow and every platform are covered by behaviour tests
-      rather than by import-time execution.
-
+    comment: '[Coverage validation](scripts/check_coverage.py) measures statements and branches for the
+      exact checkout. The global ratchet is 99 percent; the report and per-module checks establish compliance,
+      rather than a claim that no statements remain uncovered.'
   devices:
     status: done
-    comment: Every entity belongs to the one wallbox of its entry.
-  diagnostics: done
-  discovery-update-info:
-    status: exempt
-    comment: There is no discovery to update an entry from.
+    comment: '[Device metadata](custom_components/mennekes_amtron_rtu/entity.py#entry_device_info) associates
+      all entities with one wallbox and provides manufacturer, model, model ID, serial and firmware where
+      available.'
+  diagnostics:
+    status: done
+    comment: '[Diagnostics](custom_components/mennekes_amtron_rtu/diagnostics.py) redact private identifiers,
+      endpoints and credentials; [privacy tests](tests/test_diagnostics.py) cover serial, LAN and remote-service
+      data.'
   discovery:
-    status: exempt
-    comment: >-
-      A USB RS-485 adapter cannot be identified as this wallbox, so the config
-      flow offers a port list instead of claiming discovery.
-  docs-data-update: done
-  docs-examples: done
-  docs-known-limitations: done
-  docs-supported-devices: done
-  docs-supported-functions: done
-  docs-troubleshooting: done
-  docs-use-cases: done
+    status: done
+    comment: Supervisor [discovery](custom_components/mennekes_amtron_rtu/supervisor_discovery.py) discovers
+      the optional local service and privately supplies its connection details. USB adapters and generic
+      RS-485 gateways do not announce the wallbox; direct modes use explicit setup. [Discovery tests](tests/test_supervisor_discovery.py)
+      reject untrusted announcements.
+  discovery-update-info:
+    status: done
+    comment: The [discovery confirmation flow](custom_components/mennekes_amtron_rtu/config_flow.py#MennekesAmtronConfigFlow.async_step_hassio_confirm)
+      refreshes authenticated service details and updates matching entries by wallbox serial, preserving
+      entity IDs. [Real-HA discovery tests](tests/test_service_discovery.py) exercise changed credentials
+      and migration.
+  docs-data-update:
+    status: done
+    comment: '[Data update documentation](docs/user-guide.md) describes status, measurement and idle polling
+      plus the independent heartbeat; [Recorder guidance](docs/recorder.md) explains history behavior.'
+  docs-examples:
+    status: done
+    comment: '[Automation examples](docs/automations.md) and [blueprints](docs/blueprints.md) show current
+      limiting, pausing and solar operation.'
+  docs-known-limitations:
+    status: done
+    comment: '[Known limitations](docs/user-guide.md), [compatibility](docs/compatibility.md) and [safety](docs/safety.md)
+      distinguish supported layouts, vendor constraints and hardware evidence.'
+  docs-supported-devices:
+    status: done
+    comment: The [compatibility matrix](docs/compatibility.md) lists supported device families and models
+      with test evidence and known exclusions.
+  docs-supported-functions:
+    status: done
+    comment: The [entity reference](docs/entities.md) describes sensors, controls, diagnostics and capability-dependent
+      entities.
+  docs-troubleshooting:
+    status: done
+    comment: '[Troubleshooting](docs/troubleshooting.md) explains connection, permission, heartbeat and
+      service errors, with privacy-safe diagnostic collection.'
+  docs-use-cases:
+    status: done
+    comment: The [user guide](docs/user-guide.md) and [automations](docs/automations.md) show everyday
+      charge limiting, pause/resume and energy-management uses.
   dynamic-devices:
     status: exempt
-    comment: One entry models exactly one wallbox.
-  entity-category: done
-  entity-device-class: done
+    comment: Each [config entry](custom_components/mennekes_amtron_rtu/entry_types.py) models one wallbox,
+      not a hub or an account that can add child devices dynamically. A second wallbox requires another
+      entry.
+  entity-category:
+    status: done
+    comment: '[Sensor descriptions](custom_components/mennekes_amtron_rtu/sensor_descriptions.py) mark
+      diagnostics and [control platforms](docs/entities.md) identify configuration controls; [entity tests](tests/test_entity.py)
+      cover metadata.'
+  entity-device-class:
+    status: done
+    comment: '[Sensor descriptions](custom_components/mennekes_amtron_rtu/sensor_descriptions.py) and
+      [binary sensors](custom_components/mennekes_amtron_rtu/binary_sensor.py) assign matching HA device
+      classes; [sensor tests](tests/test_sensor.py) cover units and statistics.'
   entity-disabled-by-default:
     status: done
-    comment: The Modbus layout version sensor is disabled by default.
-  entity-translations: done
-  exception-translations: done
-  icon-translations: done
+    comment: Low-value diagnostic sensors such as layout version are disabled by default in [sensor descriptions](custom_components/mennekes_amtron_rtu/sensor_descriptions.py),
+      reducing unnecessary entities and history.
+  entity-translations:
+    status: done
+    comment: Entity names and enum options are declared in [strings](custom_components/mennekes_amtron_rtu/strings.json)
+      and maintained across five languages; [translation tests](tests/test_translations.py) validate matching
+      structures and placeholders.
+  exception-translations:
+    status: done
+    comment: '[Control exceptions](custom_components/mennekes_amtron_rtu/control.py) use domain translation
+      keys; [register/translation validation](scripts/check_register_map.py) checks descriptions against
+      exposed actions and values.'
+  icon-translations:
+    status: done
+    comment: Entity and option icons live in [icons.json](custom_components/mennekes_amtron_rtu/icons.json);
+      [register map checks](scripts/check_register_map.py) detect missing mappings.
   reconfiguration-flow:
     status: done
-    comment: The bus parameters can be changed without removing the entry.
-  repair-issues: done
+    comment: '[Reconfiguration](custom_components/mennekes_amtron_rtu/config_flow.py#MennekesAmtronConfigFlow.async_step_reconfigure)
+      supports USB, LAN and service changes while preserving wallbox identity. [Real-HA tests](tests/test_reconfigure_smoke.py)
+      verify handover and entity IDs.'
+  repair-issues:
+    status: done
+    comment: '[Repairs](custom_components/mennekes_amtron_rtu/repairs.py) explain actionable faults; [repair
+      tests](tests/test_repairs.py) require confirmed recovery and remove resolved issues.'
   stale-devices:
     status: exempt
-    comment: One entry models exactly one wallbox.
-
+    comment: One [config entry](custom_components/mennekes_amtron_rtu/entry_types.py) owns exactly one
+      wallbox; removing that entry removes its device association. It cannot accumulate disappeared child
+      devices.
   async-dependency:
     status: done
-    comment: pymodbus AsyncModbusSerialClient is used throughout.
+    comment: The [Modbus client](custom_components/mennekes_amtron_rtu/device/client.py) uses async serial/TCP
+      clients; the [remote client](custom_components/mennekes_amtron_rtu/remote.py) uses async aiohttp.
+      Blocking filesystem work is delegated to executor threads.
   inject-websession:
-    status: exempt
-    comment: The integration speaks serial Modbus RTU and makes no HTTP calls.
+    status: done
+    comment: Both [setup](custom_components/mennekes_amtron_rtu/__init__.py#async_setup_entry) and the
+      [config flow](custom_components/mennekes_amtron_rtu/config_flow.py) inject Home Assistant shared
+      sessions into [RemoteClient](custom_components/mennekes_amtron_rtu/remote.py#RemoteClient). Raw
+      Modbus transports use no HTTP session.
   strict-typing:
     status: done
-    comment: >-
-      scripts/check_typing.py runs mypy --strict over the whole integration
-      and the validation scripts.
+    comment: '[Strict typing](scripts/check_typing.py) checks every integration module and validation
+      script; CI runs the gate against the latest supported HA API.'

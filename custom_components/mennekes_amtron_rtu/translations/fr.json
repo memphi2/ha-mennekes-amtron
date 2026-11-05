@@ -8,7 +8,8 @@
       "invalid_service_discovery": "L’application a fourni des informations de connexion non valides.",
       "service_identity_changed": "La borne détectée a changé. Recommencez la configuration.",
       "service_discovery_updated": "L’intégration existante utilise désormais la connexion de l’application détectée.",
-      "multiple_service_apps": "Plusieurs applications Modbus ont été trouvées. Sélectionnez l’application détectée correspondante dans Appareils et services."
+      "multiple_service_apps": "Plusieurs applications Modbus ont été trouvées. Sélectionnez l’application détectée correspondante dans Appareils et services.",
+      "reauth_not_supported": "Une connexion Modbus directe n’a pas d’identifiants d’accès à renouveler."
     },
     "error": {
       "cannot_connect": "Impossible d’ouvrir le port série ou la borne n’a pas répondu. Vérifiez le câblage (Modbus A est +, B est -), le port et les paramètres du bus.",
@@ -16,12 +17,13 @@
       "not_found": "Aucune borne n’a répondu sur ce port. Vérifiez le câblage (Modbus A est +, B est -, GND est raccordé) et que les interrupteurs DIP 4 et 5 du bloc S1 sont activés, puis que la borne a été redémarrée.",
       "cannot_connect_service": "L’application est inaccessible sur le réseau. Vérifiez qu’elle fonctionne et accepte les connexions sur le port 8765.",
       "service_discovery_requires_serial": "L’application n’a pas encore lu de numéro de série. Vérifiez sa connexion à la borne et réessayez.",
-      "service_auth_failed": "L’application a refusé l’authentification. Confirmez à nouveau pour récupérer ses identifiants actuels auprès de Supervisor. Pour un service hébergé séparément, vérifiez le jeton configuré.",
+      "service_auth_failed": "Le service Modbus a refusé l’authentification. Pour une application du Supervisor, confirmez à nouveau pour récupérer ses identifiants actuels. Pour un service hébergé séparément, saisissez son jeton d’accès actuel.",
       "service_not_ready": "L’authentification auprès de l’application a réussi, mais les données de la borne ne sont pas encore disponibles. Consultez le journal de l’application et réessayez.",
       "service_invalid_response": "L’application répond, mais ses données n’ont pas été acceptées. Mettez à jour l’intégration et l’application vers la même version. Le journal de Home Assistant indique la section concernée.",
       "invalid_network_config": "Saisissez un nom d’hôte ou une adresse IP sans schéma d’URL, un port TCP de 1 à 65535 et le protocole de connexion approprié.",
       "cannot_connect_network": "L’adaptateur réseau est inaccessible ou la borne n’a pas répondu. Vérifiez l’hôte, le port, le protocole et les paramètres série de l’adaptateur.",
-      "invalid_network_response": "L’adaptateur a répondu, mais aucune table de registres Modbus valide n’a été indiquée. Vérifiez l’adresse de la borne, le protocole de l’adaptateur et le mode satellite."
+      "invalid_network_response": "L’adaptateur a répondu, mais aucune table de registres Modbus valide n’a été indiquée. Vérifiez l’adresse de la borne, le protocole de l’adaptateur et le mode satellite.",
+      "service_discovery_unavailable": "Les identifiants actuels de cette application n’ont pas pu être récupérés. Vérifiez l’application et le Supervisor, démarrez ou redémarrez l’application si nécessaire, puis confirmez à nouveau."
     },
     "progress": {
       "searching": "Recherche d’une borne sur le bus : jusqu’à {candidates} combinaisons, soit environ {minutes} minutes, auxquelles s’ajoutent les vérifications de connexion. Aucun registre n’est modifié. Pendant la reconfiguration, la connexion existante et le signal de présence sont interrompus ; le comportement de repli configuré sur la borne s’applique."
@@ -129,6 +131,17 @@
           "tcp_port": "Port TCP configuré sur l’adaptateur ; 502 par défaut. Il ne s’agit pas du port HTTP 8765 du service indépendant.",
           "device_id": "Adresse de la borne derrière l’adaptateur ; 50 par défaut, plage prise en charge de 10 à 50."
         }
+      },
+      "reauth_confirm": {
+        "title": "Renouveler l’accès au service",
+        "description": "Saisissez le jeton d’accès actuel de votre service Modbus hébergé séparément. L’URL du service et l’entrée existante de la borne sont conservées.",
+        "data": {
+          "server_token": "Jeton d’accès"
+        }
+      },
+      "reauth_app": {
+        "title": "Renouveler l’accès à l’application",
+        "description": "Confirmez pour récupérer les identifiants actuels de cette application Modbus auprès du Supervisor. L’application doit être en cours d’exécution. Vous n’avez pas de jeton à saisir."
       }
     }
   },
@@ -434,6 +447,9 @@
     },
     "service_unavailable": {
       "message": "Le service Modbus est indisponible ou n’a pas pu confirmer la commande. Vérifiez l’état actuel avant de la répéter."
+    },
+    "service_auth_failed": {
+      "message": "Le service Modbus a refusé l’authentification. Renouvelez son accès dans Paramètres > Appareils et services."
     }
   },
   "issues": {

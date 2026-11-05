@@ -11,7 +11,7 @@ import time
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -68,6 +68,7 @@ from .remote import (
     RemoteCoordinator,
     RemoteHeartbeat,
 )
+from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
 
@@ -124,6 +125,10 @@ async def async_setup_entry(
         )
     except BaseException as err:
         await client.async_close()
+        if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
+            raise ConfigEntryAuthFailed(
+                translation_domain=DOMAIN, translation_key="service_auth_failed"
+            ) from err
         if isinstance(err, AmtronBusError):
             raise ConfigEntryNotReady(str(err)) from err
         raise
@@ -179,6 +184,7 @@ async def async_setup_entry(
 
     try:
         if isinstance(client, RemoteClient):
+            client.on_auth_failed = lambda: entry.async_start_reauth(hass)
             heartbeat = RemoteHeartbeat(client, diagnostics)
             entry.runtime_data.heartbeat = heartbeat
 
@@ -268,18 +274,6 @@ async def async_remove_entry(
     for domain, issue_id in tuple(ir.async_get(hass).issues):
         if domain == DOMAIN and issue_id.startswith(prefix):
             ir.async_delete_issue(hass, domain, issue_id)
-
-
-async def async_migrate_entry(
-    hass: HomeAssistant, entry: MennekesAmtronConfigEntry
-) -> bool:
-    """Migrate an older config entry.
-
-    Version 1 is the first published schema, so there is nothing to migrate
-    yet. A future version lands here instead of in ``async_setup_entry``.
-    """
-
-    return entry.version == 1
 
 
 def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:

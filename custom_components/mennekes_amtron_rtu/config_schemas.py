@@ -225,7 +225,7 @@ def _port_selector(ports: list[PortOption]) -> Any:
     )
 
 
-def service_schema() -> probatio.Schema:
+def service_schema(*, credentials_only: bool = False) -> probatio.Schema:
     """Connection details for the independent service."""
     from homeassistant.helpers.selector import (
         TextSelector,
@@ -235,13 +235,16 @@ def service_schema() -> probatio.Schema:
 
     from .remote import CONF_SERVER_TOKEN, CONF_SERVER_URL
 
-    return probatio.Schema(
-        {
+    fields = {
+        probatio.Required(CONF_SERVER_TOKEN): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        ),
+    }
+    if not credentials_only:
+        fields = {
             probatio.Required(CONF_SERVER_URL): TextSelector(
                 TextSelectorConfig(type=TextSelectorType.URL)
             ),
-            probatio.Required(CONF_SERVER_TOKEN): TextSelector(
-                TextSelectorConfig(type=TextSelectorType.PASSWORD)
-            ),
+            **fields,
         }
-    )
+    return probatio.Schema(fields)

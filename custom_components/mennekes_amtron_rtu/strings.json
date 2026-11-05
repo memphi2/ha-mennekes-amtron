@@ -8,7 +8,8 @@
       "invalid_service_discovery": "The app reported invalid connection details.",
       "service_identity_changed": "The discovered wallbox changed. Start setup again.",
       "service_discovery_updated": "The existing integration now uses the discovered app connection.",
-      "multiple_service_apps": "Multiple Modbus apps were found. Select the matching discovered app under Devices & services."
+      "multiple_service_apps": "Multiple Modbus apps were found. Select the matching discovered app under Devices & services.",
+      "reauth_not_supported": "A direct Modbus connection has no access credentials to renew."
     },
     "error": {
       "cannot_connect": "Could not open the serial port or the wallbox did not answer. Check the cabling (Modbus A is +, B is -), the port and the bus parameters.",
@@ -16,12 +17,13 @@
       "not_found": "No wallbox answered on this port. Check the wiring (Modbus A is +, B is -, GND connected) and that DIP 4 and DIP 5 on bank S1 are on, with the wallbox restarted afterwards.",
       "cannot_connect_service": "The app cannot be reached over the network. Check that it is running and accepting connections on port 8765.",
       "service_discovery_requires_serial": "The app has not read a serial number yet. Check its wallbox connection and try again.",
-      "service_auth_failed": "The app rejected authentication. Confirm again to retrieve its current credentials from Supervisor. For a separately hosted service, check the configured token.",
+      "service_auth_failed": "The Modbus service rejected authentication. For a Supervisor app, confirm again to retrieve its current credentials. For a separately hosted service, enter its current access token.",
       "service_not_ready": "Authentication to the app succeeded, but wallbox data is not available yet. Check the app log and try again.",
       "service_invalid_response": "The app responds, but its data was not accepted. Update the integration and app to the same version. The Home Assistant log identifies the affected data section.",
       "invalid_network_config": "Enter a host name or IP address without a URL scheme, a TCP port from 1 to 65535 and the matching connection protocol.",
       "cannot_connect_network": "Could not reach the LAN adapter or the wallbox did not answer. Check the host, port, protocol and the serial settings configured on the adapter.",
-      "invalid_network_response": "The adapter answered but no valid Modbus layout was reported. Check the wallbox address, adapter protocol and satellite configuration."
+      "invalid_network_response": "The adapter answered but no valid Modbus layout was reported. Check the wallbox address, adapter protocol and satellite configuration.",
+      "service_discovery_unavailable": "The current credentials of this app could not be retrieved. Check the app and Supervisor, start or restart the app if needed, then confirm again."
     },
     "progress": {
       "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes plus connection checks. No registers are written. During reconfiguration, the existing connection and heartbeat are paused; the wallbox's configured fallback applies."
@@ -129,6 +131,17 @@
           "tcp_port": "TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.",
           "device_id": "Wallbox address behind the adapter; factory default 50, supported range 10–50."
         }
+      },
+      "reauth_confirm": {
+        "title": "Renew service access",
+        "description": "Enter the current access token for your separately hosted Modbus service. The service URL and existing wallbox entry are kept.",
+        "data": {
+          "server_token": "Access token"
+        }
+      },
+      "reauth_app": {
+        "title": "Renew app access",
+        "description": "Confirm to retrieve the current credentials of this Modbus app from Supervisor. The app must be running. You do not need to enter a token."
       }
     }
   },
@@ -434,6 +447,9 @@
     },
     "service_unavailable": {
       "message": "The Modbus service is unavailable or could not confirm the command. Check the current state before repeating it."
+    },
+    "service_auth_failed": {
+      "message": "The Modbus service rejected authentication. Renew its access under Settings > Devices & services."
     }
   },
   "issues": {

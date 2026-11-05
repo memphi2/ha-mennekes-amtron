@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.setup import async_setup_component
 
+from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu import config_flow
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
@@ -18,6 +20,43 @@ from tests.ha_fakes import FakeHass
 from tests.test_config_flow import Flow
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
+
+
+@pytest.mark.parametrize("version", [0, 2])
+def test_ha_rejects_incompatible_entry_schema_without_placeholder_migration(
+    tmp_path, monkeypatch, version
+):
+    async def run():
+        service, transport, _clock = await service_fixture(tmp_path, read_only=True)
+        hass = await _boot(tmp_path / "ha")
+        try:
+            assert await async_setup_component(hass, "network", {})
+            async with TestServer(create_app(service)) as server:
+                flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+                flow = await hass.config_entries.flow.async_configure(
+                    flow["flow_id"], {"next_step_id": "server"}
+                )
+                result = await hass.config_entries.flow.async_configure(
+                    flow["flow_id"],
+                    {"server_url": str(server.make_url("/")), "server_token": TOKEN},
+                )
+                assert result["type"] == "create_entry"
+                await hass.async_block_till_done()
+                entry = hass.config_entries.async_entries(DOMAIN)[0]
+                assert entry.state is ConfigEntryState.LOADED
+                await hass.config_entries.async_unload(entry.entry_id)
+                hass.config_entries.async_update_entry(entry, version=version)
+                setup = AsyncMock(wraps=integration.async_setup_entry)
+                monkeypatch.setattr(integration, "async_setup_entry", setup)
+                assert not await hass.config_entries.async_setup(entry.entry_id)
+                assert entry.state is ConfigEntryState.MIGRATION_ERROR
+                setup.assert_not_awaited()
+                assert not transport.writes
+        finally:
+            await hass.async_stop()
+            await service.stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))
 
 
 @pytest.mark.parametrize(

@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   migration while retaining existing wallbox identities and control settings.
 - Provide English, German, French, Dutch and Italian in the integration and app,
   with an updated installation guide and HACS/Marketplace installation buttons.
+- Recover expired service credentials through Home Assistant reauthentication,
+  with automatic Supervisor lookup for apps and a token prompt for standalone
+  services. Retain the existing entry, options and entity identities.
+- Complete the 54-rule Platinum self-assessment with current evidence, named
+  maintenance ownership and an explicitly self-assessed README badge. Enforce
+  full setup-flow coverage and more than 95% coverage of each integration module
+  alongside the existing 99% global threshold.
+- Remove obsolete 0.1.0 migration instructions, the empty migration hook and
+  unused constants. Home Assistant still rejects incompatible entry schemas.
 - Improve reconnect cleanup, pause-current preservation after a lost reply,
   slider updates after service limit changes, setup validation and diagnostics.
   Existing beta apps receive the stable app
