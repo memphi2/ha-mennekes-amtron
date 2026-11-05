@@ -7,7 +7,9 @@
   "categories": [
     "energy.ev_charging"
   ],
-  "codeowners": [],
+  "codeowners": [
+    "@memphi2"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/memphi2/ha-mennekes-amtron",

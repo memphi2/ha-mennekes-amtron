@@ -191,8 +191,8 @@ def check_release_metadata() -> list[str]:
         )
     if manifest.get("quality_scale") != "platinum":
         failures.append("manifest.json must declare the platinum quality scale")
-    if manifest.get("codeowners") != []:
-        failures.append("manifest.json must not carry personal metadata")
+    if manifest.get("codeowners") != ["@memphi2"]:
+        failures.append("manifest.json must name the public integration maintainer")
     if manifest.get("iot_class") != "local_polling":
         failures.append("manifest.json iot_class must stay local_polling")
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")

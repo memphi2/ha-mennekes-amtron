@@ -56,9 +56,9 @@ def test_no_tracked_file_carries_a_secret_or_identifying_path() -> None:
     assert offenders == []
 
 
-def test_the_manifest_ships_no_personal_metadata() -> None:
+def test_the_manifest_names_the_public_integration_maintainer() -> None:
     manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["codeowners"] == []
+    assert manifest.pop("codeowners") == ["@memphi2"]
     assert "@" not in json.dumps(manifest)
 
 
