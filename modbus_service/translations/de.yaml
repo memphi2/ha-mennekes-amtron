@@ -1,16 +1,16 @@
 configuration:
   serial_port:
     name: Serieller Adapter
-    description: 'Nur für serial: exklusiven USB-RS-485-Adapter wählen, möglichst über den stabilen /dev/serial/by-id-Pfad. Bei LAN nicht ausfüllen.'
+    description: "Nur für USB / RS-485: exklusiven USB-RS-485-Adapter wählen, möglichst über den stabilen /dev/serial/by-id-Pfad. Bei LAN nicht ausfüllen."
   device_id:
     name: Wallbox-Adresse
     description: Die in der Wallbox eingestellte Modbus-Adresse.
   baudrate:
     name: Baudrate
-    description: 'Nur für serial: muss zur Wallbox passen. Bei LAN die Baudrate am Adapter einstellen.'
+    description: "Nur für USB / RS-485: muss zur Wallbox passen. Bei LAN die Baudrate am Adapter einstellen."
   frame:
     name: Serielles Format
-    description: 'Nur für serial: Datenbits, Parität und Stoppbits müssen zur Wallbox passen. Bei LAN am Adapter einstellen.'
+    description: "Nur für USB / RS-485: Datenbits, Parität und Stoppbits müssen zur Wallbox passen. Bei LAN am Adapter einstellen."
   read_only:
     name: Nur lesen
     description: Schaltet Steuerbefehle einschließlich der Home-Assistant-Steuerung und den Heartbeat des Dienstes ab; Modbus-Leseanfragen bleiben aktiv.
@@ -31,10 +31,10 @@ configuration:
     description: Fest auf 8765; eine Freigabe am Host ist optional und normalerweise unnötig.
   connection_type:
     name: Wallbox-Verbindung
-    description: 'serial: lokales USB/RS-485; rtu_over_tcp: transparenter LAN-Adapter; modbus_tcp: Gateway übersetzt Modbus TCP in RTU. Die LAN-Modi benötigen kein USB-Gerät.'
+    description: "USB / RS-485: lokaler Adapter. LAN: Modbus RTU (TCP): transparenter Netzwerkadapter. LAN: Modbus TCP: Gateway übersetzt TCP in RTU. Die alten Werte serial, rtu_over_tcp und modbus_tcp bleiben für bestehende Konfigurationen gültig."
   host:
-    name: Adapter-Host
-    description: 'Für LAN: Hostname oder IP-Adresse des Adapters, ohne URL-Schema oder Pfad. Ein vertrauenswürdiges privates Netzwerk verwenden.'
+    name: Adapter-Host / IP-Adresse
+    description: "Bei LAN erforderlich: Hostname oder IP-Adresse des Adapters, ohne URL-Schema oder Pfad. Bei USB / RS-485 leer lassen. Ein vertrauenswürdiges privates Netzwerk verwenden."
   tcp_port:
     name: TCP-Port des Adapters
     description: Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.

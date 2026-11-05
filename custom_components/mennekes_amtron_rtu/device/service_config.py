@@ -8,6 +8,18 @@ from typing import Any, Literal, cast
 from .connection import ConnectionConfig, NetworkConfig, SerialConfig
 from .const import SUPPORTED_BAUDRATES, frame_parts
 
+# Supervisor displays literal list values and also validates saved options against
+# them at startup. Keep the three published 0.5.0 values alongside the readable
+# App choices; normalize only here so all transports keep their canonical names.
+_CONNECTION_TYPES = {
+    "USB / RS-485": "serial",
+    "LAN: Modbus RTU (TCP)": "rtu_over_tcp",
+    "LAN: Modbus TCP": "modbus_tcp",
+    "serial": "serial",
+    "rtu_over_tcp": "rtu_over_tcp",
+    "modbus_tcp": "modbus_tcp",
+}
+
 
 def validate_token(value: Any) -> str:
     """Validate credentials without including them in error messages."""
@@ -78,9 +90,10 @@ class ServerConfig:
 
 def _connection_options(values: dict[str, Any]) -> ConnectionConfig:
     """Validate only the fields used by the selected physical transport."""
-    connection_type = values.get("connection_type", "serial")
-    if connection_type not in ("serial", "rtu_over_tcp", "modbus_tcp"):
-        raise ValueError("connection_type must be serial, rtu_over_tcp or modbus_tcp")
+    selection = values.get("connection_type", "serial")
+    if not isinstance(selection, str) or selection not in _CONNECTION_TYPES:
+        raise ValueError("connection_type must select a supported USB or LAN connection")
+    connection_type = _CONNECTION_TYPES[selection]
     device_id = _integer_option(values.get("device_id", 50), "device_id", 10, 50)
     if connection_type != "serial":
         return NetworkConfig(
