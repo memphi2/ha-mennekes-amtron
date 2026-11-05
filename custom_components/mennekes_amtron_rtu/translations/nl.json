@@ -1,0 +1,526 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Deze wallbox is al ingesteld.",
+      "reconfigure_successful": "De verbinding is bijgewerkt.",
+      "unique_id_mismatch": "Deze poort hoort bij een andere wallbox.",
+      "service_migration_requires_serial": "De wallbox moet een leesbaar serienummer hebben om deze bij de overstap aan het bestaande apparaat te koppelen.",
+      "invalid_service_discovery": "De app heeft ongeldige verbindingsgegevens doorgegeven.",
+      "service_identity_changed": "De gevonden wallbox is gewijzigd. Begin de configuratie opnieuw.",
+      "service_discovery_updated": "De bestaande integratie gebruikt nu de verbinding met de gevonden app.",
+      "multiple_service_apps": "Er zijn meerdere Modbus-apps gevonden. Selecteer de juiste gevonden app onder Apparaten & diensten."
+    },
+    "error": {
+      "cannot_connect": "De seriële poort kon niet worden geopend of de wallbox antwoordde niet. Controleer de bekabeling (Modbus A is +, B is -), de poort en de businstellingen.",
+      "invalid_response": "Het apparaat antwoordde, maar gaf geen versie van de Modbus-registerindeling door. Controleer het apparaatadres en of DIP-schakelaars 4 en 5 op bank S1 aan staan.",
+      "not_found": "Er heeft geen wallbox op deze poort geantwoord. Controleer de bedrading (Modbus A is +, B is -, GND aangesloten) en of DIP-schakelaars 4 en 5 op bank S1 aan staan. Herstart de wallbox na het wijzigen van de schakelaars.",
+      "cannot_connect_service": "De app is niet bereikbaar via het netwerk. Controleer of deze draait en verbindingen op poort 8765 accepteert.",
+      "service_discovery_requires_serial": "De app heeft nog geen serienummer uitgelezen. Controleer de verbinding met de wallbox en probeer het opnieuw.",
+      "service_auth_failed": "De app heeft de aanmelding geweigerd. Bevestig opnieuw om de huidige toegangsgegevens bij Supervisor op te halen. Controleer bij een afzonderlijk gehoste service het ingestelde token.",
+      "service_not_ready": "De aanmelding bij de app is gelukt, maar er zijn nog geen wallboxgegevens beschikbaar. Controleer het logboek van de app en probeer het opnieuw.",
+      "service_invalid_response": "De app antwoordt, maar de gegevens zijn niet geaccepteerd. Werk de integratie en de app bij naar dezelfde versie. Het Home Assistant-logboek vermeldt welk onderdeel van de gegevens is afgewezen."
+    },
+    "progress": {
+      "searching": "De bus wordt doorzocht naar een wallbox: maximaal {candidates} combinaties, ongeveer {minutes} minuten plus verbindingscontroles. Er wordt niet naar registers geschreven. Tijdens het opnieuw configureren worden de bestaande verbinding en heartbeat onderbroken; het ingestelde gedrag van de wallbox bij uitval is dan van toepassing."
+    },
+    "step": {
+      "reconfigure": {
+        "title": "Verbinding wijzigen",
+        "menu_options": {
+          "server": "Verbinden met de Modbus-service",
+          "serial_reconfigure": "Seriële verbinding wijzigen"
+        }
+      },
+      "search_result": {
+        "description": "Een wallbox heeft na {attempts} pogingen geantwoord:\n\n- Apparaatadres: **{device_id}**\n- Bus: **{baudrate} baud, {frame}**\n- Modbus-registerindeling: **{layout}**\n- Serienummer: **{serial_number}**\n\nBevestig om de wallbox met deze waarden in te stellen.",
+        "title": "Wallbox gevonden"
+      },
+      "user": {
+        "title": "Verbinden met je wallbox",
+        "menu_options": {
+          "server": "Modbus-service (blijft werken tijdens een HA-herstart)",
+          "serial": "Directe seriële verbinding"
+        }
+      },
+      "serial": {
+        "data": {
+          "baudrate": "Baudrate",
+          "device_id": "Modbus-apparaatadres",
+          "frame": "Frame",
+          "port": "Seriële poort",
+          "search": "Als deze waarden niet werken"
+        },
+        "data_description": {
+          "baudrate": "De fabrieksinstelling is 57600.",
+          "device_id": "De fabrieksinstelling is 50. Adressen van 10 tot 50 kunnen worden ingesteld met de MENNEKES-configuratietool.",
+          "frame": "De documentatie van de wallbox vermeldt precies deze drie combinaties. De fabrieksinstelling is 8 databits, geen pariteit en 2 stopbits.",
+          "port": "Pad van de USB-RS-485-adapter. Gebruik bij voorkeur een /dev/serial/by-id-pad: /dev/ttyUSB0 kan na een herstart veranderen.",
+          "search": "Het apparaatadres en de businstellingen kunnen worden gewijzigd met de MENNEKES-configuratietool. Bij een bestaande installatie kunnen ze daarom afwijken. Zoeken verstuurt leesverzoeken. Gebruik dit alleen op een bus zonder een andere Modbus-master."
+        },
+        "description": "De wallbox moet als Modbus-satelliet zijn ingesteld: zet DIP-schakelaars 4 en 5 op bank S1 aan en herstart daarna de wallbox. Deze integratie is getest met registerindeling {validated_layout}.",
+        "title": "Mennekes Amtron RTU"
+      },
+      "serial_reconfigure": {
+        "data": {
+          "baudrate": "Baudrate",
+          "device_id": "Modbus-apparaatadres",
+          "frame": "Frame",
+          "port": "Seriële poort",
+          "search": "Als deze waarden niet werken"
+        },
+        "data_description": {
+          "baudrate": "De fabrieksinstelling is 57600.",
+          "device_id": "De fabrieksinstelling is 50. Adressen van 10 tot 50 kunnen worden ingesteld met de MENNEKES-configuratietool.",
+          "frame": "De documentatie van de wallbox vermeldt precies deze drie combinaties. De fabrieksinstelling is 8 databits, geen pariteit en 2 stopbits.",
+          "port": "Pad van de USB-RS-485-adapter. Gebruik bij voorkeur een /dev/serial/by-id-pad: /dev/ttyUSB0 kan na een herstart veranderen.",
+          "search": "Het apparaatadres en de businstellingen kunnen worden gewijzigd met de MENNEKES-configuratietool. Bij een bestaande installatie kunnen ze daarom afwijken. Zoeken verstuurt leesverzoeken. Gebruik dit alleen op een bus zonder een andere Modbus-master."
+        },
+        "description": "De wallbox moet als Modbus-satelliet zijn ingesteld: zet DIP-schakelaars 4 en 5 op bank S1 aan en herstart daarna de wallbox. Deze integratie is getest met registerindeling {validated_layout}.",
+        "title": "Mennekes Amtron RTU"
+      },
+      "server": {
+        "title": "Verbinden met de Modbus-service",
+        "description": "Supervisor-apps maken automatisch verbinding zonder dat je een URL of token hoeft in te voeren. Dit formulier is voor een afzonderlijk gehoste service. Schakel bij de overstap van direct Modbus eerst de bestaande integratievermelding uit om de seriële poort vrij te geven.",
+        "data": {
+          "server_url": "Service-URL",
+          "server_token": "Toegangstoken"
+        }
+      },
+      "hassio_confirm": {
+        "title": "De Modbus-app verbinden",
+        "description": "De Modbus-app is automatisch gevonden. Het adres en toegangstoken worden automatisch ingevuld. Bevestig de verbinding. Een bestaande vermelding voor deze wallbox behoudt de apparaat- en entiteits-ID's. Een uitgeschakelde vermelding blijft uitgeschakeld totdat je deze weer inschakelt."
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "authorization_enabled": {
+        "name": "Autorisatie ingeschakeld"
+      },
+      "cable_lock_enabled": {
+        "name": "Permanente kabelvergrendeling"
+      },
+      "charging": {
+        "name": "Laden"
+      },
+      "downgrade_active": {
+        "name": "Vermogensbeperking actief"
+      },
+      "error": {
+        "name": "Storing"
+      },
+      "grid_imbalance_enabled": {
+        "name": "Faseonbalansbewaking"
+      },
+      "master_lost_fallback": {
+        "name": "Terugvalmodus energiemanager actief"
+      },
+      "phase_switch_capable": {
+        "name": "Fasewisseling ondersteund"
+      },
+      "vehicle_connected": {
+        "name": "Voertuig aangesloten"
+      },
+      "heartbeat": {
+        "name": "Heartbeat"
+      }
+    },
+    "button": {
+      "recover_from_error": {
+        "name": "Storing verhelpen"
+      },
+      "restart": {
+        "name": "Herstarten"
+      }
+    },
+    "number": {
+      "charging_current_limit": {
+        "name": "Laadstroomlimiet"
+      }
+    },
+    "select": {
+      "requested_phases": {
+        "name": "Aangevraagde fasen",
+        "state": {
+          "all_available": "Alle beschikbare fasen",
+          "single_phase": "Alleen één fase"
+        }
+      },
+      "solar_charging_mode": {
+        "name": "Laadmodus voor zonnestroom",
+        "state": {
+          "fast": "Snel laden",
+          "not_active": "Niet actief",
+          "sunshine": "Zonnestroom",
+          "sunshine_plus": "Zonnestroom+"
+        }
+      }
+    },
+    "sensor": {
+      "authorization_status": {
+        "name": "Autorisatie",
+        "state": {
+          "authorized": "Geautoriseerd",
+          "not_authorized": "Niet geautoriseerd",
+          "not_used": "Niet gebruikt"
+        }
+      },
+      "cable_lock_status": {
+        "name": "Kabelvergrendeling",
+        "state": {
+          "fixed_cable": "Vaste kabel",
+          "locked": "Vergrendeld",
+          "undetermined": "Niet vastgesteld",
+          "unlocked": "Ontgrendeld"
+        }
+      },
+      "cp_state": {
+        "name": "CP-status",
+        "state": {
+          "a1": "A1 (geen voertuig)",
+          "a2": "A2 (voertuig losgekoppeld)",
+          "b1": "B1 (voertuig aangesloten)",
+          "b2": "B2 (gereed, stroom aangeboden)",
+          "c1": "C1 (voertuig klaar om te laden)",
+          "c2": "C2 (laden)",
+          "d1": "D1",
+          "d2": "D2",
+          "e": "E (storing)",
+          "f": "F (storing)",
+          "init": "Initialisatie"
+        }
+      },
+      "current_l1": {
+        "name": "Stroom L1"
+      },
+      "current_l2": {
+        "name": "Stroom L2"
+      },
+      "current_l3": {
+        "name": "Stroom L3"
+      },
+      "detected_ev_phases": {
+        "name": "Gedetecteerde voertuigfasen",
+        "state": {
+          "not_initialized": "Niet geïnitialiseerd",
+          "one_phase": "1 fase",
+          "three_phases": "3 fasen",
+          "two_phases": "2 fasen"
+        }
+      },
+      "downgrade_current": {
+        "name": "Stroom bij vermogensbeperking"
+      },
+      "ems_fallback_behaviour": {
+        "name": "Gedrag bij uitval energiemanager",
+        "state": {
+          "disabled": "Uitgeschakeld, behoudt de laatste waarden",
+          "fallback_current": "Laadt met de ingestelde stroom bij uitval",
+          "pause_on_timeout": "Pauzeert als de heartbeat uitblijft"
+        }
+      },
+      "ems_fallback_current": {
+        "name": "Stroom bij uitval energiemanager"
+      },
+      "energy_total": {
+        "name": "Totale energie"
+      },
+      "error_code": {
+        "name": "Foutcode",
+        "state": {
+          "connected_phases_mismatch": "Aangesloten fasen komen niet overeen",
+          "energy_manager_unavailable": "Energiemanager niet beschikbaar",
+          "ev_overcurrent": "Te hoge stroomafname door voertuig",
+          "no_error": "Geen storing",
+          "other": "Andere storing",
+          "voltage_out_of_range": "Spanning buiten toegestaan bereik"
+        }
+      },
+      "evse_state": {
+        "name": "EVSE-status",
+        "state": {
+          "charging": "Laden",
+          "error": "Storing",
+          "ev_connected": "Voertuig aangesloten",
+          "idle": "In rust",
+          "not_initialized": "Niet geïnitialiseerd",
+          "preconditions_valid": "Aan voorwaarden voldaan",
+          "ready_to_charge": "Klaar om te laden",
+          "service_mode": "Onderhoudsmodus"
+        }
+      },
+      "grid_imbalance_threshold": {
+        "name": "Grenswaarde faseonbalans"
+      },
+      "grid_phases_connected": {
+        "name": "Aangesloten netfasen",
+        "state": {
+          "l1": "L1",
+          "l1_l2_l3": "L1, L2, L3"
+        }
+      },
+      "max_current_house": {
+        "name": "Maximale stroom huisaansluiting"
+      },
+      "max_evse_current": {
+        "name": "Maximale stroom wallbox"
+      },
+      "modbus_layout_version": {
+        "name": "Versie Modbus-registerindeling"
+      },
+      "phase_rotation": {
+        "name": "Fasevolgorde",
+        "state": {
+          "l1_l2_l3": "L1-L2-L3",
+          "l2_l3_l1": "L2-L3-L1",
+          "l3_l1_l2": "L3-L1-L2"
+        }
+      },
+      "phase_switching_mode": {
+        "name": "Fasewisselmodus",
+        "state": {
+          "solar_dynamic": "Zonnestroom, 1 of 3 fasen",
+          "solar_one_phase": "Zonnestroom, alleen 1 fase",
+          "solar_three_phases": "Zonnestroom, alleen 3 fasen"
+        }
+      },
+      "phase_switching_pause": {
+        "name": "Pauze bij fasewisseling"
+      },
+      "power_l1": {
+        "name": "Vermogen L1"
+      },
+      "power_l2": {
+        "name": "Vermogen L2"
+      },
+      "power_l3": {
+        "name": "Vermogen L3"
+      },
+      "power_total": {
+        "name": "Totaal vermogen"
+      },
+      "session_duration": {
+        "name": "Laadsessieduur"
+      },
+      "session_energy": {
+        "name": "Energie laadsessie"
+      },
+      "session_max_current": {
+        "name": "Maximale stroom laadsessie"
+      },
+      "sessions_total": {
+        "name": "Laadsessies"
+      },
+      "signaled_current": {
+        "name": "Aangeboden stroom"
+      },
+      "solar_min_current": {
+        "name": "Minimale stroom Zonnestroom+"
+      },
+      "switched_phases": {
+        "name": "Ingeschakelde fasen",
+        "state": {
+          "all_available": "Alle beschikbare fasen",
+          "single_phase": "Eén fase"
+        }
+      },
+      "temperature": {
+        "name": "Temperatuur"
+      },
+      "voltage_l1": {
+        "name": "Spanning L1"
+      },
+      "voltage_l2": {
+        "name": "Spanning L2"
+      },
+      "voltage_l3": {
+        "name": "Spanning L3"
+      }
+    },
+    "switch": {
+      "charging_paused": {
+        "name": "Laden gepauzeerd"
+      },
+      "charging_release": {
+        "name": "Laadvrijgave"
+      },
+      "lock_evse": {
+        "name": "Wallbox vergrendeld"
+      }
+    }
+  },
+  "exceptions": {
+    "charging_current_invalid": {
+      "message": "{value} A is geen geldige laadstroomlimiet. De wallbox accepteert 0 A (geen limiet) of minimaal {minimum} A; bij waarden daartussen biedt deze 0 A aan het voertuig aan."
+    },
+    "charging_current_zero": {
+      "message": "0 A stopt het laden bij deze wallbox niet: het verwijdert de limiet en de wallbox biedt de maximale stroom aan. Gebruik de laadpauzeschakelaar om te pauzeren, of voer de actie \"Laadstroom instellen\" uit met \"Onbeperkt toestaan\" als je echt geen limiet wilt."
+    },
+    "entry_not_loaded": {
+      "message": "De wallboxvermelding voor apparaat {device} is niet geladen."
+    },
+    "no_wallbox_target": {
+      "message": "Voor deze actie moet minimaal één MENNEKES AMTRON-apparaat als doel worden gekozen."
+    },
+    "phase_switch_unsupported": {
+      "message": "Deze wallbox kan niet tussen één en drie fasen wisselen. Dynamische fasewisseling vereist een 11 kW-apparaat dat faseoptie 2 meldt."
+    },
+    "read_only_mode": {
+      "message": "Deze wallbox staat in de modus Alleen lezen. Schakel bij een serviceverbinding Alleen lezen in de app uit, sla de wijziging op en herstart de app. Kies bij een directe seriële verbinding Modbus-master in de integratieopties."
+    },
+    "restart_requires_idle": {
+      "message": "De wallbox mag alleen in rust worden herstart. Koppel eerst het voertuig los."
+    },
+    "unknown_device": {
+      "message": "Apparaat {device} is niet bekend bij Home Assistant."
+    },
+    "write_failed": {
+      "message": "Schrijven naar {register} op de wallbox is mislukt: {error}"
+    },
+    "write_rate_limited": {
+      "message": "Deze wijziging is over {seconds} s weer mogelijk. Tussen stroomwijzigingen, pauzeren en hervatten geldt minimaal vijf seconden wachttijd; voor fasewisselingen blijft dat vijf minuten."
+    },
+    "phase_state_unknown": {
+      "message": "De huidige laadstatus kon niet worden bevestigd. Er zijn geen fasen gewisseld. Controleer de verbinding en probeer het opnieuw."
+    },
+    "restart_state_unknown": {
+      "message": "De huidige laadstatus kon niet worden bevestigd. Er is geen herstart aangevraagd. Controleer de verbinding en probeer het opnieuw."
+    },
+    "recovery_not_applicable": {
+      "message": "De wallbox meldt een andere storing dan heartbeatfout 200. Er zijn geen herstelopdrachten verstuurd."
+    },
+    "recovery_state_unknown": {
+      "message": "De huidige foutstatus of laadstroom kon niet worden bevestigd. Er zijn geen herstelopdrachten verstuurd."
+    },
+    "service_unavailable": {
+      "message": "De Modbus-service is niet beschikbaar of kon de opdracht niet bevestigen. Controleer de huidige status voordat je de opdracht herhaalt."
+    }
+  },
+  "issues": {
+    "ems_fallback_not_configured": {
+      "description": "Register 0x030E is 0. Daardoor blijft de wallbox laden met de laatst ontvangen waarden als de actieve Modbus-master geen heartbeat meer verstuurt. Stel met de MENNEKES-configuratietool het gedrag of de stroom bij uitval in, zodat de wallbox bij uitval een vooraf bepaalde toestand aanneemt.",
+      "title": "Geen gedrag bij uitval van de energiemanager ingesteld"
+    },
+    "ems_heartbeat_lost": {
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "description": "De wallbox meldt fout 200 omdat de heartbeat is uitgebleven. Als schrijven is toegestaan, worden de bestaande besturingsinstellingen automatisch opnieuw toegepast zodra de heartbeat weer wordt ontvangen, ook als het laden is gepauzeerd. Bevestig om het handmatig opnieuw te proberen. Een bewuste laadpauze, apparaatvergrendeling, uitgeschakelde laadvrijgave en stroominstelling blijven behouden. Het laden wordt hierdoor niet hervat. Een al opgeloste melding wordt gesloten zonder opdrachten te versturen.",
+            "title": "Wallbox ontvangt geen heartbeat van de energiemanager"
+          }
+        },
+        "error": {
+          "entry_unavailable": "De integratie is niet geladen. Herstel de verbinding voordat je het opnieuw probeert.",
+          "different_error": "De wallbox meldt een andere storing. Heartbeatherstel verhelpt die storing niet.",
+          "read_only": "Schakel Alleen lezen in de app uit, sla de wijziging op en herstart de app voordat je herstel aanvraagt. Schakel bij een directe seriële verbinding in plaats daarvan de modus Modbus-master in via de integratieopties.",
+          "write_rate_limited": "De minimale wachttijd sinds een recente opdracht is nog niet verstreken. Wacht even en probeer het opnieuw.",
+          "recovery_failed": "Het herstel kon niet worden bevestigd. Controleer de verbinding en probeer het opnieuw.",
+          "still_active": "De herstelopdrachten zijn verstuurd, maar de wallbox meldt nog steeds een storing. Wacht tot de status is bijgewerkt; controleer de verbinding als de storing blijft bestaan."
+        }
+      },
+      "title": "Wallbox ontvangt geen heartbeat van de energiemanager"
+    },
+    "unsupported_modbus_layout": {
+      "description": "De wallbox meldt registerindeling {layout}; deze integratie is getest met {validated_layout}. Er worden geen entiteiten aangemaakt voor registers die je firmware niet heeft. Een firmware-update via de MENNEKES-configuratietool maakt deze beschikbaar.",
+      "title": "Wallbox gebruikt een oudere Modbus-registerindeling"
+    },
+    "write_rejected": {
+      "description": "Een schrijfopdracht is niet bevestigd. Controleer de seriële verbinding en of de wallbox als satelliet is ingesteld. Deze melding verdwijnt zodra de betreffende opdracht slaagt. Eerdere fouten blijven in de diagnostische teller staan.",
+      "title": "Wallbox heeft een schrijfopdracht geweigerd"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "control_mode": "Besturingsmodus",
+          "current_limit": "Maximale laadstroom",
+          "measurement_interval_seconds": "Meetinterval",
+          "scan_interval_seconds": "Statusinterval"
+        },
+        "data_description": {
+          "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
+          "current_limit": "Bovengrens van de laadstroomentiteit, naast de limiet die de wallbox zelf handhaaft.",
+          "measurement_interval_seconds": "Vermogen, spanning, stroom en sessiewaarden: 30 seconden vermindert de databasebelasting. Bij statuswijzigingen worden metingen direct vernieuwd. Zonder voertuig geldt minimaal 60 seconden. Het statusinterval bepaalt de kortst mogelijke tijd tussen uitlezingen.",
+          "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk."
+        },
+        "title": "Opties"
+      },
+      "service": {
+        "title": "Serviceopties",
+        "data": {
+          "current_limit": "Maximale laadstroom",
+          "scan_interval_seconds": "Statusinterval"
+        },
+        "data_description": {
+          "current_limit": "Extra bovengrens voor stroomwaarden die Home Assistant aanvraagt. De servicegrens blijft van toepassing. Door bewust 0 A te selecteren, schakel je de EMS-limiet uit.",
+          "scan_interval_seconds": "Hoe vaak Home Assistant de servicestatus uitleest. Dit verandert noch het uitleesinterval van de Modbus-metingen, noch het heartbeatinterval."
+        },
+        "description": "De instelling Alleen lezen van de app bepaalt ook of Home Assistant mag schrijven. Schakel deze in de app uit, sla de wijziging op en herstart de app om de bedieningselementen in te schakelen. Deze blijven niet beschikbaar zolang Alleen lezen is ingeschakeld of de service nog niet gereed is."
+      }
+    }
+  },
+  "selector": {
+    "control_mode": {
+      "options": {
+        "master": "Modbus-master",
+        "read_only": "Alleen lezen"
+      }
+    },
+    "frame": {
+      "options": {
+        "8e1": "8E1 - 8 databits, even pariteit, 1 stopbit",
+        "8n2": "8N2 - 8 databits, geen pariteit, 2 stopbits (standaard)",
+        "8o1": "8O1 - 8 databits, oneven pariteit, 1 stopbit"
+      }
+    },
+    "search": {
+      "options": {
+        "addresses": "Elk apparaatadres doorzoeken, ongeveer 20 seconden",
+        "full": "Elk adres, elke baudrate en elk frame doorzoeken, enkele minuten",
+        "off": "Niet zoeken, alleen de fout melden"
+      }
+    },
+    "recorder_profile": {
+      "options": {
+        "full": "Volledige geschiedenis",
+        "detail": "Minder detail",
+        "lean": "Alleen energie- en vermogensstatistieken"
+      }
+    }
+  },
+  "services": {
+    "set_charging_current": {
+      "description": "Stelt de laadstroomlimiet van de energiemanager voor een wallbox in. 0 A betekent geen limiet en stopt het laden niet. Daarom moet je dit hieronder uitdrukkelijk toestaan.",
+      "fields": {
+        "allow_unlimited": {
+          "description": "Staat toe om 0 A te schrijven. Dit verwijdert de limiet en laat de wallbox de maximale stroom aanbieden.",
+          "name": "Onbeperkt toestaan"
+        },
+        "current": {
+          "description": "Laadstroomlimiet in ampère. Gebruik 0 A alleen samen met \"Onbeperkt toestaan\"; waarden tussen 0,01 A en 5,99 A worden geweigerd omdat de wallbox dan 0 A zou aanbieden.",
+          "name": "Laadstroom"
+        },
+        "device_id": {
+          "description": "De wallbox waarvoor de laadstroomlimiet wordt ingesteld.",
+          "name": "Wallbox"
+        }
+      },
+      "name": "Laadstroom instellen"
+    },
+    "get_recorder_exclusions": {
+      "name": "Recorder-uitsluitingen voorstellen",
+      "description": "Geeft een YAML-voorstel met de werkelijke entiteits-ID's. Wijzigt Recorder niet en verwijdert geen geschiedenis. Voeg de lijst samen met je bestaande configuratie.",
+      "fields": {
+        "device_id": {
+          "name": "Wallboxen",
+          "description": "Wallboxen om in het voorstel op te nemen."
+        },
+        "profile": {
+          "name": "Geschiedenisprofiel",
+          "description": "Bewaar alle geschiedenis, verminder de details of bewaar alleen energie- en vermogensstatistieken."
+        }
+      }
+    }
+  }
+}

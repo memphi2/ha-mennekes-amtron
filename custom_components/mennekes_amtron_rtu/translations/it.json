@@ -1,0 +1,526 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Questa wallbox è già configurata.",
+      "reconfigure_successful": "La connessione è stata aggiornata.",
+      "unique_id_mismatch": "Questa porta appartiene a un'altra wallbox.",
+      "service_migration_requires_serial": "Per riconoscere il dispositivo esistente durante la migrazione, il numero di serie della wallbox deve essere leggibile.",
+      "invalid_service_discovery": "L'app ha fornito dati di connessione non validi.",
+      "service_identity_changed": "La wallbox rilevata è cambiata. Riavvia la configurazione.",
+      "service_discovery_updated": "L'integrazione esistente ora usa la connessione dell'app rilevata.",
+      "multiple_service_apps": "Sono state trovate più app Modbus. Seleziona l'app rilevata corretta in Dispositivi e servizi."
+    },
+    "error": {
+      "cannot_connect": "Impossibile aprire la porta seriale oppure la wallbox non ha risposto. Controlla il cablaggio (Modbus A è +, B è -), la porta e i parametri del bus.",
+      "invalid_response": "Il dispositivo ha risposto, ma non ha comunicato la versione della mappa Modbus. Controlla l'indirizzo del dispositivo e che i DIP switch 4 e 5 del banco S1 siano attivi.",
+      "not_found": "Nessuna wallbox ha risposto su questa porta. Controlla il cablaggio (Modbus A è +, B è -, GND collegato) e che i DIP switch 4 e 5 del banco S1 siano attivi, quindi riavvia la wallbox.",
+      "cannot_connect_service": "L'app non è raggiungibile in rete. Verifica che sia in esecuzione e accetti connessioni sulla porta 8765.",
+      "service_discovery_requires_serial": "L'app non ha ancora letto un numero di serie. Controlla la connessione alla wallbox e riprova.",
+      "service_auth_failed": "L'app ha rifiutato l'autenticazione. Conferma di nuovo per recuperare le credenziali attuali da Supervisor. Per un servizio su un host separato, controlla il token configurato.",
+      "service_not_ready": "L'autenticazione all'app è riuscita, ma i dati della wallbox non sono ancora disponibili. Controlla il registro dell'app e riprova.",
+      "service_invalid_response": "L'app risponde, ma i suoi dati non sono stati accettati. Aggiorna l'integrazione e l'app alla stessa versione. Il registro di Home Assistant indica la sezione dei dati interessata."
+    },
+    "progress": {
+      "searching": "Ricerca di una wallbox sul bus: fino a {candidates} combinazioni, circa {minutes} minuti più le verifiche di connessione. Non viene scritto alcun registro. Durante la riconfigurazione, la connessione esistente e l'heartbeat vengono sospesi; si applica il comportamento di fallback configurato nella wallbox."
+    },
+    "step": {
+      "reconfigure": {
+        "title": "Modifica connessione",
+        "menu_options": {
+          "server": "Connetti al servizio Modbus",
+          "serial_reconfigure": "Modifica connessione seriale"
+        }
+      },
+      "search_result": {
+        "description": "Una wallbox ha risposto dopo {attempts} tentativi:\n\n- Indirizzo del dispositivo: **{device_id}**\n- Bus: **{baudrate} baud, {frame}**\n- Mappa Modbus: **{layout}**\n- Numero di serie: **{serial_number}**\n\nConferma per configurare la wallbox con questi valori.",
+        "title": "Wallbox trovata"
+      },
+      "user": {
+        "title": "Connetti la wallbox",
+        "menu_options": {
+          "server": "Servizio Modbus (continua durante i riavvii di HA)",
+          "serial": "Connessione seriale diretta"
+        }
+      },
+      "serial": {
+        "data": {
+          "baudrate": "Velocità in baud",
+          "device_id": "Indirizzo del dispositivo Modbus",
+          "frame": "Formato seriale",
+          "port": "Porta seriale",
+          "search": "Se questi valori non funzionano"
+        },
+        "data_description": {
+          "baudrate": "Il valore di fabbrica è 57600.",
+          "device_id": "Il valore di fabbrica è 50. Con lo strumento di configurazione MENNEKES si possono impostare indirizzi da 10 a 50.",
+          "frame": "La documentazione della wallbox prevede solo questi tre formati. Il valore di fabbrica è 8 bit di dati, nessuna parità, 2 bit di stop.",
+          "port": "Percorso dell'adattatore USB RS-485. Preferisci un percorso /dev/serial/by-id: /dev/ttyUSB0 può cambiare tra un riavvio e l'altro.",
+          "search": "L'indirizzo del dispositivo e i parametri del bus possono essere modificati con lo strumento di configurazione MENNEKES. Un impianto esistente può quindi usare valori diversi. La ricerca invia richieste di lettura. Usala solo su un bus senza altri master Modbus."
+        },
+        "description": "La wallbox deve essere configurata come satellite Modbus: attiva i DIP switch 4 e 5 del banco S1, quindi riavvia la wallbox. Questa integrazione è verificata con la mappa dei registri {validated_layout}.",
+        "title": "Mennekes Amtron RTU"
+      },
+      "serial_reconfigure": {
+        "data": {
+          "baudrate": "Velocità in baud",
+          "device_id": "Indirizzo del dispositivo Modbus",
+          "frame": "Formato seriale",
+          "port": "Porta seriale",
+          "search": "Se questi valori non funzionano"
+        },
+        "data_description": {
+          "baudrate": "Il valore di fabbrica è 57600.",
+          "device_id": "Il valore di fabbrica è 50. Con lo strumento di configurazione MENNEKES si possono impostare indirizzi da 10 a 50.",
+          "frame": "La documentazione della wallbox prevede solo questi tre formati. Il valore di fabbrica è 8 bit di dati, nessuna parità, 2 bit di stop.",
+          "port": "Percorso dell'adattatore USB RS-485. Preferisci un percorso /dev/serial/by-id: /dev/ttyUSB0 può cambiare tra un riavvio e l'altro.",
+          "search": "L'indirizzo del dispositivo e i parametri del bus possono essere modificati con lo strumento di configurazione MENNEKES. Un impianto esistente può quindi usare valori diversi. La ricerca invia richieste di lettura. Usala solo su un bus senza altri master Modbus."
+        },
+        "description": "La wallbox deve essere configurata come satellite Modbus: attiva i DIP switch 4 e 5 del banco S1, quindi riavvia la wallbox. Questa integrazione è verificata con la mappa dei registri {validated_layout}.",
+        "title": "Mennekes Amtron RTU"
+      },
+      "server": {
+        "title": "Connetti al servizio Modbus",
+        "description": "Le app Supervisor si connettono automaticamente senza inserire URL o token. Questo modulo è per un servizio su un host separato. Per passare da Modbus diretto al servizio, disabilita prima la voce dell'integrazione precedente per liberare la porta seriale.",
+        "data": {
+          "server_url": "URL del servizio",
+          "server_token": "Token di accesso"
+        }
+      },
+      "hassio_confirm": {
+        "title": "Connetti l'app Modbus",
+        "description": "L'app Modbus è stata rilevata automaticamente. L'indirizzo e il token di accesso vengono forniti automaticamente. Conferma la connessione. Una voce esistente per questa wallbox mantiene gli ID del dispositivo e delle entità. Una voce disabilitata rimane tale finché non la riabiliti."
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "authorization_enabled": {
+        "name": "Autorizzazione abilitata"
+      },
+      "cable_lock_enabled": {
+        "name": "Blocco permanente del cavo"
+      },
+      "charging": {
+        "name": "Ricarica"
+      },
+      "downgrade_active": {
+        "name": "Limitazione di rete attiva"
+      },
+      "error": {
+        "name": "Errore"
+      },
+      "grid_imbalance_enabled": {
+        "name": "Monitoraggio squilibrio di rete"
+      },
+      "master_lost_fallback": {
+        "name": "Fallback del gestore energetico attivo"
+      },
+      "phase_switch_capable": {
+        "name": "Commutazione delle fasi supportata"
+      },
+      "vehicle_connected": {
+        "name": "Veicolo collegato"
+      },
+      "heartbeat": {
+        "name": "Heartbeat"
+      }
+    },
+    "button": {
+      "recover_from_error": {
+        "name": "Ripristina dopo un errore"
+      },
+      "restart": {
+        "name": "Riavvia"
+      }
+    },
+    "number": {
+      "charging_current_limit": {
+        "name": "Limite di corrente di ricarica"
+      }
+    },
+    "select": {
+      "requested_phases": {
+        "name": "Fasi richieste",
+        "state": {
+          "all_available": "Tutte le fasi disponibili",
+          "single_phase": "Solo una fase"
+        }
+      },
+      "solar_charging_mode": {
+        "name": "Modalità di ricarica solare",
+        "state": {
+          "fast": "Ricarica rapida",
+          "not_active": "Non attiva",
+          "sunshine": "Sunshine",
+          "sunshine_plus": "Sunshine+"
+        }
+      }
+    },
+    "sensor": {
+      "authorization_status": {
+        "name": "Autorizzazione",
+        "state": {
+          "authorized": "Autorizzato",
+          "not_authorized": "Non autorizzato",
+          "not_used": "Non utilizzata"
+        }
+      },
+      "cable_lock_status": {
+        "name": "Blocco del cavo",
+        "state": {
+          "fixed_cable": "Cavo fisso",
+          "locked": "Bloccato",
+          "undetermined": "Non determinato",
+          "unlocked": "Sbloccato"
+        }
+      },
+      "cp_state": {
+        "name": "Stato CP",
+        "state": {
+          "a1": "A1 (nessun veicolo)",
+          "a2": "A2 (veicolo scollegato)",
+          "b1": "B1 (veicolo collegato)",
+          "b2": "B2 (pronto, corrente offerta)",
+          "c1": "C1 (veicolo pronto alla ricarica)",
+          "c2": "C2 (ricarica)",
+          "d1": "D1",
+          "d2": "D2",
+          "e": "E (errore)",
+          "f": "F (errore)",
+          "init": "Inizializzazione"
+        }
+      },
+      "current_l1": {
+        "name": "Corrente L1"
+      },
+      "current_l2": {
+        "name": "Corrente L2"
+      },
+      "current_l3": {
+        "name": "Corrente L3"
+      },
+      "detected_ev_phases": {
+        "name": "Fasi del veicolo rilevate",
+        "state": {
+          "not_initialized": "Non inizializzato",
+          "one_phase": "1 fase",
+          "three_phases": "3 fasi",
+          "two_phases": "2 fasi"
+        }
+      },
+      "downgrade_current": {
+        "name": "Corrente con limitazione di rete"
+      },
+      "ems_fallback_behaviour": {
+        "name": "Fallback del gestore energetico",
+        "state": {
+          "disabled": "Disabilitato, mantiene gli ultimi valori",
+          "fallback_current": "Ricarica con la corrente di fallback",
+          "pause_on_timeout": "Pausa alla scadenza dell'heartbeat"
+        }
+      },
+      "ems_fallback_current": {
+        "name": "Corrente di fallback del gestore energetico"
+      },
+      "energy_total": {
+        "name": "Energia totale"
+      },
+      "error_code": {
+        "name": "Codice di errore",
+        "state": {
+          "connected_phases_mismatch": "Fasi collegate non corrispondenti",
+          "energy_manager_unavailable": "Gestore energetico non disponibile",
+          "ev_overcurrent": "Sovracorrente del veicolo",
+          "no_error": "Nessun errore",
+          "other": "Altro errore",
+          "voltage_out_of_range": "Tensione fuori intervallo"
+        }
+      },
+      "evse_state": {
+        "name": "Stato della wallbox",
+        "state": {
+          "charging": "Ricarica",
+          "error": "Errore",
+          "ev_connected": "Veicolo collegato",
+          "idle": "Inattiva",
+          "not_initialized": "Non inizializzata",
+          "preconditions_valid": "Prerequisiti soddisfatti",
+          "ready_to_charge": "Pronta alla ricarica",
+          "service_mode": "Modalità di manutenzione"
+        }
+      },
+      "grid_imbalance_threshold": {
+        "name": "Soglia di squilibrio di rete"
+      },
+      "grid_phases_connected": {
+        "name": "Fasi di rete collegate",
+        "state": {
+          "l1": "L1",
+          "l1_l2_l3": "L1, L2, L3"
+        }
+      },
+      "max_current_house": {
+        "name": "Corrente massima dell'impianto"
+      },
+      "max_evse_current": {
+        "name": "Corrente massima della wallbox"
+      },
+      "modbus_layout_version": {
+        "name": "Versione della mappa Modbus"
+      },
+      "phase_rotation": {
+        "name": "Sequenza delle fasi",
+        "state": {
+          "l1_l2_l3": "L1-L2-L3",
+          "l2_l3_l1": "L2-L3-L1",
+          "l3_l1_l2": "L3-L1-L2"
+        }
+      },
+      "phase_switching_mode": {
+        "name": "Modalità di commutazione delle fasi",
+        "state": {
+          "solar_dynamic": "Solare, 1 o 3 fasi",
+          "solar_one_phase": "Solare, solo 1 fase",
+          "solar_three_phases": "Solare, solo 3 fasi"
+        }
+      },
+      "phase_switching_pause": {
+        "name": "Pausa per commutazione delle fasi"
+      },
+      "power_l1": {
+        "name": "Potenza L1"
+      },
+      "power_l2": {
+        "name": "Potenza L2"
+      },
+      "power_l3": {
+        "name": "Potenza L3"
+      },
+      "power_total": {
+        "name": "Potenza totale"
+      },
+      "session_duration": {
+        "name": "Durata della sessione"
+      },
+      "session_energy": {
+        "name": "Energia della sessione"
+      },
+      "session_max_current": {
+        "name": "Corrente massima della sessione"
+      },
+      "sessions_total": {
+        "name": "Sessioni di ricarica"
+      },
+      "signaled_current": {
+        "name": "Corrente comunicata al veicolo"
+      },
+      "solar_min_current": {
+        "name": "Corrente minima Sunshine+"
+      },
+      "switched_phases": {
+        "name": "Fasi commutate",
+        "state": {
+          "all_available": "Tutte le fasi disponibili",
+          "single_phase": "Una fase"
+        }
+      },
+      "temperature": {
+        "name": "Temperatura"
+      },
+      "voltage_l1": {
+        "name": "Tensione L1"
+      },
+      "voltage_l2": {
+        "name": "Tensione L2"
+      },
+      "voltage_l3": {
+        "name": "Tensione L3"
+      }
+    },
+    "switch": {
+      "charging_paused": {
+        "name": "Ricarica in pausa"
+      },
+      "charging_release": {
+        "name": "Consenso alla ricarica"
+      },
+      "lock_evse": {
+        "name": "Wallbox bloccata"
+      }
+    }
+  },
+  "exceptions": {
+    "charging_current_invalid": {
+      "message": "{value} A non è un limite di corrente di ricarica valido. La wallbox accetta 0 A (nessun limite) oppure almeno {minimum} A; i valori intermedi le fanno comunicare 0 A al veicolo."
+    },
+    "charging_current_zero": {
+      "message": "Su questa wallbox, 0 A non interrompe la ricarica: rimuove il limite e la wallbox comunica la corrente massima. Per mettere in pausa usa l'interruttore di pausa della ricarica; se vuoi rimuovere il limite, esegui l'azione «Imposta corrente di ricarica» abilitando «Consenti corrente senza limite»."
+    },
+    "entry_not_loaded": {
+      "message": "La voce della wallbox per il dispositivo {device} non è caricata."
+    },
+    "no_wallbox_target": {
+      "message": "L'azione richiede almeno un dispositivo MENNEKES AMTRON come destinazione."
+    },
+    "phase_switch_unsupported": {
+      "message": "Questa wallbox non può commutare tra una e tre fasi. La commutazione dinamica richiede un dispositivo da 11 kW che riporti l'opzione fasi 2."
+    },
+    "read_only_mode": {
+      "message": "Questa wallbox è in modalità di sola lettura. Per una connessione al servizio, disattiva Sola lettura nell'app, salva e riavvia l'app. Per una connessione seriale diretta, seleziona Master Modbus nelle opzioni dell'integrazione."
+    },
+    "restart_requires_idle": {
+      "message": "La wallbox può essere riavviata solo quando è inattiva. Scollega prima il veicolo."
+    },
+    "unknown_device": {
+      "message": "Il dispositivo {device} non è noto a Home Assistant."
+    },
+    "write_failed": {
+      "message": "Scrittura di {register} sulla wallbox non riuscita: {error}"
+    },
+    "write_rate_limited": {
+      "message": "Questa modifica sarà nuovamente disponibile tra {seconds} s. Le modifiche della corrente, la pausa e la ripresa richiedono un intervallo minimo di cinque secondi; le modifiche delle fasi mantengono un intervallo di cinque minuti."
+    },
+    "phase_state_unknown": {
+      "message": "Impossibile confermare lo stato di ricarica attuale. Le fasi non sono state commutate. Controlla la connessione e riprova."
+    },
+    "restart_state_unknown": {
+      "message": "Impossibile confermare lo stato di ricarica attuale. Non è stato richiesto alcun riavvio. Controlla la connessione e riprova."
+    },
+    "recovery_not_applicable": {
+      "message": "La wallbox segnala un errore diverso dall'errore heartbeat 200. Non sono stati inviati comandi di ripristino."
+    },
+    "recovery_state_unknown": {
+      "message": "Impossibile confermare l'errore o lo stato della corrente di ricarica attuali. Non sono stati inviati comandi di ripristino."
+    },
+    "service_unavailable": {
+      "message": "Il servizio Modbus non è disponibile o non ha potuto confermare il comando. Controlla lo stato attuale prima di ripeterlo."
+    }
+  },
+  "issues": {
+    "ems_fallback_not_configured": {
+      "description": "Il registro 0x030E è impostato a 0, quindi la wallbox continua a caricare con gli ultimi valori ricevuti quando il master Modbus attivo smette di inviare l'heartbeat. Configura un comportamento o una corrente di fallback con lo strumento di configurazione MENNEKES per ottenere uno stato definito in caso di interruzione.",
+      "title": "Nessun fallback del gestore energetico configurato"
+    },
+    "ems_heartbeat_lost": {
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "description": "La wallbox segnala l'errore 200 dopo un heartbeat mancante. Quando la scrittura è abilitata, il ripristino automatico riapplica le impostazioni esistenti appena riprende l'heartbeat, anche durante una pausa della ricarica. Conferma per riprovare manualmente. Una pausa intenzionale, il blocco della wallbox, il consenso alla ricarica disattivato e la corrente impostata vengono mantenuti. La ricarica non riprende. Un problema già risolto viene chiuso senza inviare comandi.",
+            "title": "La wallbox ha perso l'heartbeat del gestore energetico"
+          }
+        },
+        "error": {
+          "entry_unavailable": "L'integrazione non è caricata. Ripristina la connessione prima di riprovare.",
+          "different_error": "La wallbox segnala un errore diverso. Il ripristino dell'heartbeat non risolve tale errore.",
+          "read_only": "Disattiva Sola lettura nell'app, salva e riavvia l'app prima di richiedere il ripristino. Per una connessione seriale diretta, abilita invece Master Modbus nelle opzioni dell'integrazione.",
+          "write_rate_limited": "Un comando recente è ancora nel suo intervallo minimo di scrittura. Attendi brevemente e riprova.",
+          "recovery_failed": "Impossibile confermare il ripristino. Controlla la connessione e riprova.",
+          "still_active": "I comandi di ripristino sono stati inviati, ma la wallbox segnala ancora un errore. Attendi l'aggiornamento dello stato; controlla la connessione se l'errore persiste."
+        }
+      },
+      "title": "La wallbox ha perso l'heartbeat del gestore energetico"
+    },
+    "unsupported_modbus_layout": {
+      "description": "La wallbox riporta la mappa dei registri {layout}; questa integrazione è verificata con la mappa {validated_layout}. Le entità per i registri non presenti nel firmware non vengono create. Un aggiornamento del firmware tramite lo strumento di configurazione MENNEKES le rende disponibili.",
+      "title": "La wallbox usa una mappa dei registri Modbus precedente"
+    },
+    "write_rejected": {
+      "description": "Una scrittura non è stata confermata. Controlla la connessione seriale e la configurazione satellite della wallbox. Questo problema scompare quando il comando interessato riesce. Gli errori precedenti rimangono nel contatore diagnostico.",
+      "title": "La wallbox ha rifiutato una scrittura"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "control_mode": "Modalità di controllo",
+          "current_limit": "Corrente massima di ricarica",
+          "measurement_interval_seconds": "Intervallo delle misurazioni",
+          "scan_interval_seconds": "Intervallo di lettura dello stato"
+        },
+        "data_description": {
+          "control_mode": "Entrambe le modalità inviano richieste di lettura e richiedono l'accesso esclusivo al bus. Sola lettura non scrive registri. Master Modbus invia anche l'heartbeat e abilita le entità di controllo. Non condividere questo bus con un altro master.",
+          "current_limit": "Limite superiore dell'entità della corrente di ricarica, oltre al limite applicato dalla wallbox stessa.",
+          "measurement_interval_seconds": "Potenza, tensione, corrente e valori di sessione: 30 secondi riducono il carico sul database. I cambiamenti di stato aggiornano subito le letture. Senza veicolo, almeno 60 secondi. L'intervallo di stato determina il tempo minimo tra le letture.",
+          "scan_interval_seconds": "Frequenza di lettura dello stato di ricarica, degli errori e dei controlli. L'heartbeat funziona indipendentemente."
+        },
+        "title": "Opzioni"
+      },
+      "service": {
+        "title": "Opzioni del servizio",
+        "data": {
+          "current_limit": "Corrente massima di ricarica",
+          "scan_interval_seconds": "Intervallo di lettura dello stato"
+        },
+        "data_description": {
+          "current_limit": "Limite aggiuntivo per le correnti richieste da Home Assistant. Si applica anche il limite del servizio. Selezionare esplicitamente 0 A disattiva il limite EMS.",
+          "scan_interval_seconds": "Frequenza con cui Home Assistant legge lo stato del servizio. Non modifica né le letture Modbus né l'intervallo dell'heartbeat."
+        },
+        "description": "L'impostazione Sola lettura dell'app controlla anche il permesso di scrittura in Home Assistant. Disattivala nell'app, salva e riavvia l'app per abilitare i controlli. Le entità di controllo rimangono non disponibili mentre il servizio è in sola lettura o non è pronto."
+      }
+    }
+  },
+  "selector": {
+    "control_mode": {
+      "options": {
+        "master": "Master Modbus",
+        "read_only": "Sola lettura"
+      }
+    },
+    "frame": {
+      "options": {
+        "8e1": "8E1 - 8 bit di dati, parità pari, 1 bit di stop",
+        "8n2": "8N2 - 8 bit di dati, nessuna parità, 2 bit di stop (predefinito)",
+        "8o1": "8O1 - 8 bit di dati, parità dispari, 1 bit di stop"
+      }
+    },
+    "search": {
+      "options": {
+        "addresses": "Cerca ogni indirizzo del dispositivo, circa 20 secondi",
+        "full": "Cerca ogni indirizzo, velocità e formato seriale, diversi minuti",
+        "off": "Non cercare, segnala solo l'errore"
+      }
+    },
+    "recorder_profile": {
+      "options": {
+        "full": "Cronologia completa",
+        "detail": "Meno dettagli",
+        "lean": "Solo statistiche di energia e potenza"
+      }
+    }
+  },
+  "services": {
+    "set_charging_current": {
+      "description": "Scrive il limite di corrente di ricarica del gestore energetico per una wallbox. 0 A significa nessun limite, non un arresto della ricarica, e richiede quindi il consenso esplicito seguente.",
+      "fields": {
+        "allow_unlimited": {
+          "description": "Consente di scrivere 0 A, rimuovendo il limite e facendo comunicare alla wallbox la corrente massima.",
+          "name": "Consenti corrente senza limite"
+        },
+        "current": {
+          "description": "Limite di corrente di ricarica in ampere. Usa 0 A solo insieme a «Consenti corrente senza limite»; i valori tra 0,01 A e 5,99 A vengono rifiutati perché la wallbox comunicherebbe 0 A.",
+          "name": "Corrente di ricarica"
+        },
+        "device_id": {
+          "description": "La wallbox di cui impostare il limite di corrente di ricarica.",
+          "name": "Wallbox"
+        }
+      },
+      "name": "Imposta corrente di ricarica"
+    },
+    "get_recorder_exclusions": {
+      "name": "Suggerisci esclusioni di Recorder",
+      "description": "Restituisce un suggerimento YAML con gli ID effettivi delle entità. Non modifica Recorder e non elimina la cronologia. Unisci l'elenco alla configurazione esistente.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Wallbox da includere nel suggerimento."
+        },
+        "profile": {
+          "name": "Profilo della cronologia",
+          "description": "Mantieni tutta la cronologia, riduci i dettagli oppure mantieni solo le statistiche di energia e potenza."
+        }
+      }
+    }
+  }
+}

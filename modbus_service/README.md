@@ -6,6 +6,8 @@ last charging state, including a deliberate pause, independently of HA.
 
 **Current beta: 0.5.0b5 · Home Assistant app or standalone service**
 
+App settings are available in English, German, French, Dutch and Italian.
+
 | Using | Start here |
 |---|---|
 | Home Assistant OS | [App setup and everyday use](DOCS.md) — discovery supplies the address and token. |

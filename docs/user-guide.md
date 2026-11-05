@@ -1,8 +1,9 @@
 # Using your wallbox
 
 Open **Settings → Devices & services → Mennekes Amtron RTU** to find your
-wallbox. This guide uses the English labels; German translations are also
-available. New here? Follow the [Quick start](quickstart.md) first.
+wallbox. This guide uses the English labels; the integration and app also
+include German, French, Dutch and Italian translations.
+New here? Follow the [Quick start](quickstart.md) first.
 
 ## Everyday controls
 

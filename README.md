@@ -9,6 +9,8 @@ stays local over **Modbus RTU / RS-485**.
 
 **[Get started](docs/installation.md)** · **[Everyday use](docs/user-guide.md)** · **[Get help](docs/troubleshooting.md)**
 
+Integration and app available in **English, German, French, Dutch and Italian**.
+
 ## Supported wallboxes
 
 - **Amtron 4You 300**

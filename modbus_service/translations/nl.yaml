@@ -1,0 +1,33 @@
+configuration:
+  serial_port:
+    name: Seriële adapter
+    description: Exclusieve RS-485-adapter, bij voorkeur met een stabiel /dev/serial/by-id-pad.
+  device_id:
+    name: Wallboxadres
+    description: Het Modbus-adres dat in de wallbox is ingesteld.
+  baudrate:
+    name: Baudrate
+    description: Moet overeenkomen met de seriële instellingen van de wallbox.
+  frame:
+    name: Serieel frame
+    description: Databits, pariteit en stopbits die in de wallbox zijn ingesteld.
+  read_only:
+    name: Alleen lezen
+    description: Schakelt laadopdrachten, inclusief de bediening vanuit Home Assistant, en de heartbeat van de service uit; Modbus-leesverzoeken blijven actief.
+  current_cap:
+    name: Maximale stroom
+    description: Maximale aangevraagde EMS-stroom in ampère. Uitdrukkelijke opdrachten voor 0 A verwijderen de EMS-limiet.
+  scan_interval:
+    name: Statusinterval
+    description: Aantal seconden tussen statusuitlezingen. De heartbeat loopt onafhankelijk.
+  measurement_interval:
+    name: Meetinterval
+    description: Aantal seconden tussen metingen; 30 seconden beperkt de Recorder-belasting.
+  listen:
+    name: API-luisteradres
+    description: Behoud 0.0.0.0 voor toegang via het privénetwerk van de app.
+  port:
+    name: Interne API-poort
+    description: Vast ingesteld op 8765; het beschikbaar stellen van een hostpoort is optioneel en meestal niet nodig.
+network:
+  8765/tcp: Service-API met authenticatie; interne toegang vereist geen hostpoort.
