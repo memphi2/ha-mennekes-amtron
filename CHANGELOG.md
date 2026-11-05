@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.5.0b3 — 2026-11-05
+
+- Refresh pending app-discovery credentials from Supervisor when confirming or
+  retrying setup, so a missed token-change announcement cannot leave the flow
+  permanently using a stale token.
+
+- Reuse Supervisor app discovery when selecting the service connection manually;
+  URL and token fields are reserved for separately hosted services. Keep wallbox
+  identity checks during migration and distinguish authentication, unavailable
+  wallbox data, invalid API responses and network failures in setup messages.
+- Accept unknown uint16 hardware phase codes as readings without exposing phase
+  switching controls; an unfamiliar optional capability no longer rejects the
+  entire service connection.
+
+- Supervise the service heartbeat task: an unexpected exit now stops the service
+  and releases the serial port, allowing Supervisor's watchdog to restart it.
+  Ordinary missed replies still use the existing heartbeat retry cadence.
+
+- Include the independent service's connection, heartbeat and recovery timeline
+  in HA diagnostics instead of the separate HA client's local event history.
+- Release unloaded serial clients promptly by avoiding a client-factory reference
+  cycle.
+
+- Add bounded, in-memory write diagnostics with bus-wait/transaction timing and
+  packet callback counts for failed writes and subsequent confirmations. Fetch
+  service diagnostics only on demand; add no Recorder state or persistent logs.
+- Clarify that missing heartbeat acknowledgements leave delivery uncertain,
+  and document how to investigate isolated timeout messages.
+
 ## 0.5.0b2 — 2026-11-04
 
 - Log service/API/serial/heartbeat lifecycle and health transitions, name invalid

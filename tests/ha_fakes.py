@@ -105,6 +105,7 @@ class FakeHass:
         self.config_dir = config_dir or tempfile.mkdtemp(prefix="mennekes-hass-")
         self.config = SimpleNamespace(
             config_dir=self.config_dir,
+            components=set(),
             path=lambda *parts: str(Path(self.config_dir, *parts)),
         )
         self.data: dict[str, Any] = {}

@@ -29,6 +29,7 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
     DeviceValidationError,
 )
 from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTER_BLOCKS
+from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
@@ -76,6 +77,7 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
     ("field", "value"),
     [
         ("api_version", 2),
+        ("api_version", True),
         ("values", []),
         ("values", {"x": float("nan")}),
         ("control.read_only", None),
@@ -86,7 +88,8 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
         ("identity.layout_version", 0),
         ("identity.serial_number", 123),
         ("identity.max_evse_current", -1),
-        ("identity.phase_options_hw", 4),
+        ("identity.phase_options_hw", 65536),
+        ("identity.phase_options_hw", True),
         ("heartbeat", {}),
         ("diagnostics", []),
         ("diagnostics.recoveries", -1),
@@ -173,7 +176,7 @@ def test_large_or_streamed_replies_are_bounded():
         app.router.add_get("/v1/state", oversized)
         async with TestServer(app) as server, ClientSession() as session:
             remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
-            with pytest.raises(AmtronConnectionError, match="cannot communicate"):
+            with pytest.raises(AmtronConnectionError, match="service response too large"):
                 await remote.update()
 
     asyncio.run(run())
@@ -354,6 +357,51 @@ def test_remote_diagnostics_and_raw_write_refusal(tmp_path):
                     await control.async_pause_charging()
         finally:
             await service.stop()
+
+    asyncio.run(run())
+
+
+def test_write_diagnostics_endpoint_requires_auth_and_performs_no_bus_io(tmp_path):
+    async def run():
+        service, transport, _clock = await service_fixture(tmp_path)
+        try:
+            await service.heartbeat.async_stop()
+            service.diagnostics.timeline.record(EventType.CONNECTION_LOST)
+            before = (list(transport.reads), list(transport.writes))
+            async with TestServer(create_app(service)) as server, ClientSession() as session:
+                url = server.make_url("/v1/diagnostics")
+                async with session.get(url) as response:
+                    assert response.status == 401
+                async with session.get(url, headers={"Authorization": f"Bearer {TOKEN}"}) as response:
+                    assert response.status == 200
+                    assert await response.json() == {
+                        "write_transactions": [],
+                        "runtime_events": service.diagnostics.timeline.snapshot(),
+                    }
+            assert (transport.reads, transport.writes) == before
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_optional_diagnostics_failure_does_not_mark_service_offline():
+    async def run():
+        app = web.Application()
+
+        async def unavailable(_request):
+            raise web.HTTPNotFound
+
+        app.router.add_get("/v1/diagnostics", unavailable)
+        async with TestServer(app) as server, ClientSession() as session:
+            remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+            remote._connected = True
+            notifications = []
+            remote.on_update = lambda: notifications.append(True)
+            with pytest.raises(AmtronConnectionError):
+                await remote.request("GET", "/v1/diagnostics", update_connection=False)
+            assert remote.connected
+            assert notifications == []
 
     asyncio.run(run())
 

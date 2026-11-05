@@ -7,14 +7,18 @@
       "service_migration_requires_serial": "Ohne auslesbare Seriennummer ist keine automatische Zuordnung zum bestehenden Gerät möglich.",
       "invalid_service_discovery": "Die App hat ungültige Verbindungsdaten gemeldet.",
       "service_identity_changed": "Die erkannte Wallbox hat sich geändert. Starte die Einrichtung erneut.",
-      "service_discovery_updated": "Die vorhandene Integration verwendet jetzt die erkannte App-Verbindung."
+      "service_discovery_updated": "Die vorhandene Integration verwendet jetzt die erkannte App-Verbindung.",
+      "multiple_service_apps": "Mehrere Modbus-Apps wurden gefunden. Wähle die passende erkannte App unter Geräte & Dienste."
     },
     "error": {
       "cannot_connect": "Der serielle Port konnte nicht geöffnet werden oder die Wallbox hat nicht geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -), den Port und die Busparameter.",
       "invalid_response": "Das Gerät hat geantwortet, aber keine Modbus-Layout-Version gemeldet. Prüfe die Geräteadresse und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen.",
       "not_found": "Auf diesem Port hat keine Wallbox geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -, GND verbunden) und ob DIP 4 und DIP 5 auf Bank S1 auf ON stehen und die Wallbox danach neu gestartet wurde.",
-      "cannot_connect_service": "Dienst nicht erreichbar, nicht bereit oder Zugriffstoken ungültig. Prüfe Adresse, Token und Dienstprotokoll.",
-      "service_discovery_requires_serial": "Die App hat noch keine Seriennummer gelesen. Prüfe die Verbindung zur Wallbox und versuche es erneut."
+      "cannot_connect_service": "Die App ist über das Netzwerk nicht erreichbar. Prüfe, ob sie läuft und auf Port 8765 Verbindungen annimmt.",
+      "service_discovery_requires_serial": "Die App hat noch keine Seriennummer gelesen. Prüfe die Verbindung zur Wallbox und versuche es erneut.",
+      "service_auth_failed": "Die App hat die Anmeldung abgelehnt. Bestätige erneut, um die aktuellen Zugangsdaten von Supervisor zu übernehmen. Prüfe bei einem separat betriebenen Dienst den konfigurierten Token.",
+      "service_not_ready": "Die Anmeldung an der App funktioniert, aber die Wallbox-Daten sind noch nicht verfügbar. Prüfe das App-Protokoll und versuche es erneut.",
+      "service_invalid_response": "Die App antwortet, aber ihre Daten werden nicht akzeptiert. Aktualisiere Integration und App auf dieselbe Version. Das Home-Assistant-Protokoll nennt den betroffenen Datenbereich."
     },
     "progress": {
       "searching": "Der Bus wird nach einer Wallbox abgesucht: bis zu {candidates} Kombinationen, etwa {minutes} Minuten zuzüglich Verbindungsprüfungen. Es werden keine Register geschrieben. Beim Neukonfigurieren pausieren die bisherige Verbindung und der Heartbeat; das konfigurierte Ausfallverhalten der Wallbox greift."
@@ -76,7 +80,7 @@
       },
       "server": {
         "title": "Modbus-Dienst verbinden",
-        "description": "Starte zuerst den unabhängigen Modbus-Dienst. Er hält den Heartbeat und deinen Ladezustand auch während eines HA-Neustarts. Beim Wechsel von direktem Modbus die bisherige Integration zuerst deaktivieren, damit der serielle Port frei ist.",
+        "description": "Supervisor-Apps werden automatisch verbunden, ohne URL oder Token einzugeben. Dieses Formular ist für einen separat betriebenen Dienst. Beim Wechsel von direktem Modbus den bisherigen Integrationseintrag zuerst deaktivieren, damit der serielle Port frei ist.",
         "data": {
           "server_url": "Dienst-URL",
           "server_token": "Zugriffstoken"

@@ -7,14 +7,18 @@
       "service_migration_requires_serial": "The wallbox needs a readable serial number to match the existing device during migration.",
       "invalid_service_discovery": "The app reported invalid connection details.",
       "service_identity_changed": "The discovered wallbox changed. Start setup again.",
-      "service_discovery_updated": "The existing integration now uses the discovered app connection."
+      "service_discovery_updated": "The existing integration now uses the discovered app connection.",
+      "multiple_service_apps": "Multiple Modbus apps were found. Select the matching discovered app under Devices & services."
     },
     "error": {
       "cannot_connect": "Could not open the serial port or the wallbox did not answer. Check the cabling (Modbus A is +, B is -), the port and the bus parameters.",
       "invalid_response": "The device answered but did not report a Modbus layout version. Check the device address and whether DIP 4 and DIP 5 on bank S1 are on.",
       "not_found": "No wallbox answered on this port. Check the wiring (Modbus A is +, B is -, GND connected) and that DIP 4 and DIP 5 on bank S1 are on, with the wallbox restarted afterwards.",
-      "cannot_connect_service": "The service is unreachable, not ready or the token is invalid. Check the address, token and service logs.",
-      "service_discovery_requires_serial": "The app has not read a serial number yet. Check its wallbox connection and try again."
+      "cannot_connect_service": "The app cannot be reached over the network. Check that it is running and accepting connections on port 8765.",
+      "service_discovery_requires_serial": "The app has not read a serial number yet. Check its wallbox connection and try again.",
+      "service_auth_failed": "The app rejected authentication. Confirm again to retrieve its current credentials from Supervisor. For a separately hosted service, check the configured token.",
+      "service_not_ready": "Authentication to the app succeeded, but wallbox data is not available yet. Check the app log and try again.",
+      "service_invalid_response": "The app responds, but its data was not accepted. Update the integration and app to the same version. The Home Assistant log identifies the affected data section."
     },
     "progress": {
       "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes plus connection checks. No registers are written. During reconfiguration, the existing connection and heartbeat are paused; the wallbox's configured fallback applies."
@@ -76,7 +80,7 @@
       },
       "server": {
         "title": "Connect to the Modbus service",
-        "description": "Start the independent Modbus service first. It maintains the heartbeat and charging state while Home Assistant restarts. When migrating from direct Modbus, disable the existing integration first to release the serial port.",
+        "description": "Supervisor apps connect automatically without entering a URL or token. This form is for a separately hosted service. When migrating from direct Modbus, disable the previous integration entry first to release the serial port.",
         "data": {
           "server_url": "Service URL",
           "server_token": "Access token"

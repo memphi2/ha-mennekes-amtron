@@ -1,6 +1,6 @@
 # Independent Modbus service
 
-**0.5.0b2 is a beta for installation and hardware testing.** The integration
+**0.5.0b3 is a beta for installation and hardware testing.** The integration
 and service use the same version. Existing stable installations keep direct
 serial mode until you explicitly switch them to the service.
 
@@ -20,7 +20,7 @@ heartbeat. The wallbox's configured fallback applies in that case. See
 
 ## Install the beta on Home Assistant OS
 
-Install the **0.5.0b2** integration release first. On HA 2026.11+, enable the
+Install the **0.5.0b3** integration release first. On HA 2026.11+, enable the
 repository's **Pre-release** switch in the Marketplace; on HA 2026.9/2026.10,
 enable beta releases in HACS. The service is an additional HA app installed
 through Supervisor. HACS and the Marketplace install only the integration.
@@ -65,6 +65,15 @@ address and token; there is no service URL to type. Discovery is restored after
 HA Core restarts. If the wallbox is not ready yet, check the app log and retry
 the discovery confirmation. Standalone Docker/Python services still use manual
 URL and token setup.
+
+Selecting **Add integration → Mennekes Amtron RTU → Connect to the Modbus service**
+also looks up the running Supervisor app before showing a manual form. If more
+than one app is announced, use the matching discovery card. Setup distinguishes
+an unreachable API, rejected authentication, unavailable wallbox data and an
+invalid response. Confirming again retrieves the current credentials directly
+from Supervisor; an app restart is not needed to refresh a stale setup flow.
+Invalid responses name the affected data section in
+the HA log without printing tokens or response contents.
 
 The integration's service options control only HA's access and refresh interval.
 Read-only there disables HA commands while the service keeps its heartbeat and
@@ -155,6 +164,13 @@ check the wallbox's fallback behavior.
 
 ## State, diagnostics and failures
 
+The integration's diagnostics download fetches the app's bounded
+`write_transactions` history on demand. It records failed writes and the next
+confirmation per affected register, including time waiting for the bus and
+send/receive callback timing. It remains in RAM only, resets when the app
+restarts, and adds no Recorder entries or regular polling traffic. See
+[isolated heartbeat timeouts](troubleshooting.md#an-occasional-no-response-received-after-0-retries).
+
 The app log reports process start, accepted bus settings, API readiness, serial
 connection, heartbeat start/stop and clean shutdown. Heartbeat acknowledgement
 and connection failures are logged on state changes, not on every beat or poll.
@@ -168,6 +184,11 @@ An unexpected worker exit is reported and closes the serial connection; a fatal
 process failure reports its error class and errno. Supervisor's Watchdog can
 restart the app after a process failure, but repeated failures need their logged
 cause corrected.
+
+The heartbeat writer is supervised separately from polling. If it unexpectedly
+exits, the service closes down so Watchdog can restart it; a working API can no
+longer conceal a permanently stopped heartbeat. A normal missing response is
+retried by the heartbeat task and does not trigger this process restart.
 
 Only pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. The file is atomically replaced

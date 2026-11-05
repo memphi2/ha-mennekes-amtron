@@ -3,10 +3,20 @@
 The diagnostics download includes `runtime_events`, a passive history of the
 last 40 connection transitions, heartbeat failures/recoveries, late heartbeats,
 write rejections/cooldowns and error-recovery attempts. Times are seconds since
-the entry was loaded. Events contain predefined names and optional register
+the entry was loaded, or since service startup in service mode. Service events
+are fetched from the app only when downloading diagnostics. Events contain predefined names and optional register
 addresses, never raw error text, serial paths, serial numbers or register values.
 The history is kept only in memory and resets on reload/restart. It adds no
 entities, Recorder rows, polling, file writes or background tasks.
+
+`write_transactions` adds the last 20 failed writes and the first subsequent
+confirmation for each affected register. It separates time waiting for the bus
+(`queue_wait_ms`) from the transaction (`transaction_ms`) and records send/receive
+callback counts and timing. Ordinary successful writes add no entries. No packet
+contents, write values or arbitrary exception messages are stored. In service
+mode, this history is fetched from the app only when downloading diagnostics;
+it is not added to regular polling responses. Update the app and integration
+together to make these diagnostics available.
 
 For downloading, updating or removing files, start with
 [Installation and updates](installation.md). Wallbox communication itself is
@@ -93,6 +103,27 @@ Diagnostics distinguish **late** heartbeat attempts from **failed** writes.
 A failure can also mean a lost response; it does not prove whether the wallbox
 received the request. Logs and counters help narrow the cause but do not by
 themselves identify a defective cable.
+
+### An occasional “No response received after 0 retries”
+
+For a request ending in `32 06 0d 00 55 aa 31 8a`, the missing response is the
+acknowledgement for a heartbeat to wallbox address 50. It does not prove that the
+wallbox missed the write. If operation continued normally, check whether the
+next heartbeat was confirmed before changing bus settings.
+
+The library's zero write retries are intentional: repeating an unconfirmed
+control command could apply it twice. Heartbeat retries are handled separately
+at a shorter interval. The empty `extra data:` text in the library log is a
+normal field, not evidence of damaged packets.
+
+After another occurrence, download diagnostics before restarting the app or
+reloading the integration. A high `queue_wait_ms` indicates waiting inside our
+client; `tx_packets: 1` with `rx_callbacks: 0` indicates that no receive callback
+was observed during that write. Received bytes do not necessarily form a valid
+response. These timings are measured in software, not on the physical wire;
+they cannot alone distinguish a delayed event loop, USB/RS-485 trouble or a
+slow wallbox. `io_error` identifies a library I/O error, not a proven cause.
+The next `recovered` entry confirms a successful write to the same register.
 
 Configure an intentional [energy-manager fallback](safety.md#the-heartbeat-and-what-happens-without-it)
 with the manufacturer's tool. The integration raises a repair issue when

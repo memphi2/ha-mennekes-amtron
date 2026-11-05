@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 from collections import deque
 from collections.abc import Callable
@@ -23,6 +24,36 @@ class EventType(StrEnum):
     WRITE_RATE_LIMITED = "write_rate_limited"
     RECOVERY_STARTED = "recovery_started"
     RECOVERY_COMPLETED = "recovery_completed"
+
+
+def sanitize_events(value: object) -> list[dict[str, str | float | int | None]] | None:
+    """Copy only bounded, predefined event metadata from a remote service."""
+
+    if not isinstance(value, list) or len(value) > MAX_EVENTS:
+        return None
+    events: list[dict[str, str | float | int | None]] = []
+    names = {event.value for event in EventType}
+    for row in value:
+        if not isinstance(row, dict) or row.keys() != {
+            "seconds_since_load", "event", "register_address",
+        }:
+            return None
+        seconds, name, address = (
+            row["seconds_since_load"], row["event"], row["register_address"]
+        )
+        if not (
+            (type(seconds) is int and seconds >= 0)
+            or (type(seconds) is float and math.isfinite(seconds) and seconds >= 0)
+        ):
+            return None
+        if type(name) is not str or name not in names:
+            return None
+        if address is not None and (
+            type(address) is not int or not 0 <= address <= 0xFFFF
+        ):
+            return None
+        events.append(dict(row))
+    return events
 
 
 @dataclass(frozen=True, slots=True)

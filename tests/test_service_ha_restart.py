@@ -113,6 +113,7 @@ def test_real_ha_restart_retains_server_state_without_replaying_commands(
                             "transport": "service",
                             "connected": True,
                         }
+                        assert dump["write_transactions"] == service.client.write_trace.snapshot()
                         assert TOKEN not in repr(dump)
                         assert str(server.make_url("/")) not in repr(dump)
                         assert service.identity.serial_number not in repr(dump)

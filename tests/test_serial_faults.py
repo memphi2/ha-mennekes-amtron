@@ -16,6 +16,8 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronProtocolError,
     AmtronRateLimitedError,
 )
+from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
+from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
 
 
 def frame(payload):
@@ -30,6 +32,44 @@ def frame(payload):
 
 def test_crc_reference_vector():
     assert frame(bytes.fromhex("01 03 00 00 00 0A")) == bytes.fromhex("01 03 00 00 00 0A C5 CD")
+
+
+def test_lost_heartbeat_acknowledgement_is_recorded_then_recovers(caplog):
+    def reply(request, number):
+        return [] if number == 2 else [(0, request)]
+
+    async def run():
+        async with serial_peer(reply) as (port, requests):
+            client = MennekesModbusClient(SerialConfig(port=port, timeout=0.05))
+            diagnostics = WriteDiagnostics()
+            heartbeat = HeartbeatTask(client, diagnostics)
+            try:
+                await client.async_connect()
+                assert await heartbeat.async_beat_once()
+                assert client.write_trace.snapshot() == []
+                assert not await heartbeat.async_beat_once()
+                assert await heartbeat.async_beat_once()
+                assert len(requests) == 3  # No hidden write retry.
+                rows = client.write_trace.snapshot()
+                failed, recovered = rows
+                assert failed["register_address"] == 0x0D00
+                assert failed["outcome"] == "io_error"
+                assert failed["tx_packets"] == 1
+                assert failed["rx_callbacks"] == 0
+                assert failed["first_tx_ms_from_start"] is not None
+                assert failed["last_rx_ms_from_start"] is None
+                assert failed["transaction_ms"] >= 40
+                assert recovered["outcome"] == "recovered"
+                assert recovered["rx_callbacks"] >= 1
+                assert diagnostics.heartbeats_sent == 2
+                assert diagnostics.heartbeats_failed == 1
+                assert port not in repr(rows)
+                assert "55aa" not in repr(rows).lower()
+                assert "No response received after 0 retries" in caplog.text
+            finally:
+                await client.async_close()
+
+    asyncio.run(asyncio.wait_for(run(), 10))
 
 
 @asynccontextmanager
@@ -138,6 +178,10 @@ def test_mismatched_write_acknowledgement_cannot_confirm_or_unlock_a_write(paylo
                 await client.async_connect()
                 with pytest.raises(AmtronProtocolError):
                     await client.async_write_register(R.CHARGING_CURRENT_EMS, 8)
+                failed, = client.write_trace.snapshot()
+                assert failed["outcome"] == "protocol_error"
+                assert failed["tx_packets"] == 1
+                assert failed["rx_callbacks"] >= 1
                 with pytest.raises(AmtronRateLimitedError):
                     await client.async_write_register(R.CHARGING_CURRENT_EMS, 10)
                 assert len(requests) == 1

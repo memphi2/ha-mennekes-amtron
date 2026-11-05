@@ -79,7 +79,7 @@ entry. For polling intervals and control mode, use its options.
 
 ## Beta releases
 
-**0.5.0b2** adds the optional independent Modbus service. On HA 2026.11+,
+**0.5.0b3** adds the optional independent Modbus service. On HA 2026.11+,
 enable **Pre-release** for this repository in the Marketplace. On older supported
 HA versions, enable beta releases in HACS. Install the matching integration
 and follow the [service installation and handover](modbus-service.md).

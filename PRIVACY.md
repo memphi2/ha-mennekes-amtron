@@ -44,6 +44,12 @@ It includes the bus parameters, the device capabilities, the write counters
 and a raw register image excluding identifying fields. Known identifiers are
 also redacted when they appear inside transport error messages.
 
+A bounded in-memory history retains at most 20 failed write attempts and
+subsequent confirmations, with register addresses, software timings, packet
+callback counts and predefined outcomes. It stores no packet contents or write
+values and creates no Recorder rows or files. The service exposes this history
+only through its authenticated diagnostics endpoint, requested on demand.
+
 ## Charging data
 
 Charging sessions say when somebody was at home and when a vehicle was

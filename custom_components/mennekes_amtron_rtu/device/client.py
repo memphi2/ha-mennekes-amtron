@@ -18,6 +18,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 
 from pymodbus import FramerType
 from pymodbus.client import AsyncModbusSerialClient
@@ -44,6 +45,7 @@ from .register_blocks import RegisterBlock
 from .registers import RegisterSpec
 from .transport import ModbusTransport
 from .write_state import WriteState
+from .write_trace import WriteTrace
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,7 +71,11 @@ class SerialConfig:
     retries: int = DEFAULT_RETRIES
 
 
-def create_serial_client(config: SerialConfig) -> AsyncModbusSerialClient:
+def create_serial_client(
+    config: SerialConfig,
+    *,
+    trace_packet: Callable[[bool, bytes], bytes] | None = None,
+) -> AsyncModbusSerialClient:
     """Create the pymodbus client for a serial configuration."""
 
     return AsyncModbusSerialClient(
@@ -84,6 +90,7 @@ def create_serial_client(config: SerialConfig) -> AsyncModbusSerialClient:
         # retries would resend it after one second, bypassing our write floor.
         # Only reads may retry, explicitly in _client_read.read_words.
         retries=0,
+        trace_packet=trace_packet,
     )
 
 
@@ -99,8 +106,14 @@ class MennekesModbusClient:
         write_state: WriteState | None = None,
     ) -> None:
         self._config = config
-        self._client_factory = client_factory
         self._monotonic = monotonic
+        self.write_trace = WriteTrace(
+            clock=monotonic, packet_trace=client_factory is create_serial_client
+        )
+        self._client_factory: ClientFactory = (
+            partial(create_serial_client, trace_packet=self.write_trace.packet)
+            if client_factory is create_serial_client else client_factory
+        )
         self._client: ModbusTransport | None = None
         self._lock = asyncio.Lock()
         # Bulk users queue behind this gate before they reach the bus, so at
@@ -226,11 +239,12 @@ class MennekesModbusClient:
         device enforces by faulting.
         """
 
+        queued = self._monotonic()
         if priority:
-            await self._async_write_locked(spec, value, min_interval=min_interval)
+            await self._async_write_locked(spec, value, min_interval=min_interval, queued=queued)
             return
         async with self._queue:
-            await self._async_write_locked(spec, value, min_interval=min_interval)
+            await self._async_write_locked(spec, value, min_interval=min_interval, queued=queued)
 
     def check_write_interval(
         self, spec: RegisterSpec, *, min_interval: float = 0.0
@@ -255,11 +269,16 @@ class MennekesModbusClient:
         value: float,
         *,
         min_interval: float,
+        queued: float,
     ) -> None:
         async with self._lock:
             self.check_write_interval(spec, min_interval=min_interval)
             client = self._require_client()
             rejected = False
+            error: BaseException | None = None
+            self.write_trace.begin(
+                address=spec.address, queued=queued, started=self._monotonic()
+            )
             try:
                 await _client_write.write_register(
                     client,
@@ -267,14 +286,17 @@ class MennekesModbusClient:
                     value=value,
                     device_id=self._config.device_id,
                 )
-            except (AmtronWriteRejectedError, AmtronIllegalAddressError):
+            except (Exception, asyncio.CancelledError) as err:
+                error = err
                 # A definite rejection did not change the register. A missing
                 # reply or transport failure may follow an applied write, so
                 # those retain the interval, as does cancellation.
-                self._rate_limiter.forget(spec.key)
-                rejected = True
+                if isinstance(err, (AmtronWriteRejectedError, AmtronIllegalAddressError)):
+                    self._rate_limiter.forget(spec.key)
+                    rejected = True
                 raise
             finally:
+                self.write_trace.finish(error=error, connected=self.connected)
                 if not rejected:
                     if spec.key == "charging_current_ems":
                         self.write_state.current_write_generation += 1

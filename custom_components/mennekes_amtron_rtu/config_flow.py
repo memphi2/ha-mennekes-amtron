@@ -63,6 +63,8 @@ from .device.service_discovery import APP_HOSTNAME
 from .entry_types import MennekesAmtronConfigEntry
 from .options_flow import MennekesAmtronOptionsFlow
 from .remote import CONF_SERVER_TOKEN, CONF_SERVER_URL, RemoteClient, server_url
+from .remote_errors import ServiceConnectionError
+from .supervisor_discovery import async_app_discoveries
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,6 +76,22 @@ BUS_FIELDS = (
     CONF_PARITY,
     CONF_STOPBITS,
 )
+
+
+def _discovered_connection(info: HassioServiceInfo) -> dict[str, Any]:
+    """Validate every announcement, including one refreshed during a retry."""
+    hostname = info.slug.replace("_", "-")
+    if (
+        not APP_HOSTNAME.fullmatch(hostname)
+        or info.config.get("host") != hostname
+        or type(info.config.get("port")) is not int
+        or info.config["port"] != 8765
+    ):
+        raise ValueError("invalid app discovery")
+    return {
+        CONF_SERVER_URL: f"http://{hostname}:8765",
+        CONF_SERVER_TOKEN: validate_token(info.config.get("token")),
+    }
 
 
 class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -117,6 +135,12 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Probe the service without sending any charging commands."""
+        if user_input is None:
+            apps = await async_app_discoveries(self.hass)
+            if len(apps) == 1:
+                return await self.async_step_hassio(apps[0])
+            if len(apps) > 1:
+                return self.async_abort(reason="multiple_service_apps")
         errors: dict[str, str] = {}
         reconfigure = self.context.get("source") == "reconfigure"
         entry = self._get_reconfigure_entry() if reconfigure else None
@@ -158,6 +182,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                 finally:
                     await client.async_close()
+            except ServiceConnectionError as err:
+                _LOGGER.warning("Modbus service setup: %s", err)
+                errors["base"] = err.reason
             except ValueError, AmtronBusError:
                 errors["base"] = "cannot_connect_service"
         defaults = user_input or (dict(entry.data) if entry is not None else {})
@@ -171,22 +198,11 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self, discovery_info: HassioServiceInfo
     ) -> ConfigFlowResult:
         """Use Supervisor's authenticated app identity, never a supplied URL."""
-        hostname = discovery_info.slug.replace("_", "-")
         try:
-            if (
-                not APP_HOSTNAME.fullmatch(hostname)
-                or discovery_info.config.get("host") != hostname
-                or type(discovery_info.config.get("port")) is not int
-                or discovery_info.config["port"] != 8765
-            ):
-                raise ValueError("invalid app discovery")
-            token = validate_token(discovery_info.config.get("token"))
+            self._discovered_service = _discovered_connection(discovery_info)
         except ValueError:
             return self.async_abort(reason="invalid_service_discovery")
-        self._discovered_service = {
-            CONF_SERVER_URL: f"http://{hostname}:8765",
-            CONF_SERVER_TOKEN: token,
-        }
+        hostname = discovery_info.slug.replace("_", "-")
         # A new app announcement may replace credentials in an unfinished
         # discovery. Keep one prompt and discard the stale private payload.
         for flow in self._async_in_progress():
@@ -207,6 +223,17 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Confirm a new connection or migration without copying URL or token."""
+        if user_input is not None:
+            app = (self.context.get("title_placeholders") or {}).get("app")
+            # Supervisor deduplicates identical announcements. Restarting the
+            # app does not necessarily replace a stale pending HA flow, so
+            # refresh its private credentials from Supervisor on each retry.
+            matches = [item for item in await async_app_discoveries(self.hass) if item.slug == app]
+            if len(matches) == 1:
+                try:
+                    self._discovered_service = _discovered_connection(matches[0])
+                except ValueError:
+                    return self.async_abort(reason="invalid_service_discovery")
         data = self._discovered_service
         if data is None:
             return self.async_abort(reason="invalid_service_discovery")
@@ -229,6 +256,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 self._discovered_serial = serial
                 entry = await self.async_set_unique_id(serial)
+                if self.context.get("source") == "reconfigure":
+                    self._abort_if_unique_id_mismatch()
                 if entry is not None and entry.source == "ignore":
                     return self.async_abort(reason="already_configured")
                 complete = {**data, CONF_SERIAL_NUMBER: serial}
@@ -253,6 +282,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                             )
                         },
                     )
+        except ServiceConnectionError as err:
+            _LOGGER.warning("Discovered Modbus app: %s", err)
+            errors["base"] = err.reason
         except AmtronBusError:
             errors["base"] = "cannot_connect_service"
         finally:

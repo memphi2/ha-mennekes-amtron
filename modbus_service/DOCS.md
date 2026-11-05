@@ -7,7 +7,7 @@ heartbeat and use the wallbox's configured fallback.
 
 ## First setup
 
-Install the matching **0.5.0b2** integration first. Enable **Pre-release** for
+Install the matching **0.5.0b3** integration first. Enable **Pre-release** for
 its Marketplace repository on HA 2026.11+, or beta releases in HACS on older
 supported versions. The integration and this app are installed separately.
 Supervisor may show **Building** while it creates the local app image from the
@@ -29,6 +29,11 @@ verified download. No Python source is compiled or dependencies installed locall
    **Modbus master** and its HA current cap; both permissions must allow writes.
 7. Reapply and verify the noted pause, current and charging-release settings
    before reconnecting the vehicle. Test a Home Assistant Core restart.
+
+For intermittent write or heartbeat faults, download the integration diagnostics
+before restarting the app. The app keeps the last 20 failed write/recovery
+records in RAM, containing timings and callback counts without packet contents.
+This history adds no Recorder rows or persistent logs.
 
 Only this app may own the serial adapter. The default API port is available
 inside the Supervisor network; there is no need to publish a host port.
@@ -61,7 +66,7 @@ records health transitions rather than every heartbeat.
 
 ## Beta channel
 
-Version 0.5.0b2 is for hardware testing. Test installation, deliberate pause,
+Version 0.5.0b3 is for hardware testing. Test installation, deliberate pause,
 HA restart, service restart and reconnection before relying on it unattended.
 Clearing error 200 while paused still needs firmware confirmation.
 
@@ -70,4 +75,4 @@ Supervisor treats these as different apps. When moving between channels,
 copy the options, stop the old app before starting the other one, and confirm the
 newly discovered app. Keep the original app and its backup until migration is verified.
 
-[Full setup and migration guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0b2/docs/modbus-service.md)
+[Full setup and migration guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0b3/docs/modbus-service.md)

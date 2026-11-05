@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import gc
+import weakref
 
 import pytest
 from pymodbus.exceptions import ModbusIOException
@@ -22,6 +24,55 @@ from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTE
 from tests.fakes import FakeModbusClient, device_bank
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)
+
+
+def test_default_client_factory_does_not_retain_its_owner():
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        client = MennekesModbusClient(CONFIG)
+        reference = weakref.ref(client)
+        del client
+        assert reference() is None
+    finally:
+        if enabled:
+            gc.enable()
+
+
+def test_failed_write_separates_bus_wait_from_transaction_time():
+    async def run():
+        clock = [0.0]
+        reading, release = asyncio.Event(), asyncio.Event()
+
+        class BusyTransport(FakeModbusClient):
+            async def read_holding_registers(self, address, *, count, device_id):
+                reading.set()
+                await release.wait()
+                clock[0] = 2.0
+                return await super().read_holding_registers(address, count=count, device_id=device_id)
+
+            async def write_register(self, address, value, *, device_id):
+                clock[0] = 3.0
+                raise ModbusIOException("lost reply containing secret-value")
+
+        client = _client(BusyTransport(device_bank()), clock)
+        await client.async_connect()
+        read = asyncio.create_task(client.async_read_register(R.EVSE_STATE))
+        await reading.wait()
+        write = asyncio.create_task(client.async_write_register(R.HEARTBEAT, 0x55AA, priority=True))
+        await asyncio.sleep(0)
+        release.set()
+        await read
+        with pytest.raises(AmtronBusError):
+            await write
+        row, = client.write_trace.snapshot()
+        assert row["queue_wait_ms"] == 2000
+        assert row["transaction_ms"] == 1000
+        assert row["tx_packets"] is None  # Injected transport has no packet callback.
+        assert "secret-value" not in repr(row)
+        await client.async_close()
+
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize("outcome", ["success", "uncertain", "cancelled", "rejected"])
