@@ -113,7 +113,7 @@ settings as in the first setup before reconnecting the vehicle.
 | Symptom | What to check |
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
-| Not ready / token rejected | Check the app log and retry discovery confirmation; HA retrieves the current credentials. |
+| Not ready / token rejected | Check the app log. During setup, retry discovery confirmation. For an existing connection, open its authentication prompt in Devices & services and confirm; HA retrieves fresh credentials without asking for a token. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0/docs/troubleshooting.md#renew-service-access). |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the serial connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
 | Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. |

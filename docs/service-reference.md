@@ -49,6 +49,12 @@ and credential to HA through authenticated local discovery; there is no manual
 app-token option or broadcast credential. Discovery is restored after Core
 restarts. On confirmation or retry, HA retrieves the current credentials directly
 from Supervisor, so a pending flow does not need an app restart to refresh them.
+An authentication failure on an existing entry opens the
+[access-renewal flow](troubleshooting.md#renew-service-access). It retrieves
+fresh credentials for the same app or asks for a new token for a standalone
+service, checks the entry's existing identity binding and reloads the entry.
+Serial-bound entries require the same serial number; standalone entries added
+without a readable serial number retain their URL binding.
 When upgrading from beta 1, update the integration first: later apps replace the
 old manually configured credential and HA learns the replacement automatically.
 

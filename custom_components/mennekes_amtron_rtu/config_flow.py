@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import math
+from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlsplit
 
 from homeassistant.config_entries import (
     ConfigEntry,
@@ -117,6 +119,89 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         return await self._async_serial_step("serial", user_input)
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> ConfigFlowResult:
+        """Replace failed service credentials without recreating the device."""
+        entry = self._get_reauth_entry()
+        if CONF_SERVER_URL not in entry.data:
+            return self.async_abort(reason="reauth_not_supported")
+        parts = urlsplit(str(entry.data[CONF_SERVER_URL]))
+        if (
+            parts.scheme == "http"
+            and parts.port == 8765
+            and APP_HOSTNAME.fullmatch(parts.hostname or "")
+        ):
+            return await self.async_step_reauth_app()
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask only for the new token of a separately hosted service."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                token = validate_token(user_input.get(CONF_SERVER_TOKEN))
+                return await self._async_reauthenticate(token)
+            except ServiceConnectionError as err:
+                errors["base"] = err.reason
+            except ValueError:
+                errors["base"] = "service_auth_failed"
+            except AmtronBusError:
+                errors["base"] = "cannot_connect_service"
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=service_schema(credentials_only=True),
+            errors=errors,
+        )
+
+    async def async_step_reauth_app(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Retrieve credentials only from the same trusted Supervisor app."""
+        entry = self._get_reauth_entry()
+        errors = {"base": "service_discovery_unavailable"}
+        matching: list[dict[str, Any]] = []
+        for info in await async_app_discoveries(self.hass):
+            try:
+                data = _discovered_connection(info)
+            except ValueError:
+                continue
+            if data[CONF_SERVER_URL] == entry.data[CONF_SERVER_URL]:
+                matching.append(data)
+        if len(matching) == 1:
+            try:
+                return await self._async_reauthenticate(matching[0][CONF_SERVER_TOKEN])
+            except ServiceConnectionError as err:
+                errors["base"] = err.reason
+            except AmtronBusError:
+                errors["base"] = "cannot_connect_service"
+        return self.async_show_form(step_id="reauth_app", errors=errors)
+
+    async def _async_reauthenticate(self, token: str) -> ConfigFlowResult:
+        """Read identity at the existing endpoint before persisting a token."""
+        entry = self._get_reauth_entry()
+        url = str(entry.data[CONF_SERVER_URL])
+        client = RemoteClient(async_get_clientsession(self.hass), url, token)
+        try:
+            await client.async_connect()
+            unique_id = client.identity.serial_number or f"{DOMAIN}_{url}"
+            await self.async_set_unique_id(unique_id)
+            self._abort_if_unique_id_mismatch()
+        finally:
+            await client.async_close()
+        updates = {CONF_SERVER_TOKEN: token}
+        if entry.update_listeners:
+            changed = entry.data.get(CONF_SERVER_TOKEN) != token
+            result = self.async_update_and_abort(entry, data_updates=updates)
+            if not changed:
+                # A recovered endpoint can accept the original token again.
+                # No data change means the update listener will not reload it.
+                self.hass.config_entries.async_schedule_reload(entry.entry_id)
+            return result
+        return self.async_update_reload_and_abort(entry, data_updates=updates)
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None

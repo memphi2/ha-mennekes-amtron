@@ -12,12 +12,14 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .control import AmtronControl, ControlOptions, ha_command
 from .coordinator import MennekesAmtronCoordinator
 from .device.client import MennekesModbusClient, SerialConfig
 from .device.client_errors import AmtronConnectionError, AmtronWriteRejectedError
+from .device.const import DOMAIN
 from .device.data import DeviceIdentity, WallboxData, WriteDiagnostics
 from .device.decode import RegisterValue
 from .device.enums import RequestedPhases, SolarChargingMode
@@ -62,6 +64,7 @@ class RemoteClient(MennekesModbusClient):
         self.snapshot: dict[str, Any] = {}
         self.identity = DeviceIdentity()
         self.on_update: Callable[[], None] | None = None
+        self.on_auth_failed: Callable[[], None] | None = None
         self._snapshot_lock = asyncio.Lock()
 
     @property
@@ -73,6 +76,7 @@ class RemoteClient(MennekesModbusClient):
 
     async def async_close(self) -> None:
         self._connected = False
+        self.on_auth_failed = None
 
     async def request(
         self, method: str, path: str, payload: dict[str, Any] | None = None,
@@ -126,11 +130,17 @@ class RemoteClient(MennekesModbusClient):
                     raise AmtronConnectionError("service request failed")
                 return data
         except (ClientError, TimeoutError, ValueError, AmtronConnectionError) as err:
-            if update_connection:
+            authentication_failed = (
+                isinstance(err, ServiceConnectionError)
+                and err.reason == "service_auth_failed"
+            )
+            if update_connection or authentication_failed:
                 self._connected = False
                 if self.on_update is not None:
                     self.on_update()
             if isinstance(err, ServiceConnectionError):
+                if authentication_failed and self.on_auth_failed is not None:
+                    self.on_auth_failed()
                 raise
             raise AmtronConnectionError(
                 "cannot communicate with the Modbus service"
@@ -293,6 +303,8 @@ class RemoteClient(MennekesModbusClient):
                     )
                 )
         except AmtronConnectionError as err:
+            if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
+                raise DeviceError("service_auth_failed") from err
             raise DeviceError("service_unavailable") from err
 
     async def async_read_register(self, spec: RegisterSpec) -> RegisterValue:
@@ -370,6 +382,10 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
         try:
             return await self._client.update()
         except AmtronConnectionError as err:
+            if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
+                raise ConfigEntryAuthFailed(
+                    translation_domain=DOMAIN, translation_key="service_auth_failed"
+                ) from err
             raise UpdateFailed(str(err)) from err
 
 
