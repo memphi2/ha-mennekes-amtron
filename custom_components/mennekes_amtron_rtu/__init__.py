@@ -270,18 +270,6 @@ async def async_remove_entry(
             ir.async_delete_issue(hass, domain, issue_id)
 
 
-async def async_migrate_entry(
-    hass: HomeAssistant, entry: MennekesAmtronConfigEntry
-) -> bool:
-    """Migrate an older config entry.
-
-    Version 1 is the first published schema, so there is nothing to migrate
-    yet. A future version lands here instead of in ``async_setup_entry``.
-    """
-
-    return entry.version == 1
-
-
 def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:
     """Return the platforms this entry exposes.
 

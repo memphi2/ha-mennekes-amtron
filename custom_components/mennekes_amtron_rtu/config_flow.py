@@ -72,14 +72,6 @@ from .supervisor_discovery import async_app_discoveries
 
 _LOGGER = logging.getLogger(__name__)
 
-BUS_FIELDS = (
-    CONF_PORT,
-    CONF_DEVICE_ID,
-    CONF_BAUDRATE,
-    CONF_BYTESIZE,
-    CONF_PARITY,
-    CONF_STOPBITS,
-)
 RECONFIGURE_STEPS = ("reconfigure", "serial_reconfigure", "network_reconfigure")
 
 

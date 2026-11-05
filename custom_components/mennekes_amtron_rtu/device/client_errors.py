@@ -12,7 +12,6 @@ from typing import Final
 ILLEGAL_FUNCTION: Final = 0x01
 ILLEGAL_DATA_ADDRESS: Final = 0x02
 ILLEGAL_DATA_VALUE: Final = 0x03
-SERVER_DEVICE_FAILURE: Final = 0x04
 
 
 class AmtronBusError(Exception):
