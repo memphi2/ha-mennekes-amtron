@@ -23,6 +23,7 @@ from .device.decode import RegisterValue
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
 from .device.heartbeat import HeartbeatTask
+from .device.identity import usable_max_evse_current
 from .device.register_blocks import REGISTER_BLOCKS
 from .device.registers import ERROR_CODE, RegisterSpec
 from .remote_errors import ServiceConnectionError
@@ -181,9 +182,16 @@ class RemoteClient(MennekesModbusClient):
             section = "identity.max_evse_current"
             if identity.max_evse_current is not None and (
                 type(identity.max_evse_current) not in (float, int)
-                or not 6 <= identity.max_evse_current <= 32
+                or (
+                    type(identity.max_evse_current) is float
+                    and not math.isfinite(identity.max_evse_current)
+                )
             ):
                 raise ValueError("invalid device current")
+            # Older service snapshots contain the raw optional register value.
+            # An unusable capability must not invalidate authenticated readings;
+            # command limits below remain mandatory and strictly validated.
+            identity.max_evse_current = usable_max_evse_current(identity.max_evse_current)
             section = "identity.phase_options_hw"
             if identity.phase_options_hw is not None and (
                 type(identity.phase_options_hw) is not int

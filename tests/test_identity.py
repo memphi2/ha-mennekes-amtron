@@ -16,7 +16,7 @@ from custom_components.mennekes_amtron_rtu.device.identity import (
     model_name,
 )
 from custom_components.mennekes_amtron_rtu.device.models import ARTICLE_MODELS
-from tests.fakes import FakeModbusClient, device_bank
+from tests.fakes import FakeModbusClient, device_bank, put
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)
 
@@ -106,3 +106,16 @@ def test_an_unreadable_maximum_current_is_absent() -> None:
     bank[R.MAX_EVSE_CURRENT.address + 1] = 0x0000
     identity = asyncio.run(_identity(FakeModbusClient(bank)))
     assert identity.max_evse_current is None
+
+
+@pytest.mark.parametrize(
+    ("reported", "expected"),
+    [(0, None), (5, None), (33, None), (63, None), (-1, None), (6, 6.0), (16, 16.0), (32, 32.0)],
+)
+def test_only_usable_reported_maximum_current_becomes_a_capability(reported, expected):
+    bank = device_bank()
+    put(bank, R.MAX_EVSE_CURRENT, reported)
+    transport = FakeModbusClient(bank)
+    identity = asyncio.run(_identity(transport))
+    assert identity.max_evse_current == expected
+    assert transport.writes == []

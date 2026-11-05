@@ -75,6 +75,10 @@ from Supervisor; an app restart is not needed to refresh a stale setup flow.
 Invalid responses name the affected data section in
 the HA log without printing tokens or response contents.
 
+An unusable optional maximum-current reading is treated as an unknown hardware
+capability rather than blocking setup. Its raw reading remains available for
+diagnosis. The app and integration still enforce their configured current caps.
+
 The integration's service options control only HA's access and refresh interval.
 Read-only there disables HA commands while the service keeps its heartbeat and
 charging state. Set Modbus polling/measurement cadence and the service's write

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Keep app setup available when the wallbox reports an unusable optional maximum
+  EVSE current. Treat that capability as unknown while retaining its raw reading;
+  configured command limits remain enforced. Accept these readings from already
+  running beta-3 apps without requiring an app restart.
+
 ## 0.5.0b3 — 2026-11-05
 
 - Refresh pending app-discovery credentials from Supervisor when confirming or
