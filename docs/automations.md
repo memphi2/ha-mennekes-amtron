@@ -5,8 +5,9 @@ downgrade notifications. They appear in Home Assistant
 after you add the wallbox and need no YAML editing.
 
 Use one control strategy at a time. A PV automation and a tariff schedule can
-otherwise undo each other's pause or current setting. Writes require **Modbus
-master** mode. Current changes have a five-second minimum interval; allow
+otherwise undo each other's pause or current setting. Enable writes with the
+app's **Read-only** switch off in service mode, or **Modbus master** in the
+integration options for direct serial mode. Current changes have a five-second minimum interval; allow
 more than five minutes between pause/resume and phase changes. Rejected mode
 changes are not retried automatically.
 
@@ -19,7 +20,8 @@ blueprint is allowed to turn it off again. Disable automatic resume if you
 want a manual pause to remain in effect.
 
 Missing power data does not automatically stop charging. The last current
-setting remains while the integration's heartbeat continues. These recipes
+setting remains while the active service or integration keeps its heartbeat
+running. These recipes
 are not house-connection overload protection. In particular, never turn an
 insufficient current budget into a 6 A request merely by clamping it upwards.
 The wallbox's static limit does not account for other household loads.
@@ -87,7 +89,8 @@ See [Phase switching](user-guide.md#phase-switching).
 
 ## Recovery and notifications
 
-Error 200 is recovered automatically in master mode. Disable any older
+Error 200 is recovered automatically when writes are enabled and the heartbeat
+is healthy. The service handles this independently of HA. Disable any older
 **Recover from a lost heartbeat** automation to avoid duplicate attempts.
 The blueprint remains available for existing installations. Its button action
 preserves a deliberate pause. If the error returns, investigate

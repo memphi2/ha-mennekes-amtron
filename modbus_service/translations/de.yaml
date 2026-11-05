@@ -13,7 +13,7 @@ configuration:
     description: In der Wallbox eingestellte Datenbits, Parität und Stoppbits.
   read_only:
     name: Nur lesen
-    description: Schaltet Steuerbefehle und den Heartbeat des Dienstes ab; Modbus-Leseanfragen bleiben aktiv.
+    description: Schaltet Steuerbefehle einschließlich der Home-Assistant-Steuerung und den Heartbeat des Dienstes ab; Modbus-Leseanfragen bleiben aktiv.
   current_cap:
     name: Stromobergrenze
     description: Höchster angeforderter EMS-Strom in Ampere. Bewusste Befehle mit 0 A heben die EMS-Begrenzung auf.

@@ -366,7 +366,7 @@
       "message": "This wallbox cannot switch between one and three phases. Dynamic phase switching needs an 11 kW device that reports phase option 2."
     },
     "read_only_mode": {
-      "message": "This wallbox is in read-only mode. For a service connection, disable Read-only in the app and apply the change. For a direct serial connection, select Modbus master in the integration options."
+      "message": "This wallbox is in read-only mode. For a service connection, disable Read-only in the app, save and restart the app. For a direct serial connection, select Modbus master in the integration options."
     },
     "restart_requires_idle": {
       "message": "The wallbox may only be restarted while it is idle. Unplug the vehicle first."
@@ -412,7 +412,7 @@
         "error": {
           "entry_unavailable": "The integration is not loaded. Restore its connection before retrying.",
           "different_error": "The wallbox reports a different error. Heartbeat recovery does not reset that error.",
-          "read_only": "Disable Read-only in the app and apply the change before requesting recovery. For a direct serial connection, enable Modbus master mode in the integration options instead.",
+          "read_only": "Disable Read-only in the app, save and restart the app before requesting recovery. For a direct serial connection, enable Modbus master mode in the integration options instead.",
           "write_rate_limited": "A recent command is still inside its minimum write interval. Wait briefly and try again.",
           "recovery_failed": "The recovery could not be confirmed. Check the connection and retry.",
           "still_active": "The recovery commands were sent, but the wallbox still reports an error. Wait for its status to update; check the connection if the error persists."
@@ -456,7 +456,7 @@
           "current_limit": "Additional cap for currents requested by Home Assistant. The service cap still applies. Explicitly selecting 0 A disables the EMS limit.",
           "scan_interval_seconds": "How often Home Assistant reads the service state. This changes neither Modbus measurement polling nor the heartbeat interval."
         },
-        "description": "The app's Read-only setting also controls write permission in Home Assistant. Disable it in the app and apply the change to enable controls. Control entities remain unavailable while the service is read-only or not ready."
+        "description": "The app's Read-only setting also controls write permission in Home Assistant. Disable it in the app, save and restart the app to enable controls. Control entities remain unavailable while the service is read-only or not ready."
       }
     }
   },

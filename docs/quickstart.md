@@ -1,57 +1,61 @@
 # Quick start
 
-This walkthrough takes you from an installed adapter to the first controlled
-charge. Normal setup uses the Home Assistant UI; a command-line bus check is
-optional.
+Choose how Home Assistant should reach the wallbox:
 
-This guide covers direct serial setup. For the independent service and a
-heartbeat that survives HA Core restarts, follow [service setup](modbus-service.md).
+| Connection | When to use it |
+|---|---|
+| **Independent Modbus service** | Recommended on Home Assistant OS: its app keeps the heartbeat running through HA Core restarts. A standalone service is also available for other installations. |
+| **Direct serial connection** | Supported without an additional service. Home Assistant owns the adapter; a Core restart interrupts the heartbeat. |
 
-## 1. Check the hardware
+The service is optional. If your wallbox is already configured, keep its entry.
+For a change to the service, follow the [handover guide](modbus-service.md#move-an-existing-wallbox)
+instead of adding it again.
 
-Have a qualified electrician prepare the wallbox using its installation
-manual and the [hardware guide](hardware.md). It must support Modbus RTU,
-have the RS-485 adapter connected, and be in **Modbus satellite mode**
-(bank S1, DIP 4 and DIP 5 on, followed by a wallbox restart).
+## 1. Prepare the hardware
 
-Confirm **exclusive bus access**. Another energy manager, control box or Home
-Assistant instance must not drive the same bus. Read-only mode also sends
-requests; it is not a passive listener.
+Have a qualified electrician prepare the wallbox and RS-485 connection using
+its installation manual and the [hardware guide](hardware.md). Modbus satellite
+mode is required. Check the [single-master rule](safety.md#modbus-rtu-uses-a-single-master)
+before connecting software to the bus.
 
-## 2. Install
+## 2. Install the integration
 
-Install **Mennekes Amtron RTU** by **memphi2** using the
-[installation guide](installation.md): Marketplace on Home Assistant 2026.11+,
-HACS on 2026.9/2026.10. That guide includes the custom-repository fallback and
-explains when a restart is needed.
-
-For an existing **0.1.0** installation, follow [Upgrading](upgrading.md) first.
-Existing **0.2.x through 0.4.x** entries can be kept.
+Follow [Installation](installation.md) for the Marketplace or HACS, including
+the release channel and any required Home Assistant restart. The service app
+is installed separately; its steps are in the [service guide](modbus-service.md).
+For an existing installation, see [Updating](upgrading.md).
 
 ## 3. Make the adapter available
 
-Connect the USB RS-485 adapter to the machine running Home Assistant. With a
-virtual machine or container, pass it through to Home Assistant; see
-[USB passthrough](hardware.md#making-the-adapter-visible-to-home-assistant). The setup form lists available
-ports and prefers stable `/dev/serial/by-id/...` paths. Use one when available:
-`/dev/ttyUSB0` can change after reconnecting USB devices.
-
-If the adapter is missing from the list, check passthrough and permissions
-before changing wallbox settings. You can enter a port manually in the form.
+Give the USB RS-485 adapter to the selected connection owner: the service app
+or standalone service, or Home Assistant for direct serial mode. Prefer a stable
+`/dev/serial/by-id/...` path. If the adapter is missing, check
+[USB passthrough and permissions](hardware.md#making-the-adapter-visible-to-home-assistant).
 
 ## 4. Check fallback behavior
 
-Read [Safety and limitations](safety.md), especially the energy-manager
-fallback. In master mode, the wallbox depends on a heartbeat from Home
-Assistant. A restart, lost USB connection or integration removal stops it.
-Configure the intended fallback with the manufacturer's tool before enabling
-control. Keep the vehicle disconnected during the initial control setup.
+Configure the wallbox's intended [energy-manager fallback](safety.md#the-heartbeat-and-what-happens-without-it)
+before enabling writes. The service protects against HA Core restarts; stopping
+the service, restarting its host or losing the serial connection still interrupts
+the heartbeat. Keep the vehicle disconnected during initial control setup.
 
 ## 5. Add the wallbox
 
+### Through the service
+
+Follow [Service setup](modbus-service.md) to install and start it in **Read-only**
+mode. On Home Assistant OS, confirm the discovered wallbox under
+**Settings → Devices & services**; its URL and token are supplied automatically.
+
+For a standalone service, use **Add integration → Mennekes Amtron RTU →
+Connect to the Modbus service** and enter its URL and token as described in that
+guide.
+
+### Direct serial connection
+
 Open **Settings → Devices & services → Add integration → Mennekes Amtron RTU**.
-Choose **Direct serial connection**, then select the adapter and enter the configured bus settings.
-Factory defaults are:
+Choose **Direct serial connection**, select the adapter and enter the wallbox's
+bus settings. Factory defaults are:
 
 | Setting | Value |
 |---|---|
@@ -59,46 +63,41 @@ Factory defaults are:
 | Baud rate | `57600` |
 | Data bits / parity / stop bits | `8` / `N` / `2` |
 
-The form verifies communication before creating an entry. If the values are
-unknown, use its search option: search addresses at the chosen bus settings
-first, or all documented baud rates and frames if needed. The broader search
-can take several minutes. Searches send read requests without register writes
-or a heartbeat and still require exclusive bus access.
+The form verifies communication before creating an entry. If the settings are
+unknown, use its search option. A search across all bus settings can take several
+minutes. New direct entries start read-only, with controls and heartbeat disabled.
 
-## 6. Verify readings, then enable control
+## 6. Check readings, then enable control
 
-New entries start in **read-only** mode: sensors are available, controls and
-the heartbeat are disabled. Compare the readings with the wallbox display.
-Read-only mode does not take over an energy-manager heartbeat.
+Compare the readings with the wallbox before allowing writes. Set an appropriate
+current cap, then enable control in the place that owns the serial connection:
 
-When readings are plausible and fallback is configured, open the entry
-options. Set the **charging current cap** for your installation and change
-**Control mode** to **Modbus master**. The entry reloads, starts the heartbeat
-and adds the controls. Resolve any repair messages before charging.
+| Connection | Enable control |
+|---|---|
+| Service | Disable **Read-only** in the app or service configuration, save and restart the service. HA controls become available after the next status refresh. There is no second HA write switch. |
+| Direct serial | In the integration entry's options, change **Control mode** to **Modbus master**. The entry reloads, starts the heartbeat and adds controls. |
+
+For the service, HA's entry options offer an additional current cap. Resolve
+any repair messages and check the **Heartbeat** sensor before charging.
 
 ## 7. First charge
 
-1. Set **Charging current limit** to 6 A before connecting the vehicle.
-2. Connect the vehicle and complete any required authorization. Check that
-   the wallbox is unlocked and charging is released.
-3. Check **Charging**, **EVSE state**, **Signaled current** and **Total power**.
-   Actual charging also depends on the vehicle; a connection alone does not
-   guarantee that it will draw current.
-4. Raise the limit as appropriate. Faster changes are deferred to respect the
-   five-second write interval.
-5. Test **Charging paused**: on pauses; off resumes after the waiting interval.
-   Allow at least five seconds between manual pause and resume. Do not set 0 A to stop.
+1. Set **Charging current limit** to 6 A, then connect the vehicle and complete
+   any required authorization. The wallbox must be unlocked and charging released.
+2. Check **Charging**, **Signaled current** and **Total power**, then raise the
+   limit as appropriate. The vehicle also determines whether and how much it draws.
+3. Test **Charging paused**: on pauses; off resumes. Allow at least five seconds
+   between manual pause and resume. **0 A removes the current limit; it does not
+   stop charging.**
 
-Once basic operation is verified, follow the [user guide](user-guide.md),
-choose a [Recorder profile](recorder.md#keep-only-energy-and-power-statistics) and add [blueprint automations](blueprints.md).
+Continue with the [user guide](user-guide.md) for everyday controls,
+[Recorder](recorder.md) for history size, and [blueprints](blueprints.md) for
+automations.
 
 ## Optional command-line bus check
 
-Use this only for troubleshooting, before adding an active entry or after
-unloading it. The check needs exclusive use of the serial port and bus; do not
-run it alongside the integration or another Modbus master.
-
-From a host administration shell with access to the Home Assistant container:
+Normal setup needs no shell. For troubleshooting with existing host access,
+stop the current serial owner first, then run the included read-only check:
 
 ```bash
 docker exec -it homeassistant \
@@ -106,18 +105,9 @@ docker exec -it homeassistant \
   /dev/serial/by-id/REPLACE_WITH_YOUR_ADAPTER
 ```
 
-Adjust the container name and config path if needed. The installed integration
-includes the script and its dependencies. It reads identification and state
-registers without writing or sending a heartbeat. `--scan` searches addresses;
-`--scan-baudrate` extends that search to bus settings. A failure can mean port
-access, wiring, conflicting bus use, unsupported responses or incorrect settings.
-See [Troubleshooting](troubleshooting.md).
-
-The output includes device identifiers. Remove the serial number and full
-adapter path before sharing it publicly. This check is optional; do not enable
-host-shell access solely to complete normal UI setup.
-
-## Removing the integration
-
-Follow [Removal](installation.md#removal). Deleting an entry stops its
-heartbeat and closes the serial port; check fallback behavior first.
+Adjust the container and path for your installation. `--scan` searches addresses;
+`--scan-baudrate` extends the search to bus settings. The check sends no writes or
+heartbeat, but still needs [exclusive bus access](safety.md#modbus-rtu-uses-a-single-master).
+Remove device serial numbers and adapter paths before sharing its output.
+See [Troubleshooting](troubleshooting.md) for connection problems and
+[Removal](installation.md#removal) before uninstalling.

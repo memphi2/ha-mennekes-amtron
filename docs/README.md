@@ -1,54 +1,60 @@
-# Documentation
+# Mennekes Amtron RTU documentation
 
-- [Independent Modbus service](modbus-service.md): keep heartbeat and charging state through HA Core restarts.
+Connect your wallbox, control charging and track its energy use in Home
+Assistant. Communication stays local over RS-485.
 
-An unofficial Home Assistant integration for MENNEKES AMTRON wallboxes over
-local Modbus RTU.
+## Get started
 
-## Start here
+1. Check your model in the [compatibility matrix](compatibility.md) and prepare
+   the connection using the [hardware guide](hardware.md).
+2. [Install the integration](installation.md), then follow the
+   [Quick start](quickstart.md).
+3. Open the [User guide](user-guide.md) for the current slider, pause switch,
+   readings and options.
+
+You can connect the serial adapter directly to the integration or use the
+**optional, recommended [Modbus service](modbus-service.md)**. The service keeps
+the heartbeat and last charging state through Home Assistant Core restarts.
+An app shutdown, host restart or serial failure still requires the wallbox's
+configured fallback.
+
+## Use your wallbox
 
 | I want to… | Read |
 |---|---|
-| check models and hardware test status | [Device compatibility](compatibility.md) |
-| prepare the installation with an electrician | [Hardware installation](hardware.md) |
-| install, update or remove the integration | [Installation and updates](installation.md) |
-| add the wallbox and test the first charge | [Quick start](quickstart.md) |
-| upgrade an existing 0.1.0 installation | [Upgrading](upgrading.md) |
-| know what every entity means | [Entity reference](entities.md) |
-| use a ready-made automation | [Blueprints](blueprints.md) |
-| set up a tariff schedule or action | [Automations](automations.md) |
-| reduce database growth and configure history retention | [Recorder](recorder.md) |
-| understand the options and the daily use | [User guide](user-guide.md) |
-| fix something that is broken | [Troubleshooting](troubleshooting.md) |
-| know what can go wrong with a wallbox | [Safety and limitations](safety.md) |
+| Set current, pause charging or change options | [User guide](user-guide.md) |
+| Understand a sensor or find its template states | [Entity reference](entities.md) |
+| Charge from PV surplus | [Blueprints](blueprints.md) |
+| Set up a tariff schedule or action | [Automations](automations.md) |
+| Use the Energy dashboard and reduce database growth | [Recorder](recorder.md) |
+| Solve a connection, control or heartbeat problem | [Troubleshooting](troubleshooting.md) |
+| Update or remove the integration | [Installation and updates](installation.md) |
+| Understand hardware limits and fallback behavior | [Safety and limitations](safety.md) |
 
-## Reference
+## Three settings worth knowing
 
-| Document | What it is |
+- **0 A removes the current limit.** Use **Charging paused** to stop charging.
+- **Write access has one setting.** With direct serial, select **Modbus master**
+  in the integration options. With the service, disable **Read-only** in the
+  app configuration, save and restart the app. HA follows its next status update
+  without a Core restart.
+- **One connection owns the bus.** Read-only mode still sends requests. Do not
+  run direct serial and the service against the same adapter at the same time.
+
+## Advanced setup and reference
+
+| Document | What you will find |
 |---|---|
-| [Modbus register map](modbus-registers.md) | Every register the integration implements, the enumerated values, the read blocks and the rules the device imposes |
-| [Architecture](architecture.md) | How the code is laid out and the four decisions behind it |
-| [Quality scale](quality-scale.md) | The Home Assistant quality-scale status, rule by rule |
-| [Maintenance validation](validation.md) | Resource measurements, release integrity, compatibility, privacy and serial fault checks |
-| [Service publication](service-releasing.md) | Container publication, beta/stable app channels and release recovery |
-| [Repository settings](repository-settings.md) | Branch protection and the security options, declared as code |
-| [Legal notes](legal.md) | Licence, trademarks, and why no vendor document is in this repository |
+| [Standalone service](service-standalone.md) | Run the service outside a Home Assistant app |
+| [Service reference](service-reference.md) | Service configuration and technical details |
+| [Upgrading older installations](upgrading.md) | Migration notes for the former integration domain |
+| [Modbus register map](modbus-registers.md) | Register meanings, values and read blocks |
+| [Architecture](architecture.md) | How the integration and service fit together |
+| [Quality scale](quality-scale.md) | Home Assistant quality-scale status |
+| [Maintenance validation](validation.md) | Compatibility, resource, privacy and release checks |
+| [Recorder validation](recorder-validation.md) | Database measurements, retention tests and their limits |
+| [Service publication](service-releasing.md) | App channels and container publication |
+| [Repository settings](repository-settings.md) | Branch protection and security requirements |
+| [Legal notes](legal.md) | Licence and trademark information |
 | [Provenance audit](audits/current-legal-provenance.md) | Source and licensing evidence |
-| [November compatibility audit](ha-2026-11-validation.md) | Local compatibility, Recorder and repository validation results |
-
-## Before you start
-
-**Read-only first.** A new direct-serial entry never writes or sends the
-heartbeat. The independent service has its own read-only setting. Look at the sensors, confirm they match the wallbox display, and
-only then switch the control mode to *Modbus master*. See
-[quickstart.md](quickstart.md).
-
-**One master per bus.** Modbus RTU allows exactly one. If a §14a control box or
-another energy manager already drives your bus, this integration must not
-share it. Read-only mode still sends requests. See [safety.md](safety.md).
-
-**0 A does not mean "stop".** Writing 0 A to the charging-current register
-removes the limit and makes the wallbox signal its *maximum*. The integration
-accepts 0 in **Charging current limit** to turn the limit off. Use
-**Charging paused** to stop charging. See
-[safety.md](safety.md#the-0-a-trap).
+| [November compatibility audit](ha-2026-11-validation.md) | Recorded compatibility and Recorder validation |

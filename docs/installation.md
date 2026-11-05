@@ -1,135 +1,151 @@
 # Installation and updates
 
-Install **Mennekes Amtron RTU** from
-**memphi2/ha-mennekes-amtron**. This is a community integration for Modbus RTU
-wallboxes, using the domain `mennekes_amtron_rtu`.
+[Start](../README.md) › Installation
 
-For a heartbeat that continues through HA Core restarts, use the
-[independent Modbus service](modbus-service.md). Existing direct entries remain
-supported and can be reconfigured without recreating entities.
+Install the integration first, then choose how it connects to the wallbox.
+On Home Assistant OS, everything is configured through the UI. Normal setup
+needs no YAML and no command-line tools.
 
-## Requirements
+Already installed? Go to [Updates](#updates) or
+[switch an existing installation to the service](modbus-service.md).
+Keep your existing entry, devices and automations.
 
-- Home Assistant **2026.9.0** or newer. Use the Marketplace on **2026.11+**,
-  or HACS on **2026.9/2026.10**.
-- A USB RS-485 adapter available to Home Assistant, preferably through a
-  stable `/dev/serial/by-id/` path. With the independent service, pass the adapter
-  to that service instead of HA.
-- A wallbox configured as a Modbus satellite and exclusive access to its
-  Modbus RTU bus. Read-only mode also sends requests.
+## Before you start
 
-Follow [hardware installation](hardware.md) before configuring the wallbox.
-Use a published release for normal operation. The [support policy](../SUPPORT.md)
-distinguishes stable support from November beta validation.
+- Home Assistant **2026.9.0 or newer**.
+- A [supported wallbox](compatibility.md) prepared for Modbus RTU by a qualified
+  electrician, including its heartbeat fallback settings.
+- A USB RS-485 adapter and **exclusive access to the bus**. The integration,
+  service and another energy manager must never use it at the same time.
 
-**Upgrading from 0.1.0:** follow the [domain migration guide](upgrading.md)
-first. The steps for keeping an existing entry below apply to **0.2.x through 0.4.x**.
+Follow the [hardware guide](hardware.md) for wiring, wallbox settings and USB
+passthrough. Leave the vehicle disconnected during the first control setup.
 
-## Home Assistant Marketplace
+## 1. Choose your connection
 
-For Home Assistant 2026.11 and newer:
+| | Independent service | Direct serial |
+|---|---|---|
+| Best fit | **Recommended** for a heartbeat that survives HA Core restarts | An installation without an extra app |
+| What to install | Integration + service app on HA OS, or a separate service container | Integration only |
+| USB adapter belongs to | Service | Home Assistant |
+| Enable writing in | App configuration → **Read-only** off | Integration options → **Control mode: Modbus master** |
+| During a Core restart | Last charging state and heartbeat continue | Heartbeat is interrupted; wallbox fallback applies |
+| Availability | **0.5.0b5 beta**, optional | Stable **0.4.1** or beta |
 
-1. Open **Settings → Marketplace** and accept the community-content notice
-   when requested.
-2. Search for **Mennekes Amtron RTU** by **memphi2**.
-3. Open the repository using the button below if the search catalog has not
-   refreshed yet. The integration is included in the default catalog;
-   [catalog PR #11749](https://github.com/hacs/default/pull/11749) was merged on
-   November 4, 2026. Catalog changes may take several hours to appear.
-4. Install the integration.
-5. Open **Settings → Devices & services → Add integration** and select
-   **Mennekes Amtron RTU**. Follow the
-   [wallbox setup](quickstart.md#5-add-the-wallbox).
+The service keeps an intentional pause, disabled charging release and selected
+current even if HA stays offline. HA automations cannot make new decisions while
+HA is down. Restarting the app or host, or losing USB, can still interrupt the
+heartbeat. See [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
+
+With the service, the connection looks like this:
+
+```mermaid
+flowchart LR
+    HA["Home Assistant"] --> APP["Modbus service"]
+    APP --> USB["USB / RS-485"] --> WB["Mennekes Amtron"]
+```
+
+The service continues running when the Home Assistant part restarts.
+
+## 2. Install the integration
+
+### Home Assistant 2026.11 and newer
 
 [![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=memphi2&repository=ha-mennekes-amtron&category=integration)
 
-Repository URL: `https://github.com/memphi2/ha-mennekes-amtron`.
+1. Open the repository with the button, or search **Settings → Marketplace**
+   for **Mennekes Amtron RTU** by **memphi2**.
+2. Accept the community-content notice when prompted.
+3. **For the service:** enable **Pre-release** for this repository and select
+   **0.5.0b5**. You do not need a beta version of Home Assistant itself.
+4. Install the integration and follow any restart request.
 
-A first Marketplace installation normally makes the config flow available
-without a restart. Updating or removing integration code that Home Assistant
-has already loaded requires a restart; follow the restart request. Copying or
-downloading new files does not replace code already running in memory.
+The first Marketplace installation can be used without a Core restart.
+Replacing code already loaded by HA needs a restart; see
+[Home Assistant's installation behavior](https://contributors.home-assistant.io/marketplace/guides/integrations/#restarts).
 
-See the official [Marketplace guide](https://contributors.home-assistant.io/marketplace/how-it-works/)
-and [installation behavior](https://contributors.home-assistant.io/marketplace/guides/integrations/).
+### Home Assistant 2026.9 and 2026.10
 
-## HACS on Home Assistant 2026.9 and 2026.10
-
-1. Open HACS and search for **Mennekes Amtron RTU** by **memphi2**.
-2. If it is not listed yet, refresh the catalog or wait for the catalog update.
-   As a temporary fallback, use the three-dot menu → **Custom repositories**
-   and add `https://github.com/memphi2/ha-mennekes-amtron`, category **Integration**.
+1. Open **HACS** and search for **Mennekes Amtron RTU** by **memphi2**.
+2. **For the service:** enable beta releases for this repository and select
+   **0.5.0b5**. Otherwise, choose the stable release.
 3. Download the integration and restart Home Assistant.
-4. Add **Mennekes Amtron RTU** under **Settings → Devices & services**
-   and follow the [wallbox setup](quickstart.md#5-add-the-wallbox).
 
-## Existing installations
+If the repository is missing from the catalog, add
+`https://github.com/memphi2/ha-mennekes-amtron` through
+**HACS → ⋮ → Custom repositories**, category **Integration**.
 
-For **0.2.x through 0.4.x**, keep your config entries, devices, entity IDs and automations.
-Moving from HACS to the Marketplace does not change this integration's
-repository or domain and does not require adding the wallbox again.
+## 3. Connect the wallbox
 
-When upgrading Home Assistant to 2026.11, the Marketplace takes over existing
-HACS-managed installations and custom repositories. Do not install a second
-copy or reinstall HACS on 2026.11. The older **0.1.0 → 0.2.x** domain change is
-separate and still requires the [migration steps](upgrading.md).
+| Your choice | Continue here |
+|---|---|
+| **Service on HA OS** | [Install the app](modbus-service.md), start it read-only and confirm the discovered integration. URL and token are supplied automatically. |
+| **Service with HA Container** | [Run the standalone service](service-standalone.md), then enter its URL and token in the integration. |
+| **Direct serial** | [Add the wallbox](quickstart.md#5-add-the-wallbox): choose **Direct serial connection**, then select the adapter and bus settings. |
 
-If the serial port or bus settings change, use **Reconfigure** on the existing
-entry. For polling intervals and control mode, use its options.
+Start by comparing the readings with the wallbox. Then set an appropriate
+current cap and enable writing in the place shown above. Test charging, pause
+and resume before adding [automations](blueprints.md).
 
-## Beta releases
-
-**0.5.0b4** adds the optional independent Modbus service. On HA 2026.11+,
-enable **Pre-release** for this repository in the Marketplace. On older supported
-HA versions, enable beta releases in HACS. Install the matching integration
-and follow the [service installation and handover](modbus-service.md).
-The service app is installed separately through Supervisor; HA Container users
-run its Docker image. Stable users remain on **0.4.1**.
-
-See the official [pre-release guidance](https://contributors.home-assistant.io/marketplace/guides/releases/#pre-releases).
+The service is a separate app: installing the integration from the Marketplace
+or HACS does not install it. It remains optional, and choosing it never deletes
+your existing device or entity IDs.
 
 ## Updates
 
-1. Back up Home Assistant and read the offered release notes.
-2. Account for the heartbeat interruption before restarting: master mode
-   in direct serial mode stops sending it while HA is down. A separate service
-   continues through a Core restart. See [fallback behavior](safety.md).
-3. On 2026.11+, install the update under **Settings → Updates**. On older
-   supported Home Assistant versions, update through HACS.
-4. Complete the requested Home Assistant restart.
-5. Check that the existing wallbox entry loads and reports current readings.
-   In master mode, also check for energy-manager or fallback repair messages.
-6. Reload automations after blueprint updates. When upgrading from **0.2.1
-   or earlier**, select the **Charging paused** input added in 0.2.2; follow
-   [Blueprint updates](blueprints.md#updating-existing-blueprint-automations).
+1. Back up Home Assistant and read the release notes.
+2. Update the integration under **Settings → Updates** on HA 2026.11+, or through
+   HACS on older supported versions. Restart Core when requested.
+3. With the service, check its app store for a separate app update. Follow the
+   release notes for the order; an app update briefly interrupts its heartbeat.
+4. Confirm current readings, the intended pause/release settings and heartbeat
+   health. Keep the existing integration entry.
 
-The Marketplace checks the minimum Home Assistant version for each release.
-Catalog changes can take several hours to appear. Keep the existing entry
-while waiting; reinstalling it is not needed. See the
-[release delivery guide](https://contributors.home-assistant.io/marketplace/guides/releases/).
+**Updating to 0.5.0b5:** update the integration first and restart Core. A running
+beta-4 app already supplies the required status, so the controls can become
+available immediately when its **Read-only** switch is off. There is no second
+HA write-permission switch. Update the app separately to keep both versions
+aligned.
+
+For beta updates, keep **Pre-release** enabled in the Marketplace or beta
+releases enabled in HACS. Stable users stay on **0.4.1**. Updates can take time
+to appear; use **Check for updates** in the app store for app updates. See
+[Home Assistant's release guidance](https://contributors.home-assistant.io/marketplace/guides/releases/#pre-releases).
+
+Moving from HACS to the Marketplace does not require a second installation or
+adding the wallbox again; [HA carries over the existing repositories](https://contributors.home-assistant.io/marketplace/how-it-works/#before-home-assistant-202611).
+If coming from **0.1.0**, follow the separate
+[migration steps](upgrading.md) first. For blueprint changes, follow
+[Updating existing automations](blueprints.md#updating-existing-blueprint-automations).
+
+## Change settings later
+
+- **Direct serial:** use **Reconfigure** for the adapter and bus settings;
+  use the integration options for write permission, intervals and current cap.
+- **Service:** use the app configuration for the adapter, bus settings, write
+  permission and measurement interval. The integration options contain the HA
+  status interval and an additional current cap.
+
+Save app configuration changes and restart the app to apply them. HA picks up
+its new write permission on the next status refresh; no HA restart is needed
+for this switch. The app restart itself briefly interrupts the heartbeat.
+
+See [Which setting goes where?](user-guide.md) for the everyday controls.
 
 ## Removal
 
-1. Stop charging and disable automations that control this wallbox. Check the
-   configured energy-manager fallback before stopping its heartbeat; see
-   [safety and limitations](safety.md).
-2. Under **Settings → Devices & services**, delete the AMTRON RTU entries you
-   intend to remove. Direct entries stop their heartbeat and close the port.
-   Service entries disconnect; the independent service continues running. Both
-   remove their entities. Update dashboards and automations that used them.
-3. To remove the integration files too, uninstall **memphi2/ha-mennekes-amtron**
-   from the Marketplace, or from HACS on older Home Assistant versions. Keep
-   the files while other AMTRON RTU entries still use them.
-4. Complete the requested Home Assistant restart.
+1. Stop charging and disable automations that control the wallbox. Check its
+   fallback before stopping the heartbeat.
+2. Remove the intended entry under **Settings → Devices & services**. A direct
+   entry releases the adapter. A service entry only disconnects HA: **the app
+   keeps running** until you stop it separately.
+3. Uninstall the integration from the Marketplace or HACS once no remaining
+   entry uses it, then follow any restart request.
 
-An entry removal does not reset wallbox registers. The wallbox applies its
-configured fallback when the heartbeat expires. Stop the independent service
-separately if you intend to relinquish control. Removing integration files
-also leaves installed blueprints and Recorder history in place; remove
-blueprint copies only after no automation uses them.
+Removal does not reset wallbox settings or delete Recorder history and
+blueprints. Update dashboards and automations that used the removed entities.
+Stop the app separately before giving the adapter to another bus owner.
 
-## Help
+---
 
-- [Quick start](quickstart.md): adapter, bus check, configuration and first charge.
-- [Troubleshooting](troubleshooting.md): communication and error recovery.
-- [Recorder](recorder.md): history retention and optional statistics exclusions.
+[Everyday use](user-guide.md) · [Troubleshooting](troubleshooting.md) · [Keep history manageable](recorder.md)

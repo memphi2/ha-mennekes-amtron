@@ -366,7 +366,7 @@
       "message": "Diese Wallbox kann nicht zwischen einer und drei Phasen umschalten. Die dynamische Phasenumschaltung setzt ein 11-kW-Gerät voraus, das Phasenoption 2 meldet."
     },
     "read_only_mode": {
-      "message": "Diese Wallbox ist im Nur-Lesen-Modus eingerichtet. Bei einer Dienst-Verbindung deaktiviere „Nur lesen“ in der App und übernimm die Änderung. Bei einer direkten seriellen Verbindung wähle „Modbus-Master“ in den Integrationsoptionen."
+      "message": "Diese Wallbox ist im Nur-Lesen-Modus eingerichtet. Bei einer Dienst-Verbindung deaktiviere „Nur lesen“ in der App, speichere und starte die App neu. Bei einer direkten seriellen Verbindung wähle „Modbus-Master“ in den Integrationsoptionen."
     },
     "restart_requires_idle": {
       "message": "Die Wallbox darf nur im Zustand \"Bereit\" neu gestartet werden. Trenne zuerst das Fahrzeug."
@@ -412,7 +412,7 @@
         "error": {
           "entry_unavailable": "Die Integration ist nicht geladen. Stelle zuerst die Verbindung wieder her.",
           "different_error": "Die Wallbox meldet einen anderen Fehler. Die Heartbeat-Wiederherstellung setzt diesen nicht zurück.",
-          "read_only": "Deaktiviere „Nur lesen“ in der App und übernimm die Änderung, um die Wiederherstellung auszuführen. Bei einer direkten seriellen Verbindung aktiviere stattdessen den Modbus-Master-Modus in den Integrationsoptionen.",
+          "read_only": "Deaktiviere „Nur lesen“ in der App, speichere und starte die App neu, um die Wiederherstellung auszuführen. Bei einer direkten seriellen Verbindung aktiviere stattdessen den Modbus-Master-Modus in den Integrationsoptionen.",
           "write_rate_limited": "Der Mindestabstand seit einem vorherigen Befehl ist noch nicht abgelaufen. Warte kurz und versuche es erneut.",
           "recovery_failed": "Die Wiederherstellung konnte nicht bestätigt werden. Prüfe die Verbindung und versuche es erneut.",
           "still_active": "Die Wiederherstellungsbefehle wurden gesendet, die Wallbox meldet aber noch einen Fehler. Warte auf die Statusaktualisierung; prüfe bei anhaltendem Fehler die Verbindung."
@@ -456,7 +456,7 @@
           "current_limit": "Zusätzliche Obergrenze für von Home Assistant angeforderte Ladestromwerte. Die Obergrenze des Dienstes bleibt wirksam. Bewusst gewählte 0 A schalten die EMS-Begrenzung aus.",
           "scan_interval_seconds": "Wie oft Home Assistant den gespeicherten Status vom Dienst abruft. Modbus-Messintervall und Heartbeat-Takt werden dadurch nicht verändert."
         },
-        "description": "Die Einstellung „Nur lesen“ der App steuert auch die Schreibfreigabe in Home Assistant. Deaktiviere sie in der App und übernimm die Änderung, um die Steuerung zu aktivieren. Die Steuer-Entitäten bleiben bei aktivem Nur-Lesen-Modus oder nicht bereitem Dienst nicht verfügbar."
+        "description": "Die Einstellung „Nur lesen“ der App steuert auch die Schreibfreigabe in Home Assistant. Deaktiviere sie in der App, speichere und starte die App neu, um die Steuerung zu aktivieren. Die Steuer-Entitäten bleiben bei aktivem Nur-Lesen-Modus oder nicht bereitem Dienst nicht verfügbar."
       }
     }
   },

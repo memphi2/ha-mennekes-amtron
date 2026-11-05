@@ -1,196 +1,246 @@
 # Troubleshooting
 
-The diagnostics download includes `runtime_events`, a passive history of the
-last 40 connection transitions, heartbeat failures/recoveries, late heartbeats,
-write rejections/cooldowns and error-recovery attempts. Times are seconds since
-the entry was loaded, or since service startup in service mode. Service events
-are fetched from the app only when downloading diagnostics. Events contain predefined names and optional register
-addresses, never raw error text, serial paths, serial numbers or register values.
-The history is kept only in memory and resets on reload/restart. It adds no
-entities, Recorder rows, polling, file writes or background tasks.
+Start with the symptom that matches your setup. **Direct serial** means the
+integration opens the USB/RS-485 adapter. **Service** means the Modbus app opens
+it and HA connects to the app.
 
-`write_transactions` adds the last 20 failed writes and the first subsequent
-confirmation for each affected register. It separates time waiting for the bus
-(`queue_wait_ms`) from the transaction (`transaction_ms`) and records send/receive
-callback counts and timing. Ordinary successful writes add no entries. No packet
-contents, write values or arbitrary exception messages are stored. In service
-mode, this history is fetched from the app only when downloading diagnostics;
-it is not added to regular polling responses. Update the app and integration
-together to make these diagnostics available.
+| What went wrong? | Start here |
+|---|---|
+| Controls are missing or greyed out | [Controls and write access](#entities-are-missing) |
+| App discovery asks for credentials or reports an error | [App connection and discovery](#app-connection-and-discovery) |
+| The serial connection cannot find the wallbox | [Serial connection](#the-config-flow-cannot-connect) |
+| Heartbeat is unhealthy or error 200 appears | [Heartbeat recovery](#error-200-energy-manager-unavailable) |
+| Charging does not follow the slider or pause switch | [Charging current](#the-charging-current-does-not-follow) |
+| Sensors became unavailable | [Missing readings](#some-sensors-became-unavailable) |
+| History keeps growing | [Database size](#the-database-keeps-growing) |
 
-For downloading, updating or removing files, start with
-[Installation and updates](installation.md). Wallbox communication itself is
-local over RS-485 and does not depend on Marketplace or GitHub availability.
+For installation, downloads and updates, see [Installation and updates](installation.md).
+
+## Entities are missing
+
+**Direct serial:** open the integration entry's options and set **Control mode**
+to **Modbus master**. New direct entries start **Read only**, with readings but
+without controls. Check the sensor readings and exclusive bus access first.
+
+**Service:** disable **Read-only** in the app configuration, save and restart the
+app. HA itself needs no restart for this switch. The app's switch is the only
+write-permission setting. After a fresh, healthy
+service status reaches HA, controls become available automatically. They keep
+their entity IDs while read-only, disconnected or not ready; no second HA switch
+is required. If you are upgrading from a beta where they were missing, update
+both components and restart HA as described in the installation guide.
+
+If just one feature is missing, check the [entity reference](entities.md):
+older register layouts provide fewer sensors, phase selection requires capable
+hardware, and some diagnostics are disabled by default. Enable **Modbus layout
+version** in its entity settings to compare your device with the reference.
+
+Do not delete and re-add an existing wallbox to recover its controls. Using
+**Reconfigure** or confirming its discovered app preserves the matched device
+and entity IDs.
+
+## Writes are refused
+
+First check write access above. When controls are available, the message helps
+distinguish a waiting interval from a device problem:
+
+| Message or symptom | Next step |
+|---|---|
+| A remaining wait time is shown | Wait that long, then retry. Pause/resume commands are not queued. |
+| Service unavailable | Check the app log and its serial connection. HA reconnecting does not replay old commands. |
+| Device rejected a write | Check satellite configuration, supported hardware/registers, device state and whether another master is using the bus. |
+| Restart refused | The wallbox must report **idle** before its **Restart** button can be used. |
+
+See [service setup](modbus-service.md) or the [hardware guide](hardware.md) for
+the relevant connection.
+
+## App connection and discovery
+
+On Home Assistant OS, a running app supplies its connection details through
+Supervisor. Confirm the discovered device under **Settings → Devices & services**;
+you normally do not enter a URL or token. A separately hosted service uses manual
+connection details; see [standalone setup](service-standalone.md).
+
+| Message or symptom | What to check |
+|---|---|
+| No discovery, or the integration asks for URL and token | Confirm the app is installed and running, then check Devices & services again. Verify that both app and integration are current. If you have multiple Modbus apps, select the matching discovered app. |
+| **App cannot be reached** | Check that the app stays running. For a separate service, also check its host, network and port 8765. |
+| **Token invalid / authentication failed** | Confirm the discovered flow again to retrieve the app's current credentials from Supervisor. For a separate service, compare the configured tokens. Do not post the token in an issue. |
+| **Not ready** | Authentication succeeded, but usable wallbox data is not available yet. Check the app log for serial connection and initialization, then retry. Changing the token will not fix this. |
+| **No serial number yet** | The app has not read the serial number needed to match the wallbox. Check the wallbox connection and supported register layout. |
+| **App responds, but its data was not accepted** / `invalid service snapshot` | Update the integration and app to matching versions. If it persists, copy the field named in parentheses in the HA log, such as `identity.max_evse_current`, and download diagnostics. This is a data-validation error, not proof of a bad token. |
+| App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
+
+An app that starts successfully can still be waiting for the wallbox. The log
+separates API startup, serial connection, heartbeat start/stop and shutdown.
+Check the last completed step instead of repeatedly restarting everything.
 
 ## The config flow cannot connect
 
-Start with the adapter and bus before trying a broad address search:
+For a direct connection, check the adapter and bus before starting a broad search.
+The same bus checks apply to the app's serial connection:
 
-1. Check that Home Assistant can see and open the USB adapter. For a virtual
-   machine or container, check USB/device passthrough and permissions. Select
-   its stable `/dev/serial/by-id/...` path when available.
-2. Ensure no other entry, serial tool, energy manager or control box uses the
-   same port/bus. **Read-only and discovery still transmit requests.**
-3. Confirm the device address and frame. Factory defaults are address **50**,
+1. Confirm that the process using the adapter can open it. For a virtual machine
+   or container, check USB/device passthrough and permissions. Prefer a stable
+   `/dev/serial/by-id/...` path.
+2. Stop any competing connection. Only one integration, app, serial tool or
+   energy manager may use the bus. **Read-only and discovery still send requests.**
+3. Confirm the address and serial settings. Factory defaults are address **50**,
    **57600 baud, 8 data bits, no parity, 2 stop bits**.
 4. Have the installer check satellite mode and wiring against the
    [hardware guide](hardware.md) and manufacturer instructions.
 
-The form can search addresses at your chosen settings, or all documented baud
-rates and frames. The wider search takes several minutes. It does not write
-registers or send a heartbeat, but still needs exclusive bus access. A report
-that the port could not be used means repeated attempts to open it failed;
-check access and ownership before changing wiring.
+The direct setup form can search addresses at the chosen settings or search all
+documented baud rates and frames. A full search can take around 15 minutes or
+longer. It does not write registers or send a heartbeat, but needs exclusive bus
+access. Reconfiguring a live direct entry stops its connection temporarily, so
+its heartbeat is also interrupted. Failed or cancelled searches restore the old
+entry.
 
-No result does not prove a wiring defect: permissions, port ownership,
-settings, device mode and unexpected responses can also be responsible. The
-[optional bus check](quickstart.md#optional-command-line-bus-check) can help
-separate serial/device problems from integration setup.
+No result does not prove a wiring defect. Port permissions, another process,
+settings and device mode can also prevent a connection. The
+[optional bus check](quickstart.md#optional-command-line-bus-check) helps separate
+serial/device problems from HA setup.
 
 ## The device answered but reported no layout version
 
-A response was received, but the integration could not identify a supported
-register layout. Check the model, satellite configuration and device address.
-Another device may be answering at that address. Download diagnostics or save
-the redacted bus-check output when reporting the issue; do not assume a model
-is supported solely because it answers Modbus requests.
+A response alone does not confirm supported hardware. Check the model against
+[device compatibility](compatibility.md), then check satellite configuration and
+the address. Another device may be answering at that address.
 
-## Writes are refused
-
-First check **Control mode** in the entry options. Read-only deliberately
-refuses writes. In master mode, a device rejection can indicate satellite
-configuration, an unsupported register, a device-state restriction or
-conflicting bus access. A rate-limit error instead names the waiting interval;
-wait before retrying it. Use the exact error and repair message to distinguish
-these cases.
-
-With an independent service, an HA Core restart does not stop its heartbeat.
-Check the service process and serial connection separately; reconnecting HA
-does not replay old settings. See [service setup](modbus-service.md).
+An older supported layout can work with fewer features; it is different from a
+response with no usable layout version. Include diagnostics or redacted bus-check
+output when reporting an unrecognized device.
 
 ## Error 200, "Energy manager unavailable"
 
-The wallbox did not receive a usable heartbeat in time. In master mode, the
-integration recovers automatically once heartbeat delivery resumes and a
-fresh read confirms error 200. It runs the documented heartbeat → charging
-release → current sequence, respects a pause, device lock or explicitly disabled
-charging release, and retains the
-current limit. Paused and unlimited settings are reasserted directly without a
-temporary charging limit. A deliberate pause is remembered across HA restarts.
+The wallbox did not receive a usable heartbeat in time. With writes enabled,
+recovery runs automatically after heartbeat delivery resumes and a fresh reading
+confirms error 200. The direct integration or independent service performs the
+recovery, depending on your connection.
 
-There are at most three attempts, 30 seconds apart, while the fault persists.
-The repair issue disappears after a poll confirms the fault has cleared. A
-new confirmed healthy state or an entry reload resets the retry budget. No
-extra recovery automation is needed; disable an older recovery blueprint to
-avoid duplicate attempts.
+Recovery keeps a deliberate pause, device lock, disabled charging release and
+current setting, including unlimited mode. It does not turn a deliberate pause
+into charging. There are at most three attempts, spaced 30 seconds apart while
+the fault persists. A confirmed healthy state resets the retry budget. Remove
+an older recovery automation if it is making duplicate attempts.
 
-If automatic recovery cannot complete, **Recover from error** or the repair
-issue's **Fix** remains available. It preserves the stopped state too; use the
-pause or charging-release switch explicitly to resume. After the recovery writes,
-the dialog waits up to ten seconds for the wallbox to clear error 200. The heartbeat
-continues during this check, and the charging commands are sent only once. A
-persistent fault, a different error or a connection problem keeps the dialog open.
+The repair disappears after a reading confirms the error has cleared. If
+recovery cannot complete, use **Recover from error** or the repair's **Fix**
+action. The dialog waits up to ten seconds for confirmation while the heartbeat
+continues. It stays open if the fault persists, a different error appears or the
+connection fails. Use the pause/release controls explicitly when you want to
+resume a deliberately stopped charge.
 
-If the error returns, investigate the cause:
+If the error returns, check what interrupted the heartbeat:
 
-- Home Assistant restarts, entry reloads or switching to read-only stop the
-  heartbeat temporarily or permanently.
-- USB disconnects, bus conflicts, wiring/termination problems and long Modbus
-  timeouts can interrupt communication.
-- A delayed event loop or slow/unresponsive device can make heartbeat writes late.
+- **Direct serial:** HA Core restarts, entry reloads and read-only mode stop it.
+- **Service:** an HA Core restart leaves it running. An app shutdown, app
+  read-only mode, host restart or serial failure can interrupt it.
+- **Either connection:** bus conflicts, USB disconnects, wiring problems, slow
+  responses or delayed processing can make heartbeat delivery fail or arrive late.
 
-Diagnostics distinguish **late** heartbeat attempts from **failed** writes.
-A failure can also mean a lost response; it does not prove whether the wallbox
-received the request. Logs and counters help narrow the cause but do not by
-themselves identify a defective cable.
+The [optional Modbus service](modbus-service.md) is recommended for uninterrupted
+heartbeat during Core restarts. It cannot protect against its own shutdown or a
+host failure. Configure an intentional
+[energy-manager fallback](safety.md#the-heartbeat-and-what-happens-without-it)
+with the manufacturer's tool; the integration raises a repair if fallback is
+disabled.
 
 ### An occasional “No response received after 0 retries”
 
-For a request ending in `32 06 0d 00 55 aa 31 8a`, the missing response is the
-acknowledgement for a heartbeat to wallbox address 50. It does not prove that the
-wallbox missed the write. If operation continued normally, check whether the
-next heartbeat was confirmed before changing bus settings.
+A missing acknowledgement does not prove the wallbox missed the command. If
+charging continued normally, check the next heartbeat and download diagnostics
+before restarting the app or reloading the integration.
 
-The library's zero write retries are intentional: repeating an unconfirmed
-control command could apply it twice. Heartbeat retries are handled separately
-at a shorter interval. The empty `extra data:` text in the library log is a
-normal field, not evidence of damaged packets.
+For a request ending in `32 06 0d 00 55 aa 31 8a`, the missing acknowledgement
+belongs to a heartbeat to wallbox address 50. Zero write retries are intentional:
+repeating an unconfirmed control command could apply it twice. Heartbeats have
+their own shorter retry interval. The empty `extra data:` field is not evidence
+of damaged packets.
 
-After another occurrence, download diagnostics before restarting the app or
-reloading the integration. A high `queue_wait_ms` indicates waiting inside our
-client; `tx_packets: 1` with `rx_callbacks: 0` indicates that no receive callback
-was observed during that write. Received bytes do not necessarily form a valid
-response. These timings are measured in software, not on the physical wire;
-they cannot alone distinguish a delayed event loop, USB/RS-485 trouble or a
-slow wallbox. `io_error` identifies a library I/O error, not a proven cause.
-The next `recovered` entry confirms a successful write to the same register.
+In `write_transactions`, a high `queue_wait_ms` means the request waited inside
+the client. `tx_packets: 1` with `rx_callbacks: 0` means no receive callback was
+observed during the write. Received bytes do not necessarily form a valid
+response. `io_error` identifies a library I/O error, not its physical cause; a
+later `recovered` entry confirms a successful write to the same register.
 
-Configure an intentional [energy-manager fallback](safety.md#the-heartbeat-and-what-happens-without-it)
-with the manufacturer's tool. The integration raises a repair issue when
-fallback is disabled.
+These are software timings, not measurements on the wire. They cannot alone
+distinguish delayed processing, USB/RS-485 trouble or a slow wallbox. See
+[diagnostics](#diagnostics-for-intermittent-problems) below.
 
 ## Some sensors became unavailable
 
-A failed register block makes its affected entities unavailable until a
-successful retry. Other blocks can keep working. A persistent failure of one
-range can indicate unsupported firmware behavior; transient failures can also
-come from the bus. The diagnostics field `failed_blocks` identifies the range.
-
-## Entities are missing
-
-- Controls exist only in **Modbus master** mode.
-- Older layouts expose fewer entities; phase selection also needs capable hardware.
-- Some diagnostic entities are disabled by default. Enable them in their entity
-  settings when needed.
-
-The **Modbus layout version** diagnostic sensor is disabled by default. Enable
-it and compare the result with the **Needs** column in the
-[entity reference](entities.md). An older-layout repair message explains the
-limited feature coverage.
+A failed group of register reads makes the affected entities unavailable until
+a successful retry. Other readings can keep working. If everything disappears,
+check the connection or app first. If only one group repeatedly fails, include
+the diagnostics field `failed_blocks` when reporting it; the range may reveal a
+firmware-specific limitation.
 
 ## The charging current does not follow
 
 | Observation | Check |
 |---|---|
-| A new setting is delayed | Current writes have a five-second floor. The latest accepted request is written after that interval. |
-| Pause/resume or phase switching is refused just after startup | After a full HA restart or first setup, current/pause commands wait five seconds and phase changes wait five minutes because previous timing is unknown. The error reports the remaining wait. Entry reloads preserve the existing guard. |
-| The offered current is lower than requested | Wallbox/installation limits and an active downgrade can lower **Signaled current**. The vehicle can draw less again. |
-| A current change is rejected while paused | A normal current command would resume charging and must respect the pause/resume interval. Switching the pause control off obeys the same interval; it is not a bypass. |
-| The current field shows a value while charging is paused | It shows the remembered setting, including 0 for no limit. Check **Charging paused**, **Signaled current** and **Total power** for the actual charging state. |
-| A manual pause is undone later | Check automations writing the pause switch or current. The pause/resume PV blueprint is allowed to resume charging; disable it to keep a manual pause. |
+| The slider is at 0 A, but charging continues | **0 A removes the limit.** Turn **Charging paused** on to stop. |
+| The slider will not accept 1–5 A | Use 0 A for no limit or at least 6 A for a limit. Pause has its own switch. |
+| A new current is delayed | Current writes have a five-second minimum interval. The latest accepted request is applied after that interval. |
+| Pause/resume is refused just after startup | The process controlling the bus waits five seconds before its first current/pause command. The error reports the remaining wait. An HA Core restart does not reset a running service's timing. |
+| The slider maximum is lower than expected | Check the device maximum and HA current cap. In service mode, the app's current cap also applies. |
+| Offered current is lower than the slider setting | Installation limits and an active downgrade can lower **Signaled current**. The vehicle can draw less again. |
+| A current change is refused while paused | Setting a current can resume charging and must respect the pause/resume waiting interval. |
+| The slider still shows a value during a pause | It shows the remembered resume setting. Check **Charging paused**, **Signaled current** and **Total power** for actual charging. |
+| A manual pause is undone later | Check automations that write the current or pause switch. Disable the PV pause/resume automation if the manual pause should remain. |
 
 ## PV automation stopped after an update
 
 Open the **Charge from PV surplus** automation and select its **Charging
-paused** input. The updated blueprint sends no commands until that input is
-configured. Check that all selected entities belong to the same wallbox and
-that the power sensor has a finite numeric value in **W or kW**.
+paused** input. The blueprint sends no commands until that input is configured.
+Ensure the entities belong to the same wallbox and the power sensor provides a
+numeric value in **W or kW**.
 
-Read [Blueprint updates](blueprints.md#updating-existing-blueprint-automations)
-for edited copies and old paths. Use the automation trace to inspect trigger
-and condition failures. Threshold hold timers are reset by Home Assistant
-restarts and automation reloads.
+See [Blueprint updates](blueprints.md#updating-existing-blueprint-automations)
+for edited copies and old paths. Inspect the automation trace for failed
+triggers or conditions. HA restarts and automation reloads reset threshold hold
+timers.
 
 ## Phase switching leaves charging paused
 
-That is expected when switching during charging: the integration pauses first,
-requests the phases and leaves resuming to you. Wait for the required interval,
-then resume explicitly. Check your vehicle's phase-switching support; some
-vehicles abort the session. The integration exposes this control only on
-hardware that reports support.
+This is expected when switching during charging. Resume explicitly after the
+waiting interval. Phase changes require five minutes between requests, including
+an initial wait after the controlling process starts. Check your vehicle's
+support: some vehicles abort the session after a phase change. The selector
+exists only on capable wallbox hardware.
 
 ## The database keeps growing
 
-A slower measurement interval reduces state-history traffic, not the number
-of hourly statistics series. Long-term statistics survive normal history
-purges. Use the [Recorder profiles](recorder.md) to reduce new detail history
-and statistics while retaining total energy for the Energy dashboard.
+A slower measurement interval reduces state-history traffic, but does not
+reduce the number of long-term statistics series. Long-term statistics survive
+normal history purges. Use the [Recorder profiles](recorder.md) to reduce new
+detail history and statistics while retaining total energy for the Energy
+dashboard.
+
+## Diagnostics for intermittent problems
+
+Download **diagnostics** from the integration entry menu before restarting or
+reloading. The connection and write history is held in memory and resets when
+its owning process restarts; it adds no Recorder rows.
+
+| Field | What it contains |
+|---|---|
+| `runtime_events` | Up to 40 connection changes, heartbeat failures/recoveries, late heartbeats, rejected writes and recovery attempts. Times are seconds since entry load or service startup. |
+| `write_transactions` | Up to 20 failed writes and the first subsequent confirmation for each affected register. Includes queue/transaction durations and send/receive callback counts. Ordinary successful writes do not add entries. |
+| `failed_blocks` | Register groups whose latest read failed. |
+
+Service event/write history is fetched only when downloading diagnostics; it is
+not included in regular status polling. Update both components to get these
+fields. The histories omit packet contents, write values and arbitrary exception
+messages. Diagnostics omit identifying register fields, the serial number and
+full serial-port path.
 
 ## Getting help
 
-Include the integration and Home Assistant versions, wallbox model/firmware,
-control mode, expected behavior and the exact error. Download integration
-**diagnostics** from its entry menu. Identifying register fields, the wallbox
-serial number and full serial-port path are omitted from that download.
-Review any additional logs or command output before posting; remove serial
-numbers, private hostnames and adapter identifiers.
+Include the integration, app (if used) and Home Assistant versions; wallbox
+model/firmware; direct or service connection; read-only setting; expected
+behavior and exact error. Attach diagnostics and the relevant log messages.
+Review extra logs before posting: remove tokens, serial numbers, private
+hostnames and adapter identifiers.
