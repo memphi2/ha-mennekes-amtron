@@ -52,8 +52,10 @@ A host or service restart can still interrupt the heartbeat.
 
 [![Add the Mennekes Amtron app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps)
 
-The integration and service app are separate installations. On HA Container,
-run the service as a [separate container](docs/service-standalone.md).
+The integration and service app are installed and updated independently.
+A normal integration update leaves the compatible app and its heartbeat running;
+matching version numbers are not required. See [Updates](docs/installation.md#updates).
+On HA Container, run the service as a [separate container](docs/service-standalone.md).
 Already using the integration? **Keep your existing entry** and follow
 [Updates and switching connections](docs/upgrading.md).
 

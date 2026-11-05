@@ -11,7 +11,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import tomllib
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -21,6 +20,7 @@ import yaml
 from manifest_version import read_integration_version
 from release_check import remote_commit, run
 from release_version import catalog_branch, validate_version
+from service_inputs import read_service_version
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHITECTURES = {"amd64", "aarch64"}
@@ -29,17 +29,15 @@ DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 def release_info(repository: str, tag: str) -> dict[str, str]:
-    """Bind package, image and app versions to the integration release."""
+    """Keep the app version separate from its reviewed integration source tag."""
     if repository != "memphi2/ha-mennekes-amtron":
         raise ValueError("service publication is restricted to its source repository")
-    version = validate_version(tag.removeprefix("v"))
-    if tag != f"v{version}" or read_integration_version() != version:
+    integration_version = validate_version(tag.removeprefix("v"))
+    if tag != f"v{integration_version}" or read_integration_version() != integration_version:
         raise ValueError("release tag differs from the integration")
+    version = read_service_version(ROOT)
     config = yaml.safe_load((ROOT / "modbus_service/config.yaml").read_text())
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     image = f"ghcr.io/{repository}-service"
-    if config["version"] != version or project["version"] != version:
-        raise ValueError("service, package and integration versions must agree")
     if "image" in config or set(config["arch"]) != ARCHITECTURES:
         raise ValueError("app image or architecture contract differs")
     commit = run("git", "rev-parse", "HEAD").decode().strip()
@@ -47,6 +45,7 @@ def release_info(repository: str, tag: str) -> dict[str, str]:
         "image": image,
         "version": version,
         "commit": commit,
+        "source_tag": tag,
         "channel": catalog_branch(version),
         "repository": repository,
     }
@@ -181,7 +180,7 @@ def build(info: dict[str, str], architecture: str, output: Path) -> None:
     run("docker", "run", "--rm", candidate, "python", "-m", "pip", "check")
     run("docker", "run", "--rm", candidate, "amtron-modbus-service", "--help")
     smoke(candidate)
-    if remote_commit(info["repository"], f"v{info['version']}") != info["commit"]:
+    if remote_commit(info["repository"], info["source_tag"]) != info["commit"]:
         raise ValueError("release tag changed before pushing image candidates")
     subprocess.run(["docker", "push", candidate], check=True)
     # Read the push result from the local daemon. A registry writer may replace
@@ -252,6 +251,35 @@ def inspect_index(reference: str, *, missing_ok: bool = False) -> dict[str, Any]
     return data
 
 
+def verify_provenance(info: dict[str, str], digest: str) -> None:
+    """Require an attested immutable image from its original reviewed source."""
+    if not DIGEST.fullmatch(digest):
+        raise ValueError("invalid published image digest")
+    run(
+        "gh", "attestation", "verify", f"oci://{info['image']}@{digest}",
+        "--repo", info["repository"],
+        "--signer-workflow", f"{info['repository']}/.github/workflows/release.yml",
+        "--source-ref", f"refs/tags/{info['source_tag']}",
+        "--source-digest", info["commit"],
+    )
+
+
+def existing_verified_image(info: dict[str, str]) -> str | None:
+    """Reuse only a public, attested image; absence is not an access failure."""
+    if remote_commit(info["repository"], info["source_tag"]) != info["commit"]:
+        raise ValueError("release source tag changed before image verification")
+    reference = f"{info['image']}:{info['version']}"
+    if inspect_index(reference, missing_ok=True) is None:
+        return None
+    digest = run(
+        "docker", "buildx", "imagetools", "inspect", reference,
+        "--format", "{{.Manifest.Digest}}",
+    ).decode().strip()
+    verify_provenance(info, digest)
+    verify_public(info, digest)
+    return digest
+
+
 def verify_index(
     index: dict[str, Any], info: dict[str, str], candidates: dict[str, str]
 ) -> None:
@@ -291,7 +319,7 @@ def verify_index(
 def publish(info: dict[str, str], directory: Path) -> str:
     """Never replace an existing release tag, including on a workflow rerun."""
     candidates = validate_candidates(directory, info)
-    if remote_commit(info["repository"], f"v{info['version']}") != info["commit"]:
+    if remote_commit(info["repository"], info["source_tag"]) != info["commit"]:
         raise ValueError("release tag changed before publishing the image")
     reference = f"{info['image']}:{info['version']}"
     index = inspect_index(reference, missing_ok=True)
@@ -380,7 +408,7 @@ def verify_public(info: dict[str, str], digest: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=("prepare", "build", "publish", "public", "app", "smoke")
+        "action", choices=("prepare", "build", "publish", "public", "app", "smoke", "existing")
     )
     parser.add_argument("--repository", default="memphi2/ha-mennekes-amtron")
     parser.add_argument("--tag")
@@ -402,6 +430,13 @@ def main() -> int:
             verify_public(info, args.digest)
         elif args.action == "app" and args.digest:
             verify_app_install(info, args.digest)
+        elif args.action == "existing":
+            digest = existing_verified_image(info)
+            if digest is None:
+                raise ValueError("expected published service image is missing")
+            if args.digest and digest != args.digest:
+                raise ValueError("published service image differs from the release plan")
+            info["digest"] = digest
         elif args.action != "prepare":
             raise ValueError("missing action arguments")
         if output := os.environ.get("GITHUB_OUTPUT"):

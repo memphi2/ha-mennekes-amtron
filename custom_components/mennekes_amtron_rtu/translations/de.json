@@ -19,12 +19,12 @@
       "service_discovery_requires_serial": "Die App hat noch keine Seriennummer gelesen. Prüfe die Verbindung zur Wallbox und versuche es erneut.",
       "service_auth_failed": "Der Modbus-Dienst hat die Anmeldung abgelehnt. Bestätige bei einer Supervisor-App erneut, um ihre aktuellen Zugangsdaten abzurufen. Gib bei einem separat betriebenen Dienst dessen aktuellen Zugangstoken ein.",
       "service_not_ready": "Die Anmeldung an der App funktioniert, aber die Wallbox-Daten sind noch nicht verfügbar. Prüfe das App-Protokoll und versuche es erneut.",
-      "service_invalid_response": "Die App antwortet, aber ihre Daten werden nicht akzeptiert. Aktualisiere Integration und App auf dieselbe Version. Das Home-Assistant-Protokoll nennt den betroffenen Datenbereich.",
+      "service_invalid_response": "Die App antwortet, aber ihre Daten werden nicht akzeptiert. Das Home-Assistant-Protokoll nennt den betroffenen Datenbereich. Prüfe das Protokoll und lade die Diagnose herunter, bevor du die App neu startest.",
       "invalid_network_config": "Gib einen Hostnamen oder eine IP-Adresse ohne URL-Schema, einen TCP-Port von 1 bis 65535 und das passende Verbindungsprotokoll an.",
       "cannot_connect_network": "Der LAN-Adapter ist nicht erreichbar oder die Wallbox antwortet nicht. Prüfe Host, Port, Protokoll und die am Adapter eingestellten seriellen Parameter.",
       "invalid_network_response": "Der Adapter hat geantwortet, aber kein gültiges Modbus-Layout geliefert. Prüfe Wallbox-Adresse, Adapterprotokoll und Satellite-Konfiguration.",
       "service_discovery_unavailable": "Die aktuellen Zugangsdaten dieser App konnten nicht abgerufen werden. Prüfe App und Supervisor, starte die App bei Bedarf oder starte sie neu und bestätige erneut.",
-      "service_version_mismatch": "Die Integration und der Modbus-Dienst verwenden unterschiedliche API-Versionen. Aktualisiere beide auf dieselbe Version, zuerst die App oder den separat betriebenen Dienst."
+      "service_version_mismatch": "Der Modbus-Dienst erfüllt die API- oder Mindestversionsanforderungen dieser Integration nicht. Verwende eine kompatible Dienstversion gemäß den Versionshinweisen der Integration. Falls beide Komponenten ein Update benötigen, aktualisiere zuerst die App oder den separat betriebenen Dienst."
     },
     "progress": {
       "searching": "Der Bus wird nach einer Wallbox abgesucht: bis zu {candidates} Kombinationen, etwa {minutes} Minuten zuzüglich Verbindungsprüfungen. Es werden keine Register geschrieben. Beim Neukonfigurieren pausieren die bisherige Verbindung und der Heartbeat; das konfigurierte Ausfallverhalten der Wallbox greift."
@@ -456,7 +456,7 @@
       "message": "Die Verbindung meldet eine andere Wallbox oder kann die gespeicherte Geräteidentität nicht bestätigen. Prüfe die Geräteadresse und die Konfiguration von Dienst oder Adapter. Die Steuerung bleibt nicht verfügbar, bis die gespeicherte Wallbox wieder eindeutig erkannt wird."
     },
     "service_version_mismatch": {
-      "message": "Die Integration und der Modbus-Dienst verwenden unterschiedliche API-Versionen. Aktualisiere beide auf dieselbe Version, zuerst die App oder den separat betriebenen Dienst."
+      "message": "Der Modbus-Dienst erfüllt die API- oder Mindestversionsanforderungen dieser Integration nicht. Verwende eine kompatible Dienstversion gemäß den Versionshinweisen der Integration. Falls beide Komponenten ein Update benötigen, aktualisiere zuerst die App oder den separat betriebenen Dienst."
     }
   },
   "issues": {

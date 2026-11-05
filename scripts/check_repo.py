@@ -202,11 +202,15 @@ def check_release_metadata() -> list[str]:
 
 
 def check_service_distribution() -> list[str]:
-    """Keep all published components on one reviewed version and image name."""
+    """Keep app metadata consistent and satisfy HA's independent minimum."""
+    from packaging.version import Version
     from service_image import release_info
+    from service_inputs import minimum_service_version
 
     try:
-        release_info("memphi2/ha-mennekes-amtron", f"v{VERSION_CONFIG['integration_version']}")
+        info = release_info("memphi2/ha-mennekes-amtron", f"v{VERSION_CONFIG['integration_version']}")
+        if Version(info["version"]) < Version(minimum_service_version()):
+            return ["service distribution metadata: app version is below the integration minimum"]
     except (OSError, ValueError, KeyError, TypeError) as error:
         return [f"service distribution metadata: {error}"]
     return []

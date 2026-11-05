@@ -1,5 +1,19 @@
 # Changes
 
+## 0.5.1
+
+- Always show **Adapter host / IP** in the app configuration. Enter it for LAN;
+  leave it empty for USB. Choosing a protocol does not hide or reveal fields.
+- Offer readable connection choices: **USB / RS-485**, **LAN: Modbus RTU (TCP)**
+  and **LAN: Modbus TCP**. Existing `serial`, `rtu_over_tcp` and `modbus_tcp`
+  settings remain valid; updating does not change the selected connection.
+- Version the app independently from the integration and report the service
+  version in API snapshots. Future integration-only updates can reuse a
+  compatible app without interrupting its heartbeat. The integration still
+  accepts the published 0.5.0 API 2 service.
+- Keep existing app data and the HA entry when updating. If both components need
+  an update, update the app first; its restart briefly interrupts the heartbeat.
+
 ## 0.5.0
 
 - **Update this app or standalone service first**, then update the integration to

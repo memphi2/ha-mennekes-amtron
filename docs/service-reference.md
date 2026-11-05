@@ -18,7 +18,11 @@ allowing commands. Changing permission notifies HA even when the register values
 are unchanged. It sends no HA commands or restored values to the service.
 Direct USB and LAN entries retain their separate HA control-mode option.
 
-`connection_type` selects `serial` (the default), `rtu_over_tcp` or `modbus_tcp`.
+For standalone configuration, `connection_type` selects `serial` (the default),
+`rtu_over_tcp` or `modbus_tcp`. App 0.5.1 displays **USB / RS-485** (default),
+**LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP** instead. The service normalizes
+these names to the same three protocols. The original raw choices remain valid
+for saved configurations; no automatic connection change is performed.
 USB uses `serial_port`, `baudrate` and `frame`. LAN uses `host` and `tcp_port`
 (default 502); UART settings belong on the adapter. `device_id` remains the
 wallbox address from 10 to 50. The HTTP API's `port` is independent and defaults
@@ -26,8 +30,10 @@ to 8765. Neither LAN mode expands the supported RTU register/model scope.
 
 The app's serial-device schema is optional, with no default device path, so a
 LAN-only installation needs no `/dev/ttyUSB0`. Existing saved USB settings remain
-valid; the runtime validates connection-specific required fields. Optional schema
-fields follow [Supervisor's options rules](https://contributors.home-assistant.io/apps/guides/options/).
+valid; the runtime validates connection-specific required fields. App 0.5.1
+supplies an empty host default so the host field stays visible: empty is valid
+for USB, while LAN requires a hostname/IP. The form does not conditionally hide
+USB or LAN fields. Optional schema fields follow [Supervisor's options rules](https://contributors.home-assistant.io/apps/guides/options/).
 
 Service settings are read only at startup: save configuration changes and restart
 the service to apply them. This briefly interrupts the heartbeat; HA does not need
@@ -55,9 +61,11 @@ fresh credentials for the same app or asks for a new token for a standalone
 service, checks the entry's existing identity binding and reloads the entry.
 Serial-bound entries require the same serial number; standalone entries added
 without a readable serial number retain their URL binding.
-For the stable 0.5.0 upgrade, update the app or standalone service first, then
-the integration and restart Core. Keep the existing app data and HA entry;
-the beta integration may be unavailable until both components use the stable API.
+Integration and service releases are independent. The current integration
+accepts **service 0.5.0 or newer with API 2**, including the already published
+0.5.0 app. A routine integration update leaves that service running. If both
+need updating, update the app/service first, then the integration and restart
+Core. Keep existing app data and the HA entry; see [Updates](modbus-service.md#updates).
 
 The internal API port is 8765. Host publication is disabled by default.
 Integration discovery checks the app slug and restricts connections to its
@@ -125,11 +133,18 @@ use the [Recorder guide](recorder.md) to control that traffic.
 
 ## Commands and API boundary
 
-Stable **0.5.0 uses API 2**. Snapshots report `api_version: 2`, and authenticated
-endpoints use `/v2/`. The beta API 1 and `/v1/` routes are intentionally unsupported;
-there are no compatibility aliases. An incompatible service version is reported
-separately from malformed snapshot data. Follow the [update order](modbus-service.md#updates)
-instead of changing credentials or recreating the integration.
+Service **0.5.0 introduced API 2**. Snapshots report `api_version: 2`, and
+authenticated endpoints use `/v2/`. The beta API 1 and `/v1/` routes are
+intentionally unsupported; there are no compatibility aliases.
+
+The integration checks the supported API and its separate minimum service
+version, currently **0.5.0**. Release numbers do not have to match: compatible
+newer service versions are accepted. New snapshots report `service_version`.
+The published 0.5.0 app predates that field and is accepted as the known API 2
+baseline; an omitted version will no longer satisfy a future higher minimum.
+An unsupported API or a service below the minimum produces the compatibility
+error. A malformed version or snapshot produces the data-validation error.
+Neither condition asks for new credentials. See [Updates](modbus-service.md#updates).
 
 | Endpoint | Purpose |
 |---|---|

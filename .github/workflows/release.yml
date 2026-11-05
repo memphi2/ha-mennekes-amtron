@@ -165,9 +165,53 @@ jobs:
           echo "::error::Timed out waiting for Validate on main for $tag_sha"
           exit 1
 
+  service-plan:
+    name: plan independent app release
+    needs: [validate, hacs, hassfest, main-validation]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      attestations: read
+      packages: read
+    outputs:
+      build_required: ${{ steps.plan.outputs.build_required }}
+      catalog_required: ${{ steps.plan.outputs.catalog_required }}
+      digest: ${{ steps.plan.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: refs/heads/main
+          persist-credentials: false
+      - name: Require the checked-out main to match the validated commit
+        env:
+          VALIDATED_COMMIT: ${{ needs.main-validation.outputs.commit }}
+        run: |
+          set -euo pipefail
+          checked_out_commit="$(git rev-parse --verify HEAD)"
+          if [ "$checked_out_commit" != "$VALIDATED_COMMIT" ]; then
+            echo "::error::Main changed since validation; rerun the release for the validated main commit"
+            exit 1
+          fi
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - run: python -m pip install -r requirements-dev.txt
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
+      - name: Compare app inputs and verify any reusable publication
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: python scripts/plan_service_release.py --tag "$RELEASE_TAG" --repository "$GITHUB_REPOSITORY"
+
   service-images:
     name: service image (${{ matrix.architecture }})
-    needs: [validate, hacs, hassfest, main-validation]
+    needs: [main-validation, service-plan]
+    if: needs.service-plan.outputs.build_required == 'true' && needs.service-plan.outputs.catalog_required == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     permissions:
@@ -191,6 +235,8 @@ jobs:
           python-version: "3.14"
       - run: python -m pip install -r requirements-dev.txt
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
@@ -212,7 +258,13 @@ jobs:
 
   service-manifest:
     name: publish service image
-    needs: [service-images, main-validation]
+    needs: [service-images, main-validation, service-plan]
+    if: >-
+      ${{ always() && needs.main-validation.result == 'success' &&
+          needs.service-plan.result == 'success' &&
+          needs.service-plan.outputs.catalog_required == 'true' &&
+          ((needs.service-plan.outputs.build_required == 'true' && needs.service-images.result == 'success') ||
+           (needs.service-plan.outputs.build_required == 'false' && needs.service-images.result == 'skipped')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -233,12 +285,15 @@ jobs:
           python-version: "3.14"
       - run: python -m pip install -r requirements-dev.txt
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.service-plan.outputs.build_required == 'true'
         with:
           pattern: service-image-*
           merge-multiple: true
@@ -248,8 +303,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
-        run: python scripts/service_image.py publish --tag "$RELEASE_TAG" --path .release/images
+          BUILD_REQUIRED: ${{ needs.service-plan.outputs.build_required }}
+          EXISTING_DIGEST: ${{ needs.service-plan.outputs.digest }}
+        run: |
+          if [ "$BUILD_REQUIRED" = true ]; then
+            python scripts/service_image.py publish --tag "$RELEASE_TAG" --path .release/images
+          else
+            python scripts/service_image.py existing --tag "$RELEASE_TAG" --digest "$EXISTING_DIGEST"
+          fi
       - name: Attest the published container
+        if: needs.service-plan.outputs.build_required == 'true'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ steps.image.outputs.image }}
@@ -275,7 +338,16 @@ jobs:
       - hacs
       - hassfest
       - main-validation
+      - service-plan
       - service-manifest
+    # Skipping an unchanged app is allowed; a failed/cancelled gate never is.
+    if: >-
+      ${{ always() && needs.validate.result == 'success' &&
+          needs.hacs.result == 'success' && needs.hassfest.result == 'success' &&
+          needs.main-validation.result == 'success' && needs.service-plan.result == 'success' &&
+          ((needs.service-plan.outputs.catalog_required == 'false' &&
+            needs.service-plan.outputs.build_required == 'false' && needs.service-manifest.result == 'skipped') ||
+           (needs.service-plan.outputs.catalog_required == 'true' && needs.service-manifest.result == 'success')) }}
     permissions:
       contents: write
       attestations: write
@@ -386,7 +458,11 @@ jobs:
 
   service-catalog:
     name: publish app catalog
-    needs: [publish, service-manifest, main-validation]
+    needs: [publish, service-manifest, main-validation, service-plan]
+    if: >-
+      ${{ always() && needs.publish.result == 'success' &&
+          needs.service-manifest.result == 'success' && needs.main-validation.result == 'success' &&
+          needs.service-plan.result == 'success' && needs.service-plan.outputs.catalog_required == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     concurrency:
@@ -394,6 +470,8 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
+      attestations: read
+      packages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -404,6 +482,8 @@ jobs:
           python-version: "3.14"
       - run: python -m pip install -r requirements-dev.txt
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
       - name: Advance app catalogs after release verification
         env:
           GH_TOKEN: ${{ github.token }}

@@ -19,12 +19,12 @@
       "service_discovery_requires_serial": "De app heeft nog geen serienummer uitgelezen. Controleer de verbinding met de wallbox en probeer het opnieuw.",
       "service_auth_failed": "De Modbus-dienst heeft de authenticatie geweigerd. Bevestig bij een Supervisor-app opnieuw om de huidige toegangsgegevens op te halen. Voer bij een afzonderlijk gehoste dienst het huidige toegangstoken in.",
       "service_not_ready": "De aanmelding bij de app is gelukt, maar er zijn nog geen wallboxgegevens beschikbaar. Controleer het logboek van de app en probeer het opnieuw.",
-      "service_invalid_response": "De app antwoordt, maar de gegevens zijn niet geaccepteerd. Werk de integratie en de app bij naar dezelfde versie. Het Home Assistant-logboek vermeldt welk onderdeel van de gegevens is afgewezen.",
+      "service_invalid_response": "De app antwoordt, maar de gegevens zijn niet geaccepteerd. Het Home Assistant-logboek vermeldt welk onderdeel van de gegevens is afgewezen. Controleer het logboek en download de diagnostiek voordat je de app opnieuw start.",
       "invalid_network_config": "Voer een hostnaam of IP-adres zonder URL-schema in, een TCP-poort van 1 tot 65535 en het juiste verbindingsprotocol.",
       "cannot_connect_network": "De LAN-adapter is niet bereikbaar of de wallbox antwoordt niet. Controleer host, poort, protocol en de seriële instellingen op de adapter.",
       "invalid_network_response": "De adapter antwoordde, maar meldde geen geldige Modbus-registerindeling. Controleer het wallboxadres, het adapterprotocol en de satellietinstelling.",
       "service_discovery_unavailable": "De huidige toegangsgegevens van deze app konden niet worden opgehaald. Controleer de app en Supervisor, start of herstart de app indien nodig en bevestig opnieuw.",
-      "service_version_mismatch": "De integratie en de Modbus-dienst gebruiken verschillende API-versies. Werk beide bij naar dezelfde versie, te beginnen met de app of de afzonderlijk gehoste dienst."
+      "service_version_mismatch": "De Modbus-dienst voldoet niet aan de API-eisen of de minimale versie van deze integratie. Gebruik een compatibele dienstversie zoals beschreven in de releaseopmerkingen van de integratie. Als beide componenten een update nodig hebben, werk dan eerst de app of de afzonderlijk gehoste dienst bij."
     },
     "progress": {
       "searching": "De bus wordt doorzocht naar een wallbox: maximaal {candidates} combinaties, ongeveer {minutes} minuten plus verbindingscontroles. Er wordt niet naar registers geschreven. Tijdens het opnieuw configureren worden de bestaande verbinding en heartbeat onderbroken; het ingestelde gedrag van de wallbox bij uitval is dan van toepassing."
@@ -456,7 +456,7 @@
       "message": "De verbinding meldt een andere laadpaal of kan de ingestelde identiteit niet bevestigen. Controleer het apparaatadres en de configuratie van de dienst of adapter. De bediening blijft niet beschikbaar totdat de ingestelde laadpaal opnieuw kan worden bevestigd."
     },
     "service_version_mismatch": {
-      "message": "De integratie en de Modbus-dienst gebruiken verschillende API-versies. Werk beide bij naar dezelfde versie, te beginnen met de app of de afzonderlijk gehoste dienst."
+      "message": "De Modbus-dienst voldoet niet aan de API-eisen of de minimale versie van deze integratie. Gebruik een compatibele dienstversie zoals beschreven in de releaseopmerkingen van de integratie. Als beide componenten een update nodig hebben, werk dan eerst de app of de afzonderlijk gehoste dienst bij."
     }
   },
   "issues": {

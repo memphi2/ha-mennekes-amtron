@@ -31,7 +31,7 @@ passthrough. Leave the vehicle disconnected during the first control setup.
 | USB adapter or LAN gateway is used by | Service | Home Assistant |
 | Enable writing in | App configuration → **Read-only** off | Integration options → **Control mode: Modbus master** |
 | During a Core restart | Last charging state and heartbeat continue | Heartbeat is interrupted; wallbox fallback applies |
-| Availability | **0.5.0**, optional | **0.5.0**; existing USB entries remain supported |
+| Availability | Since **0.5.0**, optional | Since **0.5.0**; existing USB entries remain supported |
 
 Both connection owners support USB and LAN; see
 [LAN adapter setup](network-gateway.md). A LAN connection
@@ -62,7 +62,7 @@ The service continues running when the Home Assistant part restarts.
 1. Open the repository with the button, or search **Settings → Marketplace**
    for **Mennekes Amtron RTU** by **memphi2**.
 2. Accept the community-content notice when prompted.
-3. Select the stable **0.5.0** release. Pre-release access is not required.
+3. Select the stable **0.5.1** release. Pre-release access is not required.
 4. Install the integration and follow any restart request.
 
 The first Marketplace installation can be used without a Core restart.
@@ -72,7 +72,7 @@ Replacing code already loaded by HA needs a restart; see
 ### Home Assistant 2026.9 and 2026.10
 
 1. Open **HACS** and search for **Mennekes Amtron RTU** by **memphi2**.
-2. Select the stable **0.5.0** release; beta releases are not required.
+2. Select the stable **0.5.1** release; beta releases are not required.
 3. Download the integration and restart Home Assistant.
 
 If the repository is missing from the catalog, add
@@ -98,23 +98,27 @@ your existing device or entity IDs.
 
 ## Updates
 
-1. Back up Home Assistant and read the release notes.
-2. **If you use the service, update it first.** Update the existing app from its
-   app store, or replace the standalone service while keeping its data directory.
-   Wait for the service to initialize. Its restart briefly interrupts the heartbeat.
+1. Back up Home Assistant and read the integration's release notes.
+2. **Update the app only when an app update is offered or the integration needs
+   a newer service.** If both need updating, update the app or standalone service
+   first, keep its data and wait for initialization. Its restart briefly
+   interrupts the heartbeat.
 3. Update the integration under **Settings → Updates** on HA 2026.11+, or through
    HACS on older supported versions, then restart Home Assistant Core.
 4. Confirm current readings, the intended pause/release settings and heartbeat
    health. Keep the existing integration entry.
 
-**Updating to 0.5.0:** both the integration and any service must be on **0.5.0**.
-Update the app or standalone service first, then the integration and restart
-Core. The beta integration may show unavailable controls during that interval;
-the updated running service retains its heartbeat and charging intent with
-writes enabled. Existing USB settings remain valid; switching to LAN is optional.
-Existing beta-app installations receive the stable release
-through their existing catalog too: update normally, without reinstalling or
-changing repositories. See [service updates](modbus-service.md#updates).
+**The integration and app may have different version numbers.** The current
+integration requires **service 0.5.0 or newer with API 2**. The released 0.5.0 app
+already meets that requirement. A normal integration update does not update or
+restart the compatible app; its heartbeat and charging intent continue through
+Core's restart when writes are enabled.
+
+**Still using a 0.5.0 beta?** Update the app/service to stable **0.5.1 first**, then
+update the integration. The old beta integration may show unavailable controls
+between these updates because its API differs. Existing beta-app installations
+receive stable app releases through their existing catalog: no reinstall or
+repository change is needed. See [service updates](modbus-service.md#updates).
 
 Updates can take time to appear; use **Check for updates** in the app store for
 app updates. See

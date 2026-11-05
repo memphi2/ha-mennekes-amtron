@@ -23,6 +23,7 @@ from .register_blocks import REGISTER_BLOCKS
 from .registers import ERROR_CODE, REGISTERS_BY_KEY
 from .service_config import ServerConfig, integer, number
 from .service_store import IntentStore
+from .service_version import SERVICE_VERSION
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
@@ -274,6 +275,7 @@ class ModbusService:
         control = self.control
         return {
             "api_version": API_VERSION,
+            "service_version": SERVICE_VERSION,
             "identity": asdict(self.identity),
             "available": self._is_available(),
             "values": self.data.values,

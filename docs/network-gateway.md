@@ -12,10 +12,13 @@ from automated protocol tests.
 Check the adapter's configured operating mode, not just its product name.
 These two modes are different and must match the integration/service setting:
 
-| Adapter mode | Select | What travels over the network |
-|---|---|---|
-| Transparent serial server | **RTU over TCP** / `rtu_over_tcp` | Modbus RTU frames, including their CRC, passed through to RS-485. |
-| Modbus TCP-to-RTU gateway | **Modbus TCP** / `modbus_tcp` | Modbus TCP requests that the gateway translates to RTU on the bus. |
+| Adapter mode | App 0.5.1 choice | Standalone setting | What travels over the network |
+|---|---|---|---|
+| Transparent serial server | **LAN: Modbus RTU (TCP)** | `rtu_over_tcp` | Modbus RTU frames, including their CRC, passed through to RS-485. |
+| Modbus TCP-to-RTU gateway | **LAN: Modbus TCP** | `modbus_tcp` | Modbus TCP requests that the gateway translates to RTU on the bus. |
+
+For direct HA connections, select **RTU over TCP** or **Modbus TCP** in the
+integration's LAN form. The app's default **USB / RS-485** is for a local adapter.
 
 Set the adapter to accept a TCP client connection. Configure its RS-485 baud
 rate and frame to match the wallbox: factory defaults are **57600 baud, 8 data
@@ -35,7 +38,7 @@ Modbus TCP register interface. Supported models remain those in the
 
 | Connection owner | What to configure |
 |---|---|
-| **Modbus service — preferred, optional** | Set the app/service wallbox connection to `rtu_over_tcp` or `modbus_tcp`, then enter the adapter host and TCP port. HA continues to connect to the service. |
+| **Modbus service — preferred, optional** | Select the matching LAN protocol above, then enter the adapter host and TCP port. HA continues to connect to the service. |
 | **Home Assistant directly** | Choose **Add integration → Mennekes Amtron RTU → Direct LAN adapter connection** and enter the same protocol, host, TCP port and wallbox address. |
 
 The independent service keeps the heartbeat running through HA Core restarts
@@ -48,10 +51,10 @@ can still interrupt delivery; configure the wallbox's
 
 1. Follow the [service installation](modbus-service.md) and prepare any existing
    connection for handover before starting a second bus owner.
-2. Set **Wallbox connection** to the adapter protocol. Enter **Adapter host** as
-   a hostname or IP address, without `http://` or a URL path, and set its TCP port.
-   If the host field is hidden, enable **Show unused optional configuration
-   options** on the app's Configuration tab.
+2. Set **Wallbox connection** to **LAN: Modbus RTU (TCP)** or **LAN: Modbus TCP**,
+   matching the gateway. Enter **Adapter host / IP** as a hostname or IP address,
+   without `http://` or a URL path, and set its TCP port. The host field is always
+   visible in app 0.5.1; choosing LAN does not rearrange the configuration form.
 3. Leave **Serial adapter** unset. If switching from USB, clear an old adapter
    value that no longer exists. USB baud/frame fields are ignored for LAN;
    configure those on the gateway instead. Keep **Read-only** on initially.
@@ -62,6 +65,20 @@ No local USB device is required. The app's read-only switch still controls HA
 write permission. No additional write switch is needed in HA.
 
 For a standalone service, use the [LAN configuration example](service-standalone.md#lan-adapter-configuration).
+
+### App 0.5.0 configuration
+
+App 0.5.0 remains compatible with the integration. Its list uses the values
+`serial`, `rtu_over_tcp` and `modbus_tcp`; those saved values remain valid after
+an update. In app 0.5.1 they appear after the readable choices, and changing them
+is optional.
+
+If 0.5.0 shows the TCP port without a host field, enable **Show unused optional
+configuration options** on the app's Configuration tab. Alternatively, open its
+YAML editor and add `host: "192.168.1.123"`, replacing that example with your
+adapter's address. Save and restart the app to apply it. Changing the connection
+choice alone does not reveal the field. An app restart briefly interrupts the
+heartbeat; HA does not need a restart for this setting.
 
 ### Direct Home Assistant connection
 

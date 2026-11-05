@@ -4,8 +4,9 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-**Current release: 0.5.0.** The service and integration are installed separately;
-use matching releases. For an existing installation, [update the service first](#operation-and-updates).
+**Current service release: 0.5.1.** The service and integration are installed and
+updated independently. Their version numbers may differ; the current integration
+requires **service 0.5.0 or newer with API 2**. See [Updates](#operation-and-updates).
 
 ## 1. Prepare the serial handover
 
@@ -86,7 +87,7 @@ Configure the container with:
 
 | Setting | Value |
 |---|---|
-| Image | The full reference for the matching integration release |
+| Image | The full digest reference for a compatible service release |
 | Data mount | Your private data directory mounted at `/data` |
 | Device mapping | USB only: map the required serial adapter to the path in `options.json`. None for LAN. |
 | Network | A private network reachable by HA |
@@ -99,7 +100,7 @@ and deliberately choose a new release digest when updating.
 
 ### Python
 
-With Python 3.14+, install the matching release checkout into its own virtual
+With Python 3.14+, install a compatible service release checkout into its own virtual
 environment using `pip install .`, then run:
 
 ```bash
@@ -148,12 +149,19 @@ permission and Modbus polling. Keep the state directory across restarts and
 updates. A Core restart leaves the service running; a service update interrupts
 its heartbeat briefly. Do not run the old and new service together on the bus.
 
-For an update from a beta, replace the service with **0.5.0 first**, retaining its
-data directory, and wait for initialization. Then update the integration to
-**0.5.0** and restart Core. The old beta integration may show unavailable controls
-until both components are updated. The updated service keeps its heartbeat and
-charging intent with writes enabled while HA updates. Retaining the same data
-mount preserves the saved service intent and credential; no new HA entry is needed.
+A normal integration update leaves a compatible service running. Its version
+number need not match the integration: **service 0.5.0 with API 2 remains
+compatible**. Update the service when a service release is available or the
+integration's release notes require a newer minimum, not merely because a new
+integration version exists.
+
+If both need updating, replace the service first, retaining its data directory,
+and wait for initialization. Then update the integration and restart Core.
+Retaining the same data mount preserves saved intent and credentials; no new HA
+entry is needed. For older 0.5.0 betas, upgrade the service to stable **0.5.1
+first**, then update the integration: the old beta integration may show
+unavailable controls between those updates because its API differs. With writes enabled, the updated service keeps
+its heartbeat and charging intent while HA updates.
 
 [Everyday operation and troubleshooting](modbus-service.md#everyday-use) ·
 [API, diagnostics and local development](service-reference.md)

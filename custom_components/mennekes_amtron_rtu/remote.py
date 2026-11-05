@@ -28,6 +28,7 @@ from .device.heartbeat import HeartbeatTask
 from .device.identity import usable_max_evse_current
 from .device.register_blocks import REGISTER_BLOCKS
 from .device.registers import ERROR_CODE, RegisterSpec
+from .remote_compat import SUPPORTED_API_VERSION, validate_service_version
 from .remote_errors import ServiceConnectionError, ServiceFailure
 
 CONF_SERVER_URL = "server_url"
@@ -184,9 +185,10 @@ class RemoteClient(MennekesModbusClient):
         try:
             if type(payload.get("api_version")) is not int:
                 raise ValueError("unsupported API version")
-            if payload["api_version"] != 2:
-                self._mark_unavailable("service_version_mismatch")
+            if payload["api_version"] != SUPPORTED_API_VERSION:
                 raise ServiceConnectionError("service_version_mismatch", "service API version differs")
+            section = "service_version"
+            validate_service_version(payload)
             section = "values"
             values = payload["values"]
             control = payload["control"]
@@ -292,6 +294,9 @@ class RemoteClient(MennekesModbusClient):
             generation = payload["current_write_generation"]
             if type(generation) is not int or generation < 0:
                 raise ValueError("invalid generation")
+        except ServiceConnectionError as err:
+            self._mark_unavailable(err.reason)
+            raise
         except (KeyError, TypeError, ValueError) as err:
             self._mark_unavailable("service_invalid_response")
             raise ServiceConnectionError(
@@ -350,6 +355,8 @@ class RemoteClient(MennekesModbusClient):
                 raise DeviceError("service_auth_failed") from err
             if isinstance(err, ServiceConnectionError) and err.reason == "service_identity_changed":
                 raise DeviceError("device_identity_changed") from err
+            if isinstance(err, ServiceConnectionError) and err.reason == "service_version_mismatch":
+                raise DeviceError("service_version_mismatch") from err
             raise DeviceError("service_unavailable") from err
 
     async def async_read_register(self, spec: RegisterSpec) -> RegisterValue:

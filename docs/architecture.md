@@ -8,6 +8,15 @@ register map, USB/LAN transport, poll cadence, heartbeat and control rules.
 The same source is packaged as `amtron_device` for the independent service;
 there is no copied driver implementation to keep in sync.
 
+Integration and service versions are independent. The HTTP client checks API 2
+and a separate minimum service version (currently 0.5.0), not equality with the
+integration release. The already published 0.5.0 service is the known baseline
+for API 2 snapshots without a `service_version` field; that exception does not
+satisfy a future higher minimum. New service snapshots report their own version.
+An integration-only release reuses the compatible published app, so updating
+HA does not restart the service or interrupt its heartbeat. Service changes
+have their own version and publication decision; see [publication](service-releasing.md).
+
 ```mermaid
 flowchart LR
     HA[Home Assistant integration] <-->|Authenticated HTTP| Service[Modbus service]

@@ -19,12 +19,12 @@
       "service_discovery_requires_serial": "L’application n’a pas encore lu de numéro de série. Vérifiez sa connexion à la borne et réessayez.",
       "service_auth_failed": "Le service Modbus a refusé l’authentification. Pour une application du Supervisor, confirmez à nouveau pour récupérer ses identifiants actuels. Pour un service hébergé séparément, saisissez son jeton d’accès actuel.",
       "service_not_ready": "L’authentification auprès de l’application a réussi, mais les données de la borne ne sont pas encore disponibles. Consultez le journal de l’application et réessayez.",
-      "service_invalid_response": "L’application répond, mais ses données n’ont pas été acceptées. Mettez à jour l’intégration et l’application vers la même version. Le journal de Home Assistant indique la section concernée.",
+      "service_invalid_response": "L’application répond, mais ses données n’ont pas été acceptées. Le journal de Home Assistant indique la section concernée. Consultez le journal et téléchargez les diagnostics avant de redémarrer l’application.",
       "invalid_network_config": "Saisissez un nom d’hôte ou une adresse IP sans schéma d’URL, un port TCP de 1 à 65535 et le protocole de connexion approprié.",
       "cannot_connect_network": "L’adaptateur réseau est inaccessible ou la borne n’a pas répondu. Vérifiez l’hôte, le port, le protocole et les paramètres série de l’adaptateur.",
       "invalid_network_response": "L’adaptateur a répondu, mais aucune table de registres Modbus valide n’a été indiquée. Vérifiez l’adresse de la borne, le protocole de l’adaptateur et le mode satellite.",
       "service_discovery_unavailable": "Les identifiants actuels de cette application n’ont pas pu être récupérés. Vérifiez l’application et le Supervisor, démarrez ou redémarrez l’application si nécessaire, puis confirmez à nouveau.",
-      "service_version_mismatch": "L’intégration et le service Modbus utilisent des versions d’API différentes. Mettez les deux à jour vers la même version, en commençant par l’application ou le service hébergé séparément."
+      "service_version_mismatch": "Le service Modbus ne respecte pas les exigences d’API ou de version minimale de cette intégration. Utilisez une version compatible du service, conformément aux notes de version de l’intégration. Si les deux composants doivent être mis à jour, commencez par l’application ou le service hébergé séparément."
     },
     "progress": {
       "searching": "Recherche d’une borne sur le bus : jusqu’à {candidates} combinaisons, soit environ {minutes} minutes, auxquelles s’ajoutent les vérifications de connexion. Aucun registre n’est modifié. Pendant la reconfiguration, la connexion existante et le signal de présence sont interrompus ; le comportement de repli configuré sur la borne s’applique."
@@ -456,7 +456,7 @@
       "message": "La connexion signale une autre borne ou ne permet pas de confirmer son identité configurée. Vérifiez l’adresse de l’appareil et la configuration du service ou de l’adaptateur. Les commandes restent indisponibles tant que la borne configurée ne peut pas être confirmée."
     },
     "service_version_mismatch": {
-      "message": "L’intégration et le service Modbus utilisent des versions d’API différentes. Mettez les deux à jour vers la même version, en commençant par l’application ou le service hébergé séparément."
+      "message": "Le service Modbus ne respecte pas les exigences d’API ou de version minimale de cette intégration. Utilisez une version compatible du service, conformément aux notes de version de l’intégration. Si les deux composants doivent être mis à jour, commencez par l’application ou le service hébergé séparément."
     }
   },
   "issues": {

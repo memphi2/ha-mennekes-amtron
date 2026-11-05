@@ -51,7 +51,7 @@ configured fallback.
 | [Standalone service](service-standalone.md) | Run the service outside a Home Assistant app |
 | [LAN adapter setup](network-gateway.md) | Transparent RTU over TCP or a translating Modbus TCP-to-RTU gateway |
 | [Service reference](service-reference.md) | Service configuration and technical details |
-| [Upgrading older installations](upgrading.md) | Migration notes for the former integration domain |
+| [Updates and switching connections](upgrading.md) | Updates and moving an existing wallbox to the service |
 | [Modbus register map](modbus-registers.md) | Register meanings, values and read blocks |
 | [Architecture](architecture.md) | How the integration and service fit together |
 | [Quality scale](quality-scale.md) | Home Assistant quality-scale status |

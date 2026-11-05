@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import ast
 import base64
 import json
+import os
+import re
+import shutil
 import subprocess
 from copy import deepcopy
 
@@ -19,6 +23,8 @@ INFO = {
     "image": "ghcr.io/memphi2/ha-mennekes-amtron-service",
     "version": "0.5.0b1",
     "commit": "a" * 40,
+    # The integration's source release deliberately differs from the app version.
+    "source_tag": "v0.7.0",
     "channel": "apps-beta",
 }
 DIGEST = "sha256:" + "b" * 64
@@ -264,6 +270,7 @@ def test_catalogs_are_separate_and_allowlist_only_distributable_files(version, c
         f"FROM {INFO['image']}@{DIGEST}\n".encode()
     )
     assert f"{INFO['image']}@{DIGEST}".encode() in files["README.md"]
+    assert f"/releases/tag/{INFO['source_tag']}".encode() in files["README.md"]
 
 
 @pytest.mark.parametrize("digest", ["latest", "sha256:short", DIGEST + "\nRUN evil"])
@@ -397,8 +404,11 @@ def catalog_repository(monkeypatch, initial):
         return subprocess.CompletedProcess(command, 0, b"{}", b"")
 
     monkeypatch.setattr(catalog, "remote_commit", lambda *_: INFO["commit"])
-    monkeypatch.setattr(catalog, "run", lambda *_: DIGEST.encode())
-    monkeypatch.setattr(catalog, "verify_public", lambda *_: events.append(("verified", None)))
+    def verified_image(_info):
+        events.append(("verified", None))
+        return DIGEST
+
+    monkeypatch.setattr(catalog, "existing_verified_image", verified_image)
     monkeypatch.setattr(catalog, "api", api)
     monkeypatch.setattr(catalog.subprocess, "run", patch)
     return references, commits, events, published, fail_once
@@ -479,12 +489,11 @@ def test_invalid_catalog_preflight_prevents_every_target_mutation(monkeypatch, f
 
 def test_unavailable_image_prevents_all_catalog_mutations(monkeypatch):
     monkeypatch.setattr(catalog, "remote_commit", lambda *_: INFO["commit"])
-    monkeypatch.setattr(catalog, "run", lambda *_: DIGEST.encode())
 
     def unavailable(*_):
         raise ValueError("private image")
 
-    monkeypatch.setattr(catalog, "verify_public", unavailable)
+    monkeypatch.setattr(catalog, "existing_verified_image", unavailable)
     monkeypatch.setattr(
         catalog,
         "api",
@@ -498,8 +507,7 @@ def test_unavailable_image_prevents_all_catalog_mutations(monkeypatch):
 
 def test_catalog_updates_use_fast_forward_only(monkeypatch):
     monkeypatch.setattr(catalog, "remote_commit", lambda *_: INFO["commit"])
-    monkeypatch.setattr(catalog, "run", lambda *_: DIGEST.encode())
-    monkeypatch.setattr(catalog, "verify_public", lambda *_: None)
+    monkeypatch.setattr(catalog, "existing_verified_image", lambda *_: DIGEST)
     previous = {**INFO, "version": "0.4.0b1", "digest": OTHER_DIGEST}
 
     def api(_repository, endpoint, payload=None, **_kwargs):
@@ -545,8 +553,208 @@ def test_release_pipeline_orders_image_release_and_catalog_publication():
     )
     jobs = workflow["jobs"]
     assert "main-validation" in jobs["service-images"]["needs"]
+    assert "service-plan" in jobs["service-images"]["needs"]
+    assert set(jobs["service-plan"]["needs"]) == {"validate", "hacs", "hassfest", "main-validation"}
     assert "service-manifest" in jobs["publish"]["needs"]
     assert "publish" in jobs["service-catalog"]["needs"]
     assert "service-manifest" in jobs["service-catalog"]["needs"]
     assert jobs["service-catalog"]["concurrency"]["cancel-in-progress"] is False
     assert jobs["service-catalog"]["concurrency"]["group"] == "service-catalog"
+
+
+@pytest.mark.parametrize("expected", ["matching", "changed", "missing", "invalid"])
+def test_release_planner_checks_trusted_main_before_running_repository_code(tmp_path, expected):
+    workflow = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())
+    steps = workflow["jobs"]["service-plan"]["steps"]
+    assert steps[0]["uses"].startswith("actions/checkout@")
+    assert steps[0]["with"]["ref"] == "refs/heads/main"
+    assert steps[0]["with"]["persist-credentials"] is False
+    guard = steps[1]
+    assert guard["env"] == {"VALIDATED_COMMIT": "${{ needs.main-validation.outputs.commit }}"}
+    assert "run" in guard
+    assert steps[2]["uses"].startswith("actions/setup-python@")
+    git_path = shutil.which("git")
+    bash_path = shutil.which("bash")
+    assert git_path
+    assert bash_path
+
+    def git(*args):
+        return subprocess.run(
+            [git_path, "-c", "commit.gpgsign=false", *args],
+            cwd=tmp_path, check=True, capture_output=True, text=True,
+        ).stdout.strip()
+
+    git("init", "--quiet")
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--quiet", "--allow-empty", "-m", "validated")
+    validated = git("rev-parse", "HEAD")
+    if expected == "changed":
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--quiet", "--allow-empty", "-m", "advanced")
+    env = dict(os.environ)
+    env.pop("VALIDATED_COMMIT", None)
+    if expected != "missing":
+        env["VALIDATED_COMMIT"] = "$(touch injected)" if expected == "invalid" else validated
+    result = subprocess.run(
+        [bash_path, "-c", guard["run"]], cwd=tmp_path, env=env,
+        capture_output=True, text=True, check=False,
+    )
+    assert (result.returncode == 0) is (expected == "matching")
+    assert not (tmp_path / "injected").exists()
+
+
+def test_release_buildx_never_restores_or_populates_a_shared_binary_cache():
+    workflow = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())
+    buildx_jobs = set()
+    for name, job in workflow["jobs"].items():
+        for step in job["steps"]:
+            if step.get("uses", "").startswith("docker/setup-buildx-action@"):
+                buildx_jobs.add(name)
+                assert step["with"]["cache-binary"] is False
+    assert buildx_jobs == {"service-plan", "service-images", "service-manifest", "service-catalog"}
+
+
+def test_app_metadata_and_source_release_versions_are_independent(tmp_path, monkeypatch):
+    monkeypatch.setattr(images, "ROOT", tmp_path)
+    app = tmp_path / "modbus_service"
+    app.mkdir()
+    (app / "config.yaml").write_text(yaml.safe_dump({"arch": ["amd64", "aarch64"]}))
+    monkeypatch.setattr(images, "read_integration_version", lambda: "0.9.3")
+    monkeypatch.setattr(images, "read_service_version", lambda root: "0.6.2" if root == tmp_path else None)
+    monkeypatch.setattr(images, "run", lambda *_: INFO["commit"].encode())
+    info = images.release_info(INFO["repository"], "v0.9.3")
+    assert info["version"] == "0.6.2"
+    assert info["source_tag"] == "v0.9.3"
+    assert info["channel"] == "apps"
+    with pytest.raises(ValueError, match="tag differs"):
+        images.release_info(INFO["repository"], "v0.6.2")
+
+
+def test_missing_service_image_is_the_only_rebuild_case(monkeypatch):
+    checked = []
+    monkeypatch.setattr(images, "remote_commit", lambda repo, tag: checked.append((repo, tag)) or INFO["commit"])
+    monkeypatch.setattr(images, "inspect_index", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(images, "run", lambda *_: pytest.fail("no existing image to verify"))
+    assert images.existing_verified_image(INFO) is None
+    assert checked == [(INFO["repository"], INFO["source_tag"])]
+
+
+@pytest.mark.parametrize("failure", [None, "source_tag", "attestation", "public", "digest"])
+def test_reused_image_requires_its_original_source_attestation_and_public_access(monkeypatch, failure):
+    monkeypatch.setattr(images, "remote_commit", lambda *_: "bad" if failure == "source_tag" else INFO["commit"])
+    monkeypatch.setattr(images, "inspect_index", lambda *_args, **_kwargs: {"manifests": []})
+    commands = []
+    public = []
+
+    def run(*args):
+        commands.append(args)
+        if args[0] == "docker":
+            assert args[4] == f"{INFO['image']}:{INFO['version']}"
+            return b"not-a-digest" if failure == "digest" else DIGEST.encode()
+        assert args == (
+            "gh", "attestation", "verify", f"oci://{INFO['image']}@{DIGEST}",
+            "--repo", INFO["repository"],
+            "--signer-workflow", f"{INFO['repository']}/.github/workflows/release.yml",
+            "--source-ref", f"refs/tags/{INFO['source_tag']}",
+            "--source-digest", INFO["commit"],
+        )
+        if failure == "attestation":
+            raise subprocess.CalledProcessError(1, args)
+        return b"verified"
+
+    def verify_public(info, digest):
+        public.append((info, digest))
+        if failure == "public":
+            raise ValueError("private image")
+
+    monkeypatch.setattr(images, "run", run)
+    monkeypatch.setattr(images, "verify_public", verify_public)
+    if failure is None:
+        assert images.existing_verified_image(INFO) == DIGEST
+        assert len(commands) == 2
+        assert public == [(INFO, DIGEST)]
+    else:
+        with pytest.raises((ValueError, subprocess.CalledProcessError)):
+            images.existing_verified_image(INFO)
+        if failure != "public":
+            assert not public
+
+
+def test_legacy_catalog_without_source_tag_retains_original_release_identity():
+    info = {**INFO, "source_tag": f"v{INFO['version']}"}
+    old = {key: value for key, value in info.items() if key != "source_tag"}
+    assert catalog.check_forward({**old, "digest": DIGEST}, info, DIGEST) is False
+    with pytest.raises(ValueError, match="replacement"):
+        catalog.check_forward({**old, "digest": DIGEST}, INFO, DIGEST)
+
+
+@pytest.mark.parametrize("actual", [None, OTHER_DIGEST, DIGEST])
+def test_resume_cli_requires_the_digest_approved_by_the_plan(monkeypatch, capsys, actual):
+    monkeypatch.setattr(images, "release_info", lambda *_: dict(INFO))
+    monkeypatch.setattr(images, "existing_verified_image", lambda *_: actual)
+    monkeypatch.setattr("sys.argv", [
+        "service_image.py", "existing", "--tag", INFO["source_tag"], "--digest", DIGEST,
+    ])
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+    assert images.main() == (0 if actual == DIGEST else 1)
+    result = capsys.readouterr()
+    if actual == DIGEST:
+        assert json.loads(result.out) == {**INFO, "digest": DIGEST}
+    else:
+        assert not result.out
+        assert "missing" in result.err or "differs from the release plan" in result.err
+
+
+def _job_runs(jobs, name, results, *, build, publish):
+    """Evaluate the actual workflow's small boolean condition grammar."""
+    job = jobs[name]
+    expression = job.get("if", "true").strip().removeprefix("${{").removesuffix("}}").strip()
+    dependencies = job.get("needs", [])
+    if "always()" not in expression and any(results.get(key, "success") != "success" for key in dependencies):
+        return False
+    values = {"build_required": build, "catalog_required": publish}
+    expression = re.sub(
+        r"needs\.([\w-]+)\.(result|outputs\.\w+)",
+        lambda match: repr(results.get(match[1], "success") if match[2] == "result" else values[match[2].split(".")[1]]),
+        expression,
+    )
+    expression = expression.replace("always()", "True").replace("&&", " and ").replace("||", " or ")
+
+    def evaluate(node):
+        if isinstance(node, ast.Constant):
+            return node.value
+        if isinstance(node, ast.BoolOp):
+            values = [evaluate(value) for value in node.values]
+            return all(values) if isinstance(node.op, ast.And) else any(values)
+        if isinstance(node, ast.Compare) and len(node.ops) == 1 and isinstance(node.ops[0], ast.Eq):
+            return evaluate(node.left) == evaluate(node.comparators[0])
+        raise AssertionError(f"unsupported workflow expression: {ast.dump(node)}")
+
+    return evaluate(ast.parse(expression.replace("\n", " "), mode="eval").body)
+
+
+@pytest.mark.parametrize(("build", "publish", "image_result", "manifest_result"), [
+    ("false", "false", "skipped", "skipped"),
+    ("true", "true", "success", "success"),
+    ("false", "true", "skipped", "success"),
+])
+def test_release_workflow_allows_reuse_fresh_build_and_partial_publication_resume(
+    build, publish, image_result, manifest_result
+):
+    jobs = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())["jobs"]
+    results = {"service-images": image_result, "service-manifest": manifest_result}
+    assert _job_runs(jobs, "service-images", results, build=build, publish=publish) is (build == "true")
+    assert _job_runs(jobs, "service-manifest", results, build=build, publish=publish) is (publish == "true")
+    assert _job_runs(jobs, "publish", results, build=build, publish=publish)
+    assert _job_runs(jobs, "service-catalog", results, build=build, publish=publish) is (publish == "true")
+
+
+@pytest.mark.parametrize("gate", ["validate", "hacs", "hassfest", "main-validation", "service-plan", "service-manifest"])
+@pytest.mark.parametrize("failure", ["failure", "cancelled", "skipped"])
+def test_release_workflow_never_ignores_a_required_gate_failure(gate, failure):
+    jobs = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())["jobs"]
+    assert not _job_runs(jobs, "publish", {gate: failure}, build="true", publish="true")
+
+
+@pytest.mark.parametrize("failure", ["failure", "cancelled", "skipped"])
+def test_app_image_failure_blocks_manifest_even_with_always(failure):
+    jobs = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())["jobs"]
+    assert not _job_runs(jobs, "service-manifest", {"service-images": failure}, build="true", publish="true")

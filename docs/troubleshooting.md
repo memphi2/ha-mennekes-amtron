@@ -28,8 +28,9 @@ app. HA itself needs no restart for this switch. The app's switch is the only
 write-permission setting. After a fresh, healthy
 service status reaches HA, controls become available automatically. They keep
 their entity IDs while read-only, disconnected or not ready; no second HA switch
-is required. If you are upgrading from a beta where they were missing, update
-both components and restart HA as described in the installation guide.
+is required. If you are upgrading from an old beta where they were missing,
+follow [the beta upgrade steps](installation.md#updates). A routine integration
+update does not require updating or restarting a compatible app.
 
 If just one feature is missing, check the [entity reference](entities.md):
 older register layouts provide fewer sensors, phase selection requires capable
@@ -69,13 +70,13 @@ itself, or configure those fields in the app when the service owns it.
 
 | Message or symptom | What to check |
 |---|---|
-| No discovery, or the integration asks for URL and token | Confirm the app is installed and running, then check Devices & services again. Verify that both app and integration are current. If you have multiple Modbus apps, select the matching discovered app. |
+| No discovery, or the integration asks for URL and token | Confirm the app is installed and running, then check Devices & services again. Check the integration’s minimum service/API requirements; the app and integration version numbers may differ. If you have multiple Modbus apps, select the matching discovered app. |
 | **App cannot be reached** | Check that the app stays running. For a separate service, also check its host, network and port 8765. |
 | **Token invalid / authentication failed** | During setup, confirm discovery again or check the standalone token. For an existing entry, follow [Renew service access](#renew-service-access). Do not post tokens in an issue. |
 | **Not ready** | Authentication succeeded, but usable wallbox data is not available yet. Check the app log for USB/LAN connection and initialization, then retry. Changing the token will not fix this. |
 | **No serial number yet** | The app has not read the serial number needed to match the wallbox. Check the wallbox connection and supported register layout. |
-| **Integration and service use different API versions** | Update the app or standalone service to **0.5.0 first**, then the integration to **0.5.0** and restart Core. An old beta integration may show unavailable controls until both are updated. Keep the existing app data and integration entry; changing the token will not fix this. |
-| **App responds, but its data was not accepted** / `invalid service snapshot` | Check that both components are on 0.5.0; [update the service first](installation.md#updates) if needed. If it persists, copy the field named in parentheses in the HA log, such as `identity.max_evse_current`, and download diagnostics. This is a data-validation error, not proof of a bad token. |
+| **Service API or minimum-version requirements are not met** | The current integration needs **service 0.5.0 or newer with API 2**. Check the requirements in its release notes. Different version numbers alone are fine. If both need updating, update the app/service first, then the integration and restart Core. Keep existing data and entries; changing the token will not fix this. |
+| **App responds, but its data was not accepted** / `invalid service snapshot` | Copy the field named in parentheses in the HA log, such as `identity.max_evse_current`, and download diagnostics before restarting the app. Include both component versions. This is a data-validation error; differing release numbers or a bad token are not implied. |
 | **Different wallbox / identity cannot be confirmed** | Check the Modbus address, gateway route and service configuration; see [wallbox identity](#a-different-wallbox-is-reported). |
 | App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
 
@@ -280,8 +281,9 @@ its owning process restarts; it adds no Recorder rows.
 | `failed_blocks` | Register groups whose latest read failed. |
 
 Service event/write history is fetched only when downloading diagnostics; it is
-not included in regular status polling. Update both components to get these
-fields. The histories omit packet contents, write values and arbitrary exception
+not included in regular status polling. The stable 0.5.0 service provides these
+fields; an integration-only update does not require an app restart to retain
+them. The histories omit packet contents, write values and arbitrary exception
 messages. Diagnostics omit identifying register fields, the serial number and
 full serial-port path.
 

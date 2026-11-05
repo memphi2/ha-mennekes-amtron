@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.5.1 — 2026-11-05
+
+- Release the Modbus app independently when its service changes. Integration
+  updates accept compatible service versions from the declared minimum; the
+  existing 0.5.0 API 2 app can keep its heartbeat running without an app update.
+- Show the LAN adapter's host/IP field directly in the app configuration and
+  offer readable USB/LAN connection names. Existing saved connection values
+  remain valid; LAN requires an address while USB leaves it blank.
+
 ## 0.5.0 — 2026-11-05
 
 - Release the optional independent Modbus service as stable. It keeps heartbeat
