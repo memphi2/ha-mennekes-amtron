@@ -9,7 +9,8 @@ The service can reach the RTU wallbox through **USB or a LAN-to-RS-485 adapter**
 LAN needs no USB device on its host; see [LAN setup](network-gateway.md) for the
 two supported gateway protocols.
 
-**Current release: 0.5.0.** The integration and app are installed separately.
+**Current service release: 0.5.1.** The integration and app are installed and
+updated independently. Their version numbers do not need to match.
 Check the [handover](#check-the-handover) on your hardware before relying on it.
 
 [Install on HA OS](#install-on-home-assistant-os) ·
@@ -42,7 +43,7 @@ if the wallbox has not yet been prepared.
 
 ### 1. Install the integration
 
-Install **Mennekes Amtron RTU 0.5.0** from the Marketplace on HA 2026.11+, or
+Install **Mennekes Amtron RTU** from the Marketplace on HA 2026.11+, or
 HACS on HA 2026.9/2026.10, and complete the requested Core restart.
 Use the stable release; pre-release access is not required.
 
@@ -66,20 +67,27 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
-If **Serial adapter** or **Adapter host** is hidden, enable **Show unused optional
-configuration options** in the app's Configuration tab. Fill only the field
-needed for your USB or LAN connection.
+In app **0.5.1**, **Adapter host / IP** is always visible. Enter the adapter's
+hostname or IP for LAN; leave it empty for USB. If **Serial adapter** is hidden,
+enable **Show unused optional configuration options** in the Configuration tab.
+Changing the connection choice does not hide or reveal other fields.
 
 | App option | What to enter |
 |---|---|
-| Wallbox connection | `serial` for USB; `rtu_over_tcp` for a transparent LAN adapter; `modbus_tcp` for a translating Modbus TCP-to-RTU gateway. |
+| Wallbox connection | **USB / RS-485** (default), **LAN: Modbus RTU (TCP)** for a transparent adapter, or **LAN: Modbus TCP** for a translating gateway. |
 | Serial adapter | USB only: select the adapter, preferably `/dev/serial/by-id/...`. Leave unset for LAN. |
-| Adapter host / TCP port | LAN only: gateway hostname/IP and listening port, default **502**. No URL scheme or path. |
+| Adapter host / IP + TCP port | LAN: gateway hostname/IP and listening port, default **502**. No URL scheme or path. For USB, leave the host empty. |
 | Wallbox address | The configured address; factory default **50**. |
 | Baud rate / serial frame | USB only: match the wallbox; factory defaults **57600 / 8n2**. For LAN, configure these on the gateway itself. |
 | Read-only | Leave **on** while checking the readings. |
 | Current cap | The permitted charging current for your installation; default **6 A**. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. The measurement interval helps limit database traffic. |
+
+Existing 0.5.0 settings named `serial`, `rtu_over_tcp` or `modbus_tcp` remain
+valid and also appear at the end of the list; changing to their readable
+counterparts is optional. No connection is changed automatically.
+Still on app 0.5.0 and missing the host field? See the
+[0.5.0 configuration workaround](network-gateway.md#app-050-configuration).
 
 Leave the app's **API** listen address and port at their defaults. Its HTTP port
 **8765** is separate from the gateway's Modbus TCP port. No service URL, token or
@@ -170,21 +178,26 @@ health changes rather than every beat. For smaller HA history, use a
 
 ## Updates
 
-1. **Update the existing app to 0.5.0 first.** Use **Check for updates** in the
-   app store, update normally and wait for the app to initialize. For a separate
-   service, follow the [standalone update steps](service-standalone.md#operation-and-updates).
-2. **Update the integration to 0.5.0**, then restart Home Assistant Core.
+**You do not need an app update for every integration update.** The current
+integration accepts **service 0.5.0 or newer with API 2**. The released 0.5.0 app
+already satisfies that requirement, even when the integration has a newer
+version number. Updating only the integration and restarting Core leaves the
+app, its heartbeat and its saved charging intent running with writes enabled.
 
-The beta integration may show unavailable controls between these updates. The
-updated running app retains its heartbeat and charging intent with writes
-enabled; it does not need another restart when HA updates. **The app update
-itself briefly interrupts its heartbeat.**
+When an app update is offered, read its own changes and update normally. If an
+integration update requires a newer service, its release notes state that
+minimum. **If both need updating, update the app first**, wait for initialization,
+then update the integration and restart Core. Use **Check for updates** in the
+app store; for a separate service, follow the
+[standalone update steps](service-standalone.md#operation-and-updates).
+**Updating the app itself briefly interrupts its heartbeat.**
 
-**From a beta to stable 0.5.0:** keep the existing HA entry and app. Complete both
-updates in the order above. Stable releases are offered in both `#apps` and
-`#apps-beta`, so no reinstall or repository change is needed. The existing app's
-token and saved charging state are retained. USB settings remain valid;
-LAN is an optional connection change.
+**From a 0.5.0 beta:** update the app/service to stable **0.5.1 first**, then the
+integration. The old beta integration may show unavailable controls between the
+updates because its API differs. Keep the existing HA entry and app. Stable app
+releases are offered in both `#apps` and `#apps-beta`, so no reinstall or
+repository change is needed. The existing token and saved charging state are
+retained. USB settings remain valid; LAN is an optional connection change.
 
 The beta and stable repositories end in `#apps-beta` and `#apps`. The beta catalog
 also offers future prereleases; the stable catalog offers stable releases only.
@@ -203,7 +216,7 @@ Keep the old app and backup until the handover is verified.
 | HA asks for a URL or token | Confirm that the app is running, then use its discovery card or **Connect to the Modbus service**. Manual credentials are for standalone services. |
 | App not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
 | Token rejected | During setup, retry discovery confirmation. For an existing connection, HA tries to refresh access automatically; if an authentication notice remains, [renew service access](troubleshooting.md#renew-service-access). No manual app token is needed. |
-| Integration and service versions do not match | Complete the [two updates](#updates): app/service first, then integration and Core restart. Both must be on 0.5.0. Changing the token does not fix this. |
+| Service API or minimum version is incompatible | Check the integration’s required API and minimum service version in its release notes. Different version numbers alone are fine. Follow [Updates](#updates) if the service needs updating; changing the token does not fix this. |
 | Controls are unavailable | Check the app's **Read-only** switch and USB/LAN connection. After changing app settings, save and restart the app, then wait for fresh status. |
 | App exits immediately | Look for **Invalid or unreadable service configuration** in its log; the message names the invalid option or startup phase. |
 | App runs but cannot reach the wallbox | Check adapter path, bus settings and exclusive bus ownership. A missing serial device is retried. |

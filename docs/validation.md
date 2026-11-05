@@ -97,7 +97,7 @@ an existing archive. Concurrent builds, including those sharing an output path,
 are covered by regression tests.
 
 ```bash
-.venv/bin/python scripts/release_check.py --ref v0.5.0 --published
+.venv/bin/python scripts/release_check.py --ref v0.5.1 --published
 ```
 
 Use the intended release tag or approved commit. This read-only check requires
@@ -122,6 +122,12 @@ the source commit timestamp (`source_date`) and a deterministic document
 identifier, so the same source and ZIP produce identical verification files.
 An incomplete draft remains private for inspection. Published files are never
 repaired by overwriting them; corrections require a new version.
+
+For an integration-only release, also verify that the app publication plan
+reuses the existing service: its version, image digest, original source and
+catalog commits must remain unchanged. A service update instead needs its own
+new version and image/catalog verification. See [Service publication](service-releasing.md)
+for the relevant-input comparison and independent version sources.
 
 ## Stable and preview compatibility
 

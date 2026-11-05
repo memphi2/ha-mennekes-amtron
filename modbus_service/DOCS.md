@@ -4,10 +4,10 @@ Keep the wallbox heartbeat running through Home Assistant Core restarts.
 This optional app is the preferred way to operate the integration: it holds
 the last charging state, including a deliberate pause, while HA is offline.
 
-**Version 0.5.0 · amd64 and aarch64 · separate integration required**
+**Version 0.5.1 · amd64 and aarch64 · separate integration required**
 
 LAN-to-RS-485 adapters are supported without local USB.
-See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0/docs/network-gateway.md)
+See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/network-gateway.md)
 for transparent RTU over TCP versus translating Modbus TCP-to-RTU gateways.
 
 [First setup](#first-setup) · [Daily use](#daily-use) ·
@@ -15,17 +15,17 @@ for transparent RTU over TCP versus translating Modbus TCP-to-RTU gateways.
 
 ## First setup
 
-For a new setup, install the **0.5.0 Mennekes Amtron RTU integration** and restart Home
+For a new setup, install the **Mennekes Amtron RTU integration** and restart Home
 Assistant Core. Use the stable release in the Marketplace on HA 2026.11+, or
 HACS on older supported versions. The integration and this app are
 separate installations. Already using the app? Follow [Updates](#updates)
-instead: the service must be updated before the integration.
+instead: the app and integration can be updated independently.
 
 1. **Prepare an existing wallbox.** Note its pause, current limit, resume current
    and charging-release settings. Disconnect the vehicle for the first handover.
    Disable the existing direct USB or LAN integration entry to release its connection;
    keep the entry so its device and entity IDs are retained.
-2. **Configure the app.** Choose USB (`serial`) or the matching LAN protocol.
+2. **Configure the app.** Choose **USB / RS-485** or the matching LAN protocol.
    Enter the wallbox address and connection settings below. For LAN, configure
    baud rate/frame on the gateway. Leave **Read-only on** initially.
 3. **Start the app.** Enable **Start on boot** and **Watchdog**. Check the log for
@@ -45,18 +45,24 @@ instead: the service must be updated before the integration.
 
 | App option | Initial setting |
 |---|---|
-| Wallbox connection | `serial` (USB), `rtu_over_tcp` (transparent LAN adapter), or `modbus_tcp` (translating gateway). |
+| Wallbox connection | **USB / RS-485** (default), **LAN: Modbus RTU (TCP)** (transparent adapter), or **LAN: Modbus TCP** (translating gateway). |
 | Serial adapter | USB only: select the adapter; prefer `/dev/serial/by-id/...`. Leave unset for LAN. |
-| Adapter host / TCP port | LAN only: hostname/IP without a URL scheme, and gateway port; default **502**. |
+| Adapter host / IP + TCP port | LAN: hostname/IP without a URL scheme, and gateway port; default **502**. For USB, leave the host empty. |
 | Wallbox address | Match the wallbox; factory default **50**. |
 | Baud rate / frame | USB only: match the wallbox, factory defaults **57600 / 8n2**. For LAN, configure these on the gateway. |
 | Read-only | **On** until readings are checked. |
 | Current cap | Default **6 A**; set within your installation's permitted current. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. |
 
-If **Serial adapter** or **Adapter host** is hidden, enable **Show unused optional
-configuration options** on the Configuration tab. Fill only the field your
-connection needs.
+In app **0.5.1**, **Adapter host / IP** is always visible; enter it for LAN and
+leave it empty for USB. If **Serial adapter** is hidden, enable **Show unused
+optional configuration options** on the Configuration tab. The form does not
+show or hide other fields when you change the connection choice.
+
+Existing values `serial`, `rtu_over_tcp` and `modbus_tcp` remain valid and appear
+at the end of the list. You can choose the corresponding readable name, but
+existing connections are not changed automatically. For a missing host field
+in 0.5.0, use the [older-app workaround](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/network-gateway.md#app-050-configuration).
 
 Leave the app's API settings at their defaults: HTTP port **8765** is separate
 from a LAN adapter's Modbus port. No host port needs publishing and no service
@@ -93,19 +99,24 @@ replace a small file rather than accumulating a history.
 
 ## Updates
 
-1. **Update this app to 0.5.0 first.** Use **Check for updates** in the app store,
-   update normally and wait for the app to initialize.
-2. **Update the integration to 0.5.0**, then restart Home Assistant Core.
+**The app does not need an update whenever the integration changes.** Their
+version numbers may differ. The current integration needs **service 0.5.0 or
+newer with API 2**; this app already meets that requirement. Updating only the
+integration and restarting Core leaves the app and its heartbeat running with
+writes enabled.
 
-The old beta integration may show unavailable controls until both updates are
-complete. The updated app retains its heartbeat and charging intent with writes
-enabled while HA updates. **Updating the app itself briefly interrupts the
-heartbeat.** No further app restart is needed for the integration update.
+Update the app when its own update is offered or the integration's release notes
+require a newer service. Use **Check for updates** in the app store. **If both
+components need updating, update the app first**, wait for initialization, then
+update the integration and restart Core. **Updating the app itself briefly
+interrupts the heartbeat.** Keep its data and the existing HA entry.
 
-Keep the existing HA integration entry and app when updating. Stable 0.5.0 is
-offered in both app catalogs, so a beta-app installation can update normally
-without a reinstall or repository change. Its token and saved charging state
-are retained. Existing USB settings remain valid; switching to LAN is optional.
+**From a 0.5.0 beta:** update this app to stable **0.5.1 first**, then the
+integration. The old beta integration may show unavailable controls between
+updates because its API differs. Stable app releases are offered in both app
+catalogs, so no reinstall or repository change is needed. The token and saved
+charging state are retained. Existing USB settings remain valid; switching to
+LAN is optional.
 
 The beta repository ends in `#apps-beta` and also offers future prereleases;
 the stable-only repository uses `#apps`. Switching catalogs is optional and
@@ -122,8 +133,8 @@ settings as in the first setup before reconnecting the vehicle.
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
 | Not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
-| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0/docs/troubleshooting.md#renew-service-access). |
-| Integration and service versions do not match | Complete [Updates](#updates): app first, then integration and Core restart. Both must be on 0.5.0; changing the token does not fix this. |
+| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/troubleshooting.md#renew-service-access). |
+| Service API or minimum version is incompatible | Check the API and minimum service version required in the integration’s release notes. Version numbers do not need to match. Follow [Updates](#updates) if needed; changing the token does not fix this. |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
 | Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. |
@@ -137,4 +148,4 @@ Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Error-200 recovery while paused and particular LAN gateways still need
 confirmation on the actual hardware; automated tests do not establish that.
 
-[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0/docs/modbus-service.md)
+[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/modbus-service.md)

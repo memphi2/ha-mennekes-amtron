@@ -10,12 +10,16 @@ Back up Home Assistant, read the offered release notes and follow
 [Installation → Updates](installation.md#updates). Complete the requested Core
 restart and check the existing wallbox's readings and heartbeat afterward.
 
-With the service, **update the app or standalone service first**, then update
-the integration and restart Core. Both must be on **0.5.0**. The old beta
-integration may temporarily show unavailable controls until both updates are
-complete; the updated service keeps its heartbeat and charging intent while HA
-updates. A Core restart leaves the running app active; an app or host restart
-interrupts its heartbeat.
+The integration and service have independent versions. **Service 0.5.0 with
+API 2 remains compatible**; a routine integration update does not require an
+app update or restart. Core can restart while the compatible service continues
+its heartbeat and saved charging intent with writes enabled.
+
+If an app update is offered or the integration raises its minimum service
+requirement, follow the release notes. **When both need updating, update the
+app or standalone service first**, then the integration and restart Core.
+An app or host restart interrupts the heartbeat. Older 0.5.0 beta installations
+need the stable service first because their service API differs.
 See the [service guide](modbus-service.md) for the current release channel and
 update instructions. Do not add the wallbox again to refresh its credentials or
 restore missing controls.
