@@ -3,7 +3,7 @@
     "abort": {
       "already_configured": "Questa wallbox è già configurata.",
       "reconfigure_successful": "La connessione è stata aggiornata.",
-      "unique_id_mismatch": "Questa porta appartiene a un'altra wallbox.",
+      "unique_id_mismatch": "Questa connessione appartiene a un’altra wallbox.",
       "service_migration_requires_serial": "Per riconoscere il dispositivo esistente durante la migrazione, il numero di serie della wallbox deve essere leggibile.",
       "invalid_service_discovery": "L'app ha fornito dati di connessione non validi.",
       "service_identity_changed": "La wallbox rilevata è cambiata. Riavvia la configurazione.",
@@ -18,7 +18,10 @@
       "service_discovery_requires_serial": "L'app non ha ancora letto un numero di serie. Controlla la connessione alla wallbox e riprova.",
       "service_auth_failed": "L'app ha rifiutato l'autenticazione. Conferma di nuovo per recuperare le credenziali attuali da Supervisor. Per un servizio su un host separato, controlla il token configurato.",
       "service_not_ready": "L'autenticazione all'app è riuscita, ma i dati della wallbox non sono ancora disponibili. Controlla il registro dell'app e riprova.",
-      "service_invalid_response": "L'app risponde, ma i suoi dati non sono stati accettati. Aggiorna l'integrazione e l'app alla stessa versione. Il registro di Home Assistant indica la sezione dei dati interessata."
+      "service_invalid_response": "L'app risponde, ma i suoi dati non sono stati accettati. Aggiorna l'integrazione e l'app alla stessa versione. Il registro di Home Assistant indica la sezione dei dati interessata.",
+      "invalid_network_config": "Inserisci un nome host o un indirizzo IP senza schema URL, una porta TCP da 1 a 65535 e il protocollo di connessione corretto.",
+      "cannot_connect_network": "L’adattatore LAN non è raggiungibile o la wallbox non risponde. Controlla host, porta, protocollo e impostazioni seriali dell’adattatore.",
+      "invalid_network_response": "L’adattatore ha risposto, ma non ha indicato una mappa registri Modbus valida. Controlla indirizzo della wallbox, protocollo dell’adattatore e modalità satellite."
     },
     "progress": {
       "searching": "Ricerca di una wallbox sul bus: fino a {candidates} combinazioni, circa {minutes} minuti più le verifiche di connessione. Non viene scritto alcun registro. Durante la riconfigurazione, la connessione esistente e l'heartbeat vengono sospesi; si applica il comportamento di fallback configurato nella wallbox."
@@ -28,7 +31,8 @@
         "title": "Modifica connessione",
         "menu_options": {
           "server": "Connetti al servizio Modbus",
-          "serial_reconfigure": "Modifica connessione seriale"
+          "serial_reconfigure": "Modifica connessione seriale",
+          "network_reconfigure": "Modifica connessione adattatore LAN"
         }
       },
       "search_result": {
@@ -39,7 +43,8 @@
         "title": "Connetti la wallbox",
         "menu_options": {
           "server": "Servizio Modbus (continua durante i riavvii di HA)",
-          "serial": "Connessione seriale diretta"
+          "serial": "Connessione seriale diretta",
+          "network": "Connessione diretta tramite adattatore LAN"
         }
       },
       "serial": {
@@ -80,15 +85,50 @@
       },
       "server": {
         "title": "Connetti al servizio Modbus",
-        "description": "Le app Supervisor si connettono automaticamente senza inserire URL o token. Questo modulo è per un servizio su un host separato. Per passare da Modbus diretto al servizio, disabilita prima la voce dell'integrazione precedente per liberare la porta seriale.",
+        "description": "Le app Supervisor si connettono automaticamente senza inserire URL o token. Questo modulo è per un servizio su un host separato. Per passare da Modbus diretto al servizio, disabilita prima la voce dell'integrazione precedente per liberare la connessione Modbus.",
         "data": {
           "server_url": "URL del servizio",
           "server_token": "Token di accesso"
+        },
+        "data_description": {
+          "server_url": "Indirizzo HTTP del servizio Modbus indipendente, normalmente sulla porta 8765. Non inserire qui l’indirizzo dell’adattatore Modbus LAN."
         }
       },
       "hassio_confirm": {
         "title": "Connetti l'app Modbus",
         "description": "L'app Modbus è stata rilevata automaticamente. L'indirizzo e il token di accesso vengono forniti automaticamente. Conferma la connessione. Una voce esistente per questa wallbox mantiene gli ID del dispositivo e delle entità. Una voce disabilitata rimane tale finché non la riabiliti."
+      },
+      "network": {
+        "title": "Connessione tramite adattatore LAN",
+        "description": "Collega una wallbox RTU supportata tramite un adattatore Ethernet-RS-485. Scegli RTU over TCP trasparente oppure un gateway che traduce Modbus TCP in RTU. Imposta velocità e formato seriale sull’adattatore. Usa una rete privata affidabile e l’accesso esclusivo al bus. Mappa registri verificata: {validated_layout}.",
+        "data": {
+          "connection_type": "Protocollo di connessione",
+          "host": "Host adattatore",
+          "tcp_port": "Porta TCP adattatore",
+          "device_id": "Indirizzo dispositivo Modbus"
+        },
+        "data_description": {
+          "connection_type": "Deve corrispondere alla modalità dell’adattatore: RTU over TCP trasparente oppure traduzione da Modbus TCP a RTU.",
+          "host": "Nome host o indirizzo IP dell’adattatore LAN, senza http:// o percorsi URL.",
+          "tcp_port": "Porta TCP configurata sull’adattatore; valore predefinito 502. Non è la porta HTTP 8765 del servizio indipendente.",
+          "device_id": "Indirizzo della wallbox dietro l’adattatore; predefinito 50, intervallo supportato 10–50."
+        }
+      },
+      "network_reconfigure": {
+        "title": "Connessione tramite adattatore LAN",
+        "description": "Collega una wallbox RTU supportata tramite un adattatore Ethernet-RS-485. Scegli RTU over TCP trasparente oppure un gateway che traduce Modbus TCP in RTU. Imposta velocità e formato seriale sull’adattatore. Usa una rete privata affidabile e l’accesso esclusivo al bus. Mappa registri verificata: {validated_layout}.",
+        "data": {
+          "connection_type": "Protocollo di connessione",
+          "host": "Host adattatore",
+          "tcp_port": "Porta TCP adattatore",
+          "device_id": "Indirizzo dispositivo Modbus"
+        },
+        "data_description": {
+          "connection_type": "Deve corrispondere alla modalità dell’adattatore: RTU over TCP trasparente oppure traduzione da Modbus TCP a RTU.",
+          "host": "Nome host o indirizzo IP dell’adattatore LAN, senza http:// o percorsi URL.",
+          "tcp_port": "Porta TCP configurata sull’adattatore; valore predefinito 502. Non è la porta HTTP 8765 del servizio indipendente.",
+          "device_id": "Indirizzo della wallbox dietro l’adattatore; predefinito 50, intervallo supportato 10–50."
+        }
       }
     }
   },
@@ -366,7 +406,7 @@
       "message": "Questa wallbox non può commutare tra una e tre fasi. La commutazione dinamica richiede un dispositivo da 11 kW che riporti l'opzione fasi 2."
     },
     "read_only_mode": {
-      "message": "Questa wallbox è in modalità di sola lettura. Per una connessione al servizio, disattiva Sola lettura nell'app, salva e riavvia l'app. Per una connessione seriale diretta, seleziona Master Modbus nelle opzioni dell'integrazione."
+      "message": "Questa wallbox è in modalità di sola lettura. Per una connessione al servizio, disattiva Sola lettura nell'app, salva e riavvia l'app. Per una connessione USB o LAN diretta, seleziona Master Modbus nelle opzioni dell'integrazione."
     },
     "restart_requires_idle": {
       "message": "La wallbox può essere riavviata solo quando è inattiva. Scollega prima il veicolo."
@@ -412,7 +452,7 @@
         "error": {
           "entry_unavailable": "L'integrazione non è caricata. Ripristina la connessione prima di riprovare.",
           "different_error": "La wallbox segnala un errore diverso. Il ripristino dell'heartbeat non risolve tale errore.",
-          "read_only": "Disattiva Sola lettura nell'app, salva e riavvia l'app prima di richiedere il ripristino. Per una connessione seriale diretta, abilita invece Master Modbus nelle opzioni dell'integrazione.",
+          "read_only": "Disattiva Sola lettura nell'app, salva e riavvia l'app prima di richiedere il ripristino. Per una connessione USB o LAN diretta, abilita invece Master Modbus nelle opzioni dell'integrazione.",
           "write_rate_limited": "Un comando recente è ancora nel suo intervallo minimo di scrittura. Attendi brevemente e riprova.",
           "recovery_failed": "Impossibile confermare il ripristino. Controlla la connessione e riprova.",
           "still_active": "I comandi di ripristino sono stati inviati, ma la wallbox segnala ancora un errore. Attendi l'aggiornamento dello stato; controlla la connessione se l'errore persiste."
@@ -425,7 +465,7 @@
       "title": "La wallbox usa una mappa dei registri Modbus precedente"
     },
     "write_rejected": {
-      "description": "Una scrittura non è stata confermata. Controlla la connessione seriale e la configurazione satellite della wallbox. Questo problema scompare quando il comando interessato riesce. Gli errori precedenti rimangono nel contatore diagnostico.",
+      "description": "Una scrittura non è stata confermata. Controlla la connessione USB o LAN e la configurazione satellite della wallbox. Questo problema scompare quando il comando interessato riesce. Gli errori precedenti rimangono nel contatore diagnostico.",
       "title": "La wallbox ha rifiutato una scrittura"
     }
   },
@@ -486,6 +526,12 @@
         "full": "Cronologia completa",
         "detail": "Meno dettagli",
         "lean": "Solo statistiche di energia e potenza"
+      }
+    },
+    "connection_type": {
+      "options": {
+        "rtu_over_tcp": "RTU over TCP (adattatore trasparente)",
+        "modbus_tcp": "Modbus TCP (gateway di traduzione)"
       }
     }
   },

@@ -3,7 +3,7 @@
     "abort": {
       "already_configured": "Deze wallbox is al ingesteld.",
       "reconfigure_successful": "De verbinding is bijgewerkt.",
-      "unique_id_mismatch": "Deze poort hoort bij een andere wallbox.",
+      "unique_id_mismatch": "Deze verbinding hoort bij een andere wallbox.",
       "service_migration_requires_serial": "De wallbox moet een leesbaar serienummer hebben om deze bij de overstap aan het bestaande apparaat te koppelen.",
       "invalid_service_discovery": "De app heeft ongeldige verbindingsgegevens doorgegeven.",
       "service_identity_changed": "De gevonden wallbox is gewijzigd. Begin de configuratie opnieuw.",
@@ -18,7 +18,10 @@
       "service_discovery_requires_serial": "De app heeft nog geen serienummer uitgelezen. Controleer de verbinding met de wallbox en probeer het opnieuw.",
       "service_auth_failed": "De app heeft de aanmelding geweigerd. Bevestig opnieuw om de huidige toegangsgegevens bij Supervisor op te halen. Controleer bij een afzonderlijk gehoste service het ingestelde token.",
       "service_not_ready": "De aanmelding bij de app is gelukt, maar er zijn nog geen wallboxgegevens beschikbaar. Controleer het logboek van de app en probeer het opnieuw.",
-      "service_invalid_response": "De app antwoordt, maar de gegevens zijn niet geaccepteerd. Werk de integratie en de app bij naar dezelfde versie. Het Home Assistant-logboek vermeldt welk onderdeel van de gegevens is afgewezen."
+      "service_invalid_response": "De app antwoordt, maar de gegevens zijn niet geaccepteerd. Werk de integratie en de app bij naar dezelfde versie. Het Home Assistant-logboek vermeldt welk onderdeel van de gegevens is afgewezen.",
+      "invalid_network_config": "Voer een hostnaam of IP-adres zonder URL-schema in, een TCP-poort van 1 tot 65535 en het juiste verbindingsprotocol.",
+      "cannot_connect_network": "De LAN-adapter is niet bereikbaar of de wallbox antwoordt niet. Controleer host, poort, protocol en de seriële instellingen op de adapter.",
+      "invalid_network_response": "De adapter antwoordde, maar meldde geen geldige Modbus-registerindeling. Controleer het wallboxadres, het adapterprotocol en de satellietinstelling."
     },
     "progress": {
       "searching": "De bus wordt doorzocht naar een wallbox: maximaal {candidates} combinaties, ongeveer {minutes} minuten plus verbindingscontroles. Er wordt niet naar registers geschreven. Tijdens het opnieuw configureren worden de bestaande verbinding en heartbeat onderbroken; het ingestelde gedrag van de wallbox bij uitval is dan van toepassing."
@@ -28,7 +31,8 @@
         "title": "Verbinding wijzigen",
         "menu_options": {
           "server": "Verbinden met de Modbus-service",
-          "serial_reconfigure": "Seriële verbinding wijzigen"
+          "serial_reconfigure": "Seriële verbinding wijzigen",
+          "network_reconfigure": "Verbinding met LAN-adapter wijzigen"
         }
       },
       "search_result": {
@@ -39,7 +43,8 @@
         "title": "Verbinden met je wallbox",
         "menu_options": {
           "server": "Modbus-service (blijft werken tijdens een HA-herstart)",
-          "serial": "Directe seriële verbinding"
+          "serial": "Directe seriële verbinding",
+          "network": "Directe verbinding via LAN-adapter"
         }
       },
       "serial": {
@@ -80,15 +85,50 @@
       },
       "server": {
         "title": "Verbinden met de Modbus-service",
-        "description": "Supervisor-apps maken automatisch verbinding zonder dat je een URL of token hoeft in te voeren. Dit formulier is voor een afzonderlijk gehoste service. Schakel bij de overstap van direct Modbus eerst de bestaande integratievermelding uit om de seriële poort vrij te geven.",
+        "description": "Supervisor-apps maken automatisch verbinding zonder dat je een URL of token hoeft in te voeren. Dit formulier is voor een afzonderlijk gehoste service. Schakel bij de overstap van direct Modbus eerst de bestaande integratievermelding uit om de Modbus-verbinding vrij te geven.",
         "data": {
           "server_url": "Service-URL",
           "server_token": "Toegangstoken"
+        },
+        "data_description": {
+          "server_url": "HTTP-adres van de onafhankelijke Modbus-service, normaal op poort 8765. Voer hier niet het adres van de Modbus-LAN-adapter in."
         }
       },
       "hassio_confirm": {
         "title": "De Modbus-app verbinden",
         "description": "De Modbus-app is automatisch gevonden. Het adres en toegangstoken worden automatisch ingevuld. Bevestig de verbinding. Een bestaande vermelding voor deze wallbox behoudt de apparaat- en entiteits-ID's. Een uitgeschakelde vermelding blijft uitgeschakeld totdat je deze weer inschakelt."
+      },
+      "network": {
+        "title": "Verbinden via een LAN-adapter",
+        "description": "Verbind een ondersteunde RTU-wallbox via een Ethernet-RS-485-adapter. Kies transparant RTU over TCP of een gateway die Modbus TCP naar RTU vertaalt. Stel baudrate en frame in op de adapter. Gebruik een vertrouwd privénetwerk en exclusieve toegang tot de bus. Geteste registerindeling: {validated_layout}.",
+        "data": {
+          "connection_type": "Verbindingsprotocol",
+          "host": "Adapterhost",
+          "tcp_port": "TCP-poort van adapter",
+          "device_id": "Modbus-apparaatadres"
+        },
+        "data_description": {
+          "connection_type": "Moet overeenkomen met de adaptermodus: transparant RTU over TCP of vertaling van Modbus TCP naar RTU.",
+          "host": "Hostnaam of IP-adres van de LAN-adapter, zonder http:// of URL-pad.",
+          "tcp_port": "TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.",
+          "device_id": "Adres van de wallbox achter de adapter; standaard 50, ondersteund bereik 10–50."
+        }
+      },
+      "network_reconfigure": {
+        "title": "Verbinden via een LAN-adapter",
+        "description": "Verbind een ondersteunde RTU-wallbox via een Ethernet-RS-485-adapter. Kies transparant RTU over TCP of een gateway die Modbus TCP naar RTU vertaalt. Stel baudrate en frame in op de adapter. Gebruik een vertrouwd privénetwerk en exclusieve toegang tot de bus. Geteste registerindeling: {validated_layout}.",
+        "data": {
+          "connection_type": "Verbindingsprotocol",
+          "host": "Adapterhost",
+          "tcp_port": "TCP-poort van adapter",
+          "device_id": "Modbus-apparaatadres"
+        },
+        "data_description": {
+          "connection_type": "Moet overeenkomen met de adaptermodus: transparant RTU over TCP of vertaling van Modbus TCP naar RTU.",
+          "host": "Hostnaam of IP-adres van de LAN-adapter, zonder http:// of URL-pad.",
+          "tcp_port": "TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.",
+          "device_id": "Adres van de wallbox achter de adapter; standaard 50, ondersteund bereik 10–50."
+        }
       }
     }
   },
@@ -366,7 +406,7 @@
       "message": "Deze wallbox kan niet tussen één en drie fasen wisselen. Dynamische fasewisseling vereist een 11 kW-apparaat dat faseoptie 2 meldt."
     },
     "read_only_mode": {
-      "message": "Deze wallbox staat in de modus Alleen lezen. Schakel bij een serviceverbinding Alleen lezen in de app uit, sla de wijziging op en herstart de app. Kies bij een directe seriële verbinding Modbus-master in de integratieopties."
+      "message": "Deze wallbox staat in de modus Alleen lezen. Schakel bij een serviceverbinding Alleen lezen in de app uit, sla de wijziging op en herstart de app. Kies bij een directe USB- of LAN-verbinding Modbus-master in de integratieopties."
     },
     "restart_requires_idle": {
       "message": "De wallbox mag alleen in rust worden herstart. Koppel eerst het voertuig los."
@@ -412,7 +452,7 @@
         "error": {
           "entry_unavailable": "De integratie is niet geladen. Herstel de verbinding voordat je het opnieuw probeert.",
           "different_error": "De wallbox meldt een andere storing. Heartbeatherstel verhelpt die storing niet.",
-          "read_only": "Schakel Alleen lezen in de app uit, sla de wijziging op en herstart de app voordat je herstel aanvraagt. Schakel bij een directe seriële verbinding in plaats daarvan de modus Modbus-master in via de integratieopties.",
+          "read_only": "Schakel Alleen lezen in de app uit, sla de wijziging op en herstart de app voordat je herstel aanvraagt. Schakel bij een directe USB- of LAN-verbinding in plaats daarvan de modus Modbus-master in via de integratieopties.",
           "write_rate_limited": "De minimale wachttijd sinds een recente opdracht is nog niet verstreken. Wacht even en probeer het opnieuw.",
           "recovery_failed": "Het herstel kon niet worden bevestigd. Controleer de verbinding en probeer het opnieuw.",
           "still_active": "De herstelopdrachten zijn verstuurd, maar de wallbox meldt nog steeds een storing. Wacht tot de status is bijgewerkt; controleer de verbinding als de storing blijft bestaan."
@@ -425,7 +465,7 @@
       "title": "Wallbox gebruikt een oudere Modbus-registerindeling"
     },
     "write_rejected": {
-      "description": "Een schrijfopdracht is niet bevestigd. Controleer de seriële verbinding en of de wallbox als satelliet is ingesteld. Deze melding verdwijnt zodra de betreffende opdracht slaagt. Eerdere fouten blijven in de diagnostische teller staan.",
+      "description": "Een schrijfopdracht is niet bevestigd. Controleer de USB- of LAN-verbinding en of de wallbox als satelliet is ingesteld. Deze melding verdwijnt zodra de betreffende opdracht slaagt. Eerdere fouten blijven in de diagnostische teller staan.",
       "title": "Wallbox heeft een schrijfopdracht geweigerd"
     }
   },
@@ -486,6 +526,12 @@
         "full": "Volledige geschiedenis",
         "detail": "Minder detail",
         "lean": "Alleen energie- en vermogensstatistieken"
+      }
+    },
+    "connection_type": {
+      "options": {
+        "rtu_over_tcp": "RTU over TCP (transparante adapter)",
+        "modbus_tcp": "Modbus TCP (vertalende gateway)"
       }
     }
   },

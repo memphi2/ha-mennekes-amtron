@@ -25,20 +25,26 @@ from ._flow_search import (
     search_space,
 )
 from ._flow_serial import list_by_id_ports, list_comports, merge_port_options
-from .config_schemas import service_schema, user_schema
+from .config_schemas import network_schema, service_schema, user_schema
 from .data import DeviceIdentity
 from .device.client import SerialConfig
 from .device.client_errors import AmtronBusError, AmtronConnectionError
+from .device.connection import ConnectionConfig, NetworkConfig
 from .device.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
+    CONF_CONNECTION_TYPE,
     CONF_DEVICE_ID,
     CONF_FRAME,
+    CONF_HOST,
     CONF_PARITY,
     CONF_PORT,
     CONF_SEARCH,
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
+    CONF_TCP_PORT,
+    CONNECTION_RTU_OVER_TCP,
+    CONNECTION_SERIAL,
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
@@ -46,6 +52,7 @@ from .device.const import (
     DEFAULT_NAME,
     DEFAULT_PARITY,
     DEFAULT_STOPBITS,
+    DEFAULT_TCP_PORT,
     DOMAIN,
     SEARCH_FULL,
     SEARCH_OFF,
@@ -73,6 +80,7 @@ BUS_FIELDS = (
     CONF_PARITY,
     CONF_STOPBITS,
 )
+RECONFIGURE_STEPS = ("reconfigure", "serial_reconfigure", "network_reconfigure")
 
 
 def _discovered_connection(info: HassioServiceInfo) -> dict[str, Any]:
@@ -92,7 +100,7 @@ def _discovered_connection(info: HassioServiceInfo) -> dict[str, Any]:
 
 
 class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle the serial setup of one wallbox."""
+    """Connect one wallbox directly or through the independent service."""
 
     VERSION = 1
 
@@ -108,8 +116,10 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Choose the independent service or a direct serial connection."""
-        return self.async_show_menu(step_id="user", menu_options=["server", "serial"])
+        """Choose the service, a serial adapter or a network gateway."""
+        return self.async_show_menu(
+            step_id="user", menu_options=["server", "serial", "network"]
+        )
 
     async def async_step_serial(
         self, user_input: dict[str, Any] | None = None
@@ -120,13 +130,51 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         return self.async_show_menu(
-            step_id="reconfigure", menu_options=["server", "serial_reconfigure"]
+            step_id="reconfigure",
+            menu_options=["server", "serial_reconfigure", "network_reconfigure"],
         )
 
     async def async_step_serial_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         return await self._async_serial_step("serial_reconfigure", user_input)
+
+    async def async_step_network(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self._async_network_step("network", user_input)
+
+    async def async_step_network_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self._async_network_step("network_reconfigure", user_input)
+
+    async def _async_network_step(
+        self, step_id: str, user_input: dict[str, Any] | None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                config = _network_config(user_input)
+                return await self._async_test_and_finish(step_id, user_input, config)
+            except ValueError:
+                errors["base"] = "invalid_network_config"
+            except AmtronConnectionError as err:
+                _LOGGER.debug("Network connection test failed: %s", err)
+                errors["base"] = "cannot_connect_network"
+            except AmtronBusError as err:
+                _LOGGER.debug("Network identity read failed: %s", err)
+                errors["base"] = "invalid_network_response"
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=self.add_suggested_values_to_schema(
+                network_schema(), self._suggested_values(step_id, user_input)
+            ),
+            errors=errors,
+            description_placeholders={
+                "validated_layout": layout_label(VALIDATED_LAYOUT)
+            },
+        )
 
     async def async_step_server(
         self, user_input: dict[str, Any] | None = None
@@ -314,28 +362,28 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         return await self._async_show_bus_form(step_id, user_input, errors)
 
     async def _async_test_and_finish(
-        self, step_id: str, user_input: dict[str, Any], config: SerialConfig
+        self, step_id: str, user_input: dict[str, Any], config: ConnectionConfig
     ) -> ConfigFlowResult:
         entry = (
             self._get_reconfigure_entry()
-            if step_id in ("reconfigure", "serial_reconfigure")
+            if step_id in RECONFIGURE_STEPS
             else None
         )
         loaded = entry is not None and entry.state is ConfigEntryState.LOADED
         if loaded and entry is not None and config == entry.runtime_data.client.config:
-            # The existing client owns the exclusive port and serializes reads
+            # The existing client owns the bus connection and serializes reads
             # with polling and heartbeat; an unchanged form needs no new client.
             identity = await async_read_identity(entry.runtime_data.client)
-            return await self._async_finish(step_id, user_input, identity)
+            return await self._async_finish(step_id, user_input, identity, config=config)
         if (
             loaded
             and entry is not None
             and not await self.hass.config_entries.async_unload(entry.entry_id)
         ):
-            raise AmtronConnectionError("cannot release the active serial port")
+            raise AmtronConnectionError("cannot release the active connection")
         try:
             identity = await async_test_connection(config)
-            return await self._async_finish(step_id, user_input, identity)
+            return await self._async_finish(step_id, user_input, identity, config=config)
         except BaseException:
             # A failed probe, wrong device or cancelled flow keeps the old entry
             # usable. On success the flow's update/reload helper starts it instead.
@@ -482,18 +530,30 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         step_id: str,
         user_input: dict[str, Any],
         identity: DeviceIdentity,
+        *,
+        config: ConnectionConfig | None = None,
     ) -> ConfigFlowResult:
-        config = _serial_config(user_input)
-        data = {**_serial_input(config)}
+        if config is None:
+            config = _serial_config(user_input)
+        data = (
+            _network_input(config)
+            if isinstance(config, NetworkConfig)
+            else _serial_input(config)
+        )
         if identity.serial_number:
             data[CONF_SERIAL_NUMBER] = identity.serial_number
             await self.async_set_unique_id(identity.serial_number)
         else:
-            # Older firmware has no serial register; the port path is then the
-            # only stable thing that distinguishes two wallboxes.
-            await self.async_set_unique_id(f"{DOMAIN}_{config.port}")
+            # Older firmware has no serial register. A network gateway may
+            # expose several unit IDs; distinguish those endpoints as well.
+            suffix = (
+                f"{config.port}_{config.device_id}"
+                if isinstance(config, NetworkConfig)
+                else config.port
+            )
+            await self.async_set_unique_id(f"{DOMAIN}_{suffix}")
 
-        if step_id in ("reconfigure", "serial_reconfigure"):
+        if step_id in RECONFIGURE_STEPS:
             self._abort_if_unique_id_mismatch()
             entry = self._get_reconfigure_entry()
             if not entry.update_listeners:
@@ -520,8 +580,13 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             return dict(user_input)
-        if step_id in ("reconfigure", "serial_reconfigure"):
+        if step_id in RECONFIGURE_STEPS:
             data = dict(self._get_reconfigure_entry().data)
+            if step_id == "network_reconfigure":
+                # Serial/service data must not preselect an invalid LAN protocol.
+                if data.get(CONF_CONNECTION_TYPE, CONNECTION_SERIAL) == CONNECTION_SERIAL:
+                    data.pop(CONF_CONNECTION_TYPE, None)
+                return data
             config = _serial_config(data)
             return {
                 **data,
@@ -529,7 +594,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                     config.bytesize, config.parity, config.stopbits
                 ),
             }
-        return {CONF_FRAME: DEFAULT_FRAME}
+        return {} if step_id == "network" else {CONF_FRAME: DEFAULT_FRAME}
 
     async def _async_port_options(self) -> list[Any]:
         by_id = await self.hass.async_add_executor_job(list_by_id_ports)
@@ -573,12 +638,35 @@ def _serial_input(config: SerialConfig) -> dict[str, Any]:
     """Return the entry data for a serial configuration."""
 
     return {
+        CONF_CONNECTION_TYPE: CONNECTION_SERIAL,
         CONF_PORT: config.port,
         CONF_DEVICE_ID: config.device_id,
         CONF_BAUDRATE: config.baudrate,
         CONF_BYTESIZE: config.bytesize,
         CONF_PARITY: config.parity,
         CONF_STOPBITS: config.stopbits,
+    }
+
+
+def _network_config(user_input: dict[str, Any]) -> NetworkConfig:
+    """Use the same endpoint validation as the independent service."""
+
+    return NetworkConfig(
+        host=user_input.get(CONF_HOST, ""),
+        tcp_port=user_input.get(CONF_TCP_PORT, DEFAULT_TCP_PORT),
+        connection_type=user_input.get(CONF_CONNECTION_TYPE, CONNECTION_RTU_OVER_TCP),
+        device_id=user_input.get(CONF_DEVICE_ID, DEFAULT_DEVICE_ID),
+    )
+
+
+def _network_input(config: NetworkConfig) -> dict[str, Any]:
+    """Persist only settings belonging to the selected network transport."""
+
+    return {
+        CONF_CONNECTION_TYPE: config.connection_type,
+        CONF_HOST: config.host,
+        CONF_TCP_PORT: config.tcp_port,
+        CONF_DEVICE_ID: config.device_id,
     }
 
 

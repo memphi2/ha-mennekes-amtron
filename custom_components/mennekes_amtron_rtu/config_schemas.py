@@ -19,14 +19,18 @@ from homeassistant.helpers.selector import (
 from ._flow_serial import PortOption
 from .device.const import (
     CONF_BAUDRATE,
+    CONF_CONNECTION_TYPE,
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_DEVICE_ID,
     CONF_FRAME,
+    CONF_HOST,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SEARCH,
+    CONF_TCP_PORT,
+    CONNECTION_RTU_OVER_TCP,
     CONTROL_MODES,
     DEFAULT_BAUDRATE,
     DEFAULT_CONTROL_MODE,
@@ -35,10 +39,12 @@ from .device.const import (
     DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_SEARCH,
+    DEFAULT_TCP_PORT,
     DEVICE_ID_MAX,
     DEVICE_ID_MIN,
     MAX_SCAN_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
+    NETWORK_CONNECTION_TYPES,
     SEARCH_MODES,
     SUPPORTED_BAUDRATES,
     SUPPORTED_FRAMES,
@@ -83,6 +89,56 @@ def user_schema(ports: list[PortOption]) -> probatio.Schema:
             ),
         }
     )
+
+
+def network_schema() -> probatio.Schema:
+    """Ask for the gateway endpoint and its explicit Modbus framing."""
+
+    return probatio.Schema(
+        {
+            probatio.Required(
+                CONF_CONNECTION_TYPE, default=CONNECTION_RTU_OVER_TCP
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=list(NETWORK_CONNECTION_TYPES),
+                    translation_key="connection_type",
+                    mode=SelectSelectorMode.LIST,
+                )
+            ),
+            probatio.Required(CONF_HOST): cv.string,
+            probatio.Required(CONF_TCP_PORT, default=DEFAULT_TCP_PORT): probatio.All(
+                _network_integer,
+                NumberSelector(
+                    NumberSelectorConfig(
+                        min=1, max=65535, step=1, mode=NumberSelectorMode.BOX
+                    )
+                ),
+                probatio.Coerce(int),
+            ),
+            probatio.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): probatio.All(
+                _network_integer,
+                NumberSelector(
+                    NumberSelectorConfig(
+                        min=DEVICE_ID_MIN,
+                        max=DEVICE_ID_MAX,
+                        step=1,
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
+                probatio.Coerce(int),
+            ),
+        }
+    )
+
+
+def _network_integer(value: Any) -> int:
+    """Accept whole UI numbers without truncating fractions or accepting bools."""
+
+    if type(value) is int:
+        return value
+    if type(value) is float and value.is_integer():
+        return int(value)
+    raise probatio.Invalid("expected a whole number")
 
 
 def options_schema(

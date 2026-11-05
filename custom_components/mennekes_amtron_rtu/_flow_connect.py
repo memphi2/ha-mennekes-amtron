@@ -8,12 +8,13 @@ setup instead of producing an entry with no entities.
 from __future__ import annotations
 
 from .data import DeviceIdentity
-from .device.client import MennekesModbusClient, SerialConfig
+from .device.client import MennekesModbusClient
 from .device.client_errors import AmtronBusError
+from .device.connection import ConnectionConfig
 from .device.identity import async_read_identity
 
 
-async def async_test_connection(config: SerialConfig) -> DeviceIdentity:
+async def async_test_connection(config: ConnectionConfig) -> DeviceIdentity:
     """Connect once, read the device identity and close the port again."""
 
     client = MennekesModbusClient(config)

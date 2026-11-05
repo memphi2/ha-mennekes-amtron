@@ -3,7 +3,7 @@
     "abort": {
       "already_configured": "Cette borne de recharge est déjà configurée.",
       "reconfigure_successful": "La connexion a été mise à jour.",
-      "unique_id_mismatch": "Ce port correspond à une autre borne de recharge.",
+      "unique_id_mismatch": "Cette connexion correspond à une autre borne.",
       "service_migration_requires_serial": "Le numéro de série de la borne doit pouvoir être lu pour retrouver l’appareil existant lors de la migration.",
       "invalid_service_discovery": "L’application a fourni des informations de connexion non valides.",
       "service_identity_changed": "La borne détectée a changé. Recommencez la configuration.",
@@ -18,7 +18,10 @@
       "service_discovery_requires_serial": "L’application n’a pas encore lu de numéro de série. Vérifiez sa connexion à la borne et réessayez.",
       "service_auth_failed": "L’application a refusé l’authentification. Confirmez à nouveau pour récupérer ses identifiants actuels auprès de Supervisor. Pour un service hébergé séparément, vérifiez le jeton configuré.",
       "service_not_ready": "L’authentification auprès de l’application a réussi, mais les données de la borne ne sont pas encore disponibles. Consultez le journal de l’application et réessayez.",
-      "service_invalid_response": "L’application répond, mais ses données n’ont pas été acceptées. Mettez à jour l’intégration et l’application vers la même version. Le journal de Home Assistant indique la section concernée."
+      "service_invalid_response": "L’application répond, mais ses données n’ont pas été acceptées. Mettez à jour l’intégration et l’application vers la même version. Le journal de Home Assistant indique la section concernée.",
+      "invalid_network_config": "Saisissez un nom d’hôte ou une adresse IP sans schéma d’URL, un port TCP de 1 à 65535 et le protocole de connexion approprié.",
+      "cannot_connect_network": "L’adaptateur réseau est inaccessible ou la borne n’a pas répondu. Vérifiez l’hôte, le port, le protocole et les paramètres série de l’adaptateur.",
+      "invalid_network_response": "L’adaptateur a répondu, mais aucune table de registres Modbus valide n’a été indiquée. Vérifiez l’adresse de la borne, le protocole de l’adaptateur et le mode satellite."
     },
     "progress": {
       "searching": "Recherche d’une borne sur le bus : jusqu’à {candidates} combinaisons, soit environ {minutes} minutes, auxquelles s’ajoutent les vérifications de connexion. Aucun registre n’est modifié. Pendant la reconfiguration, la connexion existante et le signal de présence sont interrompus ; le comportement de repli configuré sur la borne s’applique."
@@ -28,7 +31,8 @@
         "title": "Modifier la connexion",
         "menu_options": {
           "server": "Se connecter au service Modbus",
-          "serial_reconfigure": "Modifier la connexion série"
+          "serial_reconfigure": "Modifier la connexion série",
+          "network_reconfigure": "Modifier la connexion à l’adaptateur réseau"
         }
       },
       "search_result": {
@@ -39,7 +43,8 @@
         "title": "Se connecter à votre borne",
         "menu_options": {
           "server": "Service Modbus (reste actif lors des redémarrages de HA)",
-          "serial": "Connexion série directe"
+          "serial": "Connexion série directe",
+          "network": "Connexion directe par adaptateur réseau"
         }
       },
       "serial": {
@@ -80,15 +85,50 @@
       },
       "server": {
         "title": "Se connecter au service Modbus",
-        "description": "Les applications Supervisor se connectent automatiquement, sans saisir d’URL ni de jeton. Ce formulaire est destiné à un service hébergé séparément. Pour migrer depuis une connexion Modbus directe, désactivez d’abord l’ancienne entrée de l’intégration afin de libérer le port série.",
+        "description": "Les applications Supervisor se connectent automatiquement, sans saisir d’URL ni de jeton. Ce formulaire est destiné à un service hébergé séparément. Pour migrer depuis une connexion Modbus directe, désactivez d’abord l’ancienne entrée de l’intégration afin de libérer la connexion Modbus.",
         "data": {
           "server_url": "URL du service",
           "server_token": "Jeton d’accès"
+        },
+        "data_description": {
+          "server_url": "Adresse HTTP du service Modbus indépendant, normalement sur le port 8765. Ne saisissez pas ici l’adresse de l’adaptateur Modbus réseau."
         }
       },
       "hassio_confirm": {
         "title": "Connecter l’application Modbus",
         "description": "L’application Modbus a été détectée automatiquement. Son adresse et son jeton d’accès sont fournis automatiquement. Confirmez la connexion. Si une entrée existe déjà pour cette borne, les identifiants de l’appareil et de ses entités sont conservés. Une entrée désactivée le reste jusqu’à ce que vous la réactiviez."
+      },
+      "network": {
+        "title": "Connexion par adaptateur réseau",
+        "description": "Connectez une borne RTU compatible via un adaptateur Ethernet-RS-485. Choisissez RTU over TCP transparent ou une passerelle qui traduit Modbus TCP en RTU. Réglez le débit et la trame sur l’adaptateur. Utilisez un réseau privé de confiance et un accès exclusif au bus. Table de registres validée : {validated_layout}.",
+        "data": {
+          "connection_type": "Protocole de connexion",
+          "host": "Hôte de l’adaptateur",
+          "tcp_port": "Port TCP de l’adaptateur",
+          "device_id": "Adresse Modbus de la borne"
+        },
+        "data_description": {
+          "connection_type": "Doit correspondre au mode de l’adaptateur : RTU over TCP transparent ou traduction de Modbus TCP en RTU.",
+          "host": "Nom d’hôte ou adresse IP de l’adaptateur réseau, sans http:// ni chemin d’URL.",
+          "tcp_port": "Port TCP configuré sur l’adaptateur ; 502 par défaut. Il ne s’agit pas du port HTTP 8765 du service indépendant.",
+          "device_id": "Adresse de la borne derrière l’adaptateur ; 50 par défaut, plage prise en charge de 10 à 50."
+        }
+      },
+      "network_reconfigure": {
+        "title": "Connexion par adaptateur réseau",
+        "description": "Connectez une borne RTU compatible via un adaptateur Ethernet-RS-485. Choisissez RTU over TCP transparent ou une passerelle qui traduit Modbus TCP en RTU. Réglez le débit et la trame sur l’adaptateur. Utilisez un réseau privé de confiance et un accès exclusif au bus. Table de registres validée : {validated_layout}.",
+        "data": {
+          "connection_type": "Protocole de connexion",
+          "host": "Hôte de l’adaptateur",
+          "tcp_port": "Port TCP de l’adaptateur",
+          "device_id": "Adresse Modbus de la borne"
+        },
+        "data_description": {
+          "connection_type": "Doit correspondre au mode de l’adaptateur : RTU over TCP transparent ou traduction de Modbus TCP en RTU.",
+          "host": "Nom d’hôte ou adresse IP de l’adaptateur réseau, sans http:// ni chemin d’URL.",
+          "tcp_port": "Port TCP configuré sur l’adaptateur ; 502 par défaut. Il ne s’agit pas du port HTTP 8765 du service indépendant.",
+          "device_id": "Adresse de la borne derrière l’adaptateur ; 50 par défaut, plage prise en charge de 10 à 50."
+        }
       }
     }
   },
@@ -366,7 +406,7 @@
       "message": "Cette borne ne peut pas commuter entre une et trois phases. La commutation dynamique nécessite un appareil de 11 kW qui indique l’option de phases 2."
     },
     "read_only_mode": {
-      "message": "Cette borne est en lecture seule. Pour une connexion au service, désactivez Lecture seule dans l’application, enregistrez et redémarrez l’application. Pour une connexion série directe, sélectionnez Maître Modbus dans les options de l’intégration."
+      "message": "Cette borne est en lecture seule. Pour une connexion au service, désactivez Lecture seule dans l’application, enregistrez et redémarrez l’application. Pour une connexion USB ou réseau directe, sélectionnez Maître Modbus dans les options de l’intégration."
     },
     "restart_requires_idle": {
       "message": "La borne ne peut être redémarrée que lorsqu’elle est au repos. Débranchez d’abord le véhicule."
@@ -412,7 +452,7 @@
         "error": {
           "entry_unavailable": "L’intégration n’est pas chargée. Rétablissez sa connexion avant de réessayer.",
           "different_error": "La borne signale une autre erreur. Le rétablissement du signal de présence ne réinitialise pas cette erreur.",
-          "read_only": "Désactivez Lecture seule dans l’application, enregistrez et redémarrez l’application avant de demander le rétablissement. Pour une connexion série directe, activez plutôt le mode Maître Modbus dans les options de l’intégration.",
+          "read_only": "Désactivez Lecture seule dans l’application, enregistrez et redémarrez l’application avant de demander le rétablissement. Pour une connexion USB ou réseau directe, activez plutôt le mode Maître Modbus dans les options de l’intégration.",
           "write_rate_limited": "Une commande récente est encore dans son intervalle minimal d’écriture. Patientez un instant et réessayez.",
           "recovery_failed": "Le rétablissement n’a pas pu être confirmé. Vérifiez la connexion et réessayez.",
           "still_active": "Les commandes de rétablissement ont été envoyées, mais la borne signale toujours une erreur. Attendez la mise à jour de son état ; vérifiez la connexion si l’erreur persiste."
@@ -425,7 +465,7 @@
       "title": "La borne utilise une ancienne table de registres Modbus"
     },
     "write_rejected": {
-      "description": "Une écriture n’a pas été confirmée. Vérifiez la connexion série et la configuration satellite de la borne. Ce problème disparaît dès que la commande concernée réussit. Les échecs précédents restent dans le compteur de diagnostic.",
+      "description": "Une écriture n’a pas été confirmée. Vérifiez la connexion USB ou réseau et la configuration satellite de la borne. Ce problème disparaît dès que la commande concernée réussit. Les échecs précédents restent dans le compteur de diagnostic.",
       "title": "La borne a refusé une écriture"
     }
   },
@@ -486,6 +526,12 @@
         "full": "Historique complet",
         "detail": "Moins de détails",
         "lean": "Statistiques d’énergie et de puissance uniquement"
+      }
+    },
+    "connection_type": {
+      "options": {
+        "rtu_over_tcp": "RTU over TCP (adaptateur transparent)",
+        "modbus_tcp": "Modbus TCP (passerelle de traduction)"
       }
     }
   },

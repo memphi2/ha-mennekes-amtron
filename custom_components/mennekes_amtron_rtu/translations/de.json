@@ -3,7 +3,7 @@
     "abort": {
       "already_configured": "Diese Wallbox ist bereits konfiguriert.",
       "reconfigure_successful": "Die Verbindung wurde aktualisiert.",
-      "unique_id_mismatch": "Dieser Port gehört zu einer anderen Wallbox.",
+      "unique_id_mismatch": "Diese Verbindung gehört zu einer anderen Wallbox.",
       "service_migration_requires_serial": "Ohne auslesbare Seriennummer ist keine automatische Zuordnung zum bestehenden Gerät möglich.",
       "invalid_service_discovery": "Die App hat ungültige Verbindungsdaten gemeldet.",
       "service_identity_changed": "Die erkannte Wallbox hat sich geändert. Starte die Einrichtung erneut.",
@@ -18,7 +18,10 @@
       "service_discovery_requires_serial": "Die App hat noch keine Seriennummer gelesen. Prüfe die Verbindung zur Wallbox und versuche es erneut.",
       "service_auth_failed": "Die App hat die Anmeldung abgelehnt. Bestätige erneut, um die aktuellen Zugangsdaten von Supervisor zu übernehmen. Prüfe bei einem separat betriebenen Dienst den konfigurierten Token.",
       "service_not_ready": "Die Anmeldung an der App funktioniert, aber die Wallbox-Daten sind noch nicht verfügbar. Prüfe das App-Protokoll und versuche es erneut.",
-      "service_invalid_response": "Die App antwortet, aber ihre Daten werden nicht akzeptiert. Aktualisiere Integration und App auf dieselbe Version. Das Home-Assistant-Protokoll nennt den betroffenen Datenbereich."
+      "service_invalid_response": "Die App antwortet, aber ihre Daten werden nicht akzeptiert. Aktualisiere Integration und App auf dieselbe Version. Das Home-Assistant-Protokoll nennt den betroffenen Datenbereich.",
+      "invalid_network_config": "Gib einen Hostnamen oder eine IP-Adresse ohne URL-Schema, einen TCP-Port von 1 bis 65535 und das passende Verbindungsprotokoll an.",
+      "cannot_connect_network": "Der LAN-Adapter ist nicht erreichbar oder die Wallbox antwortet nicht. Prüfe Host, Port, Protokoll und die am Adapter eingestellten seriellen Parameter.",
+      "invalid_network_response": "Der Adapter hat geantwortet, aber kein gültiges Modbus-Layout geliefert. Prüfe Wallbox-Adresse, Adapterprotokoll und Satellite-Konfiguration."
     },
     "progress": {
       "searching": "Der Bus wird nach einer Wallbox abgesucht: bis zu {candidates} Kombinationen, etwa {minutes} Minuten zuzüglich Verbindungsprüfungen. Es werden keine Register geschrieben. Beim Neukonfigurieren pausieren die bisherige Verbindung und der Heartbeat; das konfigurierte Ausfallverhalten der Wallbox greift."
@@ -28,7 +31,8 @@
         "title": "Verbindung ändern",
         "menu_options": {
           "server": "Zum Modbus-Dienst wechseln",
-          "serial_reconfigure": "Serielle Verbindung ändern"
+          "serial_reconfigure": "Serielle Verbindung ändern",
+          "network_reconfigure": "LAN-Adapter-Verbindung ändern"
         }
       },
       "search_result": {
@@ -39,7 +43,8 @@
         "title": "Verbindung zur Wallbox",
         "menu_options": {
           "server": "Modbus-Dienst (übersteht HA-Neustarts)",
-          "serial": "Direkt über seriellen Port"
+          "serial": "Direkt über seriellen Port",
+          "network": "Direkte Verbindung über LAN-Adapter"
         }
       },
       "serial": {
@@ -80,15 +85,50 @@
       },
       "server": {
         "title": "Modbus-Dienst verbinden",
-        "description": "Supervisor-Apps werden automatisch verbunden, ohne URL oder Token einzugeben. Dieses Formular ist für einen separat betriebenen Dienst. Beim Wechsel von direktem Modbus den bisherigen Integrationseintrag zuerst deaktivieren, damit der serielle Port frei ist.",
+        "description": "Supervisor-Apps werden automatisch verbunden, ohne URL oder Token einzugeben. Dieses Formular ist für einen separat betriebenen Dienst. Beim Wechsel von direktem Modbus den bisherigen Integrationseintrag zuerst deaktivieren, damit die Modbus-Verbindung frei ist.",
         "data": {
           "server_url": "Dienst-URL",
           "server_token": "Zugriffstoken"
+        },
+        "data_description": {
+          "server_url": "HTTP-Adresse des eigenständigen Modbus-Dienstes, normalerweise auf Port 8765. Hier nicht die Adresse des Modbus-LAN-Adapters eintragen."
         }
       },
       "hassio_confirm": {
         "title": "Modbus-App verbinden",
         "description": "Die Modbus-App wurde automatisch erkannt. Adresse und Zugriffstoken werden übernommen. Bestätige die Verbindung. Ein vorhandener Eintrag derselben Wallbox wird mit seinen Geräte- und Entitäts-IDs weiterverwendet. Ein deaktivierter Eintrag bleibt deaktiviert, bis du ihn wieder aktivierst."
+      },
+      "network": {
+        "title": "Über einen LAN-Adapter verbinden",
+        "description": "Verbinde eine unterstützte RTU-Wallbox über einen Ethernet-RS-485-Adapter. Wähle transparentes RTU over TCP oder ein Gateway, das Modbus TCP in RTU übersetzt. Baudrate und Rahmenformat stellst du am Adapter ein. Nutze ein vertrauenswürdiges privates Netzwerk und exklusiven Buszugriff. Validiertes Register-Layout: {validated_layout}.",
+        "data": {
+          "connection_type": "Verbindungsprotokoll",
+          "host": "Adapter-Host",
+          "tcp_port": "TCP-Port des Adapters",
+          "device_id": "Modbus-Geräteadresse"
+        },
+        "data_description": {
+          "connection_type": "Muss zum Adaptermodus passen: transparentes RTU over TCP oder Übersetzung von Modbus TCP in RTU.",
+          "host": "Hostname oder IP-Adresse des LAN-Adapters, ohne http:// oder URL-Pfad.",
+          "tcp_port": "Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.",
+          "device_id": "Adresse der Wallbox hinter dem Adapter; Werkseinstellung 50, unterstützter Bereich 10–50."
+        }
+      },
+      "network_reconfigure": {
+        "title": "Über einen LAN-Adapter verbinden",
+        "description": "Verbinde eine unterstützte RTU-Wallbox über einen Ethernet-RS-485-Adapter. Wähle transparentes RTU over TCP oder ein Gateway, das Modbus TCP in RTU übersetzt. Baudrate und Rahmenformat stellst du am Adapter ein. Nutze ein vertrauenswürdiges privates Netzwerk und exklusiven Buszugriff. Validiertes Register-Layout: {validated_layout}.",
+        "data": {
+          "connection_type": "Verbindungsprotokoll",
+          "host": "Adapter-Host",
+          "tcp_port": "TCP-Port des Adapters",
+          "device_id": "Modbus-Geräteadresse"
+        },
+        "data_description": {
+          "connection_type": "Muss zum Adaptermodus passen: transparentes RTU over TCP oder Übersetzung von Modbus TCP in RTU.",
+          "host": "Hostname oder IP-Adresse des LAN-Adapters, ohne http:// oder URL-Pfad.",
+          "tcp_port": "Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.",
+          "device_id": "Adresse der Wallbox hinter dem Adapter; Werkseinstellung 50, unterstützter Bereich 10–50."
+        }
       }
     }
   },
@@ -366,7 +406,7 @@
       "message": "Diese Wallbox kann nicht zwischen einer und drei Phasen umschalten. Die dynamische Phasenumschaltung setzt ein 11-kW-Gerät voraus, das Phasenoption 2 meldet."
     },
     "read_only_mode": {
-      "message": "Diese Wallbox ist im Nur-Lesen-Modus eingerichtet. Bei einer Dienst-Verbindung deaktiviere „Nur lesen“ in der App, speichere und starte die App neu. Bei einer direkten seriellen Verbindung wähle „Modbus-Master“ in den Integrationsoptionen."
+      "message": "Diese Wallbox ist im Nur-Lesen-Modus eingerichtet. Bei einer Dienst-Verbindung deaktiviere „Nur lesen“ in der App, speichere und starte die App neu. Bei einer direkten USB- oder LAN-Verbindung wähle „Modbus-Master“ in den Integrationsoptionen."
     },
     "restart_requires_idle": {
       "message": "Die Wallbox darf nur im Zustand \"Bereit\" neu gestartet werden. Trenne zuerst das Fahrzeug."
@@ -412,7 +452,7 @@
         "error": {
           "entry_unavailable": "Die Integration ist nicht geladen. Stelle zuerst die Verbindung wieder her.",
           "different_error": "Die Wallbox meldet einen anderen Fehler. Die Heartbeat-Wiederherstellung setzt diesen nicht zurück.",
-          "read_only": "Deaktiviere „Nur lesen“ in der App, speichere und starte die App neu, um die Wiederherstellung auszuführen. Bei einer direkten seriellen Verbindung aktiviere stattdessen den Modbus-Master-Modus in den Integrationsoptionen.",
+          "read_only": "Deaktiviere „Nur lesen“ in der App, speichere und starte die App neu, um die Wiederherstellung auszuführen. Bei einer direkten USB- oder LAN-Verbindung aktiviere stattdessen den Modbus-Master-Modus in den Integrationsoptionen.",
           "write_rate_limited": "Der Mindestabstand seit einem vorherigen Befehl ist noch nicht abgelaufen. Warte kurz und versuche es erneut.",
           "recovery_failed": "Die Wiederherstellung konnte nicht bestätigt werden. Prüfe die Verbindung und versuche es erneut.",
           "still_active": "Die Wiederherstellungsbefehle wurden gesendet, die Wallbox meldet aber noch einen Fehler. Warte auf die Statusaktualisierung; prüfe bei anhaltendem Fehler die Verbindung."
@@ -425,7 +465,7 @@
       "title": "Wallbox nutzt ein älteres Modbus-Register-Layout"
     },
     "write_rejected": {
-      "description": "Ein Schreibzugriff wurde nicht bestätigt. Prüfe die serielle Verbindung und die Satellite-Konfiguration der Wallbox. Die Meldung verschwindet nach einem erfolgreichen Zugriff auf den betroffenen Befehl. Frühere Fehler bleiben im Diagnosezähler erhalten.",
+      "description": "Ein Schreibzugriff wurde nicht bestätigt. Prüfe die USB- oder LAN-Verbindung und die Satellite-Konfiguration der Wallbox. Die Meldung verschwindet nach einem erfolgreichen Zugriff auf den betroffenen Befehl. Frühere Fehler bleiben im Diagnosezähler erhalten.",
       "title": "Wallbox hat einen Schreibzugriff abgelehnt"
     }
   },
@@ -486,6 +526,12 @@
         "full": "Vollständige Historie",
         "detail": "Weniger Details",
         "lean": "Nur Energie- und Leistungsstatistiken"
+      }
+    },
+    "connection_type": {
+      "options": {
+        "rtu_over_tcp": "RTU over TCP (transparenter Adapter)",
+        "modbus_tcp": "Modbus TCP (übersetzendes Gateway)"
       }
     }
   },
