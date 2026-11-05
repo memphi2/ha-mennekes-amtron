@@ -99,8 +99,6 @@ Back up custom edits, compare with the updated bundled blueprint and apply the
 changes to your copy. Prefer a separate filename for custom blueprints.
 
 Blueprint files live in
-`config/blueprints/automation/mennekes_amtron_rtu/`. If upgrading from **0.1.0**,
-also follow [Upgrading](upgrading.md) to change old blueprint paths and entity
-references. This is separate from adding the new pause input.
+`config/blueprints/automation/mennekes_amtron_rtu/`.
 
 For tariff schedules and action examples, see [Automations](automations.md).
