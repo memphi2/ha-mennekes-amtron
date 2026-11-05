@@ -136,7 +136,7 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                 TestServer(create_app(service)) as server,
                 ClientSession() as session,
             ):
-                async with session.get(server.make_url("/v1/state")) as response:
+                async with session.get(server.make_url("/v2/state")) as response:
                     assert response.status == 401
                 headers = {"Authorization": f"Bearer {TOKEN}"}
                 for payload in (
@@ -146,13 +146,13 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                     {},
                 ):
                     async with session.post(
-                        server.make_url("/v1/read"), headers=headers, json=payload
+                        server.make_url("/v2/read"), headers=headers, json=payload
                     ) as response:
                         assert response.status == 400
                 async with session.post(
-                    server.make_url("/v1/command"),
+                    server.make_url("/v2/command"),
                     headers=headers,
-                    json={"command": "resume"},
+                    json={"command": "resume", "expected_serial_number": "ABC123456789"},
                 ) as response:
                     assert response.status == 409
                     assert (await response.json())["error"] == "read_only_mode"
@@ -161,15 +161,15 @@ def test_authentication_and_read_allowlist_prevent_unapproved_writes(tmp_path):
                     assert response.status == 200
                 for payload in (
                     [],
-                    {"command": "write_register"},
-                    {"command": "pause", "address": 1},
+                    {"command": "write_register", "expected_serial_number": "ABC123456789"},
+                    {"command": "pause", "address": 1, "expected_serial_number": "ABC123456789"},
                 ):
                     async with session.post(
-                        server.make_url("/v1/command"), headers=headers, json=payload
+                        server.make_url("/v2/command"), headers=headers, json=payload
                     ) as response:
                         assert response.status == 400
                 async with session.post(
-                    server.make_url("/v1/command"), headers=headers, data="not JSON"
+                    server.make_url("/v2/command"), headers=headers, data="not JSON"
                 ) as response:
                     assert response.status == 415
         finally:
@@ -197,7 +197,10 @@ def test_service_uses_the_shared_command_guards(
         service, transport, _clock = await service_fixture(tmp_path)
         try:
             await service.command(
-                {"command": command, "value": value, "allow_unlimited": True}
+                {
+                    "command": command, "value": value, "allow_unlimited": True,
+                    "expected_serial_number": "ABC123456789",
+                }
             )
             writes = [
                 decode_register(register, words)
@@ -221,7 +224,7 @@ def test_service_uses_the_shared_command_guards(
 def test_service_restart_restores_pause_and_resume_current(tmp_path):
     async def run():
         service, transport, clock = await service_fixture(tmp_path)
-        await service.command({"command": "pause"})
+        await service.command({"command": "pause", "expected_serial_number": "ABC123456789"})
         await service.stop()
         # The wallbox reports a reset value, but saved pause intent wins.
         put(transport.bank, R.ERROR_CODE, 200)
@@ -233,12 +236,12 @@ def test_service_restart_restores_pause_and_resume_current(tmp_path):
             await replacement._initialize()
             clock[0] += 6
             replacement.control._monotonic = lambda: clock[0]
-            await replacement.command({"command": "recover"})
+            await replacement.command({"command": "recover", "expected_serial_number": "ABC123456789"})
             assert current_writes(transport) == [1, 1]
             assert replacement.control.charging_setpoint == 8
             assert replacement.control.pause_requested is True
             clock[0] += 6
-            await replacement.command({"command": "resume"})
+            await replacement.command({"command": "resume", "expected_serial_number": "ABC123456789"})
             assert current_writes(transport) == [1, 1, 8]
         finally:
             await replacement.stop()

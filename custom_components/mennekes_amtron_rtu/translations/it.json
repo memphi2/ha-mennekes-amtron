@@ -23,7 +23,8 @@
       "invalid_network_config": "Inserisci un nome host o un indirizzo IP senza schema URL, una porta TCP da 1 a 65535 e il protocollo di connessione corretto.",
       "cannot_connect_network": "L’adattatore LAN non è raggiungibile o la wallbox non risponde. Controlla host, porta, protocollo e impostazioni seriali dell’adattatore.",
       "invalid_network_response": "L’adattatore ha risposto, ma non ha indicato una mappa registri Modbus valida. Controlla indirizzo della wallbox, protocollo dell’adattatore e modalità satellite.",
-      "service_discovery_unavailable": "Non è stato possibile recuperare le credenziali attuali di questa app. Controlla l’app e Supervisor, avvia o riavvia l’app se necessario, quindi conferma di nuovo."
+      "service_discovery_unavailable": "Non è stato possibile recuperare le credenziali attuali di questa app. Controlla l’app e Supervisor, avvia o riavvia l’app se necessario, quindi conferma di nuovo.",
+      "service_version_mismatch": "L’integrazione e il servizio Modbus usano versioni API diverse. Aggiorna entrambi alla stessa versione, iniziando dall’app o dal servizio ospitato separatamente."
     },
     "progress": {
       "searching": "Ricerca di una wallbox sul bus: fino a {candidates} combinazioni, circa {minutes} minuti più le verifiche di connessione. Non viene scritto alcun registro. Durante la riconfigurazione, la connessione esistente e l'heartbeat vengono sospesi; si applica il comportamento di fallback configurato nella wallbox."
@@ -450,6 +451,12 @@
     },
     "service_auth_failed": {
       "message": "Il servizio Modbus ha rifiutato l’autenticazione. Rinnova l’accesso in Impostazioni > Dispositivi e servizi."
+    },
+    "device_identity_changed": {
+      "message": "La connessione segnala una wallbox diversa o non può confermarne l’identità configurata. Controlla l’indirizzo del dispositivo e la configurazione del servizio o dell’adattatore. I comandi restano indisponibili finché non è possibile confermare nuovamente la wallbox configurata."
+    },
+    "service_version_mismatch": {
+      "message": "L’integrazione e il servizio Modbus usano versioni API diverse. Aggiorna entrambi alla stessa versione, iniziando dall’app o dal servizio ospitato separatamente."
     }
   },
   "issues": {

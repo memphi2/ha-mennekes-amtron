@@ -49,9 +49,9 @@ def test_service_permission_controls_real_ha_entities_and_commands(
 
         @web.middleware
         async def observe(request, handler):
-            if request.path == "/v1/command":
+            if request.path == "/v2/command":
                 commands.append(request.path)
-            if request.path == "/v1/state" and fault:
+            if request.path == "/v2/state" and fault:
                 if fault == "offline":
                     return web.json_response(
                         {"error": "service_unavailable"}, status=503

@@ -16,6 +16,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .blueprint_installer import async_install_blueprints
 from .control import AmtronControl, ControlOptions
@@ -40,6 +41,7 @@ from .device.const import (
     CONF_PARITY,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
+    CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
     CONF_TCP_PORT,
     CONNECTION_SERIAL,
@@ -97,6 +99,7 @@ async def async_setup_entry(
     """Set up one wallbox from a config entry."""
 
     remote = CONF_SERVER_URL in entry.data
+    expected_serial = _entry_serial_binding(entry)
     client: MennekesModbusClient
     if remote:
         # Direct-mode intent must not return after a later switch back from
@@ -107,6 +110,7 @@ async def async_setup_entry(
             str(entry.data[CONF_SERVER_URL]),
             str(entry.data[CONF_SERVER_TOKEN]),
         )
+        client.bind_identity(expected_serial)
     else:
         states: dict[str, WriteState] = hass.data.setdefault(
             f"{DOMAIN}_write_states", {}
@@ -123,11 +127,27 @@ async def async_setup_entry(
             if isinstance(client, RemoteClient)
             else await async_read_identity(client)
         )
+        if expected_serial is not None and identity.serial_number != expected_serial:
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN, translation_key="device_identity_changed"
+            )
+        if isinstance(client, RemoteClient):
+            # Legacy endpoint-only entries keep their registry identifiers, but
+            # can still bind this running client to a serial it has just read.
+            client.bind_identity(identity.serial_number)
     except BaseException as err:
         await client.async_close()
         if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
             raise ConfigEntryAuthFailed(
                 translation_domain=DOMAIN, translation_key="service_auth_failed"
+            ) from err
+        if isinstance(err, ServiceConnectionError) and err.reason == "service_identity_changed":
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN, translation_key="device_identity_changed"
+            ) from err
+        if isinstance(err, ServiceConnectionError) and err.reason == "service_version_mismatch":
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN, translation_key="service_version_mismatch"
             ) from err
         if isinstance(err, AmtronBusError):
             raise ConfigEntryNotReady(str(err)) from err
@@ -190,6 +210,17 @@ async def async_setup_entry(
 
             def update_remote() -> None:
                 heartbeat.update()
+                if not client.connected:
+                    # A command or diagnostics request can fail long before
+                    # the next scheduled poll. Reflect this in entity state now.
+                    key = {
+                        "service_auth_failed": "service_auth_failed",
+                        "service_identity_changed": "device_identity_changed",
+                        "service_version_mismatch": "service_version_mismatch",
+                    }.get(client.failure_reason or "", "service_unavailable")
+                    coordinator.async_set_update_error(UpdateFailed(
+                        translation_domain=DOMAIN, translation_key=key
+                    ))
                 counters = client.snapshot.get("diagnostics", {})
                 for name in (
                     "heartbeats_sent",
@@ -234,6 +265,17 @@ async def async_setup_entry(
         await client.async_close()
         raise
     return True
+
+
+def _entry_serial_binding(entry: MennekesAmtronConfigEntry) -> str | None:
+    """Return a known serial, retaining old endpoint-only entry identities."""
+    serial = entry.data.get(CONF_SERIAL_NUMBER)
+    if isinstance(serial, str) and serial:
+        return serial
+    unique_id = getattr(entry, "unique_id", None)
+    if isinstance(unique_id, str) and unique_id and not unique_id.startswith(f"{DOMAIN}_"):
+        return unique_id
+    return None
 
 
 async def async_unload_entry(
