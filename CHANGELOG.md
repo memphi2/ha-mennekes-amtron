@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Make the app's Read-only switch the sole write-permission setting for service
+  connections. Remove the duplicate HA option, ignore old HA-only mode settings,
+  and keep control entities registered with stable IDs. A fresh writable service
+  response enables them; read-only, disconnected or unavailable service state
+  blocks commands. Permission changes notify HA even when register values are
+  unchanged, without sending commands or adding per-poll Recorder history.
+
 ## 0.5.0b4 — 2026-11-05
 
 - Keep app setup available when the wallbox reports an unusable optional maximum

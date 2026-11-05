@@ -366,7 +366,7 @@
       "message": "Diese Wallbox kann nicht zwischen einer und drei Phasen umschalten. Die dynamische Phasenumschaltung setzt ein 11-kW-Gerät voraus, das Phasenoption 2 meldet."
     },
     "read_only_mode": {
-      "message": "Diese Wallbox ist im Nur-Lesen-Modus eingerichtet. Stelle den Steuermodus in den Integrationsoptionen auf \"Modbus-Master\", um sie zu steuern."
+      "message": "Diese Wallbox ist im Nur-Lesen-Modus eingerichtet. Bei einer Dienst-Verbindung deaktiviere „Nur lesen“ in der App und übernimm die Änderung. Bei einer direkten seriellen Verbindung wähle „Modbus-Master“ in den Integrationsoptionen."
     },
     "restart_requires_idle": {
       "message": "Die Wallbox darf nur im Zustand \"Bereit\" neu gestartet werden. Trenne zuerst das Fahrzeug."
@@ -398,21 +398,21 @@
   },
   "issues": {
     "ems_fallback_not_configured": {
-      "description": "Register 0x030E steht auf 0. Die Wallbox lädt damit mit den letzten empfangenen Werten weiter, wenn Home Assistant keinen Heartbeat mehr sendet. Konfiguriere mit dem MENNEKES-Konfigurationstool ein Fallback-Verhalten oder einen Fallback-Strom, damit bei einem Ausfall ein definierter Zustand gilt.",
+      "description": "Register 0x030E steht auf 0. Die Wallbox lädt damit mit den letzten empfangenen Werten weiter, wenn der aktive Modbus-Master keinen Heartbeat mehr sendet. Konfiguriere mit dem MENNEKES-Konfigurationstool ein Fallback-Verhalten oder einen Fallback-Strom, damit bei einem Ausfall ein definierter Zustand gilt.",
       "title": "Kein Energiemanager-Fallback konfiguriert"
     },
     "ems_heartbeat_lost": {
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Die Wallbox meldet Fehler 200 nach einem ausgebliebenen Heartbeat. Im Modbus-Master-Modus werden die bestehenden Einstellungen automatisch erneut übertragen, sobald der Heartbeat wieder ankommt – auch bei pausiertem Laden. Mit dem Bestätigen startest du einen manuellen Versuch. Eine bewusste Pause, die Gerätesperre, eine ausgeschaltete Ladefreigabe und die Stromvorgabe bleiben erhalten. Das Laden wird dadurch nicht fortgesetzt. Ein bereits behobener Fehler wird ohne weitere Befehle geschlossen.",
+            "description": "Die Wallbox meldet Fehler 200 nach einem ausgebliebenen Heartbeat. Bei aktivierter Schreibfreigabe werden die bestehenden Einstellungen automatisch erneut übertragen, sobald der Heartbeat wieder ankommt – auch bei pausiertem Laden. Mit dem Bestätigen startest du einen manuellen Versuch. Eine bewusste Pause, die Gerätesperre, eine ausgeschaltete Ladefreigabe und die Stromvorgabe bleiben erhalten. Das Laden wird dadurch nicht fortgesetzt. Ein bereits behobener Fehler wird ohne weitere Befehle geschlossen.",
             "title": "Wallbox hat den Energiemanager-Heartbeat verloren"
           }
         },
         "error": {
           "entry_unavailable": "Die Integration ist nicht geladen. Stelle zuerst die Verbindung wieder her.",
           "different_error": "Die Wallbox meldet einen anderen Fehler. Die Heartbeat-Wiederherstellung setzt diesen nicht zurück.",
-          "read_only": "Aktiviere zuerst den Modbus-Master-Modus, um die Wiederherstellung auszuführen.",
+          "read_only": "Deaktiviere „Nur lesen“ in der App und übernimm die Änderung, um die Wiederherstellung auszuführen. Bei einer direkten seriellen Verbindung aktiviere stattdessen den Modbus-Master-Modus in den Integrationsoptionen.",
           "write_rate_limited": "Der Mindestabstand seit einem vorherigen Befehl ist noch nicht abgelaufen. Warte kurz und versuche es erneut.",
           "recovery_failed": "Die Wiederherstellung konnte nicht bestätigt werden. Prüfe die Verbindung und versuche es erneut.",
           "still_active": "Die Wiederherstellungsbefehle wurden gesendet, die Wallbox meldet aber noch einen Fehler. Warte auf die Statusaktualisierung; prüfe bei anhaltendem Fehler die Verbindung."
@@ -449,15 +449,14 @@
       "service": {
         "title": "Dienst-Optionen",
         "data": {
-          "control_mode": "Steuermodus",
           "current_limit": "Obergrenze des Ladestroms",
           "scan_interval_seconds": "Statusintervall"
         },
         "data_description": {
-          "control_mode": "Legt nur fest, ob Home Assistant Steuerbefehle senden darf. Der eigenständige Dienst hält den Heartbeat und den letzten Ladezustand auch bei „Nur lesen“ weiter. Die Schreibfreigabe des Dienstes wird separat in dessen Konfiguration eingestellt.",
           "current_limit": "Zusätzliche Obergrenze für von Home Assistant angeforderte Ladestromwerte. Die Obergrenze des Dienstes bleibt wirksam. Bewusst gewählte 0 A schalten die EMS-Begrenzung aus.",
           "scan_interval_seconds": "Wie oft Home Assistant den gespeicherten Status vom Dienst abruft. Modbus-Messintervall und Heartbeat-Takt werden dadurch nicht verändert."
-        }
+        },
+        "description": "Die Einstellung „Nur lesen“ der App steuert auch die Schreibfreigabe in Home Assistant. Deaktiviere sie in der App und übernimm die Änderung, um die Steuerung zu aktivieren. Die Steuer-Entitäten bleiben bei aktivem Nur-Lesen-Modus oder nicht bereitem Dienst nicht verfügbar."
       }
     }
   },
@@ -487,12 +486,6 @@
         "full": "Vollständige Historie",
         "detail": "Weniger Details",
         "lean": "Nur Energie- und Leistungsstatistiken"
-      }
-    },
-    "service_control_mode": {
-      "options": {
-        "read_only": "Nur lesen in Home Assistant",
-        "master": "Steuerung durch Home Assistant erlauben"
       }
     }
   },

@@ -276,6 +276,7 @@ class RemoteClient(MennekesModbusClient):
             values=values,
             failed_blocks=tuple(failed),
             current_write_generation=generation,
+            service_read_only=control["read_only"],
         )
 
     async def execute(self, command: str, **values: Any) -> None:
@@ -395,9 +396,17 @@ class RemoteControl(AmtronControl):
     @property
     def read_only(self) -> bool:
         return (
-            self.options.read_only
+            not self._remote.connected
+            or self._remote.snapshot.get("available") is not True
             or self._remote.snapshot.get("control", {}).get("read_only") is not False
         )
+
+    def _require_write_access(self) -> None:
+        """Use current service permission, never a former HA-only setting."""
+        if not self._remote.connected or self._remote.snapshot.get("available") is not True:
+            raise DeviceError("service_unavailable")
+        if self.read_only:
+            raise DeviceValidationError("read_only_mode")
 
     @property
     def max_charging_current(self) -> float:

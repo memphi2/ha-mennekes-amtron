@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import probatio
+import pytest
 
 from custom_components.mennekes_amtron_rtu._flow_serial import PortOption
 from custom_components.mennekes_amtron_rtu.config_schemas import (
@@ -98,9 +99,13 @@ def test_submitting_normalises_the_values() -> None:
     asyncio.run(run())
 
 
-def test_service_options_configure_only_ha_access_and_cache_refresh() -> None:
+@pytest.mark.parametrize("stale_mode", [None, CONTROL_MODE_READ_ONLY, CONTROL_MODE_MASTER])
+def test_service_options_configure_only_current_cap_and_cache_refresh(stale_mode) -> None:
     async def run() -> None:
-        entry = FakeConfigEntry(data={"server_url": "http://service:8765"})
+        entry = FakeConfigEntry(
+            data={"server_url": "http://service:8765"},
+            options={CONF_CONTROL_MODE: CONTROL_MODE_READ_ONLY},
+        )
         flow = Flow(entry)
         result = await flow.async_step_init()
         assert result["step_id"] == "service"
@@ -110,23 +115,18 @@ def test_service_options_configure_only_ha_access_and_cache_refresh() -> None:
             for marker, selector in result["data_schema"].schema.items()
         }
         assert set(fields) == {
-            CONF_CONTROL_MODE,
             CONF_CURRENT_LIMIT,
             CONF_SCAN_INTERVAL_SECONDS,
         }
-        assert (
-            fields[CONF_CONTROL_MODE].config["translation_key"]
-            == "service_control_mode"
-        )
-        result = await flow.async_step_service(
-            {
-                CONF_CONTROL_MODE: CONTROL_MODE_READ_ONLY,
-                CONF_CURRENT_LIMIT: 8,
-                CONF_SCAN_INTERVAL_SECONDS: 10,
-            }
-        )
+        submitted = {
+            CONF_CURRENT_LIMIT: 8,
+            CONF_SCAN_INTERVAL_SECONDS: 10,
+            CONF_MEASUREMENT_INTERVAL_SECONDS: 60,
+        }
+        if stale_mode is not None:
+            submitted[CONF_CONTROL_MODE] = stale_mode
+        result = await flow.async_step_service(submitted)
         assert result["data"] == {
-            CONF_CONTROL_MODE: CONTROL_MODE_READ_ONLY,
             CONF_CURRENT_LIMIT: 8,
             CONF_SCAN_INTERVAL_SECONDS: 10,
         }

@@ -87,9 +87,7 @@ def test_service_form_validates_identity_credentials_and_backend(
                     )
                 else:
                     assert result["type"] == "create_entry"
-                    assert result["options"]["control_mode"] == (
-                        "read_only" if scenario == "read_only" else "master"
-                    )
+                    assert "control_mode" not in result.get("options", {})
                 assert not current_writes(transport)
         finally:
             await service.stop()
@@ -161,11 +159,13 @@ def test_reconfiguring_a_real_entry_preserves_entity_ids(tmp_path):
                     for entity in er.async_entries_for_config_entry(registry, entry_id)
                 }
                 assert entities.items() <= migrated.items()
-                # The direct entry was read-only and had no heartbeat sender.
-                # Migration additionally exposes the service's heartbeat.
+                # The direct entry was read-only. The service now owns write
+                # access, so migration exposes its heartbeat and all controls.
                 assert {
-                    value[0] for key, value in migrated.items() if key not in entities
-                } == {"binary_sensor.mennekes_amtron_heartbeat"}
+                    value[0].split(".", 1)[0]
+                    for key, value in migrated.items() if key not in entities
+                } == {"binary_sensor", "number", "switch", "select", "button"}
+                assert not entry.runtime_data.control.read_only
                 assert not current_writes(transport)
         finally:
             await hass.async_stop()

@@ -277,12 +277,12 @@ async def async_migrate_entry(
 def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:
     """Return the platforms this entry exposes.
 
-    A read-only entry gets no command entities at all: the safest control
-    surface is one that does not exist.
+    Direct read-only entries omit controls. Service entries retain their control
+    entities and follow the service's live write permission through availability.
     """
 
     platforms = list(READ_PLATFORMS)
-    if control_mode_is_master(dict(entry.options)):
+    if CONF_SERVER_URL in entry.data or control_mode_is_master(dict(entry.options)):
         platforms.extend(CONTROL_PLATFORMS)
     return platforms
 
@@ -308,7 +308,7 @@ def _control_options(entry: MennekesAmtronConfigEntry) -> ControlOptions:
     options = dict(entry.options)
     cap = options.get(CONF_CURRENT_LIMIT)
     return ControlOptions(
-        read_only=not control_mode_is_master(options),
+        read_only=CONF_SERVER_URL not in entry.data and not control_mode_is_master(options),
         current_cap=float(cap) if isinstance(cap, (int, float)) else None,
     )
 

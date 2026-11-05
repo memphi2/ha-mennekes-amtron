@@ -31,7 +31,7 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
     async def async_step_service(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Configure HA access without changing the service's bus ownership."""
+        """Configure cache refresh and the additional HA current cap."""
         return await self._async_options("service", user_input)
 
     async def _async_options(
@@ -39,9 +39,7 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
 
         if user_input is not None:
-            options = _normalized(user_input)
-            if step_id == "service":
-                options.pop(CONF_MEASUREMENT_INTERVAL_SECONDS, None)
+            options = _normalized(user_input, service_mode=step_id == "service")
             return self.async_create_entry(data=options)
 
         return self.async_show_form(
@@ -54,17 +52,19 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         )
 
 
-def _normalized(user_input: dict[str, Any]) -> dict[str, Any]:
-    return {
-        CONF_CONTROL_MODE: str(user_input[CONF_CONTROL_MODE]),
+def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, Any]:
+    options: dict[str, Any] = {
         CONF_SCAN_INTERVAL_SECONDS: int(user_input[CONF_SCAN_INTERVAL_SECONDS]),
-        CONF_MEASUREMENT_INTERVAL_SECONDS: int(
+        CONF_CURRENT_LIMIT: float(user_input[CONF_CURRENT_LIMIT]),
+    }
+    if not service_mode:
+        options[CONF_CONTROL_MODE] = str(user_input[CONF_CONTROL_MODE])
+        options[CONF_MEASUREMENT_INTERVAL_SECONDS] = int(
             user_input.get(
                 CONF_MEASUREMENT_INTERVAL_SECONDS, DEFAULT_MEASUREMENT_INTERVAL_SECONDS
             )
-        ),
-        CONF_CURRENT_LIMIT: float(user_input[CONF_CURRENT_LIMIT]),
-    }
+        )
+    return options
 
 
 def _max_current(entry: Any) -> float:
