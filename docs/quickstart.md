@@ -43,8 +43,8 @@ USB passthrough does not apply.
 
 Configure the wallbox's intended [energy-manager fallback](safety.md#the-heartbeat-and-what-happens-without-it)
 before enabling writes. The service protects against HA Core restarts; stopping
-the service, restarting its host or losing the serial connection still interrupts
-the heartbeat. Keep the vehicle disconnected during initial control setup.
+the service, restarting its host or losing the USB/LAN connection can still
+interrupt the heartbeat. Keep the vehicle disconnected during initial control setup.
 
 ## 5. Add the wallbox
 
@@ -86,7 +86,7 @@ requirements. Do not enter a gateway address in the **Service URL** field.
 ## 6. Check readings, then enable control
 
 Compare the readings with the wallbox before allowing writes. Set an appropriate
-current cap, then enable control in the place that owns the serial connection:
+current cap, then enable control in the place that owns the USB or LAN connection:
 
 | Connection | Enable control |
 |---|---|

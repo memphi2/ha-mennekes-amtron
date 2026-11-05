@@ -110,10 +110,13 @@ def test_auth_failure_starts_real_ha_reauth_and_preserves_entities(
                 else:
                     with pytest.raises(ServiceConnectionError):
                         await old_runtime.client.request(
-                            "GET", "/v1/diagnostics", update_connection=False
+                            "GET", "/v2/diagnostics", update_connection=False
                         )
                     assert not old_runtime.client.connected
                 await hass.async_block_till_done()
+                if trigger in ("command", "diagnostics"):
+                    assert not old_runtime.coordinator.last_update_success
+                    assert hass.states.get("number.mennekes_amtron_charging_current_limit").state == "unavailable"
                 flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
                 assert len(flows) == 1
                 assert flows[0]["step_id"] == "reauth_confirm"
@@ -163,7 +166,7 @@ def test_manual_reauth_validates_credentials_and_identity_without_mutation(
             if fault == "offline":
                 return web.json_response({}, status=503)
             if fault == "invalid":
-                return web.json_response({"api_version": 999})
+                return web.json_response({"api_version": "invalid"})
             return await handler(request)
 
         app = create_app(service)

@@ -8,6 +8,8 @@ from .device.client_errors import AmtronConnectionError
 
 type ServiceFailure = Literal[
     "service_auth_failed", "service_not_ready", "service_invalid_response",
+    "service_identity_changed",
+    "service_version_mismatch",
 ]
 
 

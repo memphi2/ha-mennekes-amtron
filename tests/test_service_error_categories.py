@@ -107,7 +107,7 @@ def test_failure_categories_are_precise_and_do_not_expose_response_data(tmp_path
                 async def invalid(_request):
                     return web.Response(text="secret-response-body")
 
-                app.router.add_get("/v1/state", invalid)
+                app.router.add_get("/v2/state", invalid)
             async with TestServer(app) as server, ClientSession() as session:
                 token = "wrong" * 10 if fault == "authentication" else TOKEN
                 remote = RemoteClient(session, str(server.make_url("/")), token)

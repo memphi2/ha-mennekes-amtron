@@ -23,7 +23,8 @@
       "invalid_network_config": "Enter a host name or IP address without a URL scheme, a TCP port from 1 to 65535 and the matching connection protocol.",
       "cannot_connect_network": "Could not reach the LAN adapter or the wallbox did not answer. Check the host, port, protocol and the serial settings configured on the adapter.",
       "invalid_network_response": "The adapter answered but no valid Modbus layout was reported. Check the wallbox address, adapter protocol and satellite configuration.",
-      "service_discovery_unavailable": "The current credentials of this app could not be retrieved. Check the app and Supervisor, start or restart the app if needed, then confirm again."
+      "service_discovery_unavailable": "The current credentials of this app could not be retrieved. Check the app and Supervisor, start or restart the app if needed, then confirm again.",
+      "service_version_mismatch": "The integration and Modbus service use different API versions. Update both to the same release, starting with the app or standalone service."
     },
     "progress": {
       "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes plus connection checks. No registers are written. During reconfiguration, the existing connection and heartbeat are paused; the wallbox's configured fallback applies."
@@ -450,6 +451,12 @@
     },
     "service_auth_failed": {
       "message": "The Modbus service rejected authentication. Renew its access under Settings > Devices & services."
+    },
+    "device_identity_changed": {
+      "message": "The connection reports a different wallbox or cannot confirm its configured identity. Check the device address and service or adapter configuration. Control stays unavailable until the configured wallbox can be confirmed again."
+    },
+    "service_version_mismatch": {
+      "message": "The integration and Modbus service use different API versions. Update both to the same release, starting with the app or standalone service."
     }
   },
   "issues": {

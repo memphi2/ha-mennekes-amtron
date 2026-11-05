@@ -205,7 +205,7 @@ def test_network_service_controls_restore_pause_and_log_the_actual_transport(
     async def run():
         service = await create_service()
         try:
-            await service.command({"command": "pause"})
+            await service.command({"command": "pause", "expected_serial_number": None})
             assert service.control.pause_requested is True
             accepted = current_writes(transport)
             assert accepted == [1]

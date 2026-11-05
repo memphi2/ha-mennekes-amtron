@@ -76,7 +76,8 @@ def test_a_delayed_poll_cannot_undo_a_newer_command_snapshot(tmp_path):
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("api_version", 2),
+        ("api_version", 1),
+        ("api_version", 3),
         ("api_version", True),
         ("values", []),
         ("values", {"x": float("nan")}),
@@ -117,9 +118,12 @@ def test_malformed_snapshots_are_never_published_as_live_state(tmp_path, field, 
                     bad[field] = value
                 else:
                     bad[parts[0]][parts[1]] = value
-                with pytest.raises(
-                    AmtronConnectionError, match="invalid service snapshot"
-                ):
+                message = (
+                    "service API version differs"
+                    if field == "api_version" and type(value) is int
+                    else "invalid service snapshot"
+                )
+                with pytest.raises(AmtronConnectionError, match=message):
                     remote.apply_snapshot(bad)
                 assert not remote.connected
                 assert notifications == [False]
@@ -160,11 +164,11 @@ def test_http_errors_have_stable_types_and_no_retries(status, payload, kind):
             return web.json_response(payload, status=status)
 
         app = web.Application()
-        app.router.add_get("/v1/state", respond)
+        app.router.add_get("/v2/state", respond)
         async with TestServer(app) as server, ClientSession() as session:
             remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
             with pytest.raises(kind):
-                await remote.request("GET", "/v1/state")
+                await remote.request("GET", "/v2/state")
             assert calls == [1]
 
     asyncio.run(run())
@@ -176,7 +180,7 @@ def test_large_or_streamed_replies_are_bounded():
             return web.Response(body=b"x" * 131073)
 
         app = web.Application()
-        app.router.add_get("/v1/state", oversized)
+        app.router.add_get("/v2/state", oversized)
         async with TestServer(app) as server, ClientSession() as session:
             remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
             with pytest.raises(AmtronConnectionError, match="service response too large"):
@@ -272,7 +276,7 @@ def test_service_rejects_invalid_resume_caps_before_any_write(tmp_path, cap):
         service, transport, _clock = await service_fixture(tmp_path)
         try:
             with pytest.raises(ValueError, match="numeric value"):
-                await service.command({"command": "resume", "current_cap": cap})
+                await service.command({"command": "resume", "current_cap": cap, "expected_serial_number": "ABC123456789"})
             assert not current_writes(transport)
         finally:
             await service.stop()
@@ -307,10 +311,11 @@ def test_remote_resume_uses_fresh_service_intent_with_the_ha_cap(
                 # Another authenticated client changes the service while HA's
                 # last snapshot still contains the previous resume current.
                 await service.command({
-                    "command": "set_current", "value": fresh, "allow_unlimited": True
+                    "command": "set_current", "value": fresh, "allow_unlimited": True,
+                    "expected_serial_number": "ABC123456789",
                 })
                 clock[0] += 6
-                await service.command({"command": "pause"})
+                await service.command({"command": "pause", "expected_serial_number": "ABC123456789"})
                 clock[0] += 6
                 assert control.charging_setpoint == cached
                 await control.async_resume_charging()
@@ -372,7 +377,7 @@ def test_write_diagnostics_endpoint_requires_auth_and_performs_no_bus_io(tmp_pat
             service.diagnostics.timeline.record(EventType.CONNECTION_LOST)
             before = (list(transport.reads), list(transport.writes))
             async with TestServer(create_app(service)) as server, ClientSession() as session:
-                url = server.make_url("/v1/diagnostics")
+                url = server.make_url("/v2/diagnostics")
                 async with session.get(url) as response:
                     assert response.status == 401
                 async with session.get(url, headers={"Authorization": f"Bearer {TOKEN}"}) as response:
@@ -395,14 +400,14 @@ def test_optional_diagnostics_failure_does_not_mark_service_offline():
         async def unavailable(_request):
             raise web.HTTPNotFound
 
-        app.router.add_get("/v1/diagnostics", unavailable)
+        app.router.add_get("/v2/diagnostics", unavailable)
         async with TestServer(app) as server, ClientSession() as session:
             remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
             remote._connected = True
             notifications = []
             remote.on_update = lambda: notifications.append(True)
             with pytest.raises(AmtronConnectionError):
-                await remote.request("GET", "/v1/diagnostics", update_connection=False)
+                await remote.request("GET", "/v2/diagnostics", update_connection=False)
             assert remote.connected
             assert notifications == []
 

@@ -107,7 +107,7 @@ automatically. It preserves a deliberate pause, lock, disabled charging release
 and current setting. If recovery cannot complete, follow
 [heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable).
 
-The service cannot bridge its own shutdown, a host restart or a lost serial
+The service cannot bridge its own shutdown, a host restart or a lost USB/LAN
 connection. In those cases, the wallbox follows its configured
 [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
 Check that behavior before relying on unattended charging.

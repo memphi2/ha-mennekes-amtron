@@ -23,7 +23,8 @@
       "invalid_network_config": "Saisissez un nom d’hôte ou une adresse IP sans schéma d’URL, un port TCP de 1 à 65535 et le protocole de connexion approprié.",
       "cannot_connect_network": "L’adaptateur réseau est inaccessible ou la borne n’a pas répondu. Vérifiez l’hôte, le port, le protocole et les paramètres série de l’adaptateur.",
       "invalid_network_response": "L’adaptateur a répondu, mais aucune table de registres Modbus valide n’a été indiquée. Vérifiez l’adresse de la borne, le protocole de l’adaptateur et le mode satellite.",
-      "service_discovery_unavailable": "Les identifiants actuels de cette application n’ont pas pu être récupérés. Vérifiez l’application et le Supervisor, démarrez ou redémarrez l’application si nécessaire, puis confirmez à nouveau."
+      "service_discovery_unavailable": "Les identifiants actuels de cette application n’ont pas pu être récupérés. Vérifiez l’application et le Supervisor, démarrez ou redémarrez l’application si nécessaire, puis confirmez à nouveau.",
+      "service_version_mismatch": "L’intégration et le service Modbus utilisent des versions d’API différentes. Mettez les deux à jour vers la même version, en commençant par l’application ou le service hébergé séparément."
     },
     "progress": {
       "searching": "Recherche d’une borne sur le bus : jusqu’à {candidates} combinaisons, soit environ {minutes} minutes, auxquelles s’ajoutent les vérifications de connexion. Aucun registre n’est modifié. Pendant la reconfiguration, la connexion existante et le signal de présence sont interrompus ; le comportement de repli configuré sur la borne s’applique."
@@ -450,6 +451,12 @@
     },
     "service_auth_failed": {
       "message": "Le service Modbus a refusé l’authentification. Renouvelez son accès dans Paramètres > Appareils et services."
+    },
+    "device_identity_changed": {
+      "message": "La connexion signale une autre borne ou ne permet pas de confirmer son identité configurée. Vérifiez l’adresse de l’appareil et la configuration du service ou de l’adaptateur. Les commandes restent indisponibles tant que la borne configurée ne peut pas être confirmée."
+    },
+    "service_version_mismatch": {
+      "message": "L’intégration et le service Modbus utilisent des versions d’API différentes. Mettez les deux à jour vers la même version, en commençant par l’application ou le service hébergé séparément."
     }
   },
   "issues": {

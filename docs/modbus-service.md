@@ -3,7 +3,7 @@
 The optional **Mennekes Amtron Modbus Service** keeps the wallbox connected while
 Home Assistant Core restarts. It is the preferred setup when you want the
 heartbeat and your chosen charging state to continue independently of HA.
-Direct serial operation remains available without the extra service.
+Direct USB and LAN connections remain available without the extra service.
 
 The service can reach the RTU wallbox through **USB or a LAN-to-RS-485 adapter**.
 LAN needs no USB device on its host; see [LAN setup](network-gateway.md) for the
@@ -29,8 +29,8 @@ and entity IDs. Before starting the app:
 1. Note the pause state, charging-current limit, charging release and the current
    you want to resume at if paused.
 2. Disconnect the vehicle for the first handover. The heartbeat is interrupted
-   while the serial adapter changes owners, so the wallbox may apply its fallback.
-3. **Disable the existing direct-serial integration entry. Do not delete it.**
+   while the USB or LAN connection changes owners, so the wallbox may apply its fallback.
+3. **Disable the existing direct USB or LAN integration entry. Do not delete it.**
    This releases its USB or gateway connection for the app.
 
 Continue below. For a new installation, start directly with the installation
@@ -63,7 +63,7 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 ### 3. Configure and start read-only
 
-If another integration owns the serial adapter, complete the
+If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
 If **Serial adapter** or **Adapter host** is hidden, enable **Show unused optional
@@ -91,7 +91,8 @@ for the wallbox connection. Read-only mode deliberately leaves the heartbeat off
 Open **Settings → Devices & services** and configure the discovered
 **Mennekes Amtron** entry. The app supplies its address and token automatically.
 An existing entry for the same wallbox is reused; re-enable it if it remains
-disabled after the handover.
+disabled after the handover. Keep the app **Read-only** while re-enabling the
+entry and checking the readings.
 
 If no discovery card is visible, choose **Add integration → Mennekes Amtron RTU →
 Connect to the Modbus service**. This also looks for the running app. If several
@@ -134,10 +135,10 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 | Pause or resume charging | Use **Charging paused** in HA. |
 | Set a charging-current limit | Use the current slider in HA. **0 A removes the EMS limit; it does not pause charging.** |
 | Enable or disable all writes | Change **Read-only**, save and restart the app. HA needs no restart. Read-only stops the heartbeat as well as writes. |
-| Change Modbus polling intervals or the service current cap | Open the app configuration. |
+| Change Modbus polling intervals or the service current cap | Change the app configuration, save and restart the app. |
 | Change USB/LAN connection settings | Open the app configuration, save and restart the app. For LAN, serial baud/frame belong on the gateway. |
 | Change how often HA reads app status, or lower HA's current cap | Open the integration options. |
-| Hand the serial adapter to another master | Stop the app. Disabling its HA entry or enabling read-only does not release the bus. |
+| Hand the USB or LAN connection to another master | Stop the app. Disabling its HA entry or enabling read-only does not release the bus. |
 
 Control entities keep their IDs when permission changes. They are unavailable
 while the service is read-only, disconnected or not ready. HA does not send old
@@ -169,13 +170,18 @@ health changes rather than every beat. For smaller HA history, use a
 
 ## Updates
 
-Update the integration first and restart Home Assistant Core. Update the app
-separately through Supervisor when offered. A Core restart leaves the running
-app's heartbeat active; **an app update briefly interrupts it**.
+1. **Update the existing app to 0.5.0 first.** Use **Check for updates** in the
+   app store, update normally and wait for the app to initialize. For a separate
+   service, follow the [standalone update steps](service-standalone.md#operation-and-updates).
+2. **Update the integration to 0.5.0**, then restart Home Assistant Core.
 
-**From a beta to stable 0.5.0:** keep the existing HA entry and app. Update the
-integration first, then use **Check for updates** in the app store and update
-the installed app normally. Stable releases are offered in both `#apps` and
+The beta integration may show unavailable controls between these updates. The
+updated running app retains its heartbeat and charging intent with writes
+enabled; it does not need another restart when HA updates. **The app update
+itself briefly interrupts its heartbeat.**
+
+**From a beta to stable 0.5.0:** keep the existing HA entry and app. Complete both
+updates in the order above. Stable releases are offered in both `#apps` and
 `#apps-beta`, so no reinstall or repository change is needed. The existing app's
 token and saved charging state are retained. USB settings remain valid;
 LAN is an optional connection change.
@@ -183,8 +189,9 @@ LAN is an optional connection change.
 The beta and stable repositories end in `#apps-beta` and `#apps`. The beta catalog
 also offers future prereleases; the stable catalog offers stable releases only.
 An optional switch to the stable-only catalog creates a different app in Supervisor.
-For that channel change, back up app data, copy the
-options, stop the old app before starting the new one, and confirm its discovery.
+For that channel change, back up app data, note the charging settings and
+disconnect the vehicle. Copy the options, set the new app to **Read-only**, stop
+the old app before starting the new one, and confirm its discovery.
 The new app has separate saved state: record and verify pause, current and
 charging-release settings as in the [first handover](#move-an-existing-wallbox).
 Keep the old app and backup until the handover is verified.
@@ -194,14 +201,16 @@ Keep the old app and backup until the handover is verified.
 | Symptom | First check |
 |---|---|
 | HA asks for a URL or token | Confirm that the app is running, then use its discovery card or **Connect to the Modbus service**. Manual credentials are for standalone services. |
-| App not ready / token rejected | Check the app log. During setup, retry discovery confirmation. For an existing connection with an authentication notice, [renew service access](troubleshooting.md#renew-service-access); HA retrieves the current credentials without a manual token. |
-| Controls are unavailable | Check the app's **Read-only** switch and serial connection. After changing app settings, save and restart the app, then wait for fresh status. |
+| App not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
+| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA tries to refresh access automatically; if an authentication notice remains, [renew service access](troubleshooting.md#renew-service-access). No manual app token is needed. |
+| Integration and service versions do not match | Complete the [two updates](#updates): app/service first, then integration and Core restart. Both must be on 0.5.0. Changing the token does not fix this. |
+| Controls are unavailable | Check the app's **Read-only** switch and USB/LAN connection. After changing app settings, save and restart the app, then wait for fresh status. |
 | App exits immediately | Look for **Invalid or unreadable service configuration** in its log; the message names the invalid option or startup phase. |
 | App runs but cannot reach the wallbox | Check adapter path, bus settings and exclusive bus ownership. A missing serial device is retried. |
 | LAN adapter connects but readings fail | Check transparent RTU-over-TCP versus translating Modbus-TCP mode, device address and gateway serial settings; see [LAN troubleshooting](network-gateway.md#network-access-and-troubleshooting). |
 | Error 200 or an occasional write timeout | Download integration diagnostics **before restarting the app**, then follow [heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable). |
 
-The log shows service startup, serial connection and heartbeat start/stop.
+The log shows service startup, USB/LAN connection and heartbeat start/stop.
 Connection and heartbeat failures are logged when their state changes.
 Watchdog can restart an exited app; recurring failures still need their cause fixed.
 

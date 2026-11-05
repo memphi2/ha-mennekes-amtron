@@ -113,6 +113,13 @@ access and heartbeat recovery. Real HA lifecycle and HTTP tests cover service
 access, reconnection and unloading. Recorder tests check state-change filtering,
 statistics and retention; see [database validation](recorder-validation.md).
 
+[Identity-binding tests](../tests/test_identity_binding.py) verify that a known
+wallbox is not silently replaced through setup or service snapshots.
+[Service-freshness tests](../tests/test_service_freshness.py) check command refusal
+for unavailable or stale data, including requests waiting for the command lock.
+The service API's identity precondition and its limits are documented in the
+[technical reference](service-reference.md#commands-and-api-boundary).
+
 ## What this assessment does not prove
 
 The owner reported successful operation on an **Amtron 4You 310 11 C2** on

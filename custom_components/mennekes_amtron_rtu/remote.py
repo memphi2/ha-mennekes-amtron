@@ -28,7 +28,7 @@ from .device.heartbeat import HeartbeatTask
 from .device.identity import usable_max_evse_current
 from .device.register_blocks import REGISTER_BLOCKS
 from .device.registers import ERROR_CODE, RegisterSpec
-from .remote_errors import ServiceConnectionError
+from .remote_errors import ServiceConnectionError, ServiceFailure
 
 CONF_SERVER_URL = "server_url"
 CONF_SERVER_TOKEN = "server_token"  # noqa: S105 - configuration key, not a credential
@@ -63,9 +63,17 @@ class RemoteClient(MennekesModbusClient):
         self._connected = False
         self.snapshot: dict[str, Any] = {}
         self.identity = DeviceIdentity()
+        self._bound_serial: str | None = None
+        self.failure_reason: ServiceFailure | None = None
         self.on_update: Callable[[], None] | None = None
         self.on_auth_failed: Callable[[], None] | None = None
         self._snapshot_lock = asyncio.Lock()
+
+    def bind_identity(self, serial_number: str | None) -> None:
+        """Bind a configured client; setup probes remain free to read identity."""
+        if self._bound_serial is not None and self._bound_serial != serial_number:
+            raise ValueError("service identity is already bound")
+        self._bound_serial = serial_number
 
     @property
     def connected(self) -> bool:
@@ -77,6 +85,13 @@ class RemoteClient(MennekesModbusClient):
     async def async_close(self) -> None:
         self._connected = False
         self.on_auth_failed = None
+
+    def _mark_unavailable(self, reason: ServiceFailure | None = None) -> None:
+        """Publish a failed connection immediately, including command failures."""
+        self.failure_reason = reason
+        self._connected = False
+        if self.on_update is not None:
+            self.on_update()
 
     async def request(
         self, method: str, path: str, payload: dict[str, Any] | None = None,
@@ -93,6 +108,8 @@ class RemoteClient(MennekesModbusClient):
             ) as response:
                 if response.status in (401, 403):
                     raise ServiceConnectionError("service_auth_failed", "service authentication failed")
+                if response.status == 404 and path == "/v2/state":
+                    raise ServiceConnectionError("service_version_mismatch", "service API version differs")
                 raw = bytearray()
                 async for chunk in response.content.iter_chunked(16384):
                     raw.extend(chunk)
@@ -108,6 +125,14 @@ class RemoteClient(MennekesModbusClient):
                     raise ServiceConnectionError("service_invalid_response", "service response is not an object")
                 if response.status == 409:
                     key = data.get("error")
+                    if key == "device_identity_changed":
+                        raise ServiceConnectionError(
+                            "service_identity_changed", "service identity differs from the configured wallbox"
+                        )
+                    if key == "service_unavailable":
+                        raise ServiceConnectionError(
+                            "service_not_ready", "wallbox is unavailable at the service"
+                        )
                     placeholders = data.get("placeholders")
                     if not isinstance(key, str) or (
                         placeholders is not None
@@ -125,6 +150,11 @@ class RemoteClient(MennekesModbusClient):
                         if data.get("validation") is True
                         else DeviceError
                     )
+                    if key == "read_only_mode":
+                        # The service changed policy after our last snapshot.
+                        # Block cached controls until the next normal poll;
+                        # never retry the command or fetch in its error path.
+                        self._mark_unavailable("service_not_ready")
                     raise error(key, placeholders)
                 if response.status != 200:
                     raise AmtronConnectionError("service request failed")
@@ -135,9 +165,7 @@ class RemoteClient(MennekesModbusClient):
                 and err.reason == "service_auth_failed"
             )
             if update_connection or authentication_failed:
-                self._connected = False
-                if self.on_update is not None:
-                    self.on_update()
+                self._mark_unavailable(err.reason if isinstance(err, ServiceConnectionError) else None)
             if isinstance(err, ServiceConnectionError):
                 if authentication_failed and self.on_auth_failed is not None:
                     self.on_auth_failed()
@@ -148,14 +176,17 @@ class RemoteClient(MennekesModbusClient):
 
     async def update(self) -> WallboxData:
         async with self._snapshot_lock:
-            payload = await self.request("GET", "/v1/state")
+            payload = await self.request("GET", "/v2/state")
             return self.apply_snapshot(payload)
 
     def apply_snapshot(self, payload: dict[str, Any]) -> WallboxData:
         section = "api_version"
         try:
-            if type(payload.get("api_version")) is not int or payload["api_version"] != 1:
+            if type(payload.get("api_version")) is not int:
                 raise ValueError("unsupported API version")
+            if payload["api_version"] != 2:
+                self._mark_unavailable("service_version_mismatch")
+                raise ServiceConnectionError("service_version_mismatch", "service API version differs")
             section = "values"
             values = payload["values"]
             control = payload["control"]
@@ -262,14 +293,18 @@ class RemoteClient(MennekesModbusClient):
             if type(generation) is not int or generation < 0:
                 raise ValueError("invalid generation")
         except (KeyError, TypeError, ValueError) as err:
-            self._connected = False
-            if self.on_update is not None:
-                self.on_update()
+            self._mark_unavailable("service_invalid_response")
             raise ServiceConnectionError(
                 "service_invalid_response", f"invalid service snapshot ({section})"
             ) from err
+        if self._bound_serial is not None and identity.serial_number != self._bound_serial:
+            self._mark_unavailable("service_identity_changed")
+            raise ServiceConnectionError(
+                "service_identity_changed", "service identity differs from the configured wallbox"
+            )
         self.identity = identity
         self.snapshot = payload
+        self.failure_reason = None
         self._connected = True
         self.write_state.pause_requested = control.get("pause_requested")
         self.write_state.charging_release_requested = control.get(
@@ -297,19 +332,29 @@ class RemoteClient(MennekesModbusClient):
             # A delayed poll response must not overwrite the command's newer
             # intent/readback. Serialize request and publication together.
             async with self._snapshot_lock:
+                # Permission may have changed while this command waited for a
+                # poll. In particular, a mismatched identity must block an
+                # already queued command before it reaches the service.
+                if not self._connected or self.snapshot.get("available") is not True:
+                    raise ServiceConnectionError("service_not_ready", "wallbox is unavailable at the service")
                 self.apply_snapshot(
                     await self.request(
-                        "POST", "/v1/command", {"command": command, **values}
+                        "POST", "/v2/command", {
+                            "command": command, **values,
+                            "expected_serial_number": self._bound_serial or self.identity.serial_number,
+                        }
                     )
                 )
         except AmtronConnectionError as err:
             if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
                 raise DeviceError("service_auth_failed") from err
+            if isinstance(err, ServiceConnectionError) and err.reason == "service_identity_changed":
+                raise DeviceError("device_identity_changed") from err
             raise DeviceError("service_unavailable") from err
 
     async def async_read_register(self, spec: RegisterSpec) -> RegisterValue:
         if spec == ERROR_CODE:
-            data = await self.request("POST", "/v1/read", {"register": spec.key})
+            data = await self.request("POST", "/v2/read", {"register": spec.key})
             value = data.get("value")
             if type(value) is not int:
                 raise AmtronConnectionError("invalid error register")
@@ -328,7 +373,7 @@ class RemoteClient(MennekesModbusClient):
         )
         if block is None:
             raise AmtronConnectionError("unsupported diagnostic block")
-        response = await self.request("POST", "/v1/read", {"block": block.name})
+        response = await self.request("POST", "/v2/read", {"block": block.name})
         words = response.get("words")
         if (
             not isinstance(words, list)
@@ -385,6 +430,14 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
             if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
                 raise ConfigEntryAuthFailed(
                     translation_domain=DOMAIN, translation_key="service_auth_failed"
+                ) from err
+            if isinstance(err, ServiceConnectionError) and err.reason == "service_identity_changed":
+                raise UpdateFailed(
+                    translation_domain=DOMAIN, translation_key="device_identity_changed"
+                ) from err
+            if isinstance(err, ServiceConnectionError) and err.reason == "service_version_mismatch":
+                raise UpdateFailed(
+                    translation_domain=DOMAIN, translation_key="service_version_mismatch"
                 ) from err
             raise UpdateFailed(str(err)) from err
 

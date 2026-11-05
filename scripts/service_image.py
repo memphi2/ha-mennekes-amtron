@@ -121,19 +121,19 @@ def smoke(image: str) -> None:
                         ) from None
                 time.sleep(0.25)
             try:
-                urllib.request.urlopen(base + "/v1/state", timeout=2)  # noqa: S310 - fixed loopback HTTP
+                urllib.request.urlopen(base + "/v2/state", timeout=2)  # noqa: S310 - fixed loopback HTTP
             except urllib.error.HTTPError as error:
                 if error.code != 401:
                     raise ValueError("unexpected unauthenticated response") from error
             else:
                 raise ValueError("container API allowed unauthenticated access")
             request = urllib.request.Request(  # noqa: S310 - fixed loopback HTTP
-                base + "/v1/state", headers={"Authorization": f"Bearer {token}"}
+                base + "/v2/state", headers={"Authorization": f"Bearer {token}"}
             )
             with urllib.request.urlopen(request, timeout=2) as response:  # noqa: S310 - fixed loopback HTTP
                 data = json.load(response)
             if (
-                data.get("api_version") != 1
+                data.get("api_version") != 2
                 or data.get("available") is not False
                 or data["control"]["read_only"] is not True
                 or data["heartbeat"]["running"] is not False

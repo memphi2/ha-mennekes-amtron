@@ -26,7 +26,7 @@ from .service_store import IntentStore
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
-API_VERSION = 1
+API_VERSION = 2
 
 
 class ModbusService:
@@ -261,15 +261,21 @@ class ModbusService:
                     await saving
                     raise
 
+    def _is_available(self) -> bool:
+        """Share the freshness boundary for state publication and command admission."""
+        return (
+            self._success
+            and self._updated_at is not None
+            and time.monotonic() - self._updated_at
+            <= max(30, self.config.scan_interval * 3)
+        )
+
     def snapshot(self) -> dict[str, Any]:
         control = self.control
         return {
             "api_version": API_VERSION,
             "identity": asdict(self.identity),
-            "available": self._success
-            and self._updated_at is not None
-            and time.monotonic() - self._updated_at
-            <= max(30, self.config.scan_interval * 3),
+            "available": self._is_available(),
             "values": self.data.values,
             "failed_blocks": list(self.data.failed_blocks),
             "current_write_generation": self.data.current_write_generation,
@@ -303,12 +309,28 @@ class ModbusService:
         }
 
     async def command(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if payload.keys() - {"command", "value", "allow_unlimited", "current_cap"}:
+        if payload.keys() - {
+            "command", "value", "allow_unlimited", "current_cap", "expected_serial_number"
+        }:
             raise ValueError("unknown command field")
+        if "expected_serial_number" not in payload:
+            raise ValueError("expected_serial_number is required")
+        expected_serial = payload["expected_serial_number"]
+        if expected_serial is not None and (
+            not isinstance(expected_serial, str) or not 1 <= len(expected_serial) <= 256
+        ):
+            raise ValueError("expected_serial_number must be a non-empty string or null")
         async with self._command_lock:
             control = self.control
-            if control is None or not self._success:
+            # A request can age while another command owns the lock. Only admit
+            # it against the same current state that the API reports as usable.
+            if control is None or not self._is_available():
                 raise DeviceError("service_unavailable")
+            # The service can restart against another wallbox between HA polls,
+            # or while this command waits. Bind the write before any bus access.
+            # Explicit null matches only a device without a readable serial.
+            if expected_serial != self.identity.serial_number:
+                raise DeviceError("device_identity_changed")
             command = payload.get("command")
             value = payload.get("value")
             try:

@@ -23,7 +23,8 @@
       "invalid_network_config": "Voer een hostnaam of IP-adres zonder URL-schema in, een TCP-poort van 1 tot 65535 en het juiste verbindingsprotocol.",
       "cannot_connect_network": "De LAN-adapter is niet bereikbaar of de wallbox antwoordt niet. Controleer host, poort, protocol en de seriële instellingen op de adapter.",
       "invalid_network_response": "De adapter antwoordde, maar meldde geen geldige Modbus-registerindeling. Controleer het wallboxadres, het adapterprotocol en de satellietinstelling.",
-      "service_discovery_unavailable": "De huidige toegangsgegevens van deze app konden niet worden opgehaald. Controleer de app en Supervisor, start of herstart de app indien nodig en bevestig opnieuw."
+      "service_discovery_unavailable": "De huidige toegangsgegevens van deze app konden niet worden opgehaald. Controleer de app en Supervisor, start of herstart de app indien nodig en bevestig opnieuw.",
+      "service_version_mismatch": "De integratie en de Modbus-dienst gebruiken verschillende API-versies. Werk beide bij naar dezelfde versie, te beginnen met de app of de afzonderlijk gehoste dienst."
     },
     "progress": {
       "searching": "De bus wordt doorzocht naar een wallbox: maximaal {candidates} combinaties, ongeveer {minutes} minuten plus verbindingscontroles. Er wordt niet naar registers geschreven. Tijdens het opnieuw configureren worden de bestaande verbinding en heartbeat onderbroken; het ingestelde gedrag van de wallbox bij uitval is dan van toepassing."
@@ -450,6 +451,12 @@
     },
     "service_auth_failed": {
       "message": "De Modbus-dienst heeft de authenticatie geweigerd. Vernieuw de toegang via Instellingen > Apparaten & diensten."
+    },
+    "device_identity_changed": {
+      "message": "De verbinding meldt een andere laadpaal of kan de ingestelde identiteit niet bevestigen. Controleer het apparaatadres en de configuratie van de dienst of adapter. De bediening blijft niet beschikbaar totdat de ingestelde laadpaal opnieuw kan worden bevestigd."
+    },
+    "service_version_mismatch": {
+      "message": "De integratie en de Modbus-dienst gebruiken verschillende API-versies. Werk beide bij naar dezelfde versie, te beginnen met de app of de afzonderlijk gehoste dienst."
     }
   },
   "issues": {

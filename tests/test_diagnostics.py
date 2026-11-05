@@ -151,7 +151,7 @@ def test_remote_write_diagnostics_are_optional_and_allowlisted(monkeypatch, fail
         else:
             assert dump["runtime_events"] is None
         assert "private-token" not in repr(dump)
-        remote.request.assert_awaited_once_with("GET", "/v1/diagnostics", update_connection=False)
+        remote.request.assert_awaited_once_with("GET", "/v2/diagnostics", update_connection=False)
         await original.async_close()
 
     asyncio.run(run())

@@ -80,8 +80,8 @@ def create_app(service: ModbusService) -> web.Application:
             return web.json_response(await service.read(await body(request)))
 
     app.router.add_get("/health", health)
-    app.router.add_get("/v1/state", state)
-    app.router.add_get("/v1/diagnostics", diagnostics)
-    app.router.add_post("/v1/command", command)
-    app.router.add_post("/v1/read", read)
+    app.router.add_get("/v2/state", state)
+    app.router.add_get("/v2/diagnostics", diagnostics)
+    app.router.add_post("/v2/command", command)
+    app.router.add_post("/v2/read", read)
     return app
