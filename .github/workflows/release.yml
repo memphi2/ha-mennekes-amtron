@@ -182,13 +182,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          ref: ${{ needs.main-validation.outputs.commit }}
+          ref: refs/heads/main
           persist-credentials: false
+      - name: Require the checked-out main to match the validated commit
+        env:
+          VALIDATED_COMMIT: ${{ needs.main-validation.outputs.commit }}
+        run: |
+          set -euo pipefail
+          checked_out_commit="$(git rev-parse --verify HEAD)"
+          if [ "$checked_out_commit" != "$VALIDATED_COMMIT" ]; then
+            echo "::error::Main changed since validation; rerun the release for the validated main commit"
+            exit 1
+          fi
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
       - run: python -m pip install -r requirements-dev.txt
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
       - name: Compare app inputs and verify any reusable publication
         id: plan
         env:
@@ -223,6 +235,8 @@ jobs:
           python-version: "3.14"
       - run: python -m pip install -r requirements-dev.txt
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
@@ -271,6 +285,8 @@ jobs:
           python-version: "3.14"
       - run: python -m pip install -r requirements-dev.txt
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
@@ -466,6 +482,8 @@ jobs:
           python-version: "3.14"
       - run: python -m pip install -r requirements-dev.txt
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
       - name: Advance app catalogs after release verification
         env:
           GH_TOKEN: ${{ github.token }}

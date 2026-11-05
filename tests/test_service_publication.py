@@ -5,7 +5,9 @@ from __future__ import annotations
 import ast
 import base64
 import json
+import os
 import re
+import shutil
 import subprocess
 from copy import deepcopy
 
@@ -558,6 +560,56 @@ def test_release_pipeline_orders_image_release_and_catalog_publication():
     assert "service-manifest" in jobs["service-catalog"]["needs"]
     assert jobs["service-catalog"]["concurrency"]["cancel-in-progress"] is False
     assert jobs["service-catalog"]["concurrency"]["group"] == "service-catalog"
+
+
+@pytest.mark.parametrize("expected", ["matching", "changed", "missing", "invalid"])
+def test_release_planner_checks_trusted_main_before_running_repository_code(tmp_path, expected):
+    workflow = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())
+    steps = workflow["jobs"]["service-plan"]["steps"]
+    assert steps[0]["uses"].startswith("actions/checkout@")
+    assert steps[0]["with"]["ref"] == "refs/heads/main"
+    assert steps[0]["with"]["persist-credentials"] is False
+    guard = steps[1]
+    assert guard["env"] == {"VALIDATED_COMMIT": "${{ needs.main-validation.outputs.commit }}"}
+    assert "run" in guard
+    assert steps[2]["uses"].startswith("actions/setup-python@")
+    git_path = shutil.which("git")
+    bash_path = shutil.which("bash")
+    assert git_path
+    assert bash_path
+
+    def git(*args):
+        return subprocess.run(
+            [git_path, "-c", "commit.gpgsign=false", *args],
+            cwd=tmp_path, check=True, capture_output=True, text=True,
+        ).stdout.strip()
+
+    git("init", "--quiet")
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--quiet", "--allow-empty", "-m", "validated")
+    validated = git("rev-parse", "HEAD")
+    if expected == "changed":
+        git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--quiet", "--allow-empty", "-m", "advanced")
+    env = dict(os.environ)
+    env.pop("VALIDATED_COMMIT", None)
+    if expected != "missing":
+        env["VALIDATED_COMMIT"] = "$(touch injected)" if expected == "invalid" else validated
+    result = subprocess.run(
+        [bash_path, "-c", guard["run"]], cwd=tmp_path, env=env,
+        capture_output=True, text=True, check=False,
+    )
+    assert (result.returncode == 0) is (expected == "matching")
+    assert not (tmp_path / "injected").exists()
+
+
+def test_release_buildx_never_restores_or_populates_a_shared_binary_cache():
+    workflow = yaml.safe_load((images.ROOT / ".github/workflows/release.yml").read_text())
+    buildx_jobs = set()
+    for name, job in workflow["jobs"].items():
+        for step in job["steps"]:
+            if step.get("uses", "").startswith("docker/setup-buildx-action@"):
+                buildx_jobs.add(name)
+                assert step["with"]["cache-binary"] is False
+    assert buildx_jobs == {"service-plan", "service-images", "service-manifest", "service-catalog"}
 
 
 def test_app_metadata_and_source_release_versions_are_independent(tmp_path, monkeypatch):
