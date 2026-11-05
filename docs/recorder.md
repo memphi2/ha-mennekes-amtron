@@ -18,7 +18,7 @@ series.
 
 | Connection | Where to set the intervals |
 |---|---|
-| Direct serial | Integration entry options: **Status polling interval** and **Measurement interval**. |
+| Direct USB or LAN | Integration entry options: **Status polling interval** and **Measurement interval**. |
 | Service | App or standalone service configuration: status and measurement intervals. HA entry options only control how often HA fetches the service's cached status. |
 
 The **Heartbeat** sensor records health changes, without a per-heartbeat

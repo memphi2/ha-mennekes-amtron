@@ -3,7 +3,7 @@
 ## Independent service
 
 The `device/` package has no Home Assistant imports. It contains the shared
-register map, serial transport, poll cadence, heartbeat and control rules.
+register map, USB/LAN transport, poll cadence, heartbeat and control rules.
 `control.py` at integration level adapts its errors into HA translations.
 The same source is packaged as `amtron_device` for the independent service;
 there is no copied driver implementation to keep in sync.
@@ -23,7 +23,8 @@ register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 
 Direct USB and LAN modes remain available without the service. A service
-entry never opens the serial adapter or starts a local heartbeat/recovery task.
+entry talks only to the service API; it never opens the USB or gateway Modbus
+connection or starts a local heartbeat/recovery task.
 All entries preserve the domain and entity unique IDs. See
 [setup and migration](modbus-service.md) for the one-owner handover.
 
@@ -127,15 +128,21 @@ missing replies, cancellation and exclusive-port release.
 
 The wallbox needs `0x0D00 = 0x55AA` at least every ten seconds. If that write
 were a step in the poll, a slow or failing poll would delay it — and a missing
-heartbeat is exactly how the device reaches error state 200. So it is an
-entry-owned background task on its own five-second interval, started only in
-master mode and cancelled on unload.
+heartbeat is exactly how the device reaches error state 200. The heartbeat
+therefore has its own background task and five-second interval.
 
-The task starts before the first full data poll. A separate deadline timer
-marks its diagnostic health unhealthy even while a transaction is blocked.
-The Heartbeat problem sensor subscribes only to health transitions and remains
-available when register polling fails. It never exposes per-beat timestamps
-or counters to Recorder. Timer and listener lifetimes follow the entry.
+With a **direct USB or LAN connection**, HA starts that task only in master mode,
+before the first full data poll, and cancels it when the entry unloads. A separate
+deadline timer marks its diagnostic health unhealthy even while a transaction
+is blocked. The Heartbeat problem sensor subscribes only to health transitions
+and remains available when register polling fails. It never exposes per-beat
+timestamps or counters to Recorder. Timer and listener lifetimes follow the entry.
+
+With the **independent service**, initialization first reads the identity, loads
+saved intent and completes the first data poll. The service then starts its own
+heartbeat task if writes are enabled. HA reads the reported health through the
+API; unloading its integration entry does not stop the service's task. Stopping
+the service or its host interrupts that heartbeat.
 
 The task *spends* the interval rather than adding it: it sleeps whatever is
 left of the five seconds after the write returned. Sleeping the full interval
@@ -199,15 +206,16 @@ seconds to current and pause/resume, and five minutes to phase requests.
 
 `register_blocks.py` marks each block `FAST`, `ACTIVE` or `SLOW`.
 
-`SLOW` is about the bus. Eight blocks carry configuration that changes when
-somebody reconfigures the wallbox, not while it charges — the serial number,
-the article number, the DIP-configured limits. The coordinator reads them once
-a minute and carries their values forward in between, which halves the bus
-traffic without hiding a reconfiguration for longer than a minute.
+`SLOW` reduces bus traffic for identity/configuration blocks and less frequently
+sampled values such as temperature, total energy and the session counter. These
+values are not all static. They become due after 60 seconds and are read on the
+next poll; their previous values are retained between due polls. Current limits,
+including the reported maximum EVSE current, belong to `FAST` and are read on
+every poll.
 
 `ACTIVE` contains measurements, signalled current, session values and detected
 vehicle phases. These blocks have a separate configurable cadence, defaulting
-to 30 seconds. While unplugged, the cadence is at least 60 seconds. Plugged-in
+to 30 seconds. While the EVSE reports idle, the cadence is at least 60 seconds. Plugged-in
 vehicles no longer generate five-second voltage history merely by remaining
 connected overnight.
 
@@ -335,5 +343,6 @@ platform device classes through the public package at runtime. Home Assistant
 without an explicit typed re-export, and 2026.11 fixes the re-export.
 
 Under `TYPE_CHECKING`, the imports point to the defining `const` modules. This
-lets both the 2026.10 and 2026.11 typing gates check the actual enum without
-version-dependent ignore comments, while retaining the 2026.9 runtime path.
+lets the latest-stable typing gate check the actual enum without
+version-dependent ignore comments. The minimum HA 2026.9 validation runs the
+runtime tests with `--skip-typing`, retaining the public-package import path.

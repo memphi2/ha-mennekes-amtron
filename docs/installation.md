@@ -2,7 +2,7 @@
 
 [Start](../README.md) › Installation
 
-Install the integration first, then choose how it connects to the wallbox.
+For a new installation, install the integration and choose how it connects to the wallbox.
 On Home Assistant OS, everything is configured through the UI. Normal setup
 needs no YAML and no command-line tools.
 
@@ -99,16 +99,20 @@ your existing device or entity IDs.
 ## Updates
 
 1. Back up Home Assistant and read the release notes.
-2. Update the integration under **Settings → Updates** on HA 2026.11+, or through
-   HACS on older supported versions. Restart Core when requested.
-3. With the service, check its app store for a separate app update. Follow the
-   release notes for the order; an app update briefly interrupts its heartbeat.
+2. **If you use the service, update it first.** Update the existing app from its
+   app store, or replace the standalone service while keeping its data directory.
+   Wait for the service to initialize. Its restart briefly interrupts the heartbeat.
+3. Update the integration under **Settings → Updates** on HA 2026.11+, or through
+   HACS on older supported versions, then restart Home Assistant Core.
 4. Confirm current readings, the intended pause/release settings and heartbeat
    health. Keep the existing integration entry.
 
-**Updating to 0.5.0:** update the integration first and restart Core. Update the
-service separately if you use it. Existing USB settings remain valid; switching
-to LAN is optional. Existing beta-app installations receive the stable release
+**Updating to 0.5.0:** both the integration and any service must be on **0.5.0**.
+Update the app or standalone service first, then the integration and restart
+Core. The beta integration may show unavailable controls during that interval;
+the updated running service retains its heartbeat and charging intent with
+writes enabled. Existing USB settings remain valid; switching to LAN is optional.
+Existing beta-app installations receive the stable release
 through their existing catalog too: update normally, without reinstalling or
 changing repositories. See [service updates](modbus-service.md#updates).
 

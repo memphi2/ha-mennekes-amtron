@@ -15,24 +15,26 @@ for transparent RTU over TCP versus translating Modbus TCP-to-RTU gateways.
 
 ## First setup
 
-Install the **0.5.0 Mennekes Amtron RTU integration** first and restart Home
+For a new setup, install the **0.5.0 Mennekes Amtron RTU integration** and restart Home
 Assistant Core. Use the stable release in the Marketplace on HA 2026.11+, or
 HACS on older supported versions. The integration and this app are
-separate installations.
+separate installations. Already using the app? Follow [Updates](#updates)
+instead: the service must be updated before the integration.
 
 1. **Prepare an existing wallbox.** Note its pause, current limit, resume current
    and charging-release settings. Disconnect the vehicle for the first handover.
-   Disable the existing direct-serial integration entry to release the adapter;
+   Disable the existing direct USB or LAN integration entry to release its connection;
    keep the entry so its device and entity IDs are retained.
 2. **Configure the app.** Choose USB (`serial`) or the matching LAN protocol.
    Enter the wallbox address and connection settings below. For LAN, configure
    baud rate/frame on the gateway. Leave **Read-only on** initially.
 3. **Start the app.** Enable **Start on boot** and **Watchdog**. Check the log for
-   its serial connection. Read-only mode deliberately leaves the heartbeat off.
+   its USB/LAN connection. Read-only mode deliberately leaves the heartbeat off.
 4. **Connect HA.** Under **Settings → Devices & services**, configure the
    discovered **Mennekes Amtron** entry. Address and token are automatic; there is
    nothing to copy. The existing entry is reused for the same wallbox. Re-enable
-   it if it remains disabled, then compare readings with the wallbox.
+   it if it remains disabled. Keep the app **Read-only** while doing this and
+   comparing readings with the wallbox.
 5. **Enable control.** Set the permitted current cap, turn **Read-only off in the
    app**, save and restart the app. Its settings are read at startup. HA enables
    its controls after fresh writable status; there is no second HA write switch
@@ -91,9 +93,14 @@ replace a small file rather than accumulating a history.
 
 ## Updates
 
-Update the integration first and restart Home Assistant Core; the running app
-continues its heartbeat. Use **Check for updates** in the app store to obtain the
-separate app update. **Updating this app briefly interrupts the heartbeat.**
+1. **Update this app to 0.5.0 first.** Use **Check for updates** in the app store,
+   update normally and wait for the app to initialize.
+2. **Update the integration to 0.5.0**, then restart Home Assistant Core.
+
+The old beta integration may show unavailable controls until both updates are
+complete. The updated app retains its heartbeat and charging intent with writes
+enabled while HA updates. **Updating the app itself briefly interrupts the
+heartbeat.** No further app restart is needed for the integration update.
 
 Keep the existing HA integration entry and app when updating. Stable 0.5.0 is
 offered in both app catalogs, so a beta-app installation can update normally
@@ -102,9 +109,10 @@ are retained. Existing USB settings remain valid; switching to LAN is optional.
 
 The beta repository ends in `#apps-beta` and also offers future prereleases;
 the stable-only repository uses `#apps`. Switching catalogs is optional and
-creates a different app in Supervisor. For that change, back up the data,
-copy the options, stop the old app before starting the new one, and confirm its
-discovery. Keep the old app and backup until the handover is verified.
+creates a different app in Supervisor. For that change, back up the data, note
+the charging settings and disconnect the vehicle. Copy the options, set the new
+app to **Read-only**, stop the old app before starting the new one, and confirm
+its discovery. Keep the old app and backup until the handover is verified.
 The new app has separate saved state: note and verify pause, current and release
 settings as in the first setup before reconnecting the vehicle.
 
@@ -113,12 +121,14 @@ settings as in the first setup before reconnecting the vehicle.
 | Symptom | What to check |
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
-| Not ready / token rejected | Check the app log. During setup, retry discovery confirmation. For an existing connection, open its authentication prompt in Devices & services and confirm; HA retrieves fresh credentials without asking for a token. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0/docs/troubleshooting.md#renew-service-access). |
-| Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the serial connection if controls remain unavailable. |
+| Not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
+| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.0/docs/troubleshooting.md#renew-service-access). |
+| Integration and service versions do not match | Complete [Updates](#updates): app first, then integration and Core restart. Both must be on 0.5.0; changing the token does not fix this. |
+| Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
 | Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. |
 
-The log shows service startup, the serial connection and heartbeat start/stop.
+The log shows service startup, the USB/LAN connection and heartbeat start/stop.
 Diagnostics include the last 20 failed write/recovery records in RAM, with timing
 information and no packet contents or credentials. They add no Recorder rows and
 are lost when the app restarts.

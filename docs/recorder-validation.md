@@ -3,6 +3,8 @@
 For configuration and day-to-day use, see [Recorder and database growth](recorder.md).
 This page records development measurements and their limits; the results are not
 promises of a fixed database size.
+The dated replay results are historical comparisons, not new measurements of
+0.5.0. Use the commands below to measure the current checkout.
 
 ## Profile assumptions
 
@@ -131,10 +133,11 @@ and SQLite. It checks energy increments, power averages, metadata and all
 three exclusion profiles, including that excluded sensors remain available
 live. This complements the state-row replay; it is not a disk-space soak test.
 
-The November beta also adds deletion of selected statistic time ranges in
-**Settings → Tools → Statistics**, useful for removing bad readings. Inspect
-the preview before deleting; it is not automatic retention. See the
-[2026.11 beta notes](https://rc.home-assistant.io/blog/2026/10/28/release-202611/).
+Home Assistant 2026.11 adds deletion of selected statistic time ranges in
+**Settings → Tools → Statistics**, useful for removing bad readings. Review the
+selected range in the dialog before deleting; this is manual cleanup, not
+automatic retention. See the
+[2026.11 release notes](https://www.home-assistant.io/blog/2026/11/04/release-202611/#remove-bad-readings-from-your-history).
 
 The integration cannot guarantee that the whole Home Assistant database will
 never fill the disk. Keep automatic purging enabled, retain headroom for

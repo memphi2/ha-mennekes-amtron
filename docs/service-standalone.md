@@ -4,8 +4,8 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-**Current release: 0.5.0.** Install the integration first. The service and integration
-are updated separately; use matching releases for a new installation.
+**Current release: 0.5.0.** The service and integration are installed separately;
+use matching releases. For an existing installation, [update the service first](#operation-and-updates).
 
 ## 1. Prepare the serial handover
 
@@ -16,8 +16,8 @@ note the controls, disconnect the vehicle and disable the existing direct entry.
 Keep that entry to retain its device and entity IDs.
 
 Configure the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
-The independent service survives HA outages; service, host and USB failures still
-interrupt the heartbeat.
+The independent service survives HA outages; service, host, USB, network or
+gateway failures can still interrupt the heartbeat.
 
 ## 2. Create the configuration
 
@@ -114,7 +114,7 @@ independent process manager.
 ## 4. Connect Home Assistant
 
 For a new wallbox, choose **Add integration → Mennekes Amtron RTU → Connect to the
-Modbus service**. For an existing direct-serial entry, use **Reconfigure** and
+Modbus service**. For an existing direct USB or LAN connection, use **Reconfigure** and
 choose the service connection. Enter the service URL, such as
 `http://amtron-service:8765`, and the token from `options.json`. The hostname must
 be reachable from HA; `localhost` refers to HA's own host or container.
@@ -148,10 +148,12 @@ permission and Modbus polling. Keep the state directory across restarts and
 updates. A Core restart leaves the service running; a service update interrupts
 its heartbeat briefly. Do not run the old and new service together on the bus.
 
-For an update from a beta, install the 0.5.0 integration and restart Core first,
-then replace the service with the matching stable image while retaining its data
-directory. Unlike separate Supervisor app channels, replacing this container
-with the same data mount preserves its saved service intent and credential.
+For an update from a beta, replace the service with **0.5.0 first**, retaining its
+data directory, and wait for initialization. Then update the integration to
+**0.5.0** and restart Core. The old beta integration may show unavailable controls
+until both components are updated. The updated service keeps its heartbeat and
+charging intent with writes enabled while HA updates. Retaining the same data
+mount preserves the saved service intent and credential; no new HA entry is needed.
 
 [Everyday operation and troubleshooting](modbus-service.md#everyday-use) ·
 [API, diagnostics and local development](service-reference.md)

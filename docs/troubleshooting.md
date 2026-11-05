@@ -48,7 +48,7 @@ distinguish a waiting interval from a device problem:
 | Message or symptom | Next step |
 |---|---|
 | A remaining wait time is shown | Wait that long, then retry. Pause/resume commands are not queued. |
-| Service unavailable | Check the app log and its serial connection. HA reconnecting does not replay old commands. |
+| Service unavailable | Check the app log and its USB/LAN connection. HA reconnecting does not replay old commands. |
 | Device rejected a write | Check satellite configuration, supported hardware/registers, device state and whether another master is using the bus. |
 | Restart refused | The wallbox must report **idle** before its **Restart** button can be used. |
 
@@ -72,13 +72,15 @@ itself, or configure those fields in the app when the service owns it.
 | No discovery, or the integration asks for URL and token | Confirm the app is installed and running, then check Devices & services again. Verify that both app and integration are current. If you have multiple Modbus apps, select the matching discovered app. |
 | **App cannot be reached** | Check that the app stays running. For a separate service, also check its host, network and port 8765. |
 | **Token invalid / authentication failed** | During setup, confirm discovery again or check the standalone token. For an existing entry, follow [Renew service access](#renew-service-access). Do not post tokens in an issue. |
-| **Not ready** | Authentication succeeded, but usable wallbox data is not available yet. Check the app log for serial connection and initialization, then retry. Changing the token will not fix this. |
+| **Not ready** | Authentication succeeded, but usable wallbox data is not available yet. Check the app log for USB/LAN connection and initialization, then retry. Changing the token will not fix this. |
 | **No serial number yet** | The app has not read the serial number needed to match the wallbox. Check the wallbox connection and supported register layout. |
-| **App responds, but its data was not accepted** / `invalid service snapshot` | Update the integration and app to matching versions. If it persists, copy the field named in parentheses in the HA log, such as `identity.max_evse_current`, and download diagnostics. This is a data-validation error, not proof of a bad token. |
+| **Integration and service use different API versions** | Update the app or standalone service to **0.5.0 first**, then the integration to **0.5.0** and restart Core. An old beta integration may show unavailable controls until both are updated. Keep the existing app data and integration entry; changing the token will not fix this. |
+| **App responds, but its data was not accepted** / `invalid service snapshot` | Check that both components are on 0.5.0; [update the service first](installation.md#updates) if needed. If it persists, copy the field named in parentheses in the HA log, such as `identity.max_evse_current`, and download diagnostics. This is a data-validation error, not proof of a bad token. |
+| **Different wallbox / identity cannot be confirmed** | Check the Modbus address, gateway route and service configuration; see [wallbox identity](#a-different-wallbox-is-reported). |
 | App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
 
 An app that starts successfully can still be waiting for the wallbox. The log
-separates API startup, serial connection, heartbeat start/stop and shutdown.
+separates API startup, USB/LAN connection, heartbeat start/stop and shutdown.
 Check the last completed step instead of repeatedly restarting everything.
 
 ### Renew service access
@@ -145,6 +147,19 @@ An older supported layout can work with fewer features; it is different from a
 response with no usable layout version. Include diagnostics or redacted bus-check
 output when reporting an unrecognized device.
 
+## A different wallbox is reported
+
+If your entry was paired with a serial number, the connection must report that
+same serial number. A different or missing number keeps controls unavailable.
+Check the Modbus device address, gateway route and service configuration. Do not
+delete the entry to bypass the check; it recovers when the configured wallbox
+can be confirmed again.
+
+Entries originally added without a readable serial number remain bound to their
+connection endpoint. They cannot independently verify the physical wallbox's
+identity. A successful network connection alone does not prove the right device
+is behind it.
+
 ## Error 200, "Energy manager unavailable"
 
 The wallbox did not receive a usable heartbeat in time. With writes enabled,
@@ -169,8 +184,8 @@ If the error returns, check what interrupted the heartbeat:
 
 - **Direct USB or LAN:** HA Core restarts, entry reloads and read-only mode stop it.
 - **Service:** an HA Core restart leaves it running. An app shutdown, app
-  read-only mode, host restart or serial failure can interrupt it.
-- **Either connection:** bus conflicts, USB disconnects, wiring problems, slow
+  read-only mode, host restart or USB/LAN failure can interrupt it.
+- **Either connection:** network/gateway outages, bus conflicts, USB disconnects, wiring problems, slow
   responses or delayed processing can make heartbeat delivery fail or arrive late.
 
 The [optional Modbus service](modbus-service.md) is recommended for uninterrupted
@@ -232,7 +247,7 @@ Ensure the entities belong to the same wallbox and the power sensor provides a
 numeric value in **W or kW**.
 
 See [Blueprint updates](blueprints.md#updating-existing-blueprint-automations)
-for edited copies and old paths. Inspect the automation trace for failed
+for edited copies and input changes. Inspect the automation trace for failed
 triggers or conditions. HA restarts and automation reloads reset threshold hold
 timers.
 

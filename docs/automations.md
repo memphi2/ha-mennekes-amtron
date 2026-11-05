@@ -6,10 +6,13 @@ after you add the wallbox and need no YAML editing.
 
 Use one control strategy at a time. A PV automation and a tariff schedule can
 otherwise undo each other's pause or current setting. Enable writes with the
-app's **Read-only** switch off in service mode, or **Modbus master** in the
-integration options for direct serial mode. Current changes have a five-second minimum interval; allow
-more than five minutes between pause/resume and phase changes. Rejected mode
-changes are not retried automatically.
+app's **Read-only** switch off in service mode, saving and restarting the app,
+or **Modbus master** in the integration options for a direct USB or LAN connection.
+Current changes and pause/resume share a **five-second minimum interval**.
+Phase changes have a separate **five-minute minimum interval**. For automatic
+pause/resume, use more than five minutes of hysteresis to avoid frequent cycles;
+the PV blueprint defaults to six minutes. Rejected pause/resume and phase
+requests are not retried automatically.
 
 ## PV charging
 
@@ -29,8 +32,9 @@ The wallbox's static limit does not account for other household loads.
 ## Charge during a fixed tariff window
 
 This example requests 10 A at 22:00 and pauses at 06:00. Choose a current that
-suits your installation; normal current commands are also limited by the entry
-cap. A current command can resume a paused charge after the waiting interval.
+suits your installation. Limited-current commands respect the HA entry cap and,
+in service mode, the app or standalone service cap; the lower applicable cap
+wins. A current command can resume a paused charge after the waiting interval.
 
 Create an empty automation, open its **Edit in YAML** editor and paste the
 following. Replace both entity IDs with your own. The IDs shown assume the

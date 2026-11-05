@@ -55,8 +55,9 @@ fresh credentials for the same app or asks for a new token for a standalone
 service, checks the entry's existing identity binding and reloads the entry.
 Serial-bound entries require the same serial number; standalone entries added
 without a readable serial number retain their URL binding.
-When upgrading from beta 1, update the integration first: later apps replace the
-old manually configured credential and HA learns the replacement automatically.
+For the stable 0.5.0 upgrade, update the app or standalone service first, then
+the integration and restart Core. Keep the existing app data and HA entry;
+the beta integration may be unavailable until both components use the stable API.
 
 The internal API port is 8765. Host publication is disabled by default.
 Integration discovery checks the app slug and restricts connections to its
@@ -78,7 +79,7 @@ the old app before starting the new one.
 
 ## Logs and diagnostics
 
-The app log reports process start, accepted bus settings, API readiness, serial
+The app log reports process start, accepted bus settings, API readiness, USB/LAN
 connection, heartbeat start/stop and clean shutdown. Connection and heartbeat
 failures are logged on state changes, not on each beat or poll. Read-only mode
 explicitly reports that heartbeat delivery is disabled. Lifecycle messages do
@@ -98,7 +99,7 @@ and callback counts do not identify a faulty cable by themselves; see
 
 **Invalid or unreadable service configuration** identifies the startup phase
 and invalid option. A missing serial adapter is retried while the API remains
-running. An unexpected worker exit is logged and closes the serial connection;
+running. An unexpected worker exit is logged and closes the Modbus connection;
 a fatal process failure reports its error class and errno.
 
 The heartbeat worker is supervised independently of polling. If it exits
@@ -124,9 +125,53 @@ use the [Recorder guide](recorder.md) to control that traffic.
 
 ## Commands and API boundary
 
+Stable **0.5.0 uses API 2**. Snapshots report `api_version: 2`, and authenticated
+endpoints use `/v2/`. The beta API 1 and `/v1/` routes are intentionally unsupported;
+there are no compatibility aliases. An incompatible service version is reported
+separately from malformed snapshot data. Follow the [update order](modbus-service.md#updates)
+instead of changing credentials or recreating the integration.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Public process-liveness check; no wallbox data. |
+| `GET /v2/state` | Authenticated cached wallbox state and service status. |
+| `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
+| `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
+| `POST /v2/command` | Authenticated named control command with an identity precondition. |
+
+Every command must include `expected_serial_number`, using the serial number
+already bound to the client's configured wallbox. For example, a pause request
+to `/v2/command` has this body; replace the example serial with that configured
+identity:
+
+```json
+{
+  "command": "pause",
+  "expected_serial_number": "EXAMPLE_CONFIGURED_SERIAL"
+}
+```
+
+The service compares this precondition with its initialized wallbox identity
+while holding the command lock, before writing. A missing field or mismatched
+serial is rejected. Explicit `null` is accepted only when the service also has
+no readable serial number; it is **not a wildcard**. Such endpoint-bound setups
+cannot independently verify the physical wallbox. Clients with a known serial
+number must retain that binding instead of accepting a newly observed device.
+
+This comparison uses the identity read during service initialization, not an
+extra Modbus identity read before each command. Stop the bus owner before
+changing a gateway route or connected wallbox, then restart it to initialize
+the new connection. A physical routing change behind a running service is not
+an authenticated identity change notification.
+
 The service enforces the same current-write floor, phase-switch guards, device
 limits and bounded error-200 recovery as direct mode. All clients share one
-serialized command path. Failed or timed-out commands are not automatically
+serialized command path. A command is rejected if the latest wallbox snapshot
+is unavailable or older than the greater of 30 seconds and three status-poll
+intervals. This is checked after waiting for the command lock; a queued request
+cannot use readiness that expired while it waited. Rejected commands are not
+replayed later, and this check does not stop the heartbeat or change saved pause
+intent. Failed or timed-out commands are not automatically
 replayed by HA because a write may already have reached the wallbox. Persistent
 recovery failures remain visible. Recovery while deliberately paused still needs
 confirmation on the actual wallbox firmware.
