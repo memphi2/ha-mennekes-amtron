@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+## 0.5.0b4 — 2026-11-05
+
 - Keep app setup available when the wallbox reports an unusable optional maximum
   EVSE current. Treat that capability as unknown while retaining its raw reading;
   configured command limits remain enforced. Accept these readings from already
