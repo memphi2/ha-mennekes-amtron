@@ -32,6 +32,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   alongside the existing 99% global threshold.
 - Remove obsolete 0.1.0 migration instructions, the empty migration hook and
   unused constants. Home Assistant still rejects incompatible entry schemas.
+- Reject a different wallbox identity during setup and in running service
+  snapshots. Stop exposing controls until the expected wallbox returns, without
+  changing registered devices or replaying commands.
+- Bind every service command to its expected wallbox identity, checked before
+  any write. The first stable service API uses `/v2` endpoints and rejects old
+  beta commands without that precondition. Update the service first, then the
+  integration; existing configuration and saved charging intent are retained.
+- Reject service commands when cached wallbox data has expired, including
+  requests that become stale while waiting for another command.
+- Clarify USB/LAN handover, app updates, heartbeat startup and control intervals
+  in the documentation. Keep one Marketplace installation button and a separate
+  HACS availability badge.
 - Improve reconnect cleanup, pause-current preservation after a lost reply,
   slider updates after service limit changes, setup validation and diagnostics.
   Existing beta apps receive the stable app
