@@ -1,16 +1,16 @@
 configuration:
   serial_port:
     name: Seriële adapter
-    description: 'Alleen voor serial: selecteer de exclusieve USB-RS-485-adapter, bij voorkeur via het vaste /dev/serial/by-id-pad. Laat dit leeg voor LAN.'
+    description: "Alleen voor USB / RS-485: selecteer de exclusieve USB-RS-485-adapter, bij voorkeur via het vaste /dev/serial/by-id-pad. Laat dit leeg voor LAN."
   device_id:
     name: Wallboxadres
     description: Het Modbus-adres dat in de wallbox is ingesteld.
   baudrate:
     name: Baudrate
-    description: 'Alleen voor serial: moet overeenkomen met de wallbox. Stel bij LAN de baudrate in op de adapter.'
+    description: "Alleen voor USB / RS-485: moet overeenkomen met de wallbox. Stel bij LAN de baudrate in op de adapter."
   frame:
     name: Serieel frame
-    description: 'Alleen voor serial: databits, pariteit en stopbits van de wallbox. Stel deze bij LAN in op de adapter.'
+    description: "Alleen voor USB / RS-485: databits, pariteit en stopbits van de wallbox. Stel deze bij LAN in op de adapter."
   read_only:
     name: Alleen lezen
     description: Schakelt laadopdrachten, inclusief de bediening vanuit Home Assistant, en de heartbeat van de service uit; Modbus-leesverzoeken blijven actief.
@@ -31,10 +31,10 @@ configuration:
     description: Vast ingesteld op 8765; het beschikbaar stellen van een hostpoort is optioneel en meestal niet nodig.
   connection_type:
     name: Wallboxverbinding
-    description: 'serial: lokaal USB/RS-485; rtu_over_tcp: transparante LAN-adapter; modbus_tcp: gateway die Modbus TCP naar RTU vertaalt. Voor LAN is geen USB-apparaat nodig.'
+    description: "USB / RS-485: lokale adapter. LAN: Modbus RTU (TCP): transparante netwerkadapter. LAN: Modbus TCP: gateway die TCP naar RTU vertaalt. De oude waarden serial, rtu_over_tcp en modbus_tcp blijven geldig voor bestaande configuraties."
   host:
-    name: Adapterhost
-    description: 'Voor LAN: hostnaam of IP-adres van de adapter, zonder URL-schema of pad. Gebruik een vertrouwd privénetwerk.'
+    name: Adapterhost / IP-adres
+    description: "Verplicht voor LAN: hostnaam of IP-adres van de adapter, zonder URL-schema of pad. Laat dit leeg voor USB / RS-485. Gebruik een vertrouwd privénetwerk."
   tcp_port:
     name: TCP-poort van adapter
     description: TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.
