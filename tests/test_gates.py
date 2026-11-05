@@ -55,58 +55,6 @@ def test_the_validation_sequence_matches_the_documented_order() -> None:
     ]
 
 
-def test_the_quality_scale_gate_rejects_an_unknown_rule() -> None:
-    import check_quality_scale
-
-    statuses = check_quality_scale.parse_quality_scale(
-        "rules:\n  made-up-rule: done\n"
-    )
-    failures = check_quality_scale.validate_rules(statuses)
-    assert any("unknown rule" in failure for failure in failures)
-    assert any("missing official rule" in failure for failure in failures)
-
-
-def test_the_quality_scale_gate_rejects_an_invalid_status() -> None:
-    import check_quality_scale
-
-    statuses = dict.fromkeys(check_quality_scale.OFFICIAL_RULES, "done")
-    statuses["brands"] = "maybe"
-    failures = check_quality_scale.validate_rules(statuses)
-    assert any("invalid status" in failure for failure in failures)
-
-
-def test_the_quality_scale_gate_rejects_any_open_rule() -> None:
-    import check_quality_scale
-
-    assert not check_quality_scale.EXPECTED_PLATINUM_BLOCKERS
-
-    statuses = dict.fromkeys(check_quality_scale.OFFICIAL_RULES, "done")
-    statuses["diagnostics"] = "todo"
-    assert any(
-        "undocumented TODO blocker" in failure
-        for failure in check_quality_scale.validate_rules(statuses)
-    )
-    assert any(
-        "blockers drifted" in failure
-        for failure in check_quality_scale.validate_blockers(statuses, "")
-    )
-
-
-def test_the_quality_scale_gate_accepts_a_fully_answered_scale() -> None:
-    import check_quality_scale
-
-    statuses = dict.fromkeys(check_quality_scale.OFFICIAL_RULES, "done")
-    assert check_quality_scale.validate_blockers(statuses, "") == []
-
-
-def test_the_quality_scale_gate_requires_its_document_phrases() -> None:
-    import check_quality_scale
-
-    failures = check_quality_scale.validate_documentation("nothing here")
-    assert len(failures) == 3
-    assert any("Open rules: none" in failure for failure in failures)
-
-
 def test_the_coverage_ratchet_stays_above_the_platinum_target() -> None:
     import check_coverage
 

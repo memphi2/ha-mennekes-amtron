@@ -2,6 +2,7 @@
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.9%2B-41BDF5.svg)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Quality: Platinum (self-assessed)](https://img.shields.io/badge/Quality-Platinum%20%28self--assessed%29-c8cdd3?labelColor=3d4852)](docs/quality-scale.md)
 
 Your Mennekes Amtron in Home Assistant: adjust the charging current, pause
 charging, follow energy use and charge from your solar surplus. Communication
