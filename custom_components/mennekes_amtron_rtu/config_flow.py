@@ -32,7 +32,6 @@ from .device.client_errors import AmtronBusError, AmtronConnectionError
 from .device.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
-    CONF_CONTROL_MODE,
     CONF_DEVICE_ID,
     CONF_FRAME,
     CONF_PARITY,
@@ -40,8 +39,6 @@ from .device.const import (
     CONF_SEARCH,
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
-    CONTROL_MODE_MASTER,
-    CONTROL_MODE_READ_ONLY,
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_DEVICE_ID,
@@ -172,13 +169,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                             return self.async_update_reload_and_abort(entry, data=data)
                         return self.async_update_and_abort(entry, data=data)
                     self._abort_if_unique_id_configured()
-                    mode = (
-                        CONTROL_MODE_READ_ONLY
-                        if client.snapshot["control"]["read_only"]
-                        else CONTROL_MODE_MASTER
-                    )
                     return self.async_create_entry(
-                        title=DEFAULT_NAME, data=data, options={CONF_CONTROL_MODE: mode}
+                        title=DEFAULT_NAME, data=data
                     )
                 finally:
                     await client.async_close()
@@ -274,13 +266,6 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                     return self.async_create_entry(
                         title=DEFAULT_NAME,
                         data=complete,
-                        options={
-                            CONF_CONTROL_MODE: (
-                                CONTROL_MODE_READ_ONLY
-                                if client.snapshot["control"]["read_only"]
-                                else CONTROL_MODE_MASTER
-                            )
-                        },
                     )
         except ServiceConnectionError as err:
             _LOGGER.warning("Discovered Modbus app: %s", err)

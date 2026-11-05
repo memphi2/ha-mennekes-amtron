@@ -366,7 +366,7 @@
       "message": "This wallbox cannot switch between one and three phases. Dynamic phase switching needs an 11 kW device that reports phase option 2."
     },
     "read_only_mode": {
-      "message": "This wallbox is set up in read-only mode. Switch the control mode to \"Modbus master\" in the integration options before controlling it."
+      "message": "This wallbox is in read-only mode. For a service connection, disable Read-only in the app, save and restart the app. For a direct serial connection, select Modbus master in the integration options."
     },
     "restart_requires_idle": {
       "message": "The wallbox may only be restarted while it is idle. Unplug the vehicle first."
@@ -398,21 +398,21 @@
   },
   "issues": {
     "ems_fallback_not_configured": {
-      "description": "Register 0x030E is 0, so the wallbox keeps charging with the last values it received when Home Assistant stops sending a heartbeat. Configure a fallback behaviour or a fallback current with the MENNEKES configuration tool to get a defined state during an outage.",
+      "description": "Register 0x030E is 0, so the wallbox keeps charging with the last values it received when the active Modbus master stops sending a heartbeat. Configure a fallback behaviour or a fallback current with the MENNEKES configuration tool to get a defined state during an outage.",
       "title": "No energy-manager fallback configured"
     },
     "ems_heartbeat_lost": {
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "The wallbox reports error 200 after a missing heartbeat. In Modbus master mode, automatic recovery reasserts the existing controls when heartbeat delivery resumes, including while charging is paused. Confirm to retry manually. A deliberate pause, device lock, disabled charging release and current setting are preserved. This does not resume charging. A resolved issue closes without sending commands.",
+            "description": "The wallbox reports error 200 after a missing heartbeat. When writes are enabled, automatic recovery reasserts the existing controls when heartbeat delivery resumes, including while charging is paused. Confirm to retry manually. A deliberate pause, device lock, disabled charging release and current setting are preserved. This does not resume charging. A resolved issue closes without sending commands.",
             "title": "Wallbox lost the energy-manager heartbeat"
           }
         },
         "error": {
           "entry_unavailable": "The integration is not loaded. Restore its connection before retrying.",
           "different_error": "The wallbox reports a different error. Heartbeat recovery does not reset that error.",
-          "read_only": "Enable Modbus master mode before requesting recovery.",
+          "read_only": "Disable Read-only in the app, save and restart the app before requesting recovery. For a direct serial connection, enable Modbus master mode in the integration options instead.",
           "write_rate_limited": "A recent command is still inside its minimum write interval. Wait briefly and try again.",
           "recovery_failed": "The recovery could not be confirmed. Check the connection and retry.",
           "still_active": "The recovery commands were sent, but the wallbox still reports an error. Wait for its status to update; check the connection if the error persists."
@@ -449,15 +449,14 @@
       "service": {
         "title": "Service options",
         "data": {
-          "control_mode": "Control mode",
           "current_limit": "Charging current cap",
           "scan_interval_seconds": "Status polling interval"
         },
         "data_description": {
-          "control_mode": "Only controls whether Home Assistant may send commands. The independent service keeps its heartbeat and last charging state even when HA is read-only. Configure the service itself separately to change its write permission.",
           "current_limit": "Additional cap for currents requested by Home Assistant. The service cap still applies. Explicitly selecting 0 A disables the EMS limit.",
           "scan_interval_seconds": "How often Home Assistant reads the service state. This changes neither Modbus measurement polling nor the heartbeat interval."
-        }
+        },
+        "description": "The app's Read-only setting also controls write permission in Home Assistant. Disable it in the app, save and restart the app to enable controls. Control entities remain unavailable while the service is read-only or not ready."
       }
     }
   },
@@ -487,12 +486,6 @@
         "full": "Full history",
         "detail": "Less detail",
         "lean": "Energy and power statistics only"
-      }
-    },
-    "service_control_mode": {
-      "options": {
-        "read_only": "Read-only in Home Assistant",
-        "master": "Allow Home Assistant controls"
       }
     }
   },

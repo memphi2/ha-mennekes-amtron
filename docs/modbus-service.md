@@ -1,233 +1,199 @@
-# Independent Modbus service
+# Modbus service: the preferred setup
 
-**0.5.0b4 is a beta for installation and hardware testing.** The integration
-and service use the same version. Existing stable installations keep direct
-serial mode until you explicitly switch them to the service.
+The optional **Mennekes Amtron Modbus Service** keeps the wallbox connected while
+Home Assistant Core restarts. It is the preferred setup when you want the
+heartbeat and your chosen charging state to continue independently of HA.
+Direct serial operation remains available without the extra service.
 
-The service owns the USB RS-485 adapter and keeps the heartbeat running while
-Home Assistant Core restarts. Home Assistant connects to its authenticated API;
-it no longer opens the serial port. This uses the same separation of hardware
-service and HA integration as Z-Wave JS, with an HTTP API instead of WebSocket.
+**Current beta: 0.5.0b5.** The integration and app are installed separately.
+Stable users can stay on 0.4.1. This beta still needs hardware testing; see
+[what to check](#check-the-handover).
 
-**A Home Assistant outage keeps the last charging state indefinitely.** A pause
-stays paused, a disabled charging release stays disabled, and the last current
-setting remains active. HA automations cannot calculate new values while HA is
-offline. Reconnecting HA reads the service state and sends no charging commands.
+[Install on HA OS](#install-the-beta-on-home-assistant-os) ·
+[Move an existing wallbox](#move-an-existing-wallbox) ·
+[Everyday use](#everyday-use) · [Updates](#updates) · [Help](#if-something-is-wrong)
 
-A host restart, service restart, power loss or USB fault can still interrupt the
-heartbeat. The wallbox's configured fallback applies in that case. See
-[Safety](safety.md#the-heartbeat-and-what-happens-without-it).
+| Your installation | How to run the service |
+|---|---|
+| Home Assistant OS | Install the app using the steps below. Address and token are discovered automatically. |
+| Home Assistant Container or another host | Follow the [standalone Docker/Python guide](service-standalone.md). |
+
+## Move an existing wallbox
+
+Keep your existing integration entry: the service connection reuses the device
+and entity IDs. Before starting the app:
+
+1. Note the pause state, charging-current limit, charging release and the current
+   you want to resume at if paused.
+2. Disconnect the vehicle for the first handover. The heartbeat is interrupted
+   while the serial adapter changes owners, so the wallbox may apply its fallback.
+3. **Disable the existing direct-serial integration entry. Do not delete it.**
+   This releases the serial adapter for the app.
+
+Continue below. For a new installation, start directly with the installation
+steps. In either case, the app must be the only Modbus master on the bus;
+read-only mode also sends requests. Check the [wiring and bus settings](hardware.md)
+if the wallbox has not yet been prepared.
 
 ## Install the beta on Home Assistant OS
 
-Install the **0.5.0b4** integration release first. On HA 2026.11+, enable the
-repository's **Pre-release** switch in the Marketplace; on HA 2026.9/2026.10,
-enable beta releases in HACS. The service is an additional HA app installed
-through Supervisor. HACS and the Marketplace install only the integration.
+### 1. Install the integration
+
+Install **Mennekes Amtron RTU 0.5.0b5** and restart Home Assistant Core.
+On HA 2026.11+, enable **Pre-release** for the repository in the Marketplace.
+On HA 2026.9/2026.10, enable beta releases in HACS.
+
+Already using beta 4? Go to [Updates](#updates); you do not need a new setup.
+
+### 2. Install the app
 
 [![Add the Mennekes Amtron beta app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps-beta)
 
-Alternatively, under **Settings → Apps → Install app → Repositories**, add:
+Or add this repository under **Settings → Apps → Install app → ⋮ → Repositories**:
 
 ```text
 https://github.com/memphi2/ha-mennekes-amtron#apps-beta
 ```
 
-Install **Mennekes Amtron Modbus Service**. Supervisor downloads the verified image
-for amd64 or aarch64 and creates the local app image. The installation may show
-**Building**; it does not compile Python or install dependencies on your device.
-Enable **Start on boot** and **Watchdog**. The app starts
-independently of Core. Its watchdog checks process liveness; a wallbox connection
-fault is retried without repeatedly restarting the app.
+Install **Mennekes Amtron Modbus Service**. During installation, Supervisor may
+show **Building**. Enable **Start on boot** and **Watchdog**.
 
-Configure:
+### 3. Configure and start read-only
 
-- **Serial adapter:** the stable adapter path, preferably `/dev/serial/by-id/...`.
-- **Wallbox address**, **baud rate**, **serial frame:** the existing wallbox settings.
-- **Read-only:** initially enabled; disable it when the service should maintain
-  the heartbeat and accept charging commands.
-- **Current cap:** the service's EMS current cap, from 6 to 32 A. The default is
-  6 A. Stay within the installation's permitted current.
+If another integration owns the serial adapter, complete the
+[handover preparation](#move-an-existing-wallbox) before starting the app.
 
-Selecting **0 A** on the integration's current slider explicitly removes the
-EMS limit, including its extra current cap; the wallbox's hardware limit remains.
-Use **Charging paused** to stop charging.
+| App option | What to enter |
+|---|---|
+| Serial adapter | Your USB RS-485 adapter; prefer a stable `/dev/serial/by-id/...` path. |
+| Wallbox address | The configured address; factory default **50**. |
+| Baud rate / serial frame | Match the wallbox; factory defaults **57600 / 8n2**. |
+| Read-only | Leave **on** while checking the readings. |
+| Current cap | The permitted charging current for your installation; default **6 A**. |
+| Status / measurement interval | Keep **5 / 30 seconds** initially. The measurement interval helps limit database traffic. |
 
-The app manages its own private access token. There is no manual token option;
-Home Assistant receives the credential through Supervisor discovery. When
-upgrading from beta 1, update the integration first: the app replaces the old
-manually configured credential and HA learns the new one automatically.
+Leave network settings at their defaults. No URL, token or published network
+port is needed for the HA OS app. Start it and check its **Log** for the serial
+connection. Read-only mode deliberately leaves the heartbeat off.
 
-The API uses port 8765 on the app's internal network. Host port publication is
-disabled by default. After starting the app, open **Settings → Devices & services**
-and configure the discovered **Mennekes Amtron** entry. Supervisor supplies its
-address and token; there is no service URL to type. Discovery is restored after
-HA Core restarts. If the wallbox is not ready yet, check the app log and retry
-the discovery confirmation. Standalone Docker/Python services still use manual
-URL and token setup.
+### 4. Connect Home Assistant
 
-Selecting **Add integration → Mennekes Amtron RTU → Connect to the Modbus service**
-also looks up the running Supervisor app before showing a manual form. If more
-than one app is announced, use the matching discovery card. Setup distinguishes
-an unreachable API, rejected authentication, unavailable wallbox data and an
-invalid response. Confirming again retrieves the current credentials directly
-from Supervisor; an app restart is not needed to refresh a stale setup flow.
-Invalid responses name the affected data section in
-the HA log without printing tokens or response contents.
+Open **Settings → Devices & services** and configure the discovered
+**Mennekes Amtron** entry. The app supplies its address and token automatically.
+An existing entry for the same wallbox is reused; re-enable it if it remains
+disabled after the handover.
 
-An unusable optional maximum-current reading is treated as an unknown hardware
-capability rather than blocking setup. Its raw reading remains available for
-diagnosis. The app and integration still enforce their configured current caps.
+If no discovery card is visible, choose **Add integration → Mennekes Amtron RTU →
+Connect to the Modbus service**. This also looks for the running app. If several
+apps are announced, use the discovery card for the one you installed.
 
-The integration's service options control only HA's access and refresh interval.
-Read-only there disables HA commands while the service keeps its heartbeat and
-charging state. Set Modbus polling/measurement cadence and the service's write
-permission in the app configuration. HA's current cap can further restrict
-limited-current commands; it cannot raise the service's cap. On resume, the
-service applies HA's cap to its latest remembered setpoint while holding the
-current-write lock. An explicitly selected unlimited setting remains unlimited.
+Compare the readings with the wallbox. The controls are present but unavailable
+while **Read-only** is on.
 
-The beta and stable catalogs use `#apps-beta` and `#apps`, respectively. They
-are different apps to Supervisor. When switching channels, copy the options,
-stop the old app before starting the new one, and confirm the newly discovered app.
-Keep a backup and the old app until the handover is verified.
+### 5. Enable controls
 
-## Standalone container or Python service
+Turn **Read-only off in the app**, save and restart the app. Configuration is
+read at startup. Once the app is ready and HA receives fresh status, the controls
+enable automatically. **There is no second write-permission switch in HA and no
+HA restart is needed for this change.** An app restart briefly interrupts the
+heartbeat.
 
-Copy the **standalone container reference** from the
-[published beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta).
-Check that its release version matches your integration. Use the complete
-`ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference, including the digest,
-as your Docker image. It selects the verified release even if a registry tag is
-later changed. The same reference supports Linux amd64 and arm64. Save it with
-your configuration; choose a new matching reference deliberately when updating.
+Check the app's current cap. In the integration options you can set an additional
+HA current cap, which can further restrict limited-current commands.
+Reapply the pause, current and charging-release settings you noted before the
+handover, and verify them before reconnecting the vehicle. On its first start,
+the app reads the wallbox's current state; it cannot recover a previous intention
+if fallback changed that state. A paused wallbox without saved app state uses
+**6 A** as its first resume target.
 
-Create a private data directory containing `options.json`. Its structure is:
+### Check the handover
 
-```json
-{
-  "serial_port": "/dev/ttyUSB0",
-  "device_id": 50,
-  "baudrate": 57600,
-  "frame": "8n2",
-  "token": "REPLACE_WITH_A_RANDOM_SECRET_OF_AT_LEAST_32_CHARACTERS",
-  "read_only": true,
-  "current_cap": 6,
-  "listen": "0.0.0.0",
-  "port": 8765
-}
-```
+Check readings and controls, then deliberately pause charging and restart
+**Home Assistant Core**. The app should remain running, its heartbeat should
+stay healthy and the pause should remain active. Check normal charging and
+reconnection as well before relying on the setup unattended.
 
-Map that directory to `/data`, map only the required serial device, and attach
-the service and HA containers to the same private network. Give the service a
-restart policy independent of HA. No privileged container or host networking
-is needed. The service itself uses plain HTTP: use a trusted private network,
-or an HTTPS reverse proxy for connections outside that network. Redirects are
-not followed and credentials must not be embedded in the URL.
+A host or app restart is a different test: it interrupts the heartbeat.
+Error-200 recovery while deliberately paused still needs confirmation on the
+actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable).
 
-Alternatively, with Python 3.14+, install this checkout into its own virtual
-environment using `pip install .`, then run:
+## Everyday use
 
-```bash
-amtron-modbus-service --config /path/to/options.json --state /path/to/intent.json
-```
+| What you want to do | Where to do it |
+|---|---|
+| Pause or resume charging | Use **Charging paused** in HA. |
+| Set a charging-current limit | Use the current slider in HA. **0 A removes the EMS limit; it does not pause charging.** |
+| Enable or disable all writes | Change **Read-only**, save and restart the app. HA needs no restart. Read-only stops the heartbeat as well as writes. |
+| Change Modbus polling intervals or the service current cap | Open the app configuration. |
+| Change how often HA reads app status, or lower HA's current cap | Open the integration options. |
+| Hand the serial adapter to another master | Stop the app. Disabling its HA entry or enabling read-only does not release the bus. |
 
-The installed package contains only the driver/service and its dependencies;
-Home Assistant is not a service dependency. Run it under an independent process
-manager with access to the serial device and state directory.
+Control entities keep their IDs when permission changes. They are unavailable
+while the service is read-only, disconnected or not ready. HA does not send old
+charging commands when permission changes or it reconnects. The service may
+still recover error 200 automatically by reasserting its saved charging state,
+including a deliberate pause. Restarting the app briefly interrupts its heartbeat.
 
-## Move an existing wallbox
+The app and HA caps both constrain limited-current commands, including resuming
+a saved limited setpoint. A deliberately selected **0 A** remains unlimited;
+the wallbox's hardware limits still apply. See the [user guide](user-guide.md)
+for charging controls and automations.
 
-1. Note the current pause, current limit and charging-release settings, including
-   the resume current if paused. Disconnect the vehicle for the first handover:
-   the existing heartbeat stops while the adapter changes owners, and the
-   wallbox may apply its fallback before the new service can read its state.
-2. Disable the existing HA integration entry so it releases the serial port.
-   Do not delete the entry: it retains the device and entity IDs.
-3. Start the service with the same bus settings and **Read-only** enabled.
-4. For the Supervisor app, confirm its discovered entry under **Devices & services**.
-   The matching wallbox entry is reused automatically. For standalone services,
-   reconfigure the existing integration, choose **Connect to the Modbus service**
-   and enter the URL and token. The serial number must match the existing
-   entry. Re-enable the entry if it remains disabled and compare its readings
-   with the wallbox while the service is still read-only.
-5. Configure the service's current cap, disable its **Read-only** option, and
-   set the integration's **Control mode** to **Modbus master** with the desired
-   HA current cap. These are separate write permissions. Reapply and verify the
-   noted pause, current and charging-release settings before reconnecting the
-   vehicle. The service first reads the wallbox's current state; it cannot infer
-   an earlier HA intention from a changed fallback readback. A currently paused
-   wallbox without saved service intent uses 6 A as its first resume target.
-6. Restart **Home Assistant Core** and verify that the service remains running,
-   its heartbeat stays healthy and the selected pause/current is unchanged.
+### What continues during an outage?
 
-Do not start another serial integration or energy manager on the same bus.
-Removing or disabling the HA entry does **not** stop the independent service.
-To relinquish control, stop the service or configure its read-only mode and
-check the wallbox's fallback behavior.
+| Event | What happens |
+|---|---|
+| HA Core restarts or stays offline | The running app keeps the heartbeat and last charging state indefinitely, including a pause or disabled charging release. |
+| HA automation is unavailable | No new schedule or surplus calculation runs; the app holds the last chosen state. |
+| App, host, power or USB connection fails | The heartbeat can stop. The wallbox's configured fallback applies. |
+| HA reconnects | HA reads the current app state; it does not restore old commands. |
 
-## State, diagnostics and failures
+Configure and understand the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
+The service does not remove the need for it. Include app data in backups:
+it contains saved charging intent and the private access token.
 
-The integration's diagnostics download fetches the app's bounded
-`write_transactions` history on demand. It records failed writes and the next
-confirmation per affected register, including time waiting for the bus and
-send/receive callback timing. It remains in RAM only, resets when the app
-restarts, and adds no Recorder entries or regular polling traffic. See
-[isolated heartbeat timeouts](troubleshooting.md#an-occasional-no-response-received-after-0-retries).
+The app saves changed settings, not a growing history. Heartbeat history records
+health changes rather than every beat. For smaller HA history, use a
+[Recorder profile](recorder.md).
 
-The app log reports process start, accepted bus settings, API readiness, serial
-connection, heartbeat start/stop and clean shutdown. Heartbeat acknowledgement
-and connection failures are logged on state changes, not on every beat or poll.
-Read-only mode explicitly reports that its heartbeat is disabled. Tokens and
-wallbox/adapter serial numbers are not included in these lifecycle messages.
+## Updates
 
-If the app stops immediately, look for **Invalid or unreadable service
-configuration**: the message identifies the startup phase and invalid option.
-A missing or disconnected serial device is retried while the API stays running.
-An unexpected worker exit is reported and closes the serial connection; a fatal
-process failure reports its error class and errno. Supervisor's Watchdog can
-restart the app after a process failure, but repeated failures need their logged
-cause corrected.
+Update the integration first and restart Home Assistant Core. Update the app
+separately through Supervisor when offered. A Core restart leaves the running
+app's heartbeat active; **an app update briefly interrupts it**.
 
-The heartbeat writer is supervised separately from polling. If it unexpectedly
-exits, the service closes down so Watchdog can restart it; a working API can no
-longer conceal a permanently stopped heartbeat. A normal missing response is
-retried by the heartbeat task and does not trigger this process restart.
+**From beta 4 to beta 5:** keep the existing entry. The running **0.5.0b4** app
+already supplies the status needed for HA controls to follow its **Read-only**
+switch. The fix works as soon as the **0.5.0b5 integration** is loaded. Use
+**Check for updates** in the app store to obtain the matching **0.5.0b5 app**.
+There is no need to delete the integration or enter a URL/token again.
 
-Only pause intent, charging-release intent and the resume current are saved in
-`intent.json`, bound to the wallbox identity. The file is atomically replaced
-with owner-only permissions when those settings change. It contains no growing
-history. Both the file and its directory are synced before a save is considered
-complete. Heartbeats and polls do not create state-file entries or Recorder rows.
-Include the app's data directory in backups; protect its options file/token.
+The beta and stable repositories end in `#apps-beta` and `#apps`. Supervisor
+regards them as different apps. To change channels, back up app data, copy the
+options, stop the old app before starting the new one, and confirm its discovery.
+Keep the old app and backup until the handover is verified.
 
-The service enforces the same current-write floor, phase-switch guards, device
-limits and bounded error-200 recovery as direct mode. All clients share one
-serialized command path. Failed or timed-out commands are never automatically
-replayed by the HA client, because the write may already have reached the box.
-A persistent recovery failure stays visible. Clearing error 200 while paused
-still needs confirmation on the actual wallbox firmware.
+## If something is wrong
 
-At most eight API bus requests can be in flight; excess requests fail promptly
-instead of building an unbounded command queue. Heartbeats retain priority over
-bus reads and commands. Normal state requests read the cache without bus traffic.
+| Symptom | First check |
+|---|---|
+| HA asks for a URL or token | Confirm that the app is running, then use its discovery card or **Connect to the Modbus service**. Manual credentials are for standalone services. |
+| App not ready / token rejected | Check the app log and retry discovery confirmation. HA retrieves the current credentials; no app restart is needed just to refresh them. |
+| Controls are unavailable | Check the app's **Read-only** switch and serial connection. After changing app settings, save and restart the app, then wait for fresh status. |
+| App exits immediately | Look for **Invalid or unreadable service configuration** in its log; the message names the invalid option or startup phase. |
+| App runs but cannot reach the wallbox | Check adapter path, bus settings and exclusive bus ownership. A missing serial device is retried. |
+| Error 200 or an occasional write timeout | Download integration diagnostics **before restarting the app**, then follow [heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable). |
 
-The API exposes named actions and an allowlist of diagnostic reads, with bearer
-authentication and version checking. It offers no arbitrary register-write or
-remote-shutdown endpoint. `/health` reveals process liveness only. If the service
-or wallbox becomes unreachable, HA marks its readings unavailable; reconnecting
-does not replay HA restore values.
+The log shows service startup, serial connection and heartbeat start/stop.
+Connection and heartbeat failures are logged when their state changes.
+Watchdog can restart an exited app; recurring failures still need their cause fixed.
 
-## Build a local development checkout
+For rejected data, the HA log names the affected field without exposing the
+access token. An unusable optional maximum-current reading does not block setup;
+configured command limits still apply.
 
-To test source changes without using the published image:
+## More detail
 
-```bash
-python scripts/build_service_app.py --output /tmp/mennekes-amtron-app
-```
-
-Copy this directory to HA's local app directory and install the local app.
-The export includes the source and development Dockerfile so Supervisor
-builds the checkout. Alternatively run `docker build -t amtron-modbus-service:local .`
-from the repository root. A local app and an app from the published catalog are
-different installations; stop the current serial owner before switching.
+- [Standalone Docker or Python deployment](service-standalone.md)
+- [Service state, diagnostics, API and local development](service-reference.md)
+- [Architecture](architecture.md) · [Security](../SECURITY.md) · [Privacy](../PRIVACY.md)

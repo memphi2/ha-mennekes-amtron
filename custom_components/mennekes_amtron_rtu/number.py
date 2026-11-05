@@ -26,7 +26,7 @@ from .device.const import (
     CHARGING_CURRENT_UNLIMITED,
 )
 from .device.registers import CHARGING_CURRENT_EMS
-from .entity import MennekesAmtronEntity
+from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
 
 PARALLEL_UPDATES = 1
@@ -44,7 +44,7 @@ async def async_setup_entry(
     )
 
 
-class AmtronChargingCurrentNumber(MennekesAmtronEntity, NumberEntity, RestoreEntity):
+class AmtronChargingCurrentNumber(MennekesAmtronControlEntity, NumberEntity, RestoreEntity):
     """The EMS charging-current limit in 0x0302."""
 
     _attr_translation_key = "charging_current_limit"

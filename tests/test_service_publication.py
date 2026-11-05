@@ -239,6 +239,19 @@ def test_catalogs_are_separate_and_allowlist_only_distributable_files(version, c
     assert yaml.safe_load(files["repository.yaml"])["url"].endswith(f"#{channel}")
     assert "mennekes_amtron_modbus/config.yaml" in files
     assert "mennekes_amtron_modbus/DOCS.md" in files
+    languages = {
+        path.stem
+        for path in (images.ROOT / "custom_components/mennekes_amtron_rtu/translations").glob("*.json")
+    }
+    assert {
+        path.removeprefix("mennekes_amtron_modbus/translations/").removesuffix(".yaml")
+        for path in files
+        if path.startswith("mennekes_amtron_modbus/translations/")
+    } == languages
+    for language in languages:
+        assert files[f"mennekes_amtron_modbus/translations/{language}.yaml"] == (
+            images.ROOT / "modbus_service/translations" / f"{language}.yaml"
+        ).read_bytes()
     assert {"LICENSE", "NOTICE", "release.json"} <= files.keys()
     assert not any(
         path.endswith((".py", ".zip")) or path.startswith(".github/") for path in files
@@ -364,10 +377,8 @@ def test_local_export_builds_the_checkout_instead_of_pulling_a_published_image(
 def test_app_translations_cover_every_configuration_option():
     app = images.ROOT / "modbus_service"
     config = yaml.safe_load((app / "config.yaml").read_text())
-    for language in ("de", "en"):
-        translated = yaml.safe_load(
-            (app / "translations" / f"{language}.yaml").read_text()
-        )
+    for path in (app / "translations").glob("*.yaml"):
+        translated = yaml.safe_load(path.read_text())
         assert set(translated["configuration"]) == set(config["schema"])
 
 

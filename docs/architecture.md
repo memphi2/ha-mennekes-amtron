@@ -27,6 +27,13 @@ entry never opens the serial adapter or starts a local heartbeat/recovery task.
 All entries preserve the domain and entity unique IDs. See
 [setup and migration](modbus-service.md) for the one-owner handover.
 
+In service mode, the authenticated service snapshot is authoritative for write
+permission. HA has no separate permission selector. Control platforms remain
+loaded, preserving entity IDs, while entity availability and command guards
+follow the service's read-only flag and current connection/readiness state.
+Permission transitions send no charging commands and do not replay HA restore
+data. Direct serial entries retain their own explicit control mode.
+
 `tests/test_service_process.py` runs the server in a separate process over a
 virtual serial Modbus bus while a real HA instance stops and starts. It checks
 continued heartbeat delivery, unchanged pause and absence of replayed commands.
@@ -66,7 +73,7 @@ control.py            HA command error adapter
 exceptions.py         translated Home Assistant errors
 entity.py             entity base: unique id, device info, availability
 config_flow.py        + _flow_serial.py, _flow_connect.py, config_schemas.py
-options_flow.py       control mode, poll interval, current cap
+options_flow.py       direct control mode, poll interval, current cap
 sensor.py             + sensor_descriptions.py
 binary_sensor.py      + binary_sensor_descriptions.py
 number.py select.py switch.py button.py

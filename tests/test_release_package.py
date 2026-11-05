@@ -47,7 +47,10 @@ def test_the_hacs_zip_has_no_wrapping_directory(tmp_path: Path) -> None:
     assert manifest["domain"] == "mennekes_amtron_rtu"
     assert "manifest.json" in names
     assert "strings.json" in names
-    assert "translations/de.json" in names
+    assert {name for name in names if name.startswith("translations/")} == {
+        f"translations/{path.name}"
+        for path in (ROOT / "custom_components/mennekes_amtron_rtu/translations").glob("*.json")
+    }
     assert "brand/icon.png" in names
     assert not any(name.startswith("custom_components/") for name in names)
     assert not any(name.endswith(".pyc") for name in names)

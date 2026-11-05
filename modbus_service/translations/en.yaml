@@ -13,7 +13,7 @@ configuration:
     description: Data bits, parity and stop bits configured in the wallbox.
   read_only:
     name: Read-only
-    description: Disables charging commands and the service heartbeat; Modbus reads remain active.
+    description: Disables charging commands, including Home Assistant controls, and the service heartbeat; Modbus reads remain active.
   current_cap:
     name: Current cap
     description: Maximum requested EMS current in amperes. Explicit 0 A commands remove the EMS limit.

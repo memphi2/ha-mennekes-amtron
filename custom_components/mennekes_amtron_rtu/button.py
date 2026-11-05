@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .device.capabilities import capability_is_supported
 from .device.registers import ERROR_CODE, SYSTEM_RESTART
-from .entity import MennekesAmtronEntity
+from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
 
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class AmtronRecoverButton(MennekesAmtronEntity, ButtonEntity):
+class AmtronRecoverButton(MennekesAmtronControlEntity, ButtonEntity):
     """Run the documented recovery sequence after a heartbeat loss."""
 
     _attr_translation_key = "recover_from_error"
@@ -59,7 +59,7 @@ class AmtronRecoverButton(MennekesAmtronEntity, ButtonEntity):
         await self.runtime_data.control.async_recover_from_error()
 
 
-class AmtronRestartButton(MennekesAmtronEntity, ButtonEntity):
+class AmtronRestartButton(MennekesAmtronControlEntity, ButtonEntity):
     """Restart the wallbox through 0x0D19.
 
     The specification allows this only in the idle state, so the control

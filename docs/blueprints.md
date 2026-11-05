@@ -62,7 +62,9 @@ phases automatically.
   automation is explicitly allowed to resume when its threshold is met.
 - Missing or invalid power values, or a unit other than W/kW, produce no new
   commands. They do **not** pause charging automatically. The last setting
-  remains in effect while the integration's heartbeat continues.
+  remains in effect while the active service or integration keeps sending its
+  heartbeat. A service continues through HA Core restarts, but the blueprint
+  cannot calculate new values while HA is offline.
 - An unavailable current control, pause switch or phase sensor prevents
   current adjustment. An unknown initial current setpoint can still be set
   from a valid power budget when the current control is available.

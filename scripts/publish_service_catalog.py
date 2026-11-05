@@ -57,10 +57,8 @@ def catalog_files(info: dict[str, str], digest: str) -> dict[str, bytes]:
     if "image" in config:
         raise ValueError("app config must use the digest-pinned Dockerfile")
     files[prefix + "Dockerfile"] = app_dockerfile(info, digest)
-    for language in ("en", "de"):
-        files[f"{prefix}translations/{language}.yaml"] = (
-            app / "translations" / f"{language}.yaml"
-        ).read_bytes()
+    for translation in sorted((app / "translations").glob("*.yaml")):
+        files[f"{prefix}translations/{translation.name}"] = translation.read_bytes()
     for name in ("LICENSE", "NOTICE"):
         files[name] = (ROOT / name).read_bytes()
     for name in ("icon.png", "logo.png"):

@@ -11,6 +11,8 @@ from .device.data import WallboxData as WallboxData
 from .device.data import WriteDiagnostics as WriteDiagnostics
 
 if TYPE_CHECKING:
+    from homeassistant.const import Platform
+
     from .control import AmtronControl
     from .coordinator import MennekesAmtronCoordinator
     from .device.client import MennekesModbusClient
@@ -28,6 +30,9 @@ class MennekesAmtronRuntimeData:
     identity: DeviceIdentity
     diagnostics: WriteDiagnostics
     connection_state: ConnectionState
+    # Config data/options are already replaced when an update starts unloading.
+    # Retain this runtime's platform set instead of recomputing from the new mode.
+    loaded_platforms: tuple[Platform, ...] = ()
     heartbeat: HeartbeatTask | None = None
     recovery: HeartbeatRecovery | None = None
     # What the repair issues looked like last time, so an unchanged issue is

@@ -104,3 +104,11 @@ class MennekesAmtronEntity(CoordinatorEntity[MennekesAmtronCoordinator]):
         if not super().available:
             return False
         return self.wallbox_data.has(self._register_key)
+
+
+class MennekesAmtronControlEntity(MennekesAmtronEntity):
+    """Keep control identities while following the current write permission."""
+
+    @property
+    def available(self) -> bool:
+        return super().available and not self.runtime_data.control.read_only

@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
-LANGUAGES = ("en", "de")
+LANGUAGES = tuple(sorted(path.stem for path in (COMPONENT / "translations").glob("*.json")))
+APP_TRANSLATIONS = ROOT / "modbus_service" / "translations"
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -46,6 +49,31 @@ def test_no_translation_is_empty(language: str) -> None:
     assert empty == []
 
 
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_translation_placeholders_match_the_english_source(language: str) -> None:
+    reference = dict(_walk(_load(COMPONENT / "strings.json")))
+    translated = dict(_walk(_load(COMPONENT / "translations" / f"{language}.json")))
+    for key, value in reference.items():
+        assert sorted(re.findall(r"\{[^{}]+\}", translated[key])) == sorted(
+            re.findall(r"\{[^{}]+\}", value)
+        ), (language, key)
+
+
+def test_app_and_integration_support_the_same_languages() -> None:
+    assert {"de", "en", "fr", "it", "nl"} <= set(LANGUAGES)
+    assert {path.stem for path in APP_TRANSLATIONS.glob("*.yaml")} == set(LANGUAGES)
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_app_translations_are_complete_and_nonempty(language: str) -> None:
+    reference = yaml.safe_load((APP_TRANSLATIONS / "en.yaml").read_text())
+    translated = yaml.safe_load((APP_TRANSLATIONS / f"{language}.yaml").read_text())
+    assert _keys(translated) == _keys(reference)
+    strings = dict(_walk(translated))
+    assert strings.keys() == _keys(reference)
+    assert all(value.strip() for value in strings.values())
+
+
 def test_every_exception_translation_key_is_used() -> None:
     declared = set(_load(COMPONENT / "strings.json")["exceptions"])
     sources = "\n".join(
@@ -56,8 +84,6 @@ def test_every_exception_translation_key_is_used() -> None:
 
 
 def test_every_raised_translation_key_is_declared() -> None:
-    import re
-
     declared = set(_load(COMPONENT / "strings.json")["exceptions"])
     pattern = re.compile(
         r"(?:service_validation_error|home_assistant_error|validation_error|device_error|DeviceError|DeviceValidationError)\(\s*\n?\s*\"([a-z_]+)\""
@@ -83,8 +109,6 @@ def test_the_repair_issues_are_translated() -> None:
 
 
 def test_the_action_fields_match_the_service_description() -> None:
-    import yaml
-
     services = yaml.safe_load(
         (COMPONENT / "services.yaml").read_text(encoding="utf-8")
     )

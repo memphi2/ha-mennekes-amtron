@@ -16,7 +16,7 @@ from .device.enums import (
     enum_options,
 )
 from .device.registers import REQUESTED_PHASES, SOLAR_CHARGING_MODE
-from .entity import MennekesAmtronEntity
+from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
 
 PARALLEL_UPDATES = 1
@@ -40,7 +40,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class AmtronSolarModeSelect(MennekesAmtronEntity, SelectEntity):
+class AmtronSolarModeSelect(MennekesAmtronControlEntity, SelectEntity):
     """The solar charging mode in 0x0D03.
 
     Writing this register drives the wallbox HMI and its solar LEDs only; the
@@ -77,7 +77,7 @@ class AmtronSolarModeSelect(MennekesAmtronEntity, SelectEntity):
         )
 
 
-class AmtronRequestedPhasesSelect(MennekesAmtronEntity, SelectEntity):
+class AmtronRequestedPhasesSelect(MennekesAmtronControlEntity, SelectEntity):
     """The requested phase usage in 0x0D04.
 
     This entity only exists when the hardware can switch phases. Switching

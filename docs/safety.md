@@ -21,8 +21,9 @@ collisions. Read-only mode still transmits Modbus read requests; it is not a
 passive listener. It only disables register writes and the heartbeat.
 
 Check exclusive bus ownership before setup, discovery or the smoke test.
-If another master is present, disable this integration and use a separate
-supported interface or obtain the readings from the existing master.
+If another master is present, stop the service or disable the direct serial
+entry and use a separate supported interface or obtain the readings from the
+existing master. Disabling a service-connected HA entry does not stop the app.
 
 ## §14a EnWG is enforced in hardware
 
@@ -46,7 +47,7 @@ previous section: this integration must not share that bus, even read-only.
 
 ## The heartbeat, and what happens without it
 
-In master mode the active bus owner writes `0x0D00 = 0x55AA` every five seconds.
+When writes are enabled, the active bus owner writes `0x0D00 = 0x55AA` every five seconds.
 A failed heartbeat is retried on a one-second interval until delivery resumes.
 The wallbox expects it at least every ten seconds. Longer connection outages
 can still miss this deadline. If the heartbeat stops:
@@ -123,7 +124,7 @@ option 2. Even there:
 
 ## Error recovery
 
-In master mode, a confirmed error 200 triggers automatic recovery once the
+With writes enabled, a confirmed error 200 triggers automatic recovery once the
 heartbeat is healthy. It respects a pause, device lock and explicitly disabled
 charging release while reasserting the EMS commands. A pause stays at the
 pause value, unlimited mode stays at 0 A, and a normal limit is kept or lowered

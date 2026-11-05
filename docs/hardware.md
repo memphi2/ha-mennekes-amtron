@@ -25,7 +25,8 @@ claim.
 
 ## What you need
 
-- A **USB RS-485 adapter** on the machine Home Assistant runs on. Any adapter
+- A **USB RS-485 adapter** on the machine running the Modbus service, or Home
+  Assistant when using direct serial mode. Any adapter
   with a reliable driver works; the integration talks plain Modbus RTU through
   pyserial. There is no supported-adapter list, because the protocol does not
   care.
@@ -139,13 +140,19 @@ Check this before setup or bus discovery. See [safety.md](safety.md).
 
 ## Making the adapter visible to Home Assistant
 
-The integration opens a serial port, so Home Assistant has to be able to see
-and open the device.
+Give the adapter to the component that opens the serial connection:
 
-**Home Assistant OS and Supervised** pass USB devices through automatically.
-Nothing to do.
+| Connection | Where the adapter must be available |
+|---|---|
+| Service app on HA OS | Select it in the app's **Serial adapter** setting. If HA OS runs in a virtual machine, pass the USB device through to that VM first. |
+| Standalone service | Pass it to the service container or process; see [standalone setup](service-standalone.md). |
+| Direct serial | Make it available to Home Assistant itself. |
 
-**Home Assistant Container** needs the device passed into the container:
+Only one component may open the port. Stop or disable the old connection
+before handing it over, including when both sides are read-only.
+
+For a **direct serial connection with Home Assistant Container**, pass the
+device into the HA container:
 
 ```yaml
 services:
@@ -157,8 +164,9 @@ services:
 Pass the `by-id` path, not `/dev/ttyUSB0`: the `ttyUSB` number changes when
 devices are re-enumerated.
 
-**Home Assistant Core** needs the user Home Assistant runs as to be in the
-group that owns the device, usually `dialout`:
+For a manually managed **Python process**, its account needs permission to
+open the device. This is usually granted through the `dialout` group. For
+example, if that account is named `homeassistant`:
 
 ```bash
 sudo usermod -aG dialout homeassistant
@@ -168,9 +176,10 @@ Log out and in, or restart the service, for the group to take effect.
 
 ## Finding and checking the port
 
-Use the integration setup form's port list for normal setup. It lists stable
-paths first and also accepts a manually entered path. If you already have an
-administration shell, you can inspect ports there:
+Use the app's **Serial adapter** selector for service mode or the integration
+setup form's port list for direct serial mode. Prefer a stable
+`/dev/serial/by-id/...` path. If you already have an administration shell,
+you can inspect ports there; these examples apply to direct serial mode:
 
 ```bash
 # Home Assistant OS, Supervised, Container
@@ -191,10 +200,10 @@ dead bus.
 
 ## Checking that it worked
 
-1. The setup form in Home Assistant is the real test: it opens the port and
-   reads the device before creating anything, and it can search the bus if the
-   address or the parameters are not the factory ones. See
-   [quickstart.md](quickstart.md).
+1. With the service, check its log for the serial connection and wallbox
+   initialization, then confirm the discovered integration. With direct serial
+   mode, the setup form reads the wallbox before creating an entry and can
+   search the bus for unknown settings. See [Quick start](quickstart.md).
 2. For an answer outside Home Assistant, the integration ships a read-only bus
    check; see
    [quickstart.md](quickstart.md#optional-command-line-bus-check).

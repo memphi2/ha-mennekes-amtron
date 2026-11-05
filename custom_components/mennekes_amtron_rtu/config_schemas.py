@@ -100,9 +100,7 @@ def options_schema(
         ): SelectSelector(
             SelectSelectorConfig(
                 options=list(CONTROL_MODES),
-                translation_key="service_control_mode"
-                if service_mode
-                else "control_mode",
+                translation_key="control_mode",
                 mode=SelectSelectorMode.LIST,
             )
         ),
@@ -152,7 +150,7 @@ def options_schema(
         fields = {
             marker: selector
             for marker, selector in fields.items()
-            if marker.schema != CONF_MEASUREMENT_INTERVAL_SECONDS
+            if marker.schema not in (CONF_CONTROL_MODE, CONF_MEASUREMENT_INTERVAL_SECONDS)
         }
     return probatio.Schema(fields)
 

@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 
 from .device.registers import CHARGING_CURRENT_EMS, CHARGING_RELEASE, LOCK_EVSE
-from .entity import MennekesAmtronEntity
+from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ class PauseRestoreData(ExtraStoredData):
         return {"pause_requested": self.requested}
 
 
-class AmtronPauseSwitch(MennekesAmtronEntity, SwitchEntity, RestoreEntity):
+class AmtronPauseSwitch(MennekesAmtronControlEntity, SwitchEntity, RestoreEntity):
     """Pause and resume charging the documented way.
 
     Turning this on writes the vendor's pause value to 0x0302 so the wallbox
@@ -116,7 +116,7 @@ class ChargingReleaseRestoreData(ExtraStoredData):
         return {"charging_release_requested": self.requested}
 
 
-class AmtronChargingReleaseSwitch(MennekesAmtronEntity, SwitchEntity, RestoreEntity):
+class AmtronChargingReleaseSwitch(MennekesAmtronControlEntity, SwitchEntity, RestoreEntity):
     """The energy-manager charging release in 0x0D05.
 
     This opens and closes the wallbox relay. For everyday pausing use the
@@ -180,7 +180,7 @@ class AmtronChargingReleaseSwitch(MennekesAmtronEntity, SwitchEntity, RestoreEnt
             control.charging_release_requested = False
 
 
-class AmtronLockSwitch(MennekesAmtronEntity, SwitchEntity):
+class AmtronLockSwitch(MennekesAmtronControlEntity, SwitchEntity):
     """Lock the wallbox against charging, through 0x0D06."""
 
     _attr_translation_key = "lock_evse"

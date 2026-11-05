@@ -1,6 +1,9 @@
-# Entity Reference
+# Entity reference
 
-Every entity this integration can create, what it means, and when it exists.
+Use **Charging current limit** and **Charging paused** for everyday charging.
+**Total power**, **Total energy** and **Heartbeat** show power use, accumulated
+energy and connection health. The [User guide](user-guide.md) explains how to
+use these controls together; this page lists every entity and its state values.
 
 The first column shows default **English** entity-ID patterns. `*` stands
 for the device prefix; it is not part of a literal entity ID. For example,
@@ -8,15 +11,34 @@ Total energy normally becomes `sensor.mennekes_amtron_total_energy`.
 Home Assistant derives IDs from translated names, not internal register keys.
 Language, renaming and multiple devices can change them: copy your actual IDs
 from **Settings → Devices & services → Entities** before using YAML examples.
-Changing the integration domain to `mennekes_amtron_rtu` does not add `rtu`
-to existing entity IDs.
+Moving an existing entry to the service keeps its device and entity IDs when
+the wallbox is matched by serial number.
 
 The **Needs** column says what the wallbox has to support. A register that
 a firmware does not have produces no entity at all, so fewer entities on an older layout can be expected. Optional diagnostic
-entities may also need enabling on their entity settings page.
+entities may also need enabling on their entity settings page. A temporarily
+failed read makes an existing entity unavailable until communication recovers.
 
-Control entities exist only while the entry's control mode is **Modbus
-master**. A read-only entry has sensors and binary sensors and nothing else.
+| Connection | When controls are available |
+|---|---|
+| **Direct serial** | Select **Control mode → Modbus master** in the integration options. Read-only entries provide readings without adding controls. |
+| **Modbus service** | Disable **Read-only** in the app configuration, save and restart the app. Controls become available after fresh service status arrives; HA needs no restart for this switch. Their IDs stay registered while the service is read-only, disconnected or not ready. |
+
+## Controls
+
+For availability, use the connection table above. Service controls follow the
+app's **Read-only** setting; direct controls require **Modbus master**.
+
+| Entity | Name | Needs | Meaning |
+|---|---|---|---|
+| `number.*_charging_current_limit` | Charging current limit | always | Slider: 0 A removes the energy-manager limit and bypasses extra current caps; 6 A or more sets a limit. Hardware limits still apply. While paused it shows the remembered setpoint; changing it can resume charging. |
+| `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. |
+| `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. |
+| `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
+| `select.*_solar_charging_mode` | Solar charging mode | always | The solar mode shown on the wallbox display. Drives the HMI only, and needs DIP 7 on. |
+| `select.*_requested_phases` | Requested phases | hardware that can switch phases | Single-phase or all-phase charging. A change while charging first pauses; resume separately after the waiting interval. Only exists on capable hardware. |
+| `button.*_recover_from_error` | Recover from error | always | Manually retries heartbeat-error recovery when automatic recovery cannot complete. Preserves a deliberate pause, lock, disabled release and current setting. |
+| `button.*_restart` | Restart | layout v01.03 | Restarts the wallbox. Refused unless the wallbox is idle. |
 
 ## Sensors
 
@@ -72,29 +94,14 @@ These sit under *Diagnostic* on the device page.
 |---|---|---|---|---|
 | `binary_sensor.*_vehicle_connected` | Vehicle connected | plug | always | A vehicle is plugged in, in any state from connected to charging. |
 | `binary_sensor.*_charging` | Charging | battery_charging | always | The wallbox reports the charging state. |
-| `binary_sensor.*_downgrade_active` | Downgrade active |  | always | The grid operator's downgrade input is active and the wallbox is limiting the current. **This is the §14a EnWG visibility.** |
+| `binary_sensor.*_downgrade_active` | Downgrade active |  | always | The grid operator's downgrade input is active and the wallbox is limiting the current. |
 | `binary_sensor.*_error` | Error | problem | always | An error code other than zero is active. |
-| `binary_sensor.*_heartbeat` | Heartbeat | problem | master mode | OK after a confirmed heartbeat; problem when none is confirmed within ten seconds or the sender stops. Independent of register polling. |
+| `binary_sensor.*_heartbeat` | Heartbeat | problem | direct master mode or service connection | OK after a confirmed heartbeat; problem when no heartbeat is confirmed within ten seconds or an active sender stops. Unknown before a result is available or when HA cannot obtain service status. Records health changes, not individual heartbeats. |
 | `binary_sensor.*_energy_manager_fallback_active` | Energy manager fallback active | problem | layout v01.02 | The wallbox has fallen back because the energy manager stopped answering. |
 | `binary_sensor.*_authorization_enabled` | Authorization enabled |  | layout v01.02 | RFID authorization is switched on in the wallbox. |
 | `binary_sensor.*_grid_imbalance_monitoring` | Grid imbalance monitoring |  | layout v01.02 | Imbalance monitoring is switched on. |
 | `binary_sensor.*_permanent_cable_lock` | Permanent cable lock |  | layout v01.02 | Permanent cable locking is switched on. |
 | `binary_sensor.*_phase_switching_supported` | Phase switching supported |  | layout v01.01 | The hardware can switch between one and three phases. |
-
-## Controls
-
-Only in **Modbus master** mode.
-
-| Entity | Name | Needs | Meaning |
-|---|---|---|---|
-| `number.*_charging_current_limit` | Charging current limit | always | Enter 0 A for no limit, or 6 A up to the configured cap for a limit. Values between 0 and 6 A are rejected. Use the pause switch to stop charging. |
-| `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. |
-| `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. |
-| `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
-| `select.*_solar_charging_mode` | Solar charging mode | always | The solar mode shown on the wallbox display. Drives the HMI only, and needs DIP 7 on. |
-| `select.*_requested_phases` | Requested phases | hardware that can switch phases | Single-phase or all-phase charging. A change while charging first pauses; resume separately after the waiting interval. Only exists on capable hardware. |
-| `button.*_recover_from_error` | Recover from error | always | Writes the documented recovery sequence after a lost heartbeat. |
-| `button.*_restart` | Restart | layout v01.03 | Restarts the wallbox. Refused unless the wallbox is idle. |
 
 ## Enumerated states
 
@@ -117,7 +124,7 @@ and templates see.
 | `select.*_solar_charging_mode` | `fast`, `not_active`, `sunshine`, `sunshine_plus` |
 | `select.*_requested_phases` | `all_available`, `single_phase` |
 
-## The action
+## Actions
 
 `mennekes_amtron_rtu.set_charging_current` writes the charging-current limit.
 Both the action and the slider accept 0 A to remove the limit. See

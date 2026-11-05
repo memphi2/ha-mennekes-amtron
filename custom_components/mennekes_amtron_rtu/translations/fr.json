@@ -1,0 +1,526 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Cette borne de recharge est déjà configurée.",
+      "reconfigure_successful": "La connexion a été mise à jour.",
+      "unique_id_mismatch": "Ce port correspond à une autre borne de recharge.",
+      "service_migration_requires_serial": "Le numéro de série de la borne doit pouvoir être lu pour retrouver l’appareil existant lors de la migration.",
+      "invalid_service_discovery": "L’application a fourni des informations de connexion non valides.",
+      "service_identity_changed": "La borne détectée a changé. Recommencez la configuration.",
+      "service_discovery_updated": "L’intégration existante utilise désormais la connexion de l’application détectée.",
+      "multiple_service_apps": "Plusieurs applications Modbus ont été trouvées. Sélectionnez l’application détectée correspondante dans Appareils et services."
+    },
+    "error": {
+      "cannot_connect": "Impossible d’ouvrir le port série ou la borne n’a pas répondu. Vérifiez le câblage (Modbus A est +, B est -), le port et les paramètres du bus.",
+      "invalid_response": "L’appareil a répondu sans indiquer de version de la table de registres Modbus. Vérifiez l’adresse de l’appareil et que les interrupteurs DIP 4 et 5 du bloc S1 sont activés.",
+      "not_found": "Aucune borne n’a répondu sur ce port. Vérifiez le câblage (Modbus A est +, B est -, GND est raccordé) et que les interrupteurs DIP 4 et 5 du bloc S1 sont activés, puis que la borne a été redémarrée.",
+      "cannot_connect_service": "L’application est inaccessible sur le réseau. Vérifiez qu’elle fonctionne et accepte les connexions sur le port 8765.",
+      "service_discovery_requires_serial": "L’application n’a pas encore lu de numéro de série. Vérifiez sa connexion à la borne et réessayez.",
+      "service_auth_failed": "L’application a refusé l’authentification. Confirmez à nouveau pour récupérer ses identifiants actuels auprès de Supervisor. Pour un service hébergé séparément, vérifiez le jeton configuré.",
+      "service_not_ready": "L’authentification auprès de l’application a réussi, mais les données de la borne ne sont pas encore disponibles. Consultez le journal de l’application et réessayez.",
+      "service_invalid_response": "L’application répond, mais ses données n’ont pas été acceptées. Mettez à jour l’intégration et l’application vers la même version. Le journal de Home Assistant indique la section concernée."
+    },
+    "progress": {
+      "searching": "Recherche d’une borne sur le bus : jusqu’à {candidates} combinaisons, soit environ {minutes} minutes, auxquelles s’ajoutent les vérifications de connexion. Aucun registre n’est modifié. Pendant la reconfiguration, la connexion existante et le signal de présence sont interrompus ; le comportement de repli configuré sur la borne s’applique."
+    },
+    "step": {
+      "reconfigure": {
+        "title": "Modifier la connexion",
+        "menu_options": {
+          "server": "Se connecter au service Modbus",
+          "serial_reconfigure": "Modifier la connexion série"
+        }
+      },
+      "search_result": {
+        "description": "Une borne a répondu après {attempts} tentatives :\n\n- Adresse de l’appareil : **{device_id}**\n- Bus : **{baudrate} bauds, {frame}**\n- Table de registres Modbus : **{layout}**\n- Numéro de série : **{serial_number}**\n\nValidez pour configurer la borne avec ces valeurs.",
+        "title": "Borne détectée"
+      },
+      "user": {
+        "title": "Se connecter à votre borne",
+        "menu_options": {
+          "server": "Service Modbus (reste actif lors des redémarrages de HA)",
+          "serial": "Connexion série directe"
+        }
+      },
+      "serial": {
+        "data": {
+          "baudrate": "Vitesse de transmission",
+          "device_id": "Adresse Modbus de l’appareil",
+          "frame": "Format de trame",
+          "port": "Port série",
+          "search": "Si ces paramètres ne fonctionnent pas"
+        },
+        "data_description": {
+          "baudrate": "La valeur d’usine est 57600.",
+          "device_id": "L’adresse d’usine est 50. L’outil de configuration MENNEKES permet de définir une adresse de 10 à 50.",
+          "frame": "La documentation de la borne prévoit uniquement ces trois formats. Le réglage d’usine est 8 bits de données, sans parité et 2 bits d’arrêt.",
+          "port": "Chemin de l’adaptateur USB RS-485. Préférez un chemin /dev/serial/by-id : /dev/ttyUSB0 peut changer après un redémarrage.",
+          "search": "L’adresse de l’appareil et les paramètres du bus peuvent être modifiés avec l’outil de configuration MENNEKES. Une installation existante peut donc utiliser d’autres valeurs. La recherche envoie des requêtes de lecture. Utilisez-la uniquement sur un bus sans autre maître Modbus."
+        },
+        "description": "La borne doit être configurée comme satellite Modbus : activez les interrupteurs DIP 4 et 5 du bloc S1, puis redémarrez la borne. Cette intégration a été validée avec la table de registres {validated_layout}.",
+        "title": "Mennekes Amtron RTU"
+      },
+      "serial_reconfigure": {
+        "data": {
+          "baudrate": "Vitesse de transmission",
+          "device_id": "Adresse Modbus de l’appareil",
+          "frame": "Format de trame",
+          "port": "Port série",
+          "search": "Si ces paramètres ne fonctionnent pas"
+        },
+        "data_description": {
+          "baudrate": "La valeur d’usine est 57600.",
+          "device_id": "L’adresse d’usine est 50. L’outil de configuration MENNEKES permet de définir une adresse de 10 à 50.",
+          "frame": "La documentation de la borne prévoit uniquement ces trois formats. Le réglage d’usine est 8 bits de données, sans parité et 2 bits d’arrêt.",
+          "port": "Chemin de l’adaptateur USB RS-485. Préférez un chemin /dev/serial/by-id : /dev/ttyUSB0 peut changer après un redémarrage.",
+          "search": "L’adresse de l’appareil et les paramètres du bus peuvent être modifiés avec l’outil de configuration MENNEKES. Une installation existante peut donc utiliser d’autres valeurs. La recherche envoie des requêtes de lecture. Utilisez-la uniquement sur un bus sans autre maître Modbus."
+        },
+        "description": "La borne doit être configurée comme satellite Modbus : activez les interrupteurs DIP 4 et 5 du bloc S1, puis redémarrez la borne. Cette intégration a été validée avec la table de registres {validated_layout}.",
+        "title": "Mennekes Amtron RTU"
+      },
+      "server": {
+        "title": "Se connecter au service Modbus",
+        "description": "Les applications Supervisor se connectent automatiquement, sans saisir d’URL ni de jeton. Ce formulaire est destiné à un service hébergé séparément. Pour migrer depuis une connexion Modbus directe, désactivez d’abord l’ancienne entrée de l’intégration afin de libérer le port série.",
+        "data": {
+          "server_url": "URL du service",
+          "server_token": "Jeton d’accès"
+        }
+      },
+      "hassio_confirm": {
+        "title": "Connecter l’application Modbus",
+        "description": "L’application Modbus a été détectée automatiquement. Son adresse et son jeton d’accès sont fournis automatiquement. Confirmez la connexion. Si une entrée existe déjà pour cette borne, les identifiants de l’appareil et de ses entités sont conservés. Une entrée désactivée le reste jusqu’à ce que vous la réactiviez."
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "authorization_enabled": {
+        "name": "Autorisation activée"
+      },
+      "cable_lock_enabled": {
+        "name": "Verrouillage permanent du câble"
+      },
+      "charging": {
+        "name": "Charge en cours"
+      },
+      "downgrade_active": {
+        "name": "Limitation externe active"
+      },
+      "error": {
+        "name": "Erreur"
+      },
+      "grid_imbalance_enabled": {
+        "name": "Surveillance du déséquilibre des phases"
+      },
+      "master_lost_fallback": {
+        "name": "Repli du gestionnaire d’énergie actif"
+      },
+      "phase_switch_capable": {
+        "name": "Commutation des phases prise en charge"
+      },
+      "vehicle_connected": {
+        "name": "Véhicule connecté"
+      },
+      "heartbeat": {
+        "name": "Signal de présence"
+      }
+    },
+    "button": {
+      "recover_from_error": {
+        "name": "Rétablir le fonctionnement"
+      },
+      "restart": {
+        "name": "Redémarrer"
+      }
+    },
+    "number": {
+      "charging_current_limit": {
+        "name": "Limite du courant de charge"
+      }
+    },
+    "select": {
+      "requested_phases": {
+        "name": "Phases demandées",
+        "state": {
+          "all_available": "Toutes les phases disponibles",
+          "single_phase": "Une seule phase"
+        }
+      },
+      "solar_charging_mode": {
+        "name": "Mode de charge solaire",
+        "state": {
+          "fast": "Charge rapide",
+          "not_active": "Inactif",
+          "sunshine": "Sunshine",
+          "sunshine_plus": "Sunshine+"
+        }
+      }
+    },
+    "sensor": {
+      "authorization_status": {
+        "name": "Autorisation",
+        "state": {
+          "authorized": "Autorisée",
+          "not_authorized": "Non autorisée",
+          "not_used": "Non utilisée"
+        }
+      },
+      "cable_lock_status": {
+        "name": "Verrouillage du câble",
+        "state": {
+          "fixed_cable": "Câble fixe",
+          "locked": "Verrouillé",
+          "undetermined": "Indéterminé",
+          "unlocked": "Déverrouillé"
+        }
+      },
+      "cp_state": {
+        "name": "État du pilote (CP)",
+        "state": {
+          "a1": "A1 (aucun véhicule)",
+          "a2": "A2 (véhicule déconnecté)",
+          "b1": "B1 (véhicule connecté)",
+          "b2": "B2 (prêt, courant proposé)",
+          "c1": "C1 (véhicule prêt à charger)",
+          "c2": "C2 (charge en cours)",
+          "d1": "D1",
+          "d2": "D2",
+          "e": "E (erreur)",
+          "f": "F (erreur)",
+          "init": "Initialisation"
+        }
+      },
+      "current_l1": {
+        "name": "Courant L1"
+      },
+      "current_l2": {
+        "name": "Courant L2"
+      },
+      "current_l3": {
+        "name": "Courant L3"
+      },
+      "detected_ev_phases": {
+        "name": "Phases détectées du véhicule",
+        "state": {
+          "not_initialized": "Non initialisé",
+          "one_phase": "1 phase",
+          "three_phases": "3 phases",
+          "two_phases": "2 phases"
+        }
+      },
+      "downgrade_current": {
+        "name": "Courant de limitation externe"
+      },
+      "ems_fallback_behaviour": {
+        "name": "Repli du gestionnaire d’énergie",
+        "state": {
+          "disabled": "Désactivé, conserve les dernières valeurs",
+          "fallback_current": "Charge avec le courant de repli",
+          "pause_on_timeout": "Met en pause en l’absence du signal de présence"
+        }
+      },
+      "ems_fallback_current": {
+        "name": "Courant de repli du gestionnaire d’énergie"
+      },
+      "energy_total": {
+        "name": "Énergie totale"
+      },
+      "error_code": {
+        "name": "Code d’erreur",
+        "state": {
+          "connected_phases_mismatch": "Phases raccordées incohérentes",
+          "energy_manager_unavailable": "Gestionnaire d’énergie indisponible",
+          "ev_overcurrent": "Surintensité du véhicule",
+          "no_error": "Aucune erreur",
+          "other": "Autre erreur",
+          "voltage_out_of_range": "Tension hors plage"
+        }
+      },
+      "evse_state": {
+        "name": "État de la borne",
+        "state": {
+          "charging": "Charge en cours",
+          "error": "Erreur",
+          "ev_connected": "Véhicule connecté",
+          "idle": "Au repos",
+          "not_initialized": "Non initialisée",
+          "preconditions_valid": "Conditions préalables remplies",
+          "ready_to_charge": "Prête à charger",
+          "service_mode": "Mode maintenance"
+        }
+      },
+      "grid_imbalance_threshold": {
+        "name": "Seuil de déséquilibre des phases"
+      },
+      "grid_phases_connected": {
+        "name": "Phases du réseau raccordées",
+        "state": {
+          "l1": "L1",
+          "l1_l2_l3": "L1, L2, L3"
+        }
+      },
+      "max_current_house": {
+        "name": "Courant maximal de l’installation"
+      },
+      "max_evse_current": {
+        "name": "Courant maximal de la borne"
+      },
+      "modbus_layout_version": {
+        "name": "Version de la table de registres Modbus"
+      },
+      "phase_rotation": {
+        "name": "Ordre des phases",
+        "state": {
+          "l1_l2_l3": "L1-L2-L3",
+          "l2_l3_l1": "L2-L3-L1",
+          "l3_l1_l2": "L3-L1-L2"
+        }
+      },
+      "phase_switching_mode": {
+        "name": "Mode de commutation des phases",
+        "state": {
+          "solar_dynamic": "Solaire, 1 ou 3 phases",
+          "solar_one_phase": "Solaire, 1 phase uniquement",
+          "solar_three_phases": "Solaire, 3 phases uniquement"
+        }
+      },
+      "phase_switching_pause": {
+        "name": "Pause de commutation des phases"
+      },
+      "power_l1": {
+        "name": "Puissance L1"
+      },
+      "power_l2": {
+        "name": "Puissance L2"
+      },
+      "power_l3": {
+        "name": "Puissance L3"
+      },
+      "power_total": {
+        "name": "Puissance totale"
+      },
+      "session_duration": {
+        "name": "Durée de la session"
+      },
+      "session_energy": {
+        "name": "Énergie de la session"
+      },
+      "session_max_current": {
+        "name": "Courant maximal de la session"
+      },
+      "sessions_total": {
+        "name": "Sessions de charge"
+      },
+      "signaled_current": {
+        "name": "Courant proposé au véhicule"
+      },
+      "solar_min_current": {
+        "name": "Courant minimal Sunshine+"
+      },
+      "switched_phases": {
+        "name": "Phases commutées",
+        "state": {
+          "all_available": "Toutes les phases disponibles",
+          "single_phase": "Une seule phase"
+        }
+      },
+      "temperature": {
+        "name": "Température"
+      },
+      "voltage_l1": {
+        "name": "Tension L1"
+      },
+      "voltage_l2": {
+        "name": "Tension L2"
+      },
+      "voltage_l3": {
+        "name": "Tension L3"
+      }
+    },
+    "switch": {
+      "charging_paused": {
+        "name": "Charge en pause"
+      },
+      "charging_release": {
+        "name": "Autorisation de charge"
+      },
+      "lock_evse": {
+        "name": "Borne verrouillée"
+      }
+    }
+  },
+  "exceptions": {
+    "charging_current_invalid": {
+      "message": "{value} A n’est pas une limite de courant de charge valide. La borne accepte 0 A (sans limite) ou au moins {minimum} A ; toute valeur intermédiaire lui fait annoncer 0 A au véhicule."
+    },
+    "charging_current_zero": {
+      "message": "0 A n’arrête pas la charge sur cette borne : cette valeur supprime la limite et la borne annonce son courant maximal. Utilisez l’interrupteur de pause pour suspendre la charge, ou l’action « Définir le courant de charge » avec « Autoriser l’absence de limite » si vous souhaitez réellement supprimer la limite."
+    },
+    "entry_not_loaded": {
+      "message": "L’entrée de la borne pour l’appareil {device} n’est pas chargée."
+    },
+    "no_wallbox_target": {
+      "message": "L’action doit cibler au moins un appareil MENNEKES AMTRON."
+    },
+    "phase_switch_unsupported": {
+      "message": "Cette borne ne peut pas commuter entre une et trois phases. La commutation dynamique nécessite un appareil de 11 kW qui indique l’option de phases 2."
+    },
+    "read_only_mode": {
+      "message": "Cette borne est en lecture seule. Pour une connexion au service, désactivez Lecture seule dans l’application, enregistrez et redémarrez l’application. Pour une connexion série directe, sélectionnez Maître Modbus dans les options de l’intégration."
+    },
+    "restart_requires_idle": {
+      "message": "La borne ne peut être redémarrée que lorsqu’elle est au repos. Débranchez d’abord le véhicule."
+    },
+    "unknown_device": {
+      "message": "L’appareil {device} n’est pas connu de Home Assistant."
+    },
+    "write_failed": {
+      "message": "L’écriture du registre {register} sur la borne a échoué : {error}"
+    },
+    "write_rate_limited": {
+      "message": "Cette modification sera à nouveau possible dans {seconds} s. Les changements de courant, la pause et la reprise nécessitent un intervalle minimal de cinq secondes ; les changements de phases conservent un intervalle de cinq minutes."
+    },
+    "phase_state_unknown": {
+      "message": "L’état actuel de charge n’a pas pu être confirmé. Aucune commutation de phases n’a été effectuée. Vérifiez la connexion et réessayez."
+    },
+    "restart_state_unknown": {
+      "message": "L’état actuel de charge n’a pas pu être confirmé. Aucun redémarrage n’a été demandé. Vérifiez la connexion et réessayez."
+    },
+    "recovery_not_applicable": {
+      "message": "La borne signale une erreur autre que l’erreur 200 liée au signal de présence. Aucune commande de rétablissement n’a été envoyée."
+    },
+    "recovery_state_unknown": {
+      "message": "L’erreur actuelle ou l’état du courant de charge n’a pas pu être confirmé. Aucune commande de rétablissement n’a été envoyée."
+    },
+    "service_unavailable": {
+      "message": "Le service Modbus est indisponible ou n’a pas pu confirmer la commande. Vérifiez l’état actuel avant de la répéter."
+    }
+  },
+  "issues": {
+    "ems_fallback_not_configured": {
+      "description": "Le registre 0x030E vaut 0 : la borne continue donc à charger avec les dernières valeurs reçues lorsque le maître Modbus actif cesse d’envoyer son signal de présence. Configurez un comportement ou un courant de repli avec l’outil de configuration MENNEKES pour obtenir un état défini en cas d’interruption.",
+      "title": "Aucun repli du gestionnaire d’énergie configuré"
+    },
+    "ems_heartbeat_lost": {
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "description": "La borne signale l’erreur 200 après l’absence du signal de présence. Lorsque les écritures sont autorisées, le rétablissement automatique réapplique les commandes existantes dès que le signal de présence reprend, y compris pendant une pause de charge. Confirmez pour réessayer manuellement. Une pause volontaire, le verrouillage de la borne, une autorisation de charge désactivée et le réglage du courant sont conservés. Cela ne relance pas la charge. Un problème déjà résolu se ferme sans envoyer de commandes.",
+            "title": "La borne a perdu le signal de présence du gestionnaire d’énergie"
+          }
+        },
+        "error": {
+          "entry_unavailable": "L’intégration n’est pas chargée. Rétablissez sa connexion avant de réessayer.",
+          "different_error": "La borne signale une autre erreur. Le rétablissement du signal de présence ne réinitialise pas cette erreur.",
+          "read_only": "Désactivez Lecture seule dans l’application, enregistrez et redémarrez l’application avant de demander le rétablissement. Pour une connexion série directe, activez plutôt le mode Maître Modbus dans les options de l’intégration.",
+          "write_rate_limited": "Une commande récente est encore dans son intervalle minimal d’écriture. Patientez un instant et réessayez.",
+          "recovery_failed": "Le rétablissement n’a pas pu être confirmé. Vérifiez la connexion et réessayez.",
+          "still_active": "Les commandes de rétablissement ont été envoyées, mais la borne signale toujours une erreur. Attendez la mise à jour de son état ; vérifiez la connexion si l’erreur persiste."
+        }
+      },
+      "title": "La borne a perdu le signal de présence du gestionnaire d’énergie"
+    },
+    "unsupported_modbus_layout": {
+      "description": "La borne indique la table de registres {layout} ; cette intégration a été validée avec {validated_layout}. Aucune entité n’est créée pour les registres absents de votre micrologiciel. Une mise à jour du micrologiciel avec l’outil de configuration MENNEKES les rend disponibles.",
+      "title": "La borne utilise une ancienne table de registres Modbus"
+    },
+    "write_rejected": {
+      "description": "Une écriture n’a pas été confirmée. Vérifiez la connexion série et la configuration satellite de la borne. Ce problème disparaît dès que la commande concernée réussit. Les échecs précédents restent dans le compteur de diagnostic.",
+      "title": "La borne a refusé une écriture"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "control_mode": "Mode de commande",
+          "current_limit": "Plafond du courant de charge",
+          "measurement_interval_seconds": "Intervalle des mesures",
+          "scan_interval_seconds": "Intervalle de lecture de l’état"
+        },
+        "data_description": {
+          "control_mode": "Les deux modes envoient des requêtes de lecture et nécessitent un accès exclusif au bus. Lecture seule n’écrit pas dans les registres. Maître Modbus envoie également le signal de présence et active les entités de commande. Ne partagez pas ce bus avec un autre maître.",
+          "current_limit": "Limite supérieure de l’entité de courant de charge, en plus de la limite imposée par la borne elle-même.",
+          "measurement_interval_seconds": "Puissance, tension, courant et données de session : un intervalle de 30 secondes réduit la charge de la base de données. Un changement d’état déclenche une actualisation immédiate. Sans véhicule, l’intervalle est d’au moins 60 secondes. L’intervalle de lecture de l’état fixe la fréquence maximale des lectures.",
+          "scan_interval_seconds": "Fréquence de lecture de l’état de charge, des erreurs et des commandes. Le signal de présence fonctionne indépendamment."
+        },
+        "title": "Options"
+      },
+      "service": {
+        "title": "Options du service",
+        "data": {
+          "current_limit": "Plafond du courant de charge",
+          "scan_interval_seconds": "Intervalle de lecture de l’état"
+        },
+        "data_description": {
+          "current_limit": "Plafond supplémentaire pour les courants demandés par Home Assistant. Le plafond du service reste applicable. Sélectionner explicitement 0 A supprime la limite du gestionnaire d’énergie.",
+          "scan_interval_seconds": "Fréquence à laquelle Home Assistant lit l’état du service. Cela ne modifie ni la fréquence des mesures Modbus ni l’intervalle du signal de présence."
+        },
+        "description": "Le réglage Lecture seule de l’application contrôle aussi l’autorisation d’écriture dans Home Assistant. Désactivez-le dans l’application, enregistrez et redémarrez l’application pour activer les commandes. Les entités de commande restent indisponibles tant que le service est en lecture seule ou n’est pas prêt."
+      }
+    }
+  },
+  "selector": {
+    "control_mode": {
+      "options": {
+        "master": "Maître Modbus",
+        "read_only": "Lecture seule"
+      }
+    },
+    "frame": {
+      "options": {
+        "8e1": "8E1 - 8 bits de données, parité paire, 1 bit d’arrêt",
+        "8n2": "8N2 - 8 bits de données, sans parité, 2 bits d’arrêt (par défaut)",
+        "8o1": "8O1 - 8 bits de données, parité impaire, 1 bit d’arrêt"
+      }
+    },
+    "search": {
+      "options": {
+        "addresses": "Rechercher toutes les adresses, environ 20 secondes",
+        "full": "Rechercher toutes les adresses, vitesses et trames, plusieurs minutes",
+        "off": "Ne pas rechercher, signaler uniquement l’erreur"
+      }
+    },
+    "recorder_profile": {
+      "options": {
+        "full": "Historique complet",
+        "detail": "Moins de détails",
+        "lean": "Statistiques d’énergie et de puissance uniquement"
+      }
+    }
+  },
+  "services": {
+    "set_charging_current": {
+      "description": "Définit la limite du courant de charge du gestionnaire d’énergie pour une borne. 0 A signifie aucune limite et n’arrête pas la charge ; l’autorisation explicite ci-dessous est donc nécessaire.",
+      "fields": {
+        "allow_unlimited": {
+          "description": "Autorise l’écriture de 0 A, ce qui supprime la limite et fait annoncer à la borne son courant maximal.",
+          "name": "Autoriser l’absence de limite"
+        },
+        "current": {
+          "description": "Limite du courant de charge en ampères. Utilisez 0 A uniquement avec « Autoriser l’absence de limite » ; les valeurs de 0,01 A à 5,99 A sont refusées, car la borne annoncerait 0 A.",
+          "name": "Courant de charge"
+        },
+        "device_id": {
+          "description": "La borne dont la limite du courant de charge est modifiée.",
+          "name": "Borne de recharge"
+        }
+      },
+      "name": "Définir le courant de charge"
+    },
+    "get_recorder_exclusions": {
+      "name": "Suggérer des exclusions Recorder",
+      "description": "Fournit une suggestion YAML utilisant les identifiants réels des entités. Ne modifie pas Recorder et ne supprime aucun historique. Fusionnez cette liste avec votre configuration existante.",
+      "fields": {
+        "device_id": {
+          "name": "Bornes de recharge",
+          "description": "Bornes à inclure dans la suggestion."
+        },
+        "profile": {
+          "name": "Profil d’historique",
+          "description": "Conserver tout l’historique, réduire les détails ou conserver uniquement les statistiques d’énergie et de puissance."
+        }
+      }
+    }
+  }
+}
