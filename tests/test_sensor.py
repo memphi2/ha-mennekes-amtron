@@ -68,11 +68,14 @@ def test_a_missing_value_yields_no_state() -> None:
         entry.runtime_data.coordinator.data.values["power_total"] = None
         entry.runtime_data.coordinator.data.values["modbus_layout_version"] = None
         entry.runtime_data.coordinator.data.values["error_code"] = None
+        entry.runtime_data.coordinator.data.values["ems_fallback_current"] = None
         assert added["evse_state"].native_value is None
         assert added["power_total"].native_value is None
         assert added["modbus_layout_version"].native_value is None
         assert added["error_code"].extra_state_attributes is None
         assert added["error_code"].native_value is None
+        assert added["ems_fallback_behaviour"].native_value is None
+        assert added["ems_fallback_current"].native_value is None
 
     asyncio.run(run())
 

@@ -4,6 +4,24 @@ Run the normal suite with `.venv/bin/python scripts/check_validate.py`.
 The minimum HA environment uses `--skip-typing`; latest stable HA
 also runs strict typing. These checks do not access a physical wallbox.
 
+## Coverage requirements
+
+The coverage gate evaluates statements and branches together, using the
+integer counters in its JSON report:
+
+- At least **99% overall** for the integration.
+- Strictly **more than 95% in each production integration module**. Strong
+  coverage elsewhere cannot hide an untested module.
+- Exactly **100%** in the configuration-flow modules: `config_flow.py`,
+  `options_flow.py`, `_flow_connect.py`, `_flow_search.py`, `_flow_serial.py`
+  and `config_schemas.py`.
+
+The thresholds use unrounded counts; a displayed percentage rounded up to a
+threshold does not pass. Missing or invalid reports and missing production
+modules fail the check. The test output identifies remaining statements and
+branches. These are enforced targets, not a claim that every module has no
+coverage gaps or that simulated tests replace hardware verification.
+
 ## Resource measurements
 
 ```bash

@@ -47,6 +47,13 @@ def test_network_schema_exposes_only_gateway_fields():
     assert protocol.config["options"] == ["rtu_over_tcp", "modbus_tcp"]
 
 
+def test_network_schema_accepts_integral_ui_numbers():
+    data = network_schema()({**NETWORK_INPUT, "tcp_port": 502.0, "device_id": 50.0})
+    assert data == NETWORK_INPUT
+    assert type(data["tcp_port"]) is int
+    assert type(data["device_id"]) is int
+
+
 @pytest.mark.parametrize("field", ["device_id", "tcp_port"])
 @pytest.mark.parametrize("value", [True, 25.5, "25", float("nan"), float("inf")])
 def test_network_schema_rejects_non_integer_identifiers(field, value):
@@ -110,6 +117,11 @@ def test_network_failures_preserve_inputs_without_searching_serial(monkeypatch, 
         assert result["description_placeholders"] == {"validated_layout": "v01.03"}
         assert _suggested(result) == NETWORK_INPUT
         search.assert_not_awaited()
+        probe.side_effect = None
+        probe.return_value = IDENTITY
+        result = await flow.async_step_network(dict(NETWORK_INPUT))
+        assert result["type"] == "create_entry"
+        assert flow.set_unique_id == IDENTITY.serial_number
 
     asyncio.run(run())
 
@@ -147,6 +159,22 @@ def test_network_reconfigure_prefills_the_current_gateway():
         }
         result = await flow.async_step_network_reconfigure()
         assert _suggested(result) == flow.reconfigure_entry.data
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("data", [
+    {"port": "/dev/fake", "connection_type": "serial"},
+    {"port": "/dev/fake"},
+    {"server_url": "http://service:8765", "server_token": "private"},
+])
+def test_network_reconfigure_from_another_backend_defaults_to_a_network_protocol(data):
+    async def run():
+        flow = Flow(FakeHass())
+        flow.reconfigure_entry.data = data
+        result = await flow.async_step_network_reconfigure()
+        assert "connection_type" not in _suggested(result)
+        assert result["data_schema"]({"host": "wallbox-gateway.local"}) == NETWORK_INPUT
 
     asyncio.run(run())
 
