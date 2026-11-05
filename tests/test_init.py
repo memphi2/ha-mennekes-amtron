@@ -138,6 +138,35 @@ def test_a_read_only_entry_never_starts_the_heartbeat(
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("change", ["enable_master", "disable_master", "service"])
+def test_unload_retains_the_platforms_from_before_entry_updates(
+    monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry(
+            options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER}
+            if change == "disable_master" else {}
+        )
+        _patch_client(monkeypatch, FakeModbusClient(device_bank()))
+        _patch_issues(monkeypatch)
+        assert await async_setup_entry(hass, entry)
+        loaded = hass.config_entries.forwarded[-1][1]
+        # HA replaces config data/options before calling the update listener.
+        if change == "service":
+            entry.data = {"server_url": "http://service:8765"}
+        else:
+            entry.options = (
+                {CONF_CONTROL_MODE: CONTROL_MODE_MASTER}
+                if change == "enable_master" else {}
+            )
+        assert loaded != _entry_platforms(entry)
+        assert await async_unload_entry(hass, entry)
+        assert hass.config_entries.unloaded[-1][1] == loaded
+
+    asyncio.run(run())
+
+
 def test_a_dead_bus_defers_the_setup(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         hass = FakeHass()

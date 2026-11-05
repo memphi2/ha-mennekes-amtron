@@ -203,9 +203,11 @@ async def async_setup_entry(
                 hass, entry, client, diagnostics
             )
         await coordinator.async_config_entry_first_refresh()
+        platforms = tuple(_entry_platforms(entry))
         await hass.config_entries.async_forward_entry_setups(
-            entry, _entry_platforms(entry)
+            entry, platforms
         )
+        entry.runtime_data.loaded_platforms = platforms
         entry.async_on_unload(entry.add_update_listener(async_reload_entry))
         async_setup_repairs(hass, entry)
         if not control.read_only and not remote:
@@ -229,7 +231,7 @@ async def async_unload_entry(
 
     runtime_data = entry.runtime_data
     unloaded = await hass.config_entries.async_unload_platforms(
-        entry, _entry_platforms(entry)
+        entry, runtime_data.loaded_platforms
     )
     if not unloaded:
         return False
