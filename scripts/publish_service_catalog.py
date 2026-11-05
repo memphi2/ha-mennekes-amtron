@@ -11,9 +11,9 @@ from typing import Any
 
 import yaml
 from packaging.version import Version
-from release_check import remote_commit, run
+from release_check import remote_commit
 from release_version import catalog_branch, catalog_branches
-from service_image import ROOT, app_dockerfile, release_info, verify_public
+from service_image import ROOT, app_dockerfile, existing_verified_image, release_info
 
 
 def api(
@@ -82,7 +82,7 @@ def catalog_files(
     files["repository.yaml"] = yaml.safe_dump({"name": title, "url": url}).encode()
     files["README.md"] = (
         f"# {title}\n\nInstall the Modbus service from `{url}`.\n\n"
-        f"Release: [{info['version']}](https://github.com/{info['repository']}/releases/tag/v{info['version']}).\n"
+        f"App version: {info['version']}. Source release: [{info['source_tag']}](https://github.com/{info['repository']}/releases/tag/{info['source_tag']}).\n"
         f"\nStandalone container reference for this release:\n\n```text\n{info['image']}@{digest}\n```\n\n"
         "This branch is generated after publication; source changes belong on main.\n"
     ).encode()
@@ -100,7 +100,11 @@ def check_forward(
     branch = branch or info["channel"]
     metadata = _release_metadata(info, digest, branch)
     # Catalogs predating stable promotion used one channel field for both roles.
-    previous = {"catalog_channel": previous.get("channel"), **previous}
+    previous = {
+        "catalog_channel": previous.get("channel"),
+        "source_tag": f"v{previous['version']}",
+        **previous,
+    }
     if (
         previous.get("catalog_channel") != branch
         or previous.get("channel") != catalog_branch(previous["version"])
@@ -124,24 +128,11 @@ def check_forward(
 
 def publish(info: dict[str, str], digest: str) -> None:
     repository = info["repository"]
-    if remote_commit(repository, f"v{info['version']}") != info["commit"]:
+    if remote_commit(repository, info["source_tag"]) != info["commit"]:
         raise ValueError("release tag changed before catalog publication")
-    actual = (
-        run(
-            "docker",
-            "buildx",
-            "imagetools",
-            "inspect",
-            f"{info['image']}:{info['version']}",
-            "--format",
-            "{{.Manifest.Digest}}",
-        )
-        .decode()
-        .strip()
-    )
+    actual = existing_verified_image(info)
     if actual != digest:
         raise ValueError("release image tag changed before catalog publication")
-    verify_public(info, digest)
     updates: list[tuple[str, dict[str, bytes], str | None]] = []
     # Inspect every target before the first mutation. An invalid identity or a
     # downgrade must not leave the other catalog partially advanced.
