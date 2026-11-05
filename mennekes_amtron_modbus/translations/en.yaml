@@ -1,0 +1,42 @@
+configuration:
+  serial_port:
+    name: Serial adapter
+    description: 'For serial only: select the exclusive USB/RS-485 adapter, preferably its stable /dev/serial/by-id path. Leave unset for LAN.'
+  device_id:
+    name: Wallbox address
+    description: Modbus address configured in the wallbox.
+  baudrate:
+    name: Baud rate
+    description: 'For serial only: match the wallbox. For LAN, configure the baud rate on the adapter.'
+  frame:
+    name: Serial frame
+    description: 'For serial only: match the wallbox data bits, parity and stop bits. For LAN, configure these on the adapter.'
+  read_only:
+    name: Read-only
+    description: Disables charging commands, including Home Assistant controls, and the service heartbeat; Modbus reads remain active.
+  current_cap:
+    name: Current cap
+    description: Maximum requested EMS current in amperes. Explicit 0 A commands remove the EMS limit.
+  scan_interval:
+    name: Status interval
+    description: Seconds between status polls. The heartbeat runs independently.
+  measurement_interval:
+    name: Measurement interval
+    description: Seconds between measurement polls; 30 seconds limits Recorder traffic.
+  listen:
+    name: API listen address
+    description: Keep 0.0.0.0 for access through the app's private network.
+  port:
+    name: Internal API port
+    description: Fixed at 8765; host port publication is optional and normally unnecessary.
+  connection_type:
+    name: Wallbox connection
+    description: 'serial: local USB/RS-485; rtu_over_tcp: transparent LAN adapter; modbus_tcp: gateway translating Modbus TCP to RTU. LAN modes need no USB device.'
+  host:
+    name: Adapter host
+    description: 'For LAN modes: adapter host name or IP address, without a URL scheme or path. Use a trusted private network.'
+  tcp_port:
+    name: Adapter TCP port
+    description: TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.
+network:
+  8765/tcp: Authenticated service API; internal access needs no host port.

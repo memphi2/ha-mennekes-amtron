@@ -1,0 +1,42 @@
+configuration:
+  serial_port:
+    name: Serieller Adapter
+    description: 'Nur für serial: exklusiven USB-RS-485-Adapter wählen, möglichst über den stabilen /dev/serial/by-id-Pfad. Bei LAN nicht ausfüllen.'
+  device_id:
+    name: Wallbox-Adresse
+    description: Die in der Wallbox eingestellte Modbus-Adresse.
+  baudrate:
+    name: Baudrate
+    description: 'Nur für serial: muss zur Wallbox passen. Bei LAN die Baudrate am Adapter einstellen.'
+  frame:
+    name: Serielles Format
+    description: 'Nur für serial: Datenbits, Parität und Stoppbits müssen zur Wallbox passen. Bei LAN am Adapter einstellen.'
+  read_only:
+    name: Nur lesen
+    description: Schaltet Steuerbefehle einschließlich der Home-Assistant-Steuerung und den Heartbeat des Dienstes ab; Modbus-Leseanfragen bleiben aktiv.
+  current_cap:
+    name: Stromobergrenze
+    description: Höchster angeforderter EMS-Strom in Ampere. Bewusste Befehle mit 0 A heben die EMS-Begrenzung auf.
+  scan_interval:
+    name: Statusintervall
+    description: Sekunden zwischen Statusabfragen. Der Heartbeat läuft unabhängig davon.
+  measurement_interval:
+    name: Messwertintervall
+    description: Sekunden zwischen Messwertabfragen; 30 Sekunden begrenzen die Recorder-Last.
+  listen:
+    name: API-Listenadresse
+    description: Für den Zugriff über das private App-Netzwerk bei 0.0.0.0 belassen.
+  port:
+    name: Interner API-Port
+    description: Fest auf 8765; eine Freigabe am Host ist optional und normalerweise unnötig.
+  connection_type:
+    name: Wallbox-Verbindung
+    description: 'serial: lokales USB/RS-485; rtu_over_tcp: transparenter LAN-Adapter; modbus_tcp: Gateway übersetzt Modbus TCP in RTU. Die LAN-Modi benötigen kein USB-Gerät.'
+  host:
+    name: Adapter-Host
+    description: 'Für LAN: Hostname oder IP-Adresse des Adapters, ohne URL-Schema oder Pfad. Ein vertrauenswürdiges privates Netzwerk verwenden.'
+  tcp_port:
+    name: TCP-Port des Adapters
+    description: Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.
+network:
+  8765/tcp: Geschützte Dienst-API; interner Zugriff benötigt keine Portfreigabe am Host.

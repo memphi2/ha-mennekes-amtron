@@ -1,0 +1,42 @@
+configuration:
+  serial_port:
+    name: Adaptateur série
+    description: 'Pour serial uniquement : sélectionnez l’adaptateur USB RS-485 exclusif, de préférence via /dev/serial/by-id. Laissez vide pour une connexion réseau.'
+  device_id:
+    name: Adresse de la borne
+    description: Adresse Modbus configurée sur la borne.
+  baudrate:
+    name: Vitesse de transmission
+    description: 'Pour serial uniquement : doit correspondre à la borne. En mode réseau, réglez le débit sur l’adaptateur.'
+  frame:
+    name: Format de trame série
+    description: 'Pour serial uniquement : bits de données, parité et bits d’arrêt de la borne. En mode réseau, réglez-les sur l’adaptateur.'
+  read_only:
+    name: Lecture seule
+    description: Désactive les commandes de charge, y compris celles de Home Assistant, et le signal de présence du service ; les lectures Modbus restent actives.
+  current_cap:
+    name: Plafond du courant
+    description: Courant de charge maximal demandé par le gestionnaire d’énergie, en ampères. Une commande explicite à 0 A supprime la limite du gestionnaire d’énergie.
+  scan_interval:
+    name: Intervalle de lecture de l’état
+    description: Secondes entre les lectures de l’état. Le signal de présence fonctionne indépendamment.
+  measurement_interval:
+    name: Intervalle des mesures
+    description: Secondes entre les lectures des mesures ; un intervalle de 30 secondes limite le volume de données dans Recorder.
+  listen:
+    name: Adresse d’écoute de l’API
+    description: Conservez 0.0.0.0 pour l’accès via le réseau privé de l’application.
+  port:
+    name: Port interne de l’API
+    description: Fixé à 8765 ; la publication du port sur l’hôte est facultative et généralement inutile.
+  connection_type:
+    name: Connexion à la borne
+    description: 'serial : USB/RS-485 local ; rtu_over_tcp : adaptateur réseau transparent ; modbus_tcp : passerelle traduisant Modbus TCP en RTU. Aucun périphérique USB n’est requis en mode réseau.'
+  host:
+    name: Hôte de l’adaptateur
+    description: 'En mode réseau : nom d’hôte ou adresse IP de l’adaptateur, sans schéma ni chemin d’URL. Utilisez un réseau privé de confiance.'
+  tcp_port:
+    name: Port TCP de l’adaptateur
+    description: Port TCP configuré sur l’adaptateur ; 502 par défaut. Il ne s’agit pas du port HTTP 8765 du service indépendant.
+network:
+  8765/tcp: API du service avec authentification ; l’accès interne ne nécessite aucun port publié sur l’hôte.

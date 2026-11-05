@@ -1,0 +1,42 @@
+configuration:
+  serial_port:
+    name: Adattatore seriale
+    description: 'Solo per serial: seleziona l’adattatore USB RS-485 esclusivo, preferibilmente tramite /dev/serial/by-id. Lascia vuoto per LAN.'
+  device_id:
+    name: Indirizzo della wallbox
+    description: Indirizzo Modbus configurato nella wallbox.
+  baudrate:
+    name: Velocità in baud
+    description: 'Solo per serial: deve corrispondere alla wallbox. Per LAN, imposta la velocità sull’adattatore.'
+  frame:
+    name: Formato seriale
+    description: 'Solo per serial: bit dati, parità e bit di stop della wallbox. Per LAN, impostali sull’adattatore.'
+  read_only:
+    name: Sola lettura
+    description: Disabilita i comandi di ricarica, compresi i controlli di Home Assistant, e l'heartbeat del servizio; le letture Modbus rimangono attive.
+  current_cap:
+    name: Corrente massima
+    description: Corrente EMS massima richiesta in ampere. I comandi espliciti con 0 A rimuovono il limite EMS.
+  scan_interval:
+    name: Intervallo di stato
+    description: Secondi tra le letture dello stato. L'heartbeat funziona indipendentemente.
+  measurement_interval:
+    name: Intervallo delle misurazioni
+    description: Secondi tra le letture delle misurazioni; 30 secondi limitano il carico su Recorder.
+  listen:
+    name: Indirizzo di ascolto API
+    description: Mantieni 0.0.0.0 per l'accesso tramite la rete privata dell'app.
+  port:
+    name: Porta API interna
+    description: Fissa a 8765; esporre la porta sull'host è facoltativo e normalmente non necessario.
+  connection_type:
+    name: Connessione wallbox
+    description: 'serial: USB/RS-485 locale; rtu_over_tcp: adattatore LAN trasparente; modbus_tcp: gateway che traduce Modbus TCP in RTU. Le modalità LAN non richiedono un dispositivo USB.'
+  host:
+    name: Host adattatore
+    description: 'Per LAN: nome host o indirizzo IP dell’adattatore, senza schema o percorso URL. Usa una rete privata affidabile.'
+  tcp_port:
+    name: Porta TCP adattatore
+    description: Porta TCP configurata sull’adattatore; valore predefinito 502. Non è la porta HTTP 8765 del servizio indipendente.
+network:
+  8765/tcp: API del servizio con autenticazione; l'accesso interno non richiede una porta esposta sull'host.
