@@ -2,6 +2,7 @@
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2026.9%2B-41BDF5.svg)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![HACS: available](https://img.shields.io/badge/HACS-available-41BDF5.svg)](docs/installation.md#home-assistant-20269-and-202610)
 [![Quality: Platinum (self-assessed)](https://img.shields.io/badge/Quality-Platinum%20%28self--assessed%29-c8cdd3?labelColor=3d4852)](docs/quality-scale.md)
 
 Your Mennekes Amtron in Home Assistant: adjust the charging current, pause
@@ -40,7 +41,6 @@ A host or service restart can still interrupt the heartbeat.
 ## Install
 
 [![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=memphi2&repository=ha-mennekes-amtron&category=integration)
-[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=memphi2&repository=ha-mennekes-amtron&category=integration)
 
 1. Install **Mennekes Amtron RTU** by **memphi2**. Use the Marketplace on
    HA **2026.11+**, or HACS on **2026.9/2026.10**.
