@@ -8,6 +8,7 @@ import pytest
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
+from custom_components.mennekes_amtron_rtu.device.connection import NetworkConfig
 from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
 from custom_components.mennekes_amtron_rtu.diagnostics import (
     async_get_config_entry_diagnostics,
@@ -85,6 +86,40 @@ def test_diagnostics_do_not_expose_identifiers_as_words_or_errors() -> None:
         assert "/dev/fake" not in repr(dump)
         transport.close()
         await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("connection_type", ["rtu_over_tcp", "modbus_tcp"])
+@pytest.mark.parametrize("host", ["wallbox.private.lan", "192.168.15.17", "fd00::1234"])
+def test_network_diagnostics_report_protocol_without_adapter_address(connection_type, host):
+    async def run():
+        hass, entry, _transport = await build_runtime()
+        client = entry.runtime_data.client
+        config = NetworkConfig(host, connection_type=connection_type)
+        client._config = config
+        entry.runtime_data.diagnostics.last_error = (
+            f"cannot open {config.port}: cannot connect to {host}"
+        )
+        client.async_read_words = AsyncMock(
+            side_effect=AmtronConnectionError(f"connection to {host} lost")
+        )
+        try:
+            dump = await async_get_config_entry_diagnostics(hass, entry)
+            assert dump["bus"] == {
+                "transport": connection_type,
+                "connected": True,
+                "device_id": 50,
+                "response_timeout_seconds": 1.0,
+                "read_retries": 2,
+                "write_retries": 0,
+            }
+            assert host not in repr(dump)
+            assert config.port not in repr(dump)
+            assert "**REDACTED**" in dump["write_diagnostics"]["last_error"]
+            assert "**REDACTED**" in dump["registers"]["status"]["error"]
+        finally:
+            await client.async_close()
 
     asyncio.run(run())
 

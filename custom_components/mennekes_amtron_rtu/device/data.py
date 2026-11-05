@@ -63,7 +63,7 @@ class WriteDiagnostics:
 
 @dataclass(slots=True)
 class ConnectionState:
-    """Availability of the serial connection, tracked for log hygiene."""
+    """Availability of the Modbus connection, tracked for log hygiene."""
 
     available: bool = True
     logged_unavailable: bool = False

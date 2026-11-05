@@ -1,4 +1,4 @@
-"""Serial Modbus client for one AMTRON wallbox.
+"""Serialized Modbus client for one AMTRON wallbox over serial or TCP.
 
 Modbus RTU uses a single master, and this integration shares its connection
 between the data poll, the heartbeat task and user-triggered writes. Every transaction
@@ -17,11 +17,10 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from functools import partial
 
 from pymodbus import FramerType
-from pymodbus.client import AsyncModbusSerialClient
+from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
 
 from . import _client_read, _client_write
 from .client_errors import (
@@ -30,14 +29,9 @@ from .client_errors import (
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
 )
+from .connection import ConnectionConfig, NetworkConfig
+from .connection import SerialConfig as SerialConfig
 from .const import (
-    DEFAULT_BAUDRATE,
-    DEFAULT_BYTESIZE,
-    DEFAULT_DEVICE_ID,
-    DEFAULT_PARITY,
-    DEFAULT_RETRIES,
-    DEFAULT_STOPBITS,
-    DEFAULT_TIMEOUT,
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
 )
 from .decode import RegisterValue, decode_register
@@ -49,26 +43,7 @@ from .write_trace import WriteTrace
 
 _LOGGER = logging.getLogger(__name__)
 
-type ClientFactory = Callable[["SerialConfig"], ModbusTransport]
-
-
-@dataclass(frozen=True, slots=True)
-class SerialConfig:
-    """Serial bus parameters of one wallbox.
-
-    The defaults are the vendor's factory settings; all of them can be
-    changed with the MENNEKES configuration tool, so all of them are
-    configurable here too.
-    """
-
-    port: str
-    baudrate: int = DEFAULT_BAUDRATE
-    bytesize: int = DEFAULT_BYTESIZE
-    parity: str = DEFAULT_PARITY
-    stopbits: int = DEFAULT_STOPBITS
-    device_id: int = DEFAULT_DEVICE_ID
-    timeout: float = DEFAULT_TIMEOUT
-    retries: int = DEFAULT_RETRIES
+type ClientFactory = Callable[[ConnectionConfig], ModbusTransport]
 
 
 def create_serial_client(
@@ -94,25 +69,46 @@ def create_serial_client(
     )
 
 
+def create_modbus_client(
+    config: ConnectionConfig,
+    *,
+    trace_packet: Callable[[bool, bytes], bytes] | None = None,
+) -> ModbusTransport:
+    """Select the wire framing while retaining one serialized command path."""
+    if isinstance(config, SerialConfig):
+        return create_serial_client(config, trace_packet=trace_packet)
+    return AsyncModbusTcpClient(
+        config.host,
+        port=config.tcp_port,
+        framer=FramerType.RTU if config.connection_type == "rtu_over_tcp" else FramerType.SOCKET,
+        timeout=config.timeout,
+        retries=0,
+        # Polling and heartbeat already reconnect through our lock. An
+        # independent library reconnect can race them and leak a TCP socket.
+        reconnect_delay=0,
+        trace_packet=trace_packet,
+    )
+
+
 class MennekesModbusClient:
     """Serialized Modbus access to one wallbox."""
 
     def __init__(
         self,
-        config: SerialConfig,
+        config: ConnectionConfig,
         *,
-        client_factory: ClientFactory = create_serial_client,
+        client_factory: ClientFactory = create_modbus_client,
         monotonic: Callable[[], float] = time.monotonic,
         write_state: WriteState | None = None,
     ) -> None:
         self._config = config
         self._monotonic = monotonic
         self.write_trace = WriteTrace(
-            clock=monotonic, packet_trace=client_factory is create_serial_client
+            clock=monotonic, packet_trace=client_factory is create_modbus_client
         )
         self._client_factory: ClientFactory = (
-            partial(create_serial_client, trace_packet=self.write_trace.packet)
-            if client_factory is create_serial_client else client_factory
+            partial(create_modbus_client, trace_packet=self.write_trace.packet)
+            if client_factory is create_modbus_client else client_factory
         )
         self._client: ModbusTransport | None = None
         self._lock = asyncio.Lock()
@@ -125,41 +121,57 @@ class MennekesModbusClient:
         self._rate_limiter = self.write_state.limiter
 
     @property
-    def config(self) -> SerialConfig:
-        """Return the serial configuration this client was built with."""
+    def config(self) -> ConnectionConfig:
+        """Return the connection configuration this client was built with."""
 
         return self._config
 
     @property
     def connected(self) -> bool:
-        """Return true while the serial transport is open."""
+        """Return true while the configured transport is open."""
 
         if self._client is None:
             return False
         return self._client.connected
 
     async def async_connect(self) -> None:
-        """Open the serial port, or raise when the port cannot be used."""
+        """Open the configured connection or raise when it cannot be used."""
 
         async with self._lock:
-            if self.connected:
-                return
             client = self._client or self._client_factory(self._config)
             self._client = client
-            try:
-                connected = await client.connect()
-            # pyserial raises many unrelated OSError subclasses; all of them
-            # mean the same thing here, and all of them are re-raised as one.
-            except Exception as err:
-                raise AmtronConnectionError(
-                    f"cannot open {self._config.port}: {err}"
-                ) from err
-            if not connected:
-                raise AmtronConnectionError(f"cannot open {self._config.port}")
-            _LOGGER.debug("Opened %s", self._config.port)
+            await self._async_connect_locked(client)
+
+    async def _async_connect_locked(self, client: ModbusTransport) -> None:
+        """Open the transport while the caller holds the transaction lock."""
+
+        if client.connected:
+            return
+        try:
+            connected = await client.connect()
+        # Drivers raise unrelated exception types; callers handle one bus error.
+        except Exception as err:
+            raise AmtronConnectionError(
+                f"cannot open {self._config.port}: {err}"
+            ) from err
+        if not connected:
+            raise AmtronConnectionError(f"cannot open {self._config.port}")
+        _LOGGER.debug("Opened %s", self._config.port)
+
+    async def _async_transaction_client(self) -> ModbusTransport:
+        """Recover a dropped TCP link before the next serialized transaction.
+
+        Never recreate a client after explicit close, and never replay a write
+        whose reply was lost. Only a newly requested transaction reconnects.
+        """
+
+        client = self._require_client()
+        if isinstance(self._config, NetworkConfig):
+            await self._async_connect_locked(client)
+        return client
 
     async def async_close(self) -> None:
-        """Close the serial port and forget the transport."""
+        """Close the connection and forget the transport."""
 
         async with self._lock:
             client = self._client
@@ -190,7 +202,7 @@ class MennekesModbusClient:
 
         async with self._lock:
             return await _client_read.read_words(
-                self._require_client(),
+                await self._async_transaction_client(),
                 address=address,
                 count=count,
                 device_id=self._config.device_id,
@@ -201,7 +213,7 @@ class MennekesModbusClient:
         """Read one register range."""
 
         async with self._queue, self._lock:
-            client = self._require_client()
+            client = await self._async_transaction_client()
             words = await _client_read.read_words(
                 client,
                 address=spec.address,
@@ -215,7 +227,7 @@ class MennekesModbusClient:
         """Read raw register words, used by diagnostics."""
 
         async with self._queue, self._lock:
-            client = self._require_client()
+            client = await self._async_transaction_client()
             return await _client_read.read_words(
                 client,
                 address=address,
@@ -280,6 +292,7 @@ class MennekesModbusClient:
                 address=spec.address, queued=queued, started=self._monotonic()
             )
             try:
+                client = await self._async_transaction_client()
                 await _client_write.write_register(
                     client,
                     spec=spec,

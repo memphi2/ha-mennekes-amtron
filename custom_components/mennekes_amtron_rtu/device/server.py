@@ -14,6 +14,7 @@ from pathlib import Path
 
 from aiohttp import web
 
+from .connection import SerialConfig
 from .service_config import ServerConfig
 from .service_discovery import app_token, publish_discovery
 from .service_http import create_app
@@ -96,15 +97,26 @@ def main() -> None:
             2,
             f"Invalid or unreadable service configuration during {phase}: {detail}.\n",
         )
-    _LOGGER.info(
-        "Configuration accepted: mode=%s, Modbus address=%s, baudrate=%s, frame=%s%s%s",
-        "read-only" if config.read_only else "master",
-        config.serial.device_id,
-        config.serial.baudrate,
-        config.serial.bytesize,
-        config.serial.parity,
-        config.serial.stopbits,
-    )
+    connection = config.connection
+    if isinstance(connection, SerialConfig):
+        _LOGGER.info(
+            "Configuration accepted: mode=%s, transport=serial, Modbus address=%s, "
+            "baudrate=%s, frame=%s%s%s",
+            "read-only" if config.read_only else "master",
+            connection.device_id,
+            connection.baudrate,
+            connection.bytesize,
+            connection.parity,
+            connection.stopbits,
+        )
+    else:
+        _LOGGER.info(
+            "Configuration accepted: mode=%s, transport=%s, Modbus address=%s, TCP port=%s",
+            "read-only" if config.read_only else "master",
+            connection.connection_type,
+            connection.device_id,
+            connection.tcp_port,
+        )
     try:
         asyncio.run(run(config, args.state, supervisor_token))
     except Exception as err:  # noqa: BLE001 - sanitize fatal errors at the process boundary

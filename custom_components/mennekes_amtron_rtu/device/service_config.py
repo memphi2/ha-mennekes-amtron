@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal, cast
 
-from .client import SerialConfig
+from .connection import ConnectionConfig, NetworkConfig, SerialConfig
 from .const import SUPPORTED_BAUDRATES, frame_parts
 
 
@@ -25,7 +25,7 @@ def validate_token(value: Any) -> str:
 
 @dataclass(frozen=True, slots=True)
 class ServerConfig:
-    serial: SerialConfig
+    connection: ConnectionConfig
     token: str = field(repr=False)
     read_only: bool = True
     current_cap: float = 6.0
@@ -37,6 +37,9 @@ class ServerConfig:
     @classmethod
     def from_dict(cls, values: dict[str, Any]) -> ServerConfig:
         allowed = {
+            "connection_type",
+            "host",
+            "tcp_port",
             "serial_port",
             "baudrate",
             "device_id",
@@ -52,28 +55,7 @@ class ServerConfig:
         if values.keys() - allowed:
             raise ValueError("unknown service configuration option")
         token = validate_token(values.get("token"))
-        serial_port = values.get("serial_port")
-        if (
-            not isinstance(serial_port, str)
-            or not serial_port.startswith("/dev/")
-            or "\x00" in serial_port
-        ):
-            raise ValueError("serial_port must be a local /dev/ device")
-        baudrate_value = values.get("baudrate", 57600)
-        # Supervisor list(...) options are serialized as strings, including
-        # digit-only choices. Accept only the documented choices, not arbitrary
-        # numeric coercions (booleans, fractional rates or surrounding text).
-        if isinstance(baudrate_value, str) and baudrate_value in {
-            str(rate) for rate in SUPPORTED_BAUDRATES
-        }:
-            baudrate_value = int(baudrate_value)
-        baudrate = _integer_option(baudrate_value, "baudrate", 9600, 57600)
-        if baudrate not in SUPPORTED_BAUDRATES:
-            raise ValueError("unsupported baudrate")
-        frame = values.get("frame", "8n2")
-        if frame not in ("8n2", "8e1", "8o1"):
-            raise ValueError("unsupported serial frame")
-        bits, parity, stops = frame_parts(frame)
+        connection = _connection_options(values)
         read_only = values.get("read_only", True)
         if not isinstance(read_only, bool):
             raise ValueError("read_only must be boolean")
@@ -81,14 +63,7 @@ class ServerConfig:
         if not isinstance(listen, str) or not listen or len(listen) > 253:
             raise ValueError("invalid listen address")
         return cls(
-            SerialConfig(
-                serial_port,
-                baudrate,
-                bits,
-                parity,
-                stops,
-                _integer_option(values.get("device_id", 50), "device_id", 10, 50),
-            ),
+            connection,
             token,
             read_only,
             _number_option(values.get("current_cap", 6), "current_cap", 6, 32),
@@ -99,6 +74,42 @@ class ServerConfig:
             listen,
             _integer_option(values.get("port", 8765), "port", 1, 65535),
         )
+
+
+def _connection_options(values: dict[str, Any]) -> ConnectionConfig:
+    """Validate only the fields used by the selected physical transport."""
+    connection_type = values.get("connection_type", "serial")
+    if connection_type not in ("serial", "rtu_over_tcp", "modbus_tcp"):
+        raise ValueError("connection_type must be serial, rtu_over_tcp or modbus_tcp")
+    device_id = _integer_option(values.get("device_id", 50), "device_id", 10, 50)
+    if connection_type != "serial":
+        return NetworkConfig(
+            host=values.get("host", ""),
+            tcp_port=values.get("tcp_port", 502),
+            connection_type=cast(Literal["rtu_over_tcp", "modbus_tcp"], connection_type),
+            device_id=device_id,
+        )
+    serial_port = values.get("serial_port")
+    if (
+        not isinstance(serial_port, str)
+        or not serial_port.startswith("/dev/")
+        or "\x00" in serial_port
+    ):
+        raise ValueError("serial_port must be a local /dev/ device")
+    baudrate_value = values.get("baudrate", 57600)
+    # Supervisor list(...) choices are strings, including digit-only options.
+    if isinstance(baudrate_value, str) and baudrate_value in {
+        str(rate) for rate in SUPPORTED_BAUDRATES
+    }:
+        baudrate_value = int(baudrate_value)
+    baudrate = _integer_option(baudrate_value, "baudrate", 9600, 57600)
+    if baudrate not in SUPPORTED_BAUDRATES:
+        raise ValueError("unsupported baudrate")
+    frame = values.get("frame", "8n2")
+    if frame not in ("8n2", "8e1", "8o1"):
+        raise ValueError("unsupported serial frame")
+    bits, parity, stops = frame_parts(frame)
+    return SerialConfig(serial_port, baudrate, bits, parity, stops, device_id)
 
 
 def number(value: Any, minimum: float, maximum: float) -> float:

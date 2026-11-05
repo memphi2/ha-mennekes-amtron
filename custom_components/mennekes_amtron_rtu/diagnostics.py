@@ -3,6 +3,7 @@
 The dump is built from an allowlist, never from the config entry itself: the
 serial number identifies the household's hardware and a ``/dev/serial/by-id``
 path contains the adapter's serial number, so neither value is reported.
+Network adapter addresses are likewise omitted and redacted from errors.
 Support also receives a register image, excluding the raw serial-number
 block, and error messages with known identifiers redacted.
 """
@@ -16,6 +17,7 @@ from homeassistant.core import HomeAssistant
 from ._flow_serial import port_category
 from .device.capabilities import supported_blocks, supported_register_keys
 from .device.client_errors import AmtronBusError
+from .device.connection import NetworkConfig
 from .device.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
@@ -56,19 +58,33 @@ async def async_get_config_entry_diagnostics(
         write_transactions = client.write_trace.snapshot()
         runtime_events = runtime_data.diagnostics.timeline.snapshot()
 
-    payload = {
-        "bus": {
-            "port_category": port_category(client.config.port),
-            CONF_BAUDRATE: client.config.baudrate,
-            CONF_BYTESIZE: client.config.bytesize,
-            CONF_PARITY: client.config.parity,
-            CONF_STOPBITS: client.config.stopbits,
+    config = client.config
+    identifiers: tuple[str | None, ...] = (config.port, identity.serial_number)
+    bus: dict[str, Any]
+    if isinstance(client, RemoteClient):
+        # The local API client cannot report the service's actual bus setup.
+        bus = {"transport": "service", "connected": client.connected}
+    else:
+        bus = {
             CONF_DEVICE_ID: client.config.device_id,
             "connected": client.connected,
             "response_timeout_seconds": client.config.timeout,
             "read_retries": client.config.retries,
             "write_retries": 0,
-        },
+        }
+        if isinstance(config, NetworkConfig):
+            bus["transport"] = config.connection_type
+            identifiers += (config.host,)
+        else:
+            bus.update({
+                "port_category": port_category(config.port),
+                CONF_BAUDRATE: config.baudrate,
+                CONF_BYTESIZE: config.bytesize,
+                CONF_PARITY: config.parity,
+                CONF_STOPBITS: config.stopbits,
+            })
+    payload = {
+        "bus": bus,
         "device": {
             "layout_version": layout_label(identity.layout_version),
             "firmware_version": identity.firmware_version,
@@ -116,11 +132,6 @@ async def async_get_config_entry_diagnostics(
         "values": decoded_values(data.values),
         "registers": await async_raw_registers(entry),
     }
-    if isinstance(client, RemoteClient):
-        # The local API client has no serial configuration. Do not report its
-        # placeholder SerialConfig defaults as the service's actual bus setup.
-        payload["bus"] = {"transport": "service", "connected": client.connected}
-    identifiers = (client.config.port, identity.serial_number)
     return {
         key: _redact_identifiers(value, identifiers) for key, value in payload.items()
     }
