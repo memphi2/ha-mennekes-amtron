@@ -169,6 +169,8 @@ def exercise_mode(image: str, name: str, mode: str, directory: Path) -> dict[str
         or report.get("status") != "passed"
         or report.get("enforcing") is not True
         or report.get("profile") != name
+        or report.get("serial_settings") is not True
+        or report.get("connection_ui") is not True
     ):
         raise ValueError("AppArmor probe did not confirm success")
     return {str(key): value for key, value in report.items()}
