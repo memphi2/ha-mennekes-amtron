@@ -19,6 +19,11 @@ itself is unencrypted and unauthenticated; restrict it to a trusted private LAN.
   unique id and in the device registry.
 - Register values, as entity states and in Home Assistant's recorder database
   like any other entity.
+- If configured, vehicle source entity IDs, the selected BavarianData device ID,
+  and electricity-price/tariff settings in the integration options. Optional
+  charging estimates retain the latest completed cycle, latest cost result and
+  bounded loss totals with one correctable match in HA's local storage, outside
+  Recorder. They do not retain a growing vehicle-history or price-history list.
 
 ## What the independent service stores
 
@@ -28,9 +33,11 @@ The Supervisor app exclusively manages its own token in an owner-only
 `service-token` file, reused across restarts. Supervisor stores the app's discovery
 address and token and transfers them locally to Home Assistant; no network
 broadcast or cloud discovery is involved. Protect Supervisor backups as well. Its
-small `intent.json` file stores the wallbox identity, pause/release intent and
-resume current. It is replaced only when intent changes, with no growing history.
-Heartbeats and polls are not persisted. Protect service data and backups.
+small `intent.json` file stores the wallbox identity, pause/release intent,
+resume current, charging targets and the latest completed charging cycle. It is
+replaced when that durable state changes, with no growing history. Heartbeats,
+ordinary polls and progress within a running cycle are not persisted. Protect
+service data and backups.
 
 ## What diagnostics contain
 
@@ -45,6 +52,8 @@ The diagnostics download is built from an allowlist. It deliberately omits:
 - the wallbox serial number — only a stable FNV-1a 64 hash of it. The raw serial-number
   register block is omitted too. This hash is a pseudonymous support
   identifier, not a cryptographic anonymization guarantee.
+- optional vehicle/price source identifiers, vehicle charging history and the
+  stored loss or cost estimates.
 
 It includes the bus parameters, the device capabilities, the write counters
 and a raw register image excluding identifying fields. Known identifiers are
@@ -59,5 +68,9 @@ only through its authenticated diagnostics endpoint, requested on demand.
 ## Charging data
 
 Charging sessions say when somebody was at home and when a vehicle was
-charged. That data stays in your Home Assistant instance; if you export or
-share it, you are the one deciding to share it.
+charged. This integration keeps that data in Home Assistant and, when used,
+the local Modbus service. Optional vehicle-energy and price sources are read
+from existing HA entities or BavarianData's local history action; this
+integration does not request a cloud refresh. Other integrations have their
+own privacy policies. If you export data, share diagnostics or share backups,
+you decide to share their contents.

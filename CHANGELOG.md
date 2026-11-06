@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Add optional charging-loss estimates from matched BavarianData local history
+  or a selected last-charge battery-energy sensor, with explicit assignment and
+  a bounded energy-weighted average.
+- Add optional charging-cost estimates using fixed prices or existing dynamic
+  HA price sensors such as Tibber, including negative prices and partial-data
+  handling. Keep §14a Module 2 and Module 1+3 network tariffs separate.
+- Retain one completed wallbox cycle and timestamp service meter observations
+  without extra Modbus polling or a growing session/price history.
+
 - Explain verified charging state and known blockers in one readable status.
 - Add cancellation of queued commands without changing the current wallbox state.
 - Add a persistent additional-energy target that only limits charging and never

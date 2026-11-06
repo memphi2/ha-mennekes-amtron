@@ -36,6 +36,9 @@
       },
       "cancel_pending_change": {
         "default": "mdi:timer-cancel-outline"
+      },
+      "assign_vehicle_charge": {
+        "default": "mdi:link-variant-plus"
       }
     },
     "number": {
@@ -175,6 +178,12 @@
           "active": "mdi:battery-charging-outline",
           "reached": "mdi:battery-check-outline"
         }
+      },
+      "last_charging_loss": {
+        "default": "mdi:battery-minus-outline"
+      },
+      "average_charging_loss": {
+        "default": "mdi:chart-line"
       }
     },
     "switch": {

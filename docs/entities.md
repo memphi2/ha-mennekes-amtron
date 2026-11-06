@@ -237,3 +237,23 @@ and templates see.
 `mennekes_amtron_rtu.set_charging_current` writes the charging-current limit.
 Both the action and the slider accept 0 A to remove the limit. See
 [user-guide.md](user-guide.md#actions).
+
+
+## Optional charging estimates — next beta, unreleased
+
+| Entity | Name | Unit | Needs | Meaning |
+|---|---|---|---|---|
+| `sensor.*_estimated_charging_loss_last_charge` | Estimated charging loss, last charge | % | Configured vehicle energy source | Last matched connection cycle; unknown when the newest completed cycle cannot be matched. |
+| `sensor.*_average_estimated_charging_loss` | Average estimated charging loss | % | Configured vehicle energy source | Energy-weighted average of accepted matches; `sample_count` counts accepted cycles. |
+| `button.*_assign_vehicle_charge_energy` | Assign vehicle charge energy | | Vehicle energy sensor selected | Explicitly pair the current vehicle kWh value with the latest completed wallbox cycle while unplugged. Also works read-only. |
+| `sensor.*_estimated_charging_cost_current_charge` | Estimated charging cost, current charge | EUR | Fixed or dynamic price configured; enable entity manually | Disabled by default to reduce Recorder writes. Running variable cost estimate; unknown for incomplete observations. |
+| `sensor.*_estimated_charging_cost_last_charge` | Estimated charging cost, last charge | EUR | Fixed or dynamic price configured | Cost of the latest completed cycle, retained across restarts. |
+
+All estimates require layout v01.02 or newer and completed-session support in
+service mode. Costs additionally require timestamped service energy samples.
+They have no state class and create no long-term statistics. Losses update per
+match/session; costs are rounded to cents. The current-cost sensor exposes only
+`complete`; the last-cost sensor also exposes `energy_kwh` and `unpriced_kwh`,
+rounded to 0.01 kWh. Setup, units, §14a tariff handling,
+matching limits and Recorder behavior are described in
+[Charging losses and costs](charging-estimates.md).

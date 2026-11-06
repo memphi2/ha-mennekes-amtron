@@ -8,6 +8,12 @@ import probatio
 import pytest
 
 from custom_components.mennekes_amtron_rtu._flow_serial import PortOption
+from custom_components.mennekes_amtron_rtu.charge_loss_const import (
+    CONF_CHARGE_LOSS_SOURCE,
+)
+from custom_components.mennekes_amtron_rtu.charging_cost_const import (
+    CONF_CHARGING_COST_SOURCE,
+)
 from custom_components.mennekes_amtron_rtu.config_schemas import (
     options_schema,
     user_schema,
@@ -35,6 +41,7 @@ from tests.ha_fakes import FakeConfigEntry
 
 class Flow(MennekesAmtronOptionsFlow):
     def __init__(self, entry: FakeConfigEntry) -> None:
+        super().__init__()
         self._entry = entry
 
     @property
@@ -125,6 +132,8 @@ def test_service_options_configure_only_current_cap_and_cache_refresh(stale_mode
             for marker, selector in result["data_schema"].schema.items()
         }
         assert set(fields) == {
+            CONF_CHARGE_LOSS_SOURCE,
+            CONF_CHARGING_COST_SOURCE,
             CONF_CURRENT_LIMIT,
             CONF_SCAN_INTERVAL_SECONDS,
             CONF_VEHICLE_SOC_ENTITY,

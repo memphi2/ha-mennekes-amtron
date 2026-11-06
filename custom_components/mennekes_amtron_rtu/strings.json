@@ -188,6 +188,9 @@
       },
       "cancel_pending_change": {
         "name": "Cancel pending change"
+      },
+      "assign_vehicle_charge": {
+        "name": "Assign vehicle charge energy"
       }
     },
     "number": {
@@ -457,6 +460,52 @@
           "active": "Active",
           "reached": "Target reached"
         }
+      },
+      "last_charging_loss": {
+        "name": "Estimated charging loss, last charge",
+        "state_attributes": {
+          "association": {
+            "name": "Assignment of last charge",
+            "state": {
+              "history": "Matching charging history",
+              "changed_value": "Changed sensor value",
+              "manual": "Manual assignment"
+            }
+          },
+          "sample_count": {
+            "name": "Charges included"
+          }
+        }
+      },
+      "average_charging_loss": {
+        "name": "Average estimated charging loss",
+        "state_attributes": {
+          "sample_count": {
+            "name": "Charges included"
+          }
+        }
+      },
+      "current_estimated_charging_cost": {
+        "name": "Estimated charging cost, current charge",
+        "state_attributes": {
+          "complete": {
+            "name": "All energy priced"
+          }
+        }
+      },
+      "last_estimated_charging_cost": {
+        "name": "Estimated charging cost, last charge",
+        "state_attributes": {
+          "complete": {
+            "name": "All energy priced"
+          },
+          "energy_kwh": {
+            "name": "Charging energy"
+          },
+          "unpriced_kwh": {
+            "name": "Energy without a price"
+          }
+        }
       }
     },
     "switch": {
@@ -622,6 +671,18 @@
     },
     "soc_goal_state_invalid": {
       "message": "The saved vehicle charge target could not be restored. Check the logs before allowing charging again."
+    },
+    "loss_source_invalid": {
+      "message": "Select a supported charging loss source and configure its matching vehicle or sensor."
+    },
+    "loss_unavailable": {
+      "message": "No complete charging session is available to match. The wallbox connection must remain available from plugging in until unplugging."
+    },
+    "loss_energy_invalid": {
+      "message": "The vehicle energy cannot be matched. Select valid battery energy for this charge, greater than zero and no higher than the wallbox energy. You may correct the latest assignment."
+    },
+    "loss_storage_unavailable": {
+      "message": "The charging loss could not be saved. Check storage availability and try again."
     }
   },
   "issues": {
@@ -668,7 +729,9 @@
           "state_change_interval_seconds": "Minimum time between state changes",
           "phase_switch_grace_seconds": "Extra wait before phase changes",
           "vehicle_soc_entity": "Vehicle charge level entity (optional)",
-          "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)"
+          "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)",
+          "charge_loss_source": "Charging loss data source",
+          "charging_cost_source": "Charging cost calculation"
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
@@ -678,7 +741,9 @@
           "state_change_interval_seconds": "Minimum seconds between charging starts, pauses, release changes, locking or unlocking, and phase changes (default 300). Early commands are queued; the latest command replaces the previous one. The five-second current-write interval still applies. Set 0 to disable the longer interval.",
           "phase_switch_grace_seconds": "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required.",
           "vehicle_soc_entity": "Optional: select the vehicle sensor reporting its actual charge level in %. This enables a separate percentage target; leave empty to keep it disabled. Missing vehicle data leaves charging unchanged until valid data returns. Changing or removing a source clears the percentage target without resuming charging.",
-          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle."
+          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle.",
+          "charge_loss_source": "Optional comparison of wallbox energy with the energy added to the vehicle battery. Select a source to configure it in the next step. Charging controls are unaffected.",
+          "charging_cost_source": "Optional cost estimate using a fixed gross electricity price or a price sensor. Configure the price in the next step. Disabled by default; this does not control charging."
         },
         "title": "Options"
       },
@@ -688,20 +753,87 @@
           "current_limit": "Charging current cap",
           "scan_interval_seconds": "Status polling interval",
           "vehicle_soc_entity": "Vehicle charge level entity (optional)",
-          "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)"
+          "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)",
+          "charge_loss_source": "Charging loss data source",
+          "charging_cost_source": "Charging cost calculation"
         },
         "data_description": {
           "current_limit": "Additional cap for currents requested by Home Assistant. The service cap still applies. Explicitly selecting 0 A disables the EMS limit.",
           "scan_interval_seconds": "How often Home Assistant reads the service state. This changes neither Modbus measurement polling nor the heartbeat interval.",
           "vehicle_soc_entity": "Optional: select the vehicle sensor reporting its actual charge level in %. This enables a separate percentage target; leave empty to keep it disabled. Missing vehicle data leaves charging unchanged until valid data returns. Changing or removing a source clears the percentage target without resuming charging.",
-          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle."
+          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle.",
+          "charge_loss_source": "Optional comparison of wallbox energy with the energy added to the vehicle battery. Select a source to configure it in the next step. Charging controls are unaffected.",
+          "charging_cost_source": "Optional cost estimate using a fixed gross electricity price or a price sensor. Configure the price in the next step. Disabled by default; this does not control charging."
         },
         "description": "The app's Read-only setting also controls write permission in Home Assistant. Disable it in the app, save and restart the app to enable controls. Control entities remain unavailable while the service is read-only or not ready. Set the minimum time between state changes and the extra wait before phase changes in the app configuration; the service applies both even while Home Assistant is restarting."
+      },
+      "loss_bavariandata": {
+        "title": "Charging losses from BavarianData",
+        "description": "Select the vehicle connected to this wallbox. Matching uses the times and estimated battery energy in its stored charging history. Only existing Home Assistant data is read; no vehicle update is requested. Without matching history, no loss is calculated.",
+        "data": {
+          "charge_loss_bavarian_device": "Vehicle"
+        }
+      },
+      "loss_sensor": {
+        "title": "Charging losses from a sensor",
+        "description": "Select a sensor reporting the energy added to the vehicle battery during its last charge, in kWh or Wh. Do not select energy measured at the wallbox or a lifetime total. Without charge times, the result is an estimate. By default, confirm the matching charge with the “Assign vehicle charge energy” button.",
+        "data": {
+          "vehicle_last_charge_energy_entity": "Vehicle battery energy, last charge",
+          "charge_loss_auto_match": "Assign changed energy automatically"
+        },
+        "data_description": {
+          "charge_loss_auto_match": "Optional: assign a changed sensor value received within 30 minutes after unplugging, if this integration observed the complete charge. A changed value cannot prove that both readings belong to the same charge. Leave disabled to confirm each match yourself."
+        }
+      },
+      "cost_fixed": {
+        "title": "Fixed electricity price",
+        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded.",
+        "data": {
+          "charging_price": "Gross electricity price",
+          "charging_network_module": "Network price adjustment"
+        },
+        "data_description": {
+          "charging_network_module": "Optional German §14a network tariff calculation. Use only the module and prices agreed with your network operator. Otherwise leave this at None."
+        }
+      },
+      "cost_sensor": {
+        "title": "Electricity price sensor",
+        "description": "Select a sensor with the current gross electricity price in EUR/kWh, ct/kWh or EUR/MWh (the € symbol is also supported). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded.",
+        "data": {
+          "charging_price_entity": "Electricity price sensor",
+          "charging_network_module": "Network price adjustment"
+        },
+        "data_description": {
+          "charging_network_module": "Optional German §14a network tariff calculation. Use only the module and prices agreed with your network operator. Otherwise leave this at None."
+        }
+      },
+      "cost_network": {
+        "title": "Network tariff: module {module}",
+        "description": "Copy gross prices from your network operator’s price sheet. Module 2 uses 40% of the regular network price. Module 3 uses the published high and low prices in the selected quarters and tariff year; remaining times use the standard price. Use Home Assistant’s time zone and whole minutes. Windows may cross midnight but must not overlap. These settings estimate variable charging costs; they do not establish eligibility or change your contract.",
+        "data": {
+          "regular_network": "Regular network price (standard tariff)",
+          "price_includes_network": "Electricity price already includes the regular network price",
+          "high_network": "High network price (HT)",
+          "low_network": "Low network price (NT)",
+          "high_start": "High tariff starts",
+          "high_end": "High tariff ends",
+          "low_start": "Low tariff starts",
+          "low_end": "Low tariff ends",
+          "active_quarters": "Quarters with time-variable network prices",
+          "tariff_year": "Price-sheet year"
+        },
+        "data_description": {
+          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice."
+        }
       }
     },
     "error": {
       "vehicle_soc_required": "Select a vehicle charge level entity before adding its optional charge limit.",
-      "invalid_vehicle_entity": "Select an entity of the supported type."
+      "invalid_vehicle_entity": "Select an entity of the supported type.",
+      "loss_source_invalid": "Select a supported charging loss source and configure its matching vehicle or sensor.",
+      "cost_source_invalid": "Select a supported cost source and a sensor entity for a sensor-based price.",
+      "cost_price_invalid": "Enter a finite gross price in EUR/kWh between −1000 and 1000. Negative prices are allowed.",
+      "network_tariff_invalid": "Check the gross network prices, tariff year, two to four active quarters and time windows. HT must exceed the standard price; NT must be lower and nonnegative. Windows must use whole minutes, must not overlap and must leave time for the standard tariff."
     }
   },
   "selector": {
@@ -736,6 +868,35 @@
       "options": {
         "rtu_over_tcp": "RTU over TCP (transparent adapter)",
         "modbus_tcp": "Modbus TCP (translating gateway)"
+      }
+    },
+    "charge_loss_source": {
+      "options": {
+        "disabled": "Disabled",
+        "bavariandata": "BavarianData charging history",
+        "sensor": "Vehicle energy sensor"
+      }
+    },
+    "charging_cost_source": {
+      "options": {
+        "disabled": "Disabled",
+        "fixed": "Fixed electricity price",
+        "sensor": "Electricity price sensor"
+      }
+    },
+    "charging_network_module": {
+      "options": {
+        "none": "None; source is the final price",
+        "module_2": "Module 2; reduced network price",
+        "module_3": "Module 3; time-variable network price"
+      }
+    },
+    "charging_tariff_quarter": {
+      "options": {
+        "1": "Q1: January–March",
+        "2": "Q2: April–June",
+        "3": "Q3: July–September",
+        "4": "Q4: October–December"
       }
     }
   },

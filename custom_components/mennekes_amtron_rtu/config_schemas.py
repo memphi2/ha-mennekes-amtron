@@ -7,6 +7,9 @@ from typing import Any
 import probatio
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.selector import (
+    BooleanSelector,
+    DeviceSelector,
+    DeviceSelectorConfig,
     EntitySelector,
     EntitySelectorConfig,
     NumberSelector,
@@ -16,9 +19,40 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TimeSelector,
 )
 
 from ._flow_serial import PortOption
+from .charge_loss_const import (
+    CONF_CHARGE_LOSS_SOURCE,
+    CONF_LOSS_AUTO_MATCH,
+    CONF_LOSS_BAVARIAN_DEVICE,
+    CONF_VEHICLE_LAST_CHARGE_ENERGY,
+    LOSS_SOURCE_DISABLED,
+    LOSS_SOURCES,
+)
+from .charging_cost_const import (
+    CONF_ACTIVE_QUARTERS,
+    CONF_CHARGING_COST_SOURCE,
+    CONF_CHARGING_NETWORK_MODULE,
+    CONF_CHARGING_PRICE,
+    CONF_CHARGING_PRICE_ENTITY,
+    CONF_HIGH_END,
+    CONF_HIGH_NETWORK,
+    CONF_HIGH_START,
+    CONF_LOW_END,
+    CONF_LOW_NETWORK,
+    CONF_LOW_START,
+    CONF_PRICE_INCLUDES_NETWORK,
+    CONF_REGULAR_NETWORK,
+    CONF_TARIFF_YEAR,
+    COST_SOURCE_DISABLED,
+    COST_SOURCE_FIXED,
+    COST_SOURCES,
+    NETWORK_MODULE_3,
+    NETWORK_MODULE_NONE,
+    NETWORK_MODULES,
+)
 from .device.const import (
     CONF_BAUDRATE,
     CONF_CONNECTION_TYPE,
@@ -274,7 +308,116 @@ def options_schema(
         fields[probatio.Optional(
             key, description={"suggested_value": current.get(key)},
         )] = EntitySelector(EntitySelectorConfig(filter={"domain": list(domains)}))
+    fields[probatio.Required(
+        CONF_CHARGE_LOSS_SOURCE,
+        default=current.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED),
+    )] = SelectSelector(SelectSelectorConfig(
+        options=list(LOSS_SOURCES),
+        translation_key="charge_loss_source",
+        mode=SelectSelectorMode.DROPDOWN,
+    ))
+    fields[probatio.Required(
+        CONF_CHARGING_COST_SOURCE,
+        default=current.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED),
+    )] = SelectSelector(SelectSelectorConfig(
+        options=list(COST_SOURCES),
+        translation_key="charging_cost_source",
+        mode=SelectSelectorMode.DROPDOWN,
+    ))
     return probatio.Schema(fields)
+
+
+def loss_bavariandata_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Select a vehicle whose locally stored charging history can be matched."""
+    return probatio.Schema({
+        probatio.Required(
+            CONF_LOSS_BAVARIAN_DEVICE,
+            description={"suggested_value": current.get(CONF_LOSS_BAVARIAN_DEVICE)},
+        ): DeviceSelector(DeviceSelectorConfig(integration="bavariandata")),
+    })
+
+
+def loss_sensor_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Select optional estimated-energy matching separately from basic options."""
+    return probatio.Schema({
+        probatio.Required(
+            CONF_VEHICLE_LAST_CHARGE_ENERGY,
+            description={"suggested_value": current.get(CONF_VEHICLE_LAST_CHARGE_ENERGY)},
+        ): EntitySelector(EntitySelectorConfig(filter={"domain": "sensor"})),
+        probatio.Optional(
+            CONF_LOSS_AUTO_MATCH, default=current.get(CONF_LOSS_AUTO_MATCH, False),
+        ): BooleanSelector(),
+    })
+
+
+def cost_source_schema(current: dict[str, Any], *, source: str) -> probatio.Schema:
+    """Select a gross electricity price and optional network-tariff calculation."""
+    fields: dict[Any, Any] = {}
+    if source == COST_SOURCE_FIXED:
+        fields[probatio.Required(
+            CONF_CHARGING_PRICE,
+            description={"suggested_value": current.get(CONF_CHARGING_PRICE)},
+        )] = _price_selector(allow_negative=True)
+    else:
+        fields[probatio.Required(
+            CONF_CHARGING_PRICE_ENTITY,
+            description={"suggested_value": current.get(CONF_CHARGING_PRICE_ENTITY)},
+        )] = EntitySelector(EntitySelectorConfig(filter={"domain": "sensor"}))
+    fields[probatio.Required(
+        CONF_CHARGING_NETWORK_MODULE,
+        default=current.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE),
+    )] = SelectSelector(SelectSelectorConfig(
+        options=list(NETWORK_MODULES),
+        translation_key="charging_network_module",
+        mode=SelectSelectorMode.DROPDOWN,
+    ))
+    return probatio.Schema(fields)
+
+
+def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Schema:
+    """Ask only for the published network prices used by the chosen module."""
+    fields: dict[Any, Any] = {
+        probatio.Required(
+            CONF_REGULAR_NETWORK,
+            description={"suggested_value": current.get(CONF_REGULAR_NETWORK)},
+        ): _price_selector(),
+        probatio.Required(
+            CONF_PRICE_INCLUDES_NETWORK,
+            default=current.get(CONF_PRICE_INCLUDES_NETWORK, True),
+        ): BooleanSelector(),
+    }
+    if module == NETWORK_MODULE_3:
+        for key in (CONF_HIGH_NETWORK, CONF_LOW_NETWORK):
+            fields[probatio.Required(
+                key, description={"suggested_value": current.get(key)},
+            )] = _price_selector()
+        for key in (CONF_HIGH_START, CONF_HIGH_END, CONF_LOW_START, CONF_LOW_END):
+            fields[probatio.Required(
+                key, description={"suggested_value": current.get(key)},
+            )] = TimeSelector()
+        fields[probatio.Required(
+            CONF_ACTIVE_QUARTERS,
+            description={"suggested_value": current.get(CONF_ACTIVE_QUARTERS)},
+        )] = SelectSelector(SelectSelectorConfig(
+            options=["1", "2", "3", "4"],
+            translation_key="charging_tariff_quarter",
+            multiple=True,
+            mode=SelectSelectorMode.LIST,
+        ))
+        fields[probatio.Required(
+            CONF_TARIFF_YEAR,
+            description={"suggested_value": current.get(CONF_TARIFF_YEAR)},
+        )] = probatio.All(_network_integer, NumberSelector(NumberSelectorConfig(
+            min=2024, max=9998, step=1, mode=NumberSelectorMode.BOX,
+        )), probatio.Coerce(int))
+    return probatio.Schema(fields)
+
+
+def _price_selector(*, allow_negative: bool = False) -> NumberSelector:
+    return NumberSelector(NumberSelectorConfig(
+        min=-1000 if allow_negative else 0,
+        max=1000, step="any", unit_of_measurement="EUR/kWh", mode=NumberSelectorMode.BOX,
+    ))
 
 
 def _port_selector(ports: list[PortOption]) -> Any:

@@ -90,6 +90,7 @@ direct USB or LAN mode, select **Modbus master** in the integration options.
 
 - [Installation](docs/installation.md) · [User guide](docs/user-guide.md) · [All entities](docs/entities.md)
 - [Troubleshooting](docs/troubleshooting.md) · [Safety and limitations](docs/safety.md)
+- [Optional charging losses and costs (next beta, unreleased)](docs/charging-estimates.md)
 - [All documentation](docs/README.md) · [Release notes](CHANGELOG.md) · [Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)
 
 Unofficial community project, not affiliated with MENNEKES.

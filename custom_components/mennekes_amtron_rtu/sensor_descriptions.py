@@ -357,3 +357,27 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
+
+# Optional estimates have no state class: a per-charge value is neither a
+# monotonic counter nor an instantaneous measurement for long-term statistics.
+ESTIMATE_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="last_charging_loss", translation_key="last_charging_loss",
+        native_unit_of_measurement="%", suggested_display_precision=1,
+    ),
+    SensorEntityDescription(
+        key="average_charging_loss", translation_key="average_charging_loss",
+        native_unit_of_measurement="%", suggested_display_precision=1,
+    ),
+    SensorEntityDescription(
+        key="current_estimated_charging_cost", translation_key="current_estimated_charging_cost",
+        entity_registry_enabled_default=False,
+        device_class=SensorDeviceClass.MONETARY, native_unit_of_measurement="EUR",
+        suggested_display_precision=2,
+    ),
+    SensorEntityDescription(
+        key="last_estimated_charging_cost", translation_key="last_estimated_charging_cost",
+        device_class=SensorDeviceClass.MONETARY, native_unit_of_measurement="EUR",
+        suggested_display_precision=2,
+    ),
+)

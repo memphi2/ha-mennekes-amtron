@@ -188,6 +188,9 @@
       },
       "cancel_pending_change": {
         "name": "Vorgemerkte Änderung abbrechen"
+      },
+      "assign_vehicle_charge": {
+        "name": "Fahrzeug-Ladeenergie zuordnen"
       }
     },
     "number": {
@@ -457,6 +460,52 @@
           "active": "Aktiv",
           "reached": "Ziel erreicht"
         }
+      },
+      "last_charging_loss": {
+        "name": "Geschätzter Ladeverlust, letzte Ladung",
+        "state_attributes": {
+          "association": {
+            "name": "Zuordnung der letzten Ladung",
+            "state": {
+              "history": "Passende Ladehistorie",
+              "changed_value": "Geänderter Sensorwert",
+              "manual": "Manuelle Zuordnung"
+            }
+          },
+          "sample_count": {
+            "name": "Berücksichtigte Ladungen"
+          }
+        }
+      },
+      "average_charging_loss": {
+        "name": "Durchschnittlicher geschätzter Ladeverlust",
+        "state_attributes": {
+          "sample_count": {
+            "name": "Berücksichtigte Ladungen"
+          }
+        }
+      },
+      "current_estimated_charging_cost": {
+        "name": "Geschätzte Ladekosten, aktuelle Ladung",
+        "state_attributes": {
+          "complete": {
+            "name": "Gesamte Energie bepreist"
+          }
+        }
+      },
+      "last_estimated_charging_cost": {
+        "name": "Geschätzte Ladekosten, letzte Ladung",
+        "state_attributes": {
+          "complete": {
+            "name": "Gesamte Energie bepreist"
+          },
+          "energy_kwh": {
+            "name": "Ladeenergie"
+          },
+          "unpriced_kwh": {
+            "name": "Energie ohne Preis"
+          }
+        }
       }
     },
     "switch": {
@@ -622,6 +671,18 @@
     },
     "soc_goal_state_invalid": {
       "message": "Das gespeicherte Fahrzeug-Ladeziel konnte nicht wiederhergestellt werden. Prüfe die Protokolle, bevor du das Laden wieder freigibst."
+    },
+    "loss_source_invalid": {
+      "message": "Wähle eine unterstützte Quelle für Ladeverluste und richte das passende Fahrzeug oder den Sensor ein."
+    },
+    "loss_unavailable": {
+      "message": "Es liegt keine vollständig beobachtete Ladung zur Zuordnung vor. Die Wallbox-Verbindung muss vom Anstecken bis zum Abstecken verfügbar bleiben."
+    },
+    "loss_energy_invalid": {
+      "message": "Die Fahrzeugenergie kann nicht zugeordnet werden. Verwende gültige Akkuenergie für diese Ladung, größer als 0 und höchstens so hoch wie die Wallbox-Energie. Die letzte Zuordnung darfst du korrigieren."
+    },
+    "loss_storage_unavailable": {
+      "message": "Der Ladeverlust konnte nicht gespeichert werden. Prüfe den verfügbaren Speicher und versuche es erneut."
     }
   },
   "issues": {
@@ -668,7 +729,9 @@
           "state_change_interval_seconds": "Mindestabstand zwischen Zustandswechseln",
           "phase_switch_grace_seconds": "Zusätzliche Wartezeit vor Phasenwechseln",
           "vehicle_soc_entity": "Entität für den Fahrzeug-Ladestand (optional)",
-          "vehicle_charge_limit_entity": "Entität für das Fahrzeug-Ladelimit (optional)"
+          "vehicle_charge_limit_entity": "Entität für das Fahrzeug-Ladelimit (optional)",
+          "charge_loss_source": "Datenquelle für Ladeverluste",
+          "charging_cost_source": "Ladekosten berechnen"
         },
         "data_description": {
           "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
@@ -678,7 +741,9 @@
           "state_change_interval_seconds": "Mindestabstand in Sekunden zwischen Start, Pause, Freigabe-, Sperr- und Phasenwechseln (Standard 300). Zu frühe Befehle werden vorgemerkt; der neueste ersetzt den vorherigen. Der Schreibabstand von fünf Sekunden für den Ladestrom bleibt bestehen. Mit 0 entfällt die längere Wartezeit.",
           "phase_switch_grace_seconds": "Zusätzliche Sekunden zwischen der bestätigten Ladepause des Fahrzeugs und dem Phasenwechsel (Standard 5, Bereich 0–30). Mit 0 entfällt nur diese zusätzliche Wartezeit; die Ladepause muss weiterhin bestätigt werden.",
           "vehicle_soc_entity": "Optional: Wähle den Sensor, der den tatsächlichen Ladestand des Fahrzeugs in % meldet. Damit wird ein separates Prozent-Ladeziel verfügbar; ohne Auswahl bleibt es deaktiviert. Bei fehlenden Fahrzeugdaten läuft das Laden unverändert weiter, bis gültige Daten zurückkehren. Ändern oder Entfernen einer Quelle löscht das Prozentziel, ohne das Laden fortzusetzen.",
-          "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt."
+          "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt.",
+          "charge_loss_source": "Optionaler Vergleich der Wallbox-Energie mit der Energie, die im Fahrzeugakku ankommt. Wähle eine Quelle und richte sie im nächsten Schritt ein. Die Ladesteuerung bleibt davon unabhängig.",
+          "charging_cost_source": "Optionale Kostenschätzung mit einem festen Bruttostrompreis oder einem Preissensor. Richte den Preis im nächsten Schritt ein. Standardmäßig deaktiviert; die Ladesteuerung bleibt unabhängig."
         },
         "title": "Optionen"
       },
@@ -688,20 +753,87 @@
           "current_limit": "Obergrenze des Ladestroms",
           "scan_interval_seconds": "Statusintervall",
           "vehicle_soc_entity": "Entität für den Fahrzeug-Ladestand (optional)",
-          "vehicle_charge_limit_entity": "Entität für das Fahrzeug-Ladelimit (optional)"
+          "vehicle_charge_limit_entity": "Entität für das Fahrzeug-Ladelimit (optional)",
+          "charge_loss_source": "Datenquelle für Ladeverluste",
+          "charging_cost_source": "Ladekosten berechnen"
         },
         "data_description": {
           "current_limit": "Zusätzliche Obergrenze für von Home Assistant angeforderte Ladestromwerte. Die Obergrenze des Dienstes bleibt wirksam. Bewusst gewählte 0 A schalten die EMS-Begrenzung aus.",
           "scan_interval_seconds": "Wie oft Home Assistant den gespeicherten Status vom Dienst abruft. Modbus-Messintervall und Heartbeat-Takt werden dadurch nicht verändert.",
           "vehicle_soc_entity": "Optional: Wähle den Sensor, der den tatsächlichen Ladestand des Fahrzeugs in % meldet. Damit wird ein separates Prozent-Ladeziel verfügbar; ohne Auswahl bleibt es deaktiviert. Bei fehlenden Fahrzeugdaten läuft das Laden unverändert weiter, bis gültige Daten zurückkehren. Ändern oder Entfernen einer Quelle löscht das Prozentziel, ohne das Laden fortzusetzen.",
-          "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt."
+          "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt.",
+          "charge_loss_source": "Optionaler Vergleich der Wallbox-Energie mit der Energie, die im Fahrzeugakku ankommt. Wähle eine Quelle und richte sie im nächsten Schritt ein. Die Ladesteuerung bleibt davon unabhängig.",
+          "charging_cost_source": "Optionale Kostenschätzung mit einem festen Bruttostrompreis oder einem Preissensor. Richte den Preis im nächsten Schritt ein. Standardmäßig deaktiviert; die Ladesteuerung bleibt unabhängig."
         },
         "description": "Die Einstellung „Nur lesen“ der App steuert auch die Schreibfreigabe in Home Assistant. Deaktiviere sie in der App, speichere und starte die App neu, um die Steuerung zu aktivieren. Die Steuer-Entitäten bleiben bei aktivem Nur-Lesen-Modus oder nicht bereitem Dienst nicht verfügbar. Den Mindestabstand zwischen Zustandswechseln und die zusätzliche Wartezeit vor Phasenwechseln stellst du in der App-Konfiguration ein; der Dienst hält beide auch während eines Home-Assistant-Neustarts ein."
+      },
+      "loss_bavariandata": {
+        "title": "Ladeverluste aus BavarianData",
+        "description": "Wähle das Fahrzeug an dieser Wallbox. Die Zuordnung verwendet die Zeitangaben und die geschätzte Akkuenergie aus seiner gespeicherten Ladehistorie. Es werden nur vorhandene Daten in Home Assistant gelesen; keine Fahrzeugaktualisierung wird angefordert. Ohne passenden Ladevorgang wird kein Verlust berechnet.",
+        "data": {
+          "charge_loss_bavarian_device": "Fahrzeug"
+        }
+      },
+      "loss_sensor": {
+        "title": "Ladeverluste aus einem Sensor",
+        "description": "Wähle einen Sensor für die Energie, die beim letzten Laden im Fahrzeugakku angekommen ist, in kWh oder Wh. Verwende weder den Wallbox-Zähler noch einen Gesamtzähler. Ohne Ladezeitangaben ist das Ergebnis eine Schätzung. Bestätige den passenden Ladevorgang standardmäßig mit „Fahrzeug-Ladeenergie zuordnen“.",
+        "data": {
+          "vehicle_last_charge_energy_entity": "Akkuenergie des Fahrzeugs, letzte Ladung",
+          "charge_loss_auto_match": "Geänderten Energiewert automatisch zuordnen"
+        },
+        "data_description": {
+          "charge_loss_auto_match": "Optional: Einen geänderten Sensorwert innerhalb von 30 Minuten nach dem Abstecken zuordnen, wenn die Integration die gesamte Ladung beobachtet hat. Ein geänderter Wert beweist nicht, dass beide Messungen zur selben Ladung gehören. Deaktiviert lassen, um jede Zuordnung selbst zu bestätigen."
+        }
+      },
+      "cost_fixed": {
+        "title": "Fester Strompreis",
+        "description": "Gib den Preis je kWh einschließlich Steuern an. Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss dies dein Endpreis einschließlich Netzentgelt sein. Grundpreise und jährliche Gutschriften werden nicht berücksichtigt.",
+        "data": {
+          "charging_price": "Bruttostrompreis",
+          "charging_network_module": "Netzentgelt-Anpassung"
+        },
+        "data_description": {
+          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen."
+        }
+      },
+      "cost_sensor": {
+        "title": "Strompreissensor",
+        "description": "Wähle einen Sensor mit dem aktuellen Bruttostrompreis in EUR/kWh, ct/kWh oder EUR/MWh (auch das €-Zeichen wird unterstützt). Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss der Preis das Netzentgelt enthalten. Eine Meldung gilt 90 Minuten; auch die erneute Meldung desselben Werts verlängert dies. Bei fehlendem oder abgelaufenem Preis bleibt diese Energie unbepreist. Grundpreise und jährliche Gutschriften sind ausgeschlossen.",
+        "data": {
+          "charging_price_entity": "Strompreissensor",
+          "charging_network_module": "Netzentgelt-Anpassung"
+        },
+        "data_description": {
+          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen."
+        }
+      },
+      "cost_network": {
+        "title": "Netzentgelt: Modul {module}",
+        "description": "Übernimm die Bruttopreise aus dem Preisblatt deines Netzbetreibers. Modul 2 verwendet 40 % des regulären Netzentgelts. Modul 3 verwendet in den gewählten Quartalen und im angegebenen Tarifjahr die veröffentlichten Hoch- und Niedrigtarife; sonst gilt der Standardtarif. Es gelten die Zeitzone von Home Assistant und volle Minuten. Zeitfenster dürfen über Mitternacht reichen, sich aber nicht überschneiden. Diese Angaben schätzen variable Ladekosten; sie bestätigen keine Berechtigung und ändern keinen Vertrag.",
+        "data": {
+          "regular_network": "Reguläres Netzentgelt (Standardtarif)",
+          "price_includes_network": "Der Strompreis enthält bereits das reguläre Netzentgelt",
+          "high_network": "Hohes Netzentgelt (HT)",
+          "low_network": "Niedriges Netzentgelt (NT)",
+          "high_start": "Hochtarif beginnt",
+          "high_end": "Hochtarif endet",
+          "low_start": "Niedrigtarif beginnt",
+          "low_end": "Niedrigtarif endet",
+          "active_quarters": "Quartale mit zeitvariablen Netzentgelten",
+          "tariff_year": "Jahr des Preisblatts"
+        },
+        "data_description": {
+          "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden."
+        }
       }
     },
     "error": {
       "vehicle_soc_required": "Wähle zuerst eine Entität für den Fahrzeug-Ladestand, bevor du das optionale Ladelimit ergänzt.",
-      "invalid_vehicle_entity": "Wähle eine Entität des unterstützten Typs."
+      "invalid_vehicle_entity": "Wähle eine Entität des unterstützten Typs.",
+      "loss_source_invalid": "Wähle eine unterstützte Quelle für Ladeverluste und richte das passende Fahrzeug oder den Sensor ein.",
+      "cost_source_invalid": "Wähle eine unterstützte Kostenquelle und für einen sensorbasierten Preis eine Sensor-Entität.",
+      "cost_price_invalid": "Gib einen endlichen Bruttopreis zwischen −1000 und 1000 EUR/kWh an. Negative Preise sind erlaubt.",
+      "network_tariff_invalid": "Prüfe Bruttonetzentgelte, Tarifjahr, zwei bis vier aktive Quartale und Zeitfenster. HT muss über dem Standardtarif liegen, NT darunter und mindestens 0 betragen. Zeitfenster müssen volle Minuten verwenden, dürfen sich nicht überschneiden und müssen Zeit für den Standardtarif übrig lassen."
     }
   },
   "selector": {
@@ -736,6 +868,35 @@
       "options": {
         "rtu_over_tcp": "RTU over TCP (transparenter Adapter)",
         "modbus_tcp": "Modbus TCP (übersetzendes Gateway)"
+      }
+    },
+    "charge_loss_source": {
+      "options": {
+        "disabled": "Deaktiviert",
+        "bavariandata": "Ladehistorie von BavarianData",
+        "sensor": "Energiesensor des Fahrzeugs"
+      }
+    },
+    "charging_cost_source": {
+      "options": {
+        "disabled": "Deaktiviert",
+        "fixed": "Fester Strompreis",
+        "sensor": "Strompreissensor"
+      }
+    },
+    "charging_network_module": {
+      "options": {
+        "none": "Keine; die Quelle liefert den Endpreis",
+        "module_2": "Modul 2; reduziertes Netzentgelt",
+        "module_3": "Modul 3; zeitvariables Netzentgelt"
+      }
+    },
+    "charging_tariff_quarter": {
+      "options": {
+        "1": "Q1: Januar–März",
+        "2": "Q2: April–Juni",
+        "3": "Q3: Juli–September",
+        "4": "Q4: Oktober–Dezember"
       }
     }
   },

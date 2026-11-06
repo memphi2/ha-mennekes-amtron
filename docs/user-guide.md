@@ -5,6 +5,16 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
+## Optional charging losses and costs — next beta, unreleased
+
+Choose a vehicle-energy source and a fixed or dynamic electricity price in the
+integration options. Both are independently optional and disabled by default. Tibber and other existing
+HA price sensors can be selected; §14a network components are configured
+separately. The optional current-cost entity must also be enabled explicitly;
+the last-cost sensor is sufficient if you only want completed charges in history.
+See [Charging losses and costs](charging-estimates.md) for setup,
+data-quality choices and restart behavior.
+
 ## Everyday controls
 
 For most charging sessions, you need just **Charging current limit** and

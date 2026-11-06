@@ -19,8 +19,16 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .blueprint_installer import async_install_blueprints
+from .charge_loss_const import (
+    CONF_CHARGE_LOSS_SOURCE,
+    LOSS_SOURCE_DISABLED,
+    LOSS_SOURCE_SENSOR,
+)
+from .charge_loss_observer import ChargeLossObserver
+from .charging_cost_const import CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED
 from .control import AmtronControl, ControlOptions
 from .coordinator import MennekesAmtronCoordinator
+from .cost_observer import ChargingCostObserver, LastChargingCost
 from .data import (
     ConnectionState,
     MennekesAmtronRuntimeData,
@@ -67,7 +75,8 @@ from .device.identity import async_read_identity
 from .device.soc_goal_controller import SocGoalController
 from .device.write_state import WriteState
 from .entry_types import MennekesAmtronConfigEntry
-from .goal_store import GoalStore, SocGoalStore
+from .goal_store import GoalStore, ModelStore, SessionHistoryStore, SocGoalStore
+from .loss_store import LossStore
 from .options_flow import control_mode_is_master
 from .recovery import HeartbeatRecovery
 from .remote import (
@@ -81,6 +90,7 @@ from .remote import (
 from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
+from .session_observer import SessionObserver
 from .vehicle_soc import VehicleSocObserver
 from .vehicle_soc_const import CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_ENTITY
 
@@ -231,6 +241,23 @@ async def async_setup_entry(
     )
 
     try:
+        loss_enabled = entry.options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+        cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
+        if loss_enabled or cost_enabled:
+            if not remote:
+                entry.runtime_data.sessions = SessionObserver(hass, entry, identity, coordinator)
+                await entry.runtime_data.sessions.async_setup()
+            if cost_enabled:
+                entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry, remote=remote)
+                await entry.runtime_data.charging_cost.async_start()
+
+            async def observe_estimates(data: WallboxData | None) -> None:
+                if entry.runtime_data.sessions is not None:
+                    await entry.runtime_data.sessions.async_observe(data)
+                if entry.runtime_data.charging_cost is not None:
+                    await entry.runtime_data.charging_cost.async_observe(data)
+
+            coordinator.observe_session = observe_estimates
         if not remote:
             soc_store = SocGoalStore(
                 hass, entry.entry_id,
@@ -309,6 +336,9 @@ async def async_setup_entry(
                 hass, entry, client, diagnostics
             )
         await coordinator.async_config_entry_first_refresh()
+        if loss_enabled:
+            entry.runtime_data.charge_loss = ChargeLossObserver(hass, entry)
+            await entry.runtime_data.charge_loss.async_start()
         if entry.options.get(CONF_VEHICLE_SOC_ENTITY) or control.soc_goal.source is not None:
             observer = VehicleSocObserver(
                 hass, control, coordinator,
@@ -322,6 +352,7 @@ async def async_setup_entry(
             # not return when this entry later switches back from the service.
             await GoalStore(hass, entry.entry_id, "").async_remove()
             await SocGoalStore(hass, entry.entry_id, "").async_remove()
+            await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
         platforms = tuple(_entry_platforms(entry))
         await hass.config_entries.async_forward_entry_setups(
             entry, platforms
@@ -333,6 +364,7 @@ async def async_setup_entry(
             entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)
             entry.runtime_data.recovery.start()
     except BaseException:
+        await _async_stop_estimates(entry.runtime_data)
         if entry.runtime_data.vehicle_soc is not None:
             await entry.runtime_data.vehicle_soc.async_stop()
         if entry.runtime_data.soc_goal is not None:
@@ -371,6 +403,7 @@ async def async_unload_entry(
     )
     if not unloaded:
         return False
+    await _async_stop_estimates(runtime_data)
     if runtime_data.vehicle_soc is not None:
         await runtime_data.vehicle_soc.async_stop()
     if runtime_data.soc_goal is not None:
@@ -384,6 +417,17 @@ async def async_unload_entry(
     await runtime_data.control.async_shutdown()
     await runtime_data.client.async_close()
     return unloaded
+
+
+async def _async_stop_estimates(runtime: MennekesAmtronRuntimeData) -> None:
+    """Detach the poll hook before closing optional estimate owners."""
+    runtime.coordinator.observe_session = None
+    if runtime.charge_loss is not None:
+        await runtime.charge_loss.async_stop()
+    if runtime.charging_cost is not None:
+        await runtime.charging_cost.async_stop()
+    if runtime.sessions is not None:
+        await runtime.sessions.async_close()
 
 
 async def async_reload_entry(
@@ -402,6 +446,9 @@ async def async_remove_entry(
     hass.data.get(f"{DOMAIN}_write_states", {}).pop(entry.entry_id, None)
     await GoalStore(hass, entry.entry_id, "").async_remove()
     await SocGoalStore(hass, entry.entry_id, "").async_remove()
+    await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
+    await LossStore(hass, entry.entry_id, "").async_remove()
+    await ModelStore(hass, entry.entry_id, "", kind="charging_cost", model=LastChargingCost).async_remove()
     prefix = f"{entry.entry_id}_"
     for domain, issue_id in tuple(ir.async_get(hass).issues):
         if domain == DOMAIN and issue_id.startswith(prefix):
@@ -418,6 +465,8 @@ def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:
     platforms = list(READ_PLATFORMS)
     if CONF_SERVER_URL in entry.data or control_mode_is_master(dict(entry.options)):
         platforms.extend(CONTROL_PLATFORMS)
+    elif entry.options.get(CONF_CHARGE_LOSS_SOURCE) == LOSS_SOURCE_SENSOR:
+        platforms.append(Platform.BUTTON)
     return platforms
 
 

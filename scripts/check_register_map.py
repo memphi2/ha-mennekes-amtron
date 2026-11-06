@@ -312,6 +312,7 @@ def _device_classes_with_icon() -> dict[str, dict[str, str]]:
     )
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         CONTROL_SENSOR_DESCRIPTIONS,
+        ESTIMATE_SENSOR_DESCRIPTIONS,
         SENSOR_DESCRIPTIONS,
     )
 
@@ -319,7 +320,7 @@ def _device_classes_with_icon() -> dict[str, dict[str, str]]:
         platform: {} for platform in _entity_keys()
     }
     for platform, descriptions in (
-        ("sensor", (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS)),
+        ("sensor", (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS, *ESTIMATE_SENSOR_DESCRIPTIONS)),
         ("binary_sensor", BINARY_SENSOR_DESCRIPTIONS),
     ):
         for description in descriptions:
@@ -389,13 +390,14 @@ def _entity_keys() -> dict[str, set[str]]:
     )
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         CONTROL_SENSOR_DESCRIPTIONS,
+        ESTIMATE_SENSOR_DESCRIPTIONS,
         SENSOR_DESCRIPTIONS,
     )
 
     return {
         "sensor": {
             description.key
-            for description in (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS)
+            for description in (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS, *ESTIMATE_SENSOR_DESCRIPTIONS)
         },
         "binary_sensor": {
             description.key for description in BINARY_SENSOR_DESCRIPTIONS
@@ -403,7 +405,7 @@ def _entity_keys() -> dict[str, set[str]]:
         "number": {"charging_current_limit", "energy_goal", "soc_goal"},
         "switch": {"charging_paused", "charging_release", "lock_evse"},
         "select": {"solar_charging_mode", "requested_phases"},
-        "button": {"recover_from_error", "restart", "cancel_pending_change"},
+        "button": {"recover_from_error", "restart", "cancel_pending_change", "assign_vehicle_charge"},
         "event": {"control_result"},
     }
 
@@ -416,6 +418,7 @@ def _enum_states() -> dict[tuple[str, str], tuple[str, ...]]:
     )
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         CONTROL_SENSOR_DESCRIPTIONS,
+        ESTIMATE_SENSOR_DESCRIPTIONS,
         SENSOR_DESCRIPTIONS,
     )
 
@@ -428,7 +431,7 @@ def _enum_states() -> dict[tuple[str, str], tuple[str, ...]]:
             expected[("sensor", description.key)] = enum_options(
                 description.enum_class
             )
-    for control_description in CONTROL_SENSOR_DESCRIPTIONS:
+    for control_description in (*CONTROL_SENSOR_DESCRIPTIONS, *ESTIMATE_SENSOR_DESCRIPTIONS):
         if control_description.options is not None:
             expected[("sensor", control_description.key)] = tuple(control_description.options)
     return expected

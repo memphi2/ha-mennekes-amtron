@@ -188,6 +188,9 @@
       },
       "cancel_pending_change": {
         "name": "Annuler la modification en attente"
+      },
+      "assign_vehicle_charge": {
+        "name": "Associer l’énergie de charge du véhicule"
       }
     },
     "number": {
@@ -457,6 +460,52 @@
           "active": "Actif",
           "reached": "Objectif atteint"
         }
+      },
+      "last_charging_loss": {
+        "name": "Perte de charge estimée, dernière charge",
+        "state_attributes": {
+          "association": {
+            "name": "Association de la dernière charge",
+            "state": {
+              "history": "Historique de charge correspondant",
+              "changed_value": "Valeur de capteur modifiée",
+              "manual": "Association manuelle"
+            }
+          },
+          "sample_count": {
+            "name": "Charges prises en compte"
+          }
+        }
+      },
+      "average_charging_loss": {
+        "name": "Perte de charge estimée moyenne",
+        "state_attributes": {
+          "sample_count": {
+            "name": "Charges prises en compte"
+          }
+        }
+      },
+      "current_estimated_charging_cost": {
+        "name": "Coût de charge estimé, charge actuelle",
+        "state_attributes": {
+          "complete": {
+            "name": "Toute l’énergie a un prix"
+          }
+        }
+      },
+      "last_estimated_charging_cost": {
+        "name": "Coût de charge estimé, dernière charge",
+        "state_attributes": {
+          "complete": {
+            "name": "Toute l’énergie a un prix"
+          },
+          "energy_kwh": {
+            "name": "Énergie de charge"
+          },
+          "unpriced_kwh": {
+            "name": "Énergie sans prix"
+          }
+        }
       }
     },
     "switch": {
@@ -622,6 +671,18 @@
     },
     "soc_goal_state_invalid": {
       "message": "L’objectif de charge du véhicule enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
+    },
+    "loss_source_invalid": {
+      "message": "Sélectionnez une source de pertes de charge prise en charge et configurez le véhicule ou le capteur correspondant."
+    },
+    "loss_unavailable": {
+      "message": "Aucune session de charge entièrement observée ne peut être associée. La connexion à la borne doit rester disponible du branchement au débranchement."
+    },
+    "loss_energy_invalid": {
+      "message": "L’énergie du véhicule ne peut pas être associée. Utilisez une énergie de batterie valide pour cette charge, supérieure à zéro et ne dépassant pas l’énergie de la borne. Vous pouvez corriger la dernière association."
+    },
+    "loss_storage_unavailable": {
+      "message": "La perte de charge n’a pas pu être enregistrée. Vérifiez la disponibilité du stockage et réessayez."
     }
   },
   "issues": {
@@ -668,7 +729,9 @@
           "state_change_interval_seconds": "Délai minimal entre changements d’état",
           "phase_switch_grace_seconds": "Attente supplémentaire avant changement de phases",
           "vehicle_soc_entity": "Entité du niveau de charge du véhicule (facultatif)",
-          "vehicle_charge_limit_entity": "Entité de limite de charge du véhicule (facultatif)"
+          "vehicle_charge_limit_entity": "Entité de limite de charge du véhicule (facultatif)",
+          "charge_loss_source": "Source des pertes de charge",
+          "charging_cost_source": "Calcul du coût de charge"
         },
         "data_description": {
           "control_mode": "Les deux modes envoient des requêtes de lecture et nécessitent un accès exclusif au bus. Lecture seule n’écrit pas dans les registres. Maître Modbus envoie également le signal de présence et active les entités de commande. Ne partagez pas ce bus avec un autre maître.",
@@ -678,7 +741,9 @@
           "state_change_interval_seconds": "Délai minimal en secondes entre les démarrages, les pauses et les changements d’autorisation de charge, de verrouillage ou de phases (300 par défaut). Les commandes trop précoces sont mises en attente ; la dernière remplace la précédente. L’intervalle de cinq secondes entre écritures du courant reste applicable. La valeur 0 désactive le délai prolongé.",
           "phase_switch_grace_seconds": "Secondes d’attente supplémentaires entre la confirmation de la pause de charge par le véhicule et le changement de phases (5 par défaut, de 0 à 30). La valeur 0 supprime uniquement cette attente supplémentaire ; la confirmation de la pause reste obligatoire.",
           "vehicle_soc_entity": "Facultatif : sélectionnez le capteur indiquant le niveau de charge réel du véhicule en %. Cela active un objectif distinct en pourcentage ; sans sélection, il reste désactivé. Si les données manquent, la recharge continue jusqu’au retour de données valides. Changer ou retirer une source efface cet objectif sans reprendre la recharge.",
-          "vehicle_charge_limit_entity": "Facultatif : limitez aussi cet objectif avec l’entité de limite de charge du véhicule. Sans cette entité, les objectifs peuvent atteindre 100 %. Une limite plus basse réduit l’objectif existant ; une hausse ne le relève pas. La dernière limite valide reste applicable si l’entité est indisponible. Aucun réglage du véhicule n’est modifié."
+          "vehicle_charge_limit_entity": "Facultatif : limitez aussi cet objectif avec l’entité de limite de charge du véhicule. Sans cette entité, les objectifs peuvent atteindre 100 %. Une limite plus basse réduit l’objectif existant ; une hausse ne le relève pas. La dernière limite valide reste applicable si l’entité est indisponible. Aucun réglage du véhicule n’est modifié.",
+          "charge_loss_source": "Comparaison facultative entre l’énergie de la borne et celle ajoutée à la batterie du véhicule. Sélectionnez une source pour la configurer à l’étape suivante. La commande de charge reste indépendante.",
+          "charging_cost_source": "Estimation facultative avec un prix d’électricité fixe toutes taxes comprises ou un capteur de prix. Configurez le prix à l’étape suivante. Désactivé par défaut ; la commande de charge reste indépendante."
         },
         "title": "Options"
       },
@@ -688,20 +753,87 @@
           "current_limit": "Plafond du courant de charge",
           "scan_interval_seconds": "Intervalle de lecture de l’état",
           "vehicle_soc_entity": "Entité du niveau de charge du véhicule (facultatif)",
-          "vehicle_charge_limit_entity": "Entité de limite de charge du véhicule (facultatif)"
+          "vehicle_charge_limit_entity": "Entité de limite de charge du véhicule (facultatif)",
+          "charge_loss_source": "Source des pertes de charge",
+          "charging_cost_source": "Calcul du coût de charge"
         },
         "data_description": {
           "current_limit": "Plafond supplémentaire pour les courants demandés par Home Assistant. Le plafond du service reste applicable. Sélectionner explicitement 0 A supprime la limite du gestionnaire d’énergie.",
           "scan_interval_seconds": "Fréquence à laquelle Home Assistant lit l’état du service. Cela ne modifie ni la fréquence des mesures Modbus ni l’intervalle du signal de présence.",
           "vehicle_soc_entity": "Facultatif : sélectionnez le capteur indiquant le niveau de charge réel du véhicule en %. Cela active un objectif distinct en pourcentage ; sans sélection, il reste désactivé. Si les données manquent, la recharge continue jusqu’au retour de données valides. Changer ou retirer une source efface cet objectif sans reprendre la recharge.",
-          "vehicle_charge_limit_entity": "Facultatif : limitez aussi cet objectif avec l’entité de limite de charge du véhicule. Sans cette entité, les objectifs peuvent atteindre 100 %. Une limite plus basse réduit l’objectif existant ; une hausse ne le relève pas. La dernière limite valide reste applicable si l’entité est indisponible. Aucun réglage du véhicule n’est modifié."
+          "vehicle_charge_limit_entity": "Facultatif : limitez aussi cet objectif avec l’entité de limite de charge du véhicule. Sans cette entité, les objectifs peuvent atteindre 100 %. Une limite plus basse réduit l’objectif existant ; une hausse ne le relève pas. La dernière limite valide reste applicable si l’entité est indisponible. Aucun réglage du véhicule n’est modifié.",
+          "charge_loss_source": "Comparaison facultative entre l’énergie de la borne et celle ajoutée à la batterie du véhicule. Sélectionnez une source pour la configurer à l’étape suivante. La commande de charge reste indépendante.",
+          "charging_cost_source": "Estimation facultative avec un prix d’électricité fixe toutes taxes comprises ou un capteur de prix. Configurez le prix à l’étape suivante. Désactivé par défaut ; la commande de charge reste indépendante."
         },
         "description": "Le réglage Lecture seule de l’application contrôle aussi l’autorisation d’écriture dans Home Assistant. Désactivez-le dans l’application, enregistrez et redémarrez l’application pour activer les commandes. Les entités de commande restent indisponibles tant que le service est en lecture seule ou n’est pas prêt. Réglez le délai minimal entre changements d’état et l’attente supplémentaire avant changement de phases dans la configuration de l’application ; le service applique les deux même pendant un redémarrage de Home Assistant."
+      },
+      "loss_bavariandata": {
+        "title": "Pertes de charge avec BavarianData",
+        "description": "Sélectionnez le véhicule relié à cette borne. La correspondance utilise les horaires et l’énergie estimée de la batterie dans son historique enregistré. Seules les données déjà présentes dans Home Assistant sont lues ; aucune actualisation du véhicule n’est demandée. Sans charge correspondante, aucune perte n’est calculée.",
+        "data": {
+          "charge_loss_bavarian_device": "Véhicule"
+        }
+      },
+      "loss_sensor": {
+        "title": "Pertes de charge avec un capteur",
+        "description": "Sélectionnez un capteur indiquant l’énergie ajoutée à la batterie du véhicule lors de sa dernière charge, en kWh ou Wh. N’utilisez ni l’énergie mesurée à la borne ni un compteur total. Sans horaires de charge, le résultat reste une estimation. Par défaut, confirmez la correspondance avec le bouton « Associer l’énergie de charge du véhicule ».",
+        "data": {
+          "vehicle_last_charge_energy_entity": "Énergie de la batterie, dernière charge",
+          "charge_loss_auto_match": "Associer automatiquement une énergie modifiée"
+        },
+        "data_description": {
+          "charge_loss_auto_match": "Facultatif : associer une valeur modifiée reçue dans les 30 minutes après le débranchement, si cette intégration a observé toute la charge. Un changement de valeur ne prouve pas que les deux mesures concernent la même charge. Laissez désactivé pour confirmer chaque association."
+        }
+      },
+      "cost_fixed": {
+        "title": "Prix d’électricité fixe",
+        "description": "Saisissez le prix par kWh toutes taxes comprises. Les prix négatifs sont acceptés. Sans ajustement réseau, ce doit être le prix final incluant les frais de réseau. Les abonnements et crédits annuels sont exclus.",
+        "data": {
+          "charging_price": "Prix d’électricité TTC",
+          "charging_network_module": "Ajustement du prix réseau"
+        },
+        "data_description": {
+          "charging_network_module": "Calcul facultatif des tarifs réseau allemands selon le §14a. Utilisez uniquement le module et les prix convenus avec votre gestionnaire de réseau. Sinon, sélectionnez Aucun."
+        }
+      },
+      "cost_sensor": {
+        "title": "Capteur de prix d’électricité",
+        "description": "Sélectionnez un capteur du prix actuel de l’électricité TTC en EUR/kWh, ct/kWh ou EUR/MWh (le symbole € est aussi accepté). Les prix négatifs sont autorisés. Sans ajustement réseau, le prix doit inclure les frais réseau. Une valeur signalée reste valide 90 minutes ; la même valeur signalée à nouveau renouvelle cette durée. Les prix absents ou expirés laissent l’énergie concernée sans prix. Abonnements et crédits annuels sont exclus.",
+        "data": {
+          "charging_price_entity": "Capteur de prix d’électricité",
+          "charging_network_module": "Ajustement du prix réseau"
+        },
+        "data_description": {
+          "charging_network_module": "Calcul facultatif des tarifs réseau allemands selon le §14a. Utilisez uniquement le module et les prix convenus avec votre gestionnaire de réseau. Sinon, sélectionnez Aucun."
+        }
+      },
+      "cost_network": {
+        "title": "Tarif réseau : module {module}",
+        "description": "Recopiez les prix TTC du barème de votre gestionnaire de réseau. Le module 2 utilise 40 % du prix réseau normal. Le module 3 applique les prix hauts et bas publiés pendant les trimestres et l’année sélectionnés ; le tarif standard s’applique le reste du temps. Utilisez le fuseau horaire de Home Assistant et des minutes entières. Les plages peuvent traverser minuit mais ne doivent pas se chevaucher. Ces paramètres estiment les coûts variables de charge ; ils ne confirment pas l’éligibilité et ne modifient pas votre contrat.",
+        "data": {
+          "regular_network": "Prix réseau normal (tarif standard)",
+          "price_includes_network": "Le prix d’électricité inclut déjà le prix réseau normal",
+          "high_network": "Prix réseau haut (HT)",
+          "low_network": "Prix réseau bas (NT)",
+          "high_start": "Début du tarif haut",
+          "high_end": "Fin du tarif haut",
+          "low_start": "Début du tarif bas",
+          "low_end": "Fin du tarif bas",
+          "active_quarters": "Trimestres à prix réseau variables",
+          "tariff_year": "Année du barème"
+        },
+        "data_description": {
+          "price_includes_network": "Activé : retirer le prix réseau normal avant d’ajouter le tarif choisi. Désactivé : la source exclut les frais réseau, donc ajouter le tarif réseau. Choisissez selon votre source pour éviter un double comptage."
+        }
       }
     },
     "error": {
       "vehicle_soc_required": "Sélectionnez une entité de niveau de charge avant d’ajouter sa limite de charge facultative.",
-      "invalid_vehicle_entity": "Sélectionnez une entité du type pris en charge."
+      "invalid_vehicle_entity": "Sélectionnez une entité du type pris en charge.",
+      "loss_source_invalid": "Sélectionnez une source de pertes de charge prise en charge et configurez le véhicule ou le capteur correspondant.",
+      "cost_source_invalid": "Sélectionnez une source de coût prise en charge et une entité capteur pour un prix issu d’un capteur.",
+      "cost_price_invalid": "Saisissez un prix TTC fini entre −1000 et 1000 EUR/kWh. Les prix négatifs sont autorisés.",
+      "network_tariff_invalid": "Vérifiez les prix réseau TTC, l’année, les deux à quatre trimestres actifs et les plages horaires. HT doit dépasser le tarif standard ; NT doit être inférieur et positif ou nul. Les plages doivent être en minutes entières, sans chevauchement, et laisser une plage au tarif standard."
     }
   },
   "selector": {
@@ -736,6 +868,35 @@
       "options": {
         "rtu_over_tcp": "RTU over TCP (adaptateur transparent)",
         "modbus_tcp": "Modbus TCP (passerelle de traduction)"
+      }
+    },
+    "charge_loss_source": {
+      "options": {
+        "disabled": "Désactivé",
+        "bavariandata": "Historique de charge BavarianData",
+        "sensor": "Capteur d’énergie du véhicule"
+      }
+    },
+    "charging_cost_source": {
+      "options": {
+        "disabled": "Désactivé",
+        "fixed": "Prix d’électricité fixe",
+        "sensor": "Capteur de prix d’électricité"
+      }
+    },
+    "charging_network_module": {
+      "options": {
+        "none": "Aucun ; la source fournit le prix final",
+        "module_2": "Module 2 ; prix réseau réduit",
+        "module_3": "Module 3 ; prix réseau variable dans le temps"
+      }
+    },
+    "charging_tariff_quarter": {
+      "options": {
+        "1": "T1 : janvier–mars",
+        "2": "T2 : avril–juin",
+        "3": "T3 : juillet–septembre",
+        "4": "T4 : octobre–décembre"
       }
     }
   },

@@ -17,6 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
+from .charge_loss_const import LOSS_SENSOR_KEYS
 from .coordinator import MennekesAmtronCoordinator
 from .device.capabilities import capability_is_supported
 from .device.charging_status import charging_status
@@ -24,8 +25,10 @@ from .device.decode import RegisterValue, enum_option
 from .device.registers import CP_STATE, ENERGY_TOTAL, REGISTERS_BY_KEY
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
+from .estimate_sensor import AmtronEstimateSensor
 from .sensor_descriptions import (
     CONTROL_SENSOR_DESCRIPTIONS,
+    ESTIMATE_SENSOR_DESCRIPTIONS,
     SENSOR_DESCRIPTIONS,
     AmtronSensorEntityDescription,
 )
@@ -64,6 +67,11 @@ async def async_setup_entry(
         for description in CONTROL_SENSOR_DESCRIPTIONS
         if (description.key != "energy_goal_status" or identity.layout_version >= ENERGY_TOTAL.min_layout)
         and (description.key != "soc_goal_status" or entry.options.get(CONF_VEHICLE_SOC_ENTITY))
+    )
+    entities.extend(
+        AmtronEstimateSensor(entry, runtime_data.coordinator, description)
+        for description in ESTIMATE_SENSOR_DESCRIPTIONS
+        if (runtime_data.charge_loss is not None if description.key in LOSS_SENSOR_KEYS else runtime_data.charging_cost is not None)
     )
     async_add_entities(entities)
 
