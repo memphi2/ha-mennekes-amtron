@@ -1,17 +1,21 @@
-"""Persist only accepted control intent, with atomic replacement and no history."""
+"""Persist accepted control intent and one completed session atomically."""
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
+from .charging_session import SessionHistory
 from .energy_goal import EnergyGoal
 from .service_config import number
 from .soc_goal import SocGoal
 from .write_state import WriteState
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class IntentStore:
@@ -42,11 +46,20 @@ class IntentStore:
                 raise ValueError("invalid saved resume current")
         goal = EnergyGoal.restore(payload["energy_goal"]) if "energy_goal" in payload else EnergyGoal()
         soc_goal = SocGoal.restore(payload["soc_goal"]) if "soc_goal" in payload else SocGoal()
+        history = SessionHistory()
+        if "charging_session_history" in payload:
+            try:
+                history = SessionHistory.restore(payload["charging_session_history"])
+            except ValueError:
+                # Optional measurements must not block valid control intent
+                # or heartbeat startup. Do not expose stored data in the log.
+                _LOGGER.warning("Ignoring invalid completed charging session history")
         state.pause_requested = payload.get("pause_requested")
         state.charging_release_requested = payload.get("charging_release_requested")
         state.charging_setpoint = current
         state.energy_goal = goal
         state.soc_goal = soc_goal
+        state.session_history = history
         self._last = payload
 
     def save(self, state: WriteState) -> None:
@@ -58,6 +71,7 @@ class IntentStore:
             "charging_setpoint": state.charging_setpoint,
             "energy_goal": state.energy_goal.snapshot(),
             "soc_goal": state.soc_goal.snapshot(),
+            "charging_session_history": state.session_history.snapshot(),
         }
         if payload == self._last:
             return

@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .control import AmtronControl, ControlOptions, ha_command
 from .coordinator import MennekesAmtronCoordinator
+from .device.charging_session import CompletedSession
 from .device.client import MennekesModbusClient, SerialConfig
 from .device.client_errors import AmtronConnectionError, AmtronWriteRejectedError
 from .device.command_events import CommandEvents
@@ -103,6 +104,7 @@ class RemoteClient(MennekesModbusClient):
         self._snapshot_lock = asyncio.Lock()
         self.pending_until: datetime | None = None
         self.events = CommandEvents(supported=False)
+        self._last_energy_observed_at: float | None = None
 
     def bind_identity(self, serial_number: str | None) -> None:
         """Bind a configured client; setup probes remain free to read identity."""
@@ -216,6 +218,7 @@ class RemoteClient(MennekesModbusClient):
 
     def apply_snapshot(
         self, payload: dict[str, Any], *, require_available: bool = True,
+        consume_energy: bool = True,
     ) -> WallboxData:
         section = "api_version"
         try:
@@ -231,6 +234,37 @@ class RemoteClient(MennekesModbusClient):
             quality = payload.get("connection_quality")
             if quality is not None and quality not in CONNECTION_QUALITY_STATES:
                 raise ValueError("invalid connection quality")
+            section = "charging_session"
+            session_supported = False
+            completed_session = None
+            if "charging_session" in payload:
+                summary = payload["charging_session"]
+                if (
+                    not isinstance(summary, dict)
+                    or summary.keys() != {"supported", "latest"}
+                    or type(summary["supported"]) is not bool
+                    or (not summary["supported"] and summary["latest"] is not None)
+                ):
+                    raise ValueError("invalid charging session summary")
+                session_supported = summary["supported"]
+                if summary["latest"] is not None:
+                    completed_session = CompletedSession.parse(summary["latest"])
+            section = "energy_sample"
+            observed_at: float | None = None
+            observed_energy: float | None = None
+            sample = payload.get("energy_sample")
+            if sample is not None:
+                if not isinstance(sample, dict) or sample.keys() != {"observed_at", "value"}:
+                    raise ValueError("invalid energy sample")
+                stamp, energy = sample["observed_at"], sample["value"]
+                if type(stamp) not in (int, float) or not 0 <= stamp <= 253402300799:
+                    raise ValueError("invalid meter observation timestamp")
+                if energy is not None and (
+                    type(energy) not in (int, float) or not math.isfinite(energy) or energy < 0
+                ):
+                    raise ValueError("invalid meter observation value")
+                observed_at = float(stamp)
+                observed_energy = float(energy) if energy is not None else None
             section = "values"
             values = payload["values"]
             control = payload["control"]
@@ -411,6 +445,13 @@ class RemoteClient(MennekesModbusClient):
             self.on_update()
         if require_available and payload.get("available") is not True:
             raise ServiceConnectionError("service_not_ready", "wallbox is unavailable at the service")
+        energy_read = observed_at is not None and observed_at != self._last_energy_observed_at
+        if consume_energy:
+            self._last_energy_observed_at = observed_at
+        if observed_at is not None:
+            # Meter value and timestamp form one observation. Never attach a
+            # sample timestamp to an independently carried-forward raw value.
+            values = {**values, "energy_total": observed_energy}
         return WallboxData(
             values=values,
             failed_blocks=tuple(failed),
@@ -424,6 +465,10 @@ class RemoteClient(MennekesModbusClient):
             connection_quality=quality,
             energy_goal=goal.snapshot() if goal_supported else None,
             soc_goal=soc_goal.snapshot() if soc_supported else None,
+            charging_session=completed_session.as_dict() if completed_session is not None else None,
+            session_summary_supported=session_supported,
+            energy_read=energy_read,
+            energy_observed_at=observed_at,
         )
 
     async def execute(self, command: str, **values: Any) -> None:
@@ -455,6 +500,7 @@ class RemoteClient(MennekesModbusClient):
                         }
                     ),
                     require_available=not (cancelling or metadata),
+                    consume_energy=False,
                 )
         except AmtronConnectionError as err:
             if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
@@ -540,8 +586,10 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
         if not isinstance(self._client, RemoteClient):
             raise UpdateFailed("service client missing")
         try:
-            return await self._client.update()
+            data = await self._client.update()
         except AmtronConnectionError as err:
+            if self.observe_session is not None:
+                await self.observe_session(None)
             if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
                 raise ConfigEntryAuthFailed(
                     translation_domain=DOMAIN, translation_key="service_auth_failed"
@@ -555,6 +603,9 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
                     translation_domain=DOMAIN, translation_key="service_version_mismatch"
                 ) from err
             raise UpdateFailed(str(err)) from err
+        if self.observe_session is not None:
+            await self.observe_session(data)
+        return data
 
 
 class RemoteControl(AmtronControl):

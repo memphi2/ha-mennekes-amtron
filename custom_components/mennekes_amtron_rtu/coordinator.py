@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
@@ -58,6 +58,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         self.observe_recovery: Callable[[object, int], None] | None = None
         self.observe_goal: Callable[[WallboxData | None], None] | None = None
         self.retry_soc_goal: Callable[[], None] | None = None
+        self.observe_session: Callable[[WallboxData | None], Awaitable[None]] | None = None
         self._poller = DevicePoller(
             client,
             identity,
@@ -94,8 +95,12 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
                 self.observe_goal(data)
             if self.retry_soc_goal is not None:
                 self.retry_soc_goal()
+            if self.observe_session is not None:
+                await self.observe_session(data)
             return data
         except AmtronBusError as err:
+            if self.observe_session is not None:
+                await self.observe_session(None)
             if self.observe_goal is not None:
                 self.observe_goal(WallboxData(
                     energy_read=True, energy_goal_generation=goal_generation,

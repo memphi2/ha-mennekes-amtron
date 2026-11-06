@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from .decode import RegisterValue
 from .registers import LAYOUT_V01_00
@@ -49,7 +50,12 @@ class WallboxData:
     soc_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
     # A goal may only act on a counter attempted in this poll, never a cached one.
     energy_read: bool = field(default=False, compare=False, repr=False)
+    # Actual service-side meter attempt time, not a repeated API cache read.
+    energy_observed_at: float | None = field(default=None, compare=False, repr=False)
     energy_goal_generation: int = field(default=0, compare=False, repr=False)
+    # Only completed-session metadata changes; no per-poll progress is exposed.
+    charging_session: dict[str, Any] | None = field(default=None, repr=False)
+    session_summary_supported: bool = field(default=False, repr=False)
 
     def get(self, key: str) -> RegisterValue:
         """Return one decoded register value, or ``None`` when unavailable."""

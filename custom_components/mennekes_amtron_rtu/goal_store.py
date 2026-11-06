@@ -1,4 +1,4 @@
-"""Persist direct-mode charging goals on changes, outside Recorder."""
+"""Persist bounded direct-mode models on changes, outside Recorder."""
 
 from __future__ import annotations
 
@@ -11,13 +11,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import STORAGE_DIR
 from homeassistant.util.file import WriteError, write_utf8_file_atomic
 
+from .device.charging_session import SessionHistory
 from .device.const import DOMAIN
 from .device.energy_goal import EnergyGoal
 from .device.soc_goal import SocGoal
 
 
 class _GoalModel(Protocol):
-    """The bounded durable state shared by the independent goal models."""
+    """The bounded durable state shared by independent models."""
 
     def snapshot(self) -> dict[str, Any]: ...
 
@@ -25,7 +26,7 @@ class _GoalModel(Protocol):
     def restore(cls, raw: object) -> Self: ...
 
 
-class _GoalStore[Goal: _GoalModel]:
+class ModelStore[Goal: _GoalModel]:
     """Atomically persist one model, isolated by store key and wallbox identity."""
 
     def __init__(
@@ -42,7 +43,7 @@ class _GoalStore[Goal: _GoalModel]:
         self._last: dict[str, Any] | None = None
 
     async def async_load(self) -> Goal:
-        """Read durable intent without moving corrupt state aside or caching it."""
+        """Read durable state without moving corrupt files aside or caching them."""
         async with self._lock:
             payload = await self._hass.async_add_executor_job(self._validate_file)
             goal = self._validate_payload(payload) if payload is not None else self._model()
@@ -85,7 +86,7 @@ class _GoalStore[Goal: _GoalModel]:
         return self._model.restore(payload["goal"])
 
     async def async_save(self, goal: Goal) -> None:
-        """Save only target/latch changes; finish an atomic save during unload."""
+        """Save only durable changes; finish an atomic save during unload."""
         payload = {"identity": self._identity, "goal": goal.snapshot()}
         async with self._lock:
             if payload == self._last:
@@ -121,15 +122,22 @@ class _GoalStore[Goal: _GoalModel]:
             self._last = None
 
 
-class GoalStore(_GoalStore[EnergyGoal]):
+class GoalStore(ModelStore[EnergyGoal]):
     """Keep the energy baseline durable without saving each meter observation."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
         super().__init__(hass, entry_id, identity, kind="energy_goal", model=EnergyGoal)
 
 
-class SocGoalStore(_GoalStore[SocGoal]):
+class SocGoalStore(ModelStore[SocGoal]):
     """Keep the vehicle-charge goal in its own file, independent of energy goals."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
         super().__init__(hass, entry_id, identity, kind="soc_goal", model=SocGoal)
+
+
+class SessionHistoryStore(ModelStore[SessionHistory]):
+    """Keep one completed session, without persisting individual meter readings."""
+
+    def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
+        super().__init__(hass, entry_id, identity, kind="charging_session", model=SessionHistory)
