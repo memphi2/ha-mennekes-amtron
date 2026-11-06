@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Retry automatic heartbeat recovery when error 200 returns during its final
+  check, even if the preceding fresh check needed no recovery writes.
 - Retain confirmed heartbeat and fallback repairs when their status register
   temporarily cannot be read; clear them only after a healthy reading.
 - Treat excessively nested service responses as invalid and mark the connection

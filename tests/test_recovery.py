@@ -132,6 +132,38 @@ def test_a_freshly_cleared_fault_receives_no_recovery_writes():
     asyncio.run(run())
 
 
+def test_fault_returning_during_noop_recovery_retains_a_retry():
+    async def run():
+        runtime, recovery, transport, clock = await _runtime()
+        original = transport.read_holding_registers
+        first_error_read = True
+
+        async def read(address, **kwargs):
+            nonlocal first_error_read
+            if address == R.ERROR_CODE.address and first_error_read:
+                first_error_read = False
+                put(transport.bank, R.ERROR_CODE, 0)
+                response = await original(address, **kwargs)
+                put(transport.bank, R.ERROR_CODE, 200)
+                return response
+            return await original(address, **kwargs)
+
+        transport.read_holding_registers = read
+        recovery.start()
+        await _finish(recovery)
+        assert not transport.writes
+        assert runtime.coordinator.current_data().get("error_code") == 200
+        assert recovery._retry is not None
+        await _retry(recovery, clock)
+        assert runtime.diagnostics.recoveries == 1
+        assert runtime.coordinator.current_data().get("error_code") == 0
+        assert recovery._retry is None
+        await recovery.async_stop()
+        await runtime.client.async_close()
+
+    asyncio.run(run())
+
+
 def test_startup_write_floor_is_retried_without_manual_confirmation():
     async def run():
         runtime, recovery, _transport, clock = await _runtime()

@@ -86,7 +86,10 @@ class HeartbeatRecovery:
             attempted = await runtime.control.async_recover_from_error()
             if attempted:
                 self._attempts += 1
-                retry_after = RECOVERY_RETRY_SECONDS
+            # The fresh precondition can report a cleared fault while the
+            # following poll already sees error 200 again. Keep a retry for
+            # that case too: an unchanged poll will not notify listeners.
+            retry_after = RECOVERY_RETRY_SECONDS
             # This must complete a poll, not merely queue a debounced refresh.
             await runtime.coordinator.async_refresh()
             if (
