@@ -809,21 +809,21 @@
       },
       "cost_network": {
         "title": "Tariffa di rete: modulo {module}",
-        "description": "Copia i prezzi lordi dal tariffario del gestore di rete. Il modulo 2 usa il 40% del prezzo di rete ordinario. Il modulo 3 usa i prezzi alti e bassi pubblicati nei trimestri e nell’anno selezionati; negli altri periodi si applica il prezzo standard. Usa il fuso orario di Home Assistant e minuti interi. Le fasce possono attraversare la mezzanotte ma non sovrapporsi. Queste impostazioni stimano i costi variabili di ricarica; non confermano l’idoneità e non modificano il contratto.",
+        "description": "Copia i prezzi lordi dal tariffario del gestore di rete. Il modulo 2 usa il 40% del prezzo di rete ordinario. Il modulo 3 usa i prezzi alti e bassi pubblicati nei trimestri e nell’anno selezionati; negli altri periodi si applica il prezzo standard. Usa il fuso orario di Home Assistant e intervalli di 15 minuti. Le fasce possono attraversare la mezzanotte ma non sovrapporsi. Queste impostazioni stimano i costi variabili di ricarica; non confermano l’idoneità e non modificano il contratto.",
         "data": {
           "regular_network": "Prezzo di rete ordinario (tariffa standard)",
           "price_includes_network": "Il prezzo dell’elettricità include già il prezzo di rete ordinario",
           "high_network": "Prezzo di rete alto (HT)",
           "low_network": "Prezzo di rete basso (NT)",
-          "high_start": "Inizio tariffa alta",
-          "high_end": "Fine tariffa alta",
-          "low_start": "Inizio tariffa bassa",
-          "low_end": "Fine tariffa bassa",
           "active_quarters": "Trimestri con prezzi di rete variabili",
-          "tariff_year": "Anno del tariffario"
+          "tariff_year": "Anno del tariffario",
+          "high_periods": "Periodi tariffa alta",
+          "low_periods": "Periodi tariffa bassa"
         },
         "data_description": {
-          "price_includes_network": "Attivato: sottrai il prezzo di rete ordinario prima di aggiungere la tariffa scelta. Disattivato: la fonte esclude gli oneri di rete, quindi aggiungi la tariffa di rete. Scegli in base alla fonte per evitare un doppio conteggio."
+          "price_includes_network": "Attivato: sottrai il prezzo di rete ordinario prima di aggiungere la tariffa scelta. Disattivato: la fonte esclude gli oneri di rete, quindi aggiungi la tariffa di rete. Scegli in base alla fonte per evitare un doppio conteggio.",
+          "high_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte.",
+          "low_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte."
         }
       }
     },
@@ -833,7 +833,7 @@
       "loss_source_invalid": "Seleziona una fonte supportata per le perdite di ricarica e configura il veicolo o il sensore corrispondente.",
       "cost_source_invalid": "Seleziona una fonte di costo supportata e un’entità sensore per un prezzo basato su sensore.",
       "cost_price_invalid": "Inserisci un prezzo lordo finito compreso tra −1000 e 1000 EUR/kWh. Sono ammessi prezzi negativi.",
-      "network_tariff_invalid": "Controlla i prezzi di rete lordi, l’anno, da due a quattro trimestri attivi e le fasce orarie. HT deve superare il prezzo standard; NT deve essere inferiore e non negativo. Le fasce devono usare minuti interi, non sovrapporsi e lasciare un periodo per la tariffa standard."
+      "network_tariff_invalid": "Controlla prezzi lordi, anno, da due a quattro trimestri e periodi alti/bassi. Un periodo HH:MM-HH:MM per riga, ogni 15 minuti, senza sovrapposizioni e lasciando un periodo standard."
     }
   },
   "selector": {

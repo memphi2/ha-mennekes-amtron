@@ -809,21 +809,21 @@
       },
       "cost_network": {
         "title": "Tarif réseau : module {module}",
-        "description": "Recopiez les prix TTC du barème de votre gestionnaire de réseau. Le module 2 utilise 40 % du prix réseau normal. Le module 3 applique les prix hauts et bas publiés pendant les trimestres et l’année sélectionnés ; le tarif standard s’applique le reste du temps. Utilisez le fuseau horaire de Home Assistant et des minutes entières. Les plages peuvent traverser minuit mais ne doivent pas se chevaucher. Ces paramètres estiment les coûts variables de charge ; ils ne confirment pas l’éligibilité et ne modifient pas votre contrat.",
+        "description": "Recopiez les prix TTC du barème de votre gestionnaire de réseau. Le module 2 utilise 40 % du prix réseau normal. Le module 3 applique les prix hauts et bas publiés pendant les trimestres et l’année sélectionnés ; le tarif standard s’applique le reste du temps. Utilisez le fuseau horaire de Home Assistant et des quarts d’heure. Les plages peuvent traverser minuit mais ne doivent pas se chevaucher. Ces paramètres estiment les coûts variables de charge ; ils ne confirment pas l’éligibilité et ne modifient pas votre contrat.",
         "data": {
           "regular_network": "Prix réseau normal (tarif standard)",
           "price_includes_network": "Le prix d’électricité inclut déjà le prix réseau normal",
           "high_network": "Prix réseau haut (HT)",
           "low_network": "Prix réseau bas (NT)",
-          "high_start": "Début du tarif haut",
-          "high_end": "Fin du tarif haut",
-          "low_start": "Début du tarif bas",
-          "low_end": "Fin du tarif bas",
           "active_quarters": "Trimestres à prix réseau variables",
-          "tariff_year": "Année du barème"
+          "tariff_year": "Année du barème",
+          "high_periods": "Périodes tarif haut",
+          "low_periods": "Périodes tarif bas"
         },
         "data_description": {
-          "price_includes_network": "Activé : retirer le prix réseau normal avant d’ajouter le tarif choisi. Désactivé : la source exclut les frais réseau, donc ajouter le tarif réseau. Choisissez selon votre source pour éviter un double comptage."
+          "price_includes_network": "Activé : retirer le prix réseau normal avant d’ajouter le tarif choisi. Désactivé : la source exclut les frais réseau, donc ajouter le tarif réseau. Choisissez selon votre source pour éviter un double comptage.",
+          "high_periods": "Une période HH:MM-HH:MM par ligne, aux quarts d’heure. Le passage de minuit est possible.",
+          "low_periods": "Une période HH:MM-HH:MM par ligne, aux quarts d’heure. Le passage de minuit est possible."
         }
       }
     },
@@ -833,7 +833,7 @@
       "loss_source_invalid": "Sélectionnez une source de pertes de charge prise en charge et configurez le véhicule ou le capteur correspondant.",
       "cost_source_invalid": "Sélectionnez une source de coût prise en charge et une entité capteur pour un prix issu d’un capteur.",
       "cost_price_invalid": "Saisissez un prix TTC fini entre −1000 et 1000 EUR/kWh. Les prix négatifs sont autorisés.",
-      "network_tariff_invalid": "Vérifiez les prix réseau TTC, l’année, les deux à quatre trimestres actifs et les plages horaires. HT doit dépasser le tarif standard ; NT doit être inférieur et positif ou nul. Les plages doivent être en minutes entières, sans chevauchement, et laisser une plage au tarif standard."
+      "network_tariff_invalid": "Vérifiez les prix bruts, l’année, deux à quatre trimestres et les périodes hautes/basses. Une période HH:MM-HH:MM par ligne, par quarts d’heure, sans chevauchement et avec une plage standard."
     }
   },
   "selector": {

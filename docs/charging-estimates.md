@@ -144,9 +144,11 @@ Module 1 and cannot be combined with Module 2 for the same market location.
 Eligibility and the price structure are explained by the
 [Bundesnetzagentur](https://www.bundesnetzagentur.de/DE/Vportal/Energie/SteuerbareVBE/artikel.html).
 
-The Module 3 form supports one high-price and one low-price daily window,
-including windows crossing midnight; all other times use the standard rate.
-The windows must use whole minutes, must not overlap and must leave some time
+The Module 3 form supports multiple high-price and low-price daily windows.
+Enter one period per line as `HH:MM-HH:MM`, for example `06:00-09:00` and
+`17:00-20:00` on separate lines. Windows may cross midnight; all other times
+use the standard rate. Window boundaries must fall on quarter hours, must not
+overlap and must leave some time
 at the standard rate. Select **two to four quarters** from the operator's
 schedule. Outside those quarters, the standard rate applies. There are no
 invented default prices, time windows or tariff year: copy these from the
@@ -154,8 +156,8 @@ published price sheet. The form uses Home Assistant's configured timezone,
 including daylight saving changes. Check that this agrees with your operator's
 price sheet.
 A different tariff year makes the price unknown until you update the settings.
-Published schedules with more daily windows are not supported by this form;
-use a sensor supplying the complete correct price instead.
+The form accepts up to eight high and eight low periods. For more complex
+published schedules, use a sensor supplying the complete correct price instead.
 
 The selected tariff must match the operator's published schedule and your
 contract. The integration validates the input structure, not legal eligibility.

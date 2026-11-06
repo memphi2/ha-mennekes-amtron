@@ -809,21 +809,21 @@
       },
       "cost_network": {
         "title": "Nettarief: module {module}",
-        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de tijdzone van Home Assistant en hele minuten. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet.",
+        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de tijdzone van Home Assistant en kwartiergrenzen. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet.",
         "data": {
           "regular_network": "Normaal nettarief (standaardtarief)",
           "price_includes_network": "De stroomprijs bevat al het normale nettarief",
           "high_network": "Hoog nettarief (HT)",
           "low_network": "Laag nettarief (NT)",
-          "high_start": "Hoog tarief begint",
-          "high_end": "Hoog tarief eindigt",
-          "low_start": "Laag tarief begint",
-          "low_end": "Laag tarief eindigt",
           "active_quarters": "Kwartalen met tijdsafhankelijke nettarieven",
-          "tariff_year": "Jaar van de prijslijst"
+          "tariff_year": "Jaar van de prijslijst",
+          "high_periods": "Hoogtariefperioden",
+          "low_periods": "Laagtariefperioden"
         },
         "data_description": {
-          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen."
+          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen.",
+          "high_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan.",
+          "low_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan."
         }
       }
     },
@@ -833,7 +833,7 @@
       "loss_source_invalid": "Selecteer een ondersteunde bron voor laadverliezen en stel het bijbehorende voertuig of de sensor in.",
       "cost_source_invalid": "Selecteer een ondersteunde kostenbron en een sensorentiteit voor een prijs uit een sensor.",
       "cost_price_invalid": "Voer een eindige prijs inclusief belastingen tussen −1000 en 1000 EUR/kWh in. Negatieve prijzen zijn toegestaan.",
-      "network_tariff_invalid": "Controleer nettarieven inclusief belastingen, het tariefjaar, twee tot vier actieve kwartalen en tijdvakken. HT moet hoger zijn dan het standaardtarief; NT moet lager en niet negatief zijn. Tijdvakken moeten hele minuten gebruiken, niet overlappen en tijd voor het standaardtarief overlaten."
+      "network_tariff_invalid": "Controleer brutoprijzen, tariefjaar, twee tot vier actieve kwartalen en hoog/laagperioden. Eén HH:MM-HH:MM per regel op kwartiergrenzen, zonder overlap en met ruimte voor het standaardtarief."
     }
   },
   "selector": {

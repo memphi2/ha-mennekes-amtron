@@ -19,12 +19,10 @@ from custom_components.mennekes_amtron_rtu.charging_cost_const import (
     CONF_CHARGING_NETWORK_TARIFF,
     CONF_CHARGING_PRICE,
     CONF_CHARGING_PRICE_ENTITY,
-    CONF_HIGH_END,
     CONF_HIGH_NETWORK,
-    CONF_HIGH_START,
-    CONF_LOW_END,
+    CONF_HIGH_PERIODS,
     CONF_LOW_NETWORK,
-    CONF_LOW_START,
+    CONF_LOW_PERIODS,
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
@@ -51,10 +49,8 @@ NETWORK = {
     CONF_PRICE_INCLUDES_NETWORK: True,
     CONF_HIGH_NETWORK: 0.2,
     CONF_LOW_NETWORK: 0.01,
-    CONF_HIGH_START: "16:00:00",
-    CONF_HIGH_END: "20:00:00",
-    CONF_LOW_START: "22:00:00",
-    CONF_LOW_END: "06:00:00",
+    CONF_HIGH_PERIODS: "16:00-20:00",
+    CONF_LOW_PERIODS: "22:00-06:00",
     CONF_ACTIVE_QUARTERS: ["1", "4"],
     CONF_TARIFF_YEAR: 2026,
 }
@@ -251,19 +247,83 @@ def test_editing_an_existing_network_tariff_populates_all_published_values():
         markers = {marker.schema: marker for marker in network["data_schema"].schema}
         assert markers[CONF_REGULAR_NETWORK].description["suggested_value"] == 0.1
         assert markers[CONF_ACTIVE_QUARTERS].description["suggested_value"] == ["1", "4"]
-        assert markers[CONF_HIGH_START].description["suggested_value"] == "16:00"
-        assert markers[CONF_LOW_END].description["suggested_value"] == "06:00"
-        whole_minutes = {key: value[:5] if key.endswith(("_start", "_end")) else value for key, value in NETWORK.items()}
-        assert (await flow.async_step_cost_network(whole_minutes))["type"] == "create_entry"
+        assert markers[CONF_HIGH_PERIODS].description["suggested_value"] == "16:00-20:00"
+        assert markers[CONF_LOW_PERIODS].description["suggested_value"] == "22:00-06:00"
+        assert (await flow.async_step_cost_network(dict(NETWORK)))["type"] == "create_entry"
+
+    asyncio.run(run())
+
+
+def test_module_three_accepts_multiple_quarter_hour_periods_and_preserves_them():
+    async def run():
+        flow = _flow()
+        await flow.async_step_init(_values())
+        await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        periods = {
+            **NETWORK,
+            CONF_HIGH_PERIODS: "06:00-09:00\n17:00-20:00",
+            CONF_LOW_PERIODS: "22:00-06:00\n12:00-13:30",
+        }
+        result = await flow.async_step_cost_network(periods)
+        assert result["type"] == "create_entry"
+        tariff = TariffConfig.parse(result["data"][CONF_CHARGING_NETWORK_TARIFF])
+        assert len(tariff.windows) == 4
+        assert tariff.windows[0].as_dict() == {"start": "06:00", "end": "09:00", "rate": "ht"}
+        assert tariff.windows[-1].as_dict() == {"start": "12:00", "end": "13:30", "rate": "nt"}
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("replacement", [NETWORK_MODULE_2, NETWORK_MODULE_NONE])
+def test_back_from_module_three_can_select_another_network_module(replacement):
+    async def run():
+        flow = _flow()
+        await flow.async_step_init(_values())
+        network = await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        assert network["step_id"] == "cost_network"
+        back = await flow.async_step_cost_fixed()
+        assert back["step_id"] == "cost_fixed"
+        marker = next(key for key in back["data_schema"].schema if key.schema == CONF_CHARGING_NETWORK_MODULE)
+        assert marker.default() == NETWORK_MODULE_3
+        result = await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: replacement,
+        })
+        if replacement == NETWORK_MODULE_2:
+            assert result["step_id"] == "cost_network"
+            result = await flow.async_step_cost_network({
+                CONF_REGULAR_NETWORK: 0.1, CONF_PRICE_INCLUDES_NETWORK: True,
+            })
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_CHARGING_NETWORK_TARIFF]["module"] == replacement
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("previous", [None, "module_3", {"windows": None}, {"windows": [{}]}])
+def test_old_or_partial_tariff_cannot_crash_opening_module_three(previous):
+    async def run():
+        flow = _flow(options={CONF_CHARGING_NETWORK_TARIFF: previous})
+        await flow.async_step_init(_values())
+        result = await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        assert result["step_id"] == "cost_network"
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("changes", [
-    {CONF_HIGH_START: "16:00:01"},
-    {CONF_HIGH_START: None},
-    {CONF_HIGH_START: "25:00"},
-    {CONF_LOW_START: "19:00"},
+    {CONF_HIGH_PERIODS: "16:00:01-20:00"},
+    {CONF_HIGH_PERIODS: None},
+    {CONF_HIGH_PERIODS: "25:00-20:00"},
+    {CONF_HIGH_PERIODS: "16:10-20:00"},
+    {CONF_HIGH_PERIODS: "16:00-20:00\n17:00-18:00"},
+    {CONF_HIGH_PERIODS: "16:00-20:00\n" * 9},
+    {CONF_LOW_PERIODS: "19:00-21:00"},
     {CONF_ACTIVE_QUARTERS: "1,4"},
     {CONF_ACTIVE_QUARTERS: [1, 4]},
     {CONF_ACTIVE_QUARTERS: ["1"]},
@@ -314,13 +374,13 @@ def test_cost_schema_has_no_invented_tariff_prices_or_windows():
     markers = {marker.schema: marker for marker in schema.schema}
     for key in (
         CONF_REGULAR_NETWORK, CONF_HIGH_NETWORK, CONF_LOW_NETWORK,
-        CONF_HIGH_START, CONF_HIGH_END, CONF_LOW_START, CONF_LOW_END, CONF_TARIFF_YEAR,
+        CONF_HIGH_PERIODS, CONF_LOW_PERIODS, CONF_TARIFF_YEAR,
     ):
         assert not callable(markers[key].default)
         assert markers[key].description["suggested_value"] is None
     assert markers[CONF_PRICE_INCLUDES_NETWORK].default() is True
-    for key in (CONF_HIGH_START, CONF_HIGH_END, CONF_LOW_START, CONF_LOW_END):
-        assert schema.schema[markers[key]].selector_type == "time"
+    for key in (CONF_HIGH_PERIODS, CONF_LOW_PERIODS):
+        assert schema.schema[markers[key]].selector_type == "text"
     assert schema.schema[markers[CONF_ACTIVE_QUARTERS]].config["multiple"] is True
     with pytest.raises(probatio.Invalid, match="required key"):
         schema({})

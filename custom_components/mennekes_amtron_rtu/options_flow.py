@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
@@ -26,12 +27,10 @@ from .charging_cost_const import (
     CONF_CHARGING_NETWORK_TARIFF,
     CONF_CHARGING_PRICE,
     CONF_CHARGING_PRICE_ENTITY,
-    CONF_HIGH_END,
     CONF_HIGH_NETWORK,
-    CONF_HIGH_START,
-    CONF_LOW_END,
+    CONF_HIGH_PERIODS,
     CONF_LOW_NETWORK,
-    CONF_LOW_START,
+    CONF_LOW_PERIODS,
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
@@ -192,7 +191,11 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         self, source: str, user_input: dict[str, Any] | None
     ) -> ConfigFlowResult:
         pending = self._pending_options
-        if pending is None or self._pending_step != f"cost_{source}":
+        if (
+            pending is None
+            or pending.get(CONF_CHARGING_COST_SOURCE) != source
+            or self._pending_step not in (f"cost_{source}", "cost_network")
+        ):
             return await self.async_step_init()
         errors = _cost_errors(source, user_input) if user_input is not None else {}
         if user_input is not None and not errors:
@@ -208,9 +211,14 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
             return await self.async_step_cost_network()
         current = dict(self.config_entry.options) if user_input is None else user_input
         if user_input is None:
-            current[CONF_CHARGING_NETWORK_MODULE] = current.get(
-                CONF_CHARGING_NETWORK_TARIFF, {}
-            ).get("module", NETWORK_MODULE_NONE)
+            # Back navigation from Module 3 must show the draft that the user
+            # just entered, not the older saved options.
+            current.update(pending)
+            previous = current.get(CONF_CHARGING_NETWORK_TARIFF)
+            current[CONF_CHARGING_NETWORK_MODULE] = (
+                previous.get("module", NETWORK_MODULE_NONE)
+                if isinstance(previous, dict) else NETWORK_MODULE_NONE
+            )
         return self.async_show_form(
             step_id=f"cost_{source}",
             data_schema=cost_source_schema(current, source=source),
@@ -236,9 +244,11 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
                 errors["base"] = "network_tariff_invalid"
             else:
                 return self._finish_options(pending)
-        current = _network_form_values(dict(self.config_entry.options).get(
-            CONF_CHARGING_NETWORK_TARIFF, {}
-        )) if user_input is None else user_input
+        previous = dict(self.config_entry.options).get(CONF_CHARGING_NETWORK_TARIFF)
+        current = (
+            _network_form_values(previous if isinstance(previous, dict) else {})
+            if user_input is None else user_input
+        )
         return self.async_show_form(
             step_id="cost_network",
             data_schema=cost_network_schema(current, module=module),
@@ -351,29 +361,43 @@ def _network_tariff(values: dict[str, Any], *, module: str, timezone: str) -> di
             CONF_TARIFF_YEAR: values[CONF_TARIFF_YEAR],
             "timezone": timezone,
             "windows": [
-                {"start": _tariff_time(values[CONF_HIGH_START]), "end": _tariff_time(values[CONF_HIGH_END]), "rate": "ht"},
-                {"start": _tariff_time(values[CONF_LOW_START]), "end": _tariff_time(values[CONF_LOW_END]), "rate": "nt"},
+                *_tariff_periods(values[CONF_HIGH_PERIODS], "ht"),
+                *_tariff_periods(values[CONF_LOW_PERIODS], "nt"),
             ],
         })
     return TariffConfig.parse(tariff).as_dict()
 
 
-def _tariff_time(value: Any) -> str:
-    """The HA time selector includes seconds; network windows use whole minutes."""
-    if isinstance(value, str) and len(value) == 8 and value.endswith(":00"):
-        return value[:5]
-    if isinstance(value, str) and len(value) == 5:
-        return value
-    raise ValueError("network time must use whole minutes")
+def _tariff_periods(value: object, rate: str) -> list[dict[str, str]]:
+    """Parse one HH:MM-HH:MM interval per line, including overnight windows."""
+    if not isinstance(value, str) or not 1 <= len(value) <= 512:
+        raise ValueError("tariff periods must be short text")
+    lines = value.splitlines()
+    if not 1 <= len(lines) <= 8:
+        raise ValueError("tariff periods require one to eight lines")
+    windows: list[dict[str, str]] = []
+    for line in lines:
+        match = re.fullmatch(r"\s*([0-2][0-9]:[0-5][0-9])\s*[-\u2013]\s*([0-2][0-9]:[0-5][0-9])\s*", line)
+        if match is None:
+            raise ValueError("tariff period must be HH:MM-HH:MM")
+        windows.append({"start": match[1], "end": match[2], "rate": rate})
+    return windows
 
 
 def _network_form_values(tariff: dict[str, Any]) -> dict[str, Any]:
     values = dict(tariff)
-    values[CONF_ACTIVE_QUARTERS] = [str(value) for value in tariff.get(CONF_ACTIVE_QUARTERS, [])]
-    for window in tariff.get("windows", []):
-        prefix = "high" if window["rate"] == "ht" else "low"
-        values[f"{prefix}_start"] = window["start"]
-        values[f"{prefix}_end"] = window["end"]
+    quarters = tariff.get(CONF_ACTIVE_QUARTERS)
+    values[CONF_ACTIVE_QUARTERS] = [str(value) for value in quarters] if isinstance(quarters, list) else []
+    windows = tariff.get("windows")
+    windows = windows if isinstance(windows, list) else []
+    for rate, key in (("ht", CONF_HIGH_PERIODS), ("nt", CONF_LOW_PERIODS)):
+        values[key] = "\n".join(
+            f"{window['start']}-{window['end']}"
+            for window in windows if isinstance(window, dict)
+            and window.get("rate") == rate
+            and isinstance(window.get("start"), str)
+            and isinstance(window.get("end"), str)
+        )
     return values
 
 

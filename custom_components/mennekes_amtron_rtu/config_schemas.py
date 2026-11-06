@@ -19,7 +19,8 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
-    TimeSelector,
+    TextSelector,
+    TextSelectorConfig,
 )
 
 from ._flow_serial import PortOption
@@ -37,12 +38,10 @@ from .charging_cost_const import (
     CONF_CHARGING_NETWORK_MODULE,
     CONF_CHARGING_PRICE,
     CONF_CHARGING_PRICE_ENTITY,
-    CONF_HIGH_END,
     CONF_HIGH_NETWORK,
-    CONF_HIGH_START,
-    CONF_LOW_END,
+    CONF_HIGH_PERIODS,
     CONF_LOW_NETWORK,
-    CONF_LOW_START,
+    CONF_LOW_PERIODS,
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
@@ -391,10 +390,10 @@ def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Sch
             fields[probatio.Required(
                 key, description={"suggested_value": current.get(key)},
             )] = _price_selector()
-        for key in (CONF_HIGH_START, CONF_HIGH_END, CONF_LOW_START, CONF_LOW_END):
+        for key in (CONF_HIGH_PERIODS, CONF_LOW_PERIODS):
             fields[probatio.Required(
                 key, description={"suggested_value": current.get(key)},
-            )] = TimeSelector()
+            )] = TextSelector(TextSelectorConfig(multiline=True))
         fields[probatio.Required(
             CONF_ACTIVE_QUARTERS,
             description={"suggested_value": current.get(CONF_ACTIVE_QUARTERS)},

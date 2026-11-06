@@ -809,21 +809,21 @@
       },
       "cost_network": {
         "title": "Network tariff: module {module}",
-        "description": "Copy gross prices from your network operator’s price sheet. Module 2 uses 40% of the regular network price. Module 3 uses the published high and low prices in the selected quarters and tariff year; remaining times use the standard price. Use Home Assistant’s time zone and whole minutes. Windows may cross midnight but must not overlap. These settings estimate variable charging costs; they do not establish eligibility or change your contract.",
+        "description": "Copy gross prices from your network operator’s price sheet. Module 2 uses 40% of the regular network price. Module 3 uses the published high and low prices in the selected quarters and tariff year; remaining times use the standard price. Use Home Assistant’s time zone and quarter-hour boundaries. Windows may cross midnight but must not overlap. These settings estimate variable charging costs; they do not establish eligibility or change your contract.",
         "data": {
           "regular_network": "Regular network price (standard tariff)",
           "price_includes_network": "Electricity price already includes the regular network price",
           "high_network": "High network price (HT)",
           "low_network": "Low network price (NT)",
-          "high_start": "High tariff starts",
-          "high_end": "High tariff ends",
-          "low_start": "Low tariff starts",
-          "low_end": "Low tariff ends",
           "active_quarters": "Quarters with time-variable network prices",
-          "tariff_year": "Price-sheet year"
+          "tariff_year": "Price-sheet year",
+          "high_periods": "High tariff periods",
+          "low_periods": "Low tariff periods"
         },
         "data_description": {
-          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice."
+          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice.",
+          "high_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed.",
+          "low_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed."
         }
       }
     },
@@ -833,7 +833,7 @@
       "loss_source_invalid": "Select a supported charging loss source and configure its matching vehicle or sensor.",
       "cost_source_invalid": "Select a supported cost source and a sensor entity for a sensor-based price.",
       "cost_price_invalid": "Enter a finite gross price in EUR/kWh between −1000 and 1000. Negative prices are allowed.",
-      "network_tariff_invalid": "Check the gross network prices, tariff year, two to four active quarters and time windows. HT must exceed the standard price; NT must be lower and nonnegative. Windows must use whole minutes, must not overlap and must leave time for the standard tariff."
+      "network_tariff_invalid": "Check the gross prices, tariff year, two to four active quarters and HT/NT periods. Use one 15-minute-aligned HH:MM-HH:MM period per line; periods must not overlap and must leave standard-tariff time."
     }
   },
   "selector": {

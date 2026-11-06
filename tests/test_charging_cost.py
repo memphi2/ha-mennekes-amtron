@@ -127,12 +127,13 @@ def test_quarter_switch_and_year_expiry_split_a_meter_interval():
     config(windows=[]), config(windows=[window()]),
     config(windows=[window(), window("10:00", "11:00")]),
     config(windows=[window(), window("23:00", "01:00", "ht")]),
+    config(windows=[window("22:10", "06:00"), window("17:00", "20:00", "ht")]),
     config(windows=[window("00:00", "12:00"), window("12:00", "00:00", "ht")]),
     config(timezone="missing/timezone"), config(timezone="/absolute"),
     config(timezone="a" * 256), config(timezone=False),
 ])
 def test_invalid_tariff_configuration_is_rejected(raw):
-    with pytest.raises(ValueError, match=r"invalid|must|requires|overlap|is required|require low_network"):
+    with pytest.raises(ValueError, match=r"invalid|must|require|overlap"):
         TariffConfig.parse(raw)
 
 

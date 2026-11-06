@@ -809,21 +809,21 @@
       },
       "cost_network": {
         "title": "Netzentgelt: Modul {module}",
-        "description": "Übernimm die Bruttopreise aus dem Preisblatt deines Netzbetreibers. Modul 2 verwendet 40 % des regulären Netzentgelts. Modul 3 verwendet in den gewählten Quartalen und im angegebenen Tarifjahr die veröffentlichten Hoch- und Niedrigtarife; sonst gilt der Standardtarif. Es gelten die Zeitzone von Home Assistant und volle Minuten. Zeitfenster dürfen über Mitternacht reichen, sich aber nicht überschneiden. Diese Angaben schätzen variable Ladekosten; sie bestätigen keine Berechtigung und ändern keinen Vertrag.",
+        "description": "Übernimm die Bruttopreise aus dem Preisblatt deines Netzbetreibers. Modul 2 verwendet 40 % des regulären Netzentgelts. Modul 3 verwendet in den gewählten Quartalen und im angegebenen Tarifjahr die veröffentlichten Hoch- und Niedrigtarife; sonst gilt der Standardtarif. Es gelten die Zeitzone von Home Assistant und Viertelstundengrenzen. Zeitfenster dürfen über Mitternacht reichen, sich aber nicht überschneiden. Diese Angaben schätzen variable Ladekosten; sie bestätigen keine Berechtigung und ändern keinen Vertrag.",
         "data": {
           "regular_network": "Reguläres Netzentgelt (Standardtarif)",
           "price_includes_network": "Der Strompreis enthält bereits das reguläre Netzentgelt",
           "high_network": "Hohes Netzentgelt (HT)",
           "low_network": "Niedriges Netzentgelt (NT)",
-          "high_start": "Hochtarif beginnt",
-          "high_end": "Hochtarif endet",
-          "low_start": "Niedrigtarif beginnt",
-          "low_end": "Niedrigtarif endet",
           "active_quarters": "Quartale mit zeitvariablen Netzentgelten",
-          "tariff_year": "Jahr des Preisblatts"
+          "tariff_year": "Jahr des Preisblatts",
+          "high_periods": "Hochtarif-Zeiträume",
+          "low_periods": "Niedrigtarif-Zeiträume"
         },
         "data_description": {
-          "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden."
+          "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden.",
+          "high_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich.",
+          "low_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich."
         }
       }
     },
@@ -833,7 +833,7 @@
       "loss_source_invalid": "Wähle eine unterstützte Quelle für Ladeverluste und richte das passende Fahrzeug oder den Sensor ein.",
       "cost_source_invalid": "Wähle eine unterstützte Kostenquelle und für einen sensorbasierten Preis eine Sensor-Entität.",
       "cost_price_invalid": "Gib einen endlichen Bruttopreis zwischen −1000 und 1000 EUR/kWh an. Negative Preise sind erlaubt.",
-      "network_tariff_invalid": "Prüfe Bruttonetzentgelte, Tarifjahr, zwei bis vier aktive Quartale und Zeitfenster. HT muss über dem Standardtarif liegen, NT darunter und mindestens 0 betragen. Zeitfenster müssen volle Minuten verwenden, dürfen sich nicht überschneiden und müssen Zeit für den Standardtarif übrig lassen."
+      "network_tariff_invalid": "Prüfe Brutto-Netzentgelte, Tarifjahr, zwei bis vier aktive Quartale und HT/NT-Zeiträume. Je Zeile HH:MM-HH:MM mit Viertelstundengrenzen; keine Überschneidung und eine Standardtarifzeit muss bleiben."
     }
   },
   "selector": {
