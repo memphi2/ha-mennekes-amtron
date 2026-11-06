@@ -1,5 +1,5 @@
 name: Mennekes Amtron Modbus Service
-version: 0.5.2b2
+version: 0.6.0b1
 url: https://github.com/memphi2/ha-mennekes-amtron
 slug: mennekes_amtron_modbus
 description: Independent Modbus connection and heartbeat for Mennekes Amtron
@@ -12,6 +12,10 @@ init: true
 uart: true
 udev: true
 apparmor: true
+ingress: true
+ingress_port: 8099
+panel_admin: true
+panel_icon: mdi:ev-station
 discovery:
   - mennekes_amtron_rtu
 ports:
@@ -36,7 +40,7 @@ options:
   port: 8765
 schema:
   connection_type: 'list(USB / RS-485|LAN: Modbus RTU (TCP)|LAN: Modbus TCP)'
-  serial_port: device(subsystem=tty)?
+  serial_port: str?
   host: str?
   tcp_port: port
   device_id: int(10,50)

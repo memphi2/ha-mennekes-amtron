@@ -1,7 +1,7 @@
 configuration:
   serial_port:
-    name: Serial adapter
-    description: "For USB / RS-485 only: select the exclusive USB/RS-485 adapter, preferably its stable /dev/serial/by-id path. Leave unset for LAN."
+    name: Serial adapter (path)
+    description: "Choose the USB adapter from the dropdown in Open Web UI. Its path is saved here. Ignored for LAN and removed when saving LAN through the Web UI."
   device_id:
     name: Wallbox address
     description: Modbus address configured in the wallbox.
@@ -37,7 +37,7 @@ configuration:
     description: Fixed at 8765; host port publication is optional and normally unnecessary.
   connection_type:
     name: Wallbox connection
-    description: "USB / RS-485: local adapter. LAN: Modbus RTU (TCP): transparent network adapter. LAN: Modbus TCP: gateway translating TCP to RTU."
+    description: "Use Open Web UI to choose a USB adapter or enter the LAN host and port. Save changes, then restart the app."
   host:
     name: Adapter host / IP
     description: "Required for LAN: adapter host name or IP address, without a URL scheme or path. Leave empty for USB / RS-485. Use a trusted private network."
