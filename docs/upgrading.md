@@ -8,6 +8,25 @@ the Marketplace also keeps the same integration and entry.
 to select the integration prerelease and beta app catalog. Check the
 [app connection choice](#app-connection-choice) before updating the app.
 
+## Next beta — unreleased
+
+The next beta improves entity grouping and state-dependent icons, fixes false
+vehicle-disconnected states during wallbox faults, and names the display-only
+solar selector **Solar display mode**. Existing entity IDs and user customizations
+are retained; no device or entity needs deleting. Documentation of these changes
+on this branch does not mean they are part of the published 0.5.2b2 release.
+
+Six optional phase-voltage/power sensors now start disabled on new installations;
+existing registry settings are preserved. Session duration stops creating new
+long-term statistics without deleting old data. Total energy remains suitable
+for the Energy dashboard.
+
+The new **Control result** event entity starts disabled; enable it for command
+notifications when needed. Events work directly, or with a service that publishes the new
+optional event feed. Older API 2 services remain compatible, but their event
+entity is unavailable. Existing commands are not replayed as events after
+startup or reconnect.
+
 ## 0.5.2b2: configurable charging transitions
 
 Version 0.5.2b2 adds **Minimum time between state changes**, default **300

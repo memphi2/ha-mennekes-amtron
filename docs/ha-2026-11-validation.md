@@ -80,7 +80,8 @@ reconfiguration paths no longer emit the update-listener warning.
 
 The existing 30-second measurement default limits state-history traffic.
 It does not change the fixed statistics cadence. With valid values, the
-default 17 statistics series generate 408 hourly rows per day. The documented
+then-default 17 statistics series generated 408 hourly rows per day. The next
+beta changes the defaults; see [Recorder](recorder.md#new-defaults-in-the-next-beta--unreleased). The documented
 exclusion profiles leave seven or two series; the latter retains total energy
 and power and generates 48 hourly rows per day. Excluded entities remain live.
 

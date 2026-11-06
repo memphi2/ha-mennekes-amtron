@@ -58,12 +58,13 @@ rules:
   docs-triggers:
     status: exempt
     comment: No integration-specific triggers are registered. [Automation examples](docs/automations.md)
-      use standard state and numeric-state triggers.
+      use standard state and numeric-state triggers, including state changes of the command-result event entity.
   entity-event-setup:
     status: done
     comment: The [heartbeat entity lifecycle](custom_components/mennekes_amtron_rtu/binary_sensor.py#AmtronHeartbeatSensor.async_added_to_hass)
       subscribes only after addition and registers cleanup with async_on_remove; coordinator entities
-      use the HA lifecycle. [Heartbeat entity tests](tests/test_binary_sensor.py) exercise transitions
+      use the HA lifecycle. The [command event entity](custom_components/mennekes_amtron_rtu/event.py#AmtronControlResultEvent.async_added_to_hass)
+      also registers listener cleanup. [Heartbeat entity tests](tests/test_binary_sensor.py) exercise transitions
       and removal.
   entity-unique-id:
     status: done
@@ -127,7 +128,7 @@ rules:
       recurring failure behavior.'
   parallel-updates:
     status: done
-    comment: 'All six [entity platforms](docs/entities.md) declare PARALLEL_UPDATES: reads use coordinator
+    comment: 'All seven [entity platforms](docs/entities.md) declare PARALLEL_UPDATES: reads use coordinator
       updates, controls serialize operations. The [bus client](custom_components/mennekes_amtron_rtu/device/client.py)
       also locks each transaction.'
   reauthentication-flow:

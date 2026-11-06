@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
 ENTITY_REFERENCE = ROOT / "docs" / "entities.md"
 REGISTER_REFERENCE = ROOT / "docs" / "modbus-registers.md"
-LANGUAGES = ("en", "de")
+LANGUAGES = ("en", "de", "fr", "it", "nl")
 
 # Rows of the three tables in docs/modbus-registers.md. The row patterns are
 # anchored at both ends so a table with a different column count cannot match
@@ -403,6 +403,7 @@ def _entity_keys() -> dict[str, set[str]]:
         "switch": {"charging_paused", "charging_release", "lock_evse"},
         "select": {"solar_charging_mode", "requested_phases"},
         "button": {"recover_from_error", "restart"},
+        "event": {"control_result"},
     }
 
 

@@ -8,6 +8,22 @@ The integration does not set a database size limit. Keep automatic purging
 enabled and monitor free disk space; hourly long-term statistics continue growing
 even with short history retention.
 
+## New defaults in the next beta — unreleased
+
+On new installations, the three phase-voltage and three phase-power entities
+start disabled. Enable individual readings under **Settings → Devices & services
+→ Entities** when needed. Existing entity choices are preserved. Phase currents,
+total power and energy stay enabled. Session duration remains visible but no
+longer creates new long-term statistics; existing statistics are retained.
+
+The **Control result** event entity starts disabled because frequent PV current
+commands can create many outcomes. Enable it only if you need those events for
+automations. Its feed is bounded in memory, but recording an enabled entity adds
+one state change per observed outcome: a command every five seconds could add
+17,280 rows per day. Exclude its actual entity ID from `recorder.exclude.entities`
+if you only need live notifications. Exclusion does not stop automation triggers.
+Heartbeats and polls create no command events.
+
 ## Choose the history you need
 
 Keep **30-second measurements** unless your automations need faster readings.

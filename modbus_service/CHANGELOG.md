@@ -1,5 +1,11 @@
 # Changes
 
+## Unreleased
+
+- Expose a bounded optional command-outcome feed for HA automations. Confirm recovery
+  success from fresh error status; keep polling and heartbeats out of the feed.
+  Existing API 2 clients remain compatible.
+
 ## 0.5.2b2
 
 - Persist executed queued stop intent before refreshing wallbox status, so a

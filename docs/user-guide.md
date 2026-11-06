@@ -182,7 +182,7 @@ The [PV blueprints](blueprints.md) adjust current and pause/resume charging from
 your available power budget. [Automation examples](automations.md) include a
 tariff schedule.
 
-**Solar charging mode** changes the mode shown on the wallbox; it does not
+**Solar display mode** (called **Solar charging mode** in 0.5.2b2) changes the mode shown on the wallbox; it does not
 measure PV surplus or run a surplus-charging algorithm. It requires the hardware
 configuration described in the [hardware guide](hardware.md).
 

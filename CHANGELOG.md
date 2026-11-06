@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Preserve vehicle presence during wallbox faults when CP confirms a connected
+  vehicle; report unknown for ambiguous or conflicting status.
+- Improve state-dependent entity icons and group technical details under
+  diagnostics. Name the display-only solar control and wallbox phase feedback
+  according to their actual function, retaining existing entity identities.
+
+- Add an opt-in command-result event entity for accepted, replaced, cancelled, failed and uncertain
+  requests, plus verified recovery outcomes. Bound the service feed and suppress
+  historical replay on startup or reconnect; older compatible services still work.
+- Disable optional per-phase voltage/power entities on new installations and stop
+  creating long-term statistics for session duration. Keep existing user choices.
+- Share pause/release intent restoration and tighten entity typing without changing
+  saved intent, device identities or the HA-independent device boundary.
+
 ## 0.5.2b2 — 2026-11-06
 
 - Persist executed queued stop intent before refreshing wallbox status, so a

@@ -110,6 +110,57 @@ Repeated recovery is not a substitute for a functioning connection.
 Use **Notify on a grid-operator downgrade** to see when a hardware restriction
 starts and ends. The integration observes that restriction; it cannot remove it.
 
+## React to command results — next beta, unreleased
+
+Enable **Control result** under **Settings → Devices & services → Entities**
+first; it starts disabled to avoid history growth from frequent current commands.
+You can [exclude it from Recorder](recorder.md#new-defaults-in-the-next-beta--unreleased)
+while keeping live automation triggers. Use it to notify you about a rejected command, an uncertain
+write, a phase-pause timeout or a recovery that did not clear the error. In the
+UI, add a state trigger for the event entity, then filter its `event_type`
+attribute. This follows Home Assistant's [event-entity pattern](https://www.home-assistant.io/integrations/event/).
+Use a state trigger, not a raw event-bus trigger.
+
+This example excludes startup/restored state and availability-only changes.
+Replace the entity ID with your actual **Control result** entity. The action
+and reason in the message are stable automation values, so they work in every
+UI language. Read the [event meanings](entities.md#command-events--next-beta-unreleased)
+before using an outcome to issue another command.
+
+```yaml
+alias: Wallbox command needs attention
+triggers:
+  - trigger: state
+    entity_id: event.mennekes_amtron_control_result
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.from_state is not none
+         and trigger.to_state is not none
+         and trigger.from_state.state != 'unavailable'
+         and not trigger.from_state.attributes.get('restored', false)
+         and trigger.to_state.state not in ['unknown', 'unavailable']
+         and trigger.to_state.state != trigger.from_state.state
+         and trigger.to_state.attributes.event_type
+             in ['failed', 'uncertain', 'recovery_failed'] }}
+actions:
+  - action: persistent_notification.create
+    data:
+      notification_id: wallbox_command_attention
+      title: Wallbox command needs attention
+      message: >-
+        {{ trigger.to_state.attributes.action }}:
+        {{ trigger.to_state.attributes.reason }}.
+        Check the wallbox status before retrying.
+mode: queued
+max: 10
+```
+
+The feed does not replay outcomes missed while HA was
+disconnected. Use current state to reconcile after reconnect; this event entity
+is not a persistent command journal. A service must support the new optional
+feed; earlier compatible services expose the event entity as unavailable.
+
 ## Call the current action
 
 For a normal current limit, use `number.set_value` as in the schedule above.
