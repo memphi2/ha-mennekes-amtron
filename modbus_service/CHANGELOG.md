@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Remove duplicate connection choices: only **USB / RS-485**, **LAN: Modbus RTU
+  (TCP)** and **LAN: Modbus TCP** are shown. If an old technical name is saved,
+  select its matching readable choice once; 0.5.1 supports doing this before
+  the update. Existing readable selections and other settings stay unchanged.
 - Add a custom AppArmor profile that Supervisor loads with protection mode on.
   App options stay read-only; the service can maintain its own token and charging
   state and communicate over USB/LAN. Native AMD64/ARM64 tests exercise all three

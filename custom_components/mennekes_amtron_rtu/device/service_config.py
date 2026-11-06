@@ -8,9 +8,8 @@ from typing import Any, Literal, cast
 from .connection import ConnectionConfig, NetworkConfig, SerialConfig
 from .const import SUPPORTED_BAUDRATES, frame_parts
 
-# Supervisor displays literal list values and also validates saved options against
-# them at startup. Keep the three published 0.5.0 values alongside the readable
-# App choices; normalize only here so all transports keep their canonical names.
+# The app exposes only three readable choices. Standalone JSON configurations
+# keep their canonical transport names; normalize both forms at this boundary.
 _CONNECTION_TYPES = {
     "USB / RS-485": "serial",
     "LAN: Modbus RTU (TCP)": "rtu_over_tcp",

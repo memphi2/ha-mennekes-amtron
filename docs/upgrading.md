@@ -26,6 +26,25 @@ restore missing controls.
 
 After blueprint changes, follow [Updating existing blueprint automations](blueprints.md#updating-existing-blueprint-automations).
 
+## App connection choice
+
+The beta app has exactly three choices. If your saved choice already has a
+readable name, keep it. Otherwise select the matching name once:
+
+| Older saved value | Select |
+|---|---|
+| `serial` | **USB / RS-485** |
+| `rtu_over_tcp` | **LAN: Modbus RTU (TCP)** |
+| `modbus_tcp` | **LAN: Modbus TCP** |
+
+In app 0.5.1, select and save the readable name **before updating**. Retain the
+adapter/IP, port and other settings. Supervisor skips automatic updates while
+the saved choice is incompatible. If a manual app update rejects an old value,
+the **Configuration** tab remains available: select the matching name, save,
+and start the app. There is no automatic USB fallback and no need to reinstall
+the app or remove the HA entry. Standalone JSON configurations continue to
+accept their existing technical names.
+
 ## Optional move to the service
 
 Direct USB and LAN connections remain supported. On Home Assistant OS, the independent

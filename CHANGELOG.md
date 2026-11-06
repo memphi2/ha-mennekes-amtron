@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Show exactly three readable app connection choices. Older technical choices
+  need a one-time selection of their matching readable name; standalone
+  configuration files keep accepting the technical names.
 - Add a custom AppArmor profile for the Supervisor app, with limited runtime and
   state-file access, plus a dedicated enforcement check using simulated USB/LAN
   transports on native AMD64 and ARM64 runners before publishing an app image.

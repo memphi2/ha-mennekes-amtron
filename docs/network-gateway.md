@@ -69,9 +69,10 @@ For a standalone service, use the [LAN configuration example](service-standalone
 ### App 0.5.0 configuration
 
 App 0.5.0 remains compatible with the integration. Its list uses the values
-`serial`, `rtu_over_tcp` and `modbus_tcp`; those saved values remain valid after
-an update. In app 0.5.1 they appear after the readable choices, and changing them
-is optional.
+`serial`, `rtu_over_tcp` and `modbus_tcp`. App 0.5.1 shows those values alongside
+the readable choices. The beta removes the duplicates; before updating from
+0.5.1, select the matching readable choice once. See
+[Updating the connection choice](upgrading.md#app-connection-choice).
 
 If 0.5.0 shows the TCP port without a host field, enable **Show unused optional
 configuration options** on the app's Configuration tab. Alternatively, open its

@@ -33,7 +33,7 @@ options:
   listen: 0.0.0.0
   port: 8765
 schema:
-  connection_type: 'list(USB / RS-485|LAN: Modbus RTU (TCP)|LAN: Modbus TCP|serial|rtu_over_tcp|modbus_tcp)'
+  connection_type: 'list(USB / RS-485|LAN: Modbus RTU (TCP)|LAN: Modbus TCP)'
   serial_port: device(subsystem=tty)?
   host: str?
   tcp_port: port

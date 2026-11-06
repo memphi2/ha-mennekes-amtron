@@ -26,6 +26,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODES = ("serial", "rtu_over_tcp", "modbus_tcp")
+APP_CONNECTIONS = {
+    "serial": "USB / RS-485",
+    "rtu_over_tcp": "LAN: Modbus RTU (TCP)",
+    "modbus_tcp": "LAN: Modbus TCP",
+}
 
 
 def command(*args: str, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -103,7 +108,7 @@ def exercise_mode(image: str, name: str, mode: str, directory: Path) -> dict[str
     data = directory / mode
     data.mkdir()
     (data / "options.json").write_text(json.dumps({
-        "connection_type": mode,
+        "connection_type": APP_CONNECTIONS[mode],
         "serial_port": "/dev/serial/by-id/amtron-test",
         "baudrate": "57600",
         "frame": "8n2",

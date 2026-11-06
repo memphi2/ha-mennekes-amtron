@@ -31,7 +31,7 @@ configuration:
     description: Fixed at 8765; host port publication is optional and normally unnecessary.
   connection_type:
     name: Wallbox connection
-    description: "USB / RS-485: local adapter. LAN: Modbus RTU (TCP): transparent network adapter. LAN: Modbus TCP: gateway translating TCP to RTU. The old serial, rtu_over_tcp and modbus_tcp choices remain valid for existing configurations."
+    description: "USB / RS-485: local adapter. LAN: Modbus RTU (TCP): transparent network adapter. LAN: Modbus TCP: gateway translating TCP to RTU."
   host:
     name: Adapter host / IP
     description: "Required for LAN: adapter host name or IP address, without a URL scheme or path. Leave empty for USB / RS-485. Use a trusted private network."

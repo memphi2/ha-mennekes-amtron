@@ -83,9 +83,10 @@ Changing the connection choice does not hide or reveal other fields.
 | Current cap | The permitted charging current for your installation; default **6 A**. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. The measurement interval helps limit database traffic. |
 
-Existing 0.5.0 settings named `serial`, `rtu_over_tcp` or `modbus_tcp` remain
-valid and also appear at the end of the list; changing to their readable
-counterparts is optional. No connection is changed automatically.
+The beta app shows exactly these three connection choices. When updating an
+older app with a saved technical connection name, select the matching readable
+choice once; see [Updating the connection choice](upgrading.md#app-connection-choice).
+The transport is never changed automatically to USB.
 Still on app 0.5.0 and missing the host field? See the
 [0.5.0 configuration workaround](network-gateway.md#app-050-configuration).
 

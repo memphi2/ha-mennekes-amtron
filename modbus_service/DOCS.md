@@ -59,9 +59,13 @@ leave it empty for USB. If **Serial adapter** is hidden, enable **Show unused
 optional configuration options** on the Configuration tab. The form does not
 show or hide other fields when you change the connection choice.
 
-Existing values `serial`, `rtu_over_tcp` and `modbus_tcp` remain valid and appear
-at the end of the list. You can choose the corresponding readable name, but
-existing connections are not changed automatically. For a missing host field
+The beta app shows exactly three connection choices. If an older app still has
+a technical name saved, select its matching readable choice once:
+`serial` → **USB / RS-485**, `rtu_over_tcp` → **LAN: Modbus RTU (TCP)**,
+`modbus_tcp` → **LAN: Modbus TCP**. App 0.5.1 already lets you save this choice
+before updating. Keep your existing adapter/IP and other settings. If an update
+rejects an old choice, select and save the matching choice in Configuration,
+then start the app. No invalid choice falls back to USB. For a missing host field
 in 0.5.0, use the [older-app workaround](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/network-gateway.md#app-050-configuration).
 
 Leave the app's API settings at their defaults: HTTP port **8765** is separate

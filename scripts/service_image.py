@@ -70,6 +70,7 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
         options.write_text(
             json.dumps(
                 {
+                    "connection_type": "USB / RS-485",
                     "serial_port": "/dev/amtron-test-absent",
                     # Supervisor's list(...) selector serializes numbers as text.
                     "baudrate": "57600",
