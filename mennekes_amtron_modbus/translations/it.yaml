@@ -31,7 +31,7 @@ configuration:
     description: Fissa a 8765; esporre la porta sull'host è facoltativo e normalmente non necessario.
   connection_type:
     name: Connessione wallbox
-    description: "USB / RS-485: adattatore locale. LAN: Modbus RTU (TCP): adattatore di rete trasparente. LAN: Modbus TCP: gateway che traduce TCP in RTU. I vecchi valori serial, rtu_over_tcp e modbus_tcp restano validi per le configurazioni esistenti."
+    description: "USB / RS-485: adattatore locale. LAN: Modbus RTU (TCP): adattatore di rete trasparente. LAN: Modbus TCP: gateway che traduce TCP in RTU."
   host:
     name: Host / indirizzo IP adattatore
     description: "Obbligatorio per LAN: nome host o indirizzo IP dell’adattatore, senza schema o percorso URL. Lascia vuoto per USB / RS-485. Usa una rete privata affidabile."

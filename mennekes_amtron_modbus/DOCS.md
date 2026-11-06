@@ -4,10 +4,14 @@ Keep the wallbox heartbeat running through Home Assistant Core restarts.
 This optional app is the preferred way to operate the integration: it holds
 the last charging state, including a deliberate pause, while HA is offline.
 
-**Version 0.5.1 · amd64 and aarch64 · separate integration required**
+**Beta 0.5.2b1 · amd64 and aarch64 · separate integration required**
+
+This prerelease is available through `#apps-beta`. The stable `#apps` catalog
+stays on **0.5.1**. See [Beta testing](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/installation.md#beta-testing-052b1)
+to select the matching integration prerelease and prepare an app update.
 
 LAN-to-RS-485 adapters are supported without local USB.
-See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/network-gateway.md)
+See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/network-gateway.md)
 for transparent RTU over TCP versus translating Modbus TCP-to-RTU gateways.
 
 [First setup](#first-setup) · [Daily use](#daily-use) ·
@@ -16,8 +20,9 @@ for transparent RTU over TCP versus translating Modbus TCP-to-RTU gateways.
 ## First setup
 
 For a new setup, install the **Mennekes Amtron RTU integration** and restart Home
-Assistant Core. Use the stable release in the Marketplace on HA 2026.11+, or
-HACS on older supported versions. The integration and this app are
+Assistant Core. For beta testing, select **0.5.2b1** in the Marketplace or HACS
+using the [beta guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/installation.md#beta-testing-052b1).
+The integration and this app are
 separate installations. Already using the app? Follow [Updates](#updates)
 instead: the app and integration can be updated independently.
 
@@ -54,14 +59,18 @@ instead: the app and integration can be updated independently.
 | Current cap | Default **6 A**; set within your installation's permitted current. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. |
 
-In app **0.5.1**, **Adapter host / IP** is always visible; enter it for LAN and
+**Adapter host / IP** is always visible; enter it for LAN and
 leave it empty for USB. If **Serial adapter** is hidden, enable **Show unused
 optional configuration options** on the Configuration tab. The form does not
 show or hide other fields when you change the connection choice.
 
-Existing values `serial`, `rtu_over_tcp` and `modbus_tcp` remain valid and appear
-at the end of the list. You can choose the corresponding readable name, but
-existing connections are not changed automatically. For a missing host field
+App **0.5.2b1** shows exactly three connection choices. If an older app still has
+a technical name saved, select its matching readable choice once:
+`serial` → **USB / RS-485**, `rtu_over_tcp` → **LAN: Modbus RTU (TCP)**,
+`modbus_tcp` → **LAN: Modbus TCP**. App 0.5.1 already lets you save this choice
+before updating. Keep your existing adapter/IP and other settings. If an update
+rejects an old choice, select and save the matching choice in Configuration,
+then start the app. No invalid choice falls back to USB. For a missing host field
 in 0.5.0, use the [older-app workaround](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/network-gateway.md#app-050-configuration).
 
 Leave the app's API settings at their defaults: HTTP port **8765** is separate
@@ -111,15 +120,16 @@ components need updating, update the app first**, wait for initialization, then
 update the integration and restart Core. **Updating the app itself briefly
 interrupts the heartbeat.** Keep its data and the existing HA entry.
 
-**From a 0.5.0 beta:** update this app to stable **0.5.1 first**, then the
+**From a 0.5.0 beta:** update this app to **0.5.2b1 first**, then the
 integration. The old beta integration may show unavailable controls between
-updates because its API differs. Stable app releases are offered in both app
-catalogs, so no reinstall or repository change is needed. The token and saved
-charging state are retained. Existing USB settings remain valid; switching to
-LAN is optional.
+updates because its API differs. Keep the existing beta app and its data; no
+reinstall is needed. If an older technical connection choice is rejected,
+select its matching readable name as described above before starting the app.
+The token, saved charging state and USB settings are retained; switching to LAN
+is optional.
 
-The beta repository ends in `#apps-beta` and also offers future prereleases;
-the stable-only repository uses `#apps`. Switching catalogs is optional and
+The beta repository ends in `#apps-beta` and offers **0.5.2b1**;
+the stable-only repository uses `#apps` and stays on **0.5.1**. Switching catalogs is optional and
 creates a different app in Supervisor. For that change, back up the data, note
 the charging settings and disconnect the vehicle. Copy the options, set the new
 app to **Read-only**, stop the old app before starting the new one, and confirm
@@ -127,13 +137,31 @@ its discovery. Keep the old app and backup until the handover is verified.
 The new app has separate saved state: note and verify pause, current and release
 settings as in the first setup before reconnecting the vehicle.
 
+## AppArmor protection
+
+**Included in 0.5.2b1:** stable 0.5.1 does not contain this custom profile.
+Supervisor loads it automatically when installing this beta app.
+Keep **Protection mode on**. The profile allows USB/LAN communication, heartbeat
+and the service's own token and saved charging state; app options remain
+read-only to the service.
+
+With default settings, **8/8** is possible after the installed custom profile
+has loaded. **7/8 before installation** is normal; the store rating is not
+proof of hardware testing. See [Supervisor's rating rules](https://contributors.home-assistant.io/apps/reference/security-rating/).
+
+If AppArmor denies an operation, inspect Supervisor logs and the host kernel
+log for `apparmor="DENIED"`. Report the operation and path with private details
+removed. Keep protection enabled while investigating the rejected access.
+Standalone Docker needs explicit host/profile configuration; direct HA mode
+uses HA's own security policy and does not automatically use this service profile.
+
 ## Help
 
 | Symptom | What to check |
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
 | Not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
-| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/troubleshooting.md#renew-service-access). |
+| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/troubleshooting.md#renew-service-access). |
 | Service API or minimum version is incompatible | Check the API and minimum service version required in the integration’s release notes. Version numbers do not need to match. Follow [Updates](#updates) if needed; changing the token does not fix this. |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
@@ -148,4 +176,4 @@ Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Error-200 recovery while paused and particular LAN gateways still need
 confirmation on the actual hardware; automated tests do not establish that.
 
-[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/modbus-service.md)
+[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/modbus-service.md)

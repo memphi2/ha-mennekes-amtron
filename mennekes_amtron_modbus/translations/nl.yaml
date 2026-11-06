@@ -31,7 +31,7 @@ configuration:
     description: Vast ingesteld op 8765; het beschikbaar stellen van een hostpoort is optioneel en meestal niet nodig.
   connection_type:
     name: Wallboxverbinding
-    description: "USB / RS-485: lokale adapter. LAN: Modbus RTU (TCP): transparante netwerkadapter. LAN: Modbus TCP: gateway die TCP naar RTU vertaalt. De oude waarden serial, rtu_over_tcp en modbus_tcp blijven geldig voor bestaande configuraties."
+    description: "USB / RS-485: lokale adapter. LAN: Modbus RTU (TCP): transparante netwerkadapter. LAN: Modbus TCP: gateway die TCP naar RTU vertaalt."
   host:
     name: Adapterhost / IP-adres
     description: "Verplicht voor LAN: hostnaam of IP-adres van de adapter, zonder URL-schema of pad. Laat dit leeg voor USB / RS-485. Gebruik een vertrouwd privénetwerk."

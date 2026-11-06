@@ -1,5 +1,25 @@
 # Changes
 
+## 0.5.2b1
+
+- Check the physical serial after reconnects and before control writes, including
+  recovery. A replaced or unidentifiable wallbox makes the service unavailable;
+  saved intent stays intact until the original wallbox can be verified again.
+- Tolerate malformed optional firmware, article and serial text so other valid
+  readings remain usable; existing serial-number identity checks still apply.
+- Keep the latest requested current after a lost write reply or cancellation;
+  an older queued slider value must not return later or after a service restart.
+- Remove duplicate connection choices: only **USB / RS-485**, **LAN: Modbus RTU
+  (TCP)** and **LAN: Modbus TCP** are shown. If an old technical name is saved,
+  select its matching readable choice once; 0.5.1 supports doing this before
+  the update. Existing readable selections and other settings stay unchanged.
+- Add a custom AppArmor profile that Supervisor loads with protection mode on.
+  App options stay read-only; the service can maintain its own token and charging
+  state and communicate over USB/LAN. Native AMD64/ARM64 tests exercise all three
+  transports under enforcement, including restart and rejected unrelated access.
+- Document permission-denial troubleshooting and why an installed app's rating
+  can differ from the app-store rating before installation.
+
 ## 0.5.1
 
 - Always show **Adapter host / IP** in the app configuration. Enter it for LAN;
