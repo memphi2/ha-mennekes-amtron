@@ -49,7 +49,7 @@ can still interrupt delivery; configure the wallbox's
 
 ### Service app
 
-App **0.6.0** includes **Open Web UI**. Older app 0.5.2b2 uses the native
+App **0.6.0b1** includes **Open Web UI**. Older app 0.5.2b2 uses the native
 Configuration tab described below.
 
 1. Follow the [service installation](modbus-service.md) and prepare any existing

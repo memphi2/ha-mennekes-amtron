@@ -4,10 +4,10 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-**Stable service: 0.6.0.** The service and integration are installed and
+**Stable service: 0.5.1 · Beta: 0.6.0b1.** The service and integration are installed and
 updated independently. Their version numbers may differ; the current integration
 requires **service 0.5.0 or newer with API 2**. See [Updates](#operation-and-updates).
-Use the **v0.6.0** release's container reference or source archive for all new
+Use the **v0.6.0b1** prerelease's container reference or source archive to test the new
 service features. An older compatible service retains its existing functions.
 
 ## 1. Prepare the serial handover
@@ -94,7 +94,9 @@ that runs independently of Home Assistant.
 ### Docker
 
 Copy the **standalone container reference** from the
-[published app catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps).
+[published app catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps)
+for stable **0.5.1**, or the [beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta)
+for **0.6.0b1**.
 Use the complete `ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference
 as the image. The digest selects the verified release even if a registry tag
 changes later. The same reference supports Linux amd64 and arm64.
@@ -175,7 +177,7 @@ If both need updating, replace the service first, retaining its data directory,
 and wait for initialization. Then update the integration and restart Core.
 Retaining the same data mount preserves saved intent and credentials; no new HA
 entry is needed. For older 0.5.0 betas, upgrade the service to API 2 first
-(stable **0.6.0**), then update the integration:
+(stable **0.5.1**, or **0.6.0b1** for beta testing), then update the integration:
 the old beta integration may show
 unavailable controls between those updates because its API differs. With writes enabled, the updated service keeps
 its heartbeat and charging intent while HA updates.

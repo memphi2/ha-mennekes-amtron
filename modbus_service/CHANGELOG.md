@@ -1,6 +1,8 @@
 # Changes
 
-## 0.6.0
+## 0.6.0b1
+
+Beta release; stable remains **0.5.1**.
 
 - Add a guided USB/LAN connection page with a real adapter dropdown. An absent
   old USB adapter no longer blocks LAN setup. Save, then restart to apply changes.
@@ -18,8 +20,8 @@
 Keep the app's existing data and update it before the integration. An app restart
 briefly interrupts the heartbeat. The connection page requires an administrator
 and stable **Supervisor 2026.11.0+**; the native Configuration tab remains available.
-The stable app is offered in both **#apps** and **#apps-beta**, so existing beta
-installations can update in place.
+This beta app is offered only in **#apps-beta**, where existing beta installations
+can update in place. **#apps** remains on stable **0.5.1**.
 
 ## 0.5.2b2
 

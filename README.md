@@ -59,10 +59,11 @@ On HA Container, run the service as a [separate container](docs/service-standalo
 Already using the integration? **Keep your existing entry** and follow
 [Updates and switching connections](docs/upgrading.md).
 
-**Stable 0.6.0** adds optional kWh and vehicle-percentage targets, charging-loss
+**Beta 0.6.0b1** adds optional kWh and vehicle-percentage targets, charging-loss
 and cost estimates, clearer status and configurable charging waits. The app adds
 a guided USB/LAN connection page and AppArmor protection.
-See [what changes and how to update](docs/upgrading.md#updating-to-060).
+Stable remains **0.5.1**. See [beta installation](docs/installation.md#beta-testing-060b1)
+and [what changes](docs/upgrading.md#updating-to-060b1).
 
 You need a compatible wallbox, a USB RS-485 adapter or supported LAN gateway,
 and exclusive access to its bus. LAN needs no USB device on the HA/service host.
@@ -70,6 +71,8 @@ Have the [hardware and fallback settings](docs/hardware.md) prepared before
 enabling control. Read-only mode also needs exclusive bus access.
 
 ## Ready for everyday use
+
+Charging targets and estimates below are part of **beta 0.6.0b1**.
 
 | I want to… | Use |
 |---|---|

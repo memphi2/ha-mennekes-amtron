@@ -19,7 +19,7 @@ are unchanged. It sends no HA commands or restored values to the service.
 Direct USB and LAN entries retain their separate HA control-mode option.
 
 For standalone configuration, `connection_type` selects `serial` (the default),
-`rtu_over_tcp` or `modbus_tcp`. App 0.6.0 offers exactly **USB / RS-485** (default),
+`rtu_over_tcp` or `modbus_tcp`. App 0.6.0b1 offers exactly **USB / RS-485** (default),
 **LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP**. The service normalizes these
 names to the same three protocols. Standalone JSON keeps accepting the technical
 names. Saved app choices using those names need a one-time
@@ -37,7 +37,7 @@ protocol. A stale saved USB device can prevent Supervisor from saving LAN
 settings; clear that serial selection first. A LAN-only installation needs no
 local serial device.
 
-In **0.6.0**, `serial_port` is an optional string in the native
+In **0.6.0b1**, `serial_port` is an optional string in the native
 schema. A separate **Open Web UI** page supplies a USB dropdown and only the
 fields relevant to the selected transport. It prefers stable adapter paths and
 removes the serial path when saving LAN. USB runtime validation still restricts
@@ -167,7 +167,7 @@ and invalid option. A missing serial adapter is retried while the API remains
 running. An unexpected worker exit is logged and closes the Modbus connection;
 a fatal process failure reports its error class and errno.
 
-In **0.6.0**, an app missing the selected transport's serial
+In **0.6.0b1**, an app missing the selected transport's serial
 path or LAN host stays in setup mode after validating all other options. Its
 health endpoint reports `configured: false`; Modbus, heartbeat and discovery do
 not start. Save the connection in **Open Web UI** or native Configuration, then

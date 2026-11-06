@@ -5,6 +5,10 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
+Charging targets, loss/cost estimates, revised status and command-result events
+in this guide are features of **beta 0.6.0b1**. Stable remains **0.5.1**;
+see [Beta testing](installation.md#beta-testing-060b1) to try them.
+
 ## Optional charging losses and costs
 
 Choose a vehicle-energy source and a fixed or dynamic electricity price in the
@@ -144,7 +148,7 @@ the exact state values available to templates.
 | Minimum time between state changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 | Extra wait before phase changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 
-App **0.6.0** moves USB/LAN connection selection to
+App **0.6.0b1** moves USB/LAN connection selection to
 **Open Web UI**, with an adapter dropdown and fields for the chosen mode.
 Write permission and other operating settings stay in **Configuration**.
 Save and restart the app to apply changes; see [the connection page](upgrading.md#app-connection-page)

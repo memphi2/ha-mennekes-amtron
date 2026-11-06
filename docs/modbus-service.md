@@ -9,10 +9,11 @@ The service can reach the RTU wallbox through **USB or a LAN-to-RS-485 adapter**
 LAN needs no USB device on its host; see [LAN setup](network-gateway.md) for the
 two supported gateway protocols.
 
-**Stable service: 0.6.0.** The integration and app are installed and
+**Stable service: 0.5.1 · Beta: 0.6.0b1.** The integration and app are installed and
 updated independently. Their version numbers do not need to match.
 Check the [handover](#check-the-handover) on your hardware before relying on it.
-Existing beta installations can [update in place](installation.md#moving-from-beta-to-stable).
+This guide includes the new beta features. Existing beta installations can
+[update in place](installation.md#beta-testing-060b1).
 
 [Install on HA OS](#install-on-home-assistant-os) ·
 [Move an existing wallbox](#move-an-existing-wallbox) ·
@@ -46,7 +47,8 @@ if the wallbox has not yet been prepared.
 
 Install **Mennekes Amtron RTU** from the Marketplace on HA 2026.11+, or
 HACS on HA 2026.9/2026.10, and complete the requested Core restart.
-Use the stable release; pre-release access is not required.
+Use stable **0.5.1** for stable operation. For the new features described here,
+enable prereleases and select **0.6.0b1**; see [Beta testing](installation.md#beta-testing-060b1).
 
 Already using the service? Go to [Updates](#updates); keep your existing entry.
 
@@ -63,12 +65,16 @@ https://github.com/memphi2/ha-mennekes-amtron#apps
 Install **Mennekes Amtron Modbus Service**. During installation, Supervisor may
 show **Building**. Enable **Start on boot** and **Watchdog**.
 
+The repository above provides stable **0.5.1**. To test **0.6.0b1**, use
+`https://github.com/memphi2/ha-mennekes-amtron#apps-beta` instead. Existing
+beta-app users can update their installed app normally; no reinstall is needed.
+
 ### 3. Configure and start read-only
 
 If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
-In app **0.6.0**, start the app and choose **Open Web UI** as an
+In app **0.6.0b1**, start the app and choose **Open Web UI** as an
 administrator. It requires stable **Supervisor 2026.11.0 or newer**. Choose USB
 or LAN; USB provides an adapter dropdown, while LAN shows the host/IP and port.
 A missing USB adapter is never replaced automatically. Saving LAN removes its
@@ -92,7 +98,7 @@ options**. Those older forms do not rearrange fields when the connection changes
 | Current cap | The permitted charging current for your installation; default **6 A**. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. The measurement interval helps limit database traffic. |
 
-App 0.6.0 shows exactly these three connection choices. When updating an
+App 0.6.0b1 shows exactly these three connection choices. When updating an
 older app with a saved technical connection name, select the matching readable
 choice once; see [Updating the connection choice](upgrading.md#app-connection-choice).
 The transport is never changed automatically to USB.
@@ -211,7 +217,7 @@ health changes rather than every beat. For smaller HA history, use a
 
 ## AppArmor protection
 
-App **0.6.0** includes the custom AppArmor profile first introduced in 0.5.2b1.
+App **0.6.0b1** includes the custom AppArmor profile first introduced in 0.5.2b1.
 Supervisor loads it automatically when the app is installed;
 keep **Protection mode on**. It limits the service to its runtime files, USB/LAN
 communication and its own token and charging-state files. App options remain
@@ -249,17 +255,16 @@ app store; for a separate service, follow the
 **Updating the app itself briefly interrupts its heartbeat.**
 
 **From a 0.5.0 beta:** update the app/service to an API 2 release first:
-**0.6.0** in either app catalog. Then update the
+stable **0.5.1** from `#apps`, or **0.6.0b1** from `#apps-beta`. Then update the
 integration. The old beta integration may show unavailable controls between
 updates because its API differs. Keep the existing HA entry, app and data.
 The token, saved charging state and USB settings are retained;
 check the [connection choice](upgrading.md#app-connection-choice) before starting.
 LAN remains an optional connection change.
 
-The beta and stable repositories end in `#apps-beta` and `#apps`. Both offer
-stable **0.6.0**. An existing beta app updates normally with its data intact;
-no catalog switch or reinstall is needed. The beta catalog can offer future
-prereleases. When updating from 0.5.1, check the
+The beta repository `#apps-beta` offers **0.6.0b1**; stable `#apps` stays on **0.5.1**.
+An existing beta app updates normally with its data intact; no catalog switch or
+reinstall is needed. When updating from 0.5.1, check the
 [connection-choice change](upgrading.md#app-connection-choice).
 An optional switch to the stable-only catalog creates a different app in Supervisor.
 For that channel change, back up app data, note the charging settings and

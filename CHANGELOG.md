@@ -5,7 +5,10 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.6.0 — 2026-11-06
+## 0.6.0b1 — 2026-11-06
+
+Beta release of the integration and app. **0.5.1 remains stable**; the app beta
+is available only through **#apps-beta**.
 
 - Set an optional energy target in kWh or a vehicle charge-level target in percent.
   Targets only limit charging; they never start a charge or lift a deliberate pause.
@@ -26,8 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and quieter Recorder defaults. Optional estimates add no extra Modbus polling
   or growing session history.
 
-**Updating:** keep your existing entry and app data. Update the app to **0.6.0**
-first to use the new service features, then update the integration and restart
+**Updating:** keep your existing entry and app data. Update the app to **0.6.0b1**
+from **#apps-beta** first to use the new service features, then select the
+integration prerelease in HACS/Marketplace and restart
 Core. Older API 2 services from **0.5.0** remain compatible with their existing
 functions. The app's connection page requires stable **Supervisor 2026.11.0+**;
 the integration still supports **Home Assistant 2026.9+**.

@@ -52,7 +52,7 @@ host, TCP port and device address; serial baud/frame are configured on the
 gateway. HA-to-service HTTP remains a separate connection. See
 [LAN setup](network-gateway.md) and the [security boundary](../SECURITY.md#threat-model).
 
-Since **0.6.0**, an administrator connection page runs on a separate
+Since **0.6.0b1**, an administrator connection page runs on a separate
 internal Ingress listener. It requires stable Supervisor 2026.11.0+, enumerates
 only locally mapped serial adapters and saves connection fields through the
 Supervisor API for this app. It neither exposes the service token to the browser

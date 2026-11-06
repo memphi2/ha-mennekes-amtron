@@ -112,9 +112,11 @@ starts and ends. The integration observes that restriction; it cannot remove it.
 
 ## React to command results
 
+This event entity is available in **beta 0.6.0b1**.
+
 Enable **Control result** under **Settings → Devices & services → Entities**
 first; it starts disabled to avoid history growth from frequent current commands.
-You can [exclude it from Recorder](recorder.md#recorder-defaults-in-060)
+You can [exclude it from Recorder](recorder.md#recorder-defaults-in-060b1)
 while keeping live automation triggers. Use it to notify you about a rejected command, an uncertain
 write, a phase-pause timeout or a recovery that did not clear the error. In the
 UI, add a state trigger for the event entity, then filter its `event_type`

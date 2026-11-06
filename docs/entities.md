@@ -5,6 +5,9 @@ Use **Charging current limit** and **Charging paused** for everyday charging.
 energy and connection health. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
 
+The new targets, estimates, status entities, command events and grouping changes
+described here belong to **beta 0.6.0b1**, not stable 0.5.1.
+
 The first column shows default **English** entity-ID patterns. `*` stands
 for the device prefix; it is not part of a literal entity ID. For example,
 Total energy normally becomes `sensor.mennekes_amtron_total_energy`.

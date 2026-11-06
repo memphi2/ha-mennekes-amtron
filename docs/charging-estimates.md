@@ -1,4 +1,7 @@
-# Charging losses and costs
+# Charging losses and costs — beta 0.6.0b1
+
+These features are available in **beta 0.6.0b1**, not stable 0.5.1.
+See [Beta testing](installation.md#beta-testing-060b1) before enabling them.
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure** and choose the sources you want. They work with a

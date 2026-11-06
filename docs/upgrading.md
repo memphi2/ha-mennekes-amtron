@@ -4,17 +4,18 @@
 do not require deleting devices, entities or automations. Moving from HACS to
 the Marketplace also keeps the same integration and entry.
 
-**Coming from a beta?** Select stable **0.6.0** for the integration. The same
-stable app is offered in both app catalogs, so keep your installed app and data.
-Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
+**Testing the beta?** Enable prereleases and select **0.6.0b1** for the integration.
+Its app is offered only in **#apps-beta**; existing beta-app users update in place
+and keep their data. Stable remains **0.5.1**. Follow [Beta testing](installation.md#beta-testing-060b1)
+and check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Updating to 0.6.0
+## Updating to 0.6.0b1
 
-Version 0.6.0 improves entity grouping and state-dependent icons, fixes false
+Beta 0.6.0b1 improves entity grouping and state-dependent icons, fixes false
 vehicle-disconnected states during wallbox faults, and names the display-only
 solar selector **Solar display mode**. Existing entity IDs and user customizations
 are retained; no device or entity needs deleting. If using the service, update
-the app to **0.6.0** first to use its new capabilities, then update the integration.
+the app to **0.6.0b1** first to use its new capabilities, then update the integration.
 
 Six optional phase-voltage/power sensors now start disabled on new installations;
 existing registry settings are preserved. Session duration stops creating new
@@ -27,7 +28,7 @@ optional event feed. Older API 2 services remain compatible, but their event
 entity is unavailable. Existing commands are not replayed as events after
 startup or reconnect.
 
-Version 0.6.0 also adds **Charging status**, **Connection quality**, **Cancel
+Version 0.6.0b1 also adds **Charging status**, **Connection quality**, **Cancel
 pending change**, **Energy target** and **Energy target status**. A target only
 limits energy and never starts charging. For service connections, target and
 cancel support are optional capabilities: an older service remains usable, while
@@ -47,11 +48,11 @@ deliberate pause.
 Optional [charging losses and costs](charging-estimates.md) use existing vehicle
 and price data. They add no vehicle polling or growing history. All sources are
 off by default; configure only the estimates you want. Service mode needs app
-**0.6.0** for these measurements. Existing compatible apps retain their other functions.
+**0.6.0b1** for these measurements. Existing compatible apps retain their other functions.
 
 ### App connection page
 
-App **0.6.0** adds **Open Web UI** for connection setup.
+App **0.6.0b1** adds **Open Web UI** for connection setup.
 Start the app, open that page as an administrator and choose USB or LAN. USB
 shows an adapter dropdown, preferring stable `/dev/serial/by-id/...` paths;
 LAN shows the gateway host/IP and TCP port. Saving LAN also clears any old USB
@@ -62,14 +63,14 @@ The page requires stable **Supervisor 2026.11.0 or newer** for its administrator
 access check. This is a requirement of the page, not a new minimum Home Assistant
 version for the integration. On older Supervisor versions, the native app
 **Configuration** tab remains available; its serial path is a text field in
-0.6.0. Update Supervisor to use the guided USB dropdown.
+0.6.0b1. Update Supervisor to use the guided USB dropdown.
 
 Save, then restart the app from its **Info** tab. Saving does not change a running
 connection. **Read-only**, current limits and polling intervals remain in the
 native **Configuration** tab. Keep existing valid connection settings when
 updating; the transport is not changed automatically.
 
-With no serial path or no LAN host configured, app 0.6.0 remains running for
+With no serial path or no LAN host configured, app 0.6.0b1 remains running for
 setup and its health check. It starts neither Modbus nor heartbeat nor discovery
 until a valid connection is saved and the app restarted. A configured USB adapter
 that is temporarily unplugged instead keeps its identity and is retried.
