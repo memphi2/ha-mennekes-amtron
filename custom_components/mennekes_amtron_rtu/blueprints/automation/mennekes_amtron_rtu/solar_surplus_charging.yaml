@@ -61,11 +61,12 @@ blueprint:
             - integration: mennekes_amtron_rtu
               domain: binary_sensor
     switched_phases:
-      name: Switched phases
+      name: Wallbox phase selection
       description: >-
-        The wallbox switched-phases sensor. Single phase uses one phase;
-        all available uses three. This does not detect the vehicle's actual
-        phase use. An unknown state leaves the current unchanged.
+        Choose Wallbox phase selection (formerly Switched phases). This blueprint
+        assumes a three-phase supply: single phase uses one phase and all
+        available uses three. It does not detect the vehicle's actual phase
+        use. An unknown state leaves the current unchanged.
       selector:
         entity:
           filter:

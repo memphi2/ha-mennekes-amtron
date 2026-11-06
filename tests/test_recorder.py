@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from tests.recorder_replay import measure
+from tests.recorder_replay import DETAILS, EXTRAS, OPTIONAL_MEASUREMENTS, measure
 
 
 def test_unchanged_values_do_not_create_recorder_rows(tmp_path: Path) -> None:
@@ -22,7 +22,19 @@ def test_measurement_interval_reduces_real_recorder_writes(tmp_path: Path) -> No
         assert default["attributes_rows"] == fast["attributes_rows"]
         assert default["rows_by_entity"]["sensor.mennekes_amtron_total_energy"] > 0
         assert default["rows_by_entity"]["sensor.mennekes_amtron_total_power"] > 0
-        assert 0 < lean["state_rows"] < default["state_rows"] * 0.2
+        assert 0 < lean["state_rows"] < default["state_rows"]
+        excluded_ids = {f"sensor.mennekes_amtron_{key}" for key in DETAILS + EXTRAS}
+        # The lean profile removes exactly the requested readings; a percentage
+        # tied to the former always-enabled detail entities is no longer useful.
+        assert lean["rows_by_entity"] == {
+            entity_id: count
+            for entity_id, count in default["rows_by_entity"].items()
+            if entity_id not in excluded_ids
+        }
+        assert all(
+            f"sensor.mennekes_amtron_{key}" not in default["rows_by_entity"]
+            for key in OPTIONAL_MEASUREMENTS
+        )
         for key in ("total_energy", "total_power"):
             entity_id = f"sensor.mennekes_amtron_{key}"
             assert lean["rows_by_entity"][entity_id] == default["rows_by_entity"][entity_id]

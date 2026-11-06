@@ -201,7 +201,7 @@
         }
       },
       "solar_charging_mode": {
-        "name": "Modalità di ricarica solare",
+        "name": "Modalità di visualizzazione solare",
         "state": {
           "fast": "Ricarica rapida",
           "not_active": "Non attiva",
@@ -372,7 +372,7 @@
         "name": "Corrente minima Sunshine+"
       },
       "switched_phases": {
-        "name": "Fasi commutate",
+        "name": "Selezione delle fasi della wallbox",
         "state": {
           "all_available": "Tutte le fasi disponibili",
           "single_phase": "Una fase"

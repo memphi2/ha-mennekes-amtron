@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.const import EntityCategory
@@ -13,6 +13,7 @@ from .binary_sensor_descriptions import (
     BINARY_SENSOR_DESCRIPTIONS,
     AmtronBinarySensorEntityDescription,
 )
+from .coordinator import MennekesAmtronCoordinator
 from .device.capabilities import capability_is_supported
 from .device.heartbeat import HeartbeatTask
 from .device.registers import CP_STATE
@@ -87,7 +88,7 @@ class AmtronBinarySensor(MennekesAmtronEntity, BinarySensorEntity):
     def __init__(
         self,
         entry: MennekesAmtronConfigEntry,
-        coordinator: Any,
+        coordinator: MennekesAmtronCoordinator,
         description: AmtronBinarySensorEntityDescription,
     ) -> None:
         super().__init__(

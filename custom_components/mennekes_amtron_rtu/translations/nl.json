@@ -201,7 +201,7 @@
         }
       },
       "solar_charging_mode": {
-        "name": "Laadmodus voor zonnestroom",
+        "name": "Weergavemodus zonnestroom",
         "state": {
           "fast": "Snel laden",
           "not_active": "Niet actief",
@@ -372,7 +372,7 @@
         "name": "Minimale stroom Zonnestroom+"
       },
       "switched_phases": {
-        "name": "Ingeschakelde fasen",
+        "name": "Fasekeuze van de laadpaal",
         "state": {
           "all_available": "Alle beschikbare fasen",
           "single_phase": "Eén fase"

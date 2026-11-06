@@ -201,7 +201,7 @@
         }
       },
       "solar_charging_mode": {
-        "name": "Mode de charge solaire",
+        "name": "Mode d’affichage solaire",
         "state": {
           "fast": "Charge rapide",
           "not_active": "Inactif",
@@ -372,7 +372,7 @@
         "name": "Courant minimal Sunshine+"
       },
       "switched_phases": {
-        "name": "Phases commutées",
+        "name": "Sélection des phases de la borne",
         "state": {
           "all_available": "Toutes les phases disponibles",
           "single_phase": "Une seule phase"

@@ -201,7 +201,7 @@
         }
       },
       "solar_charging_mode": {
-        "name": "Solar charging mode",
+        "name": "Solar display mode",
         "state": {
           "fast": "Fast charging",
           "not_active": "Not active",
@@ -372,7 +372,7 @@
         "name": "Sunshine+ minimum current"
       },
       "switched_phases": {
-        "name": "Switched phases",
+        "name": "Wallbox phase selection",
         "state": {
           "all_available": "All available phases",
           "single_phase": "Single phase"

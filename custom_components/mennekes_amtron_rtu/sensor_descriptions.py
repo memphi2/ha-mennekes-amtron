@@ -130,16 +130,23 @@ def _current(
 
 SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     _enum("evse_state", EvseState),
-    _enum("cp_state", CpState),
+    _enum("cp_state", CpState, entity_category=EntityCategory.DIAGNOSTIC),
     _enum("authorization_status", AuthorizationStatus),
-    _enum("error_code", ErrorCategory, value_fn=_error_category_option),
+    _enum(
+        "error_code",
+        ErrorCategory,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=_error_category_option,
+    ),
     _enum("detected_ev_phases", DetectedEvPhases),
+    _enum("switched_phases", SwitchedPhases),
     _current("signaled_current"),
     _current("current_l1"),
     _current("current_l2"),
     _current("current_l3"),
     AmtronSensorEntityDescription(
         key="voltage_l1",
+        entity_registry_enabled_default=False,
         translation_key="voltage_l1",
         register_key="voltage_l1",
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
@@ -149,6 +156,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="voltage_l2",
+        entity_registry_enabled_default=False,
         translation_key="voltage_l2",
         register_key="voltage_l2",
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
@@ -158,6 +166,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="voltage_l3",
+        entity_registry_enabled_default=False,
         translation_key="voltage_l3",
         register_key="voltage_l3",
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
@@ -167,6 +176,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="power_l1",
+        entity_registry_enabled_default=False,
         translation_key="power_l1",
         register_key="power_l1",
         native_unit_of_measurement=UnitOfPower.WATT,
@@ -176,6 +186,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="power_l2",
+        entity_registry_enabled_default=False,
         translation_key="power_l2",
         register_key="power_l2",
         native_unit_of_measurement=UnitOfPower.WATT,
@@ -185,6 +196,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="power_l3",
+        entity_registry_enabled_default=False,
         translation_key="power_l3",
         register_key="power_l3",
         native_unit_of_measurement=UnitOfPower.WATT,
@@ -217,7 +229,6 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         register_key="session_duration",
         native_unit_of_measurement=UnitOfTime.SECONDS,
         device_class=SensorDeviceClass.DURATION,
-        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
     ),
     AmtronSensorEntityDescription(
@@ -252,9 +263,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         register_key="modbus_layout_version",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
-        value_fn=lambda value: (
-            layout_label(value) if isinstance(value, int) else None
-        ),
+        value_fn=lambda value: layout_label(value) if isinstance(value, int) else None,
     ),
     _current("downgrade_current", entity_category=EntityCategory.DIAGNOSTIC),
     _current(
@@ -304,11 +313,6 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     _enum("phase_rotation", PhaseRotation, entity_category=EntityCategory.DIAGNOSTIC),
-    _enum(
-        "switched_phases",
-        SwitchedPhases,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
     _enum(
         "cable_lock_status",
         CableLockStatus,

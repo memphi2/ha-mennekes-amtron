@@ -445,7 +445,7 @@ def test_the_bundled_blueprints_run_as_automations(
                                 "charging_current": number,
                                 "charging_paused": pick("_charging_paused"),
                                 "vehicle_connected": pick("_vehicle_connected"),
-                                "switched_phases": pick("_switched_phases"),
+                                "switched_phases": pick("_wallbox_phase_selection"),
                             },
                         },
                     },

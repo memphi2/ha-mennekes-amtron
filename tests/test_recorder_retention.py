@@ -29,7 +29,7 @@ from sqlalchemy import event
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
-from tests.recorder_replay import DETAILS, EXTRAS
+from tests.recorder_replay import DEFAULT_STATISTICS, DETAILS, EXTRAS
 from tests.test_home_assistant_smoke import _boot
 
 
@@ -130,7 +130,19 @@ def test_repeated_retention_cycles_keep_history_bounded_and_energy_statistics(
                         series, rows = conn.execute(
                             "SELECT COUNT(DISTINCT metadata_id), COUNT(*) FROM statistics"
                         ).fetchone()
-                        assert series == 17 - len(excluded)
+                        expected_statistics = {
+                            f"sensor.mennekes_amtron_{key}"
+                            for key in DEFAULT_STATISTICS.difference(excluded)
+                        }
+                        actual_statistics = {
+                            row[0]
+                            for row in conn.execute(
+                                "SELECT DISTINCT m.statistic_id FROM statistics s "
+                                "JOIN statistics_meta m ON m.id=s.metadata_id"
+                            )
+                        }
+                        assert actual_statistics == expected_statistics
+                        assert series == len(expected_statistics)
                         assert rows == series * (day + 1)
                         energy_sum = conn.execute(
                             "SELECT s.sum FROM statistics s JOIN statistics_meta m "
