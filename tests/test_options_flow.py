@@ -17,6 +17,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_SCAN_INTERVAL_SECONDS,
+    CONF_STATE_CHANGE_INTERVAL_SECONDS,
     CONTROL_MODE_MASTER,
     CONTROL_MODE_READ_ONLY,
 )
@@ -67,6 +68,7 @@ def test_the_form_defaults_to_the_stored_options() -> None:
                 CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
                 CONF_SCAN_INTERVAL_SECONDS: 10,
                 CONF_CURRENT_LIMIT: 12.0,
+                CONF_STATE_CHANGE_INTERVAL_SECONDS: 175,
             }
         )
         result = await Flow(entry).async_step_init()
@@ -76,6 +78,7 @@ def test_the_form_defaults_to_the_stored_options() -> None:
         }
         assert defaults[CONF_CONTROL_MODE] == CONTROL_MODE_MASTER
         assert defaults[CONF_SCAN_INTERVAL_SECONDS] == 10
+        assert defaults[CONF_STATE_CHANGE_INTERVAL_SECONDS] == 175
 
     asyncio.run(run())
 
@@ -94,6 +97,7 @@ def test_submitting_normalises_the_values() -> None:
             CONF_SCAN_INTERVAL_SECONDS: 7,
             CONF_MEASUREMENT_INTERVAL_SECONDS: 30,
             CONF_CURRENT_LIMIT: 11.5,
+            CONF_STATE_CHANGE_INTERVAL_SECONDS: 300,
         }
 
     asyncio.run(run())
@@ -122,6 +126,7 @@ def test_service_options_configure_only_current_cap_and_cache_refresh(stale_mode
             CONF_CURRENT_LIMIT: 8,
             CONF_SCAN_INTERVAL_SECONDS: 10,
             CONF_MEASUREMENT_INTERVAL_SECONDS: 60,
+            CONF_STATE_CHANGE_INTERVAL_SECONDS: 123,
         }
         if stale_mode is not None:
             submitted[CONF_CONTROL_MODE] = stale_mode
@@ -132,6 +137,33 @@ def test_service_options_configure_only_current_cap_and_cache_refresh(stale_mode
         }
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("seconds", [0, 1, 175, 300, 3600])
+def test_state_change_interval_is_saved_as_whole_seconds(seconds: int) -> None:
+    async def run() -> None:
+        form = await Flow(FakeConfigEntry()).async_step_init()
+        values = form["data_schema"]({CONF_STATE_CHANGE_INTERVAL_SECONDS: float(seconds)})
+        result = await Flow(FakeConfigEntry()).async_step_init(values)
+        stored = result["data"][CONF_STATE_CHANGE_INTERVAL_SECONDS]
+        assert stored == seconds
+        assert type(stored) is int
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "value", [-1, 3601, 1.5, True, None, "300", float("nan"), float("inf")]
+)
+def test_state_change_interval_rejects_invalid_ui_values(value: Any) -> None:
+    schema = options_schema({}, max_current=16)
+    with pytest.raises(probatio.Invalid):
+        schema({CONF_STATE_CHANGE_INTERVAL_SECONDS: value})
+
+
+def test_state_change_interval_default_is_300_seconds() -> None:
+    values = options_schema({}, max_current=16)({})
+    assert values[CONF_STATE_CHANGE_INTERVAL_SECONDS] == 300
 
 
 BUS = {"port": "/dev/a", "device_id": 50, "baudrate": 57600, "frame": "8n2"}

@@ -47,6 +47,11 @@ current needs correspondingly higher thresholds. The default hold time is
 six minutes; keep it longer than five minutes. These examples do not switch
 phases automatically.
 
+In the next beta, the bus owner's configurable state-change interval adds a
+separate guard (default 300 seconds). It does not replace these power thresholds
+or their hold times. Early resume requests can be queued; a later stop cancels
+the pending resume. See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+
 ## What to expect
 
 - The current is recalculated when surplus or selected phases change, when a

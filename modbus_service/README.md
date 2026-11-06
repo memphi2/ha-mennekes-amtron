@@ -12,6 +12,11 @@ for integration installation and app updates.
 
 App settings are available in English, German, French, Dutch and Italian.
 
+**Next beta, unreleased:** a configurable state-change interval (default
+**300 seconds**) queues early starts and phase changes. HA shows the pending
+action and due time; a stop cancels pending starts. This feature is not part
+of the published 0.5.2b1 app.
+
 | Using | Start here |
 |---|---|
 | Home Assistant OS | [App setup and everyday use](DOCS.md) — discovery supplies the address and token. |

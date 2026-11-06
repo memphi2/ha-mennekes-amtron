@@ -208,5 +208,7 @@ block.
 - **Timing**: change the charging current no faster than every five seconds;
   the manufacturer recommends keeping pauses, resumes and phase switches
   more than five minutes apart with hysteresis. This recommendation is not a
-  protocol lockout. The integration retains a five-minute phase-switch guard
-  and a five-second write floor for pause/resume.
+  protocol lockout. Published 0.5.2b1 uses a five-minute phase-switch guard
+  and a five-second write floor for pause/resume. The next beta adds a shared,
+  configurable state-change interval and queues early requests; see
+  [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).

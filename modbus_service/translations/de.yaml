@@ -17,6 +17,9 @@ configuration:
   current_cap:
     name: Stromobergrenze
     description: Höchster angeforderter EMS-Strom in Ampere. Bewusste Befehle mit 0 A heben die EMS-Begrenzung auf.
+  state_change_interval_seconds:
+    name: Mindestabstand zwischen Zustandswechseln
+    description: "Sekunden bis zu einem erneuten Start oder Phasenwechsel (Standard 300). Zu frühe Befehle werden vorgemerkt; der neueste ersetzt den vorherigen. Stoppen verwirft einen vorgemerkten Start und wartet nicht auf dieses Intervall. Der Schreibabstand von fünf Sekunden für den Ladestrom bleibt bestehen. Mit 0 entfällt die längere Wartezeit."
   scan_interval:
     name: Statusintervall
     description: Sekunden zwischen Statusabfragen. Der Heartbeat läuft unabhängig davon.

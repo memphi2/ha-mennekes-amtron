@@ -8,11 +8,14 @@ Use one control strategy at a time. A PV automation and a tariff schedule can
 otherwise undo each other's pause or current setting. Enable writes with the
 app's **Read-only** switch off in service mode, saving and restarting the app,
 or **Modbus master** in the integration options for a direct USB or LAN connection.
-Current changes and pause/resume share a **five-second minimum interval**.
-Phase changes have a separate **five-minute minimum interval**. For automatic
-pause/resume, use more than five minutes of hysteresis to avoid frequent cycles;
-the PV blueprint defaults to six minutes. Rejected pause/resume and phase
-requests are not retried automatically.
+Current writes retain a **five-second minimum interval**. For automatic
+pause/resume, use different start/stop thresholds and hold times; the PV blueprint
+defaults to six minutes. **Next beta, unreleased:** early starts and phase
+changes are queued using the configurable state-change interval (default
+300 seconds). A newer charging request replaces older pending work, and a stop
+clears a pending start. See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+Published 0.5.2b1 still rejects early pause/resume and phase requests rather than
+retrying them automatically.
 
 ## PV charging
 
@@ -75,10 +78,12 @@ mode: single
 ```
 
 A fixed time trigger is missed if Home Assistant is stopped at that time.
-It does not restore the schedule when HA starts later. A recent manual pause
-can also make the start command fail its waiting interval; inspect the
-**automation trace** if the expected action did not happen. Check the current
-state after a restart rather than assuming the schedule ran.
+It does not restore the schedule when HA starts later. In the next beta, a recent
+pause can delay an accepted start: inspect **Pending change** and **Pending
+change due**, as well as the **automation trace**. In published 0.5.2b1 the early
+start is rejected instead. A running service can execute an already queued
+command while HA is offline. Check the current state after a restart rather
+than assuming the schedule ran.
 
 When using `automations.yaml` directly instead of the UI editor, add this as
 one list item. Do not add a second `automation:` section to configuration.yaml.

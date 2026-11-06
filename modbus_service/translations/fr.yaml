@@ -17,6 +17,9 @@ configuration:
   current_cap:
     name: Plafond du courant
     description: Courant de charge maximal demandé par le gestionnaire d’énergie, en ampères. Une commande explicite à 0 A supprime la limite du gestionnaire d’énergie.
+  state_change_interval_seconds:
+    name: Délai minimal entre changements d’état
+    description: "Secondes avant un nouveau démarrage ou changement de phases (300 par défaut). Les commandes trop précoces sont mises en attente ; la dernière remplace la précédente. Un arrêt annule le démarrage en attente sans attendre ce délai. L’intervalle de cinq secondes entre écritures du courant reste applicable. La valeur 0 désactive le délai prolongé."
   scan_interval:
     name: Intervalle de lecture de l’état
     description: Secondes entre les lectures de l’état. Le signal de présence fonctionne indépendamment.

@@ -389,6 +389,21 @@
       },
       "voltage_l3": {
         "name": "Tension L3"
+      },
+      "pending_change": {
+        "name": "Changement en attente",
+        "state": {
+          "none": "Aucun changement en attente",
+          "resume": "Reprendre la charge",
+          "set_current": "Régler le courant de charge",
+          "single_phase": "Utiliser une phase",
+          "all_phases": "Utiliser toutes les phases disponibles",
+          "enable_charging": "Autoriser la charge",
+          "unlock": "Déverrouiller la borne"
+        }
+      },
+      "pending_change_until": {
+        "name": "Changement prévu à"
       }
     },
     "switch": {
@@ -432,7 +447,7 @@
       "message": "L’écriture du registre {register} sur la borne a échoué : {error}"
     },
     "write_rate_limited": {
-      "message": "Cette modification sera à nouveau possible dans {seconds} s. Les changements de courant, la pause et la reprise nécessitent un intervalle minimal de cinq secondes ; les changements de phases conservent un intervalle de cinq minutes."
+      "message": "Attendez {seconds} s avant de réécrire ce changement."
     },
     "phase_state_unknown": {
       "message": "L’état actuel de charge n’a pas pu être confirmé. Aucune commutation de phases n’a été effectuée. Vérifiez la connexion et réessayez."
@@ -457,6 +472,9 @@
     },
     "service_version_mismatch": {
       "message": "Le service Modbus ne respecte pas les exigences d’API ou de version minimale de cette intégration. Utilisez une version compatible du service, conformément aux notes de version de l’intégration. Si les deux composants doivent être mis à jour, commencez par l’application ou le service hébergé séparément."
+    },
+    "control_state_unknown": {
+      "message": "L’état actuel de la borne n’a pas pu être confirmé. Aucune commande d’autorisation de charge, de déverrouillage ou de changement de phases n’a été envoyée. Vérifiez la connexion et réessayez."
     }
   },
   "issues": {
@@ -499,13 +517,15 @@
           "control_mode": "Mode de commande",
           "current_limit": "Plafond du courant de charge",
           "measurement_interval_seconds": "Intervalle des mesures",
-          "scan_interval_seconds": "Intervalle de lecture de l’état"
+          "scan_interval_seconds": "Intervalle de lecture de l’état",
+          "state_change_interval_seconds": "Délai minimal entre changements d’état"
         },
         "data_description": {
           "control_mode": "Les deux modes envoient des requêtes de lecture et nécessitent un accès exclusif au bus. Lecture seule n’écrit pas dans les registres. Maître Modbus envoie également le signal de présence et active les entités de commande. Ne partagez pas ce bus avec un autre maître.",
           "current_limit": "Limite supérieure de l’entité de courant de charge, en plus de la limite imposée par la borne elle-même.",
           "measurement_interval_seconds": "Puissance, tension, courant et données de session : un intervalle de 30 secondes réduit la charge de la base de données. Un changement d’état déclenche une actualisation immédiate. Sans véhicule, l’intervalle est d’au moins 60 secondes. L’intervalle de lecture de l’état fixe la fréquence maximale des lectures.",
-          "scan_interval_seconds": "Fréquence de lecture de l’état de charge, des erreurs et des commandes. Le signal de présence fonctionne indépendamment."
+          "scan_interval_seconds": "Fréquence de lecture de l’état de charge, des erreurs et des commandes. Le signal de présence fonctionne indépendamment.",
+          "state_change_interval_seconds": "Secondes avant un nouveau démarrage ou changement de phases (300 par défaut). Les commandes trop précoces sont mises en attente ; la dernière remplace la précédente. Un arrêt annule le démarrage en attente sans attendre ce délai. L’intervalle de cinq secondes entre écritures du courant reste applicable. La valeur 0 désactive le délai prolongé."
         },
         "title": "Options"
       },
@@ -519,7 +539,7 @@
           "current_limit": "Plafond supplémentaire pour les courants demandés par Home Assistant. Le plafond du service reste applicable. Sélectionner explicitement 0 A supprime la limite du gestionnaire d’énergie.",
           "scan_interval_seconds": "Fréquence à laquelle Home Assistant lit l’état du service. Cela ne modifie ni la fréquence des mesures Modbus ni l’intervalle du signal de présence."
         },
-        "description": "Le réglage Lecture seule de l’application contrôle aussi l’autorisation d’écriture dans Home Assistant. Désactivez-le dans l’application, enregistrez et redémarrez l’application pour activer les commandes. Les entités de commande restent indisponibles tant que le service est en lecture seule ou n’est pas prêt."
+        "description": "Le réglage Lecture seule de l’application contrôle aussi l’autorisation d’écriture dans Home Assistant. Désactivez-le dans l’application, enregistrez et redémarrez l’application pour activer les commandes. Les entités de commande restent indisponibles tant que le service est en lecture seule ou n’est pas prêt. Réglez le délai minimal entre changements d’état dans la configuration de l’application ; le service l’applique même pendant un redémarrage de Home Assistant."
       }
     }
   },

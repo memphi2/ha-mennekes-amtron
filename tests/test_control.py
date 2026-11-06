@@ -46,6 +46,7 @@ class Harness:
         values: dict[str, object] | None = None,
         clock: list[float] | None = None,
         error_code: int = 0,
+        state_change_interval_seconds: float = 0,
     ) -> None:
         self.transport = FakeModbusClient(device_bank(
             error_code=error_code,
@@ -71,7 +72,10 @@ class Harness:
             self.client,
             diagnostics=self.diagnostics,
             identity=self.identity,
-            options=ControlOptions(read_only=read_only, current_cap=current_cap),
+            options=ControlOptions(
+                read_only=read_only, current_cap=current_cap,
+                state_change_interval_seconds=state_change_interval_seconds,
+            ),
             state=lambda: self.snapshot,
             request_refresh=self._refresh,
             sleep=self._sleep,
@@ -271,15 +275,15 @@ def test_a_fast_current_change_is_deferred_not_rejected() -> None:
     assert harness.diagnostics.writes_rate_limited == 2
 
 
-def test_a_fast_mode_change_is_rejected_with_a_wait_time() -> None:
+def test_a_fast_mode_change_is_queued_without_changing_actual_pause() -> None:
     harness = Harness(values={"charging_current_ems": 16.0})
 
     async def run() -> None:
         control = await harness.connect()
         await control.async_pause_charging()
-        with pytest.raises(ServiceValidationError) as excinfo:
-            await control.async_resume_charging()
-        assert excinfo.value.translation_key == "write_rate_limited"
+        await control.async_resume_charging()
+        assert control.pending_action == "resume"
+        assert control.is_paused is True
 
     asyncio.run(run())
 
@@ -416,7 +420,7 @@ def test_the_phase_switch_skips_the_pause_when_idle() -> None:
 
     asyncio.run(run())
     assert harness.written(R.CHARGING_CURRENT_EMS) == []
-    assert harness.written(R.REQUESTED_PHASES) == [[0]]
+    assert harness.written(R.REQUESTED_PHASES) == []  # Already all phases: idempotent.
 
 
 def test_recovery_writes_the_documented_sequence_in_order() -> None:
@@ -629,9 +633,9 @@ def test_a_setpoint_change_cannot_undo_a_pause_early() -> None:
         await control.async_pause_charging()
         harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
         harness.clock[0] += 1
-        with pytest.raises(ServiceValidationError) as excinfo:
-            await control.async_set_charging_current(12)
-        assert excinfo.value.translation_key == "write_rate_limited"
+        await control.async_set_charging_current(12)
+        assert control.pending_action == "set_current"
+        assert control.is_paused is True
 
     asyncio.run(run())
     assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
@@ -652,9 +656,14 @@ def test_lost_or_old_readback_cannot_lift_a_confirmed_pause(missing, command):
         action = (control.async_recover_from_error() if command == "recovery" else
                   control.async_set_charging_current(
                       0 if command == "unlimited" else 8, allow_unlimited=True))
-        with pytest.raises(ServiceValidationError) as error:
+        if command == "recovery":
+            with pytest.raises(ServiceValidationError) as error:
+                await action
+            assert error.value.translation_placeholders == {"seconds": "4"}
+        else:
             await action
-        assert error.value.translation_placeholders == {"seconds": "4"}
+            assert control.pending_action == "set_current"
+            assert control.is_paused is True
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
         harness.clock[0] += 4
         await control.async_set_charging_current(8)
@@ -664,21 +673,21 @@ def test_lost_or_old_readback_cannot_lift_a_confirmed_pause(missing, command):
 
 
 def test_unknown_pause_state_keeps_the_startup_guard():
-    harness = Harness(values={})
+    harness = Harness(values={}, state_change_interval_seconds=300)
 
     async def run():
         control = await harness.connect()
         harness.client.write_state.mode_change_at = harness.clock[0]
         assert control.is_paused is None
         harness.clock[0] += 1
-        with pytest.raises(ServiceValidationError):
-            await control.async_set_charging_current(8)
+        await control.async_set_charging_current(8)
+        assert control.pending_action == "set_current"
         assert not harness.transport.writes
 
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("rejection", ["cooldown", "device"])
+@pytest.mark.parametrize("rejection", ["device"])
 def test_rejected_setpoint_does_not_change_the_later_resume(rejection: str) -> None:
     harness = Harness(values={"charging_current_ems": 8.0})
 
@@ -722,8 +731,8 @@ def test_a_setpoint_change_undoes_a_pause_after_five_seconds() -> None:
     assert decode_register(R.CHARGING_CURRENT_EMS, writes[-1]) == 12.0
 
 
-def test_a_refused_mode_change_does_not_start_the_hysteresis_again() -> None:
-    """A refusal must not push the deadline out; it never touched the bus."""
+def test_a_queued_mode_change_does_not_start_the_hysteresis_again() -> None:
+    """A queued request must not push the deadline out; it never touched the bus."""
 
     harness = Harness(values={"charging_current_ems": 16.0}, clock=[1000.0])
 
@@ -732,8 +741,9 @@ def test_a_refused_mode_change_does_not_start_the_hysteresis_again() -> None:
         await control.async_pause_charging()
         harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
         harness.clock[0] += 2
-        with pytest.raises(ServiceValidationError):
-            await control.async_resume_charging()
+        await control.async_resume_charging()
+        assert control.pending_action == "resume"
+        assert harness.client.write_state.mode_change_at == 1000
         harness.clock[0] += 3
         await control.async_resume_charging()
 
@@ -774,9 +784,9 @@ def test_the_unlimited_opt_in_cannot_undo_a_pause_early_either() -> None:
         await control.async_pause_charging()
         harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
         harness.clock[0] += 1
-        with pytest.raises(ServiceValidationError) as excinfo:
-            await control.async_set_charging_current(0, allow_unlimited=True)
-        assert excinfo.value.translation_key == "write_rate_limited"
+        await control.async_set_charging_current(0, allow_unlimited=True)
+        assert control.pending_action == "set_current"
+        assert control.is_paused is True
 
     asyncio.run(run())
     assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
@@ -822,9 +832,9 @@ def test_pause_and_resume_preserve_unlimited_mode(initial: float) -> None:
             harness.clock[0] += 5
         await control.async_pause_charging()
         assert control.charging_setpoint == 0
-        with pytest.raises(ServiceValidationError) as error:
-            await control.async_resume_charging()
-        assert error.value.translation_key == "write_rate_limited"
+        await control.async_resume_charging()
+        assert control.pending_action == "resume"
+        assert control.is_paused is True
         harness.clock[0] += 300
         await control.async_resume_charging()
         assert control.charging_setpoint == 0
@@ -985,8 +995,8 @@ def test_a_sleeping_deferred_write_cannot_undo_a_pause() -> None:
 
 
 @pytest.mark.parametrize("charging", [False, True])
-def test_phase_switch_rate_limit_reports_a_translated_wait(charging: bool) -> None:
-    harness = Harness(values={"evse_state": EvseState.IDLE})
+def test_phase_switch_rate_limit_queues_until_the_shared_interval(charging: bool) -> None:
+    harness = Harness(values={"evse_state": EvseState.IDLE}, state_change_interval_seconds=300)
 
     async def run() -> None:
         control = await harness.connect()
@@ -995,10 +1005,9 @@ def test_phase_switch_rate_limit_reports_a_translated_wait(charging: bool) -> No
         if charging:
             harness.snapshot.values["evse_state"] = EvseState.CHARGING
             harness.transport.bank[R.EVSE_STATE.address] = int(EvseState.CHARGING)
-        with pytest.raises(ServiceValidationError) as error:
-            await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
-        assert error.value.translation_key == "write_rate_limited"
-        assert error.value.translation_placeholders == {"seconds": "285"}
+        await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
+        assert control.pending_action == "all_phases"
+        assert control._mode_change_remaining() == 285
         assert harness.diagnostics.writes_rate_limited == 1
         assert harness.written(R.REQUESTED_PHASES) == [[1]]
         assert harness.written(R.CHARGING_CURRENT_EMS) == []
@@ -1024,9 +1033,9 @@ def test_uncertain_pause_keeps_hysteresis_even_with_old_readback(outcome):
         harness.clock[0] += 1
         assert control.is_paused is None
         assert control.pause_requested is True
-        with pytest.raises(ServiceValidationError) as limited:
-            await control.async_set_charging_current(8)
-        assert limited.value.translation_placeholders == {"seconds": "4"}
+        await control.async_set_charging_current(8)
+        assert control.pending_action == "set_current"
+        assert control.is_paused is None
         assert not harness.written(R.CHARGING_CURRENT_EMS)
 
     asyncio.run(run())
@@ -1047,7 +1056,7 @@ def test_phase_switch_uses_fresh_device_status(cached, actual, pause):
         await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
         assert bool(harness.written(R.CHARGING_CURRENT_EMS)) == pause
         assert harness.written(R.REQUESTED_PHASES) == [[1]]
-        assert harness.transport.reads[0] == (R.EVSE_STATE.address, 1)
+        assert (R.EVSE_STATE.address, 1) in harness.transport.reads
 
     asyncio.run(run())
 

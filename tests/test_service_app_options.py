@@ -45,6 +45,41 @@ def test_app_shows_host_even_before_a_network_address_has_been_entered(app_confi
     assert config.connection == SerialConfig("/dev/fake")
 
 
+def test_app_and_standalone_default_to_300_seconds_between_state_changes(app_config):
+    key = "state_change_interval_seconds"
+    assert app_config["options"][key] == 300
+    assert app_config["schema"][key] == "int(0,3600)"
+    for options in ({}, app_config["options"]):
+        config = ServerConfig.from_dict({
+            **options, "token": TOKEN, "serial_port": "/dev/fake",
+        })
+        assert config.state_change_interval_seconds == 300
+
+
+@pytest.mark.parametrize("seconds", [0, 1, 175, 300, 3600])
+def test_service_retains_the_configured_state_change_interval(app_config, seconds):
+    config = ServerConfig.from_dict({
+        **app_config["options"],
+        "token": TOKEN,
+        "serial_port": "/dev/fake",
+        "state_change_interval_seconds": seconds,
+    })
+    assert config.state_change_interval_seconds == seconds
+
+
+@pytest.mark.parametrize(
+    "seconds", [None, True, -1, 3601, 1.5, 300.0, "300", [], {}, float("nan"), float("inf")]
+)
+def test_service_rejects_invalid_state_change_intervals(app_config, seconds):
+    with pytest.raises(ValueError, match="state_change_interval_seconds"):
+        ServerConfig.from_dict({
+            **app_config["options"],
+            "token": TOKEN,
+            "serial_port": "/dev/fake",
+            "state_change_interval_seconds": seconds,
+        })
+
+
 def test_app_offers_exactly_three_readable_choices_without_duplicate_transports(app_config):
     schema = app_config["schema"]["connection_type"]
     assert schema.startswith("list(")

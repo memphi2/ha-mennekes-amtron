@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Add a configurable interval between charging-state changes, in seconds,
+  defaulting to 300. Queue early starts and phase changes, with the latest
+  request replacing an older pending action and stop commands cancelling it.
+- Show the pending change and its scheduled time without per-second Recorder
+  updates. Configure the interval in direct-mode HA options or in the app/service
+  that owns the connection; heartbeat and same-state error recovery continue.
+
 ## 0.5.2b1 — 2026-11-06
 
 - Verify a known physical wallbox identity after reconnects and before control

@@ -50,6 +50,30 @@ constrain limited-current commands. On resume, the service applies HA's cap to i
 latest saved setpoint while holding the current-write lock; a deliberately
 unlimited setpoint stays unlimited.
 
+### State-change interval — next beta, unreleased
+
+`state_change_interval_seconds` accepts whole seconds from 0 to 3600 and defaults
+to 300. The app and standalone service use the same setting; HA's service-mode
+options do not impose another timer. Zero disables the long transition guard,
+while the five-second current-write floor remains. Ordinary current adjustment
+during charging uses that short floor. Start/resume and phase changes use the
+shared state-change interval, including charging-release enable and unlock.
+
+The service keeps one pending charging request. A newer request supersedes it;
+pause, release-off and lock-on cancel pending starts without waiting for the
+long interval. A pause that hits the five-second current-write floor clears
+pending work but returns a rate-limit error; it is not queued for later. The
+caller must request that pause again after the reported wait. Repeating the
+same state does not extend the deadline. Recovery
+that reasserts existing intent and the independent heartbeat do not wait for
+this interval. A compound pause-before-phase command still leaves charging
+paused; it does not automatically resume.
+
+The queue belongs to the running service, so it can execute while HA is offline.
+Restarting the service cancels pending work and begins a conservative guard
+period. Neither HA reconnect nor saved intent replays a cancelled queued start.
+See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+
 ## Supervisor discovery and distribution
 
 The app generates and stores its private token. Supervisor passes its address
@@ -133,6 +157,12 @@ sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
 use the [Recorder guide](recorder.md) to control that traffic.
 
+In the next beta, the pending action and its fixed UTC due time are kept in
+memory. These fields change on scheduling, replacement or completion, not on
+every second of the wait. The frontend can display the due time relatively;
+the database does not need a changing countdown value. Pending work is not
+added to `intent.json` and is cancelled on service restart.
+
 ## Commands and API boundary
 
 Service **0.5.0 introduced API 2**. Snapshots report `api_version: 2`, and
@@ -147,6 +177,20 @@ baseline; an omitted version will no longer satisfy a future higher minimum.
 An unsupported API or a service below the minimum produces the compatibility
 error. A malformed version or snapshot produces the data-validation error.
 Neither condition asks for new credentials. See [Updates](modbus-service.md#updates).
+
+The next beta adds these fields to the snapshot's `control` object:
+
+| Field | Meaning |
+|---|---|
+| `state_change_interval_seconds` | The service's configured interval, default 300 seconds |
+| `pending_action` | The queued action, or `null` when nothing is pending |
+| `pending_until` | The action's fixed timezone-aware UTC timestamp, or `null` |
+
+The pending fields form a pair: an action needs a due timestamp, and no pending
+action has no due timestamp. These additions are optional for older API 2
+services. Their absence does not enable the new queue in that service; its
+existing control behavior remains. HA derives the two pending-change sensors
+from the service data rather than maintaining a second queue.
 
 | Endpoint | Purpose |
 |---|---|
@@ -188,14 +232,17 @@ Stop the bus owner before deliberately changing a gateway route or connected
 wallbox. Modbus serial numbers are not cryptographic authentication, and a
 physical routing change is not an authenticated identity change notification.
 
-The service enforces the same current-write floor, phase-switch guards, device
-limits and bounded error-200 recovery as direct mode. All clients share one
+The service enforces the same current-write floor, charging transition guards,
+device limits and bounded error-200 recovery as direct mode. All clients share one
 serialized command path. A command is rejected if the latest wallbox snapshot
 is unavailable or older than the greater of 30 seconds and three status-poll
 intervals. This is checked after waiting for the command lock; a queued request
 cannot use readiness that expired while it waited. Rejected commands are not
 replayed later, and this check does not stop the heartbeat or change saved pause
-intent. Failed or timed-out commands are not automatically
+intent. In the next beta, an accepted command can instead be queued for its
+state-change deadline; execution rechecks its prerequisites, and an execution
+failure clears pending work rather than retrying an uncertain write indefinitely.
+Failed or timed-out commands are not automatically
 replayed by HA because a write may already have reached the wallbox. Persistent
 recovery failures remain visible. Recovery while deliberately paused still needs
 confirmation on the actual wallbox firmware.

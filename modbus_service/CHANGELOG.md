@@ -1,5 +1,15 @@
 # Changes
 
+## Unreleased
+
+- Add `state_change_interval_seconds`, default 300 and configurable from 0 to
+  3600 seconds. Queue early charging starts and phase changes; newer requests
+  replace old pending work, and stop commands cancel a pending start.
+- Report the pending action and fixed due time to HA. A running service keeps
+  the queue through HA restarts; restarting the service cancels pending work.
+  Heartbeat and recovery that preserves the existing charging intent continue
+  without waiting for this interval.
+
 ## 0.5.2b1
 
 - Check the physical serial after reconnects and before control writes, including

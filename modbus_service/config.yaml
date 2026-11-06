@@ -28,6 +28,7 @@ options:
   frame: 8n2
   read_only: true
   current_cap: 6
+  state_change_interval_seconds: 300
   scan_interval: 5
   measurement_interval: 30
   listen: 0.0.0.0
@@ -42,6 +43,7 @@ schema:
   frame: list(8n2|8e1|8o1)
   read_only: bool
   current_cap: float(6,32)
+  state_change_interval_seconds: int(0,3600)
   scan_interval: int(2,300)
   measurement_interval: int(2,300)
   listen: str

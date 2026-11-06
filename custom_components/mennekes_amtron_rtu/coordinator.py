@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -53,6 +53,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         )
         self._client = client
         self._identity = identity
+        self.control_status: Callable[[], tuple[str | None, datetime | None]] | None = None
         self._poller = DevicePoller(
             client,
             identity,
@@ -75,8 +76,11 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
 
     async def _async_update_data(self) -> WallboxData:
         try:
-            return await self._poller.async_poll(
+            data = await self._poller.async_poll(
                 self.current_data(), last_success=self.last_update_success
             )
+            if self.control_status is not None:
+                data.pending_change, data.pending_change_until = self.control_status()
+            return data
         except AmtronBusError as err:
             raise UpdateFailed(str(err)) from err

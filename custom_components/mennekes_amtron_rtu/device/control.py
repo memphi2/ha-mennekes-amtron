@@ -21,6 +21,7 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from .capabilities import phase_switch_is_supported
 from .client import MennekesModbusClient
@@ -35,16 +36,17 @@ from .const import (
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_UNLIMITED,
     CHARGING_PAUSE_CURRENT,
+    DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
     ERROR_CODE_EMS_UNAVAILABLE,
     HEARTBEAT_VALUE,
+    MAX_STATE_CHANGE_INTERVAL_SECONDS,
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
-    MIN_PAUSE_RESUME_INTERVAL_SECONDS,
     MIN_PHASE_CHANGE_INTERVAL_SECONDS,
     SYSTEM_RESTART_VALUE,
 )
 from .data import DeviceIdentity, WallboxData, WriteDiagnostics
 from .enums import EvseState, RequestedPhases, SolarChargingMode
-from .errors import DeviceError, device_error, validation_error
+from .errors import DeviceError, DeviceValidationError, device_error, validation_error
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
@@ -60,6 +62,15 @@ from .registers import (
 from .runtime_events import EventType
 
 _LOGGER = logging.getLogger(__name__)
+PENDING_ACTIONS = (
+    "resume", "set_current", "single_phase", "all_phases", "enable_charging", "unlock",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _PendingCommand:
+    action: str
+    value: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +79,17 @@ class ControlOptions:
 
     read_only: bool = True
     current_cap: float | None = None
+    state_change_interval_seconds: float = DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
+
+    def __post_init__(self) -> None:
+        interval = self.state_change_interval_seconds
+        if (
+            isinstance(interval, bool)
+            or not isinstance(interval, (int, float))
+            or not math.isfinite(interval)
+            or not 0 <= interval <= MAX_STATE_CHANGE_INTERVAL_SECONDS
+        ):
+            raise ValueError("state_change_interval_seconds must be between 0 and 3600")
 
 
 class AmtronControl:
@@ -83,6 +105,7 @@ class AmtronControl:
         state: Callable[[], WallboxData],
         request_refresh: Callable[[], Awaitable[None]] | None = None,
         notify_write_error: Callable[[], None] | None = None,
+        validate_deferred: Callable[[], None] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -93,12 +116,26 @@ class AmtronControl:
         self._state = state
         self._request_refresh = request_refresh
         self._notify_write_error = notify_write_error
+        self._validate_deferred = validate_deferred
         self._sleep = sleep
         self._monotonic = monotonic
-        self._pending_current: float | None = None
+        self._pending: _PendingCommand | None = None
+        self._pending_due = 0.0
+        self._pending_until: datetime | None = None
+        self._pending_changed = asyncio.Event()
         self._current_lock = asyncio.Lock()
         self._flush_task: asyncio.Task[None] | None = None
         self._write_state = client.write_state
+
+    @property
+    def pending_action(self) -> str | None:
+        """Return the latest queued command without changing actual readback."""
+        return self._pending.action if self._pending else None
+
+    @property
+    def pending_until(self) -> datetime | None:
+        """Return a stable deadline; a UI can derive remaining time locally."""
+        return self._pending_until
 
     @property
     def charging_setpoint(self) -> float | None:
@@ -207,17 +244,21 @@ class AmtronControl:
             )
         else:
             current = min(current, self.max_charging_current)
-        # Every value this method accepts is either a real limit or the
-        # explicit 0 A, and while the pause value is active both of them
-        # resume the charge, whatever the caller meant by it. So they answer
-        # to the same short write guard as the pause switch.
-        await self._async_request_current(current)
+        # Both a valid limit and zero can resume a paused charge. Classify
+        # them from confirmed state, not from the name of the HA control.
+        async with self._current_lock:
+            await self._async_submit_locked(_PendingCommand("set_current", current))
 
     async def async_pause_charging(self) -> None:
         """Pause charging the documented way, by signalling 0 A to the EV."""
 
         self._require_write_access()
-        await self._async_request_current(CHARGING_PAUSE_CURRENT, mode_change=True)
+        async with self._current_lock:
+            await self._async_cancel_pending()
+            try:
+                await self._async_apply_current(CHARGING_PAUSE_CURRENT)
+            except AmtronRateLimitedError as err:
+                self._raise_rate_limited(err)
 
     def _resume_current_maximum(self, current_cap: float | None) -> float:
         if current_cap is None:
@@ -240,29 +281,29 @@ class AmtronControl:
                 target = maximum
             elif target != CHARGING_CURRENT_UNLIMITED:
                 target = max(CHARGING_CURRENT_MINIMUM, min(target, maximum))
-            await self._async_request_current_locked(target, mode_change=True)
+            await self._async_submit_locked(_PendingCommand("resume", target))
 
     async def async_set_charging_release(self, released: bool) -> None:
         """Open or close the charging relay through 0x0D05."""
 
         self._require_write_access()
         async with self._current_lock:
-            previous = self.charging_release_requested
-            self.charging_release_requested = released
-            try:
-                await self._async_write(CHARGING_RELEASE, int(released))
-            except (DeviceError, asyncio.CancelledError) as err:
-                # A failed block command still expresses the user's intent.
-                # A failed enable must never erase a previously blocked state.
-                if released or isinstance(err.__cause__, AmtronIdentityError):
-                    self.charging_release_requested = previous
-                raise
+            if released:
+                await self._async_submit_locked(_PendingCommand("enable_charging", 1))
+            else:
+                await self._async_cancel_pending()
+                await self._async_apply_release(False)
 
     async def async_set_lock_evse(self, locked: bool) -> None:
         """Lock or unlock the wallbox through 0x0D06."""
 
         self._require_write_access()
-        await self._async_write(LOCK_EVSE, int(locked))
+        async with self._current_lock:
+            if locked:
+                await self._async_cancel_pending()
+                await self._async_apply_lock(True)
+            else:
+                await self._async_submit_locked(_PendingCommand("unlock", 0))
 
     async def async_set_solar_charging_mode(self, mode: SolarChargingMode) -> None:
         """Set the solar charging mode shown on the wallbox HMI (0x0D03)."""
@@ -281,26 +322,11 @@ class AmtronControl:
         self._require_write_access()
         if not phase_switch_is_supported(self._identity.phase_options_hw):
             raise validation_error("phase_switch_unsupported")
-        try:
-            async with self._current_lock:
-                self._client.check_write_interval(
-                    REQUESTED_PHASES, min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS
-                )
-                state = await self._async_current_evse_state("phase_state_unknown")
-                if state == EvseState.CHARGING:
-                    await self._async_request_current_locked(
-                        CHARGING_PAUSE_CURRENT, mode_change=True, defer=False
-                    )
-                await self._async_write(
-                    REQUESTED_PHASES,
-                    int(phases),
-                    min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
-                )
-        except AmtronRateLimitedError as err:
-            self._diagnostics.writes_rate_limited += 1
-            raise validation_error(
-                "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
-            ) from err
+        async with self._current_lock:
+            await self._async_submit_locked(_PendingCommand(
+                "single_phase" if phases == RequestedPhases.SINGLE_PHASE else "all_phases",
+                int(phases),
+            ))
 
     async def async_recover_from_error(self) -> bool:
         """Run the documented recovery sequence for error state 200.
@@ -324,10 +350,8 @@ class AmtronControl:
                 raise validation_error("recovery_state_unknown") from err
             if not isinstance(current, (int, float)) or not math.isfinite(current) or current < 0:
                 raise validation_error("recovery_state_unknown")
-            # Refuse known cooldowns before changing charging release. The
-            # final current write still rechecks after the awaited bus calls.
-            if self.is_paused is not False or self.pause_requested is True:
-                self._check_mode_change_interval()
+            # Recovery reasserts existing intent, including a deliberate
+            # pause. It never starts the long state-change timer again.
             try:
                 self._client.check_write_interval(
                     CHARGING_CURRENT_EMS, min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS
@@ -355,12 +379,10 @@ class AmtronControl:
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
             await self._async_write(CHARGING_RELEASE, int(self.charging_release_requested is not False))
-            await self._async_request_current_locked(
+            await self._async_apply_current(
                 min(target, self.max_charging_current),
-                # Confirm the final write before reporting sequence completion.
-                mode_change=self.is_paused is not False,
-                defer=False,
                 preserve_setpoint=paused,
+                recovery=True,
             )
         self._diagnostics.recoveries += 1
         self._diagnostics.timeline.record(EventType.RECOVERY_COMPLETED)
@@ -388,9 +410,9 @@ class AmtronControl:
         return EvseState(state)
 
     async def async_shutdown(self) -> None:
-        """Cancel a deferred charging-current write during unload."""
+        """Cancel deferred work; a new owner never inherits a delayed start."""
 
-        self._pending_current = None
+        self._clear_pending()
         task = self._flush_task
         self._flush_task = None
         if task is not None and not task.done():
@@ -398,96 +420,77 @@ class AmtronControl:
             with suppress(asyncio.CancelledError):
                 await task
 
-    async def _async_request_current(
-        self,
-        value: float,
-        *,
-        mode_change: bool = False,
-    ) -> None:
-        """Write 0x0302, deferring the write when it comes too fast.
+    @staticmethod
+    def _uncertain(error: BaseException) -> bool:
+        return not isinstance(error, DeviceValidationError) and not isinstance(
+            error.__cause__,
+            (AmtronWriteRejectedError, AmtronIllegalAddressError, AmtronIdentityError),
+        )
 
-        Every write keeps the five-second distance enforced by the client.
-        The vendor's longer anti-cycling recommendation is implemented by
-        automation hysteresis, not a five-minute manual-control lockout.
-
-        Rejecting a plain setpoint write would make a dragged slider fail, so
-        the newest value is remembered and written once the interval passed. A
-        mode change is reported back instead: it is a deliberate act, and
-        quietly performing it later would hide the user's actual pause state.
-        """
-
-        async with self._current_lock:
-            await self._async_request_current_locked(
-                value, mode_change=mode_change
-            )
-
-    async def _async_request_current_locked(
-        self, value: float, *, mode_change: bool, defer: bool = True,
-        preserve_setpoint: bool = False,
-    ) -> None:
-        """Serialize a new command against any deferred setpoint."""
-
+    def _current_transition(self, value: float) -> bool:
         paused = self.is_paused
-        mode_change = mode_change or paused is not False or self.pause_requested is True
+        if self.pause_requested is True:
+            paused = True
+        target_paused = 0 < value < CHARGING_CURRENT_MINIMUM
+        return paused is None or paused != target_paused
+
+    def _check_transition_interval(self) -> None:
+        remaining = self._mode_change_remaining()
+        if remaining > 0:
+            raise AmtronRateLimitedError("state_change", remaining)
+
+    def _mode_change_remaining(self) -> float:
+        if self._write_state.mode_change_at is None:
+            return 0.0
+        waited = self._monotonic() - self._write_state.mode_change_at
+        return max(0.0, self._options.state_change_interval_seconds - waited)
+
+    def _raise_rate_limited(self, error: AmtronRateLimitedError) -> None:
+        self._diagnostics.writes_rate_limited += 1
+        self._diagnostics.timeline.record(
+            EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
+        )
+        raise validation_error(
+            "write_rate_limited", {"seconds": str(math.ceil(error.retry_after))}
+        ) from error
+
+    async def _async_apply_current(
+        self, value: float, *, preserve_setpoint: bool = False, recovery: bool = False,
+    ) -> None:
+        transition = self._current_transition(value) and not recovery
+        paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._write_state.confirmed_current
-        if mode_change:
-            self._check_mode_change_interval()
+        if transition and not paused:
+            self._check_transition_interval()
         try:
             await self._async_write(
-                CHARGING_CURRENT_EMS,
-                value,
-                min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
-                refresh=False,
+                CHARGING_CURRENT_EMS, value,
+                min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS, refresh=False,
             )
-        except AmtronRateLimitedError as err:
-            self._diagnostics.writes_rate_limited += 1
-            if mode_change or not defer:
-                raise validation_error(
-                    "write_rate_limited",
-                    {"seconds": f"{err.retry_after:.0f}"},
-                ) from err
-            self._pending_current = value
-            self.charging_setpoint = value
-            self._ensure_flush_task()
-            return
         except (DeviceError, asyncio.CancelledError) as err:
-            uncertain = not isinstance(
-                err.__cause__, (AmtronWriteRejectedError, AmtronIllegalAddressError, AmtronIdentityError)
-            )
-            if uncertain:
-                # The newer current may already have reached the wallbox.
-                # Never let an older queued slider target undo it afterwards.
-                self._pending_current = None
+            if self._uncertain(err):
+                self._clear_pending()
                 self._write_state.confirmed_current = None
-                if value == CHARGING_CURRENT_UNLIMITED or value >= CHARGING_CURRENT_MINIMUM:
-                    # Retain the latest explicit intent for persistence and
-                    # recovery, not the superseded deferred slider target.
+                if not paused:
                     self.charging_setpoint = value
-            if mode_change and uncertain:
-                # A lost acknowledgement/cancellation may follow an applied
-                # pause or resume. Unknown outcome must not remove hysteresis.
-                self._write_state.mode_change_at = self._monotonic()
-                if 0 < value < CHARGING_CURRENT_MINIMUM:
+                if transition:
+                    self._write_state.mode_change_at = self._monotonic()
+                if paused:
                     self.pause_requested = True
-                    # The wallbox may already be paused. Keep the known
-                    # pre-pause current so a later resume cannot silently
-                    # fall back to the configured maximum after a lost ACK.
                     self._remember_pause_setpoint(previous, preserve_setpoint)
             raise
-        # A successful command supersedes every older deferred setpoint,
-        # including one whose background task is currently sleeping.
-        self._pending_current = None
         self._write_state.confirmed_current = value
-        self.pause_requested = 0 < value < CHARGING_CURRENT_MINIMUM
-        # Publish accepted bookkeeping before coordinator callbacks read it.
-        # Rejected commands never alter the setpoint; pauses retain the actual
-        # previous limit, whether requested manually or by a phase change.
-        if value == CHARGING_CURRENT_UNLIMITED or value >= CHARGING_CURRENT_MINIMUM:
+        self.pause_requested = paused
+        if not paused:
             self.charging_setpoint = value
-        elif value == CHARGING_PAUSE_CURRENT:
+        else:
             self._remember_pause_setpoint(previous, preserve_setpoint)
-        if mode_change:
+        if transition:
             self._write_state.mode_change_at = self._monotonic()
+        if not recovery:
+            # The command reached the device. A failed visibility/persistence
+            # callback must never allow an older queued command to run later.
+            self._clear_pending()
         if self._request_refresh is not None:
             await self._request_refresh()
 
@@ -504,65 +507,193 @@ class AmtronControl:
         ):
             self.charging_setpoint = float(previous)
 
-    def _check_mode_change_interval(self) -> None:
-        """Reject a known pause/resume cooldown before any operation writes."""
+    async def _async_read_switch(self, spec: RegisterSpec, *, stopping: bool = False) -> int | None:
+        """Recheck live state, but a failed read must not prevent a stop."""
+        try:
+            value = await self._client.async_read_register(spec)
+        except AmtronBusError as err:
+            if stopping:
+                return None
+            raise validation_error("control_state_unknown") from err
+        if type(value) is not int or value not in (0, 1):
+            if stopping:
+                return None
+            raise validation_error("control_state_unknown")
+        return value
 
-        remaining = self._mode_change_remaining()
-        if remaining > 0:
-            self._diagnostics.writes_rate_limited += 1
-            self._diagnostics.timeline.record(
-                EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
-            )
-            raise validation_error(
-                "write_rate_limited", {"seconds": f"{remaining:.0f}"}
-            )
+    async def _async_transition_write(
+        self, spec: RegisterSpec, value: int, *, changed: bool,
+        min_interval: float = 0.0,
+    ) -> None:
+        try:
+            await self._async_write(spec, value, min_interval=min_interval, refresh=False)
+        except (DeviceError, asyncio.CancelledError) as err:
+            if changed and self._uncertain(err):
+                self._write_state.mode_change_at = self._monotonic()
+            raise
+        if changed:
+            self._write_state.mode_change_at = self._monotonic()
+        self._clear_pending()
+        if self._request_refresh is not None:
+            await self._request_refresh()
 
-    def _mode_change_remaining(self) -> float:
-        """Return the seconds left of the pause and resume hysteresis."""
+    async def _async_apply_release(self, released: bool) -> None:
+        current = await self._async_read_switch(CHARGING_RELEASE, stopping=not released)
+        changed = current != int(released)
+        if released and changed:
+            self._check_transition_interval()
+        previous = self.charging_release_requested
+        self.charging_release_requested = released
+        try:
+            await self._async_transition_write(CHARGING_RELEASE, int(released), changed=changed)
+        except (DeviceError, asyncio.CancelledError) as err:
+            # A failed block retains its intent unless identity verification
+            # proves that no command could have reached the intended device.
+            if released or isinstance(err.__cause__, AmtronIdentityError):
+                self.charging_release_requested = previous
+            raise
 
-        if self._write_state.mode_change_at is None:
-            return 0.0
-        waited = self._monotonic() - self._write_state.mode_change_at
-        return max(0.0, MIN_PAUSE_RESUME_INTERVAL_SECONDS - waited)
+    async def _async_apply_lock(self, locked: bool) -> None:
+        current = await self._async_read_switch(LOCK_EVSE, stopping=locked)
+        changed = current != int(locked)
+        if not locked and changed:
+            self._check_transition_interval()
+        await self._async_transition_write(LOCK_EVSE, int(locked), changed=changed)
 
-    def _ensure_flush_task(self) -> None:
-        if self._flush_task is not None and not self._flush_task.done():
+    async def _async_apply_phases(self, phases: int) -> None:
+        current = await self._async_read_switch(REQUESTED_PHASES)
+        if current == phases:
             return
-        self._flush_task = asyncio.get_running_loop().create_task(
-            self._async_flush_pending_current(),
-            name="mennekes_amtron_rtu_current_flush",
+        # Admit the entire pause/phase operation before changing either
+        # register. Its own pause must not block the following phase write.
+        self._check_transition_interval()
+        self._client.check_write_interval(
+            REQUESTED_PHASES, min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS
+        )
+        state = await self._async_current_evse_state("phase_state_unknown")
+        if state == EvseState.CHARGING:
+            await self._async_apply_current(CHARGING_PAUSE_CURRENT)
+        await self._async_transition_write(
+            REQUESTED_PHASES, phases, changed=True,
+            min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
         )
 
-    async def _async_flush_pending_current(self) -> None:
+    async def _async_apply_command(self, command: _PendingCommand) -> None:
+        self._require_write_access()
+        if command.action in ("set_current", "resume"):
+            # A configuration change can lower the available current while
+            # an accepted request is waiting. Reapply the active limit.
+            await self._async_apply_current(min(command.value, self.max_charging_current))
+        elif command.action in ("single_phase", "all_phases"):
+            if not phase_switch_is_supported(self._identity.phase_options_hw):
+                raise validation_error("phase_switch_unsupported")
+            await self._async_apply_phases(int(command.value))
+        elif command.action == "enable_charging":
+            await self._async_apply_release(True)
+        else:
+            await self._async_apply_lock(False)
+
+    async def _async_submit_locked(self, command: _PendingCommand) -> None:
+        """Accept the latest request, coalescing all deferred commands together."""
+        had_pending = self._pending is not None
+        try:
+            await self._async_apply_command(command)
+        except AmtronRateLimitedError as err:
+            self._diagnostics.writes_rate_limited += 1
+            self._diagnostics.timeline.record(EventType.WRITE_RATE_LIMITED)
+            if command.action in ("set_current", "resume"):
+                self.charging_setpoint = command.value
+            await self._async_queue(command, err.retry_after)
+            return
+        except (DeviceError, asyncio.CancelledError) as err:
+            if self._uncertain(err):
+                self._clear_pending()
+                if had_pending:
+                    await self._async_publish_pending()
+            raise
+        await self._async_cancel_pending()
+
+    async def _async_queue(self, command: _PendingCommand, delay: float) -> None:
+        due = self._monotonic() + delay
+        if self._pending == command and abs(self._pending_due - due) < 0.01:
+            return
+        self._pending = command
+        self._pending_due = due
+        self._pending_until = datetime.now(UTC) + timedelta(seconds=delay)
+        self._pending_changed.set()
+        if self._flush_task is None or self._flush_task.done():
+            self._flush_task = asyncio.create_task(
+                self._async_flush_pending(), name="mennekes_amtron_rtu_control_flush"
+            )
+        await self._async_publish_pending()
+
+    def _clear_pending(self) -> bool:
+        changed = self._pending is not None
+        self._pending = None
+        self._pending_until = None
+        self._pending_changed.set()
+        return changed
+
+    async def _async_publish_pending(self) -> None:
+        if self._request_refresh is not None:
+            try:
+                await self._request_refresh()
+            except (AmtronBusError, OSError):
+                # A subsequent normal poll publishes the cleared/queued
+                # status. Do not retry a command because visibility failed.
+                _LOGGER.debug("Unable to refresh queued command status")
+
+    async def _async_cancel_pending(self) -> None:
+        if self._clear_pending():
+            await self._async_publish_pending()
+
+    async def _async_wait_pending(self, delay: float) -> None:
+        sleeping = asyncio.ensure_future(self._sleep(delay))
+        changed = asyncio.create_task(self._pending_changed.wait())
+        try:
+            await asyncio.wait((sleeping, changed), return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for task in (sleeping, changed):
+                task.cancel()
+            await asyncio.gather(sleeping, changed, return_exceptions=True)
+
+    async def _async_flush_pending(self) -> None:
         try:
             while True:
                 async with self._current_lock:
-                    value = self._pending_current
-                    if value is None:
+                    command = self._pending
+                    if command is None:
                         return
-                    try:
-                        if self.is_paused is not False:
-                            await self._async_request_current_locked(
-                                value, mode_change=True, defer=False
+                    delay = self._pending_due - self._monotonic()
+                    if delay <= 0:
+                        try:
+                            if self._validate_deferred is not None:
+                                self._validate_deferred()
+                            await self._async_apply_command(command)
+                        except AmtronRateLimitedError as err:
+                            await self._async_queue(command, err.retry_after)
+                            delay = err.retry_after
+                        except (DeviceError, AmtronBusError, OSError) as err:
+                            # One attempt only. A lost acknowledgement must
+                            # never produce an automatic duplicate start.
+                            _LOGGER.warning(
+                                "Queued %s command cancelled (%s)", command.action,
+                                err.translation_key if isinstance(err, DeviceError)
+                                else type(err).__name__,
                             )
+                            self._clear_pending()
+                            await self._async_publish_pending()
+                            return
                         else:
-                            await self._async_write(
-                                CHARGING_CURRENT_EMS,
-                                value,
-                                min_interval=MIN_CURRENT_WRITE_INTERVAL_SECONDS,
-                            )
-                            self._write_state.confirmed_current = value
-                    except AmtronRateLimitedError as err:
-                        retry_after = err.retry_after
-                    except DeviceError:
-                        # The write path already counted and translated it.
-                        self._pending_current = None
-                        return
-                    else:
-                        self._pending_current = None
-                        return
-                # New commands must be able to replace a sleeping setpoint.
-                await self._sleep(retry_after)
+                            await self._async_cancel_pending()
+                            return
+                    self._pending_changed.clear()
+                await self._async_wait_pending(delay)
+        except (OSError, RuntimeError, ValueError) as err:
+            # A failing refresh/persistence callback must not leave an
+            # unobserved task or a queued start with no owner. Never retry it.
+            self._clear_pending()
+            _LOGGER.warning("Deferred command cancelled after %s", type(err).__name__)
         finally:
             self._flush_task = None
 

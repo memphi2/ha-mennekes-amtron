@@ -8,6 +8,31 @@ the Marketplace also keeps the same integration and entry.
 to select the integration prerelease and beta app catalog. Check the
 [app connection choice](#app-connection-choice) before updating the app.
 
+## Next beta: configurable charging transitions — unreleased
+
+The next beta adds **Minimum time between state changes**, default **300
+seconds** and configurable from **0 to 3600 seconds**. Early starts and phase
+changes are queued; the latest charging request wins and a stop cancels pending
+work. **Pending change** and **Pending change due** show what will happen and
+when. The regular controls continue to show the wallbox's actual state.
+While paused, the current slider instead shows the remembered resume target,
+which may already reflect a pending current request. Pausing within five
+seconds of a current write cancels pending work but returns a short wait error;
+request pause again after that wait.
+
+In direct mode, configure the interval in the integration options. In service
+mode, the app/service must include this feature and owns the setting; updating
+only HA cannot add it to an older service. Compatible older services keep their
+existing timing behavior. Update both components for the new service-mode
+setting and status display, with the app/service first.
+
+After a direct-entry reload or an app/service restart, pending work is cancelled;
+request it again if still wanted. Restarting HA Core alone does not cancel a
+running service's queue. Check pending status before that restart because its
+command can execute while HA is offline. See the
+[user guide](user-guide.md#waiting-between-charging-changes--next-beta-unreleased)
+for the interval, stop behavior and manufacturer recommendation.
+
 ## Routine updates
 
 Back up Home Assistant, read the offered release notes and follow

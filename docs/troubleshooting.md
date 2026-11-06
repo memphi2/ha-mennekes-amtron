@@ -235,12 +235,15 @@ firmware-specific limitation.
 | The slider is at 0 A, but charging continues | **0 A removes the limit.** Turn **Charging paused** on to stop. |
 | The slider will not accept 1–5 A | Use 0 A for no limit or at least 6 A for a limit. Pause has its own switch. |
 | A new current is delayed | Current writes have a five-second minimum interval. The latest accepted request is applied after that interval. |
-| Pause/resume is refused just after startup | The process controlling the bus waits five seconds before its first current/pause command. The error reports the remaining wait. An HA Core restart does not reset a running service's timing. |
+| Pause/resume is refused just after startup | Published 0.5.2b1 applies a five-second current/pause guard and reports the remaining wait. The next beta queues an early resume for its configurable state-change interval. An HA Core restart does not reset a running service's timing. |
 | The slider maximum is lower than expected | Check the device maximum and HA current cap. In service mode, the app's current cap also applies. |
 | Offered current is lower than the slider setting | Installation limits and an active downgrade can lower **Signaled current**. The vehicle can draw less again. |
-| A current change is refused while paused | Setting a current can resume charging and must respect the pause/resume waiting interval. |
+| A current change waits while paused | Setting a current can resume charging. In the next beta, inspect **Pending change** and **Pending change due**; published 0.5.2b1 instead rejects an early resume with the remaining wait. |
+| Pause returns a short wait error — next beta | It cancelled any pending start, but did not write the pause because the previous current write was less than five seconds ago. Request pause again after the reported wait; this stop is not queued. |
 | The slider still shows a value during a pause | It shows the remembered resume setting. Check **Charging paused**, **Signaled current** and **Total power** for actual charging. |
 | A manual pause is undone later | Check automations that write the current or pause switch. Disable the PV pause/resume automation if the manual pause should remain. |
+| A pending change disappears after restart — next beta | A restart of the bus owner cancels queued commands. Request the action again if still wanted. HA Core restarting alone does not cancel a running service's queue. |
+| A pending change disappears without changing the wallbox — next beta | A newer charging command or stop can replace/cancel it. If no new command was sent, inspect connectivity, write permission and the integration/app log for an execution failure. |
 
 ## PV automation stopped after an update
 
@@ -257,9 +260,12 @@ timers.
 ## Phase switching leaves charging paused
 
 This is expected when switching during charging. Resume explicitly after the
-waiting interval. Phase changes require five minutes between requests, including
-an initial wait after the controlling process starts. Check your vehicle's
-support: some vehicles abort the session after a phase change. The selector
+phase change has actually run. Published 0.5.2b1 requires five minutes between
+phase requests, including an initial wait after the controlling process starts.
+The next beta uses the configurable state-change interval and queues early
+requests. Check **Pending change** before requesting resume: a new resume
+request replaces a phase change that is still waiting. Check your vehicle's
+support; some vehicles abort the session after a phase change. The selector
 exists only on capable wallbox hardware.
 
 ## The database keeps growing

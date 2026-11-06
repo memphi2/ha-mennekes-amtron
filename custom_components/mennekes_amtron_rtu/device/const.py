@@ -63,12 +63,13 @@ MIN_SCAN_INTERVAL_SECONDS: Final = 2
 MAX_SCAN_INTERVAL_SECONDS: Final = 300
 DEFAULT_MEASUREMENT_INTERVAL_SECONDS: Final = 30
 
-# Current commands, including pause/resume, share the five-second write floor.
-# The vendor's five-minute anti-cycling recommendation belongs in automation
-# hysteresis; phase switching retains its own conservative interval.
+# The short register floors remain independent of the configurable minimum
+# between charging state changes. Zero disables only the longer interval.
 MIN_CURRENT_WRITE_INTERVAL_SECONDS: Final = 5.0
-MIN_PAUSE_RESUME_INTERVAL_SECONDS: Final = 5.0
-MIN_PHASE_CHANGE_INTERVAL_SECONDS: Final = 300.0
+MIN_PHASE_CHANGE_INTERVAL_SECONDS: Final = 5.0
+CONF_STATE_CHANGE_INTERVAL_SECONDS: Final = "state_change_interval_seconds"
+DEFAULT_STATE_CHANGE_INTERVAL_SECONDS: Final = 300
+MAX_STATE_CHANGE_INTERVAL_SECONDS: Final = 3600
 
 # 0x0302 semantics. 0 A means "no limitation" and makes the wallbox signal its
 # maximum, 0.01-5.99 A is the vendor's documented pause value.

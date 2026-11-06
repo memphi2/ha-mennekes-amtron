@@ -146,6 +146,7 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 | Set a charging-current limit | Use the current slider in HA. **0 A removes the EMS limit; it does not pause charging.** |
 | Enable or disable all writes | Change **Read-only**, save and restart the app. HA needs no restart. Read-only stops the heartbeat as well as writes. |
 | Change Modbus polling intervals or the service current cap | Change the app configuration, save and restart the app. |
+| Set the time between charging changes — next beta | Set **Minimum time between state changes** in the app, in seconds; default **300**, range **0–3600**. Save and restart the app. |
 | Change USB/LAN connection settings | Open the app configuration, save and restart the app. For LAN, serial baud/frame belong on the gateway. |
 | Change how often HA reads app status, or lower HA's current cap | Open the integration options. |
 | Hand the USB or LAN connection to another master | Stop the app. Disabling its HA entry or enabling read-only does not release the bus. |
@@ -161,14 +162,25 @@ a saved limited setpoint. A deliberately selected **0 A** remains unlimited;
 the wallbox's hardware limits still apply. See the [user guide](user-guide.md)
 for charging controls and automations.
 
+**Next beta, unreleased:** early starts and phase changes wait in one pending
+slot. **Pending change** and **Pending change due** show the action and when
+it can run. A newer charging request replaces it, and stopping cancels a
+pending start. Heartbeat and recovery that preserves the current intent keep
+running. Zero disables the longer wait, while technical write guards remain.
+See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+
 ### What continues during an outage?
 
 | Event | What happens |
 |---|---|
-| HA Core restarts or stays offline | The running app keeps the heartbeat and last charging state indefinitely, including a pause or disabled charging release. |
+| HA Core restarts or stays offline | The running app keeps heartbeat and accepted charging intent. In the next beta, an already queued command can execute while HA is offline. |
 | HA automation is unavailable | No new schedule or surplus calculation runs; the app holds the last chosen state. |
 | App, host, power, USB or LAN/gateway connection fails | The heartbeat can stop. The wallbox's configured fallback applies. |
 | HA reconnects | HA reads the current app state; it does not restore old commands. |
+
+In the next beta, an app/service restart cancels pending commands; it does not
+cancel an already applied pause. HA Core restarts leave the independent
+service's queue running. These queue features are not in published 0.5.2b1.
 
 Configure and understand the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
 The service does not remove the need for it. Include app data in backups:

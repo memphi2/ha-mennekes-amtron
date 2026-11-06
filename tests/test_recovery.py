@@ -753,7 +753,7 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                 assert getattr(runtime.control, intent_key) is (blocked == "pause")
 
                 # Only an explicit resume/release action permits charging.
-                clock[0] += 6
+                clock[0] += 300
                 await hass.services.async_call(
                     "switch",
                     "turn_off" if blocked == "pause" else "turn_on",

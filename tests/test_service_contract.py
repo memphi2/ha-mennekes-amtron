@@ -251,7 +251,7 @@ def test_remote_resume_respects_the_local_current_cap(tmp_path, cap, unknown_tar
                     request_refresh=remote.update,
                 )
                 await control.async_pause_charging()
-                clock[0] += 6
+                clock[0] += 300
                 if unknown_target:
                     service.control.charging_setpoint = None
                     await remote.update()
@@ -316,7 +316,7 @@ def test_remote_resume_uses_fresh_service_intent_with_the_ha_cap(
                 })
                 clock[0] += 6
                 await service.command({"command": "pause", "expected_serial_number": "ABC123456789"})
-                clock[0] += 6
+                clock[0] += 300
                 assert control.charging_setpoint == cached
                 await control.async_resume_charging()
                 assert current_writes(transport) == [fresh, 1, expected]

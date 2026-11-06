@@ -208,16 +208,32 @@ of them are dangerous. Centralising it means the minimum current, the
 `allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics
 counters are written once and cannot be forgotten by a new platform.
 
-Current commands retain the newest pending value when requested inside the
-five-second register interval. Pause/resume commands are instead rejected
-with the short remaining wait, so an old deferred setpoint cannot silently
-undo a later pause. The manufacturer recommends longer anti-cycling hysteresis;
-that belongs in automation policy, and the bundled PV blueprint defaults to
-six minutes. Manual pause/resume no longer has a five-minute lockout.
+**Next beta, unreleased:** current writes retain their five-second register
+floor. A separate `state_change_interval_seconds` option defaults to 300 and
+accepts 0–3600 seconds; zero disables the longer guard. The direct integration
+owns this option in direct mode, while the service configuration owns it in
+service mode. Remote HA commands use the service's policy.
 
-Phase requests retain a separate five-minute interval. Both guards survive
-entry reloads, including uncertain write outcomes. A cold start applies five
-seconds to current and pause/resume, and five minutes to phase requests.
+One pending-command slot and worker coordinate both short current-write delays
+and longer state-change waits. A newer command supersedes older pending work.
+Pause, release-off and lock-on discard pending starts and bypass the long guard;
+the current-write floor remains. Resume, phase changes, release-on and unlock
+share the transition clock. A phase command's pause and phase write form one
+operation and retain the existing behavior of leaving charging paused.
+Idempotent commands do not restart the timer. Recovery reasserts existing intent
+without consuming a new transition or waiting for the longer interval.
+
+The worker releases locks while waiting and revalidates the operation before
+execution. It exposes a stable pending action and UTC due timestamp; no
+per-second state or timestamp writes are required. Register readback remains
+separate from requested state. Shutdown cancels pending work, so a new owner
+never silently replays a queued start. The running service and its queue survive
+an HA restart. Entry reloads retain timing in memory; cold process starts use
+a conservative fresh guard because previous timing is unknown.
+
+Published 0.5.2b1 instead rejects early pause/resume commands and retains its
+separate five-minute phase guard. The new configurable queue is not included
+in that release.
 
 ### Three polling cadences, and one of them is about the database
 

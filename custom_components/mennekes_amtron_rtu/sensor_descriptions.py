@@ -21,6 +21,7 @@ from homeassistant.const import (
     UnitOfTime,
 )
 
+from .device.control import PENDING_ACTIONS
 from .device.decode import RegisterValue
 from .device.enums import (
     AuthorizationStatus,
@@ -41,6 +42,20 @@ from .device.enums import (
     error_category,
 )
 from .device.registers import layout_label
+
+CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="pending_change",
+        translation_key="pending_change",
+        device_class=SensorDeviceClass.ENUM,
+        options=["none", *PENDING_ACTIONS],
+    ),
+    SensorEntityDescription(
+        key="pending_change_until",
+        translation_key="pending_change_until",
+        device_class=SensorDeviceClass.TIMESTAMP,
+    ),
+)
 
 
 @dataclass(frozen=True, kw_only=True)

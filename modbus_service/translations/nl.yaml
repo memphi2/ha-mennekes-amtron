@@ -17,6 +17,9 @@ configuration:
   current_cap:
     name: Maximale stroom
     description: Maximale aangevraagde EMS-stroom in ampère. Uitdrukkelijke opdrachten voor 0 A verwijderen de EMS-limiet.
+  state_change_interval_seconds:
+    name: Minimale tijd tussen statuswijzigingen
+    description: "Seconden vóór opnieuw starten of een fasewisseling (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Stoppen annuleert een geplande start zonder op dit interval te wachten. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen."
   scan_interval:
     name: Statusinterval
     description: Aantal seconden tussen statusuitlezingen. De heartbeat loopt onafhankelijk.

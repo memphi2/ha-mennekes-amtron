@@ -6,7 +6,12 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
 from .connection import ConnectionConfig, NetworkConfig, SerialConfig
-from .const import SUPPORTED_BAUDRATES, frame_parts
+from .const import (
+    DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
+    MAX_STATE_CHANGE_INTERVAL_SECONDS,
+    SUPPORTED_BAUDRATES,
+    frame_parts,
+)
 
 # The app exposes only three readable choices. Standalone JSON configurations
 # keep their canonical transport names; normalize both forms at this boundary.
@@ -44,6 +49,7 @@ class ServerConfig:
     measurement_interval: float = 30.0
     listen: str = "127.0.0.1"
     port: int = 8765
+    state_change_interval_seconds: float = DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
 
     @classmethod
     def from_dict(cls, values: dict[str, Any]) -> ServerConfig:
@@ -62,6 +68,7 @@ class ServerConfig:
             "measurement_interval",
             "listen",
             "port",
+            "state_change_interval_seconds",
         }
         if values.keys() - allowed:
             raise ValueError("unknown service configuration option")
@@ -84,6 +91,10 @@ class ServerConfig:
             ),
             listen,
             _integer_option(values.get("port", 8765), "port", 1, 65535),
+            _integer_option(
+                values.get("state_change_interval_seconds", DEFAULT_STATE_CHANGE_INTERVAL_SECONDS),
+                "state_change_interval_seconds", 0, MAX_STATE_CHANGE_INTERVAL_SECONDS,
+            ),
         )
 
 

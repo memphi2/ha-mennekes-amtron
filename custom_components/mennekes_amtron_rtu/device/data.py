@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from .decode import RegisterValue
 from .registers import LAYOUT_V01_00
@@ -37,6 +38,9 @@ class WallboxData:
     # without changing a register. Compare these stable control values too.
     service_max_charging_current: float | None = field(default=None, repr=False)
     service_charging_setpoint: float | None = field(default=None, repr=False)
+    # Fixed queue metadata changes only when intent changes, never each second.
+    pending_change: str | None = field(default=None, repr=False)
+    pending_change_until: datetime | None = field(default=None, repr=False)
 
     def get(self, key: str) -> RegisterValue:
         """Return one decoded register value, or ``None`` when unavailable."""

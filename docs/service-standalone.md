@@ -48,6 +48,14 @@ The service also accepts `scan_interval` and `measurement_interval`, which defau
 to 5 and 30 seconds. Protect this directory and its backups: they contain both
 the credential and saved charging intent.
 
+**Next beta, unreleased:** the service also accepts
+`"state_change_interval_seconds": 300` (whole seconds, 0–3600). It controls
+the wait between charging-state changes; early starts and phase changes are
+queued, while a stop cancels pending work. Zero disables the longer wait;
+technical write guards remain. Do not add this option to published 0.5.2b1 or
+older services, which reject unknown configuration fields. See
+[Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+
 The API uses plain HTTP. Put it on a trusted private network or use an HTTPS
 reverse proxy outside that network. Do not expose it to the Internet. The HA
 client does not follow redirects, and credentials must not be embedded in its

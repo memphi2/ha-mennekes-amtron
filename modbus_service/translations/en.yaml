@@ -17,6 +17,9 @@ configuration:
   current_cap:
     name: Current cap
     description: Maximum requested EMS current in amperes. Explicit 0 A commands remove the EMS limit.
+  state_change_interval_seconds:
+    name: Minimum time between state changes
+    description: "Seconds before a new start or phase change can run (default 300). Early commands are queued; the latest command replaces the previous one. Stopping cancels a queued start and does not wait for this interval. The five-second current-write interval still applies. Set 0 to disable the longer interval."
   scan_interval:
     name: Status interval
     description: Seconds between status polls. The heartbeat runs independently.

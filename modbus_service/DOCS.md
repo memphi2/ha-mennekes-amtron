@@ -59,6 +59,11 @@ instead: the app and integration can be updated independently.
 | Current cap | Default **6 A**; set within your installation's permitted current. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. |
 
+**Next beta, unreleased:** **Minimum time between state changes** defaults to
+**300 seconds**, with a range of **0–3600 seconds**. This option is not in
+published 0.5.2b1. Zero disables the longer wait; the technical write guards
+remain. Save changes and restart this app. HA does not apply a second interval.
+
 **Adapter host / IP** is always visible; enter it for LAN and
 leave it empty for USB. If **Serial adapter** is hidden, enable **Show unused
 optional configuration options** on the Configuration tab. The form does not
@@ -96,8 +101,22 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
 - **Heartbeat status:** check HA's **Heartbeat** diagnostic sensor. It records
   health changes rather than every beat.
 
+In the next beta, an early start or phase change is queued. HA's **Pending
+change** and **Pending change due** show the request and its scheduled time.
+The latest charging request replaces the old one, and stopping cancels a
+pending start. A pause within the five-second current-write interval cancels
+pending work but returns a short wait error; request pause again after that
+wait. A fixed due timestamp supplies the remaining-time display without
+database updates every second. Pause/release/lock/phase readback still shows the
+actual wallbox state; the slider while paused shows the remembered resume
+target, which may already reflect a queued request. Heartbeat and recovery that preserves the existing intent keep
+running during a wait.
+
 HA can remain offline indefinitely while the app holds the last charging state.
-Automations cannot produce new settings during that outage. **App, host, power
+Automations cannot produce new settings during that outage. In the next beta,
+the running app can still execute a command that was queued before HA stopped.
+Restarting the app itself cancels pending commands, while retaining accepted
+charging intent. **App, host, power
 or USB/LAN/gateway failures still interrupt the heartbeat** and use the wallbox's configured
 fallback. Switching the app to read-only also stops the heartbeat.
 

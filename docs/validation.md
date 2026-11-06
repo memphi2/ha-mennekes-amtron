@@ -32,6 +32,26 @@ These tests use real decoders, the shared control/poll paths and simulated
 Modbus or HTTP responses. They complement hardware tests; passing them does
 not establish that every possible device or timing fault has been covered.
 
+## State-change queue — next beta, unreleased
+
+The queue's regression contract covers configurable intervals, the unchanged
+five-second current-write floor, and a shared guard for resume, phase changes,
+charging-release enable and unlock. Tests must also cover repeated identical
+commands, newer requests superseding pending work, stop cancelling a pending
+start, and same-intent recovery while the longer interval is active.
+
+Use a controlled clock for delay and cancellation cases. Check that a worker
+does not hold the command lock while waiting, revalidates execution, and cannot
+send stale commands after shutdown or a newer request. Service-mode checks
+must distinguish an HA restart from a service restart: only the latter stops
+the service-owned queue. Configuration bounds and optional API 2 status fields
+need their own invalid-input checks.
+
+The two status entities must publish a stable action and due timestamp while
+waiting. Repeated snapshots and elapsed seconds must not generate countdown
+state updates in Recorder. These software checks do not replace hardware
+acceptance of deliberate pause, resume and phase switching.
+
 ## Coverage requirements
 
 The coverage gate evaluates statements and branches together, using the
