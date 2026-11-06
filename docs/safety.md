@@ -108,7 +108,10 @@ the integration's extra current cap, while hardware limits remain in force.
   still observe their five-second floor, including a pause requested just after
   another current write. An early pause is queued and does not need to be
   requested again. Zero disables the longer interval, not these technical
-  write guards.
+  write guards. Fresh, consistent EVSE Idle and CP A1/A2 readings bypass the
+  longer interval when no vehicle is connected. Failed reads, inconsistent
+  status or layouts without CP keep the interval. Register-write guards and
+  heartbeat remain active; pending waits check for unplugging every five seconds.
 - Repeating the same state and recovery that preserves existing intent do not
   restart the long timer. Timing guards survive an entry reload in memory.
   A cold process start uses a fresh guard period because prior timing is

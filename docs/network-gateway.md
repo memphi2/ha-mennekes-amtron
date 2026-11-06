@@ -116,6 +116,8 @@ Only one controller may use the wallbox bus. Multiple TCP clients or a gateway
 with other masters behind it do not make simultaneous control safe. Read-only
 also sends requests. See [Safety](safety.md#modbus-rtu-uses-a-single-master).
 
+### Troubleshooting
+
 | Symptom | Check |
 |---|---|
 | Connection refused or timeout | Host, TCP port, firewall, adapter power and TCP-server mode. |

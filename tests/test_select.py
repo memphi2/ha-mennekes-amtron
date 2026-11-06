@@ -30,6 +30,7 @@ def test_the_phase_select_exists_only_on_capable_hardware() -> None:
     async def run() -> None:
         selects, _entry, transport = await _selects()
         assert "requested_phases" in selects
+        transport.bank[R.CP_STATE.address] = int(R.CpState.A1)
         await selects["requested_phases"].async_select_option("single_phase")
         assert dict(transport.writes)[R.REQUESTED_PHASES.address] == [1]
 

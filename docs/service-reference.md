@@ -78,8 +78,11 @@ automatically resume. Confirmation and grace waits run in the background queue,
 so an HTTP command does not wait for the full sequence. During confirmation,
 the phase action remains pending with a `null` due timestamp; after confirmation,
 the timestamp gives the end of the grace period. An idle wallbox with no vehicle
-does not need pause confirmation or grace time; the shared state-change interval
-still applies.
+does not need pause confirmation or grace time. Fresh EVSE Idle and CP A1/A2
+readings also skip the state-change interval. Missing CP support, unreadable or
+inconsistent readings retain the interval. Pending waits check for unplugging
+every five seconds without updating the due timestamp. Register-write guards
+and heartbeat remain active.
 
 The queue belongs to the running service, so it can execute while HA is offline.
 Restarting the service cancels pending work and begins a conservative guard

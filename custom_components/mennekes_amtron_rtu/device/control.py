@@ -453,7 +453,23 @@ class AmtronControl:
         target_paused = 0 < value < CHARGING_CURRENT_MINIMUM
         return paused is None or paused != target_paused
 
-    def _check_transition_interval(self) -> None:
+    async def _async_vehicle_absent(self) -> bool:
+        """Grant an exception only from fresh, consistent EVSE and CP readings."""
+        if self._identity.layout_version < CP_STATE.min_layout:
+            return False
+        try:
+            state = await self._client.async_read_register(EVSE_STATE)
+            if type(state) is not int or state != EvseState.IDLE:
+                return False
+            cp = await self._client.async_read_register(CP_STATE)
+        except AmtronBusError:
+            return False
+        return type(cp) is int and cp in (CpState.A1, CpState.A2)
+
+    async def _async_check_transition_interval(self) -> None:
+        remaining = self._mode_change_remaining()
+        if remaining > 0 and await self._async_vehicle_absent():
+            return
         remaining = self._mode_change_remaining()
         if remaining > 0:
             raise AmtronRateLimitedError("state_change", remaining)
@@ -472,7 +488,7 @@ class AmtronControl:
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._write_state.confirmed_current
         if transition and not phase_preparation:
-            self._check_transition_interval()
+            await self._async_check_transition_interval()
         try:
             await self._async_write(
                 CHARGING_CURRENT_EMS, value,
@@ -552,7 +568,7 @@ class AmtronControl:
         current = await self._async_read_switch(CHARGING_RELEASE, stopping=not released)
         changed = current != int(released)
         if changed:
-            self._check_transition_interval()
+            await self._async_check_transition_interval()
         previous = self.charging_release_requested
         self.charging_release_requested = released
         try:
@@ -568,7 +584,7 @@ class AmtronControl:
         current = await self._async_read_switch(LOCK_EVSE, stopping=locked)
         changed = current != int(locked)
         if changed:
-            self._check_transition_interval()
+            await self._async_check_transition_interval()
         await self._async_transition_write(LOCK_EVSE, int(locked), changed=changed)
 
     async def _async_apply_phases(self, phases: int) -> None:
@@ -579,7 +595,7 @@ class AmtronControl:
         if change is None:
             # Admit the whole pause/phase operation once. Its own pause must
             # not trigger another long wait within this operation.
-            self._check_transition_interval()
+            await self._async_check_transition_interval()
             self._client.check_write_interval(
                 REQUESTED_PHASES, min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS
             )
@@ -587,6 +603,12 @@ class AmtronControl:
             if state not in (EvseState.IDLE, EvseState.EV_CONNECTED,
                              EvseState.PRECONDITIONS_VALID, EvseState.READY_TO_CHARGE,
                              EvseState.CHARGING):
+                raise validation_error("phase_pause_state_unknown")
+            if (
+                state == EvseState.IDLE
+                and self._identity.layout_version >= CP_STATE.min_layout
+                and not await self._async_vehicle_absent()
+            ):
                 raise validation_error("phase_pause_state_unknown")
             if state != EvseState.IDLE:
                 # Preparation physically pauses charging. Discard the older
@@ -623,6 +645,10 @@ class AmtronControl:
                 cp in (CpState.A1, CpState.A2) if state == EvseState.IDLE else cp == CpState.B1
             )
         now = self._monotonic()
+        if paused and state == EvseState.IDLE:
+            # Unplugging also ends an already pending vehicle grace period.
+            change.ready_at = now
+            return
         if not paused:
             if change.ready_at is not None:
                 raise validation_error("phase_pause_state_unknown")
@@ -738,6 +764,13 @@ class AmtronControl:
                     if command is None:
                         return
                     delay = self._pending_due - self._monotonic()
+                    check_disconnect = (
+                        self._phase_change.ready_at is not None
+                        if self._phase_change is not None
+                        else self._mode_change_remaining() > 0
+                    )
+                    if delay > 0 and check_disconnect and await self._async_vehicle_absent():
+                        delay = 0
                     if delay <= 0:
                         try:
                             if self._validate_deferred is not None:
@@ -766,7 +799,8 @@ class AmtronControl:
                             await self._async_cancel_pending()
                             return
                     self._pending_changed.clear()
-                await self._async_wait_pending(delay)
+                # Recheck unplugging without publishing a changing countdown.
+                await self._async_wait_pending(min(delay, MIN_CURRENT_WRITE_INTERVAL_SECONDS))
         except (OSError, RuntimeError, ValueError) as err:
             # A failing refresh/persistence callback must not leave an
             # unobserved task or a queued start with no owner. Never retry it.

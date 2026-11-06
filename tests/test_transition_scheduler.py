@@ -245,7 +245,8 @@ def test_queue_recalculates_remaining_time_after_other_transition():
         control._write_state.mode_change_at += 10
         await asyncio.wait_for(control._flush_task, 1)
         assert harness.clock[0] == 1310
-        assert harness.slept == [300, 10]
+        assert sum(harness.slept) == 310
+        assert max(harness.slept) <= 5
         assert control.pending_action is None
 
     asyncio.run(run())

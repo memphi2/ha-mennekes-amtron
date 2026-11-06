@@ -59,7 +59,9 @@ def test_phase_write_waits_for_vehicle_confirmation_then_configured_grace(grace,
         await asyncio.wait_for(control._flush_task, 1)
 
         assert harness.clock[0] == 1003 + grace
-        assert harness.slept == [1, 1, 1] + ([grace] if grace else [])
+        assert harness.slept[:3] == [1, 1, 1]
+        assert sum(harness.slept[3:]) == grace
+        assert max(harness.slept) <= 5
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
         assert harness.written(R.REQUESTED_PHASES) == [[1]]
         assert control.is_paused is True
@@ -160,6 +162,7 @@ def test_lost_pause_confirmation_during_grace_aborts_phase_command(failure, capl
 def test_idle_wallbox_switches_without_pause_or_grace():
     async def run():
         harness = _harness(grace=30, state=EvseState.IDLE)
+        put(harness.transport.bank, R.CP_STATE, CpState.A1)
         control = await harness.connect()
         await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
         assert harness.written(R.REQUESTED_PHASES) == [[1]]

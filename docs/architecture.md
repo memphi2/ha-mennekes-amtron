@@ -228,7 +228,12 @@ The separate `phase_switch_grace_seconds` setting defaults to 5 and accepts
 write. A read failure or timeout aborts the phase command and retains the pause.
 Zero grace time skips only the additional delay. The operation leaves charging
 paused afterward. With no vehicle and an idle EVSE, confirmation and grace time
-are unnecessary; the shared transition guard still applies.
+are unnecessary. Fresh EVSE Idle and CP A1/A2 reads also exempt commands from
+the shared transition guard. Missing CP support or unreadable/inconsistent
+status never grants that exception. The transition timestamp is still retained,
+so reconnecting a vehicle restores the guard. During pending transition and
+grace waits, the worker checks for unplugging every five seconds without
+changing the published due timestamp; register-write floors remain in force.
 Idempotent commands do not restart the timer. Recovery reasserts existing intent
 without consuming a new transition or waiting for the longer interval.
 

@@ -49,7 +49,11 @@ range 0–30), the live recheck after that wait and the independence of the shar
 state-change interval. Zero grace time must not skip pause confirmation.
 Connected vehicles require EVSE state 2 and, when the layout provides it, CP
 state B1. An idle EVSE without a vehicle needs neither confirmation nor grace
-time. Test the corresponding register-layout and idle paths.
+time. Test the corresponding register-layout and idle paths. The long-interval
+exception requires fresh Idle plus CP A1/A2, never cached state alone. Cover
+all command directions, failed/invalid/disagreeing reads, old layouts without
+CP, unplugging during a pending wait, replugging before execution, and the
+unchanged five-second write floors. Pending timestamps must stay stable.
 
 Use a controlled clock for delay and cancellation cases. Check that a worker
 does not hold the command lock while waiting, revalidates execution, and cannot

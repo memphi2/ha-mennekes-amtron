@@ -49,6 +49,13 @@ Changing the current while paused can also queue a resume. The latest charging
 request replaces an older pending request. Repeating the same requested state
 does not extend the wait.
 
+With **no vehicle connected**, the longer wait is skipped when fresh wallbox
+readings agree: EVSE is Idle and CP is A1 or A2. Unplugging during a queued
+wait is checked every five seconds, so the request can run earlier than the
+displayed due time. The five-second register-write guards and heartbeat remain.
+Unknown, inconsistent or unreadable status keeps the longer wait; older register
+layouts without CP status also keep it.
+
 **Pending change** shows what is waiting, and **Pending change due** shows
 the planned execution time when known. While a phase change waits for the
 vehicle to confirm its pause, the action stays visible but its due time is
@@ -204,7 +211,8 @@ service connections. Zero removes only the extra grace time, not pause
 confirmation or the separate 300-second state-change interval. If confirmation
 fails or times out, the phase command is not sent and the requested pause
 remains in place. With no vehicle connected and the wallbox idle, there is no
-vehicle pause to confirm or extra wait; the state-change interval still applies.
+vehicle pause to confirm or extra wait. Fresh Idle and CP A1/A2 readings also
+skip the longer state-change interval; register-write guards still apply.
 See [phase-switching troubleshooting](troubleshooting.md#phase-switching-leaves-charging-paused).
 
 ## Actions

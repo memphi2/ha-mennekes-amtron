@@ -25,6 +25,7 @@ from custom_components.mennekes_amtron_rtu.device.client import (
 )
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.enums import (
+    CpState,
     EvseState,
     RequestedPhases,
     SolarChargingMode,
@@ -1010,6 +1011,7 @@ def test_a_sleeping_deferred_write_cannot_undo_a_pause() -> None:
 @pytest.mark.parametrize("charging", [False, True])
 def test_phase_switch_rate_limit_queues_until_the_shared_interval(charging: bool) -> None:
     harness = Harness(values={"evse_state": EvseState.IDLE}, state_change_interval_seconds=300)
+    harness.transport.bank[R.CP_STATE.address] = int(CpState.A1)
 
     async def run() -> None:
         control = await harness.connect()
@@ -1018,7 +1020,13 @@ def test_phase_switch_rate_limit_queues_until_the_shared_interval(charging: bool
         if charging:
             harness.snapshot.values["evse_state"] = EvseState.CHARGING
             harness.transport.bank[R.EVSE_STATE.address] = int(EvseState.CHARGING)
+            harness.transport.bank[R.CP_STATE.address] = int(CpState.C2)
         await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
+        if not charging:
+            assert control.pending_action is None
+            assert harness.written(R.REQUESTED_PHASES) == [[1], [0]]
+            assert harness.written(R.CHARGING_CURRENT_EMS) == []
+            return
         assert control.pending_action == "all_phases"
         assert control._mode_change_remaining() == 285
         assert harness.diagnostics.writes_rate_limited == 1
@@ -1065,6 +1073,9 @@ def test_phase_switch_uses_fresh_device_status(cached, actual, pause):
     harness = Harness(values={"charging_current_ems": 8.0})
     harness.snapshot.values["evse_state"] = cached
     harness.transport.bank[R.EVSE_STATE.address] = int(actual)
+    harness.transport.bank[R.CP_STATE.address] = int(
+        CpState.A1 if actual == EvseState.IDLE else CpState.C2
+    )
 
     async def run():
         control = await harness.connect()

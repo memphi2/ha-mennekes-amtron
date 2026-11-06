@@ -195,6 +195,7 @@ def test_service_uses_the_shared_command_guards(
 ):
     async def run():
         service, transport, _clock = await service_fixture(tmp_path)
+        put(transport.bank, R.CP_STATE, int(R.CpState.A1))
         try:
             await service.command(
                 {

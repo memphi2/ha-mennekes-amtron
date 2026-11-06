@@ -203,6 +203,7 @@ def test_large_or_streamed_replies_are_bounded():
 def test_every_remote_action_uses_the_shared_service(tmp_path, method, value):
     async def run():
         service, transport, _clock = await service_fixture(tmp_path)
+        transport.bank[R.CP_STATE.address] = int(R.CpState.A1)
         try:
             async with (
                 TestServer(create_app(service)) as server,

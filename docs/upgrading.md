@@ -27,6 +27,12 @@ confirmation or timeout leaves the phase command unsent and retains the pause.
 The grace time is separate from the 300-second state-change interval and is set
 in the same place.
 
+When fresh EVSE Idle and CP A1/A2 readings confirm that no vehicle is connected,
+the longer state-change wait and vehicle grace time are skipped. Pending waits
+check for unplugging every five seconds. The five-second register-write guards
+and heartbeat remain active. Unknown or inconsistent status, read failures and
+older layouts without CP retain the longer state-change wait.
+
 In direct mode, configure the interval in the integration options. In service
 mode, the app/service must include this feature and owns the setting; updating
 only HA cannot add it to an older service. Compatible older services keep their
