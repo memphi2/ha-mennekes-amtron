@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Add a custom AppArmor profile for the Supervisor app, with limited runtime and
   state-file access, plus a dedicated enforcement check using simulated USB/LAN
-  transports. The beta CI result is required before claiming runtime validation.
+  transports on native AMD64 and ARM64 runners before publishing an app image.
 
 ## 0.5.1 — 2026-11-05
 

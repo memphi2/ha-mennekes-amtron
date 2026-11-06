@@ -111,9 +111,11 @@ restart and shutdown. Negative probes must reject writes outside the service's
 state files, modification of options, protected-file reads and shell execution.
 A successful startup alone cannot pass the enforcement check.
 
-**Validation status:** the development host has a parser but no Docker/Podman or
-permissions to load profiles. Local compilation is therefore not an enforcement
-result. The beta CI run must supply that evidence before publication. Simulated
+The native AMD64 and ARM64 CI jobs run this check on every `beta`/`main` push and
+pull request. Release builds require it before pushing an app image. Missing
+AppArmor support or a failed enforcement check stops the job. On development
+hosts without Docker or permission to load profiles, `--compile-only` verifies
+syntax and explicitly reports that enforcement was not tested. Simulated
 transports do not establish behavior on physical adapters or wallbox firmware.
 
 ## Published release verification
