@@ -56,6 +56,8 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         self._identity = identity
         self.control_status: Callable[[], tuple[str | None, datetime | None]] | None = None
         self.observe_recovery: Callable[[object, int], None] | None = None
+        self.observe_goal: Callable[[WallboxData | None], None] | None = None
+        self.retry_soc_goal: Callable[[], None] | None = None
         self._poller = DevicePoller(
             client,
             identity,
@@ -77,6 +79,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         return self.data or WallboxData()
 
     async def _async_update_data(self) -> WallboxData:
+        goal_generation = self._client.write_state.energy_goal_generation
         try:
             data = await self._poller.async_poll(
                 self.current_data(), last_success=self.last_update_success
@@ -87,6 +90,14 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
                 self.observe_recovery(
                     data.values.get(ERROR_CODE.key), data.current_write_generation,
                 )
+            if self.observe_goal is not None:
+                self.observe_goal(data)
+            if self.retry_soc_goal is not None:
+                self.retry_soc_goal()
             return data
         except AmtronBusError as err:
+            if self.observe_goal is not None:
+                self.observe_goal(WallboxData(
+                    energy_read=True, energy_goal_generation=goal_generation,
+                ))
             raise UpdateFailed(str(err)) from err

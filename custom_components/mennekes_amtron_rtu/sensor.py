@@ -19,8 +19,9 @@ from homeassistant.helpers.typing import StateType
 
 from .coordinator import MennekesAmtronCoordinator
 from .device.capabilities import capability_is_supported
+from .device.charging_status import charging_status
 from .device.decode import RegisterValue, enum_option
-from .device.registers import REGISTERS_BY_KEY
+from .device.registers import CP_STATE, ENERGY_TOTAL, REGISTERS_BY_KEY
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .sensor_descriptions import (
@@ -28,6 +29,7 @@ from .sensor_descriptions import (
     SENSOR_DESCRIPTIONS,
     AmtronSensorEntityDescription,
 )
+from .vehicle_soc_const import CONF_VEHICLE_SOC_ENTITY
 
 PARALLEL_UPDATES = 0
 
@@ -58,14 +60,16 @@ async def async_setup_entry(
                 AmtronSensor(entry, runtime_data.coordinator, description)
             )
     entities.extend(
-        AmtronPendingChangeSensor(entry, runtime_data.coordinator, description)
+        AmtronStateSensor(entry, runtime_data.coordinator, description)
         for description in CONTROL_SENSOR_DESCRIPTIONS
+        if (description.key != "energy_goal_status" or identity.layout_version >= ENERGY_TOTAL.min_layout)
+        and (description.key != "soc_goal_status" or entry.options.get(CONF_VEHICLE_SOC_ENTITY))
     )
     async_add_entities(entities)
 
 
-class AmtronPendingChangeSensor(MennekesAmtronEntity, SensorEntity):
-    """Expose a stable queued intent and deadline, never a ticking DB counter."""
+class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
+    """Expose derived status and fixed queue metadata without ticking counters."""
 
     def __init__(
         self,
@@ -78,12 +82,30 @@ class AmtronPendingChangeSensor(MennekesAmtronEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success
+        if not self.coordinator.last_update_success:
+            return False
+        if self.entity_description.key == "energy_goal_status":
+            return self.runtime_data.control.supports_energy_goal
+        if self.entity_description.key == "soc_goal_status":
+            return self.runtime_data.control.supports_soc_goal
+        return True
 
     @property
     def native_value(self) -> str | datetime | None:
+        key = self.entity_description.key
+        if key == "charging_status":
+            return charging_status(
+                self.wallbox_data,
+                cp_supported=self.runtime_data.identity.layout_version >= CP_STATE.min_layout,
+            )
+        if key == "connection_quality":
+            return self.wallbox_data.connection_quality
         control = self.runtime_data.control
-        if self.entity_description.key == "pending_change":
+        if key == "energy_goal_status":
+            return control.energy_goal.status
+        if key == "soc_goal_status":
+            return control.soc_goal.status
+        if key == "pending_change":
             return control.pending_action or "none"
         return control.pending_until
 

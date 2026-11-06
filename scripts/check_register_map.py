@@ -328,6 +328,7 @@ def _device_classes_with_icon() -> dict[str, dict[str, str]]:
             if device_class is not None and device_class.value != "enum":
                 classes[platform][description.key] = str(device_class.value)
     classes["number"]["charging_current_limit"] = "current"
+    classes["number"]["energy_goal"] = "energy"
     classes["switch"]["charging_release"] = "switch"
     classes["button"]["restart"] = "restart"
     return classes
@@ -399,10 +400,10 @@ def _entity_keys() -> dict[str, set[str]]:
         "binary_sensor": {
             description.key for description in BINARY_SENSOR_DESCRIPTIONS
         } | {"heartbeat"},
-        "number": {"charging_current_limit"},
+        "number": {"charging_current_limit", "energy_goal", "soc_goal"},
         "switch": {"charging_paused", "charging_release", "lock_evse"},
         "select": {"solar_charging_mode", "requested_phases"},
-        "button": {"recover_from_error", "restart"},
+        "button": {"recover_from_error", "restart", "cancel_pending_change"},
         "event": {"control_result"},
     }
 

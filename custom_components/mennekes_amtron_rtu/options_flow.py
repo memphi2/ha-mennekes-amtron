@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
+from homeassistant.core import valid_entity_id
 
 from .config_schemas import options_schema
 from .device.const import (
@@ -20,6 +21,12 @@ from .device.const import (
     DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
 )
 from .remote import CONF_SERVER_URL
+from .vehicle_soc_const import (
+    CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
+    CONF_VEHICLE_SOC_ENTITY,
+    VEHICLE_CHARGE_LIMIT_DOMAINS,
+    VEHICLE_SOC_DOMAINS,
+)
 
 
 class MennekesAmtronOptionsFlow(OptionsFlow):
@@ -42,17 +49,19 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         self, step_id: str, user_input: dict[str, Any] | None
     ) -> ConfigFlowResult:
 
-        if user_input is not None:
+        errors = _vehicle_errors(user_input) if user_input is not None else {}
+        if user_input is not None and not errors:
             options = _normalized(user_input, service_mode=step_id == "service")
             return self.async_create_entry(data=options)
 
         return self.async_show_form(
             step_id=step_id,
             data_schema=options_schema(
-                dict(self.config_entry.options),
+                dict(self.config_entry.options) if user_input is None else user_input,
                 max_current=_max_current(self.config_entry),
                 service_mode=step_id == "service",
             ),
+            errors=errors,
         )
 
 
@@ -78,7 +87,29 @@ def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, 
                 CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS
             )
         )
+    for key in (CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY):
+        if value := user_input.get(key):
+            options[key] = value
     return options
+
+
+def _vehicle_errors(values: dict[str, Any]) -> dict[str, str]:
+    """Validate source identifiers without requiring a currently online car."""
+    errors = {}
+    for key, domains in (
+        (CONF_VEHICLE_SOC_ENTITY, VEHICLE_SOC_DOMAINS),
+        (CONF_VEHICLE_CHARGE_LIMIT_ENTITY, VEHICLE_CHARGE_LIMIT_DOMAINS),
+    ):
+        if not (value := values.get(key)):
+            continue
+        if (
+            not isinstance(value, str) or not valid_entity_id(value)
+            or value.split(".", 1)[0] not in domains
+        ):
+            errors[key] = "invalid_vehicle_entity"
+    if values.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY) and not values.get(CONF_VEHICLE_SOC_ENTITY):
+        errors[CONF_VEHICLE_SOC_ENTITY] = "vehicle_soc_required"
+    return errors
 
 
 def _max_current(entry: Any) -> float:

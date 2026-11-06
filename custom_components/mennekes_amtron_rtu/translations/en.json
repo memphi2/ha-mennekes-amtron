@@ -185,11 +185,20 @@
       },
       "restart": {
         "name": "Restart"
+      },
+      "cancel_pending_change": {
+        "name": "Cancel pending change"
       }
     },
     "number": {
       "charging_current_limit": {
         "name": "Charging current limit"
+      },
+      "energy_goal": {
+        "name": "Energy target"
+      },
+      "soc_goal": {
+        "name": "Vehicle charge target"
       }
     },
     "select": {
@@ -407,6 +416,47 @@
       },
       "pending_change_until": {
         "name": "Pending change due"
+      },
+      "charging_status": {
+        "name": "Charging status",
+        "state": {
+          "initializing": "Initializing",
+          "wallbox_error": "Wallbox error",
+          "service_mode": "Service mode",
+          "no_vehicle": "No vehicle connected",
+          "charging": "Charging",
+          "locked": "Wallbox locked",
+          "release_disabled": "Charging release disabled",
+          "paused": "Charging paused",
+          "authorization_required": "Authorization required",
+          "preparing": "Preparing to charge",
+          "waiting_for_vehicle": "Waiting for vehicle"
+        }
+      },
+      "connection_quality": {
+        "name": "Connection quality",
+        "state": {
+          "good": "Good",
+          "degraded": "Communication errors detected"
+        }
+      },
+      "energy_goal_status": {
+        "name": "Energy target status",
+        "state": {
+          "disabled": "Disabled",
+          "active": "Active",
+          "reached": "Energy target reached",
+          "meter_unavailable": "Energy meter unavailable",
+          "meter_reset": "Energy meter reading decreased"
+        }
+      },
+      "soc_goal_status": {
+        "name": "Vehicle charge target status",
+        "state": {
+          "disabled": "Disabled",
+          "active": "Active",
+          "reached": "Target reached"
+        }
       }
     },
     "switch": {
@@ -464,7 +514,9 @@
               "permission_denied": "Writing not allowed",
               "status_refresh_failed": "Status refresh failed",
               "error_still_active": "Error is still active",
-              "unknown": "Unknown reason"
+              "unknown": "Unknown reason",
+              "user_cancelled": "Cancelled by user",
+              "energy_goal": "Charge target stop"
             }
           }
         }
@@ -534,6 +586,42 @@
     },
     "control_state_unknown": {
       "message": "The current wallbox state could not be confirmed. No charging release, unlock or phase-change command was sent. Check the connection and try again."
+    },
+    "energy_goal_invalid": {
+      "message": "Enter 0 to disable the energy target, or 0.1–1000 kWh in 0.1 kWh steps."
+    },
+    "energy_goal_unavailable": {
+      "message": "An energy target needs a supported total-energy meter and a fresh valid reading. Check the connection and try again."
+    },
+    "energy_goal_stop_active": {
+      "message": "A charging target requires a pause. Check its status. After reaching a target or a meter reset, set a new target or disable it with 0 before resuming. Changing a target does not start charging."
+    },
+    "energy_goal_state_invalid": {
+      "message": "The saved energy target could not be restored. Check the logs before allowing charging again."
+    },
+    "energy_goal_not_supported": {
+      "message": "This Modbus service does not support energy targets. Update the app or standalone service first."
+    },
+    "cancel_pending_not_supported": {
+      "message": "This Modbus service cannot cancel pending changes. Update the app or standalone service first."
+    },
+    "soc_goal_invalid": {
+      "message": "Enter a target from 0 to 100%, no higher than the vehicle charge limit. 0 disables the percentage target."
+    },
+    "soc_goal_unavailable": {
+      "message": "The vehicle charge target cannot be changed right now. Check the configured vehicle sources and try again."
+    },
+    "soc_goal_limit_unavailable": {
+      "message": "The selected vehicle charge limit has not provided a valid value yet. Wait for it to become available before setting a percentage target. 0 remains available to disable the target."
+    },
+    "soc_goal_source_changed": {
+      "message": "The vehicle sources have changed. Reload the integration before changing its percentage target."
+    },
+    "soc_goal_not_supported": {
+      "message": "The Modbus service does not support vehicle percentage targets. Update the app to use this optional feature."
+    },
+    "soc_goal_state_invalid": {
+      "message": "The saved vehicle charge target could not be restored. Check the logs before allowing charging again."
     }
   },
   "issues": {
@@ -578,7 +666,9 @@
           "measurement_interval_seconds": "Measurement interval",
           "scan_interval_seconds": "Status polling interval",
           "state_change_interval_seconds": "Minimum time between state changes",
-          "phase_switch_grace_seconds": "Extra wait before phase changes"
+          "phase_switch_grace_seconds": "Extra wait before phase changes",
+          "vehicle_soc_entity": "Vehicle charge level entity (optional)",
+          "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)"
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
@@ -586,7 +676,9 @@
           "measurement_interval_seconds": "Power, voltage, current and session values: 30 seconds reduces database load. Status changes refresh immediately. Without a vehicle, at least 60 seconds. The status interval sets the shortest possible polling time.",
           "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently.",
           "state_change_interval_seconds": "Minimum seconds between charging starts, pauses, release changes, locking or unlocking, and phase changes (default 300). Early commands are queued; the latest command replaces the previous one. The five-second current-write interval still applies. Set 0 to disable the longer interval.",
-          "phase_switch_grace_seconds": "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required."
+          "phase_switch_grace_seconds": "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required.",
+          "vehicle_soc_entity": "Optional: select the vehicle sensor reporting its actual charge level in %. This enables a separate percentage target; leave empty to keep it disabled. Missing vehicle data leaves charging unchanged until valid data returns. Changing or removing a source clears the percentage target without resuming charging.",
+          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle."
         },
         "title": "Options"
       },
@@ -594,14 +686,22 @@
         "title": "Service options",
         "data": {
           "current_limit": "Charging current cap",
-          "scan_interval_seconds": "Status polling interval"
+          "scan_interval_seconds": "Status polling interval",
+          "vehicle_soc_entity": "Vehicle charge level entity (optional)",
+          "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)"
         },
         "data_description": {
           "current_limit": "Additional cap for currents requested by Home Assistant. The service cap still applies. Explicitly selecting 0 A disables the EMS limit.",
-          "scan_interval_seconds": "How often Home Assistant reads the service state. This changes neither Modbus measurement polling nor the heartbeat interval."
+          "scan_interval_seconds": "How often Home Assistant reads the service state. This changes neither Modbus measurement polling nor the heartbeat interval.",
+          "vehicle_soc_entity": "Optional: select the vehicle sensor reporting its actual charge level in %. This enables a separate percentage target; leave empty to keep it disabled. Missing vehicle data leaves charging unchanged until valid data returns. Changing or removing a source clears the percentage target without resuming charging.",
+          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle."
         },
         "description": "The app's Read-only setting also controls write permission in Home Assistant. Disable it in the app, save and restart the app to enable controls. Control entities remain unavailable while the service is read-only or not ready. Set the minimum time between state changes and the extra wait before phase changes in the app configuration; the service applies both even while Home Assistant is restarting."
       }
+    },
+    "error": {
+      "vehicle_soc_required": "Select a vehicle charge level entity before adding its optional charge limit.",
+      "invalid_vehicle_entity": "Select an entity of the supported type."
     }
   },
   "selector": {

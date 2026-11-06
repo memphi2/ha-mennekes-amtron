@@ -185,11 +185,20 @@
       },
       "restart": {
         "name": "Redémarrer"
+      },
+      "cancel_pending_change": {
+        "name": "Annuler la modification en attente"
       }
     },
     "number": {
       "charging_current_limit": {
         "name": "Limite du courant de charge"
+      },
+      "energy_goal": {
+        "name": "Objectif énergétique"
+      },
+      "soc_goal": {
+        "name": "Objectif de charge du véhicule"
       }
     },
     "select": {
@@ -407,6 +416,47 @@
       },
       "pending_change_until": {
         "name": "Changement prévu à"
+      },
+      "charging_status": {
+        "name": "État de la recharge",
+        "state": {
+          "initializing": "Initialisation en cours",
+          "wallbox_error": "Erreur de la borne",
+          "service_mode": "Mode maintenance",
+          "no_vehicle": "Aucun véhicule connecté",
+          "charging": "Recharge en cours",
+          "locked": "Borne verrouillée",
+          "release_disabled": "Autorisation de recharge désactivée",
+          "paused": "Recharge en pause",
+          "authorization_required": "Autorisation requise",
+          "preparing": "Préparation de la recharge",
+          "waiting_for_vehicle": "En attente du véhicule"
+        }
+      },
+      "connection_quality": {
+        "name": "Qualité de la connexion",
+        "state": {
+          "good": "Bonne",
+          "degraded": "Erreurs de communication détectées"
+        }
+      },
+      "energy_goal_status": {
+        "name": "État de l’objectif énergétique",
+        "state": {
+          "disabled": "Désactivé",
+          "active": "Actif",
+          "reached": "Objectif énergétique atteint",
+          "meter_unavailable": "Mesure d’énergie indisponible",
+          "meter_reset": "Valeur du compteur en baisse"
+        }
+      },
+      "soc_goal_status": {
+        "name": "État de l’objectif de charge du véhicule",
+        "state": {
+          "disabled": "Désactivé",
+          "active": "Actif",
+          "reached": "Objectif atteint"
+        }
       }
     },
     "switch": {
@@ -464,7 +514,9 @@
               "permission_denied": "Écriture non autorisée",
               "status_refresh_failed": "Échec de l’actualisation de l’état",
               "error_still_active": "L’erreur est toujours active",
-              "unknown": "Motif inconnu"
+              "unknown": "Motif inconnu",
+              "user_cancelled": "Annulé par l’utilisateur",
+              "energy_goal": "Arrêt demandé par un objectif de recharge"
             }
           }
         }
@@ -534,6 +586,42 @@
     },
     "control_state_unknown": {
       "message": "L’état actuel de la borne n’a pas pu être confirmé. Aucune commande d’autorisation de charge, de déverrouillage ou de changement de phases n’a été envoyée. Vérifiez la connexion et réessayez."
+    },
+    "energy_goal_invalid": {
+      "message": "Saisissez 0 pour désactiver l’objectif énergétique, ou une valeur de 0,1 à 1000 kWh par pas de 0,1 kWh."
+    },
+    "energy_goal_unavailable": {
+      "message": "Un objectif énergétique nécessite un compteur d’énergie totale pris en charge et une mesure récente valide. Vérifiez la connexion et réessayez."
+    },
+    "energy_goal_stop_active": {
+      "message": "Un objectif de recharge impose une pause. Vérifiez son état. Une fois l’objectif atteint ou après une remise à zéro du compteur, définissez un nouvel objectif ou désactivez-le avec 0 avant de reprendre. Modifier l’objectif ne démarre pas la recharge."
+    },
+    "energy_goal_state_invalid": {
+      "message": "L’objectif énergétique enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
+    },
+    "energy_goal_not_supported": {
+      "message": "Ce service Modbus ne prend pas en charge les objectifs énergétiques. Mettez d’abord à jour l’application ou le service autonome."
+    },
+    "cancel_pending_not_supported": {
+      "message": "Ce service Modbus ne peut pas annuler les modifications en attente. Mettez d’abord à jour l’application ou le service autonome."
+    },
+    "soc_goal_invalid": {
+      "message": "Saisissez un objectif de 0 à 100 %, sans dépasser la limite du véhicule. 0 désactive cet objectif."
+    },
+    "soc_goal_unavailable": {
+      "message": "Impossible de modifier actuellement l’objectif du véhicule. Vérifiez les sources sélectionnées et réessayez."
+    },
+    "soc_goal_limit_unavailable": {
+      "message": "La limite de charge sélectionnée n’a pas encore fourni de valeur valide. Attendez une valeur disponible avant de définir un objectif. La valeur 0 permet toujours de le désactiver."
+    },
+    "soc_goal_source_changed": {
+      "message": "Les sources du véhicule ont changé. Rechargez l’intégration avant de modifier son objectif en pourcentage."
+    },
+    "soc_goal_not_supported": {
+      "message": "Le service Modbus ne prend pas en charge les objectifs en pourcentage du véhicule. Mettez l’application à jour pour utiliser cette fonction facultative."
+    },
+    "soc_goal_state_invalid": {
+      "message": "L’objectif de charge du véhicule enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
     }
   },
   "issues": {
@@ -578,7 +666,9 @@
           "measurement_interval_seconds": "Intervalle des mesures",
           "scan_interval_seconds": "Intervalle de lecture de l’état",
           "state_change_interval_seconds": "Délai minimal entre changements d’état",
-          "phase_switch_grace_seconds": "Attente supplémentaire avant changement de phases"
+          "phase_switch_grace_seconds": "Attente supplémentaire avant changement de phases",
+          "vehicle_soc_entity": "Entité du niveau de charge du véhicule (facultatif)",
+          "vehicle_charge_limit_entity": "Entité de limite de charge du véhicule (facultatif)"
         },
         "data_description": {
           "control_mode": "Les deux modes envoient des requêtes de lecture et nécessitent un accès exclusif au bus. Lecture seule n’écrit pas dans les registres. Maître Modbus envoie également le signal de présence et active les entités de commande. Ne partagez pas ce bus avec un autre maître.",
@@ -586,7 +676,9 @@
           "measurement_interval_seconds": "Puissance, tension, courant et données de session : un intervalle de 30 secondes réduit la charge de la base de données. Un changement d’état déclenche une actualisation immédiate. Sans véhicule, l’intervalle est d’au moins 60 secondes. L’intervalle de lecture de l’état fixe la fréquence maximale des lectures.",
           "scan_interval_seconds": "Fréquence de lecture de l’état de charge, des erreurs et des commandes. Le signal de présence fonctionne indépendamment.",
           "state_change_interval_seconds": "Délai minimal en secondes entre les démarrages, les pauses et les changements d’autorisation de charge, de verrouillage ou de phases (300 par défaut). Les commandes trop précoces sont mises en attente ; la dernière remplace la précédente. L’intervalle de cinq secondes entre écritures du courant reste applicable. La valeur 0 désactive le délai prolongé.",
-          "phase_switch_grace_seconds": "Secondes d’attente supplémentaires entre la confirmation de la pause de charge par le véhicule et le changement de phases (5 par défaut, de 0 à 30). La valeur 0 supprime uniquement cette attente supplémentaire ; la confirmation de la pause reste obligatoire."
+          "phase_switch_grace_seconds": "Secondes d’attente supplémentaires entre la confirmation de la pause de charge par le véhicule et le changement de phases (5 par défaut, de 0 à 30). La valeur 0 supprime uniquement cette attente supplémentaire ; la confirmation de la pause reste obligatoire.",
+          "vehicle_soc_entity": "Facultatif : sélectionnez le capteur indiquant le niveau de charge réel du véhicule en %. Cela active un objectif distinct en pourcentage ; sans sélection, il reste désactivé. Si les données manquent, la recharge continue jusqu’au retour de données valides. Changer ou retirer une source efface cet objectif sans reprendre la recharge.",
+          "vehicle_charge_limit_entity": "Facultatif : limitez aussi cet objectif avec l’entité de limite de charge du véhicule. Sans cette entité, les objectifs peuvent atteindre 100 %. Une limite plus basse réduit l’objectif existant ; une hausse ne le relève pas. La dernière limite valide reste applicable si l’entité est indisponible. Aucun réglage du véhicule n’est modifié."
         },
         "title": "Options"
       },
@@ -594,14 +686,22 @@
         "title": "Options du service",
         "data": {
           "current_limit": "Plafond du courant de charge",
-          "scan_interval_seconds": "Intervalle de lecture de l’état"
+          "scan_interval_seconds": "Intervalle de lecture de l’état",
+          "vehicle_soc_entity": "Entité du niveau de charge du véhicule (facultatif)",
+          "vehicle_charge_limit_entity": "Entité de limite de charge du véhicule (facultatif)"
         },
         "data_description": {
           "current_limit": "Plafond supplémentaire pour les courants demandés par Home Assistant. Le plafond du service reste applicable. Sélectionner explicitement 0 A supprime la limite du gestionnaire d’énergie.",
-          "scan_interval_seconds": "Fréquence à laquelle Home Assistant lit l’état du service. Cela ne modifie ni la fréquence des mesures Modbus ni l’intervalle du signal de présence."
+          "scan_interval_seconds": "Fréquence à laquelle Home Assistant lit l’état du service. Cela ne modifie ni la fréquence des mesures Modbus ni l’intervalle du signal de présence.",
+          "vehicle_soc_entity": "Facultatif : sélectionnez le capteur indiquant le niveau de charge réel du véhicule en %. Cela active un objectif distinct en pourcentage ; sans sélection, il reste désactivé. Si les données manquent, la recharge continue jusqu’au retour de données valides. Changer ou retirer une source efface cet objectif sans reprendre la recharge.",
+          "vehicle_charge_limit_entity": "Facultatif : limitez aussi cet objectif avec l’entité de limite de charge du véhicule. Sans cette entité, les objectifs peuvent atteindre 100 %. Une limite plus basse réduit l’objectif existant ; une hausse ne le relève pas. La dernière limite valide reste applicable si l’entité est indisponible. Aucun réglage du véhicule n’est modifié."
         },
         "description": "Le réglage Lecture seule de l’application contrôle aussi l’autorisation d’écriture dans Home Assistant. Désactivez-le dans l’application, enregistrez et redémarrez l’application pour activer les commandes. Les entités de commande restent indisponibles tant que le service est en lecture seule ou n’est pas prêt. Réglez le délai minimal entre changements d’état et l’attente supplémentaire avant changement de phases dans la configuration de l’application ; le service applique les deux même pendant un redémarrage de Home Assistant."
       }
+    },
+    "error": {
+      "vehicle_soc_required": "Sélectionnez une entité de niveau de charge avant d’ajouter sa limite de charge facultative.",
+      "invalid_vehicle_entity": "Sélectionnez une entité du type pris en charge."
     }
   },
   "selector": {

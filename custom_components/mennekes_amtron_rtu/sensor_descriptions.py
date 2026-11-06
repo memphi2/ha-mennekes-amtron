@@ -21,8 +21,10 @@ from homeassistant.const import (
     UnitOfTime,
 )
 
+from .device.charging_status import CHARGING_STATUS_OPTIONS
 from .device.control import PENDING_ACTIONS
 from .device.decode import RegisterValue
+from .device.energy_goal import ENERGY_GOAL_STATES
 from .device.enums import (
     AuthorizationStatus,
     CableLockStatus,
@@ -42,8 +44,34 @@ from .device.enums import (
     error_category,
 )
 from .device.registers import layout_label
+from .device.soc_goal import SOC_GOAL_STATES
 
 CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="soc_goal_status",
+        translation_key="soc_goal_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(SOC_GOAL_STATES),
+    ),
+    SensorEntityDescription(
+        key="energy_goal_status",
+        translation_key="energy_goal_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(ENERGY_GOAL_STATES),
+    ),
+    SensorEntityDescription(
+        key="charging_status",
+        translation_key="charging_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(CHARGING_STATUS_OPTIONS),
+    ),
+    SensorEntityDescription(
+        key="connection_quality",
+        translation_key="connection_quality",
+        device_class=SensorDeviceClass.ENUM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        options=["good", "degraded"],
+    ),
     SensorEntityDescription(
         key="pending_change",
         translation_key="pending_change",

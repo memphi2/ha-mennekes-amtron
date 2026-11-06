@@ -7,6 +7,8 @@ from typing import Any
 import probatio
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -54,6 +56,12 @@ from .device.const import (
     SEARCH_MODES,
     SUPPORTED_BAUDRATES,
     SUPPORTED_FRAMES,
+)
+from .vehicle_soc_const import (
+    CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
+    CONF_VEHICLE_SOC_ENTITY,
+    VEHICLE_CHARGE_LIMIT_DOMAINS,
+    VEHICLE_SOC_DOMAINS,
 )
 
 
@@ -257,6 +265,15 @@ def options_schema(
                 CONF_PHASE_SWITCH_GRACE_SECONDS,
             )
         }
+    # Suggested values remain removable. A schema default would silently put
+    # a formerly selected vehicle back when the user clears the optional field.
+    for key, domains in (
+        (CONF_VEHICLE_SOC_ENTITY, VEHICLE_SOC_DOMAINS),
+        (CONF_VEHICLE_CHARGE_LIMIT_ENTITY, VEHICLE_CHARGE_LIMIT_DOMAINS),
+    ):
+        fields[probatio.Optional(
+            key, description={"suggested_value": current.get(key)},
+        )] = EntitySelector(EntitySelectorConfig(filter={"domain": list(domains)}))
     return probatio.Schema(fields)
 
 

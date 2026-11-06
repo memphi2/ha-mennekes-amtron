@@ -185,11 +185,20 @@
       },
       "restart": {
         "name": "Neu starten"
+      },
+      "cancel_pending_change": {
+        "name": "Vorgemerkte Änderung abbrechen"
       }
     },
     "number": {
       "charging_current_limit": {
         "name": "Ladestrom-Begrenzung"
+      },
+      "energy_goal": {
+        "name": "Ladeziel"
+      },
+      "soc_goal": {
+        "name": "Fahrzeug-Ladeziel"
       }
     },
     "select": {
@@ -407,6 +416,47 @@
       },
       "pending_change_until": {
         "name": "Geplante Änderung um"
+      },
+      "charging_status": {
+        "name": "Ladestatus",
+        "state": {
+          "initializing": "Wird initialisiert",
+          "wallbox_error": "Wallbox meldet einen Fehler",
+          "service_mode": "Wartungsmodus",
+          "no_vehicle": "Kein Fahrzeug verbunden",
+          "charging": "Lädt",
+          "locked": "Wallbox gesperrt",
+          "release_disabled": "Ladefreigabe deaktiviert",
+          "paused": "Laden pausiert",
+          "authorization_required": "Autorisierung erforderlich",
+          "preparing": "Laden wird vorbereitet",
+          "waiting_for_vehicle": "Warten auf das Fahrzeug"
+        }
+      },
+      "connection_quality": {
+        "name": "Verbindungsqualität",
+        "state": {
+          "good": "Stabil",
+          "degraded": "Kommunikationsfehler erkannt"
+        }
+      },
+      "energy_goal_status": {
+        "name": "Ladezielstatus",
+        "state": {
+          "disabled": "Deaktiviert",
+          "active": "Aktiv",
+          "reached": "Ladeziel erreicht",
+          "meter_unavailable": "Energiemessung fehlt",
+          "meter_reset": "Zählerstand zurückgegangen"
+        }
+      },
+      "soc_goal_status": {
+        "name": "Status des Fahrzeug-Ladeziels",
+        "state": {
+          "disabled": "Deaktiviert",
+          "active": "Aktiv",
+          "reached": "Ziel erreicht"
+        }
       }
     },
     "switch": {
@@ -464,7 +514,9 @@
               "permission_denied": "Schreiben nicht erlaubt",
               "status_refresh_failed": "Statusaktualisierung fehlgeschlagen",
               "error_still_active": "Fehler weiterhin aktiv",
-              "unknown": "Unbekannter Grund"
+              "unknown": "Unbekannter Grund",
+              "user_cancelled": "Vom Benutzer abgebrochen",
+              "energy_goal": "Ladestopp durch ein Ladeziel"
             }
           }
         }
@@ -534,6 +586,42 @@
     },
     "control_state_unknown": {
       "message": "Der aktuelle Zustand der Wallbox konnte nicht bestätigt werden. Es wurde kein Befehl zur Ladefreigabe, Entsperrung oder zum Phasenwechsel gesendet. Prüfe die Verbindung und versuche es erneut."
+    },
+    "energy_goal_invalid": {
+      "message": "Gib 0 ein, um das Ladeziel zu deaktivieren, oder 0,1–1000 kWh in Schritten von 0,1 kWh."
+    },
+    "energy_goal_unavailable": {
+      "message": "Für ein Ladeziel wird ein unterstützter Gesamtenergiezähler mit einem aktuellen gültigen Messwert benötigt. Prüfe die Verbindung und versuche es erneut."
+    },
+    "energy_goal_stop_active": {
+      "message": "Ein Ladeziel erfordert eine Pause. Prüfe seinen Status. Nach Erreichen des Ziels oder einem Zählerreset kannst du ein neues Ziel setzen oder es mit 0 deaktivieren, bevor du weiterlädst. Eine Zieländerung startet das Laden nicht."
+    },
+    "energy_goal_state_invalid": {
+      "message": "Das gespeicherte Ladeziel konnte nicht wiederhergestellt werden. Prüfe das Protokoll, bevor du das Laden erneut freigibst."
+    },
+    "energy_goal_not_supported": {
+      "message": "Dieser Modbus-Dienst unterstützt keine Ladeziele. Aktualisiere zuerst die App oder den eigenständigen Dienst."
+    },
+    "cancel_pending_not_supported": {
+      "message": "Dieser Modbus-Dienst kann vorgemerkte Änderungen nicht abbrechen. Aktualisiere zuerst die App oder den eigenständigen Dienst."
+    },
+    "soc_goal_invalid": {
+      "message": "Gib ein Ziel von 0 bis 100 % ein, höchstens das Ladelimit des Fahrzeugs. 0 deaktiviert das Prozentziel."
+    },
+    "soc_goal_unavailable": {
+      "message": "Das Fahrzeug-Ladeziel kann gerade nicht geändert werden. Prüfe die gewählten Fahrzeugquellen und versuche es erneut."
+    },
+    "soc_goal_limit_unavailable": {
+      "message": "Das gewählte Fahrzeug-Ladelimit hat noch keinen gültigen Wert geliefert. Warte auf einen verfügbaren Wert, bevor du ein Prozentziel setzt. Mit 0 kannst du das Ziel weiterhin deaktivieren."
+    },
+    "soc_goal_source_changed": {
+      "message": "Die Fahrzeugquellen wurden geändert. Lade die Integration neu, bevor du ihr Prozentziel änderst."
+    },
+    "soc_goal_not_supported": {
+      "message": "Der Modbus-Dienst unterstützt keine Fahrzeug-Prozentziele. Aktualisiere die App, um diese optionale Funktion zu nutzen."
+    },
+    "soc_goal_state_invalid": {
+      "message": "Das gespeicherte Fahrzeug-Ladeziel konnte nicht wiederhergestellt werden. Prüfe die Protokolle, bevor du das Laden wieder freigibst."
     }
   },
   "issues": {
@@ -578,7 +666,9 @@
           "measurement_interval_seconds": "Messwertintervall",
           "scan_interval_seconds": "Statusintervall",
           "state_change_interval_seconds": "Mindestabstand zwischen Zustandswechseln",
-          "phase_switch_grace_seconds": "Zusätzliche Wartezeit vor Phasenwechseln"
+          "phase_switch_grace_seconds": "Zusätzliche Wartezeit vor Phasenwechseln",
+          "vehicle_soc_entity": "Entität für den Fahrzeug-Ladestand (optional)",
+          "vehicle_charge_limit_entity": "Entität für das Fahrzeug-Ladelimit (optional)"
         },
         "data_description": {
           "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
@@ -586,7 +676,9 @@
           "measurement_interval_seconds": "Leistung, Spannung, Strom und Sitzungswerte: 30 Sekunden reduzieren die Datenbanklast. Statuswechsel aktualisieren sofort. Ohne Fahrzeug mindestens 60 Sekunden. Das Statusintervall bestimmt die kürzeste mögliche Abfragezeit.",
           "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon.",
           "state_change_interval_seconds": "Mindestabstand in Sekunden zwischen Start, Pause, Freigabe-, Sperr- und Phasenwechseln (Standard 300). Zu frühe Befehle werden vorgemerkt; der neueste ersetzt den vorherigen. Der Schreibabstand von fünf Sekunden für den Ladestrom bleibt bestehen. Mit 0 entfällt die längere Wartezeit.",
-          "phase_switch_grace_seconds": "Zusätzliche Sekunden zwischen der bestätigten Ladepause des Fahrzeugs und dem Phasenwechsel (Standard 5, Bereich 0–30). Mit 0 entfällt nur diese zusätzliche Wartezeit; die Ladepause muss weiterhin bestätigt werden."
+          "phase_switch_grace_seconds": "Zusätzliche Sekunden zwischen der bestätigten Ladepause des Fahrzeugs und dem Phasenwechsel (Standard 5, Bereich 0–30). Mit 0 entfällt nur diese zusätzliche Wartezeit; die Ladepause muss weiterhin bestätigt werden.",
+          "vehicle_soc_entity": "Optional: Wähle den Sensor, der den tatsächlichen Ladestand des Fahrzeugs in % meldet. Damit wird ein separates Prozent-Ladeziel verfügbar; ohne Auswahl bleibt es deaktiviert. Bei fehlenden Fahrzeugdaten läuft das Laden unverändert weiter, bis gültige Daten zurückkehren. Ändern oder Entfernen einer Quelle löscht das Prozentziel, ohne das Laden fortzusetzen.",
+          "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt."
         },
         "title": "Optionen"
       },
@@ -594,14 +686,22 @@
         "title": "Dienst-Optionen",
         "data": {
           "current_limit": "Obergrenze des Ladestroms",
-          "scan_interval_seconds": "Statusintervall"
+          "scan_interval_seconds": "Statusintervall",
+          "vehicle_soc_entity": "Entität für den Fahrzeug-Ladestand (optional)",
+          "vehicle_charge_limit_entity": "Entität für das Fahrzeug-Ladelimit (optional)"
         },
         "data_description": {
           "current_limit": "Zusätzliche Obergrenze für von Home Assistant angeforderte Ladestromwerte. Die Obergrenze des Dienstes bleibt wirksam. Bewusst gewählte 0 A schalten die EMS-Begrenzung aus.",
-          "scan_interval_seconds": "Wie oft Home Assistant den gespeicherten Status vom Dienst abruft. Modbus-Messintervall und Heartbeat-Takt werden dadurch nicht verändert."
+          "scan_interval_seconds": "Wie oft Home Assistant den gespeicherten Status vom Dienst abruft. Modbus-Messintervall und Heartbeat-Takt werden dadurch nicht verändert.",
+          "vehicle_soc_entity": "Optional: Wähle den Sensor, der den tatsächlichen Ladestand des Fahrzeugs in % meldet. Damit wird ein separates Prozent-Ladeziel verfügbar; ohne Auswahl bleibt es deaktiviert. Bei fehlenden Fahrzeugdaten läuft das Laden unverändert weiter, bis gültige Daten zurückkehren. Ändern oder Entfernen einer Quelle löscht das Prozentziel, ohne das Laden fortzusetzen.",
+          "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt."
         },
         "description": "Die Einstellung „Nur lesen“ der App steuert auch die Schreibfreigabe in Home Assistant. Deaktiviere sie in der App, speichere und starte die App neu, um die Steuerung zu aktivieren. Die Steuer-Entitäten bleiben bei aktivem Nur-Lesen-Modus oder nicht bereitem Dienst nicht verfügbar. Den Mindestabstand zwischen Zustandswechseln und die zusätzliche Wartezeit vor Phasenwechseln stellst du in der App-Konfiguration ein; der Dienst hält beide auch während eines Home-Assistant-Neustarts ein."
       }
+    },
+    "error": {
+      "vehicle_soc_required": "Wähle zuerst eine Entität für den Fahrzeug-Ladestand, bevor du das optionale Ladelimit ergänzt.",
+      "invalid_vehicle_entity": "Wähle eine Entität des unterstützten Typs."
     }
   },
   "selector": {

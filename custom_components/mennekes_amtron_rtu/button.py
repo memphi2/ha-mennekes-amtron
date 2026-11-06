@@ -33,12 +33,32 @@ async def async_setup_entry(
     runtime_data = entry.runtime_data
     identity = runtime_data.identity
     coordinator = runtime_data.coordinator
-    entities: list[ButtonEntity] = [AmtronRecoverButton(entry, coordinator)]
+    entities: list[ButtonEntity] = [
+        AmtronRecoverButton(entry, coordinator), AmtronCancelPendingButton(entry, coordinator),
+    ]
     if capability_is_supported(
         identity.layout_version, identity.phase_options_hw, SYSTEM_RESTART.key
     ):
         entities.append(AmtronRestartButton(entry, coordinator))
     async_add_entities(entities)
+
+
+class AmtronCancelPendingButton(MennekesAmtronControlEntity, ButtonEntity):
+    """Remove a queued change without changing the current charging state."""
+
+    _attr_translation_key = "cancel_pending_change"
+
+    def __init__(
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
+    ) -> None:
+        super().__init__(entry, coordinator, "cancel_pending_change")
+
+    @property
+    def available(self) -> bool:
+        return self.runtime_data.control.can_cancel_pending
+
+    async def async_press(self) -> None:
+        await self.runtime_data.control.async_cancel_pending_change()
 
 
 class AmtronRecoverButton(MennekesAmtronControlEntity, ButtonEntity):

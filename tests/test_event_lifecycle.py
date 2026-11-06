@@ -50,7 +50,10 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                 registry = er.async_get(hass)
                 registered = er.async_entries_for_config_entry(registry, entry.entry_id)
                 event_id = next(item.entity_id for item in registered if item.domain == "event")
-                number_id = next(item.entity_id for item in registered if item.domain == "number")
+                number_id = next(
+                    item.entity_id for item in registered
+                    if item.unique_id.endswith("_charging_current_limit")
+                )
                 assert registry.async_get(event_id).disabled_by is er.RegistryEntryDisabler.INTEGRATION
                 assert hass.states.get(event_id) is None
 

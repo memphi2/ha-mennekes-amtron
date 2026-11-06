@@ -26,6 +26,10 @@ from custom_components.mennekes_amtron_rtu.options_flow import (
     _max_current,
     control_mode_is_master,
 )
+from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
+    CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
+    CONF_VEHICLE_SOC_ENTITY,
+)
 from tests.ha_fakes import FakeConfigEntry
 
 
@@ -75,6 +79,7 @@ def test_the_form_defaults_to_the_stored_options() -> None:
         assert result["type"] == "form"
         defaults = {
             marker.schema: marker.default() for marker in result["data_schema"].schema
+            if callable(marker.default)
         }
         assert defaults[CONF_CONTROL_MODE] == CONTROL_MODE_MASTER
         assert defaults[CONF_SCAN_INTERVAL_SECONDS] == 10
@@ -122,6 +127,8 @@ def test_service_options_configure_only_current_cap_and_cache_refresh(stale_mode
         assert set(fields) == {
             CONF_CURRENT_LIMIT,
             CONF_SCAN_INTERVAL_SECONDS,
+            CONF_VEHICLE_SOC_ENTITY,
+            CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
         }
         submitted = {
             CONF_CURRENT_LIMIT: 8,
@@ -201,3 +208,53 @@ def test_the_options_schema_never_offers_less_than_six_ampere() -> None:
         marker for marker in schema.schema if marker.schema == CONF_CURRENT_LIMIT
     )
     assert schema.schema[marker].config["max"] == 6
+
+
+@pytest.mark.parametrize("service_mode", [False, True])
+def test_vehicle_sources_are_optional_preserved_and_removable(service_mode):
+    async def run():
+        sources = {
+            CONF_VEHICLE_SOC_ENTITY: "sensor.car_battery",
+            CONF_VEHICLE_CHARGE_LIMIT_ENTITY: "number.car_limit",
+        }
+        entry = FakeConfigEntry(
+            data={"server_url": "http://service:8765"} if service_mode else None,
+            options=sources,
+        )
+        flow = Flow(entry)
+        form = await flow.async_step_init()
+        markers = {marker.schema: marker for marker in form["data_schema"].schema}
+        for key, value in sources.items():
+            assert isinstance(markers[key], probatio.Optional)
+            assert markers[key].description["suggested_value"] == value
+            assert not callable(markers[key].default)
+        # Empty optional selectors have no schema default that resurrects them.
+        values = form["data_schema"]({})
+        assert not sources.keys() & values.keys()
+        cleared = await flow.async_step_init(values)
+        assert not sources.keys() & cleared["data"].keys()
+        selected = await flow.async_step_init({**values, **sources})
+        assert sources.items() <= selected["data"].items()
+        alone = await flow.async_step_init({**values, CONF_VEHICLE_SOC_ENTITY: sources[CONF_VEHICLE_SOC_ENTITY]})
+        assert CONF_VEHICLE_SOC_ENTITY in alone["data"]
+        assert CONF_VEHICLE_CHARGE_LIMIT_ENTITY not in alone["data"]
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("sources", "field", "error"), [
+    ({CONF_VEHICLE_CHARGE_LIMIT_ENTITY: "number.limit"}, CONF_VEHICLE_SOC_ENTITY, "vehicle_soc_required"),
+    ({CONF_VEHICLE_SOC_ENTITY: "switch.car"}, CONF_VEHICLE_SOC_ENTITY, "invalid_vehicle_entity"),
+    ({CONF_VEHICLE_SOC_ENTITY: "not_an_entity"}, CONF_VEHICLE_SOC_ENTITY, "invalid_vehicle_entity"),
+    ({CONF_VEHICLE_SOC_ENTITY: True}, CONF_VEHICLE_SOC_ENTITY, "invalid_vehicle_entity"),
+    ({CONF_VEHICLE_SOC_ENTITY: "sensor.car", CONF_VEHICLE_CHARGE_LIMIT_ENTITY: "switch.limit"},
+     CONF_VEHICLE_CHARGE_LIMIT_ENTITY, "invalid_vehicle_entity"),
+])
+def test_invalid_vehicle_sources_are_field_errors_without_live_reads(sources, field, error):
+    async def run():
+        flow = Flow(FakeConfigEntry())
+        result = await flow.async_step_init(sources)
+        assert result["type"] == "form"
+        assert result["errors"][field] == error
+
+    asyncio.run(run())

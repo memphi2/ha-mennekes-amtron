@@ -185,11 +185,20 @@
       },
       "restart": {
         "name": "Riavvia"
+      },
+      "cancel_pending_change": {
+        "name": "Annulla modifica in attesa"
       }
     },
     "number": {
       "charging_current_limit": {
         "name": "Limite di corrente di ricarica"
+      },
+      "energy_goal": {
+        "name": "Obiettivo energetico"
+      },
+      "soc_goal": {
+        "name": "Obiettivo di carica del veicolo"
       }
     },
     "select": {
@@ -407,6 +416,47 @@
       },
       "pending_change_until": {
         "name": "Modifica prevista alle"
+      },
+      "charging_status": {
+        "name": "Stato di ricarica",
+        "state": {
+          "initializing": "Inizializzazione",
+          "wallbox_error": "Errore della wallbox",
+          "service_mode": "Modalità manutenzione",
+          "no_vehicle": "Nessun veicolo collegato",
+          "charging": "Ricarica in corso",
+          "locked": "Wallbox bloccata",
+          "release_disabled": "Abilitazione alla ricarica disattivata",
+          "paused": "Ricarica in pausa",
+          "authorization_required": "Autorizzazione richiesta",
+          "preparing": "Preparazione della ricarica",
+          "waiting_for_vehicle": "In attesa del veicolo"
+        }
+      },
+      "connection_quality": {
+        "name": "Qualità della connessione",
+        "state": {
+          "good": "Buona",
+          "degraded": "Errori di comunicazione rilevati"
+        }
+      },
+      "energy_goal_status": {
+        "name": "Stato dell’obiettivo energetico",
+        "state": {
+          "disabled": "Disattivato",
+          "active": "Attivo",
+          "reached": "Obiettivo energetico raggiunto",
+          "meter_unavailable": "Misurazione energetica non disponibile",
+          "meter_reset": "Lettura del contatore diminuita"
+        }
+      },
+      "soc_goal_status": {
+        "name": "Stato dell’obiettivo di carica del veicolo",
+        "state": {
+          "disabled": "Disattivato",
+          "active": "Attivo",
+          "reached": "Obiettivo raggiunto"
+        }
       }
     },
     "switch": {
@@ -464,7 +514,9 @@
               "permission_denied": "Scrittura non consentita",
               "status_refresh_failed": "Aggiornamento dello stato non riuscito",
               "error_still_active": "L’errore è ancora attivo",
-              "unknown": "Motivo sconosciuto"
+              "unknown": "Motivo sconosciuto",
+              "user_cancelled": "Annullato dall’utente",
+              "energy_goal": "Arresto richiesto da un obiettivo di ricarica"
             }
           }
         }
@@ -534,6 +586,42 @@
     },
     "control_state_unknown": {
       "message": "Non è stato possibile confermare lo stato attuale della wallbox. Non è stato inviato alcun comando di autorizzazione alla ricarica, sblocco o cambio delle fasi. Controlla la connessione e riprova."
+    },
+    "energy_goal_invalid": {
+      "message": "Inserisci 0 per disattivare l’obiettivo energetico, oppure un valore da 0,1 a 1000 kWh a incrementi di 0,1 kWh."
+    },
+    "energy_goal_unavailable": {
+      "message": "Un obiettivo energetico richiede un contatore di energia totale supportato e una lettura recente valida. Controlla la connessione e riprova."
+    },
+    "energy_goal_stop_active": {
+      "message": "Un obiettivo di ricarica richiede una pausa. Controllane lo stato. Dopo aver raggiunto l’obiettivo o un azzeramento del contatore, imposta un nuovo obiettivo o disattivalo con 0 prima di riprendere. Modificare l’obiettivo non avvia la ricarica."
+    },
+    "energy_goal_state_invalid": {
+      "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."
+    },
+    "energy_goal_not_supported": {
+      "message": "Questo servizio Modbus non supporta gli obiettivi energetici. Aggiorna prima l’app o il servizio autonomo."
+    },
+    "cancel_pending_not_supported": {
+      "message": "Questo servizio Modbus non può annullare le modifiche in attesa. Aggiorna prima l’app o il servizio autonomo."
+    },
+    "soc_goal_invalid": {
+      "message": "Inserisci un obiettivo da 0 al 100%, senza superare il limite del veicolo. 0 disattiva l’obiettivo percentuale."
+    },
+    "soc_goal_unavailable": {
+      "message": "Non è possibile modificare ora l’obiettivo del veicolo. Controlla le fonti selezionate e riprova."
+    },
+    "soc_goal_limit_unavailable": {
+      "message": "Il limite di carica selezionato non ha ancora fornito un valore valido. Attendi un valore disponibile prima di impostare un obiettivo. Puoi comunque disattivarlo con 0."
+    },
+    "soc_goal_source_changed": {
+      "message": "Le fonti del veicolo sono cambiate. Ricarica l’integrazione prima di modificare l’obiettivo percentuale."
+    },
+    "soc_goal_not_supported": {
+      "message": "Il servizio Modbus non supporta gli obiettivi percentuali del veicolo. Aggiorna l’app per usare questa funzione facoltativa."
+    },
+    "soc_goal_state_invalid": {
+      "message": "Impossibile ripristinare l’obiettivo di carica del veicolo salvato. Controlla i registri prima di consentire nuovamente la ricarica."
     }
   },
   "issues": {
@@ -578,7 +666,9 @@
           "measurement_interval_seconds": "Intervallo delle misurazioni",
           "scan_interval_seconds": "Intervallo di lettura dello stato",
           "state_change_interval_seconds": "Intervallo minimo tra cambiamenti di stato",
-          "phase_switch_grace_seconds": "Attesa aggiuntiva prima del cambio delle fasi"
+          "phase_switch_grace_seconds": "Attesa aggiuntiva prima del cambio delle fasi",
+          "vehicle_soc_entity": "Entità del livello di carica del veicolo (facoltativa)",
+          "vehicle_charge_limit_entity": "Entità del limite di carica del veicolo (facoltativa)"
         },
         "data_description": {
           "control_mode": "Entrambe le modalità inviano richieste di lettura e richiedono l'accesso esclusivo al bus. Sola lettura non scrive registri. Master Modbus invia anche l'heartbeat e abilita le entità di controllo. Non condividere questo bus con un altro master.",
@@ -586,7 +676,9 @@
           "measurement_interval_seconds": "Potenza, tensione, corrente e valori di sessione: 30 secondi riducono il carico sul database. I cambiamenti di stato aggiornano subito le letture. Senza veicolo, almeno 60 secondi. L'intervallo di stato determina il tempo minimo tra le letture.",
           "scan_interval_seconds": "Frequenza di lettura dello stato di ricarica, degli errori e dei controlli. L'heartbeat funziona indipendentemente.",
           "state_change_interval_seconds": "Intervallo minimo in secondi tra avvii, pause e cambiamenti del consenso alla ricarica, del blocco o delle fasi (predefinito 300). I comandi anticipati vengono accodati; l’ultimo sostituisce il precedente. Rimane l’intervallo di cinque secondi tra le scritture della corrente. Impostare 0 per disabilitare l’intervallo più lungo.",
-          "phase_switch_grace_seconds": "Secondi di attesa aggiuntivi tra la conferma della pausa di ricarica da parte del veicolo e il cambio delle fasi (predefinito 5, da 0 a 30). Impostare 0 per eliminare solo questa attesa aggiuntiva; la conferma della pausa rimane obbligatoria."
+          "phase_switch_grace_seconds": "Secondi di attesa aggiuntivi tra la conferma della pausa di ricarica da parte del veicolo e il cambio delle fasi (predefinito 5, da 0 a 30). Impostare 0 per eliminare solo questa attesa aggiuntiva; la conferma della pausa rimane obbligatoria.",
+          "vehicle_soc_entity": "Facoltativo: seleziona il sensore che indica il livello di carica reale del veicolo in %. Abilita un obiettivo percentuale separato; senza selezione rimane disattivato. Se mancano i dati, la ricarica continua fino al ritorno di valori validi. Cambiare o rimuovere una fonte cancella questo obiettivo senza riprendere la ricarica.",
+          "vehicle_charge_limit_entity": "Facoltativo: limita ulteriormente l’obiettivo con l’entità del limite di carica del veicolo. Senza questa entità sono possibili obiettivi fino al 100%. Un limite inferiore riduce l’obiettivo esistente; un aumento non lo alza. Se l’entità non è disponibile rimane valido l’ultimo limite noto. Nessuna impostazione del veicolo viene modificata."
         },
         "title": "Opzioni"
       },
@@ -594,14 +686,22 @@
         "title": "Opzioni del servizio",
         "data": {
           "current_limit": "Corrente massima di ricarica",
-          "scan_interval_seconds": "Intervallo di lettura dello stato"
+          "scan_interval_seconds": "Intervallo di lettura dello stato",
+          "vehicle_soc_entity": "Entità del livello di carica del veicolo (facoltativa)",
+          "vehicle_charge_limit_entity": "Entità del limite di carica del veicolo (facoltativa)"
         },
         "data_description": {
           "current_limit": "Limite aggiuntivo per le correnti richieste da Home Assistant. Si applica anche il limite del servizio. Selezionare esplicitamente 0 A disattiva il limite EMS.",
-          "scan_interval_seconds": "Frequenza con cui Home Assistant legge lo stato del servizio. Non modifica né le letture Modbus né l'intervallo dell'heartbeat."
+          "scan_interval_seconds": "Frequenza con cui Home Assistant legge lo stato del servizio. Non modifica né le letture Modbus né l'intervallo dell'heartbeat.",
+          "vehicle_soc_entity": "Facoltativo: seleziona il sensore che indica il livello di carica reale del veicolo in %. Abilita un obiettivo percentuale separato; senza selezione rimane disattivato. Se mancano i dati, la ricarica continua fino al ritorno di valori validi. Cambiare o rimuovere una fonte cancella questo obiettivo senza riprendere la ricarica.",
+          "vehicle_charge_limit_entity": "Facoltativo: limita ulteriormente l’obiettivo con l’entità del limite di carica del veicolo. Senza questa entità sono possibili obiettivi fino al 100%. Un limite inferiore riduce l’obiettivo esistente; un aumento non lo alza. Se l’entità non è disponibile rimane valido l’ultimo limite noto. Nessuna impostazione del veicolo viene modificata."
         },
         "description": "L'impostazione Sola lettura dell'app controlla anche il permesso di scrittura in Home Assistant. Disattivala nell'app, salva e riavvia l'app per abilitare i controlli. Le entità di controllo rimangono non disponibili mentre il servizio è in sola lettura o non è pronto. Imposta l’intervallo minimo tra cambiamenti di stato e l’attesa aggiuntiva prima del cambio delle fasi nella configurazione dell’app; il servizio applica entrambi anche durante un riavvio di Home Assistant."
       }
+    },
+    "error": {
+      "vehicle_soc_required": "Seleziona un’entità del livello di carica prima di aggiungere il limite facoltativo.",
+      "invalid_vehicle_entity": "Seleziona un’entità del tipo supportato."
     }
   },
   "selector": {

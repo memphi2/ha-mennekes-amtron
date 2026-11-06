@@ -185,11 +185,20 @@
       },
       "restart": {
         "name": "Herstarten"
+      },
+      "cancel_pending_change": {
+        "name": "Wachtende wijziging annuleren"
       }
     },
     "number": {
       "charging_current_limit": {
         "name": "Laadstroomlimiet"
+      },
+      "energy_goal": {
+        "name": "Energiedoel"
+      },
+      "soc_goal": {
+        "name": "Laaddoel van voertuig"
       }
     },
     "select": {
@@ -407,6 +416,47 @@
       },
       "pending_change_until": {
         "name": "Wijziging gepland om"
+      },
+      "charging_status": {
+        "name": "Laadstatus",
+        "state": {
+          "initializing": "Initialiseren",
+          "wallbox_error": "Storing van de wallbox",
+          "service_mode": "Onderhoudsmodus",
+          "no_vehicle": "Geen voertuig aangesloten",
+          "charging": "Bezig met laden",
+          "locked": "Wallbox vergrendeld",
+          "release_disabled": "Laadvrijgave uitgeschakeld",
+          "paused": "Laden gepauzeerd",
+          "authorization_required": "Autorisatie vereist",
+          "preparing": "Laden voorbereiden",
+          "waiting_for_vehicle": "Wachten op het voertuig"
+        }
+      },
+      "connection_quality": {
+        "name": "Verbindingskwaliteit",
+        "state": {
+          "good": "Goed",
+          "degraded": "Communicatiefouten gedetecteerd"
+        }
+      },
+      "energy_goal_status": {
+        "name": "Status energiedoel",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "active": "Actief",
+          "reached": "Energiedoel bereikt",
+          "meter_unavailable": "Energiemeting niet beschikbaar",
+          "meter_reset": "Meterstand gedaald"
+        }
+      },
+      "soc_goal_status": {
+        "name": "Status van laaddoel van voertuig",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "active": "Actief",
+          "reached": "Doel bereikt"
+        }
       }
     },
     "switch": {
@@ -464,7 +514,9 @@
               "permission_denied": "Schrijven niet toegestaan",
               "status_refresh_failed": "Status bijwerken mislukt",
               "error_still_active": "De fout is nog actief",
-              "unknown": "Onbekende reden"
+              "unknown": "Onbekende reden",
+              "user_cancelled": "Geannuleerd door de gebruiker",
+              "energy_goal": "Stop door een laaddoel"
             }
           }
         }
@@ -534,6 +586,42 @@
     },
     "control_state_unknown": {
       "message": "De huidige status van de wallbox kon niet worden bevestigd. Er is geen opdracht verstuurd om laden toe te staan, de wallbox te ontgrendelen of de fasen te wisselen. Controleer de verbinding en probeer het opnieuw."
+    },
+    "energy_goal_invalid": {
+      "message": "Voer 0 in om het energiedoel uit te schakelen, of 0,1–1000 kWh in stappen van 0,1 kWh."
+    },
+    "energy_goal_unavailable": {
+      "message": "Een energiedoel vereist een ondersteunde meter voor totale energie en een recente geldige meting. Controleer de verbinding en probeer het opnieuw."
+    },
+    "energy_goal_stop_active": {
+      "message": "Een laaddoel vereist een pauze. Controleer de status. Stel na het bereiken van het doel of een meterreset een nieuw doel in of schakel het uit met 0 voordat je hervat. Het wijzigen van een doel start het laden niet."
+    },
+    "energy_goal_state_invalid": {
+      "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."
+    },
+    "energy_goal_not_supported": {
+      "message": "Deze Modbus-dienst ondersteunt geen energiedoelen. Werk eerst de app of de zelfstandige dienst bij."
+    },
+    "cancel_pending_not_supported": {
+      "message": "Deze Modbus-dienst kan wachtende wijzigingen niet annuleren. Werk eerst de app of de zelfstandige dienst bij."
+    },
+    "soc_goal_invalid": {
+      "message": "Voer een doel van 0 tot 100% in, niet hoger dan de laadlimiet van het voertuig. 0 schakelt het percentagedoel uit."
+    },
+    "soc_goal_unavailable": {
+      "message": "Het laaddoel van het voertuig kan nu niet worden gewijzigd. Controleer de gekozen bronnen en probeer opnieuw."
+    },
+    "soc_goal_limit_unavailable": {
+      "message": "De gekozen laadlimiet heeft nog geen geldige waarde gemeld. Wacht op een beschikbare waarde voordat je een percentagedoel instelt. Met 0 kun je het doel nog steeds uitschakelen."
+    },
+    "soc_goal_source_changed": {
+      "message": "De voertuigbronnen zijn gewijzigd. Herlaad de integratie voordat je het percentagedoel wijzigt."
+    },
+    "soc_goal_not_supported": {
+      "message": "De Modbus-dienst ondersteunt geen percentagedoelen voor het voertuig. Werk de app bij om deze optionele functie te gebruiken."
+    },
+    "soc_goal_state_invalid": {
+      "message": "Het opgeslagen laaddoel van het voertuig kon niet worden hersteld. Controleer de logboeken voordat je laden opnieuw toestaat."
     }
   },
   "issues": {
@@ -578,7 +666,9 @@
           "measurement_interval_seconds": "Meetinterval",
           "scan_interval_seconds": "Statusinterval",
           "state_change_interval_seconds": "Minimale tijd tussen statuswijzigingen",
-          "phase_switch_grace_seconds": "Extra wachttijd vóór fasewisselingen"
+          "phase_switch_grace_seconds": "Extra wachttijd vóór fasewisselingen",
+          "vehicle_soc_entity": "Entiteit voor laadniveau van voertuig (optioneel)",
+          "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig (optioneel)"
         },
         "data_description": {
           "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
@@ -586,7 +676,9 @@
           "measurement_interval_seconds": "Vermogen, spanning, stroom en sessiewaarden: 30 seconden vermindert de databasebelasting. Bij statuswijzigingen worden metingen direct vernieuwd. Zonder voertuig geldt minimaal 60 seconden. Het statusinterval bepaalt de kortst mogelijke tijd tussen uitlezingen.",
           "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk.",
           "state_change_interval_seconds": "Minimaal aantal seconden tussen starten, pauzeren en wijzigingen van de laadtoestemming, vergrendeling of fasen (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen.",
-          "phase_switch_grace_seconds": "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist."
+          "phase_switch_grace_seconds": "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist.",
+          "vehicle_soc_entity": "Optioneel: selecteer de sensor die het werkelijke laadniveau van het voertuig in % meldt. Dit schakelt een apart percentagedoel in; zonder selectie blijft het uitgeschakeld. Bij ontbrekende gegevens gaat het laden ongewijzigd door tot geldige gegevens terugkeren. Een bron wijzigen of verwijderen wist dit doel zonder het laden te hervatten.",
+          "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd."
         },
         "title": "Opties"
       },
@@ -594,14 +686,22 @@
         "title": "Serviceopties",
         "data": {
           "current_limit": "Maximale laadstroom",
-          "scan_interval_seconds": "Statusinterval"
+          "scan_interval_seconds": "Statusinterval",
+          "vehicle_soc_entity": "Entiteit voor laadniveau van voertuig (optioneel)",
+          "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig (optioneel)"
         },
         "data_description": {
           "current_limit": "Extra bovengrens voor stroomwaarden die Home Assistant aanvraagt. De servicegrens blijft van toepassing. Door bewust 0 A te selecteren, schakel je de EMS-limiet uit.",
-          "scan_interval_seconds": "Hoe vaak Home Assistant de servicestatus uitleest. Dit verandert noch het uitleesinterval van de Modbus-metingen, noch het heartbeatinterval."
+          "scan_interval_seconds": "Hoe vaak Home Assistant de servicestatus uitleest. Dit verandert noch het uitleesinterval van de Modbus-metingen, noch het heartbeatinterval.",
+          "vehicle_soc_entity": "Optioneel: selecteer de sensor die het werkelijke laadniveau van het voertuig in % meldt. Dit schakelt een apart percentagedoel in; zonder selectie blijft het uitgeschakeld. Bij ontbrekende gegevens gaat het laden ongewijzigd door tot geldige gegevens terugkeren. Een bron wijzigen of verwijderen wist dit doel zonder het laden te hervatten.",
+          "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd."
         },
         "description": "De instelling Alleen lezen van de app bepaalt ook of Home Assistant mag schrijven. Schakel deze in de app uit, sla de wijziging op en herstart de app om de bedieningselementen in te schakelen. Deze blijven niet beschikbaar zolang Alleen lezen is ingeschakeld of de service nog niet gereed is. Stel de minimale tijd tussen statuswijzigingen en de extra wachttijd vóór fasewisselingen in bij de appconfiguratie; de service handhaaft beide ook tijdens een herstart van Home Assistant."
       }
+    },
+    "error": {
+      "vehicle_soc_required": "Selecteer eerst een entiteit voor het laadniveau voordat je de optionele laadlimiet toevoegt.",
+      "invalid_vehicle_entity": "Selecteer een entiteit van het ondersteunde type."
     }
   },
   "selector": {

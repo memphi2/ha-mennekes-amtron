@@ -33,9 +33,16 @@
     "button": {
       "recover_from_error": {
         "default": "mdi:restore-alert"
+      },
+      "cancel_pending_change": {
+        "default": "mdi:timer-cancel-outline"
       }
     },
-    "number": {},
+    "number": {
+      "soc_goal": {
+        "default": "mdi:battery-arrow-up-outline"
+      }
+    },
     "select": {
       "requested_phases": {
         "default": "mdi:swap-horizontal",
@@ -129,6 +136,44 @@
         "default": "mdi:swap-horizontal",
         "state": {
           "single_phase": "mdi:numeric-1-circle"
+        }
+      },
+      "charging_status": {
+        "default": "mdi:ev-station",
+        "state": {
+          "initializing": "mdi:progress-clock",
+          "wallbox_error": "mdi:alert-circle-outline",
+          "service_mode": "mdi:wrench-outline",
+          "no_vehicle": "mdi:car-off",
+          "charging": "mdi:lightning-bolt",
+          "locked": "mdi:lock",
+          "release_disabled": "mdi:power-plug-off",
+          "paused": "mdi:pause-circle",
+          "authorization_required": "mdi:card-account-details-outline",
+          "preparing": "mdi:timer-sand",
+          "waiting_for_vehicle": "mdi:car-clock"
+        }
+      },
+      "connection_quality": {
+        "default": "mdi:connection",
+        "state": {
+          "good": "mdi:check-circle-outline",
+          "degraded": "mdi:alert-circle-outline"
+        }
+      },
+      "energy_goal_status": {
+        "default": "mdi:target",
+        "state": {
+          "reached": "mdi:check-circle-outline",
+          "meter_unavailable": "mdi:alert-circle-outline",
+          "meter_reset": "mdi:alert-circle-outline"
+        }
+      },
+      "soc_goal_status": {
+        "default": "mdi:battery-outline",
+        "state": {
+          "active": "mdi:battery-charging-outline",
+          "reached": "mdi:battery-check-outline"
         }
       }
     },

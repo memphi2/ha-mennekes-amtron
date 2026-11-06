@@ -16,8 +16,11 @@ if TYPE_CHECKING:
     from .control import AmtronControl
     from .coordinator import MennekesAmtronCoordinator
     from .device.client import MennekesModbusClient
+    from .device.energy_goal_controller import EnergyGoalController
     from .device.heartbeat import HeartbeatTask
+    from .device.soc_goal_controller import SocGoalController
     from .recovery import HeartbeatRecovery
+    from .vehicle_soc import VehicleSocObserver
 
 
 @dataclass(slots=True)
@@ -35,6 +38,9 @@ class MennekesAmtronRuntimeData:
     loaded_platforms: tuple[Platform, ...] = ()
     heartbeat: HeartbeatTask | None = None
     recovery: HeartbeatRecovery | None = None
+    goal: EnergyGoalController | None = None
+    soc_goal: SocGoalController | None = None
+    vehicle_soc: VehicleSocObserver | None = None
     # What the repair issues looked like last time, so an unchanged issue is
     # not written to the issue registry on every poll.
     repair_state: dict[str, dict[str, str] | None] = field(default_factory=dict)
