@@ -100,6 +100,66 @@ def test_live_soc_at_goal_consumes_trip_without_writing(monkeypatch: pytest.Monk
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("stop", ["meter_unavailable", "meter_reset", "pending_soc"])
+def test_safety_stop_retains_trip_and_recovery_resumes_pacing(monkeypatch: pytest.MonkeyPatch, stop: str) -> None:
+    async def run() -> None:
+        observer, control, _hass = setup_observer(monkeypatch)
+        deadline = NOW + timedelta(hours=8)
+        observer.goal.set(deadline)
+        control.energy_goal.set_target(10, 100)
+        await observer._evaluate()
+        assert control.commands == [("current", 9.7)]
+        original = observer.goal
+        if stop != "pending_soc":
+            control.energy_goal.observe(None if stop == "meter_unavailable" else 99)
+            assert control.energy_goal.status == stop
+        # The composite stop can also fence a start while a SoC observation
+        # waits for its controller lock; it is not itself proof of completion.
+        control.energy_goal_stop_requested = True
+        control.is_paused = True
+        control.data.values["charging_current_ems"] = 1.0
+        await observer._evaluate()
+        await observer._evaluate()
+        assert observer.status == "waiting_for_device"
+        assert observer.goal is original
+        assert observer.goal.deadline == deadline
+        assert observer.goal.finished is None
+        assert control.commands == [("current", 9.7)]
+        assert observer._store.saved == []
+        if stop == "meter_unavailable":
+            control.energy_goal.observe(101)
+            assert control.energy_goal.status == "active"
+        elif stop == "meter_reset":
+            # Meter-reset safety remains latched until the energy goal is
+            # explicitly cleared; the independent departure is still usable.
+            control.energy_goal.set_target(0)
+        control.energy_goal_stop_requested = False
+        monkeypatch.setattr(observer_module.time, "monotonic", lambda: 301.0)
+        await observer._evaluate()
+        assert observer.status == "paced"
+        assert observer.goal is original
+        assert control.commands == [("current", 9.7), ("current", 9.7)]
+
+    asyncio.run(run())
+
+
+def test_reached_energy_ceiling_finishes_trip_without_resuming(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, _hass = setup_observer(monkeypatch)
+        deadline = NOW + timedelta(hours=8)
+        observer.goal.set(deadline)
+        control.energy_goal.set_target(10, 100)
+        control.energy_goal.observe(110)
+        control.energy_goal_stop_requested = True
+        await observer._evaluate()
+        assert observer.status == "reached"
+        assert observer.goal.finished == "reached"
+        assert observer.goal.deadline == deadline
+        assert control.commands == []
+
+    asyncio.run(run())
+
+
 def test_manual_selection_wins_until_external_departure_changes(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, _control, hass = setup_observer(monkeypatch)

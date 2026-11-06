@@ -17,6 +17,7 @@ from custom_components.mennekes_amtron_rtu.datetime import (
     async_setup_entry as setup_datetime,
 )
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.energy_goal import EnergyGoal
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.options_flow import (
     _normalized,
@@ -123,6 +124,7 @@ class FakeStore:
 class FakeControl:
     def __init__(self, data: WallboxData) -> None:
         self.soc_goal = SimpleNamespace(status="active", target_percent=80.0)
+        self.energy_goal = EnergyGoal()
         self.max_charging_current = 16.0
         self.read_only = False
         self.energy_goal_stop_requested = False
@@ -276,7 +278,7 @@ def test_invalid_capacity_read_only_and_queue_do_not_write(monkeypatch: pytest.M
         control.pending_action = None
         control.energy_goal_stop_requested = True
         await observer._evaluate()
-        assert observer.status == "reached"
+        assert observer.status == "waiting_for_device"
         assert control.commands == []
 
     asyncio.run(run())

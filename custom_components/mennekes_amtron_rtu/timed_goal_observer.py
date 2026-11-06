@@ -357,8 +357,13 @@ class TimedGoalObserver:
             capacity_kwh=capacity, phases=self._phases(),
             max_current_a=control.max_charging_current,
         )
-        if plan.status == "reached" or control.energy_goal_stop_requested:
+        if plan.status == "reached" or control.energy_goal.status == "reached":
             await self._finish("reached", trip)
+            return
+        if control.energy_goal_stop_requested:
+            # Missing/reset meter data and stop evidence awaiting persistence
+            # block commands without proving that either target was reached.
+            self._set_status("waiting_for_device")
             return
         if control.pending_action is not None:
             self._set_status("queued")
