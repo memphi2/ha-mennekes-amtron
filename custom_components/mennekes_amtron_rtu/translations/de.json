@@ -389,6 +389,24 @@
       },
       "voltage_l3": {
         "name": "Spannung L3"
+      },
+      "pending_change": {
+        "name": "Vorgemerkte Änderung",
+        "state": {
+          "none": "Keine Änderung vorgemerkt",
+          "pause": "Laden pausieren",
+          "resume": "Laden fortsetzen",
+          "set_current": "Ladestrom einstellen",
+          "single_phase": "Eine Phase verwenden",
+          "all_phases": "Alle verfügbaren Phasen verwenden",
+          "enable_charging": "Ladefreigabe einschalten",
+          "disable_charging": "Ladefreigabe ausschalten",
+          "unlock": "Wallbox entsperren",
+          "lock": "Wallbox sperren"
+        }
+      },
+      "pending_change_until": {
+        "name": "Geplante Änderung um"
       }
     },
     "switch": {
@@ -432,10 +450,16 @@
       "message": "Das Schreiben von {register} an die Wallbox ist fehlgeschlagen: {error}"
     },
     "write_rate_limited": {
-      "message": "Diese Änderung ist in {seconds} s wieder möglich. Stromänderungen, Pause und Fortsetzen haben fünf Sekunden Mindestabstand; Phasenwechsel behalten fünf Minuten Abstand."
+      "message": "Diese Änderung kann in {seconds} s erneut geschrieben werden."
     },
     "phase_state_unknown": {
       "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurden keine Phasen umgeschaltet. Prüfe die Verbindung und versuche es erneut."
+    },
+    "phase_pause_timeout": {
+      "message": "Das Fahrzeug hat die Ladepause nicht rechtzeitig bestätigt. Es wurde kein Phasenwechsel angefordert. Prüfe den Ladezustand vor einem erneuten Versuch."
+    },
+    "phase_pause_state_unknown": {
+      "message": "Die Ladepause konnte nicht bestätigt werden. Es wurde kein Phasenwechsel angefordert. Prüfe die Verbindung und den Ladezustand vor einem erneuten Versuch."
     },
     "restart_state_unknown": {
       "message": "Der aktuelle Ladezustand konnte nicht bestätigt werden. Es wurde kein Neustart ausgelöst. Prüfe die Verbindung und versuche es erneut."
@@ -457,6 +481,9 @@
     },
     "service_version_mismatch": {
       "message": "Der Modbus-Dienst erfüllt die API- oder Mindestversionsanforderungen dieser Integration nicht. Verwende eine kompatible Dienstversion gemäß den Versionshinweisen der Integration. Falls beide Komponenten ein Update benötigen, aktualisiere zuerst die App oder den separat betriebenen Dienst."
+    },
+    "control_state_unknown": {
+      "message": "Der aktuelle Zustand der Wallbox konnte nicht bestätigt werden. Es wurde kein Befehl zur Ladefreigabe, Entsperrung oder zum Phasenwechsel gesendet. Prüfe die Verbindung und versuche es erneut."
     }
   },
   "issues": {
@@ -499,13 +526,17 @@
           "control_mode": "Steuermodus",
           "current_limit": "Obergrenze des Ladestroms",
           "measurement_interval_seconds": "Messwertintervall",
-          "scan_interval_seconds": "Statusintervall"
+          "scan_interval_seconds": "Statusintervall",
+          "state_change_interval_seconds": "Mindestabstand zwischen Zustandswechseln",
+          "phase_switch_grace_seconds": "Zusätzliche Wartezeit vor Phasenwechseln"
         },
         "data_description": {
           "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
           "current_limit": "Obergrenze der Ladestrom-Entität, zusätzlich zur Begrenzung, die die Wallbox selbst erzwingt.",
           "measurement_interval_seconds": "Leistung, Spannung, Strom und Sitzungswerte: 30 Sekunden reduzieren die Datenbanklast. Statuswechsel aktualisieren sofort. Ohne Fahrzeug mindestens 60 Sekunden. Das Statusintervall bestimmt die kürzeste mögliche Abfragezeit.",
-          "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon."
+          "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon.",
+          "state_change_interval_seconds": "Mindestabstand in Sekunden zwischen Start, Pause, Freigabe-, Sperr- und Phasenwechseln (Standard 300). Zu frühe Befehle werden vorgemerkt; der neueste ersetzt den vorherigen. Der Schreibabstand von fünf Sekunden für den Ladestrom bleibt bestehen. Mit 0 entfällt die längere Wartezeit.",
+          "phase_switch_grace_seconds": "Zusätzliche Sekunden zwischen der bestätigten Ladepause des Fahrzeugs und dem Phasenwechsel (Standard 5, Bereich 0–30). Mit 0 entfällt nur diese zusätzliche Wartezeit; die Ladepause muss weiterhin bestätigt werden."
         },
         "title": "Optionen"
       },
@@ -519,7 +550,7 @@
           "current_limit": "Zusätzliche Obergrenze für von Home Assistant angeforderte Ladestromwerte. Die Obergrenze des Dienstes bleibt wirksam. Bewusst gewählte 0 A schalten die EMS-Begrenzung aus.",
           "scan_interval_seconds": "Wie oft Home Assistant den gespeicherten Status vom Dienst abruft. Modbus-Messintervall und Heartbeat-Takt werden dadurch nicht verändert."
         },
-        "description": "Die Einstellung „Nur lesen“ der App steuert auch die Schreibfreigabe in Home Assistant. Deaktiviere sie in der App, speichere und starte die App neu, um die Steuerung zu aktivieren. Die Steuer-Entitäten bleiben bei aktivem Nur-Lesen-Modus oder nicht bereitem Dienst nicht verfügbar."
+        "description": "Die Einstellung „Nur lesen“ der App steuert auch die Schreibfreigabe in Home Assistant. Deaktiviere sie in der App, speichere und starte die App neu, um die Steuerung zu aktivieren. Die Steuer-Entitäten bleiben bei aktivem Nur-Lesen-Modus oder nicht bereitem Dienst nicht verfügbar. Den Mindestabstand zwischen Zustandswechseln und die zusätzliche Wartezeit vor Phasenwechseln stellst du in der App-Konfiguration ein; der Dienst hält beide auch während eines Home-Assistant-Neustarts ein."
       }
     }
   },

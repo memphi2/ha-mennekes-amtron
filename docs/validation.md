@@ -32,6 +32,43 @@ These tests use real decoders, the shared control/poll paths and simulated
 Modbus or HTTP responses. They complement hardware tests; passing them does
 not establish that every possible device or timing fault has been covered.
 
+## State-change queue
+
+The queue's regression contract covers configurable intervals, the unchanged
+five-second current-write floor, and a shared guard for pause/resume, phase
+changes, both charging-release directions and lock/unlock. Tests must also cover
+repeated identical commands, newer requests superseding pending work, a queued
+stop replacing a pending start, and same-intent recovery while the longer
+interval is active.
+
+Phase-switch tests must prove that the pause command alone does not authorize
+the phase write: live status must first confirm the paused state. Cover delayed
+confirmation, invalid or failed reads, timeout and cancellation without a phase
+write or automatic resume. Verify the configurable grace time (default 5 seconds,
+range 0–30), the live recheck after that wait and the independence of the shared
+state-change interval. Zero grace time must not skip pause confirmation.
+Connected vehicles require EVSE state 2 and, when the layout provides it, CP
+state B1. An idle EVSE without a vehicle needs neither confirmation nor grace
+time. Test the corresponding register-layout and idle paths. The long-interval
+exception requires fresh Idle plus CP A1/A2, never cached state alone. Cover
+all command directions, failed/invalid/disagreeing reads, old layouts without
+CP, unplugging during a pending wait, replugging before execution, and the
+unchanged five-second write floors. Pending timestamps must stay stable.
+
+Use a controlled clock for delay and cancellation cases. Check that a worker
+does not hold the command lock while waiting, revalidates execution, and cannot
+send stale commands after shutdown or a newer request. Service-mode checks
+must distinguish an HA restart from a service restart: only the latter stops
+the service-owned queue. Configuration bounds and optional API 2 status fields
+need their own invalid-input checks.
+
+The two status entities must publish a stable action and due timestamp during
+timed waits. While awaiting vehicle pause confirmation, the phase action stays
+visible with no due timestamp. Confirmation sets the fixed grace-end timestamp.
+Repeated snapshots and elapsed seconds must not generate countdown state updates
+in Recorder. These software checks do not replace hardware
+acceptance of deliberate pause, resume and phase switching.
+
 ## Coverage requirements
 
 The coverage gate evaluates statements and branches together, using the
@@ -119,7 +156,7 @@ A partial report cannot pass validation.
 
 ## AppArmor enforcement
 
-App 0.5.2b1 adds a custom profile for the Supervisor app. Syntax validation and
+App 0.5.2b1 and newer include a custom profile for the Supervisor app. Syntax validation and
 runtime enforcement are separate checks. A parser run must accept the pinned
 ABI and rules without warnings; it does not prove that the service can operate
 under those rules.

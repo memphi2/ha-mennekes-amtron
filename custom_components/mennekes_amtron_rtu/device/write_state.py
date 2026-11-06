@@ -17,6 +17,8 @@ class WriteState:
     """Timing shared by replacement clients and controllers for one entry."""
 
     limiter: WriteRateLimiter = field(default_factory=WriteRateLimiter)
+    # Last actual/uncertain pause, resume, phase, release or lock transition.
+    # Deferred commands live only on their controller and never survive unload.
     mode_change_at: float | None = None
     confirmed_current: float | None = None
     charging_setpoint: float | None = None

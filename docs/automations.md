@@ -8,11 +8,13 @@ Use one control strategy at a time. A PV automation and a tariff schedule can
 otherwise undo each other's pause or current setting. Enable writes with the
 app's **Read-only** switch off in service mode, saving and restarting the app,
 or **Modbus master** in the integration options for a direct USB or LAN connection.
-Current changes and pause/resume share a **five-second minimum interval**.
-Phase changes have a separate **five-minute minimum interval**. For automatic
-pause/resume, use more than five minutes of hysteresis to avoid frequent cycles;
-the PV blueprint defaults to six minutes. Rejected pause/resume and phase
-requests are not retried automatically.
+Current writes retain a **five-second minimum interval**. For automatic
+pause/resume, use different start/stop thresholds and hold times; the PV blueprint
+defaults to six minutes. **New in 0.5.2b2:** early pause/resume, phase,
+release and lock changes are queued using the configurable state-change
+interval (default 300 seconds). A newer charging request replaces older pending
+work. A stop replaces a pending start and also waits for its due time. See
+[Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
 ## PV charging
 
@@ -75,10 +77,11 @@ mode: single
 ```
 
 A fixed time trigger is missed if Home Assistant is stopped at that time.
-It does not restore the schedule when HA starts later. A recent manual pause
-can also make the start command fail its waiting interval; inspect the
-**automation trace** if the expected action did not happen. Check the current
-state after a restart rather than assuming the schedule ran.
+It does not restore the schedule when HA starts later. In version 0.5.2b2, a recent
+pause can delay an accepted start: inspect **Pending change** and **Pending
+change due**, as well as the **automation trace**. A running service can execute an already queued
+command while HA is offline. Check the current state after a restart rather
+than assuming the schedule ran.
 
 When using `automations.yaml` directly instead of the UI editor, add this as
 one list item. Do not add a second `automation:` section to configuration.yaml.
@@ -89,6 +92,9 @@ Select **Requested phases** on the device page before automating a change.
 The integration pauses first when the wallbox reports charging and leaves it
 paused. Resume separately after the waiting interval, once the vehicle and
 wallbox are ready. The PV blueprints do not coordinate dynamic phase switching.
+In version 0.5.2b2, the phase command waits for live pause confirmation and the
+configured extra wait, then checks the state again. A failed confirmation leaves
+the phase command unsent and retains the pause.
 See [Phase switching](user-guide.md#phase-switching).
 
 ## Recovery and notifications

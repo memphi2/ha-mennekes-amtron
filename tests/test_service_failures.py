@@ -93,7 +93,9 @@ def test_service_recovery_is_bounded_and_never_lifts_a_pause(tmp_path, failure):
                     raise_connection_error()
                 )
             elif failure == "cooldown":
-                service.client.write_state.mode_change_at = clock[0]
+                service.client.write_state.limiter.record(
+                    R.CHARGING_CURRENT_EMS.key, now=clock[0]
+                )
             elif failure == "changed_error":
                 put(transport.bank, R.ERROR_CODE, 2011)
             await service._recover()

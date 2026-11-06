@@ -195,6 +195,7 @@ def test_service_uses_the_shared_command_guards(
 ):
     async def run():
         service, transport, _clock = await service_fixture(tmp_path)
+        put(transport.bank, R.CP_STATE, int(R.CpState.A1))
         try:
             await service.command(
                 {
@@ -242,6 +243,11 @@ def test_service_restart_restores_pause_and_resume_current(tmp_path):
             assert replacement.control.pause_requested is True
             clock[0] += 6
             await replacement.command({"command": "resume", "expected_serial_number": "ABC123456789"})
+            assert current_writes(transport) == [1, 1]
+            assert replacement.control.pending_action == "resume"
+            clock[0] += 300
+            replacement.control._pending_changed.set()
+            await asyncio.wait_for(replacement.control._flush_task, 1)
             assert current_writes(transport) == [1, 1, 8]
         finally:
             await replacement.stop()

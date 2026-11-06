@@ -311,6 +311,7 @@ def _device_classes_with_icon() -> dict[str, dict[str, str]]:
         BINARY_SENSOR_DESCRIPTIONS,
     )
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
+        CONTROL_SENSOR_DESCRIPTIONS,
         SENSOR_DESCRIPTIONS,
     )
 
@@ -318,7 +319,7 @@ def _device_classes_with_icon() -> dict[str, dict[str, str]]:
         platform: {} for platform in _entity_keys()
     }
     for platform, descriptions in (
-        ("sensor", SENSOR_DESCRIPTIONS),
+        ("sensor", (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS)),
         ("binary_sensor", BINARY_SENSOR_DESCRIPTIONS),
     ):
         for description in descriptions:
@@ -386,11 +387,15 @@ def _entity_keys() -> dict[str, set[str]]:
         BINARY_SENSOR_DESCRIPTIONS,
     )
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
+        CONTROL_SENSOR_DESCRIPTIONS,
         SENSOR_DESCRIPTIONS,
     )
 
     return {
-        "sensor": {description.key for description in SENSOR_DESCRIPTIONS},
+        "sensor": {
+            description.key
+            for description in (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS)
+        },
         "binary_sensor": {
             description.key for description in BINARY_SENSOR_DESCRIPTIONS
         } | {"heartbeat"},
@@ -408,6 +413,7 @@ def _enum_states() -> dict[tuple[str, str], tuple[str, ...]]:
         enum_options,
     )
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
+        CONTROL_SENSOR_DESCRIPTIONS,
         SENSOR_DESCRIPTIONS,
     )
 
@@ -420,6 +426,9 @@ def _enum_states() -> dict[tuple[str, str], tuple[str, ...]]:
             expected[("sensor", description.key)] = enum_options(
                 description.enum_class
             )
+    for control_description in CONTROL_SENSOR_DESCRIPTIONS:
+        if control_description.options is not None:
+            expected[("sensor", control_description.key)] = tuple(control_description.options)
     return expected
 
 

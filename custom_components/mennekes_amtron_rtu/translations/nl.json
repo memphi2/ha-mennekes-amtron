@@ -389,6 +389,24 @@
       },
       "voltage_l3": {
         "name": "Spanning L3"
+      },
+      "pending_change": {
+        "name": "Geplande wijziging",
+        "state": {
+          "none": "Geen wijziging gepland",
+          "pause": "Laden pauzeren",
+          "resume": "Laden hervatten",
+          "set_current": "Laadstroom instellen",
+          "single_phase": "Eén fase gebruiken",
+          "all_phases": "Alle beschikbare fasen gebruiken",
+          "enable_charging": "Laden toestaan",
+          "disable_charging": "Laadtoestemming uitschakelen",
+          "unlock": "Wallbox ontgrendelen",
+          "lock": "Wallbox vergrendelen"
+        }
+      },
+      "pending_change_until": {
+        "name": "Wijziging gepland om"
       }
     },
     "switch": {
@@ -432,10 +450,16 @@
       "message": "Schrijven naar {register} op de wallbox is mislukt: {error}"
     },
     "write_rate_limited": {
-      "message": "Deze wijziging is over {seconds} s weer mogelijk. Tussen stroomwijzigingen, pauzeren en hervatten geldt minimaal vijf seconden wachttijd; voor fasewisselingen blijft dat vijf minuten."
+      "message": "Wacht {seconds} s voordat je deze wijziging opnieuw schrijft."
     },
     "phase_state_unknown": {
       "message": "De huidige laadstatus kon niet worden bevestigd. Er zijn geen fasen gewisseld. Controleer de verbinding en probeer het opnieuw."
+    },
+    "phase_pause_timeout": {
+      "message": "Het voertuig heeft de laadpauze niet op tijd bevestigd. Er is geen opdracht voor een fasewisseling verzonden. Controleer de laadstatus voordat je het opnieuw probeert."
+    },
+    "phase_pause_state_unknown": {
+      "message": "De laadpauze kon niet worden bevestigd. Er is geen opdracht voor een fasewisseling verzonden. Controleer de verbinding en de laadstatus voordat je het opnieuw probeert."
     },
     "restart_state_unknown": {
       "message": "De huidige laadstatus kon niet worden bevestigd. Er is geen herstart aangevraagd. Controleer de verbinding en probeer het opnieuw."
@@ -457,6 +481,9 @@
     },
     "service_version_mismatch": {
       "message": "De Modbus-dienst voldoet niet aan de API-eisen of de minimale versie van deze integratie. Gebruik een compatibele dienstversie zoals beschreven in de releaseopmerkingen van de integratie. Als beide componenten een update nodig hebben, werk dan eerst de app of de afzonderlijk gehoste dienst bij."
+    },
+    "control_state_unknown": {
+      "message": "De huidige status van de wallbox kon niet worden bevestigd. Er is geen opdracht verstuurd om laden toe te staan, de wallbox te ontgrendelen of de fasen te wisselen. Controleer de verbinding en probeer het opnieuw."
     }
   },
   "issues": {
@@ -499,13 +526,17 @@
           "control_mode": "Besturingsmodus",
           "current_limit": "Maximale laadstroom",
           "measurement_interval_seconds": "Meetinterval",
-          "scan_interval_seconds": "Statusinterval"
+          "scan_interval_seconds": "Statusinterval",
+          "state_change_interval_seconds": "Minimale tijd tussen statuswijzigingen",
+          "phase_switch_grace_seconds": "Extra wachttijd vóór fasewisselingen"
         },
         "data_description": {
           "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
           "current_limit": "Bovengrens van de laadstroomentiteit, naast de limiet die de wallbox zelf handhaaft.",
           "measurement_interval_seconds": "Vermogen, spanning, stroom en sessiewaarden: 30 seconden vermindert de databasebelasting. Bij statuswijzigingen worden metingen direct vernieuwd. Zonder voertuig geldt minimaal 60 seconden. Het statusinterval bepaalt de kortst mogelijke tijd tussen uitlezingen.",
-          "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk."
+          "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk.",
+          "state_change_interval_seconds": "Minimaal aantal seconden tussen starten, pauzeren en wijzigingen van de laadtoestemming, vergrendeling of fasen (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen.",
+          "phase_switch_grace_seconds": "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist."
         },
         "title": "Opties"
       },
@@ -519,7 +550,7 @@
           "current_limit": "Extra bovengrens voor stroomwaarden die Home Assistant aanvraagt. De servicegrens blijft van toepassing. Door bewust 0 A te selecteren, schakel je de EMS-limiet uit.",
           "scan_interval_seconds": "Hoe vaak Home Assistant de servicestatus uitleest. Dit verandert noch het uitleesinterval van de Modbus-metingen, noch het heartbeatinterval."
         },
-        "description": "De instelling Alleen lezen van de app bepaalt ook of Home Assistant mag schrijven. Schakel deze in de app uit, sla de wijziging op en herstart de app om de bedieningselementen in te schakelen. Deze blijven niet beschikbaar zolang Alleen lezen is ingeschakeld of de service nog niet gereed is."
+        "description": "De instelling Alleen lezen van de app bepaalt ook of Home Assistant mag schrijven. Schakel deze in de app uit, sla de wijziging op en herstart de app om de bedieningselementen in te schakelen. Deze blijven niet beschikbaar zolang Alleen lezen is ingeschakeld of de service nog niet gereed is. Stel de minimale tijd tussen statuswijzigingen en de extra wachttijd vóór fasewisselingen in bij de appconfiguratie; de service handhaaft beide ook tijdens een herstart van Home Assistant."
       }
     }
   },

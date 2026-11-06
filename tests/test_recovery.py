@@ -658,7 +658,9 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                 )
                 await hass.async_block_till_done()
                 runtime = entry.runtime_data
-                clock = [runtime.control._monotonic() + 6]
+                # First accept the deliberate stop after the cold-start
+                # transition guard; only executed intent is persisted.
+                clock = [runtime.control._monotonic() + 301]
                 runtime.control._monotonic = runtime.client._monotonic = lambda: clock[
                     0
                 ]
@@ -753,7 +755,7 @@ def test_paused_restart_and_manual_repair_never_allow_charging(
                 assert getattr(runtime.control, intent_key) is (blocked == "pause")
 
                 # Only an explicit resume/release action permits charging.
-                clock[0] += 6
+                clock[0] += 300
                 await hass.services.async_call(
                     "switch",
                     "turn_off" if blocked == "pause" else "turn_on",

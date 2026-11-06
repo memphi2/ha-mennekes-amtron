@@ -70,7 +70,7 @@ For a standalone service, use the [LAN configuration example](service-standalone
 
 App 0.5.0 remains compatible with the integration. Its list uses the values
 `serial`, `rtu_over_tcp` and `modbus_tcp`. App 0.5.1 shows those values alongside
-the readable choices. App 0.5.2b1 removes the duplicates; before updating from
+the readable choices. App 0.5.2b1 and newer keep only the readable choices; before updating from
 0.5.1, select the matching readable choice once. See
 [Updating the connection choice](upgrading.md#app-connection-choice).
 
@@ -115,6 +115,8 @@ HA-to-service API; it does not protect the gateway's Modbus port.
 Only one controller may use the wallbox bus. Multiple TCP clients or a gateway
 with other masters behind it do not make simultaneous control safe. Read-only
 also sends requests. See [Safety](safety.md#modbus-rtu-uses-a-single-master).
+
+### Troubleshooting
 
 | Symptom | Check |
 |---|---|

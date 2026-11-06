@@ -29,11 +29,63 @@ It does not show the current flowing to the vehicle. Check **Charging paused**,
 **Signaled current** and **Total power** to see what is happening. An automation
 can change a manual setting later; disable it if you want that setting to stay.
 
-Commands that change the current or pause state have a **five-second minimum
-interval**. A new current request may wait until that interval ends; only the
-latest accepted request is applied. A pause/resume request made too soon is
-rejected with a remaining wait time. Try again after that time. For automations,
-avoid frequent pause/resume cycles; the PV blueprint defaults to six minutes.
+Current writes have a **five-second minimum interval**. During charging, a new
+current request may wait until that interval ends; the latest request wins.
+A separate configurable wait applies before starting or changing the charging
+state, described below.
+
+## Waiting between charging changes
+
+**Minimum time between state changes** defaults to **300 seconds**. Enter a
+whole number from **0 to 3600 seconds**. With a direct USB or LAN connection,
+change it in the integration options. With the Modbus service, change it in
+the app configuration or standalone `state_change_interval_seconds` setting,
+then restart the service. HA does not apply a second interval on top of it.
+
+An early pause, resume, phase change, charging-release change or wallbox lock
+change is **queued** and runs when the applicable interval has elapsed.
+Changing the current while paused can also queue a resume. The latest charging
+request replaces an older pending request. Repeating the same requested state
+does not extend the wait.
+
+With **no vehicle connected**, the longer wait is skipped when fresh wallbox
+readings agree: EVSE is Idle and CP is A1 or A2. Unplugging during a queued
+wait is checked every five seconds, so the request can run earlier than the
+displayed due time. The five-second register-write guards and heartbeat remain.
+Unknown, inconsistent or unreadable status keeps the longer wait; older register
+layouts without CP status also keep it.
+
+**Pending change** shows what is waiting, and **Pending change due** shows
+the planned execution time when known. While a phase change waits for the
+vehicle to confirm its pause, the action stays visible but its due time is
+unknown. Once confirmed, the due time shows the end of the extra wait. Home
+Assistant can display a known timestamp relative to the current time. That
+timestamp stays fixed during a timed wait, so a countdown does not create a
+database update every second. Pause, release, lock and phase
+controls continue to show the wallbox's actual state. While paused, the current
+slider shows the remembered resume target, which can already reflect the queued
+request; it does not indicate that charging has started.
+
+Pausing, disabling charging release or locking the wallbox replaces a pending
+start with that new request. **These commands also wait for the interval:**
+charging may continue until the displayed due time. A pause within five seconds
+of the previous current write is also queued, so it does not need to be sent
+again. Error recovery can reassert the existing state and the heartbeat
+continues throughout the wait.
+Setting the interval to **0** disables the longer wait, while the technical
+write guards remain.
+
+MENNEKES recommends **more than five minutes** between charging transitions.
+The configurable default is 300 seconds; choose **360 seconds**, for example,
+to exceed that recommendation's five-minute threshold. Keep separate PV start
+and stop thresholds and hold times too: the interval alone does not decide
+whether enough surplus is available.
+
+A pending command is cancelled if its owner restarts: an integration reload or
+HA Core restart in direct mode, or an app/service restart in service mode.
+An HA Core restart alone leaves a running service's pending command active;
+it can therefore execute while HA is offline. After a cold start, a fresh
+guard period protects transitions whose previous timing is unknown.
 
 ## Where do I enable controls?
 
@@ -79,6 +131,8 @@ the exact state values available to templates.
 | Status and measurement polling | Integration options | App configuration |
 | How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
 | Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
+| Minimum time between state changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
+| Extra wait before phase changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 
 The default status interval is **5 seconds** and the measurement interval is
 **30 seconds**. The available range is 2–300 seconds. In service mode, changing
@@ -142,8 +196,21 @@ your vehicle's support before using it. Switching during charging pauses first
 and **does not resume automatically**. Resume explicitly after the waiting
 interval and check the result; some vehicles abort the session.
 
-Phase changes have a five-minute minimum interval. After the controlling
-process starts, the same interval applies before the first phase change.
+Phase changes share
+the [configurable state-change interval](#waiting-between-charging-changes)
+and an early request is queued. Wait until the phase request has actually run
+before requesting resume; a new resume request would replace a queued phase
+request. Before changing phases, version 0.5.2b2 waits up to **30 seconds** for
+live confirmation that the vehicle has paused. It then waits an additional
+**5 seconds** by default and checks the state again before sending the phase
+command. Configure **Extra wait before phase changes** from **0 to 30 seconds** in
+the integration options for direct connections, or in the app/service for
+service connections. Zero removes only the extra grace time, not pause
+confirmation or the separate 300-second state-change interval. If confirmation
+fails or times out, the phase command is not sent and the requested pause
+remains in place. With no vehicle connected and the wallbox idle, there is no
+vehicle pause to confirm or extra wait. Fresh Idle and CP A1/A2 readings also
+skip the longer state-change interval; register-write guards still apply.
 See [phase-switching troubleshooting](troubleshooting.md#phase-switching-leaves-charging-paused).
 
 ## Actions

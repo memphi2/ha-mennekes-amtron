@@ -39,9 +39,11 @@ from .device.const import (
     CONF_HOST,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_PARITY,
+    CONF_PHASE_SWITCH_GRACE_SECONDS,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SERIAL_NUMBER,
+    CONF_STATE_CHANGE_INTERVAL_SECONDS,
     CONF_STOPBITS,
     CONF_TCP_PORT,
     CONNECTION_SERIAL,
@@ -51,11 +53,14 @@ from .device.const import (
     DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
     DEFAULT_NAME,
     DEFAULT_PARITY,
+    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
+    DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
     DEFAULT_STOPBITS,
     DEFAULT_TCP_PORT,
     DOMAIN,
 )
+from .device.errors import device_error
 from .device.heartbeat import HeartbeatTask
 from .device.identity import async_read_identity
 from .device.write_state import WriteState
@@ -184,6 +189,10 @@ async def async_setup_entry(
             request_refresh=coordinator.async_refresh,
         )
     else:
+        def validate_deferred() -> None:
+            if not coordinator.last_update_success:
+                raise device_error("control_state_unknown")
+
         control = AmtronControl(
             client,
             diagnostics=diagnostics,
@@ -192,7 +201,9 @@ async def async_setup_entry(
             state=coordinator.current_data,
             request_refresh=coordinator.async_request_refresh,
             notify_write_error=lambda: async_check_repairs(hass, entry),
+            validate_deferred=validate_deferred,
         )
+        coordinator.control_status = lambda: (control.pending_action, control.pending_until)
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -369,6 +380,12 @@ def _control_options(entry: MennekesAmtronConfigEntry) -> ControlOptions:
     return ControlOptions(
         read_only=CONF_SERVER_URL not in entry.data and not control_mode_is_master(options),
         current_cap=float(cap) if isinstance(cap, (int, float)) else None,
+        state_change_interval_seconds=float(options.get(
+            CONF_STATE_CHANGE_INTERVAL_SECONDS, DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
+        )),
+        phase_switch_grace_seconds=float(options.get(
+            CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS
+        )),
     )
 
 

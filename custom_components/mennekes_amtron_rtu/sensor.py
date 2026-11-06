@@ -10,9 +10,10 @@ database row every few seconds.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
@@ -23,6 +24,7 @@ from .device.registers import REGISTERS_BY_KEY
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .sensor_descriptions import (
+    CONTROL_SENSOR_DESCRIPTIONS,
     SENSOR_DESCRIPTIONS,
     AmtronSensorEntityDescription,
 )
@@ -55,7 +57,35 @@ async def async_setup_entry(
             entities.append(
                 AmtronSensor(entry, runtime_data.coordinator, description)
             )
+    entities.extend(
+        AmtronPendingChangeSensor(entry, runtime_data.coordinator, description)
+        for description in CONTROL_SENSOR_DESCRIPTIONS
+    )
     async_add_entities(entities)
+
+
+class AmtronPendingChangeSensor(MennekesAmtronEntity, SensorEntity):
+    """Expose a stable queued intent and deadline, never a ticking DB counter."""
+
+    def __init__(
+        self,
+        entry: MennekesAmtronConfigEntry,
+        coordinator: Any,
+        description: SensorEntityDescription,
+    ) -> None:
+        super().__init__(entry, coordinator, description.key)
+        self.entity_description = description
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+
+    @property
+    def native_value(self) -> str | datetime | None:
+        control = self.runtime_data.control
+        if self.entity_description.key == "pending_change":
+            return control.pending_action or "none"
+        return control.pending_until
 
 
 class AmtronSensor(MennekesAmtronEntity, SensorEntity):

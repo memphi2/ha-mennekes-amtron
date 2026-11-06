@@ -66,7 +66,7 @@ def test_newer_uncertain_current_is_persisted_before_restart(tmp_path, outcome):
             await restored.command({
                 "command": "pause", "expected_serial_number": restored.identity.serial_number,
             })
-            new_clock[0] += 6
+            new_clock[0] += 300
             await restored.command({
                 "command": "resume", "expected_serial_number": restored.identity.serial_number,
             })

@@ -4,14 +4,14 @@ Keep the wallbox heartbeat running through Home Assistant Core restarts.
 This optional app is the preferred way to operate the integration: it holds
 the last charging state, including a deliberate pause, while HA is offline.
 
-**Beta 0.5.2b1 · amd64 and aarch64 · separate integration required**
+**Beta 0.5.2b2 · amd64 and aarch64 · separate integration required**
 
 This prerelease is available through `#apps-beta`. The stable `#apps` catalog
-stays on **0.5.1**. See [Beta testing](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/installation.md#beta-testing-052b1)
+stays on **0.5.1**. See [Beta testing](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b2/docs/installation.md#beta-testing-052b2)
 to select the matching integration prerelease and prepare an app update.
 
 LAN-to-RS-485 adapters are supported without local USB.
-See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/network-gateway.md)
+See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b2/docs/network-gateway.md)
 for transparent RTU over TCP versus translating Modbus TCP-to-RTU gateways.
 
 [First setup](#first-setup) · [Daily use](#daily-use) ·
@@ -20,8 +20,8 @@ for transparent RTU over TCP versus translating Modbus TCP-to-RTU gateways.
 ## First setup
 
 For a new setup, install the **Mennekes Amtron RTU integration** and restart Home
-Assistant Core. For beta testing, select **0.5.2b1** in the Marketplace or HACS
-using the [beta guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/installation.md#beta-testing-052b1).
+Assistant Core. For beta testing, select **0.5.2b2** in the Marketplace or HACS
+using the [beta guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b2/docs/installation.md#beta-testing-052b2).
 The integration and this app are
 separate installations. Already using the app? Follow [Updates](#updates)
 instead: the app and integration can be updated independently.
@@ -59,12 +59,27 @@ instead: the app and integration can be updated independently.
 | Current cap | Default **6 A**; set within your installation's permitted current. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. |
 
+**New in 0.5.2b2:** **Minimum time between state changes** defaults to
+**300 seconds**, with a range of **0–3600 seconds**. Zero disables the longer wait; the technical write guards
+remain. Save changes and restart this app. HA does not apply a second interval.
+
+Version 0.5.2b2 also adds **Extra wait before phase changes**, default **5 seconds** and
+configurable from **0 to 30 seconds**. After the vehicle confirms a pause, the
+app waits this extra time and checks the state again before changing phases.
+Zero skips only the extra delay; pause confirmation and the state-change
+interval still apply.
+
+With no vehicle connected, fresh EVSE Idle and CP A1/A2 readings skip the long
+state-change wait and vehicle grace time. Pending waits check for unplugging
+every five seconds. Unknown or inconsistent status retains the wait;
+five-second register-write guards and heartbeat remain active.
+
 **Adapter host / IP** is always visible; enter it for LAN and
 leave it empty for USB. If **Serial adapter** is hidden, enable **Show unused
 optional configuration options** on the Configuration tab. The form does not
 show or hide other fields when you change the connection choice.
 
-App **0.5.2b1** shows exactly three connection choices. If an older app still has
+App **0.5.2b2** shows exactly three connection choices. If an older app still has
 a technical name saved, select its matching readable choice once:
 `serial` → **USB / RS-485**, `rtu_over_tcp` → **LAN: Modbus RTU (TCP)**,
 `modbus_tcp` → **LAN: Modbus TCP**. App 0.5.1 already lets you save this choice
@@ -96,8 +111,33 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
 - **Heartbeat status:** check HA's **Heartbeat** diagnostic sensor. It records
   health changes rather than every beat.
 
+In version 0.5.2b2, early pause/resume, phase, release and lock changes are queued.
+HA's **Pending change** and **Pending change due** show the request and its
+scheduled time. The latest charging request replaces the old one. **A stop
+request also waits**, replacing any pending start. A pause within the five-second
+current-write interval is queued too and does not need to be requested again.
+A fixed due timestamp supplies the remaining-time display during timed waits,
+without database updates every second. While a phase change waits for vehicle
+pause confirmation, its action stays visible but the due time is unknown. Once
+confirmed, the timestamp shows the end of the extra wait.
+Pause/release/lock/phase readback still shows the
+actual wallbox state; the slider while paused shows the remembered resume
+target, which may already reflect a queued request. Heartbeat and recovery that
+preserves the existing intent keep running during a wait.
+
+Before changing phases, version 0.5.2b2 waits up to 30 seconds for live confirmation
+that the vehicle has paused, followed by the configured grace time. If the
+confirmation or the final state check fails, the phase command is not sent and
+the requested pause remains in place. Resume separately after a successful
+phase change.
+An idle wallbox without a connected vehicle does not need pause confirmation or
+the extra wait; the shared state-change interval still applies.
+
 HA can remain offline indefinitely while the app holds the last charging state.
-Automations cannot produce new settings during that outage. **App, host, power
+Automations cannot produce new settings during that outage. In version 0.5.2b2,
+the running app can still execute a command that was queued before HA stopped.
+Restarting the app itself cancels pending commands, while retaining accepted
+charging intent. **App, host, power
 or USB/LAN/gateway failures still interrupt the heartbeat** and use the wallbox's configured
 fallback. Switching the app to read-only also stops the heartbeat.
 
@@ -120,7 +160,7 @@ components need updating, update the app first**, wait for initialization, then
 update the integration and restart Core. **Updating the app itself briefly
 interrupts the heartbeat.** Keep its data and the existing HA entry.
 
-**From a 0.5.0 beta:** update this app to **0.5.2b1 first**, then the
+**From a 0.5.0 beta:** update this app to **0.5.2b2 first**, then the
 integration. The old beta integration may show unavailable controls between
 updates because its API differs. Keep the existing beta app and its data; no
 reinstall is needed. If an older technical connection choice is rejected,
@@ -128,7 +168,7 @@ select its matching readable name as described above before starting the app.
 The token, saved charging state and USB settings are retained; switching to LAN
 is optional.
 
-The beta repository ends in `#apps-beta` and offers **0.5.2b1**;
+The beta repository ends in `#apps-beta` and offers **0.5.2b2**;
 the stable-only repository uses `#apps` and stays on **0.5.1**. Switching catalogs is optional and
 creates a different app in Supervisor. For that change, back up the data, note
 the charging settings and disconnect the vehicle. Copy the options, set the new
@@ -139,7 +179,7 @@ settings as in the first setup before reconnecting the vehicle.
 
 ## AppArmor protection
 
-**Included in 0.5.2b1:** stable 0.5.1 does not contain this custom profile.
+**Included in 0.5.2b2:** stable 0.5.1 does not contain this custom profile.
 Supervisor loads it automatically when installing this beta app.
 Keep **Protection mode on**. The profile allows USB/LAN communication, heartbeat
 and the service's own token and saved charging state; app options remain
@@ -161,7 +201,7 @@ uses HA's own security policy and does not automatically use this service profil
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
 | Not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
-| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/troubleshooting.md#renew-service-access). |
+| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b2/docs/troubleshooting.md#renew-service-access). |
 | Service API or minimum version is incompatible | Check the API and minimum service version required in the integration’s release notes. Version numbers do not need to match. Follow [Updates](#updates) if needed; changing the token does not fix this. |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
@@ -176,4 +216,4 @@ Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Error-200 recovery while paused and particular LAN gateways still need
 confirmation on the actual hardware; automated tests do not establish that.
 
-[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b1/docs/modbus-service.md)
+[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b2/docs/modbus-service.md)

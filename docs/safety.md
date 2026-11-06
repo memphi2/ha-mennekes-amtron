@@ -97,17 +97,30 @@ the integration's extra current cap, while hardware limits remain in force.
   interval has passed.
 - MENNEKES **recommends more than 5 minutes** between pauses, resumes and phase
   switches to avoid excessive cycling. Use hysteresis in automations; the
-  bundled PV pause/resume blueprint defaults to six minutes. Manual pause and
-  resume use the five-second current-write floor. Phase switching retains a
-  separate five-minute guard. Timing guards survive an entry
-  reload in memory, without Recorder writes. The remembered current before a
-  pause also survives reloads; resuming still respects a newly lowered current
-  cap. In direct mode, after a full Home Assistant
-  restart (or the first setup), the previous timing is unknown: current
-  writes and pause/resume wait five seconds, and phase changes wait five
-  minutes from setup. The independent service keeps these guards through an
-  HA restart; they reset only when the service itself restarts. Reading and
-  the heartbeat remain available.
+  bundled PV pause/resume blueprint defaults to six minutes. This recommendation
+  concerns charging behavior; it is not a Modbus protocol lockout.
+- **New in 0.5.2b2:** one shared state-change interval defaults to
+  **300 seconds** and can be set from 0 to 3600 seconds. Choose 360 seconds if
+  you want to exceed the manufacturer's five-minute threshold. An early
+  pause, resume, phase change, release change or lock change waits in a single
+  pending slot; a newer charging request replaces the older one. Stop requests
+  also wait, so charging can continue until their due time. Current writes
+  still observe their five-second floor, including a pause requested just after
+  another current write. An early pause is queued and does not need to be
+  requested again. Zero disables the longer interval, not these technical
+  write guards. Fresh, consistent EVSE Idle and CP A1/A2 readings bypass the
+  longer interval when no vehicle is connected. Failed reads, inconsistent
+  status or layouts without CP keep the interval. Register-write guards and
+  heartbeat remain active; pending waits check for unplugging every five seconds.
+- Repeating the same state and recovery that preserves existing intent do not
+  restart the long timer. Timing guards survive an entry reload in memory.
+  A cold process start uses a fresh guard period because prior timing is
+  unknown. The independent service keeps its timer and queue through an HA
+  restart. Restarting the actual bus owner cancels pending commands; it does
+  not replay a pending start afterward. Reading and heartbeat remain available.
+
+See
+[Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
 ## Phase switching can abort a charge
 
@@ -123,6 +136,14 @@ option 2. Even there:
 - some vehicles need the charging current set to the pause value **before**
   the phase count changes. The integration does that automatically while the
   wallbox is charging;
+- **Since 0.5.2b2:** after requesting a pause, the integration waits
+  up to 30 seconds for live confirmation that charging has paused. A separate
+  grace time then defaults to 5 seconds and is configurable from 0 to 30
+  seconds. The state is checked again before sending the phase command. A
+  failed confirmation or timeout leaves the phase request unsent and retains
+  the pause. Zero grace time does not disable confirmation or the shared
+  state-change interval. An idle wallbox with no vehicle does not need pause
+  confirmation or the extra wait;
 - the integration leaves charging paused after this sequence. Resume
   explicitly after the waiting interval;
 - not every vehicle tolerates phase switching at all. Check your vehicle's
@@ -138,10 +159,12 @@ to the remembered limit. Manual recovery follows the same rules and cannot
 resume charging. At most three automatic attempts are made while the fault
 persists; clearing a repair requires a confirmed error-free state.
 
-Recovery checks known current-write and pause/resume cooldowns before sending
-its heartbeat/release/current sequence. A cooldown rejection therefore does
-not change the charging release. A transport failure during the sequence can
-still leave a partial operation; it is reported as a failed recovery.
+Recovery checks the current-write guard before sending its
+heartbeat/release/current sequence. In version 0.5.2b2, reasserting the same
+charging intent is exempt from the longer state-change interval; it must not
+turn a heartbeat fault into a five-minute recovery lockout. Recovery does not
+authorize a queued start to run early. A transport failure during the sequence
+can still leave a partial operation; it is reported as a failed recovery.
 
 ## Restart
 

@@ -114,9 +114,15 @@ class ModbusService:
             self.client,
             diagnostics=self.diagnostics,
             identity=identity,
-            options=ControlOptions(self.config.read_only, self.config.current_cap),
+            options=ControlOptions(
+                self.config.read_only,
+                self.config.current_cap,
+                state_change_interval_seconds=self.config.state_change_interval_seconds,
+                phase_switch_grace_seconds=self.config.phase_switch_grace_seconds,
+            ),
             state=lambda: self.data,
-            request_refresh=self.refresh,
+            request_refresh=self._control_updated,
+            validate_deferred=self._validate_deferred,
         )
         await self.refresh()
         # With no saved resume limit, a migrated pause must not default to the
@@ -262,6 +268,18 @@ class ModbusService:
                     await saving
                     raise
 
+    async def _control_updated(self) -> None:
+        """Publish queue changes and persist commands executed by the worker."""
+        # A command may already have reached the wallbox. Save its intent
+        # before a poll can fail or be cancelled during a connection outage.
+        await self._persist()
+        await self.refresh()
+
+    def _validate_deferred(self) -> None:
+        """A queued command needs the same fresh connection as an API request."""
+        if self._stopping or not self._is_available():
+            raise DeviceError("service_unavailable")
+
     def _is_available(self) -> bool:
         """Share the freshness boundary for state publication and command admission."""
         return (
@@ -285,6 +303,13 @@ class ModbusService:
             "control": {
                 "read_only": self.config.read_only,
                 "current_cap": self.config.current_cap,
+                "state_change_interval_seconds": self.config.state_change_interval_seconds,
+                "phase_switch_grace_seconds": self.config.phase_switch_grace_seconds,
+                "pending_action": control.pending_action if control else None,
+                "pending_until": (
+                    control.pending_until.isoformat()
+                    if control and control.pending_until is not None else None
+                ),
                 "max_charging_current": control.max_charging_current if control else 6,
                 "charging_setpoint": control.charging_setpoint if control else None,
                 "pause_requested": control.pause_requested if control else None,

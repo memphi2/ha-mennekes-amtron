@@ -48,7 +48,7 @@ distinguish a waiting interval from a device problem:
 
 | Message or symptom | Next step |
 |---|---|
-| A remaining wait time is shown | Wait that long, then retry. Pause/resume commands are not queued. |
+| A remaining wait time is shown | Early changes are queued and shown in **Pending change** and **Pending change due**. |
 | Service unavailable | Check the app log and its USB/LAN connection. HA reconnecting does not replay old commands. |
 | Device rejected a write | Check satellite configuration, supported hardware/registers, device state and whether another master is using the bus. |
 | Restart refused | The wallbox must report **idle** before its **Restart** button can be used. |
@@ -235,12 +235,15 @@ firmware-specific limitation.
 | The slider is at 0 A, but charging continues | **0 A removes the limit.** Turn **Charging paused** on to stop. |
 | The slider will not accept 1–5 A | Use 0 A for no limit or at least 6 A for a limit. Pause has its own switch. |
 | A new current is delayed | Current writes have a five-second minimum interval. The latest accepted request is applied after that interval. |
-| Pause/resume is refused just after startup | The process controlling the bus waits five seconds before its first current/pause command. The error reports the remaining wait. An HA Core restart does not reset a running service's timing. |
+| Pause/resume is refused just after startup | Early pause and resume requests are queued for the configurable state-change interval and five-second write floor. An HA Core restart does not reset a running service's timing. |
 | The slider maximum is lower than expected | Check the device maximum and HA current cap. In service mode, the app's current cap also applies. |
 | Offered current is lower than the slider setting | Installation limits and an active downgrade can lower **Signaled current**. The vehicle can draw less again. |
-| A current change is refused while paused | Setting a current can resume charging and must respect the pause/resume waiting interval. |
+| A current change waits while paused | Setting a current can resume charging. Inspect **Pending change** and **Pending change due** for a queued resume. |
+| Charging continues after requesting pause | The pause shares the state-change interval and the five-second current-write floor. Check **Pending change** and **Pending change due**: the pause replaces an older pending start and runs when permitted. Release-off and lock-on also wait; switching controls does not bypass the interval. |
 | The slider still shows a value during a pause | It shows the remembered resume setting. Check **Charging paused**, **Signaled current** and **Total power** for actual charging. |
 | A manual pause is undone later | Check automations that write the current or pause switch. Disable the PV pause/resume automation if the manual pause should remain. |
+| A pending change disappears after restart | A restart of the bus owner cancels queued commands. Request the action again if still wanted. HA Core restarting alone does not cancel a running service's queue. |
+| A pending change disappears without changing the wallbox | A newer charging command or stop can replace/cancel it. If no new command was sent, inspect connectivity, write permission and the integration/app log for an execution failure. |
 
 ## PV automation stopped after an update
 
@@ -257,10 +260,23 @@ timers.
 ## Phase switching leaves charging paused
 
 This is expected when switching during charging. Resume explicitly after the
-waiting interval. Phase changes require five minutes between requests, including
-an initial wait after the controlling process starts. Check your vehicle's
-support: some vehicles abort the session after a phase change. The selector
+phase change has actually run. The integration uses the configurable state-change interval and queues early
+requests. Check **Pending change** before requesting resume: a new resume
+request replaces a phase change that is still waiting. Check your vehicle's
+support; some vehicles abort the session after a phase change. The selector
 exists only on capable wallbox hardware.
+
+In version 0.5.2b2, the phase command is sent only after live status confirms
+that the vehicle has paused. If confirmation fails or times out, the requested
+pause remains and no phase command is sent. Check the wallbox connection and
+vehicle state before trying again; a pause command being accepted does not by
+itself confirm that the vehicle has stopped charging.
+
+While waiting for that confirmation, **Pending change** still shows the requested
+phase action but **Pending change due** is unknown. This is expected: the vehicle
+determines when confirmation arrives. Once confirmed, the due time shows the end
+of the configured extra wait. An idle wallbox with no vehicle skips confirmation
+and that extra wait.
 
 ## The database keeps growing
 

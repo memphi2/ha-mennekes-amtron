@@ -203,6 +203,7 @@ def test_large_or_streamed_replies_are_bounded():
 def test_every_remote_action_uses_the_shared_service(tmp_path, method, value):
     async def run():
         service, transport, _clock = await service_fixture(tmp_path)
+        transport.bank[R.CP_STATE.address] = int(R.CpState.A1)
         try:
             async with (
                 TestServer(create_app(service)) as server,
@@ -251,7 +252,7 @@ def test_remote_resume_respects_the_local_current_cap(tmp_path, cap, unknown_tar
                     request_refresh=remote.update,
                 )
                 await control.async_pause_charging()
-                clock[0] += 6
+                clock[0] += 300
                 if unknown_target:
                     service.control.charging_setpoint = None
                     await remote.update()
@@ -316,7 +317,7 @@ def test_remote_resume_uses_fresh_service_intent_with_the_ha_cap(
                 })
                 clock[0] += 6
                 await service.command({"command": "pause", "expected_serial_number": "ABC123456789"})
-                clock[0] += 6
+                clock[0] += 300
                 assert control.charging_setpoint == cached
                 await control.async_resume_charging()
                 assert current_writes(transport) == [fresh, 1, expected]

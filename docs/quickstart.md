@@ -102,8 +102,10 @@ any repair messages and check the **Heartbeat** sensor before charging.
    any required authorization. The wallbox must be unlocked and charging released.
 2. Check **Charging**, **Signaled current** and **Total power**, then raise the
    limit as appropriate. The vehicle also determines whether and how much it draws.
-3. Test **Charging paused**: on pauses; off resumes. Allow at least five seconds
-   between manual pause and resume. **0 A removes the current limit; it does not
+3. Test **Charging paused**: on requests pause; off requests resume.
+   Early pause and resume requests are queued for the configured interval
+   (default 300 seconds);
+   check **Pending change** and **Pending change due**. **0 A removes the current limit; it does not
    stop charging.**
 
 Continue with the [user guide](user-guide.md) for everyday controls,

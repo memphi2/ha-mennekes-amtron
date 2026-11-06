@@ -19,7 +19,7 @@ are unchanged. It sends no HA commands or restored values to the service.
 Direct USB and LAN entries retain their separate HA control-mode option.
 
 For standalone configuration, `connection_type` selects `serial` (the default),
-`rtu_over_tcp` or `modbus_tcp`. App 0.5.2b1 offers exactly **USB / RS-485** (default),
+`rtu_over_tcp` or `modbus_tcp`. App 0.5.2b2 offers exactly **USB / RS-485** (default),
 **LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP**. The service normalizes these
 names to the same three protocols. Standalone JSON keeps accepting the technical
 names. Saved app choices using those names need a one-time
@@ -49,6 +49,45 @@ and invalid payload types are rejected. Service and HA current caps still
 constrain limited-current commands. On resume, the service applies HA's cap to its
 latest saved setpoint while holding the current-write lock; a deliberately
 unlimited setpoint stays unlimited.
+
+### State-change interval
+
+`state_change_interval_seconds` accepts whole seconds from 0 to 3600 and defaults
+to 300. The app and standalone service use the same setting; HA's service-mode
+options do not impose another timer. Zero disables the long transition guard,
+while the five-second current-write floor remains. Ordinary current adjustment
+during charging uses that short floor. Pause/resume, phase changes, both
+charging-release directions and lock/unlock use the shared state-change interval.
+
+The service keeps one pending charging request. A newer request supersedes it;
+pause, release-off and lock-on replace pending starts and also wait for the
+long interval when necessary. A pause that hits the five-second current-write
+floor is queued too; the caller does not need to repeat it. Repeating the
+same state does not extend the deadline. Recovery
+that reasserts existing intent and the independent heartbeat do not wait for
+this interval. A compound pause-before-phase command waits for live confirmation
+of the paused state for up to 30 seconds before sending the phase command.
+With a connected vehicle, layout v01.02 and newer require EVSE state 2 and CP
+state B1; layout v01.01 uses EVSE state 2 because CP state is unavailable.
+`phase_switch_grace_seconds` adds a separate wait after confirmation: whole
+seconds from 0 to 30, default 5. Status is rechecked after that wait. Zero removes
+only the extra grace time; confirmation and the state-change interval remain.
+A failed confirmation or timeout leaves the phase command unsent and retains
+the pause. A successful phase change still leaves charging paused; it does not
+automatically resume. Confirmation and grace waits run in the background queue,
+so an HTTP command does not wait for the full sequence. During confirmation,
+the phase action remains pending with a `null` due timestamp; after confirmation,
+the timestamp gives the end of the grace period. An idle wallbox with no vehicle
+does not need pause confirmation or grace time. Fresh EVSE Idle and CP A1/A2
+readings also skip the state-change interval. Missing CP support, unreadable or
+inconsistent readings retain the interval. Pending waits check for unplugging
+every five seconds without updating the due timestamp. Register-write guards
+and heartbeat remain active.
+
+The queue belongs to the running service, so it can execute while HA is offline.
+Restarting the service cancels pending work and begins a conservative guard
+period. Neither HA reconnect nor saved intent replays a cancelled queued start.
+See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
 ## Supervisor discovery and distribution
 
@@ -133,6 +172,12 @@ sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
 use the [Recorder guide](recorder.md) to control that traffic.
 
+In version 0.5.2b2, the pending action and its UTC due time, when known, are kept in
+memory. These fields change on scheduling, replacement or completion, not on
+every second of the wait. The frontend can display the due time relatively;
+the database does not need a changing countdown value. Pending work is not
+added to `intent.json` and is cancelled on service restart.
+
 ## Commands and API boundary
 
 Service **0.5.0 introduced API 2**. Snapshots report `api_version: 2`, and
@@ -147,6 +192,23 @@ baseline; an omitted version will no longer satisfy a future higher minimum.
 An unsupported API or a service below the minimum produces the compatibility
 error. A malformed version or snapshot produces the data-validation error.
 Neither condition asks for new credentials. See [Updates](modbus-service.md#updates).
+
+Version 0.5.2b2 adds these fields to the snapshot's `control` object:
+
+| Field | Meaning |
+|---|---|
+| `state_change_interval_seconds` | The service's configured interval, default 300 seconds |
+| `phase_switch_grace_seconds` | Extra wait after confirmed pause before switching phases, default 5 seconds |
+| `pending_action` | The queued action, or `null` when nothing is pending |
+| `pending_until` | Fixed timezone-aware UTC timestamp for a timed wait; `null` with no pending action or while a phase change awaits vehicle pause confirmation |
+
+No pending action means no due timestamp. An ordinary pending action has a due
+timestamp; `single_phase` and `all_phases` may instead have `null` while waiting
+for vehicle pause confirmation. Once confirmed, a fixed timestamp identifies
+the end of the grace period. These additions are optional for older API 2
+services. Their absence does not enable the new queue in that service; its
+existing control behavior remains. HA derives the two pending-change sensors
+from the service data rather than maintaining a second queue.
 
 | Endpoint | Purpose |
 |---|---|
@@ -176,7 +238,7 @@ cannot independently verify the physical wallbox. Clients with a known serial
 number must retain that binding instead of accepting a newly observed device.
 
 The released 0.5.1 service compares the identity read during initialization.
-The 0.5.2b1 driver additionally verifies a known serial over Modbus after a
+The 0.5.2b2 driver additionally verifies a known serial over Modbus after a
 reconnection and before control writes. This also detects a changed wallbox
 behind a gateway whose TCP connection stayed open. A missing or different
 serial blocks the write without changing saved intent; the service reports
@@ -188,14 +250,17 @@ Stop the bus owner before deliberately changing a gateway route or connected
 wallbox. Modbus serial numbers are not cryptographic authentication, and a
 physical routing change is not an authenticated identity change notification.
 
-The service enforces the same current-write floor, phase-switch guards, device
-limits and bounded error-200 recovery as direct mode. All clients share one
+The service enforces the same current-write floor, charging transition guards,
+device limits and bounded error-200 recovery as direct mode. All clients share one
 serialized command path. A command is rejected if the latest wallbox snapshot
 is unavailable or older than the greater of 30 seconds and three status-poll
 intervals. This is checked after waiting for the command lock; a queued request
 cannot use readiness that expired while it waited. Rejected commands are not
 replayed later, and this check does not stop the heartbeat or change saved pause
-intent. Failed or timed-out commands are not automatically
+intent. In version 0.5.2b2, an accepted command can instead be queued for its
+state-change deadline; execution rechecks its prerequisites, and an execution
+failure clears pending work rather than retrying an uncertain write indefinitely.
+Failed or timed-out commands are not automatically
 replayed by HA because a write may already have reached the wallbox. Persistent
 recovery failures remain visible. Recovery while deliberately paused still needs
 confirmation on the actual wallbox firmware.

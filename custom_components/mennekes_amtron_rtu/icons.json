@@ -65,6 +65,9 @@
       "phase_rotation": {
         "default": "mdi:rotate-right"
       },
+      "pending_change": {
+        "default": "mdi:timer-sand"
+      },
       "phase_switching_mode": {
         "default": "mdi:swap-horizontal"
       },

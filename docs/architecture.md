@@ -51,7 +51,7 @@ host, TCP port and device address; serial baud/frame are configured on the
 gateway. HA-to-service HTTP remains a separate connection. See
 [LAN setup](network-gateway.md) and the [security boundary](../SECURITY.md#threat-model).
 
-The 0.5.2b1 driver binds a readable serial number to the client. Reconnection
+The 0.5.2b2 driver binds a readable serial number to the client. Reconnection
 invalidates that verification; the next transaction checks it again under the
 bus lock. Control writes also read the serial to catch a downstream gateway
 change without a TCP disconnect. A mismatch blocks writes and preserves saved
@@ -208,16 +208,45 @@ of them are dangerous. Centralising it means the minimum current, the
 `allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics
 counters are written once and cannot be forgotten by a new platform.
 
-Current commands retain the newest pending value when requested inside the
-five-second register interval. Pause/resume commands are instead rejected
-with the short remaining wait, so an old deferred setpoint cannot silently
-undo a later pause. The manufacturer recommends longer anti-cycling hysteresis;
-that belongs in automation policy, and the bundled PV blueprint defaults to
-six minutes. Manual pause/resume no longer has a five-minute lockout.
+**New in 0.5.2b2:** current writes retain their five-second register
+floor. A separate `state_change_interval_seconds` option defaults to 300 and
+accepts 0–3600 seconds; zero disables the longer guard. The direct integration
+owns this option in direct mode, while the service configuration owns it in
+service mode. Remote HA commands use the service's policy.
 
-Phase requests retain a separate five-minute interval. Both guards survive
-entry reloads, including uncertain write outcomes. A cold start applies five
-seconds to current and pause/resume, and five minutes to phase requests.
+One pending-command slot and worker coordinate both short current-write delays
+and longer state-change waits. A newer command supersedes older pending work.
+Pause/resume, phase changes, both release directions and lock/unlock share the
+transition clock; the current-write floor also remains. A stop request replaces
+an older pending start and can itself wait in that slot. A phase command's pause
+and phase write form one operation. Before sending the phase write, live status
+checks must confirm that charging has paused within a bounded 30-second wait.
+For a connected vehicle, layouts v01.02 and newer require EVSE state 2 and CP
+state B1; v01.01 uses EVSE state 2 because it has no CP-state register.
+The separate `phase_switch_grace_seconds` setting defaults to 5 and accepts
+0–30 seconds. After this additional wait, status is rechecked before the phase
+write. A read failure or timeout aborts the phase command and retains the pause.
+Zero grace time skips only the additional delay. The operation leaves charging
+paused afterward. With no vehicle and an idle EVSE, confirmation and grace time
+are unnecessary. Fresh EVSE Idle and CP A1/A2 reads also exempt commands from
+the shared transition guard. Missing CP support or unreadable/inconsistent
+status never grants that exception. The transition timestamp is still retained,
+so reconnecting a vehicle restores the guard. During pending transition and
+grace waits, the worker checks for unplugging every five seconds without
+changing the published due timestamp; register-write floors remain in force.
+Idempotent commands do not restart the timer. Recovery reasserts existing intent
+without consuming a new transition or waiting for the longer interval.
+
+The worker releases locks while waiting and revalidates the operation before
+execution. It exposes a stable pending action and a UTC due timestamp during
+timed waits. While awaiting vehicle pause confirmation, the phase action remains
+visible with no due timestamp; confirmation sets a fixed timestamp for the end
+of the grace period. No per-second state or timestamp writes are required.
+Register readback remains
+separate from requested state. Shutdown cancels pending work, so a new owner
+never silently replays a queued start. The running service and its queue survive
+an HA restart. Entry reloads retain timing in memory; cold process starts use
+a conservative fresh guard because previous timing is unknown.
 
 ### Three polling cadences, and one of them is about the database
 

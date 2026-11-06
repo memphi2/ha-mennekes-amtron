@@ -59,9 +59,13 @@ def test_poll_finishing_after_pause_cannot_resume_early(outcome, command):
             assert control.is_paused is (True if outcome == "success" else None)
             action = (control.async_recover_from_error() if command == "recovery" else
                       control.async_set_charging_current(0 if command == "unlimited" else 12, allow_unlimited=True))
-            with pytest.raises(ServiceValidationError) as limited:
+            if command == "recovery":
+                with pytest.raises(ServiceValidationError) as limited:
+                    await action
+                assert limited.value.translation_placeholders == {"seconds": "1"}
+            else:
                 await action
-            assert limited.value.translation_placeholders == {"seconds": "1"}
+                assert control.pending_action == "set_current"
             assert len([w for w in transport.writes if w[0] == R.CHARGING_CURRENT_EMS.address]) == 1
             # A later poll can still report an actual external state change.
             client.async_read_block = original_read

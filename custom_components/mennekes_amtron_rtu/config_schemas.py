@@ -26,9 +26,11 @@ from .device.const import (
     CONF_FRAME,
     CONF_HOST,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
+    CONF_PHASE_SWITCH_GRACE_SECONDS,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SEARCH,
+    CONF_STATE_CHANGE_INTERVAL_SECONDS,
     CONF_TCP_PORT,
     CONNECTION_RTU_OVER_TCP,
     CONTROL_MODES,
@@ -37,12 +39,16 @@ from .device.const import (
     DEFAULT_DEVICE_ID,
     DEFAULT_FRAME,
     DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
+    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_SEARCH,
+    DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
     DEFAULT_TCP_PORT,
     DEVICE_ID_MAX,
     DEVICE_ID_MIN,
+    MAX_PHASE_SWITCH_GRACE_SECONDS,
     MAX_SCAN_INTERVAL_SECONDS,
+    MAX_STATE_CHANGE_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
     NETWORK_CONNECTION_TYPES,
     SEARCH_MODES,
@@ -201,12 +207,55 @@ def options_schema(
                 mode=NumberSelectorMode.BOX,
             )
         ),
+        probatio.Required(
+            CONF_STATE_CHANGE_INTERVAL_SECONDS,
+            default=current.get(
+                CONF_STATE_CHANGE_INTERVAL_SECONDS,
+                DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
+            ),
+        ): probatio.All(
+            _network_integer,
+            NumberSelector(
+                NumberSelectorConfig(
+                    min=0,
+                    max=MAX_STATE_CHANGE_INTERVAL_SECONDS,
+                    step=1,
+                    unit_of_measurement="s",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
+            probatio.Coerce(int),
+        ),
+        probatio.Required(
+            CONF_PHASE_SWITCH_GRACE_SECONDS,
+            default=current.get(
+                CONF_PHASE_SWITCH_GRACE_SECONDS,
+                DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
+            ),
+        ): probatio.All(
+            _network_integer,
+            NumberSelector(
+                NumberSelectorConfig(
+                    min=0,
+                    max=MAX_PHASE_SWITCH_GRACE_SECONDS,
+                    step=1,
+                    unit_of_measurement="s",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
+            probatio.Coerce(int),
+        ),
     }
     if service_mode:
         fields = {
             marker: selector
             for marker, selector in fields.items()
-            if marker.schema not in (CONF_CONTROL_MODE, CONF_MEASUREMENT_INTERVAL_SECONDS)
+            if marker.schema not in (
+                CONF_CONTROL_MODE,
+                CONF_MEASUREMENT_INTERVAL_SECONDS,
+                CONF_STATE_CHANGE_INTERVAL_SECONDS,
+                CONF_PHASE_SWITCH_GRACE_SECONDS,
+            )
         }
     return probatio.Schema(fields)
 

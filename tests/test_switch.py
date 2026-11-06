@@ -23,19 +23,33 @@ async def _switches(**kwargs: object):
 def test_the_release_and_lock_switches_follow_their_registers() -> None:
     async def run() -> None:
         switches, entry, transport = await _switches()
+        control = entry.runtime_data.control
+        clock = [1000.0]
+        control._monotonic = lambda: clock[0]
         assert switches["charging_release"].is_on is True
         assert switches["lock_evse"].is_on is False
 
         await switches["charging_release"].async_turn_off()
         await switches["lock_evse"].async_turn_on()
+        assert control.pending_action == "lock"
+        assert transport.bank[R.LOCK_EVSE.address] == 0
+        assert switches["lock_evse"].is_on is False
+        clock[0] += 300
+        await asyncio.wait_for(control._flush_task, 1)
+        assert control.pending_action is None
         written = dict(transport.writes)
         assert written[R.CHARGING_RELEASE.address] == [0]
         assert written[R.LOCK_EVSE.address] == [1]
+        await entry.runtime_data.coordinator.async_refresh()
+        assert switches["charging_release"].is_on is False
+        assert switches["lock_evse"].is_on is True
 
         entry.runtime_data.coordinator.data.values["charging_release"] = None
         assert switches["charging_release"].is_on is None
         entry.runtime_data.coordinator.data.values["lock_evse"] = None
         assert switches["lock_evse"].is_on is None
+        await control.async_shutdown()
+        await entry.runtime_data.client.async_close()
 
     asyncio.run(run())
 

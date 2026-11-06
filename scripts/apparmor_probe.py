@@ -49,7 +49,8 @@ def register_words() -> list[int]:
     for spec, value in (
         (registers.MODBUS_LAYOUT_VERSION, registers.LAYOUT_V01_03),
         (registers.EVSE_STATE, 1), (registers.AUTHORIZATION_STATUS, 1),
-        (registers.DOWNGRADE_STATUS, 1), (registers.CP_STATE, 11),
+        # Idle must agree with CP A1: this probe has no connected vehicle.
+        (registers.DOWNGRADE_STATUS, 1), (registers.CP_STATE, 10),
         (registers.CHARGING_RELEASE, 1), (registers.EMS_FALLBACK_CURRENT, 6),
         (registers.PHASE_OPTIONS_HW, 2), (registers.MAX_EVSE_CURRENT, 16),
         (registers.MAX_CURRENT_HOUSE, 32), (registers.CHARGING_CURRENT_EMS, 8),
