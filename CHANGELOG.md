@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Discard an older deferred current target when a newer write loses its reply
+  or is cancelled. Preserve the latest explicit target through recovery and
+  service restarts instead of later restoring the superseded value.
 - Retry automatic heartbeat recovery when error 200 returns during its final
   check, even if the preceding fresh check needed no recovery writes.
 - Retain confirmed heartbeat and fallback repairs when their status register

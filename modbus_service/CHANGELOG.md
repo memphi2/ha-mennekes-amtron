@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep the latest requested current after a lost write reply or cancellation;
+  an older queued slider value must not return later or after a service restart.
 - Remove duplicate connection choices: only **USB / RS-485**, **LAN: Modbus RTU
   (TCP)** and **LAN: Modbus TCP** are shown. If an old technical name is saved,
   select its matching readable choice once; 0.5.1 supports doing this before

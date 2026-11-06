@@ -861,6 +861,58 @@ def test_uncertain_pause_discards_an_older_queued_current(outcome):
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("outcome", ["lost_reply", "cancelled"])
+@pytest.mark.parametrize("followup", ["resume", "recovery"])
+def test_uncertain_lower_current_discards_an_older_queued_increase(outcome, followup):
+    """A lost ACK must not let an older slider target undo a lower limit."""
+
+    async def run():
+        harness = Harness(values={"charging_current_ems": 8.0}, error_code=200)
+        control = await harness.connect()
+        await control.async_set_charging_current(8)
+        await control.async_set_charging_current(16)
+        flush = control._flush_task
+        harness.clock[0] += 6
+        original = harness.transport.write_registers
+
+        async def apply_without_confirmation(address, values, **kwargs):
+            await original(address, values, **kwargs)
+            if outcome == "cancelled":
+                raise asyncio.CancelledError
+            raise raise_connection_error()
+
+        harness.transport.write_registers = apply_without_confirmation
+        with pytest.raises(
+            asyncio.CancelledError if outcome == "cancelled" else HomeAssistantError
+        ):
+            await control.async_set_charging_current(6)
+        harness.transport.write_registers = original
+        await flush
+        assert [
+            decode_register(R.CHARGING_CURRENT_EMS, words)
+            for words in harness.written(R.CHARGING_CURRENT_EMS)
+        ] == [8.0, 6.0]
+        assert await harness.client.async_read_register(R.CHARGING_CURRENT_EMS) == 6.0
+        assert control.charging_setpoint == 6.0
+        assert control.is_paused is None
+        harness.clock[0] += 5
+        if followup == "resume":
+            await control.async_pause_charging()
+            assert control.charging_setpoint == 6.0
+            harness.clock[0] += 5
+            await control.async_resume_charging()
+        else:
+            await control.async_recover_from_error()
+        assert control.charging_setpoint == 6.0
+        assert decode_register(
+            R.CHARGING_CURRENT_EMS, harness.written(R.CHARGING_CURRENT_EMS)[-1]
+        ) == 6.0
+        await control.async_shutdown()
+        await harness.client.async_close()
+
+    asyncio.run(run())
+
+
 def test_deferred_zero_preserves_the_write_floor_and_replaces_a_pending_limit() -> None:
     async def run() -> None:
         harness = Harness()

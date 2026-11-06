@@ -450,16 +450,24 @@ class AmtronControl:
             self._ensure_flush_task()
             return
         except (DeviceError, asyncio.CancelledError) as err:
-            if mode_change and not isinstance(
+            uncertain = not isinstance(
                 err.__cause__, (AmtronWriteRejectedError, AmtronIllegalAddressError)
-            ):
+            )
+            if uncertain:
+                # The newer current may already have reached the wallbox.
+                # Never let an older queued slider target undo it afterwards.
+                self._pending_current = None
+                self._write_state.confirmed_current = None
+                if value == CHARGING_CURRENT_UNLIMITED or value >= CHARGING_CURRENT_MINIMUM:
+                    # Retain the latest explicit intent for persistence and
+                    # recovery, not the superseded deferred slider target.
+                    self.charging_setpoint = value
+            if mode_change and uncertain:
                 # A lost acknowledgement/cancellation may follow an applied
                 # pause or resume. Unknown outcome must not remove hysteresis.
-                self._write_state.confirmed_current = None
                 self._write_state.mode_change_at = self._monotonic()
                 if 0 < value < CHARGING_CURRENT_MINIMUM:
                     self.pause_requested = True
-                    self._pending_current = None
                     # The wallbox may already be paused. Keep the known
                     # pre-pause current so a later resume cannot silently
                     # fall back to the configured maximum after a lost ACK.
