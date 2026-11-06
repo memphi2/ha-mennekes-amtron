@@ -161,11 +161,12 @@ def test_upgrades_preserve_a_previously_stopped_charge(
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("intent", [False, True])
 @pytest.mark.parametrize(
-    ("entity_key", "intent_key", "intent"),
+    ("entity_key", "intent_key"),
     [
-        ("charging_release", "charging_release_requested", False),
-        ("charging_paused", "pause_requested", True),
+        ("charging_release", "charging_release_requested"),
+        ("charging_paused", "pause_requested"),
     ],
 )
 def test_reload_does_not_override_current_control_intent(
@@ -173,8 +174,14 @@ def test_reload_does_not_override_current_control_intent(
 ):
     async def run():
         switches, entry, _transport = await _switches()
+        switch = switches[entity_key]
         setattr(entry.runtime_data.control, intent_key, intent)
-        await switches[entity_key].async_added_to_hass()
+
+        async def extra():
+            return RestoredExtraData({intent_key: not intent})
+
+        switch.async_get_last_extra_data = extra
+        await switch.async_added_to_hass()
         assert getattr(entry.runtime_data.control, intent_key) is intent
 
     asyncio.run(run())

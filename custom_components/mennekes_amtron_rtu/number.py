@@ -7,7 +7,6 @@ between is rejected by the control layer. Pausing has its own switch.
 from __future__ import annotations
 
 import math
-from typing import Any
 
 from homeassistant.components.number import (
     NumberDeviceClass,
@@ -19,6 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
+from .coordinator import MennekesAmtronCoordinator
 from .device.const import (
     CHARGING_CURRENT_DECIMALS,
     CHARGING_CURRENT_MINIMUM,
@@ -55,7 +55,7 @@ class AmtronChargingCurrentNumber(MennekesAmtronControlEntity, NumberEntity, Res
     _attr_mode = NumberMode.SLIDER
 
     def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: Any
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
     ) -> None:
         super().__init__(
             entry,

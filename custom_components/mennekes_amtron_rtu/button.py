@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .coordinator import MennekesAmtronCoordinator
 from .device.capabilities import capability_is_supported
 from .device.registers import ERROR_CODE, SYSTEM_RESTART
 from .entity import MennekesAmtronControlEntity
@@ -47,7 +48,7 @@ class AmtronRecoverButton(MennekesAmtronControlEntity, ButtonEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: Any
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
     ) -> None:
         super().__init__(
             entry, coordinator, "recover_from_error", register_key=ERROR_CODE.key
@@ -71,7 +72,7 @@ class AmtronRestartButton(MennekesAmtronControlEntity, ButtonEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: Any
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
     ) -> None:
         super().__init__(entry, coordinator, "restart", register_key="evse_state")
 
