@@ -419,6 +419,56 @@
       "lock_evse": {
         "name": "Borne verrouillée"
       }
+    },
+    "event": {
+      "control_result": {
+        "name": "Résultat de la commande",
+        "state_attributes": {
+          "event_type": {
+            "name": "Résultat",
+            "state": {
+              "executed": "Commande acceptée",
+              "replaced": "Remplacée",
+              "cancelled": "Annulée",
+              "failed": "Échec",
+              "uncertain": "Résultat non confirmé",
+              "recovery_succeeded": "Correction de l’erreur confirmée",
+              "recovery_failed": "Échec de la correction de l’erreur"
+            }
+          },
+          "action": {
+            "name": "Action",
+            "state": {
+              "pause": "Mettre la charge en pause",
+              "resume": "Reprendre la charge",
+              "set_current": "Régler le courant de charge",
+              "single_phase": "Utiliser une phase",
+              "all_phases": "Utiliser toutes les phases disponibles",
+              "enable_charging": "Autoriser la charge",
+              "disable_charging": "Désactiver l’autorisation de charge",
+              "unlock": "Déverrouiller la borne",
+              "lock": "Verrouiller la borne",
+              "recover": "Corriger l’erreur"
+            }
+          },
+          "reason": {
+            "name": "Motif",
+            "state": {
+              "completed": "Terminé",
+              "replaced": "Remplacée par une autre commande",
+              "shutdown": "Intégration arrêtée",
+              "phase_timeout": "Le véhicule n’était pas prêt à temps",
+              "phase_unconfirmed": "La sélection des phases n’a pas pu être confirmée",
+              "connection_error": "Échec de la connexion",
+              "write_rejected": "Écriture refusée",
+              "permission_denied": "Écriture non autorisée",
+              "status_refresh_failed": "Échec de l’actualisation de l’état",
+              "error_still_active": "L’erreur est toujours active",
+              "unknown": "Motif inconnu"
+            }
+          }
+        }
+      }
     }
   },
   "exceptions": {

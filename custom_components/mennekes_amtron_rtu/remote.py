@@ -20,6 +20,7 @@ from .control import AmtronControl, ControlOptions, ha_command
 from .coordinator import MennekesAmtronCoordinator
 from .device.client import MennekesModbusClient, SerialConfig
 from .device.client_errors import AmtronConnectionError, AmtronWriteRejectedError
+from .device.command_events import CommandEvents
 from .device.const import (
     DOMAIN,
     MAX_PHASE_SWITCH_GRACE_SECONDS,
@@ -98,6 +99,7 @@ class RemoteClient(MennekesModbusClient):
         self.on_auth_failed: Callable[[], None] | None = None
         self._snapshot_lock = asyncio.Lock()
         self.pending_until: datetime | None = None
+        self.events = CommandEvents(supported=False)
 
     def bind_identity(self, serial_number: str | None) -> None:
         """Bind a configured client; setup probes remain free to read identity."""
@@ -218,6 +220,8 @@ class RemoteClient(MennekesModbusClient):
                 raise ServiceConnectionError("service_version_mismatch", "service API version differs")
             section = "service_version"
             validate_service_version(payload)
+            section = "command_events"
+            command_events = CommandEvents.parse(payload.get("command_events"))
             section = "values"
             values = payload["values"]
             control = payload["control"]
@@ -354,6 +358,13 @@ class RemoteClient(MennekesModbusClient):
             raise ServiceConnectionError(
                 "service_identity_changed", "service identity differs from the configured wallbox"
             )
+        try:
+            self.events.receive(command_events, connected=self._connected)
+        except ValueError as err:
+            self._mark_unavailable("service_invalid_response")
+            raise ServiceConnectionError(
+                "service_invalid_response", "invalid service snapshot (command_events)"
+            ) from err
         self.identity = identity
         self.snapshot = payload
         self.pending_until = pending_until
@@ -520,6 +531,11 @@ class RemoteControl(AmtronControl):
             request_refresh=request_refresh,
         )
         self._remote = client
+
+    @property
+    def events(self) -> CommandEvents:
+        """Expose only the bus owner's outcomes, never guessed HTTP results."""
+        return self._remote.events
 
     @property
     def pending_action(self) -> str | None:

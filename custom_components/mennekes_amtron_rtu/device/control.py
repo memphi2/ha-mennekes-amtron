@@ -32,6 +32,7 @@ from .client_errors import (
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
 )
+from .command_events import CONTROL_ACTIONS, CommandEvents
 from .const import (
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_UNLIMITED,
@@ -65,10 +66,7 @@ from .registers import (
 from .runtime_events import EventType
 
 _LOGGER = logging.getLogger(__name__)
-PENDING_ACTIONS = (
-    "pause", "resume", "set_current", "single_phase", "all_phases",
-    "disable_charging", "enable_charging", "lock", "unlock",
-)
+PENDING_ACTIONS = CONTROL_ACTIONS
 _PHASE_PAUSE_TIMEOUT = 30.0
 
 
@@ -155,6 +153,32 @@ class AmtronControl:
         self._current_lock = asyncio.Lock()
         self._flush_task: asyncio.Task[None] | None = None
         self._write_state = client.write_state
+        self._events = CommandEvents()
+        self._active_command: _PendingCommand | None = None
+        self._command_acknowledged = False
+        self._command_write_started = False
+        self._recovery_deadline: float | None = None
+        self._recovery_generation = 0
+
+    @property
+    def events(self) -> CommandEvents:
+        """Expose discrete outcomes without per-poll entity updates."""
+        return self._events
+
+    def observe_recovery(self, error_code: object, current_write_generation: int) -> None:
+        """Confirm a completed recovery from a subsequent successful fresh poll."""
+        if (
+            self._recovery_deadline is None or type(error_code) is not int
+            or current_write_generation < self._recovery_generation
+        ):
+            return
+        if error_code == 0:
+            self.events.record("recovery_succeeded", "recover")
+        elif self._monotonic() >= self._recovery_deadline:
+            self.events.record("recovery_failed", "recover", "error_still_active")
+        else:
+            return
+        self._recovery_deadline = None
 
     @property
     def pending_action(self) -> str | None:
@@ -396,15 +420,25 @@ class AmtronControl:
                     else current
                 )
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
-            await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
-            await self._async_write(CHARGING_RELEASE, int(self.charging_release_requested is not False))
-            await self._async_apply_current(
-                min(target, self.max_charging_current),
-                preserve_setpoint=paused,
-                recovery=True,
-            )
+            try:
+                await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
+                await self._async_write(CHARGING_RELEASE, int(self.charging_release_requested is not False))
+                await self._async_apply_current(
+                    min(target, self.max_charging_current),
+                    preserve_setpoint=paused,
+                    recovery=True,
+                )
+            except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError, asyncio.CancelledError) as err:
+                self._recovery_deadline = None
+                self.events.record(
+                    "uncertain" if self._uncertain(err) else "recovery_failed", "recover",
+                    "connection_error" if self._uncertain(err) else "write_rejected",
+                )
+                raise
         self._diagnostics.recoveries += 1
         self._diagnostics.timeline.record(EventType.RECOVERY_COMPLETED)
+        self._recovery_generation = self._write_state.current_write_generation
+        self._recovery_deadline = self._monotonic() + 30
         return True
 
     async def async_restart(self) -> None:
@@ -431,7 +465,7 @@ class AmtronControl:
     async def async_shutdown(self) -> None:
         """Cancel deferred work; a new owner never inherits a delayed start."""
 
-        self._clear_pending()
+        self._clear_pending(outcome="cancelled", reason="shutdown")
         task = self._flush_task
         self._flush_task = None
         if task is not None and not task.done():
@@ -678,13 +712,45 @@ class AmtronControl:
         else:
             await self._async_apply_lock(bool(command.value))
 
+    async def _async_observe_command(self, command: _PendingCommand, *, deferred: bool = False) -> None:
+        """Report the bus outcome independently of status/persistence callbacks."""
+        self._active_command = command
+        self._command_acknowledged = False
+        self._command_write_started = False
+        try:
+            if deferred and self._validate_deferred is not None:
+                self._validate_deferred()
+            await self._async_apply_command(command)
+        except (_PhaseWaitError, AmtronRateLimitedError):
+            raise
+        except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError, asyncio.CancelledError) as err:
+            key = err.translation_key if isinstance(err, DeviceError) else ""
+            reason = {
+                "phase_pause_timeout": "phase_timeout",
+                "phase_pause_state_unknown": "phase_unconfirmed",
+                "phase_state_unknown": "phase_unconfirmed",
+                "read_only_mode": "permission_denied",
+            }.get(key, "write_rejected" if not self._uncertain(err) else "connection_error")
+            if self._command_acknowledged:
+                self.events.record("executed", command.action, "status_refresh_failed")
+            else:
+                uncertain = self._command_write_started and self._uncertain(err)
+                self.events.record("uncertain" if uncertain else "failed", command.action, reason)
+            raise
+        else:
+            self._record_replaced(command)
+            self.events.record("executed", command.action)
+        finally:
+            self._active_command = None
+
     async def _async_submit_locked(self, command: _PendingCommand) -> None:
         """Accept the latest request, coalescing all deferred commands together."""
         if self._phase_change is not None and command != self._pending:
+            self._record_replaced(command)
             await self._async_cancel_pending()
         had_pending = self._pending is not None
         try:
-            await self._async_apply_command(command)
+            await self._async_observe_command(command)
         except _PhaseWaitError as err:
             await self._async_queue(command, err.retry_after, preserve_deadline=err.preserve_deadline)
             return
@@ -712,6 +778,7 @@ class AmtronControl:
             return
         if self._pending == command and abs(self._pending_due - due) < 0.01:
             return
+        self._record_replaced(command)
         self._pending = command
         self._pending_due = due
         self._pending_until = (
@@ -725,8 +792,17 @@ class AmtronControl:
             )
         await self._async_publish_pending()
 
-    def _clear_pending(self) -> bool:
+    def _record_replaced(self, command: _PendingCommand | None) -> None:
+        if self._pending is not None and self._pending != command:
+            self.events.record("replaced", self._pending.action, "replaced")
+
+    def _clear_pending(self, *, outcome: str | None = None, reason: str = "completed") -> bool:
         changed = self._pending is not None
+        if self._pending is not None:
+            if outcome is not None and self._active_command is None:
+                self.events.record(outcome, self._pending.action, reason)
+            elif self._active_command is not None:
+                self._record_replaced(self._active_command)
         self._pending = None
         self._phase_change = None
         self._pending_until = None
@@ -773,9 +849,7 @@ class AmtronControl:
                         delay = 0
                     if delay <= 0:
                         try:
-                            if self._validate_deferred is not None:
-                                self._validate_deferred()
-                            await self._async_apply_command(command)
+                            await self._async_observe_command(command, deferred=True)
                         except _PhaseWaitError as err:
                             await self._async_queue(
                                 command, err.retry_after, preserve_deadline=err.preserve_deadline,
@@ -817,6 +891,8 @@ class AmtronControl:
         min_interval: float = 0.0,
         refresh: bool = True,
     ) -> None:
+        if self._active_command is not None:
+            self._command_write_started = True
         try:
             await self._client.async_write_register(
                 spec, value, min_interval=min_interval
@@ -838,6 +914,16 @@ class AmtronControl:
                 "write_failed", {"register": spec.key, "error": str(err)}
             ) from err
         self._diagnostics.writes_sent += 1
+        if self._active_command is not None:
+            action = self._active_command.action
+            expected = (
+                CHARGING_CURRENT_EMS if action in ("pause", "resume", "set_current")
+                else REQUESTED_PHASES if action in ("single_phase", "all_phases")
+                else CHARGING_RELEASE if action in ("enable_charging", "disable_charging")
+                else LOCK_EVSE
+            )
+            if spec == expected:
+                self._command_acknowledged = True
         if spec.key in self._diagnostics.write_errors:
             self._diagnostics.write_errors.remove(spec.key)
             if self._notify_write_error is not None:

@@ -81,7 +81,7 @@ from .services import async_setup_services
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-READ_PLATFORMS = (Platform.SENSOR, Platform.BINARY_SENSOR)
+READ_PLATFORMS = (Platform.SENSOR, Platform.BINARY_SENSOR, Platform.EVENT)
 CONTROL_PLATFORMS = (
     Platform.NUMBER,
     Platform.SELECT,
@@ -204,6 +204,7 @@ async def async_setup_entry(
             validate_deferred=validate_deferred,
         )
         coordinator.control_status = lambda: (control.pending_action, control.pending_until)
+        coordinator.observe_recovery = control.observe_recovery
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,

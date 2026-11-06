@@ -419,6 +419,56 @@
       "lock_evse": {
         "name": "Wallbox bloccata"
       }
+    },
+    "event": {
+      "control_result": {
+        "name": "Esito del comando",
+        "state_attributes": {
+          "event_type": {
+            "name": "Esito",
+            "state": {
+              "executed": "Comando accettato",
+              "replaced": "Sostituito",
+              "cancelled": "Annullato",
+              "failed": "Non riuscito",
+              "uncertain": "Esito non confermato",
+              "recovery_succeeded": "Risoluzione dell’errore confermata",
+              "recovery_failed": "Risoluzione dell’errore non riuscita"
+            }
+          },
+          "action": {
+            "name": "Azione",
+            "state": {
+              "pause": "Metti in pausa la ricarica",
+              "resume": "Riprendere la ricarica",
+              "set_current": "Impostare la corrente di ricarica",
+              "single_phase": "Usare una fase",
+              "all_phases": "Usare tutte le fasi disponibili",
+              "enable_charging": "Autorizzare la ricarica",
+              "disable_charging": "Disabilita il consenso alla ricarica",
+              "unlock": "Sbloccare la wallbox",
+              "lock": "Blocca la wallbox",
+              "recover": "Risolvere l’errore"
+            }
+          },
+          "reason": {
+            "name": "Motivo",
+            "state": {
+              "completed": "Completato",
+              "replaced": "Sostituito da un altro comando",
+              "shutdown": "Integrazione arrestata",
+              "phase_timeout": "Il veicolo non era pronto in tempo",
+              "phase_unconfirmed": "Impossibile confermare la selezione delle fasi",
+              "connection_error": "Connessione non riuscita",
+              "write_rejected": "Scrittura rifiutata",
+              "permission_denied": "Scrittura non consentita",
+              "status_refresh_failed": "Aggiornamento dello stato non riuscito",
+              "error_still_active": "L’errore è ancora attivo",
+              "unknown": "Motivo sconosciuto"
+            }
+          }
+        }
+      }
     }
   },
   "exceptions": {

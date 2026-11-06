@@ -419,6 +419,56 @@
       "lock_evse": {
         "name": "Wallbox locked"
       }
+    },
+    "event": {
+      "control_result": {
+        "name": "Control result",
+        "state_attributes": {
+          "event_type": {
+            "name": "Result",
+            "state": {
+              "executed": "Command accepted",
+              "replaced": "Replaced",
+              "cancelled": "Cancelled",
+              "failed": "Failed",
+              "uncertain": "Result unconfirmed",
+              "recovery_succeeded": "Error recovery confirmed",
+              "recovery_failed": "Error recovery failed"
+            }
+          },
+          "action": {
+            "name": "Action",
+            "state": {
+              "pause": "Pause charging",
+              "resume": "Resume charging",
+              "set_current": "Set charging current",
+              "single_phase": "Use one phase",
+              "all_phases": "Use all available phases",
+              "enable_charging": "Enable charging release",
+              "disable_charging": "Disable charging release",
+              "unlock": "Unlock wallbox",
+              "lock": "Lock wallbox",
+              "recover": "Recover from error"
+            }
+          },
+          "reason": {
+            "name": "Reason",
+            "state": {
+              "completed": "Completed",
+              "replaced": "Replaced by another command",
+              "shutdown": "Integration stopped",
+              "phase_timeout": "Vehicle did not become ready in time",
+              "phase_unconfirmed": "Phase selection could not be confirmed",
+              "connection_error": "Connection failed",
+              "write_rejected": "Write rejected",
+              "permission_denied": "Writing not allowed",
+              "status_refresh_failed": "Status refresh failed",
+              "error_still_active": "Error is still active",
+              "unknown": "Unknown reason"
+            }
+          }
+        }
+      }
     }
   },
   "exceptions": {

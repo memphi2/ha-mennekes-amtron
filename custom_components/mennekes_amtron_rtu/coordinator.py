@@ -21,6 +21,7 @@ from .device.client import MennekesModbusClient
 from .device.client_errors import AmtronBusError
 from .device.const import DEFAULT_MEASUREMENT_INTERVAL_SECONDS
 from .device.poller import DevicePoller
+from .device.registers import ERROR_CODE
 from .device.runtime_events import EventTimeline
 from .entry_types import MennekesAmtronConfigEntry
 
@@ -54,6 +55,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         self._client = client
         self._identity = identity
         self.control_status: Callable[[], tuple[str | None, datetime | None]] | None = None
+        self.observe_recovery: Callable[[object, int], None] | None = None
         self._poller = DevicePoller(
             client,
             identity,
@@ -81,6 +83,10 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
             )
             if self.control_status is not None:
                 data.pending_change, data.pending_change_until = self.control_status()
+            if self.observe_recovery is not None:
+                self.observe_recovery(
+                    data.values.get(ERROR_CODE.key), data.current_write_generation,
+                )
             return data
         except AmtronBusError as err:
             raise UpdateFailed(str(err)) from err

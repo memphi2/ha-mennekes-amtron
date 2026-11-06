@@ -85,6 +85,25 @@
       "lock_evse": {
         "default": "mdi:lock"
       }
+    },
+    "event": {
+      "control_result": {
+        "default": "mdi:clipboard-text-outline",
+        "state_attributes": {
+          "event_type": {
+            "default": "mdi:clipboard-text-outline",
+            "state": {
+              "executed": "mdi:clipboard-check-outline",
+              "replaced": "mdi:clipboard-arrow-right-outline",
+              "cancelled": "mdi:clipboard-remove-outline",
+              "failed": "mdi:clipboard-alert-outline",
+              "uncertain": "mdi:help-circle-outline",
+              "recovery_succeeded": "mdi:check-circle-outline",
+              "recovery_failed": "mdi:alert-circle-outline"
+            }
+          }
+        }
+      }
     }
   },
   "services": {

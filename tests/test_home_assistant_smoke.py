@@ -172,7 +172,7 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
                 SERIAL_NUMBER.lower() not in entity.entity_id for entity in entities
             )
             platforms = {entity.domain for entity in entities}
-            assert platforms == {"sensor", "binary_sensor"}
+            assert platforms == {"sensor", "binary_sensor", "event"}
 
             device = dr.async_entries_for_config_entry(
                 dr.async_get(hass), entry.entry_id

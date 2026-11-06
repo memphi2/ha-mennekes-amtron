@@ -219,6 +219,10 @@ class ModbusService:
                 raise
             self._success = True
             self._updated_at = time.monotonic()
+            if self.control is not None:
+                self.control.observe_recovery(
+                    self.data.get("error_code"), self.data.current_write_generation,
+                )
 
     async def _recover(self) -> None:
         self._phase = "recovering the wallbox error"
@@ -300,6 +304,7 @@ class ModbusService:
             "values": self.data.values,
             "failed_blocks": list(self.data.failed_blocks),
             "current_write_generation": self.data.current_write_generation,
+            "command_events": control.events.snapshot() if control else None,
             "control": {
                 "read_only": self.config.read_only,
                 "current_cap": self.config.current_cap,

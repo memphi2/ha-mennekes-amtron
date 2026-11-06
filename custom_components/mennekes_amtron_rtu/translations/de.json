@@ -419,6 +419,56 @@
       "lock_evse": {
         "name": "Wallbox gesperrt"
       }
+    },
+    "event": {
+      "control_result": {
+        "name": "Steuerungsergebnis",
+        "state_attributes": {
+          "event_type": {
+            "name": "Ergebnis",
+            "state": {
+              "executed": "Befehl angenommen",
+              "replaced": "Ersetzt",
+              "cancelled": "Abgebrochen",
+              "failed": "Fehlgeschlagen",
+              "uncertain": "Ergebnis unbestätigt",
+              "recovery_succeeded": "Fehlerbehebung bestätigt",
+              "recovery_failed": "Fehlerbehebung fehlgeschlagen"
+            }
+          },
+          "action": {
+            "name": "Aktion",
+            "state": {
+              "pause": "Laden pausieren",
+              "resume": "Laden fortsetzen",
+              "set_current": "Ladestrom einstellen",
+              "single_phase": "Eine Phase verwenden",
+              "all_phases": "Alle verfügbaren Phasen verwenden",
+              "enable_charging": "Ladefreigabe einschalten",
+              "disable_charging": "Ladefreigabe ausschalten",
+              "unlock": "Wallbox entsperren",
+              "lock": "Wallbox sperren",
+              "recover": "Fehler beheben"
+            }
+          },
+          "reason": {
+            "name": "Grund",
+            "state": {
+              "completed": "Abgeschlossen",
+              "replaced": "Durch einen anderen Befehl ersetzt",
+              "shutdown": "Integration gestoppt",
+              "phase_timeout": "Fahrzeug wurde nicht rechtzeitig bereit",
+              "phase_unconfirmed": "Phasenauswahl konnte nicht bestätigt werden",
+              "connection_error": "Verbindung fehlgeschlagen",
+              "write_rejected": "Schreibzugriff abgelehnt",
+              "permission_denied": "Schreiben nicht erlaubt",
+              "status_refresh_failed": "Statusaktualisierung fehlgeschlagen",
+              "error_still_active": "Fehler weiterhin aktiv",
+              "unknown": "Unbekannter Grund"
+            }
+          }
+        }
+      }
     }
   },
   "exceptions": {

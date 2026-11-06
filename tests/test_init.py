@@ -74,6 +74,7 @@ def test_a_read_only_entry_exposes_no_control_platforms() -> None:
     assert _entry_platforms(FakeConfigEntry()) == [
         Platform.SENSOR,
         Platform.BINARY_SENSOR,
+        Platform.EVENT,
     ]
     master = FakeConfigEntry(options={CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
     assert Platform.NUMBER in _entry_platforms(master)

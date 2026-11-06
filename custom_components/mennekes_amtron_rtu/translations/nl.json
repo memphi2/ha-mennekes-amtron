@@ -419,6 +419,56 @@
       "lock_evse": {
         "name": "Wallbox vergrendeld"
       }
+    },
+    "event": {
+      "control_result": {
+        "name": "Besturingsresultaat",
+        "state_attributes": {
+          "event_type": {
+            "name": "Resultaat",
+            "state": {
+              "executed": "Opdracht geaccepteerd",
+              "replaced": "Vervangen",
+              "cancelled": "Geannuleerd",
+              "failed": "Mislukt",
+              "uncertain": "Resultaat niet bevestigd",
+              "recovery_succeeded": "Foutherstel bevestigd",
+              "recovery_failed": "Foutherstel mislukt"
+            }
+          },
+          "action": {
+            "name": "Actie",
+            "state": {
+              "pause": "Laden pauzeren",
+              "resume": "Laden hervatten",
+              "set_current": "Laadstroom instellen",
+              "single_phase": "Eén fase gebruiken",
+              "all_phases": "Alle beschikbare fasen gebruiken",
+              "enable_charging": "Laden toestaan",
+              "disable_charging": "Laadtoestemming uitschakelen",
+              "unlock": "Wallbox ontgrendelen",
+              "lock": "Wallbox vergrendelen",
+              "recover": "Fout verhelpen"
+            }
+          },
+          "reason": {
+            "name": "Reden",
+            "state": {
+              "completed": "Voltooid",
+              "replaced": "Vervangen door een andere opdracht",
+              "shutdown": "Integratie gestopt",
+              "phase_timeout": "Het voertuig was niet op tijd gereed",
+              "phase_unconfirmed": "De fasekeuze kon niet worden bevestigd",
+              "connection_error": "Verbinding mislukt",
+              "write_rejected": "Schrijfactie geweigerd",
+              "permission_denied": "Schrijven niet toegestaan",
+              "status_refresh_failed": "Status bijwerken mislukt",
+              "error_still_active": "De fout is nog actief",
+              "unknown": "Onbekende reden"
+            }
+          }
+        }
+      }
     }
   },
   "exceptions": {
