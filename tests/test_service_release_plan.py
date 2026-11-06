@@ -100,6 +100,28 @@ def test_changed_service_inputs_require_a_different_fingerprint(source_tree, pat
     assert inputs.fingerprint("HEAD", source_tree) != before
 
 
+def test_profile_addition_changes_and_removal_all_affect_release_identity(source_tree):
+    """Profiles live outside the image but must never silently reuse an App release."""
+    original = git(source_tree, "rev-parse", "HEAD")
+    baseline = inputs.fingerprint(original, source_tree)
+    profile = source_tree / "modbus_service/apparmor.txt"
+    profile.write_text("profile app { /data/options.json r, }\n")
+    added_commit = commit(source_tree)
+    added = inputs.fingerprint(added_commit, source_tree)
+    assert added != baseline
+    profile.write_text("profile app { /data/options.json r, /data/intent.json rw, }\n")
+    changed_commit = commit(source_tree)
+    changed = inputs.fingerprint(changed_commit, source_tree)
+    assert changed != added
+    profile.unlink()
+    commit(source_tree)
+    assert inputs.fingerprint("HEAD", source_tree) == baseline
+    # Historical releases without a profile remain valid comparison baselines.
+    assert inputs.fingerprint(original, source_tree) == baseline
+    assert inputs.fingerprint(added_commit, source_tree) == added
+    assert inputs.fingerprint(changed_commit, source_tree) == changed
+
+
 @pytest.mark.parametrize(("path", "old", "new", "changes_inputs"), [
     ("pyproject.toml", "line-length=88", "line-length=100", False),
     ("pyproject.toml", "aiohttp>=3", "aiohttp>=4", True),

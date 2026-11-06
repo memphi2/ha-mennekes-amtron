@@ -127,6 +127,24 @@ its discovery. Keep the old app and backup until the handover is verified.
 The new app has separate saved state: note and verify pause, current and release
 settings as in the first setup before reconnecting the vehicle.
 
+## AppArmor protection
+
+**Beta development:** released 0.5.1 does not contain this custom profile yet.
+Supervisor loads it automatically when installing an app that includes it.
+Keep **Protection mode on**. The profile allows USB/LAN communication, heartbeat
+and the service's own token and saved charging state; app options remain
+read-only to the service.
+
+With default settings, **8/8** is possible after the installed custom profile
+has loaded. **7/8 before installation** is normal; the store rating is not
+proof of hardware testing. See [Supervisor's rating rules](https://contributors.home-assistant.io/apps/reference/security-rating/).
+
+If AppArmor denies an operation, inspect Supervisor logs and the host kernel
+log for `apparmor="DENIED"`. Report the operation and path with private details
+removed. Keep protection enabled while investigating the rejected access.
+Standalone Docker needs explicit host/profile configuration; direct HA mode
+uses HA's own security policy and does not automatically use this service profile.
+
 ## Help
 
 | Symptom | What to check |

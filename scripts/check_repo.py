@@ -26,6 +26,7 @@ REQUIRED_PATHS = (
     "hacs.json",
     "project-versions.json",
     "pyproject.toml",
+    "modbus_service/apparmor.txt",
     "requirements-dev.txt",
     "requirements-dev-min-ha.txt",
     "custom_components/mennekes_amtron_rtu/manifest.json",

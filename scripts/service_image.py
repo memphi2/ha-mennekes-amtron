@@ -51,8 +51,18 @@ def release_info(repository: str, tag: str) -> dict[str, str]:
     }
 
 
-def smoke(image: str) -> None:
+def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
     """Exercise the installed container API with no hardware or HA dependency."""
+    if apparmor_profile is not None and (
+        not isinstance(apparmor_profile, str)
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", apparmor_profile)
+        or apparmor_profile == "unconfined"
+    ):
+        raise ValueError("invalid AppArmor profile name")
+    confinement = (
+        ("--init", f"--security-opt=apparmor={apparmor_profile}")
+        if apparmor_profile is not None else ()
+    )
     with tempfile.TemporaryDirectory(prefix="amtron-container-") as temporary:
         directory = Path(temporary)
         token = secrets.token_urlsafe(32)
@@ -75,6 +85,7 @@ def smoke(image: str) -> None:
                 "docker",
                 "run",
                 "--detach",
+                *confinement,
                 # Match the owner of the private bind mount without granting
                 # DAC override to container root or weakening the token file.
                 "--user",
@@ -179,7 +190,13 @@ def build(info: dict[str, str], architecture: str, output: Path) -> None:
     subprocess.run([*command, "."], cwd=ROOT, check=True)
     run("docker", "run", "--rm", candidate, "python", "-m", "pip", "check")
     run("docker", "run", "--rm", candidate, "amtron-modbus-service", "--help")
-    smoke(candidate)
+    # The mandatory harness also runs the API/auth/SIGTERM smoke under the
+    # actual profile; an unavailable or rejected profile must stop publication.
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts/check_service_apparmor.py"), "--image", candidate],
+        cwd=ROOT,
+        check=True,
+    )
     if remote_commit(info["repository"], info["source_tag"]) != info["commit"]:
         raise ValueError("release tag changed before pushing image candidates")
     subprocess.run(["docker", "push", candidate], check=True)

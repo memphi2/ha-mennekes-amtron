@@ -38,7 +38,7 @@ source commit of the last published app. Its relevant inputs are:
 - The shared Python driver and service under `device/`.
 - `Dockerfile`, `.dockerignore` and `requirements-service.txt`.
 - The semantic build, project and setuptools configuration in `pyproject.toml`.
-- App configuration and app translations.
+- App configuration, app translations and the custom `modbus_service/apparmor.txt` profile.
 - `LICENSE`, `NOTICE` and the app's brand icon.
 
 Integration-only code, tests, repository/app README files, documentation and
@@ -87,6 +87,13 @@ The image version is the app version. Its `source_tag` and source commit identif
 the integration release that first published it; the catalog release link uses
 that original source tag. A later integration release can therefore use the
 same service version, digest and provenance.
+
+The app catalog includes `apparmor.txt` for Supervisor to load. It is a relevant
+service input: policy changes require the same review, enforcement validation
+and new app version as other service changes. The profile is not activated merely
+by pulling the standalone OCI image. The [AppArmor check](validation.md#apparmor-enforcement)
+loads it only on disposable CI runners; parser-only results do not substitute
+for an enforcement run.
 
 The catalog's Dockerfile contains only `FROM image@sha256:<attested-index>`;
 its config deliberately has no `image` key. Supervisor's supported local-build

@@ -89,6 +89,33 @@ even when the test fails. With `--json-output`, checkpoints are written directly
 to the artifact path so they also survive interruption of the runner itself.
 A partial report cannot pass validation.
 
+## AppArmor enforcement
+
+The beta adds a custom profile for the Supervisor app. Syntax validation and
+runtime enforcement are separate checks. A parser run must accept the pinned
+ABI and rules without warnings; it does not prove that the service can operate
+under those rules.
+
+The enforcement check is designed for a **disposable Linux CI runner** with
+Docker, kernel AppArmor support and passwordless `sudo -n`:
+
+```bash
+.venv/bin/python scripts/check_service_apparmor.py --image IMAGE
+```
+
+Replace `IMAGE` with the locally built service image. This check loads a uniquely
+named profile through `sudo -n`, runs the actual service image under enforcement,
+and removes its test containers and profile afterward. It tests simulated USB,
+RTU-over-TCP and Modbus TCP connections, heartbeat, permitted token/state writes,
+restart and shutdown. Negative probes must reject writes outside the service's
+state files, modification of options, protected-file reads and shell execution.
+A successful startup alone cannot pass the enforcement check.
+
+**Validation status:** the development host has a parser but no Docker/Podman or
+permissions to load profiles. Local compilation is therefore not an enforcement
+result. The beta CI run must supply that evidence before publication. Simulated
+transports do not establish behavior on physical adapters or wallbox firmware.
+
 ## Published release verification
 
 Local HACS builds use an independent temporary staging directory per invocation.

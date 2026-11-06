@@ -176,6 +176,29 @@ The app saves changed settings, not a growing history. Heartbeat history records
 health changes rather than every beat. For smaller HA history, use a
 [Recorder profile](recorder.md).
 
+## AppArmor protection
+
+**Beta development:** the custom AppArmor profile is not part of released 0.5.1.
+When an app containing it is installed, Supervisor loads the profile automatically;
+keep **Protection mode on**. It limits the service to its runtime files, USB/LAN
+communication and its own token and charging-state files. App options remain
+read-only to the service. Normal heartbeat and charging operation are intended
+to continue within these limits.
+
+With the default app settings, an installed app can show **8/8** once Supervisor
+has loaded its custom profile. A store rating of **7/8 before installation** is
+normal. The [rating describes configuration](https://contributors.home-assistant.io/apps/reference/security-rating/),
+not a completed hardware test.
+
+If the app cannot start or an operation is denied, check Supervisor logs and
+host kernel entries containing `apparmor="DENIED"`. Report the rejected operation
+and path, removing private identifiers. Keep protection enabled while the cause
+is investigated; changing the token does not resolve a policy denial.
+
+This service profile is not applied automatically to standalone Docker or direct
+HA connections. Standalone deployments need explicit host/profile configuration;
+direct mode uses Home Assistant's own host/container security policy.
+
 ## Updates
 
 **You do not need an app update for every integration update.** The current

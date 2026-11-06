@@ -68,6 +68,24 @@ What matters for security here is different from a cloud integration:
   credential. Diagnostics do not include service URLs, credentials or gateway
   hostnames/IP addresses.
 
+## Service AppArmor profile
+
+The beta development branch adds a custom Supervisor-app profile; released
+0.5.1 does not include it. Supervisor loads the packaged `apparmor.txt` for the
+installed app without disabling protection mode. The allowlist permits the
+Python runtime, USB/LAN communication and the service's private token and intent
+files. Options are read-only; there is no general filesystem-write or shell
+execution permission. This does not add authentication or encryption to Modbus
+or restrict TCP destinations to a particular gateway.
+
+The profile is separate from the OCI image. Standalone Docker deployments must
+load and select a suitable profile explicitly. Direct HA connections use the
+security policy of Home Assistant and its host, not this service profile.
+Runtime tests must prove both permitted service operation and denied unrelated
+access; see [AppArmor validation](docs/validation.md#apparmor-enforcement).
+For denials, retain protection and collect Supervisor/kernel logs identifying
+the blocked operation, with private values removed.
+
 ## Out of Scope
 
 - Firmware vulnerabilities in the wallbox itself. Report those to MENNEKES.

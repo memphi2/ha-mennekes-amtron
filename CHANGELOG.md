@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Add a custom AppArmor profile for the Supervisor app, with limited runtime and
+  state-file access, plus a dedicated enforcement check using simulated USB/LAN
+  transports. The beta CI result is required before claiming runtime validation.
+
 ## 0.5.1 — 2026-11-05
 
 - Release the Modbus app independently when its service changes. Integration

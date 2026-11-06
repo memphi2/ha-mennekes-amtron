@@ -1,5 +1,13 @@
 # Changes
 
+## Unreleased
+
+- Add a custom AppArmor profile that Supervisor loads with protection mode on.
+  App options stay read-only; the service can maintain its own token and charging
+  state and communicate over USB/LAN. Enforcement validation is pending beta CI.
+- Document permission-denial troubleshooting and why an installed app's rating
+  can differ from the app-store rating before installation.
+
 ## 0.5.1
 
 - Always show **Adapter host / IP** in the app configuration. Enter it for LAN;
