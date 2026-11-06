@@ -4,6 +4,30 @@ Run the normal suite with `.venv/bin/python scripts/check_validate.py`.
 The minimum HA environment uses `--skip-typing`; latest stable HA
 also runs strict typing. These checks do not access a physical wallbox.
 
+## Fault regressions
+
+The suite includes failures that a successful normal charging cycle does not
+exercise:
+
+- A newer current write can reach the wallbox even if its reply is lost or its
+  caller is cancelled. Tests verify that an older queued value is discarded,
+  the latest intent is saved, and a service restart followed by pause/resume
+  does not bring the older value back.
+- A failed status-register read must retain an existing heartbeat or fallback
+  repair. Only a valid healthy reading clears it, without repeatedly deleting
+  and recreating the issue.
+- Error 200 can disappear during recovery's fresh precondition read and return
+  in its final poll. Automatic recovery keeps a delayed retry for that race.
+- Invalid optional device text must not abort initialization or polling;
+  unused bytes after the NUL terminator are ignored.
+- A service response within the byte-size limit can still exceed the JSON
+  decoder's nesting limit. The HTTP client reports invalid data and marks the
+  connection unavailable instead of retaining a usable cached connection.
+
+These tests use real decoders, the shared control/poll paths and simulated
+Modbus or HTTP responses. They complement hardware tests; passing them does
+not establish that every possible device or timing fault has been covered.
+
 ## Coverage requirements
 
 The coverage gate evaluates statements and branches together, using the
