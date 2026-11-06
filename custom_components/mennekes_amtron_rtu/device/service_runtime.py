@@ -270,8 +270,10 @@ class ModbusService:
 
     async def _control_updated(self) -> None:
         """Publish queue changes and persist commands executed by the worker."""
-        await self.refresh()
+        # A command may already have reached the wallbox. Save its intent
+        # before a poll can fail or be cancelled during a connection outage.
         await self._persist()
+        await self.refresh()
 
     def _validate_deferred(self) -> None:
         """A queued command needs the same fresh connection as an API request."""

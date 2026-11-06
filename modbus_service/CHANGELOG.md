@@ -2,6 +2,8 @@
 
 ## 0.5.2b2
 
+- Persist executed queued stop intent before refreshing wallbox status, so a
+  failed or cancelled read cannot leave stale intent for the next service start.
 - Add `state_change_interval_seconds`, default 300 and configurable from 0 to
   3600 seconds. Queue early pause/resume, phase, release and lock changes;
   newer requests replace old pending work, including a stop replacing a start.

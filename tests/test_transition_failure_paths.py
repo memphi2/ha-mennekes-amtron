@@ -3,22 +3,81 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.enums import (
     EvseState,
     RequestedPhases,
 )
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
+from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
+from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from tests.fakes import put
 from tests.test_control import Harness
 from tests.test_modbus_service import TOKEN, service_fixture
+
+
+@pytest.mark.parametrize("command", ["pause", "release"])
+@pytest.mark.parametrize("failure", [AmtronBusError, OSError, asyncio.CancelledError])
+def test_deferred_stop_is_durable_before_a_failing_refresh(
+    tmp_path, monkeypatch, command, failure
+):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        proceed = asyncio.Event()
+
+        async def wait(_delay):
+            await proceed.wait()
+            clock[0] = 1300
+
+        key = "pause_requested" if command == "pause" else "charging_release_requested"
+        expected = command == "pause"
+        register = R.CHARGING_CURRENT_EMS if command == "pause" else R.CHARGING_RELEASE
+        try:
+            put(transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)
+            service.control._write_state.mode_change_at = clock[0]
+            service.control._sleep = wait
+            await service.command({
+                "command": command, "value": False,
+                "expected_serial_number": service.identity.serial_number,
+            })
+            worker = service.control._flush_task
+            assert worker is not None
+            assert json.loads(service.state_path.read_text())[key] is not expected
+
+            async def fail_refresh():
+                # Prove durability before any post-write poll or graceful stop.
+                assert json.loads(service.state_path.read_text())[key] is expected
+                raise failure("poll unavailable after accepted stop")
+
+            monkeypatch.setattr(service, "refresh", fail_refresh)
+            proceed.set()
+            result = await asyncio.wait_for(asyncio.gather(worker, return_exceptions=True), 1)
+            if failure is asyncio.CancelledError:
+                assert isinstance(result[0], asyncio.CancelledError)
+            else:
+                assert result == [None]
+            assert getattr(service.control, key) is expected
+            assert service.control.pending_action is None
+            assert [
+                decode_register(register, words)
+                for address, words in transport.writes if address == register.address
+            ] == [1 if command == "pause" else 0]
+            restored = WriteState()
+            IntentStore(service.state_path, service._store.identity).load(restored)
+            assert getattr(restored, key) is expected
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize("failure", [OSError, RuntimeError])

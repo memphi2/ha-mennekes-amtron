@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## 0.5.2b2 — 2026-11-06
 
+- Persist executed queued stop intent before refreshing wallbox status, so a
+  failed or cancelled read cannot leave stale intent for the next service start.
 - Add a configurable interval between charging-state changes, in seconds,
   defaulting to 300. Queue early pause/resume, phase, release and lock changes,
   with the latest request replacing an older pending action.
