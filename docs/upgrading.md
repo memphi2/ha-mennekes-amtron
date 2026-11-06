@@ -27,6 +27,23 @@ optional event feed. Older API 2 services remain compatible, but their event
 entity is unavailable. Existing commands are not replayed as events after
 startup or reconnect.
 
+The next beta also adds **Charging status**, **Connection quality**, **Cancel
+pending change**, **Energy target** and **Energy target status**. A target only
+limits energy and never starts charging. For service connections, target and
+cancel support are optional capabilities: an older service remains usable, while
+the new controls stay unavailable. Communication quality stays unknown if the
+service does not publish it. A service update is needed for service-owned goals,
+queued-command cancellation and communication quality. Charging status is
+calculated in HA and also works with existing compatible service readbacks.
+
+The vehicle percentage target is separately optional: select a vehicle SoC
+entity in the integration options to add it. Selecting the car's own percentage
+limit as a maximum is another optional setting. With no SoC source configured,
+no percentage controls are added. See [Percentage targets](user-guide.md#optional-vehicle-percentage-target--next-beta-unreleased)
+for behavior when the car or HA is unavailable. Existing kWh goals can recover
+from temporary meter outages without resetting their baseline or lifting a
+deliberate pause.
+
 ## 0.5.2b2: configurable charging transitions
 
 Version 0.5.2b2 adds **Minimum time between state changes**, default **300

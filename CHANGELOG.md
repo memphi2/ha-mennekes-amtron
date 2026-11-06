@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Explain verified charging state and known blockers in one readable status.
+- Add cancellation of queued commands without changing the current wallbox state.
+- Add a persistent additional-energy target that only limits charging and never
+  starts it. Pause when the target is reached or its meter becomes unreliable;
+  retain the five-second write floor and guard against stale observations.
+- Automatically resume a charge paused only for a temporary energy-meter outage
+  after valid readings recover; retain the original goal and deliberate pauses.
+- Add an optional vehicle percentage target using an existing HA SoC entity,
+  with a separately optional vehicle limit as its maximum. Missing vehicle data
+  leaves charging unchanged; neither setting nor disabling a goal starts charging.
+- Summarize Modbus communication quality without extra polling, recurring counters
+  or long-term statistics; include read retries, heartbeat and write responses.
+
 - Preserve vehicle presence during wallbox faults when CP confirms a connected
   vehicle; report unknown for ambiguous or conflicting status.
 - Improve state-dependent entity icons and group technical details under

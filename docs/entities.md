@@ -47,6 +47,24 @@ evidence becomes unknown instead of inventing an unplug event. A definite
 connected EVSE state remains connected if CP is missing. Older layouts
 without CP use known EVSE idle/connected states and leave fault states unknown.
 
+## New controls and status — next beta, unreleased
+
+**Charging status** explains observed state: initialization, a wallbox fault,
+service mode, no connected vehicle, charging, a lock, disabled release, pause,
+missing authorization, preparation or waiting for the vehicle. Faults take
+priority; for a connected vehicle, lock, release, pause and authorization are
+checked in that order. Missing or contradictory evidence is unknown. A queued
+request is shown by **Pending change**, not presented as an executed change.
+The status does not infer a full battery or identify an undocumented restriction.
+
+**Connection quality** describes Modbus communication, including heartbeat and
+write responses. It becomes degraded after a timeout or malformed response,
+including a failed read that a retry subsequently recovers. A valid device error
+reply still proves communication. It returns to good after 300 seconds without
+a communication error and a new confirmed response. Before the first response
+it is unknown; loss of the connection is still handled by normal availability.
+It exposes no frequently changing counters or timestamps.
+
 ## Controls
 
 For availability, use the connection table above. Service controls follow the
@@ -54,6 +72,9 @@ app's **Read-only** setting; direct controls require **Modbus master**.
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
+| `number.*_vehicle_charge_target` | Vehicle charge target | optional configured vehicle SoC source; compatible service in service mode | Percentage ceiling, 0 = off. Only limits charging. Up to 100%, or the separately optional vehicle charge-limit source. Neither setting nor disabling resumes charging. |
+| `number.*_energy_target` | Energy target | lifetime energy counter; compatible service in service mode | Additional kWh from the time you set it, in 0.1 kWh steps, up to 1000. Setting a positive value never starts or resumes charging. Zero disables the goal without resuming. |
+| `button.*_cancel_pending_change` | Cancel pending change | new direct controller or supporting service | Removes the queued action without a wallbox write. Already executed preparation, such as a phase-change pause, remains. Available only while an action is pending. |
 | `number.*_charging_current_limit` | Charging current limit | always | Slider: 0 A removes the energy-manager limit and bypasses extra current caps; 6 A or more sets a limit. Hardware limits still apply. While paused it shows the remembered setpoint; changing it can resume charging. |
 | `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. |
 | `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. |
@@ -88,6 +109,9 @@ remembered resume target while paused, which may be the pending target. See
 
 | Entity | Name | Unit | Class | Needs | Meaning |
 |---|---|---|---|---|---|
+| `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. |
+| `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. |
+| `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
 | `sensor.*_pending_change` | Pending change |  | enum | 0.5.2b2; new service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |
 | `sensor.*_pending_change_due` | Pending change due |  | timestamp | 0.5.2b2; new service for service-owned queues | Planned execution time when known. Empty with no pending action or while awaiting vehicle pause confirmation; afterward shows the end of the extra wait. Enabled by default, with no per-second countdown writes. |
 | `sensor.*_evse_state` | EVSE state |  | enum | always | What the wallbox itself thinks it is doing. The main state sensor. |
@@ -119,6 +143,7 @@ These sit under *Diagnostic* on the device page.
 |---|---|---|---|---|
 | `sensor.*_cp_state` | CP state |  | layout v01.02 | The control-pilot state between wallbox and vehicle. Use the current and power sensors to check actual consumption. |
 | `sensor.*_error_code` | Error code |  | always | The active error, as a documented category. The raw number is in the `code` attribute. |
+| `sensor.*_connection_quality` | Connection quality |  | direct connection or supporting service | `good` or `degraded`; a stable communication-health summary, without recurring counter changes. |
 | `sensor.*_temperature` | Temperature | °C | layout v01.02 | Temperature inside the wallbox. |
 | `sensor.*_modbus_layout_version` | Modbus layout version |  | always | The register layout the firmware implements. Decides which entities exist. Disabled by default. |
 | `sensor.*_downgrade_current` | Downgrade current | A | always | The current limit the wallbox applies while a grid-operator downgrade is active. |
@@ -164,14 +189,16 @@ when it runs, is replaced, or is cancelled; the pending sensors show the wait.
 |---|---|
 | `executed` | The controller accepted the command. |
 | `replaced` | A newer request replaced a pending action. |
-| `cancelled` | Pending work was cancelled when its controller stopped. |
+| `cancelled` | Pending work was cancelled by the user, an energy stop, or controller shutdown. |
 | `failed` | The command failed, including a phase-pause timeout. |
 | `uncertain` | A write may have reached the wallbox but could not be confirmed. Inspect readback before retrying. |
 | `recovery_succeeded` | Fresh status confirmed error code 0 after recovery commands. |
 | `recovery_failed` | A recovery write was rejected, or fresh status still showed an error after the confirmation window. |
 
 The feed covers current, pause/resume, phase selection, release, locking and
-error recovery. Solar display selection and restart do not publish command
+error recovery. Cancelling a queued action reports `cancelled` with reason
+`user_cancelled`; a kWh or percentage goal can cancel queued work with reason
+`energy_goal`. Solar display selection and restart do not publish command
 outcomes.
 
 This is a live notification feed, not a durable audit log. It keeps at most 32
@@ -180,6 +207,9 @@ new baseline without replaying historical outcomes. Heartbeats, polling and
 countdown ticks create no events. Older compatible services keep working;
 the event entity stays unavailable until their service supports this feature.
 See the [notification example](automations.md#react-to-command-results--next-beta-unreleased).
+
+The [energy-target guide](user-guide.md#energy-target--next-beta-unreleased)
+explains restart behavior, measurement failures and stopping accuracy.
 
 ## Enumerated states
 

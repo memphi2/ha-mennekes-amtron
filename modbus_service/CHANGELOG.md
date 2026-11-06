@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add durable energy goals, independent of HA: setting a target never starts or
+  resumes charging; reaching it or losing reliable meter data requests a pause.
+- Recover from a temporary meter outage without resetting the energy target,
+  while preserving deliberate pauses and completed goals.
+- Accept optional source-bound vehicle percentage goals and observations from
+  HA. Missing vehicle data keeps the charge unchanged; reached targets persist.
+- Allow pending-command cancellation without a live wallbox transaction.
+- Report stable Modbus communication quality and advertise new controls through
+  optional capabilities, retaining existing API 2 compatibility.
+
 - Expose a bounded optional command-outcome feed for HA automations. Confirm recovery
   success from fresh error status; keep polling and heartbeats out of the feed.
   Existing API 2 clients remain compatible.

@@ -239,3 +239,101 @@ To generate a Recorder exclusion list using your actual entity IDs, run
 `mennekes_amtron_rtu.get_recorder_exclusions`. Choose your wallboxes and history
 profile, then merge the returned YAML into your configuration. See
 [Recorder profiles](recorder.md#configure-history-retention-and-detail-exclusions).
+
+## Energy target — next beta, unreleased
+
+Set **Energy target** to the additional energy you want the wallbox to supply,
+for example **12 kWh**. The range is 0.1–1000 kWh in 0.1 kWh steps. Each positive
+setting establishes a new goal from a fresh lifetime-energy reading, even if
+you enter the same number again. It **only limits** a charge: it does not start
+charging, lift a pause, unlock the wallbox or enable charging release. Start
+charging yourself or through your existing automation.
+
+At the target, the owner requests a pause and cancels pending charging changes.
+The five-second current-write interval remains, but this stop does not wait for
+the longer state-change interval. **Energy target status** changes to `reached`;
+check **Charging paused** and actual power to confirm that charging stopped.
+The goal is not an exact energy cutoff: measurement cadence (normally up to
+60 seconds for the lifetime counter), meter resolution, communication delays
+and the remaining write interval can cause additional energy to be delivered.
+
+The target and meter baseline survive a controller restart. The independent
+service continues enforcing them during HA Core downtime. Direct mode can only
+monitor and pause while HA is running. A failed or unreadable meter pauses the
+charge instead of guessing how much energy was delivered. A falling counter
+requires your attention. After restart, a counter below the saved baseline
+is also detected; a counter reset during downtime that ends above the baseline
+cannot be distinguished reliably without saving every observation.
+
+With `meter_unavailable`, fresh valid meter readings automatically restore
+monitoring against the original target. If the goal itself paused a previously
+unpaused charge, it can resume through the normal waiting interval. A deliberate
+pause, another charging/current/phase/lock/release command, or a new goal cancels
+that automatic restart. An already
+reached goal, a reset counter, or another active goal's stop remains paused.
+Heartbeat-error recovery likewise respects active goals and deliberate pauses;
+this does not introduce an automatic reset of unrelated wallbox faults.
+Permission to restart after a meter outage lasts only for the running owner.
+After restarting that owner, the target is retained but its error pause stays
+paused until you resume it. Restarting HA alone does not restart the separate app.
+
+For `meter_reset`, check the meter and set a new goal or enter **0** to disable it.
+Neither setting nor disabling a goal resumes charging. A reached goal blocks
+start/resume until you change or disable it. Other limits, authorization, deliberate pauses,
+locks and release settings still apply. Read-only mode disables all writes,
+including goal enforcement.
+
+The goal requires the lifetime energy counter (Modbus layout v01.02 or later).
+An older compatible service keeps its existing functions; update the service to
+use the new goal controls. Switching an entry between direct and service mode
+does not transfer an active goal: the new connection owner has its own stored
+state. Set the intended goal with that owner before continuing the charge.
+
+## Optional vehicle percentage target — next beta, unreleased
+
+The percentage target is **off by default**. In the integration's options,
+select **Vehicle charge level entity** from your existing vehicle integration.
+This adds **Vehicle charge target** and its status sensor. The integration only
+reads that vehicle entity; it does not change the car's settings or estimate
+battery capacity from wallbox energy.
+
+**Vehicle charge limit entity** is a separate, optional selection. Without it,
+you can choose a target up to **100%**. With it, the reported car limit becomes
+the maximum you can select. A falling car limit also lowers an existing target;
+a later increase never raises the target you chose. If this optional source is
+temporarily unavailable, the last valid maximum is kept. Before its first valid
+reading, setting a positive target is refused rather than assuming 100%.
+
+For example, with a reported charge level of 45%, set a target of **80%**.
+Charging pauses when the vehicle reports at least 80%. Setting a target never
+starts charging or lifts a pause; **0%** switches this target off without
+resuming. A reached target stays reached even if the reported charge level later
+falls. Setting a new positive target establishes a new limit. The independent
+kWh target can also remain active: reaching either target stops the charge.
+
+As selected for this integration, missing or invalid vehicle data **does not
+pause charging**. Monitoring resumes when a valid value returns. The same applies
+while HA is down: the service can keep charging, but cannot evaluate an external
+percentage until HA sends vehicle data again. Delayed or unchanged reports from
+the vehicle integration can therefore allow the target to be exceeded. This is
+not a replacement for the car's own charge limit. The five-second write floor
+and wallbox response time also still apply when a stop is requested.
+
+Changing or removing either selected source clears the old percentage target
+and remembered maximum without starting charging. Clear the SoC selection to
+turn off the whole percentage feature; also clear the maximum selection if one
+was configured. The kWh goal is independent. Service
+mode needs an app version advertising percentage-goal support; existing service
+functions remain available on older compatible versions.
+
+## Cancel a queued change — next beta, unreleased
+
+While **Pending change** shows an action, press **Cancel pending change**.
+This removes the queue entry and does not send a wallbox command. A phase-change
+pause already performed stays paused. The remembered current setpoint is kept;
+cancellation does not undo a command that has already reached the wallbox.
+
+Direct-mode cancellation also works during a failed wallbox poll. Service mode
+requires the app to be reachable, authenticated and write-enabled, but its
+wallbox connection may be down. Older services need updating to support this
+button. It becomes unavailable again when there is no pending work.
