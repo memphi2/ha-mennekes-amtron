@@ -17,6 +17,12 @@ configuration:
   current_cap:
     name: Current cap
     description: Maximum requested EMS current in amperes. Explicit 0 A commands remove the EMS limit.
+  state_change_interval_seconds:
+    name: Minimum time between state changes
+    description: "Minimum seconds between charging starts, pauses, release changes, locking or unlocking, and phase changes (default 300). Early commands are queued; the latest command replaces the previous one. The five-second current-write interval still applies. Set 0 to disable the longer interval."
+  phase_switch_grace_seconds:
+    name: "Extra wait before phase changes"
+    description: "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required."
   scan_interval:
     name: Status interval
     description: Seconds between status polls. The heartbeat runs independently.

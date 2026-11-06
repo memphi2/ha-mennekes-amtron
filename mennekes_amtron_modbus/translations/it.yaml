@@ -17,6 +17,12 @@ configuration:
   current_cap:
     name: Corrente massima
     description: Corrente EMS massima richiesta in ampere. I comandi espliciti con 0 A rimuovono il limite EMS.
+  state_change_interval_seconds:
+    name: Intervallo minimo tra cambiamenti di stato
+    description: "Intervallo minimo in secondi tra avvii, pause e cambiamenti del consenso alla ricarica, del blocco o delle fasi (predefinito 300). I comandi anticipati vengono accodati; l’ultimo sostituisce il precedente. Rimane l’intervallo di cinque secondi tra le scritture della corrente. Impostare 0 per disabilitare l’intervallo più lungo."
+  phase_switch_grace_seconds:
+    name: "Attesa aggiuntiva prima del cambio delle fasi"
+    description: "Secondi di attesa aggiuntivi tra la conferma della pausa di ricarica da parte del veicolo e il cambio delle fasi (predefinito 5, da 0 a 30). Impostare 0 per eliminare solo questa attesa aggiuntiva; la conferma della pausa rimane obbligatoria."
   scan_interval:
     name: Intervallo di stato
     description: Secondi tra le letture dello stato. L'heartbeat funziona indipendentemente.
