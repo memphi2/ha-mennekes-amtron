@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from check_service_apparmor import APP_CONNECTIONS
 
 from custom_components.mennekes_amtron_rtu.device.connection import (
     NetworkConfig,
@@ -19,6 +20,8 @@ CHOICES = {
     "USB / RS-485": "serial",
     "LAN: Modbus RTU (TCP)": "rtu_over_tcp",
     "LAN: Modbus TCP": "modbus_tcp",
+}
+STANDALONE_CHOICES = {
     "serial": "serial",
     "rtu_over_tcp": "rtu_over_tcp",
     "modbus_tcp": "modbus_tcp",
@@ -42,15 +45,17 @@ def test_app_shows_host_even_before_a_network_address_has_been_entered(app_confi
     assert config.connection == SerialConfig("/dev/fake")
 
 
-def test_app_offers_readable_choices_and_keeps_published_settings_valid(app_config):
+def test_app_offers_exactly_three_readable_choices_without_duplicate_transports(app_config):
     schema = app_config["schema"]["connection_type"]
     assert schema.startswith("list(")
     assert schema.endswith(")")
     assert schema[5:-1].split("|") == list(CHOICES)
+    assert len(set(CHOICES.values())) == 3
+    assert {protocol: label for label, protocol in CHOICES.items()} == APP_CONNECTIONS
 
 
-@pytest.mark.parametrize(("selection", "protocol"), CHOICES.items())
-def test_every_app_choice_selects_the_expected_transport(app_config, selection, protocol):
+@pytest.mark.parametrize(("selection", "protocol"), (CHOICES | STANDALONE_CHOICES).items())
+def test_app_and_standalone_choices_select_the_expected_transport(app_config, selection, protocol):
     options = {
         **app_config["options"],
         "connection_type": selection,
@@ -70,7 +75,7 @@ def test_every_app_choice_selects_the_expected_transport(app_config, selection, 
 
 
 @pytest.mark.parametrize(
-    "selection", [choice for choice, protocol in CHOICES.items() if protocol != "serial"]
+    "selection", [choice for choice, protocol in (CHOICES | STANDALONE_CHOICES).items() if protocol != "serial"]
 )
 @pytest.mark.parametrize("host", [None, "", " ", "http://gateway.local", "gateway.local:502"])
 def test_lan_choices_require_an_address_even_when_usb_fields_are_valid(

@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.5.2b1 — 2026-11-06
+
+- Verify a known physical wallbox identity after reconnects and before control
+  writes. Reject changed or missing serial numbers without altering saved
+  charging intent, and recover when the original wallbox returns.
+- Ignore malformed optional device text without breaking initialization or
+  polling, and decode NUL-terminated strings without interpreting unused bytes.
+- Discard an older deferred current target when a newer write loses its reply
+  or is cancelled. Preserve the latest explicit target through recovery and
+  service restarts instead of later restoring the superseded value.
+- Retry automatic heartbeat recovery when error 200 returns during its final
+  check, even if the preceding fresh check needed no recovery writes.
+- Retain confirmed heartbeat and fallback repairs when their status register
+  temporarily cannot be read; clear them only after a healthy reading.
+- Treat excessively nested service responses as invalid and mark the connection
+  unavailable instead of leaving cached availability after a decoder error.
+- Show exactly three readable app connection choices. Older technical choices
+  need a one-time selection of their matching readable name; standalone
+  configuration files keep accepting the technical names.
+- Add a custom AppArmor profile for the Supervisor app, with limited runtime and
+  state-file access, plus a dedicated enforcement check using simulated USB/LAN
+  transports on native AMD64 and ARM64 runners before publishing an app image.
+
 ## 0.5.1 — 2026-11-05
 
 - Release the Modbus app independently when its service changes. Integration

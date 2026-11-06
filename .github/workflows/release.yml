@@ -242,12 +242,21 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - name: Install AppArmor validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends apparmor
       - name: Build, smoke-test and push the native image candidate
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
           ARCHITECTURE: ${{ matrix.architecture }}
         run: python scripts/service_image.py build --tag "$RELEASE_TAG" --architecture "$ARCHITECTURE" --path ".release/image-$ARCHITECTURE.json"
+      - name: Show test-profile denials after a failed validation
+        if: failure()
+        run: |
+          sudo journalctl --dmesg --no-pager --since '10 minutes ago' |
+            grep -F 'profile="amtron-ci-' | tail -n 60 || true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: service-image-${{ matrix.architecture }}

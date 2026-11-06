@@ -29,16 +29,22 @@ _DATATYPES: Mapping[RegisterDataType, ModbusClientMixin.DATATYPE] = {
 def decode_register(spec: RegisterSpec, words: Sequence[int]) -> RegisterValue:
     """Decode the words of one register range into a Python value.
 
-    Returns ``None`` for a short read and for a float the device reports as
-    NaN or infinity, so a broken frame never reaches an entity as a number.
+    Returns ``None`` for a short read, invalid text and a float the device
+    reports as NaN or infinity, so invalid values do not break the whole poll.
     """
 
     if len(words) < spec.count:
         return None
     raw = list(words[: spec.count])
-    value = ModbusClientMixin.convert_from_registers(raw, _DATATYPES[spec.datatype])
     if spec.datatype is RegisterDataType.STRING:
-        return _clean_string(value)
+        # The register strings are NUL terminated. Unused bytes after the
+        # terminator are not text and need not contain valid UTF-8.
+        encoded = b"".join(word.to_bytes(2, "big") for word in raw).split(b"\x00", 1)[0]
+        try:
+            return _clean_string(encoded.decode("utf-8"))
+        except UnicodeDecodeError:
+            return None
+    value = ModbusClientMixin.convert_from_registers(raw, _DATATYPES[spec.datatype])
     if spec.datatype is RegisterDataType.FLOAT32:
         return value if isinstance(value, float) and math.isfinite(value) else None
     return value if isinstance(value, int) else None

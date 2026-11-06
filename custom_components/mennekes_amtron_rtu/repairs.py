@@ -80,21 +80,26 @@ def async_check_repairs(
     data = runtime_data.coordinator.current_data()
     identity = runtime_data.identity
 
-    _set_issue(
-        hass,
-        entry,
-        ISSUE_EMS_HEARTBEAT_LOST,
-        heartbeat_lost(data),
-        severity=ir.IssueSeverity.ERROR,
-        is_fixable=True,
-    )
-    _set_issue(
-        hass,
-        entry,
-        ISSUE_EMS_FALLBACK_NOT_CONFIGURED,
-        fallback_not_configured(data),
-        severity=ir.IssueSeverity.WARNING,
-    )
+    # A failed block read removes its values from the current snapshot. Missing
+    # evidence must not clear a confirmed fault or repeatedly recreate the same
+    # issue when the register becomes readable again.
+    if data.has("error_code"):
+        _set_issue(
+            hass,
+            entry,
+            ISSUE_EMS_HEARTBEAT_LOST,
+            heartbeat_lost(data),
+            severity=ir.IssueSeverity.ERROR,
+            is_fixable=True,
+        )
+    if data.has("ems_fallback_current"):
+        _set_issue(
+            hass,
+            entry,
+            ISSUE_EMS_FALLBACK_NOT_CONFIGURED,
+            fallback_not_configured(data),
+            severity=ir.IssueSeverity.WARNING,
+        )
     _set_issue(
         hass,
         entry,

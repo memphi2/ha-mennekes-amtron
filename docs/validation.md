@@ -4,6 +4,34 @@ Run the normal suite with `.venv/bin/python scripts/check_validate.py`.
 The minimum HA environment uses `--skip-typing`; latest stable HA
 also runs strict typing. These checks do not access a physical wallbox.
 
+## Fault regressions
+
+The suite includes failures that a successful normal charging cycle does not
+exercise:
+
+- A newer current write can reach the wallbox even if its reply is lost or its
+  caller is cancelled. Tests verify that an older queued value is discarded,
+  the latest intent is saved, and a service restart followed by pause/resume
+  does not bring the older value back.
+- A failed status-register read must retain an existing heartbeat or fallback
+  repair. Only a valid healthy reading clears it, without repeatedly deleting
+  and recreating the issue.
+- Error 200 can disappear during recovery's fresh precondition read and return
+  in its final poll. Automatic recovery keeps a delayed retry for that race.
+- Invalid optional device text must not abort initialization or polling;
+  unused bytes after the NUL terminator are ignored.
+- A service response within the byte-size limit can still exceed the JSON
+  decoder's nesting limit. The HTTP client reports invalid data and marks the
+  connection unavailable instead of retaining a usable cached connection.
+- Replacing the wallbox behind the same USB/LAN endpoint must not authorize
+  writes with cached identity. Tests change the simulated device registers,
+  exercise reconnection and an already-open link, and verify rejection without
+  changed intent, followed by recovery when the original device returns.
+
+These tests use real decoders, the shared control/poll paths and simulated
+Modbus or HTTP responses. They complement hardware tests; passing them does
+not establish that every possible device or timing fault has been covered.
+
 ## Coverage requirements
 
 The coverage gate evaluates statements and branches together, using the
@@ -88,6 +116,35 @@ test failure or timeout retains the available samples. CI uploads this report
 even when the test fails. With `--json-output`, checkpoints are written directly
 to the artifact path so they also survive interruption of the runner itself.
 A partial report cannot pass validation.
+
+## AppArmor enforcement
+
+App 0.5.2b1 adds a custom profile for the Supervisor app. Syntax validation and
+runtime enforcement are separate checks. A parser run must accept the pinned
+ABI and rules without warnings; it does not prove that the service can operate
+under those rules.
+
+The enforcement check is designed for a **disposable Linux CI runner** with
+Docker, kernel AppArmor support and passwordless `sudo -n`:
+
+```bash
+.venv/bin/python scripts/check_service_apparmor.py --image IMAGE
+```
+
+Replace `IMAGE` with the locally built service image. This check loads a uniquely
+named profile through `sudo -n`, runs the actual service image under enforcement,
+and removes its test containers and profile afterward. It tests simulated USB,
+RTU-over-TCP and Modbus TCP connections, heartbeat, permitted token/state writes,
+restart and shutdown. Negative probes must reject writes outside the service's
+state files, modification of options, protected-file reads and shell execution.
+A successful startup alone cannot pass the enforcement check.
+
+The native AMD64 and ARM64 CI jobs run this check on every `beta`/`main` push and
+pull request. Release builds require it before pushing an app image. Missing
+AppArmor support or a failed enforcement check stops the job. On development
+hosts without Docker or permission to load profiles, `--compile-only` verifies
+syntax and explicitly reports that enforcement was not tested. Simulated
+transports do not establish behavior on physical adapters or wallbox firmware.
 
 ## Published release verification
 

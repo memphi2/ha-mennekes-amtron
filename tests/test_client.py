@@ -32,8 +32,10 @@ def test_default_client_factory_does_not_retain_its_owner():
     try:
         client = MennekesModbusClient(CONFIG)
         reference = weakref.ref(client)
+        trace_connect = client._trace_connect
         del client
         assert reference() is None
+        trace_connect(True)
     finally:
         if enabled:
             gc.enable()

@@ -33,6 +33,7 @@ def export(destination: Path) -> None:
     shutil.copy2(ROOT / "modbus_service/README.md", destination / "README.md")
     shutil.copy2(ROOT / "modbus_service/DOCS.md", destination / "DOCS.md")
     shutil.copy2(ROOT / "modbus_service/CHANGELOG.md", destination / "CHANGELOG.md")
+    shutil.copy2(ROOT / "modbus_service/apparmor.txt", destination / "apparmor.txt")
     shutil.copytree(ROOT / "modbus_service/translations", destination / "translations")
     target = destination / "custom_components/mennekes_amtron_rtu/device"
     target.mkdir(parents=True)

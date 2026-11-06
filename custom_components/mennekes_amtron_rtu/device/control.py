@@ -26,6 +26,7 @@ from .capabilities import phase_switch_is_supported
 from .client import MennekesModbusClient
 from .client_errors import (
     AmtronBusError,
+    AmtronIdentityError,
     AmtronIllegalAddressError,
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
@@ -250,10 +251,10 @@ class AmtronControl:
             self.charging_release_requested = released
             try:
                 await self._async_write(CHARGING_RELEASE, int(released))
-            except (DeviceError, asyncio.CancelledError):
+            except (DeviceError, asyncio.CancelledError) as err:
                 # A failed block command still expresses the user's intent.
                 # A failed enable must never erase a previously blocked state.
-                if released:
+                if released or isinstance(err.__cause__, AmtronIdentityError):
                     self.charging_release_requested = previous
                 raise
 
@@ -450,16 +451,24 @@ class AmtronControl:
             self._ensure_flush_task()
             return
         except (DeviceError, asyncio.CancelledError) as err:
-            if mode_change and not isinstance(
-                err.__cause__, (AmtronWriteRejectedError, AmtronIllegalAddressError)
-            ):
+            uncertain = not isinstance(
+                err.__cause__, (AmtronWriteRejectedError, AmtronIllegalAddressError, AmtronIdentityError)
+            )
+            if uncertain:
+                # The newer current may already have reached the wallbox.
+                # Never let an older queued slider target undo it afterwards.
+                self._pending_current = None
+                self._write_state.confirmed_current = None
+                if value == CHARGING_CURRENT_UNLIMITED or value >= CHARGING_CURRENT_MINIMUM:
+                    # Retain the latest explicit intent for persistence and
+                    # recovery, not the superseded deferred slider target.
+                    self.charging_setpoint = value
+            if mode_change and uncertain:
                 # A lost acknowledgement/cancellation may follow an applied
                 # pause or resume. Unknown outcome must not remove hysteresis.
-                self._write_state.confirmed_current = None
                 self._write_state.mode_change_at = self._monotonic()
                 if 0 < value < CHARGING_CURRENT_MINIMUM:
                     self.pause_requested = True
-                    self._pending_current = None
                     # The wallbox may already be paused. Keep the known
                     # pre-pause current so a later resume cannot silently
                     # fall back to the configured maximum after a lost ACK.
@@ -573,6 +582,8 @@ class AmtronControl:
             self._diagnostics.timeline.record(EventType.WRITE_RATE_LIMITED, register=spec.address)
             raise
         except AmtronBusError as err:
+            if isinstance(err, AmtronIdentityError):
+                raise device_error("device_identity_changed") from err
             self._diagnostics.timeline.record(EventType.WRITE_REJECTED, register=spec.address)
             self._diagnostics.writes_rejected += 1
             if spec != HEARTBEAT:

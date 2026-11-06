@@ -51,6 +51,14 @@ host, TCP port and device address; serial baud/frame are configured on the
 gateway. HA-to-service HTTP remains a separate connection. See
 [LAN setup](network-gateway.md) and the [security boundary](../SECURITY.md#threat-model).
 
+The 0.5.2b1 driver binds a readable serial number to the client. Reconnection
+invalidates that verification; the next transaction checks it again under the
+bus lock. Control writes also read the serial to catch a downstream gateway
+change without a TCP disconnect. A mismatch blocks writes and preserves saved
+intent. Ordinary heartbeat delivery adds no serial-number read or Recorder
+update. Devices without a readable serial retain their documented endpoint
+binding limitation.
+
 `tests/test_service_process.py` runs the server in a separate process over a
 virtual serial Modbus bus while a real HA instance stops and starts. It checks
 continued heartbeat delivery, unchanged pause and absence of replayed commands.

@@ -11,11 +11,16 @@ from custom_components.mennekes_amtron_rtu.device.client import (
     SerialConfig,
 )
 from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
+from custom_components.mennekes_amtron_rtu.device.data import (
+    ConnectionState,
+    WallboxData,
+)
 from custom_components.mennekes_amtron_rtu.device.identity import (
     async_read_identity,
     model_name,
 )
 from custom_components.mennekes_amtron_rtu.device.models import ARTICLE_MODELS
+from custom_components.mennekes_amtron_rtu.device.poller import DevicePoller
 from tests.fakes import FakeModbusClient, device_bank, put
 
 CONFIG = SerialConfig(port="/dev/fake", device_id=50)
@@ -92,6 +97,30 @@ def test_a_register_that_fails_is_simply_absent() -> None:
     identity = asyncio.run(_identity(transport))
     assert identity.serial_number is None
     assert identity.article_number == "1313201205"
+
+
+@pytest.mark.parametrize("spec", [R.FIRMWARE_VERSION, R.SERIAL_NUMBER, R.ARTICLE_NUMBER])
+def test_invalid_optional_text_keeps_identity_and_status_polling_usable(spec) -> None:
+    async def run():
+        bank = device_bank()
+        bank[spec.address] = 0xFFFF
+        transport = FakeModbusClient(bank)
+        client = MennekesModbusClient(CONFIG, client_factory=lambda _config: transport)
+        await client.async_connect()
+        try:
+            identity = await async_read_identity(client)
+            assert getattr(identity, spec.key) is None
+            assert identity.layout_version == R.LAYOUT_V01_03
+            assert identity.max_evse_current == 16.0
+            poller = DevicePoller(client, identity, connection_state=ConnectionState())
+            data = await poller.async_poll(WallboxData(), last_success=False)
+            assert data.get(spec.key) is None
+            assert data.get("evse_state") == 1
+            assert data.get("charging_current_ems") == 16.0
+        finally:
+            await client.async_close()
+
+    asyncio.run(run())
 
 
 def test_a_device_without_a_layout_version_is_refused() -> None:

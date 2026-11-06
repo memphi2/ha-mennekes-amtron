@@ -1,10 +1,9 @@
 """Actions of the MENNEKES AMTRON integration.
 
-The current action exists because its dangerous argument cannot
-be offered safely as an entity: writing 0 A to 0x0302 removes the charging
-limit instead of stopping the charge. The number entity therefore never
-reaches 0 A, and a user who really wants "no limitation" has to say so
-explicitly here.
+Writing 0 A to 0x0302 removes the charging limit instead of stopping the
+charge. The number entity treats selecting zero as explicit intent; this
+action additionally requires ``allow_unlimited`` for a zero-current request.
+Pausing uses the dedicated charging-pause switch.
 """
 
 from __future__ import annotations

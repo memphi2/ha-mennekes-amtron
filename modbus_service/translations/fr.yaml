@@ -31,7 +31,7 @@ configuration:
     description: Fixé à 8765 ; la publication du port sur l’hôte est facultative et généralement inutile.
   connection_type:
     name: Connexion à la borne
-    description: "USB / RS-485 : adaptateur local. LAN: Modbus RTU (TCP) : adaptateur réseau transparent. LAN: Modbus TCP : passerelle traduisant TCP en RTU. Les anciennes valeurs serial, rtu_over_tcp et modbus_tcp restent valides pour les configurations existantes."
+    description: "USB / RS-485 : adaptateur local. LAN: Modbus RTU (TCP) : adaptateur réseau transparent. LAN: Modbus TCP : passerelle traduisant TCP en RTU."
   host:
     name: Hôte / adresse IP de l’adaptateur
     description: "Obligatoire en mode réseau : nom d’hôte ou adresse IP de l’adaptateur, sans schéma ni chemin d’URL. Laissez vide pour USB / RS-485. Utilisez un réseau privé de confiance."

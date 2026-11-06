@@ -63,7 +63,7 @@ def catalog_files(
     app = ROOT / "modbus_service"
     files = {
         prefix + name: (app / name).read_bytes()
-        for name in ("config.yaml", "README.md", "DOCS.md", "CHANGELOG.md")
+        for name in ("config.yaml", "README.md", "DOCS.md", "CHANGELOG.md", "apparmor.txt")
     }
     config = yaml.safe_load(files[prefix + "config.yaml"])
     if "image" in config:

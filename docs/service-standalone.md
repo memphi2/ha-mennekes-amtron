@@ -4,9 +4,11 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-**Current service release: 0.5.1.** The service and integration are installed and
+**Stable service: 0.5.1 · Beta: 0.5.2b1.** The service and integration are installed and
 updated independently. Their version numbers may differ; the current integration
 requires **service 0.5.0 or newer with API 2**. See [Updates](#operation-and-updates).
+To test the beta, use the **v0.5.2b1** release's container reference or source
+archive in the installation steps below; the defaults remain stable.
 
 ## 1. Prepare the serial handover
 
@@ -158,8 +160,9 @@ integration version exists.
 If both need updating, replace the service first, retaining its data directory,
 and wait for initialization. Then update the integration and restart Core.
 Retaining the same data mount preserves saved intent and credentials; no new HA
-entry is needed. For older 0.5.0 betas, upgrade the service to stable **0.5.1
-first**, then update the integration: the old beta integration may show
+entry is needed. For older 0.5.0 betas, upgrade the service to API 2 first
+(stable **0.5.1**, or **0.5.2b1** for beta testing), then update the integration:
+the old beta integration may show
 unavailable controls between those updates because its API differs. With writes enabled, the updated service keeps
 its heartbeat and charging intent while HA updates.
 

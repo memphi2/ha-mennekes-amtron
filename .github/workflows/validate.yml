@@ -3,7 +3,7 @@ name: Validate
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, beta]
   schedule:
     - cron: "43 5 * * 2"
   workflow_dispatch:
@@ -105,6 +105,17 @@ jobs:
           docker run --rm amtron-service:test python -m pip check
           python -m pip install -r requirements-dev.txt
           python scripts/service_image.py smoke --image amtron-service:test
+      - name: Install AppArmor validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends apparmor
+      - name: Require the service to run under its AppArmor profile
+        run: python scripts/check_service_apparmor.py --image amtron-service:test
+      - name: Show test-profile denials after a failed validation
+        if: failure()
+        run: |
+          sudo journalctl --dmesg --no-pager --since '10 minutes ago' |
+            grep -F 'profile="amtron-ci-' | tail -n 60 || true
 
   # Preview checks are maintenance signals, not part of the PR/release matrix.
   # Resolve the newest available prerelease instead of keeping an old beta pin.

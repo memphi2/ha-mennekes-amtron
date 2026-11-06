@@ -3,6 +3,6 @@ WORKDIR /app
 COPY pyproject.toml requirements-service.txt LICENSE NOTICE ./
 COPY custom_components/mennekes_amtron_rtu/device ./custom_components/mennekes_amtron_rtu/device
 RUN python -m pip install --no-cache-dir -r requirements-service.txt .
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8765
 CMD ["amtron-modbus-service", "--config", "/data/options.json", "--state", "/data/intent.json"]

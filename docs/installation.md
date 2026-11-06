@@ -114,11 +114,11 @@ already meets that requirement. A normal integration update does not update or
 restart the compatible app; its heartbeat and charging intent continue through
 Core's restart when writes are enabled.
 
-**Still using a 0.5.0 beta?** Update the app/service to stable **0.5.1 first**, then
-update the integration. The old beta integration may show unavailable controls
-between these updates because its API differs. Existing beta-app installations
-receive stable app releases through their existing catalog: no reinstall or
-repository change is needed. See [service updates](modbus-service.md#updates).
+**Still using a 0.5.0 beta?** Update the app/service to an API 2 release first:
+**0.5.1** for stable use, or **0.5.2b1** when testing this beta. Then update the
+integration. The old beta integration may show unavailable controls between
+these updates because its API differs. Keep the existing app and follow
+[service updates](modbus-service.md#updates), including the connection choice.
 
 Updates can take time to appear; use **Check for updates** in the app store for
 app updates. See
@@ -128,6 +128,27 @@ Moving from HACS to the Marketplace does not require a second installation or
 adding the wallbox again; [HA carries over the existing repositories](https://contributors.home-assistant.io/marketplace/how-it-works/#before-home-assistant-202611).
 For blueprint changes, follow
 [Updating existing automations](blueprints.md#updating-existing-blueprint-automations).
+
+## Beta testing 0.5.2b1
+
+**0.5.2b1 is a prerelease of both the integration and service.** Stable remains
+0.5.1. Keep the existing HA entry and back up the app's data before testing.
+
+- **Marketplace:** open this repository, enable its **Pre-release** switch and
+  select **0.5.2b1**. See [Marketplace prereleases](https://contributors.home-assistant.io/marketplace/guides/releases/#pre-releases).
+- **HACS:** open Mennekes Amtron RTU, choose **⋮ → Redownload → Need a different
+  version?**, then select **v0.5.2b1**, download and restart Core.
+- **App:** the beta is offered through
+  `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`. Existing users of that
+  catalog can use **Check for updates** and update normally. The stable `#apps`
+  catalog stays on 0.5.1. Switching catalogs creates a separate app; follow the
+  [channel handover](modbus-service.md#updates) instead of running both apps.
+
+Before updating the app from 0.5.1, save one of the three readable connection
+choices if a technical value such as `serial` is still selected; see
+[App connection choice](upgrading.md#app-connection-choice). Update the app
+first, wait for initialization, then update the integration. Check charging,
+pause, current limiting and heartbeat on your hardware after the update.
 
 ## Change settings later
 

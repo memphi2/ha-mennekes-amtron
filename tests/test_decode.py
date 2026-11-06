@@ -36,6 +36,14 @@ def test_ascii_of_only_padding_is_none() -> None:
     assert decode_register(R.SERIAL_NUMBER, [0] * 8) is None
 
 
+def test_malformed_text_is_absent_instead_of_crashing_the_poll() -> None:
+    assert decode_register(R.SERIAL_NUMBER, [0xFFFF] * 8) is None
+
+
+def test_text_terminator_precedes_decoding_unused_register_bytes() -> None:
+    assert decode_register(R.SERIAL_NUMBER, [0x4142, 0x4300] + [0xFFFF] * 6) == "ABC"
+
+
 def test_non_finite_float_is_rejected() -> None:
     assert decode_register(R.POWER_TOTAL, [0x7FC0, 0x0000]) is None
     assert decode_register(R.POWER_TOTAL, [0x7F80, 0x0000]) is None

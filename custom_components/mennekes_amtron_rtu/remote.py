@@ -120,7 +120,7 @@ class RemoteClient(MennekesModbusClient):
 
                 try:
                     data = json.loads(raw)
-                except ValueError as err:
+                except (ValueError, RecursionError) as err:
                     raise ServiceConnectionError("service_invalid_response", "service response is not JSON") from err
                 if not isinstance(data, dict):
                     raise ServiceConnectionError("service_invalid_response", "service response is not an object")

@@ -75,6 +75,7 @@ async def async_read_identity(client: MennekesModbusClient) -> DeviceIdentity:
     identity.max_evse_current = usable_max_evse_current(
         await _optional_float(client, MAX_EVSE_CURRENT, layout)
     )
+    client.bind_identity(identity.serial_number)
     return identity
 
 

@@ -10,10 +10,12 @@ import re
 import shutil
 import subprocess
 from copy import deepcopy
+from functools import partial
 
 import pytest
 import yaml
 
+from scripts import build_service_app as app_export
 from scripts import publish_service_catalog as catalog
 from scripts import service_image as images
 from scripts.build_service_app import export
@@ -143,7 +145,6 @@ def test_build_evidence_uses_the_local_push_digest_not_the_remote_tag(
     monkeypatch.setenv("GITHUB_RUN_ID", "123")
     monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
     monkeypatch.setattr(images, "remote_commit", lambda *_: INFO["commit"])
-    monkeypatch.setattr(images, "smoke", lambda *_: None)
     monkeypatch.setattr(
         images.subprocess,
         "run",
@@ -163,6 +164,88 @@ def test_build_evidence_uses_the_local_push_digest_not_the_remote_tag(
     images.build(INFO, "amd64", output)
     assert json.loads(output.read_text())["digest"] == DIGEST
     assert inspected == [f"{INFO['image']}:build-123-1-amd64"]
+
+
+@pytest.mark.parametrize("profile_passes", [True, False])
+def test_native_candidate_must_pass_the_profile_harness_before_any_push(
+    tmp_path, monkeypatch, profile_passes
+):
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+    candidate = f"{INFO['image']}:build-123-1-amd64"
+    events = []
+
+    def subprocess_run(command, **kwargs):
+        events.append(tuple(command))
+        assert kwargs["check"] is True
+        if command[0] == images.sys.executable:
+            assert command == [
+                images.sys.executable, str(images.ROOT / "scripts/check_service_apparmor.py"),
+                "--image", candidate,
+            ]
+            assert kwargs["cwd"] == images.ROOT
+            if not profile_passes:
+                raise subprocess.CalledProcessError(1, command)
+        return subprocess.CompletedProcess(command, 0)
+
+    def run(*args):
+        events.append(args)
+        if args[:3] == ("docker", "image", "inspect"):
+            return json.dumps([f"{INFO['image']}@{DIGEST}"]).encode()
+        return b""
+
+    def remote_commit(*_args):
+        events.append(("source-check",))
+        return INFO["commit"]
+
+    monkeypatch.setattr(images.subprocess, "run", subprocess_run)
+    monkeypatch.setattr(images, "run", run)
+    monkeypatch.setattr(images, "remote_commit", remote_commit)
+    output = tmp_path / "image-amd64.json"
+    if profile_passes:
+        images.build(INFO, "amd64", output)
+        assert output.is_file()
+        assert [event[0] for event in events] == [
+            "docker", "docker", "docker", images.sys.executable,
+            "source-check", "docker", "docker",
+        ]
+        assert events[-2] == ("docker", "push", candidate)
+    else:
+        with pytest.raises(subprocess.CalledProcessError):
+            images.build(INFO, "amd64", output)
+        assert not output.exists()
+        assert not any(event[:2] == ("docker", "push") for event in events)
+        assert ("source-check",) not in events
+
+
+@pytest.mark.parametrize("profile", [None, "amtron-test-123"])
+def test_api_smoke_uses_init_and_exact_profile_only_when_requested(monkeypatch, profile):
+    commands = []
+
+    def stop_before_container_start(*command):
+        commands.append(command)
+        raise RuntimeError("startup intercepted")
+
+    monkeypatch.setattr(images, "run", stop_before_container_start)
+    with pytest.raises(RuntimeError, match="startup intercepted"):
+        images.smoke("amtron-service:test", apparmor_profile=profile)
+    assert len(commands) == 1
+    command = commands[0]
+    assert command[:3] == ("docker", "run", "--detach")
+    assert ("--init" in command) is (profile is not None)
+    assert [arg for arg in command if arg.startswith("--security-opt=apparmor=")] == (
+        [] if profile is None else [f"--security-opt=apparmor={profile}"]
+    )
+    assert "--read-only" in command
+    assert "--cap-drop=ALL" in command
+    assert "--security-opt=no-new-privileges" in command
+
+
+@pytest.mark.parametrize("profile", ["", "unconfined", "name/other", "name\n", "name space", "-name", "a" * 129, True])
+def test_api_smoke_rejects_invalid_or_unconfined_profile_before_docker(monkeypatch, profile):
+    monkeypatch.setattr(images, "run", lambda *_args: pytest.fail("Docker must not run"))
+    with pytest.raises(ValueError, match="AppArmor profile"):
+        images.smoke("amtron-service:test", apparmor_profile=profile)
 
 
 @pytest.mark.parametrize(
@@ -245,6 +328,9 @@ def test_catalogs_are_separate_and_allowlist_only_distributable_files(version, c
     assert yaml.safe_load(files["repository.yaml"])["url"].endswith(f"#{channel}")
     assert "mennekes_amtron_modbus/config.yaml" in files
     assert "mennekes_amtron_modbus/DOCS.md" in files
+    assert files["mennekes_amtron_modbus/apparmor.txt"] == (
+        images.ROOT / "modbus_service/apparmor.txt"
+    ).read_bytes()
     languages = {
         path.stem
         for path in (images.ROOT / "custom_components/mennekes_amtron_rtu/translations").glob("*.json")
@@ -266,6 +352,7 @@ def test_catalogs_are_separate_and_allowlist_only_distributable_files(version, c
     assert json.loads(files["release.json"])["catalog_channel"] == channel
     config = yaml.safe_load(files["mennekes_amtron_modbus/config.yaml"])
     assert "image" not in config  # Supervisor must select the build path.
+    assert config["apparmor"] is True
     assert files["mennekes_amtron_modbus/Dockerfile"] == (
         f"FROM {INFO['image']}@{DIGEST}\n".encode()
     )
@@ -334,6 +421,7 @@ def test_stable_promotion_keeps_provenance_and_catalog_identity_separate():
     preview = catalog.catalog_files(info, DIGEST, branch="apps-beta")
     assert stable["mennekes_amtron_modbus/Dockerfile"] == preview["mennekes_amtron_modbus/Dockerfile"]
     assert stable["mennekes_amtron_modbus/config.yaml"] == preview["mennekes_amtron_modbus/config.yaml"]
+    assert stable["mennekes_amtron_modbus/apparmor.txt"] == preview["mennekes_amtron_modbus/apparmor.txt"]
     assert yaml.safe_load(preview["repository.yaml"])["url"].endswith("#apps-beta")
     metadata = json.loads(preview["release.json"])
     assert metadata == {**info, "digest": DIGEST, "catalog_channel": "apps-beta"}
@@ -535,8 +623,33 @@ def test_local_export_builds_the_checkout_instead_of_pulling_a_published_image(
     export(output)
     assert "image" not in yaml.safe_load((output / "config.yaml").read_text())
     assert (output / "Dockerfile").is_file()
+    assert (output / "apparmor.txt").read_bytes() == (
+        images.ROOT / "modbus_service/apparmor.txt"
+    ).read_bytes()
     with pytest.raises(FileExistsError):
         export(output)
+
+
+@pytest.mark.parametrize("distribution", ["catalog", "local"])
+def test_app_exports_fail_instead_of_silently_omitting_the_security_profile(
+    tmp_path, monkeypatch, distribution
+):
+    source = tmp_path / "source"
+    source.mkdir()
+    for name in ("Dockerfile", "pyproject.toml", "requirements-service.txt", "LICENSE", "NOTICE"):
+        shutil.copy2(images.ROOT / name, source / name)
+    shutil.copytree(images.ROOT / "modbus_service", source / "modbus_service")
+    profile = source / "modbus_service/apparmor.txt"
+    profile.unlink()
+    if distribution == "catalog":
+        monkeypatch.setattr(catalog, "ROOT", source)
+        generate = partial(catalog.catalog_files, INFO, DIGEST)
+    else:
+        monkeypatch.setattr(app_export, "ROOT", source)
+        generate = partial(app_export.export, tmp_path / "exported")
+    with pytest.raises(FileNotFoundError) as error:
+        generate()
+    assert error.value.filename == str(profile)
 
 
 def test_app_translations_cover_every_configuration_option():
@@ -560,6 +673,32 @@ def test_release_pipeline_orders_image_release_and_catalog_publication():
     assert "service-manifest" in jobs["service-catalog"]["needs"]
     assert jobs["service-catalog"]["concurrency"]["cancel-in-progress"] is False
     assert jobs["service-catalog"]["concurrency"]["group"] == "service-catalog"
+
+
+def test_beta_pushes_require_native_profile_validation_and_codeql():
+    workflows = images.ROOT / ".github/workflows"
+    validate = yaml.safe_load((workflows / "validate.yml").read_text())
+    codeql = yaml.safe_load((workflows / "codeql.yml").read_text())
+    for workflow in (validate, codeql):
+        # PyYAML's YAML 1.1 loader reads the GitHub Actions 'on' key as True.
+        triggers = workflow.get("on", workflow.get(True))
+        assert set(triggers["push"]["branches"]) == {"main", "beta"}
+    job = validate["jobs"]["modbus-service"]
+    assert "if" not in job
+    assert not job.get("continue-on-error")
+    assert {item["architecture"] for item in job["strategy"]["matrix"]["include"]} == {"amd64", "aarch64"}
+    steps = job["steps"]
+    checks = [step for step in steps if "check_service_apparmor.py" in step.get("run", "")]
+    assert len(checks) == 1
+    check = checks[0]
+    assert check["run"] == "python scripts/check_service_apparmor.py --image amtron-service:test"
+    assert "if" not in check
+    assert not check.get("continue-on-error")
+    assert "apt-get install --yes --no-install-recommends apparmor" in steps[steps.index(check) - 1]["run"]
+    release = yaml.safe_load((workflows / "release.yml").read_text())
+    native_steps = release["jobs"]["service-images"]["steps"]
+    build = next(step for step in native_steps if "service_image.py build" in step.get("run", ""))
+    assert "apt-get install --yes --no-install-recommends apparmor" in native_steps[native_steps.index(build) - 1]["run"]
 
 
 @pytest.mark.parametrize("expected", ["matching", "changed", "missing", "invalid"])
