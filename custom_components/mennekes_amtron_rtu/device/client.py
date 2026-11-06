@@ -185,27 +185,32 @@ class MennekesModbusClient:
 
         if self._bound_serial is None:
             return
-        generation = self._connection_generation
-        try:
-            words = await _client_read.read_words(
-                client, address=SERIAL_NUMBER.address, count=SERIAL_NUMBER.count,
-                device_id=self._config.device_id, retries=self._config.retries,
-            )
-        except asyncio.CancelledError as err:
-            # No write was attempted. Preserve cancellation, but distinguish
-            # this from an acknowledgement lost after an actual command.
-            self._identity_check_needed = True
-            raise err from AmtronIdentityError("wallbox identity verification cancelled")
-        except AmtronBusError as err:
-            self._identity_check_needed = True
-            raise AmtronIdentityError("wallbox identity could not be verified") from err
-        if (
-            generation != self._connection_generation
-            or decode_register(SERIAL_NUMBER, words) != self._bound_serial
-        ):
-            self._identity_check_needed = True
-            raise AmtronIdentityError("wallbox identity changed or is unavailable")
-        self._identity_check_needed = False
+        # Serial reconnect can return before its connection-made callback runs.
+        # If that callback overlaps the read, discard the old-session result and
+        # allow one bounded fresh check. No command is sent before it succeeds.
+        for _attempt in range(2):
+            generation = self._connection_generation
+            try:
+                words = await _client_read.read_words(
+                    client, address=SERIAL_NUMBER.address, count=SERIAL_NUMBER.count,
+                    device_id=self._config.device_id, retries=self._config.retries,
+                )
+            except asyncio.CancelledError as err:
+                # No write was attempted. Preserve cancellation, but distinguish
+                # this from an acknowledgement lost after an actual command.
+                self._identity_check_needed = True
+                raise err from AmtronIdentityError("wallbox identity verification cancelled")
+            except AmtronBusError as err:
+                self._identity_check_needed = True
+                raise AmtronIdentityError("wallbox identity could not be verified") from err
+            if generation != self._connection_generation:
+                continue
+            if decode_register(SERIAL_NUMBER, words) != self._bound_serial:
+                break
+            self._identity_check_needed = False
+            return
+        self._identity_check_needed = True
+        raise AmtronIdentityError("wallbox identity changed or is unavailable")
 
     async def async_connect(self) -> None:
         """Open the configured connection or raise when it cannot be used."""

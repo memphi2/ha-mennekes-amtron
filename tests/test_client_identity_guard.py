@@ -145,6 +145,43 @@ def test_reconnect_during_verification_cannot_confirm_the_previous_connection():
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("replacement", ["ABC123456789", "OTHER-WALLBOX"])
+def test_delayed_connect_callback_requires_one_fresh_identity_read(replacement):
+    async def run():
+        transport = FakeModbusClient(device_bank())
+        client = MennekesModbusClient(SerialConfig("/dev/fake"), client_factory=lambda _: transport)
+        await client.async_connect()
+        await async_read_identity(client)
+        original = transport.read_holding_registers
+        reads = 0
+
+        async def connected_after_first_read(address, **kwargs):
+            nonlocal reads
+            response = await original(address, **kwargs)
+            reads += 1
+            if reads == 1:
+                client._connection_changed(True)
+                put(transport.bank, R.SERIAL_NUMBER, replacement)
+            return response
+
+        transport.read_holding_registers = connected_after_first_read
+        try:
+            if replacement == "ABC123456789":
+                await client.async_write_register(R.HEARTBEAT, 0x55AA, priority=True)
+                assert client.identity_verified
+                assert transport.writes == [(R.HEARTBEAT.address, [0x55AA])]
+            else:
+                with pytest.raises(AmtronConnectionError):
+                    await client.async_write_register(R.HEARTBEAT, 0x55AA, priority=True)
+                assert not client.identity_verified
+                assert not transport.writes
+            assert reads == 2
+        finally:
+            await client.async_close()
+
+    asyncio.run(run())
+
+
 def test_polled_serial_change_blocks_even_periodic_heartbeats():
     async def run():
         transport = FakeModbusClient(device_bank())
