@@ -15,6 +15,8 @@ from .binary_sensor_descriptions import (
 )
 from .device.capabilities import capability_is_supported
 from .device.heartbeat import HeartbeatTask
+from .device.registers import CP_STATE
+from .device.vehicle import vehicle_connected
 from .entity import MennekesAmtronEntity, entry_device_info, entry_entity_unique_id
 from .entry_types import MennekesAmtronConfigEntry
 
@@ -36,7 +38,8 @@ async def async_setup_entry(
     runtime_data = entry.runtime_data
     identity = runtime_data.identity
     async_add_entities(
-        AmtronBinarySensor(entry, runtime_data.coordinator, description)
+        (AmtronVehicleConnectedSensor if description.key == "vehicle_connected"
+         else AmtronBinarySensor)(entry, runtime_data.coordinator, description)
         for description in BINARY_SENSOR_DESCRIPTIONS
         if capability_is_supported(
             identity.layout_version,
@@ -100,3 +103,14 @@ class AmtronBinarySensor(MennekesAmtronEntity, BinarySensorEntity):
         """Return the derived state of this binary sensor."""
 
         return self.entity_description.is_on_fn(self.register_value)
+
+
+class AmtronVehicleConnectedSensor(AmtronBinarySensor):
+    """Use pilot state to retain presence during a wallbox fault."""
+
+    @property
+    def is_on(self) -> bool | None:
+        return vehicle_connected(
+            self.register_value, self.wallbox_data.get(CP_STATE.key),
+            cp_supported=self.runtime_data.identity.layout_version >= CP_STATE.min_layout,
+        )

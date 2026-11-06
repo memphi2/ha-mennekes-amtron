@@ -15,21 +15,12 @@ from .device.enums import (
     EvseState,
     PhaseOptionsHardware,
 )
+from .device.vehicle import vehicle_connected
 
 if TYPE_CHECKING:
     from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
 else:
     from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-
-VEHICLE_CONNECTED_STATES = frozenset(
-    {
-        EvseState.EV_CONNECTED,
-        EvseState.PRECONDITIONS_VALID,
-        EvseState.READY_TO_CHARGE,
-        EvseState.CHARGING,
-    }
-)
-
 
 @dataclass(frozen=True, kw_only=True)
 class AmtronBinarySensorEntityDescription(BinarySensorEntityDescription):
@@ -52,7 +43,7 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[AmtronBinarySensorEntityDescription, ...] = (
         register_key="evse_state",
         device_class=BinarySensorDeviceClass.PLUG,
         is_on_fn=lambda value: (
-            value in VEHICLE_CONNECTED_STATES if isinstance(value, int) else None
+            vehicle_connected(value, None, cp_supported=False)
         ),
     ),
     AmtronBinarySensorEntityDescription(
