@@ -175,6 +175,7 @@ def test_network_factory_keeps_tracing_but_disables_library_write_retry_and_reco
             assert options == {
                 "port": 1502, "framer": framer, "timeout": 2, "retries": 0,
                 "reconnect_delay": 0, "trace_packet": client.write_trace.packet,
+                "trace_connect": client._trace_connect,
             }
             assert client.config.retries == 4  # Our explicit read retry budget remains.
         finally:

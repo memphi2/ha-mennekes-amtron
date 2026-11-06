@@ -266,6 +266,7 @@ class ModbusService:
         """Share the freshness boundary for state publication and command admission."""
         return (
             self._success
+            and self.client.identity_verified
             and self._updated_at is not None
             and time.monotonic() - self._updated_at
             <= max(30, self.config.scan_interval * 3)

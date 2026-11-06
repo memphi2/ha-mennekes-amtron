@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Verify a known physical wallbox identity after reconnects and before control
+  writes. Reject changed or missing serial numbers without altering saved
+  charging intent, and recover when the original wallbox returns.
 - Ignore malformed optional device text without breaking initialization or
   polling, and decode NUL-terminated strings without interpreting unused bytes.
 - Discard an older deferred current target when a newer write loses its reply

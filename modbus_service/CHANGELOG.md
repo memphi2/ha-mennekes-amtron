@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Check the physical serial after reconnects and before control writes, including
+  recovery. A replaced or unidentifiable wallbox makes the service unavailable;
+  saved intent stays intact until the original wallbox can be verified again.
 - Tolerate malformed optional firmware, article and serial text so other valid
   readings remain usable; existing serial-number identity checks still apply.
 - Keep the latest requested current after a lost write reply or cancellation;

@@ -23,6 +23,10 @@ exercise:
 - A service response within the byte-size limit can still exceed the JSON
   decoder's nesting limit. The HTTP client reports invalid data and marks the
   connection unavailable instead of retaining a usable cached connection.
+- Replacing the wallbox behind the same USB/LAN endpoint must not authorize
+  writes with cached identity. Tests change the simulated device registers,
+  exercise reconnection and an already-open link, and verify rejection without
+  changed intent, followed by recovery when the original device returns.
 
 These tests use real decoders, the shared control/poll paths and simulated
 Modbus or HTTP responses. They complement hardware tests; passing them does

@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import weakref
 from collections.abc import Callable
 from functools import partial
 
@@ -24,7 +25,9 @@ from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
 
 from . import _client_read, _client_write
 from .client_errors import (
+    AmtronBusError,
     AmtronConnectionError,
+    AmtronIdentityError,
     AmtronIllegalAddressError,
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
@@ -36,7 +39,7 @@ from .const import (
 )
 from .decode import RegisterValue, decode_register
 from .register_blocks import RegisterBlock
-from .registers import RegisterSpec
+from .registers import HEARTBEAT, SERIAL_NUMBER, RegisterSpec
 from .transport import ModbusTransport
 from .write_state import WriteState
 from .write_trace import WriteTrace
@@ -50,6 +53,7 @@ def create_serial_client(
     config: SerialConfig,
     *,
     trace_packet: Callable[[bool, bytes], bytes] | None = None,
+    trace_connect: Callable[[bool], None] | None = None,
 ) -> AsyncModbusSerialClient:
     """Create the pymodbus client for a serial configuration."""
 
@@ -66,6 +70,7 @@ def create_serial_client(
         # Only reads may retry, explicitly in _client_read.read_words.
         retries=0,
         trace_packet=trace_packet,
+        trace_connect=trace_connect,
     )
 
 
@@ -73,10 +78,13 @@ def create_modbus_client(
     config: ConnectionConfig,
     *,
     trace_packet: Callable[[bool, bytes], bytes] | None = None,
+    trace_connect: Callable[[bool], None] | None = None,
 ) -> ModbusTransport:
     """Select the wire framing while retaining one serialized command path."""
     if isinstance(config, SerialConfig):
-        return create_serial_client(config, trace_packet=trace_packet)
+        return create_serial_client(
+            config, trace_packet=trace_packet, trace_connect=trace_connect
+        )
     return AsyncModbusTcpClient(
         config.host,
         port=config.tcp_port,
@@ -87,6 +95,7 @@ def create_modbus_client(
         # independent library reconnect can race them and leak a TCP socket.
         reconnect_delay=0,
         trace_packet=trace_packet,
+        trace_connect=trace_connect,
     )
 
 
@@ -106,8 +115,22 @@ class MennekesModbusClient:
         self.write_trace = WriteTrace(
             clock=monotonic, packet_trace=client_factory is create_modbus_client
         )
+        self._bound_serial: str | None = None
+        self._identity_check_needed = False
+        self._connection_generation = 0
+        connection_changed = weakref.WeakMethod(self._connection_changed)
+
+        def trace_connect(connected: bool) -> None:
+            # The stored factory and transport must not keep their owner alive.
+            if (callback := connection_changed()) is not None:
+                callback(connected)
+
+        self._trace_connect = trace_connect
         self._client_factory: ClientFactory = (
-            partial(create_modbus_client, trace_packet=self.write_trace.packet)
+            partial(
+                create_modbus_client, trace_packet=self.write_trace.packet,
+                trace_connect=self._trace_connect,
+            )
             if client_factory is create_modbus_client else client_factory
         )
         self._client: ModbusTransport | None = None
@@ -134,6 +157,56 @@ class MennekesModbusClient:
             return False
         return self._client.connected
 
+    @property
+    def identity_verified(self) -> bool:
+        """Whether the current connection still belongs to the bound device."""
+
+        return self._bound_serial is None or not self._identity_check_needed
+
+    def bind_identity(self, serial_number: str | None) -> None:
+        """Bind a readable physical serial once, never silently replace it."""
+
+        if self._bound_serial is not None and serial_number != self._bound_serial:
+            self._identity_check_needed = True
+            raise AmtronIdentityError("wallbox identity changed or is unavailable")
+        self._bound_serial = serial_number
+        # The link may have changed after the serial's setup read but before
+        # the remaining capability reads completed. Verify the first operation.
+        self._identity_check_needed = serial_number is not None
+
+    def _connection_changed(self, _connected: bool) -> None:
+        """Invalidate identity on both explicit and library-managed reconnects."""
+
+        self._identity_check_needed = True
+        self._connection_generation += 1
+
+    async def _async_verify_identity(self, client: ModbusTransport) -> None:
+        """Confirm the bound serial while holding the transaction lock."""
+
+        if self._bound_serial is None:
+            return
+        generation = self._connection_generation
+        try:
+            words = await _client_read.read_words(
+                client, address=SERIAL_NUMBER.address, count=SERIAL_NUMBER.count,
+                device_id=self._config.device_id, retries=self._config.retries,
+            )
+        except asyncio.CancelledError as err:
+            # No write was attempted. Preserve cancellation, but distinguish
+            # this from an acknowledgement lost after an actual command.
+            self._identity_check_needed = True
+            raise err from AmtronIdentityError("wallbox identity verification cancelled")
+        except AmtronBusError as err:
+            self._identity_check_needed = True
+            raise AmtronIdentityError("wallbox identity could not be verified") from err
+        if (
+            generation != self._connection_generation
+            or decode_register(SERIAL_NUMBER, words) != self._bound_serial
+        ):
+            self._identity_check_needed = True
+            raise AmtronIdentityError("wallbox identity changed or is unavailable")
+        self._identity_check_needed = False
+
     async def async_connect(self) -> None:
         """Open the configured connection or raise when it cannot be used."""
 
@@ -147,6 +220,7 @@ class MennekesModbusClient:
 
         if client.connected:
             return
+        self._identity_check_needed = True
         try:
             connected = await client.connect()
         # Drivers raise unrelated exception types; callers handle one bus error.
@@ -158,7 +232,9 @@ class MennekesModbusClient:
             raise AmtronConnectionError(f"cannot open {self._config.port}")
         _LOGGER.debug("Opened %s", self._config.port)
 
-    async def _async_transaction_client(self) -> ModbusTransport:
+    async def _async_transaction_client(
+        self, *, verify_identity: bool = False
+    ) -> ModbusTransport:
         """Recover a dropped TCP link before the next serialized transaction.
 
         Never recreate a client after explicit close, and never replay a write
@@ -168,6 +244,8 @@ class MennekesModbusClient:
         client = self._require_client()
         if isinstance(self._config, NetworkConfig):
             await self._async_connect_locked(client)
+        if self._identity_check_needed or verify_identity:
+            await self._async_verify_identity(client)
         return client
 
     async def async_close(self) -> None:
@@ -190,12 +268,20 @@ class MennekesModbusClient:
 
         async with self._queue:
             client = self._require_client()
-            return await _client_read.read_block(
+            result = await _client_read.read_block(
                 client,
                 block=block,
                 device_id=self._config.device_id,
                 read=self._async_read_words_locked,
             )
+            if (
+                self._bound_serial is not None
+                and SERIAL_NUMBER.key in result
+                and result[SERIAL_NUMBER.key] != self._bound_serial
+            ):
+                self._identity_check_needed = True
+                raise AmtronIdentityError("wallbox identity changed or is unavailable")
+            return result
 
     async def _async_read_words_locked(self, address: int, count: int) -> list[int]:
         """Release the bus between fallback reads so a heartbeat can pass."""
@@ -253,10 +339,16 @@ class MennekesModbusClient:
 
         queued = self._monotonic()
         if priority:
-            await self._async_write_locked(spec, value, min_interval=min_interval, queued=queued)
+            await self._async_write_locked(
+                spec, value, min_interval=min_interval, queued=queued,
+                verify_identity=spec != HEARTBEAT,
+            )
             return
         async with self._queue:
-            await self._async_write_locked(spec, value, min_interval=min_interval, queued=queued)
+            await self._async_write_locked(
+                spec, value, min_interval=min_interval, queued=queued,
+                verify_identity=True,
+            )
 
     def check_write_interval(
         self, spec: RegisterSpec, *, min_interval: float = 0.0
@@ -282,6 +374,7 @@ class MennekesModbusClient:
         *,
         min_interval: float,
         queued: float,
+        verify_identity: bool,
     ) -> None:
         async with self._lock:
             self.check_write_interval(spec, min_interval=min_interval)
@@ -292,7 +385,12 @@ class MennekesModbusClient:
                 address=spec.address, queued=queued, started=self._monotonic()
             )
             try:
-                client = await self._async_transaction_client()
+                # A transparent gateway may retain its TCP connection while
+                # its downstream wallbox changes. Check every control write;
+                # ordinary heartbeats reuse the connection's confirmed identity.
+                client = await self._async_transaction_client(
+                    verify_identity=verify_identity
+                )
                 await _client_write.write_register(
                     client,
                     spec=spec,
@@ -304,7 +402,10 @@ class MennekesModbusClient:
                 # A definite rejection did not change the register. A missing
                 # reply or transport failure may follow an applied write, so
                 # those retain the interval, as does cancellation.
-                if isinstance(err, (AmtronWriteRejectedError, AmtronIllegalAddressError)):
+                if (
+                    isinstance(err, (AmtronWriteRejectedError, AmtronIllegalAddressError, AmtronIdentityError))
+                    or isinstance(err.__cause__, AmtronIdentityError)
+                ):
                     self._rate_limiter.forget(spec.key)
                     rejected = True
                 raise

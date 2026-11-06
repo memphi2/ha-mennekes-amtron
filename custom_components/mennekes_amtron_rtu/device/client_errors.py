@@ -22,6 +22,10 @@ class AmtronConnectionError(AmtronBusError):
     """The connection or the device did not answer at all."""
 
 
+class AmtronIdentityError(AmtronConnectionError):
+    """The bound physical identity could not be verified before a transaction."""
+
+
 class AmtronProtocolError(AmtronBusError):
     """The device answered, but not with usable data."""
 

@@ -26,6 +26,7 @@ from .capabilities import phase_switch_is_supported
 from .client import MennekesModbusClient
 from .client_errors import (
     AmtronBusError,
+    AmtronIdentityError,
     AmtronIllegalAddressError,
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
@@ -250,10 +251,10 @@ class AmtronControl:
             self.charging_release_requested = released
             try:
                 await self._async_write(CHARGING_RELEASE, int(released))
-            except (DeviceError, asyncio.CancelledError):
+            except (DeviceError, asyncio.CancelledError) as err:
                 # A failed block command still expresses the user's intent.
                 # A failed enable must never erase a previously blocked state.
-                if released:
+                if released or isinstance(err.__cause__, AmtronIdentityError):
                     self.charging_release_requested = previous
                 raise
 
@@ -451,7 +452,7 @@ class AmtronControl:
             return
         except (DeviceError, asyncio.CancelledError) as err:
             uncertain = not isinstance(
-                err.__cause__, (AmtronWriteRejectedError, AmtronIllegalAddressError)
+                err.__cause__, (AmtronWriteRejectedError, AmtronIllegalAddressError, AmtronIdentityError)
             )
             if uncertain:
                 # The newer current may already have reached the wallbox.
@@ -581,6 +582,8 @@ class AmtronControl:
             self._diagnostics.timeline.record(EventType.WRITE_RATE_LIMITED, register=spec.address)
             raise
         except AmtronBusError as err:
+            if isinstance(err, AmtronIdentityError):
+                raise device_error("device_identity_changed") from err
             self._diagnostics.timeline.record(EventType.WRITE_REJECTED, register=spec.address)
             self._diagnostics.writes_rejected += 1
             if spec != HEARTBEAT:

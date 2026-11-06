@@ -173,11 +173,18 @@ no readable serial number; it is **not a wildcard**. Such endpoint-bound setups
 cannot independently verify the physical wallbox. Clients with a known serial
 number must retain that binding instead of accepting a newly observed device.
 
-This comparison uses the identity read during service initialization, not an
-extra Modbus identity read before each command. Stop the bus owner before
-changing a gateway route or connected wallbox, then restart it to initialize
-the new connection. A physical routing change behind a running service is not
-an authenticated identity change notification.
+The released 0.5.1 service compares the identity read during initialization.
+The beta driver additionally verifies a known serial over Modbus after a
+reconnection and before control writes. This also detects a changed wallbox
+behind a gateway whose TCP connection stayed open. A missing or different
+serial blocks the write without changing saved intent; the service reports
+unavailable until the original device can be verified again. Direct mode uses
+the same driver checks. Normal heartbeats reuse the verified connection;
+reconnects and a detected identity mismatch require verification again.
+
+Stop the bus owner before deliberately changing a gateway route or connected
+wallbox. Modbus serial numbers are not cryptographic authentication, and a
+physical routing change is not an authenticated identity change notification.
 
 The service enforces the same current-write floor, phase-switch guards, device
 limits and bounded error-200 recovery as direct mode. All clients share one
