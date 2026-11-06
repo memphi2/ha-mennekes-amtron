@@ -45,7 +45,7 @@ def bavarian_vehicle_vin(hass: HomeAssistant, device_id: object) -> str | None:
         return None
     candidates = {
         value.strip().upper() for domain, value in device.identifiers
-        if domain == HISTORY_DOMAIN and value not in device.config_entries
+        if domain == HISTORY_DOMAIN and value != device.config_entry_id
         and re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", value.strip().upper())
     }
     return next(iter(candidates)) if len(candidates) == 1 else None

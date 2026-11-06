@@ -32,7 +32,7 @@ def vehicle_registry(*, identifiers=None, entries=None):
     """The public registry contract of a BavarianData vehicle device."""
     device = SimpleNamespace(
         identifiers={("bavariandata", VIN)} if identifiers is None else identifiers,
-        config_entries={"account-entry"} if entries is None else entries,
+        config_entry_id="account-entry" if entries is None else next(iter(entries)),
     )
     return SimpleNamespace(async_get=Mock(return_value=device))
 
