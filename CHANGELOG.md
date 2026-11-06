@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.6.1 — 2026-11-07
+
+- Add next-trip charging deadlines with fixed or dynamic battery capacity,
+  manual/calendar selection, optional BavarianData timer import and climate
+  blueprints. Keep departure available for climate after reaching the charge target.
+- Import German Module 3 tariffs with optional annual refresh, multiple daily
+  windows and marked provisional values, without restarting Modbus.
+- Fix switching from Module 3 back to Module 2 or no adjustment, fragmented
+  tariff downloads and current HA device-registry access.
+- Expire queued timed-plan commands in the service even while HA is offline,
+  and update shared tariff validation. Service mode now requires app/service
+  **0.6.1 or newer with API 2**: update it first. The stable app is offered through
+  **#apps** and reaches existing **#apps-beta** installations too.
+
 ## 0.6.0b1 — 2026-11-06
 
 Beta release of the integration and app. **0.5.1 remains stable**; the app beta

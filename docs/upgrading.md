@@ -4,12 +4,41 @@
 do not require deleting devices, entities or automations. Moving from HACS to
 the Marketplace also keeps the same integration and entry.
 
-**Testing the beta?** Enable prereleases and select **0.6.0b1** for the integration.
-Its app is offered only in **#apps-beta**; existing beta-app users update in place
-and keep their data. Stable remains **0.5.1**. Follow [Beta testing](installation.md#beta-testing-060b1)
-and check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
+**Current stable release: 0.6.1.** In service mode, update the app/service first,
+then the integration. Keep existing app data and your HA entry. Existing
+**#apps-beta** users receive this stable app too and need no catalog switch.
+Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
+
+## Updating to 0.6.1
+
+**Service mode requires app/service 0.6.1 or newer with API 2.** Update it first,
+even if timed planning is not configured. Older apps, including 0.6.0b1, do not
+provide the new timed-command expiry support. Direct USB/LAN needs no app.
+
+Configure a vehicle SoC source and usable battery capacity before enabling the
+new next-trip deadline. Manual entry, calendar events and optional BavarianData
+timer import can coexist. Optional calendar and climate blueprints are described
+under [Blueprints](blueprints.md); see [departure setup](user-guide.md#charge-for-the-next-departure)
+for BMW timer sensors, weekdays and time zone. Ordinary charging targets still
+only limit a charge. An active timed plan can resume a pause to meet departure.
+
+The service drops queued timed-plan commands when their deadline passes, even
+with HA offline. This does not reverse a command already applied. Recalculating
+the plan and starting climate actions still require HA to be running.
+
+German Module 2/3 settings now allow returning from Module 3 to Module 2 or
+no adjustment. Module 3 can import the tariff for HA Home and optionally refresh
+it at the year boundary. The lookup shares Home coordinates with VNBdigital;
+see [Privacy](../PRIVACY.md) and [Charging estimates](charging-estimates.md).
+The app also includes updated shared tariff validation.
+
+Future integration and service versions can still differ when the service meets
+the declared minimum. Stable 0.6.1 includes the earlier beta improvements below.
 
 ## Updating to 0.6.0b1
+
+The compatibility notes in this section describe that earlier beta. For the
+current release, follow [Updating to 0.6.1](#updating-to-061) above.
 
 Beta 0.6.0b1 improves entity grouping and state-dependent icons, fixes false
 vehicle-disconnected states during wallbox faults, and names the display-only
@@ -121,16 +150,17 @@ Back up Home Assistant, read the offered release notes and follow
 [Installation → Updates](installation.md#updates). Complete the requested Core
 restart and check the existing wallbox's readings and heartbeat afterward.
 
-The integration and service have independent versions. **Service 0.5.0 with
-API 2 remains compatible**; a routine integration update does not require an
-app update or restart. Core can restart while the compatible service continues
-its heartbeat and saved charging intent with writes enabled.
+The integration and service have independent versions. **Integration 0.6.1
+requires service 0.6.1 or newer with API 2.** After this required service update,
+future integration-only updates can reuse a compatible app without restarting
+it. Core can restart while that service continues its heartbeat and saved
+charging intent with writes enabled.
 
 If an app update is offered or the integration raises its minimum service
 requirement, follow the release notes. **When both need updating, update the
 app or standalone service first**, then the integration and restart Core.
 An app or host restart interrupts the heartbeat. Older 0.5.0 beta installations
-need an API 2 service first because their service API differs.
+need service 0.6.1 first; their old service API also differs.
 See the [service guide](modbus-service.md) for the current release channel and
 update instructions. Do not add the wallbox again to refresh its credentials or
 restore missing controls.

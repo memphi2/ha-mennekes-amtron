@@ -28,6 +28,7 @@ configured fallback.
 | Set current, pause charging or change options | [User guide](user-guide.md) |
 | Understand a sensor or find its template states | [Entity reference](entities.md) |
 | Charge from PV surplus | [Blueprints](blueprints.md) |
+| Charge for the next trip | [Departure planning](user-guide.md#charge-for-the-next-departure), [calendar and climate blueprints](blueprints.md) |
 | Set up a tariff schedule or action | [Automations](automations.md) |
 | Estimate charging losses or costs | [Charging estimates](charging-estimates.md) |
 | Use the Energy dashboard and reduce database growth | [Recorder](recorder.md) |

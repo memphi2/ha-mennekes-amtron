@@ -54,7 +54,7 @@ Follow [Service setup](modbus-service.md) to install and start it in **Read-only
 mode. On Home Assistant OS, confirm the discovered wallbox under
 **Settings → Devices & services**; its URL and token are supplied automatically.
 
-In app **0.6.0b1**, start it and use **Open Web UI** to choose USB
+In app **0.6.1**, start it and use **Open Web UI** to choose USB
 or LAN, save and restart it. The page needs an administrator and stable
 Supervisor **2026.11.0+**. Until a connection is configured, the app stays in
 setup mode without Modbus or discovery. See [the connection page](upgrading.md#app-connection-page).

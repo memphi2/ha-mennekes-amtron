@@ -59,11 +59,12 @@ On HA Container, run the service as a [separate container](docs/service-standalo
 Already using the integration? **Keep your existing entry** and follow
 [Updates and switching connections](docs/upgrading.md).
 
-**Beta 0.6.0b1** adds optional kWh and vehicle-percentage targets, charging-loss
-and cost estimates, clearer status and configurable charging waits. The app adds
-a guided USB/LAN connection page and AppArmor protection.
-Stable remains **0.5.1**. See [beta installation](docs/installation.md#beta-testing-060b1)
-and [what changes](docs/upgrading.md#updating-to-060b1).
+**Stable 0.6.1** adds next-trip charging by manual time, calendar or optional
+BavarianData timer, with a preconditioning blueprint and German Module 3 tariff
+import with yearly updates. In service mode, update the **app to 0.6.1 first**;
+it expires obsolete queued departure commands even while HA is offline.
+See [how to update](docs/installation.md#updating-to-061) and
+[what changes](docs/upgrading.md#updating-to-061).
 
 You need a compatible wallbox, a USB RS-485 adapter or supported LAN gateway,
 and exclusive access to its bus. LAN needs no USB device on the HA/service host.
@@ -72,7 +73,7 @@ enabling control. Read-only mode also needs exclusive bus access.
 
 ## Ready for everyday use
 
-Charging targets and estimates below are part of **beta 0.6.0b1**.
+Charging targets, departure planning and estimates are optional features of **0.6.1**.
 
 | I want to… | Use |
 |---|---|
@@ -84,6 +85,7 @@ Charging targets and estimates below are part of **beta 0.6.0b1**.
 | Limit charging | **Energy target**, or an optional **Vehicle charge target** from your car's SoC sensor |
 | Estimate losses and costs | [Optional charging estimates](docs/charging-estimates.md) using existing vehicle and price data |
 | Charge from solar surplus | [Ready-made PV blueprints](docs/blueprints.md) |
+| Charge for the next trip | [Next departure](docs/user-guide.md#charge-for-the-next-departure), with optional calendar, BMW timer and climate automation |
 | Keep history manageable | [Recorder settings](docs/recorder.md); the heartbeat records status changes, not a timestamp every five seconds |
 
 **Where do I enable control?** With the service, turn off **Read-only** in the

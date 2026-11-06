@@ -2,7 +2,9 @@
 
 ## What this integration collects
 
-There is no cloud service or telemetry. Direct mode speaks Modbus through a local
+Wallbox control has no cloud dependency or telemetry. The optional German
+Module 3 tariff import makes the external requests described below.
+Direct mode speaks Modbus through a local
 USB/serial adapter or an outgoing TCP connection to a configured LAN-to-RS-485
 gateway. Service mode exchanges wallbox readings and control commands
 with the configured Modbus service URL. Keep that service on a trusted private
@@ -24,6 +26,15 @@ itself is unencrypted and unauthenticated; restrict it to a trusted private LAN.
   charging estimates retain the latest completed cycle, latest cost result and
   bounded loss totals with one correctable match in HA's local storage, outside
   Recorder. They do not retain a growing vehicle-history or price-history list.
+- Optional timed charging stores the selected source entities, calendar and
+  exact event title in the integration options, plus one departure and its
+  source/finished marker in local storage. BMW departure imports read the last
+  locally published BavarianData timer sensors for the selected vehicle; no
+  BMW cloud refresh is requested. Timer weekdays and the vehicle time zone
+  are optional local settings. The preconditioning blueprint's HA
+  Text helper remembers the last attempted departure to avoid duplicate actions.
+  A selected preconditioning action uses its vehicle integration, which may
+  contact that vehicle's cloud service under its own privacy policy.
 
 ## What the independent service stores
 
@@ -82,3 +93,16 @@ from existing HA entities or BavarianData's local history action; this
 integration does not request a cloud refresh. Other integrations have their
 own privacy policies. If you export data, share diagnostics or share backups,
 you decide to share their contents.
+
+## Optional German tariff import
+
+Opening Module 3 options sends HA Home latitude and longitude to VNBdigital
+to identify the local low-voltage network operator. Public tariff CSV data is
+downloaded from Par14a-Database through GitHub. Both services see the requesting
+IP address; GitHub receives no Home coordinates. No vehicle history, wallbox
+identity or access token is sent.
+
+Optional yearly refresh repeats the lookup after the tariff year expires, with
+one scheduled attempt per day until a valid tariff is found, plus a retry after
+an HA restart. Values are saved locally without a growing download history.
+Disable yearly refresh to stop background imports.

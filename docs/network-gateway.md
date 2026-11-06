@@ -49,7 +49,7 @@ can still interrupt delivery; configure the wallbox's
 
 ### Service app
 
-App **0.6.0b1** includes **Open Web UI**. Older app 0.5.2b2 uses the native
+App **0.6.1** includes **Open Web UI**. Older app 0.5.2b2 uses the native
 Configuration tab described below.
 
 1. Follow the [service installation](modbus-service.md) and prepare any existing
@@ -73,7 +73,8 @@ For a standalone service, use the [LAN configuration example](service-standalone
 
 ### App 0.5.0 configuration
 
-App 0.5.0 remains compatible with the integration. Its list uses the values
+If you are still on app 0.5.0, update it to 0.6.1 before updating the
+integration. That older app lists the values
 `serial`, `rtu_over_tcp` and `modbus_tcp`. App 0.5.1 shows those values alongside
 the readable choices. App 0.5.2b1 and newer keep only the readable choices; before updating from
 0.5.1, select the matching readable choice once. See

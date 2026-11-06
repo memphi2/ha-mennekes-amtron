@@ -103,3 +103,10 @@ device paths, unexpected runtime requirements and brand-asset changes.
 The current local provenance evidence is retained under
 [docs/audits/current-legal-provenance.md](audits/current-legal-provenance.md).
 That file is a technical audit snapshot, not a live legal opinion.
+
+## Optional tariff data
+
+Imported data comes from [Par14a-Database (the78mole)](https://github.com/the78mole/Par14a-Database)
+under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Operator matching
+uses VNBdigital, operated by BDEW. Original operator price sheets remain
+authoritative. The repository does not distribute their PDFs.

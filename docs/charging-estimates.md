@@ -1,9 +1,8 @@
-# Charging losses and costs — beta 0.6.0b1
+# Charging losses and costs
 
-Charging losses and costs are available in **beta 0.6.0b1**, not stable 0.5.1.
-The automatic tariff import and yearly refresh described below are in the
-beta branch and have not been released yet.
-See [Beta testing](installation.md#beta-testing-060b1) before enabling them.
+These optional features are available in **stable 0.6.1**, including automatic
+tariff import and yearly refresh. For service connections,
+[update the app first](installation.md#updating-to-061).
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure** and choose the sources you want. They work with a

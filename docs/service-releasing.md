@@ -21,10 +21,11 @@ change, subject to the promotion rule below. The integration tag identifies
 the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 2 and service 0.5.0 or newer**.
-Raise the minimum only when the integration needs a newer service feature; a
-published or planned service release must satisfy that requirement. Existing
-0.5.0 apps remain compatible without an update.
+separately. The current requirement is **API 2 and service 0.6.1 or newer**,
+which supplies deadline expiry for queued timed charging commands. Raise the
+minimum only when the integration needs a newer service feature; a published
+or planned service release must satisfy that requirement. For this release,
+older apps must update before the integration.
 
 PR checks run minimum/latest stable HA and native amd64/aarch64 container tests.
 Automatic bot review and the mandatory security-review status must pass before
