@@ -117,7 +117,7 @@ These sit under *Diagnostic* on the device page.
 
 | Entity | Name | Unit | Needs | Meaning |
 |---|---|---|---|---|
-| `sensor.*_cp_state` | CP state |  | layout v01.02 | The control-pilot signal between wallbox and vehicle. `c2` means the vehicle is actually drawing current. |
+| `sensor.*_cp_state` | CP state |  | layout v01.02 | The control-pilot state between wallbox and vehicle. Use the current and power sensors to check actual consumption. |
 | `sensor.*_error_code` | Error code |  | always | The active error, as a documented category. The raw number is in the `code` attribute. |
 | `sensor.*_temperature` | Temperature | °C | layout v01.02 | Temperature inside the wallbox. |
 | `sensor.*_modbus_layout_version` | Modbus layout version |  | always | The register layout the firmware implements. Decides which entities exist. Disabled by default. |
