@@ -21,8 +21,10 @@ from homeassistant.const import (
     UnitOfTime,
 )
 
+from .device.charging_status import CHARGING_STATUS_OPTIONS
 from .device.control import PENDING_ACTIONS
 from .device.decode import RegisterValue
+from .device.energy_goal import ENERGY_GOAL_STATES
 from .device.enums import (
     AuthorizationStatus,
     CableLockStatus,
@@ -42,8 +44,34 @@ from .device.enums import (
     error_category,
 )
 from .device.registers import layout_label
+from .device.soc_goal import SOC_GOAL_STATES
 
 CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="soc_goal_status",
+        translation_key="soc_goal_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(SOC_GOAL_STATES),
+    ),
+    SensorEntityDescription(
+        key="energy_goal_status",
+        translation_key="energy_goal_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(ENERGY_GOAL_STATES),
+    ),
+    SensorEntityDescription(
+        key="charging_status",
+        translation_key="charging_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(CHARGING_STATUS_OPTIONS),
+    ),
+    SensorEntityDescription(
+        key="connection_quality",
+        translation_key="connection_quality",
+        device_class=SensorDeviceClass.ENUM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        options=["good", "degraded"],
+    ),
     SensorEntityDescription(
         key="pending_change",
         translation_key="pending_change",
@@ -130,16 +158,23 @@ def _current(
 
 SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     _enum("evse_state", EvseState),
-    _enum("cp_state", CpState),
+    _enum("cp_state", CpState, entity_category=EntityCategory.DIAGNOSTIC),
     _enum("authorization_status", AuthorizationStatus),
-    _enum("error_code", ErrorCategory, value_fn=_error_category_option),
+    _enum(
+        "error_code",
+        ErrorCategory,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=_error_category_option,
+    ),
     _enum("detected_ev_phases", DetectedEvPhases),
+    _enum("switched_phases", SwitchedPhases),
     _current("signaled_current"),
     _current("current_l1"),
     _current("current_l2"),
     _current("current_l3"),
     AmtronSensorEntityDescription(
         key="voltage_l1",
+        entity_registry_enabled_default=False,
         translation_key="voltage_l1",
         register_key="voltage_l1",
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
@@ -149,6 +184,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="voltage_l2",
+        entity_registry_enabled_default=False,
         translation_key="voltage_l2",
         register_key="voltage_l2",
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
@@ -158,6 +194,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="voltage_l3",
+        entity_registry_enabled_default=False,
         translation_key="voltage_l3",
         register_key="voltage_l3",
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
@@ -167,6 +204,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="power_l1",
+        entity_registry_enabled_default=False,
         translation_key="power_l1",
         register_key="power_l1",
         native_unit_of_measurement=UnitOfPower.WATT,
@@ -176,6 +214,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="power_l2",
+        entity_registry_enabled_default=False,
         translation_key="power_l2",
         register_key="power_l2",
         native_unit_of_measurement=UnitOfPower.WATT,
@@ -185,6 +224,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     AmtronSensorEntityDescription(
         key="power_l3",
+        entity_registry_enabled_default=False,
         translation_key="power_l3",
         register_key="power_l3",
         native_unit_of_measurement=UnitOfPower.WATT,
@@ -217,7 +257,6 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         register_key="session_duration",
         native_unit_of_measurement=UnitOfTime.SECONDS,
         device_class=SensorDeviceClass.DURATION,
-        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
     ),
     AmtronSensorEntityDescription(
@@ -252,9 +291,7 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         register_key="modbus_layout_version",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
-        value_fn=lambda value: (
-            layout_label(value) if isinstance(value, int) else None
-        ),
+        value_fn=lambda value: layout_label(value) if isinstance(value, int) else None,
     ),
     _current("downgrade_current", entity_category=EntityCategory.DIAGNOSTIC),
     _current(
@@ -305,11 +342,6 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     _enum("phase_rotation", PhaseRotation, entity_category=EntityCategory.DIAGNOSTIC),
     _enum(
-        "switched_phases",
-        SwitchedPhases,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    _enum(
         "cable_lock_status",
         CableLockStatus,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -323,5 +355,29 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         "grid_phases_connected",
         GridPhasesConnected,
         entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
+
+# Optional estimates have no state class: a per-charge value is neither a
+# monotonic counter nor an instantaneous measurement for long-term statistics.
+ESTIMATE_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="last_charging_loss", translation_key="last_charging_loss",
+        native_unit_of_measurement="%", suggested_display_precision=1,
+    ),
+    SensorEntityDescription(
+        key="average_charging_loss", translation_key="average_charging_loss",
+        native_unit_of_measurement="%", suggested_display_precision=1,
+    ),
+    SensorEntityDescription(
+        key="current_estimated_charging_cost", translation_key="current_estimated_charging_cost",
+        entity_registry_enabled_default=False,
+        device_class=SensorDeviceClass.MONETARY, native_unit_of_measurement="EUR",
+        suggested_display_precision=2,
+    ),
+    SensorEntityDescription(
+        key="last_estimated_charging_cost", translation_key="last_estimated_charging_cost",
+        device_class=SensorDeviceClass.MONETARY, native_unit_of_measurement="EUR",
+        suggested_display_precision=2,
     ),
 )

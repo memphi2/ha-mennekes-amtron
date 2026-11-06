@@ -19,7 +19,7 @@ are unchanged. It sends no HA commands or restored values to the service.
 Direct USB and LAN entries retain their separate HA control-mode option.
 
 For standalone configuration, `connection_type` selects `serial` (the default),
-`rtu_over_tcp` or `modbus_tcp`. App 0.5.2b2 offers exactly **USB / RS-485** (default),
+`rtu_over_tcp` or `modbus_tcp`. App 0.6.0b1 offers exactly **USB / RS-485** (default),
 **LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP**. The service normalizes these
 names to the same three protocols. Standalone JSON keeps accepting the technical
 names. Saved app choices using those names need a one-time
@@ -30,12 +30,28 @@ USB uses `serial_port`, `baudrate` and `frame`. LAN uses `host` and `tcp_port`
 wallbox address from 10 to 50. The HTTP API's `port` is independent and defaults
 to 8765. Neither LAN mode expands the supported RTU register/model scope.
 
-The app's serial-device schema is optional, with no default device path, so a
-LAN-only installation needs no `/dev/ttyUSB0`. USB device paths and serial settings
-remain unchanged; the runtime validates connection-specific required fields. Since 0.5.1 the app
-supplies an empty host default so the host field stays visible: empty is valid
-for USB, while LAN requires a hostname/IP. The form does not conditionally hide
-USB or LAN fields. Optional schema fields follow [Supervisor's options rules](https://contributors.home-assistant.io/apps/guides/options/).
+In older apps **0.5.1–0.5.2b2**, the native Configuration tab has an optional
+serial-device selector with no default device path. It keeps the host field
+visible, accepts an empty host for USB and does not hide fields when changing
+protocol. A stale saved USB device can prevent Supervisor from saving LAN
+settings; clear that serial selection first. A LAN-only installation needs no
+local serial device.
+
+In **0.6.0b1**, `serial_port` is an optional string in the native
+schema. A separate **Open Web UI** page supplies a USB dropdown and only the
+fields relevant to the selected transport. It prefers stable adapter paths and
+removes the serial path when saving LAN. USB runtime validation still restricts
+paths to supported serial devices; the schema change grants no additional device
+access. See [connection setup](upgrading.md#app-connection-page).
+
+The new page uses a separate internal Ingress listener on port 8099 and requires
+an administrator with stable Supervisor **2026.11.0+**. It accepts requests only
+from Supervisor, validates administrator identity and protects writes against
+cross-site requests and concurrent option changes. It reads only locally mapped
+serial devices, saves through Supervisor's own-app API and never sends the
+service token to the browser. There is no host-published settings port or need
+for additional Supervisor roles. Native Configuration remains available for
+read-only mode, current limits, intervals and manual configuration.
 
 Service settings are read only at startup: save configuration changes and restart
 the service to apply them. This briefly interrupts the heartbeat; HA does not need
@@ -151,6 +167,14 @@ and invalid option. A missing serial adapter is retried while the API remains
 running. An unexpected worker exit is logged and closes the Modbus connection;
 a fatal process failure reports its error class and errno.
 
+In **0.6.0b1**, an app missing the selected transport's serial
+path or LAN host stays in setup mode after validating all other options. Its
+health endpoint reports `configured: false`; Modbus, heartbeat and discovery do
+not start. Save the connection in **Open Web UI** or native Configuration, then
+restart the app. A configured but temporarily absent adapter still uses normal
+retries. Invalid values and standalone configuration errors remain fatal rather
+than being silently converted into setup mode.
+
 The heartbeat worker is supervised independently of polling. If it exits
 unexpectedly, the service stops so Supervisor's enabled Watchdog can restart it.
 A live API cannot conceal a permanently stopped heartbeat worker. Ordinary
@@ -172,7 +196,7 @@ sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
 use the [Recorder guide](recorder.md) to control that traffic.
 
-In version 0.5.2b2, the pending action and its UTC due time, when known, are kept in
+Since 0.5.2b2, the pending action and its UTC due time, when known, are kept in
 memory. These fields change on scheduling, replacement or completion, not on
 every second of the wait. The frontend can display the due time relatively;
 the database does not need a changing countdown value. Pending work is not
@@ -193,7 +217,7 @@ An unsupported API or a service below the minimum produces the compatibility
 error. A malformed version or snapshot produces the data-validation error.
 Neither condition asks for new credentials. See [Updates](modbus-service.md#updates).
 
-Version 0.5.2b2 adds these fields to the snapshot's `control` object:
+Since 0.5.2b2, these fields are included in the snapshot's `control` object:
 
 | Field | Meaning |
 |---|---|
@@ -237,8 +261,8 @@ no readable serial number; it is **not a wildcard**. Such endpoint-bound setups
 cannot independently verify the physical wallbox. Clients with a known serial
 number must retain that binding instead of accepting a newly observed device.
 
-The released 0.5.1 service compares the identity read during initialization.
-The 0.5.2b2 driver additionally verifies a known serial over Modbus after a
+The older 0.5.1 service compares the identity read during initialization.
+Since 0.5.2b2, the driver additionally verifies a known serial over Modbus after a
 reconnection and before control writes. This also detects a changed wallbox
 behind a gateway whose TCP connection stayed open. A missing or different
 serial blocks the write without changing saved intent; the service reports
@@ -257,7 +281,7 @@ is unavailable or older than the greater of 30 seconds and three status-poll
 intervals. This is checked after waiting for the command lock; a queued request
 cannot use readiness that expired while it waited. Rejected commands are not
 replayed later, and this check does not stop the heartbeat or change saved pause
-intent. In version 0.5.2b2, an accepted command can instead be queued for its
+intent. Since 0.5.2b2, an accepted command can instead be queued for its
 state-change deadline; execution rechecks its prerequisites, and an execution
 failure clears pending work rather than retrying an uncertain write indefinitely.
 Failed or timed-out commands are not automatically

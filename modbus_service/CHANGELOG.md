@@ -1,5 +1,28 @@
 # Changes
 
+## 0.6.0b1
+
+Beta release; stable remains **0.5.1**.
+
+- Add a guided USB/LAN connection page with a real adapter dropdown. An absent
+  old USB adapter no longer blocks LAN setup. Save, then restart to apply changes.
+- Keep energy targets running independently of HA, with recovery after temporary
+  meter outages. Support optional vehicle percentage targets supplied by HA;
+  setting either target never starts charging.
+- Let HA cancel pending commands and show connection quality and command results.
+  Supply the measurements needed for optional charging-loss and cost estimates.
+- Make charging-state waits configurable and confirm the vehicle has paused
+  before switching phases. Improve heartbeat recovery and reconnect handling
+  while retaining deliberate pauses and the latest current setting.
+- Include AppArmor protection and start unconfigured installations in setup mode,
+  ready for connection settings without wallbox traffic.
+
+Keep the app's existing data and update it before the integration. An app restart
+briefly interrupts the heartbeat. The connection page requires an administrator
+and stable **Supervisor 2026.11.0+**; the native Configuration tab remains available.
+This beta app is offered only in **#apps-beta**, where existing beta installations
+can update in place. **#apps** remains on stable **0.5.1**.
+
 ## 0.5.2b2
 
 - Persist executed queued stop intent before refreshing wallbox status, so a

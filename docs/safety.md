@@ -99,7 +99,7 @@ the integration's extra current cap, while hardware limits remain in force.
   switches to avoid excessive cycling. Use hysteresis in automations; the
   bundled PV pause/resume blueprint defaults to six minutes. This recommendation
   concerns charging behavior; it is not a Modbus protocol lockout.
-- **New in 0.5.2b2:** one shared state-change interval defaults to
+- **Since 0.5.2b2:** one shared state-change interval defaults to
   **300 seconds** and can be set from 0 to 3600 seconds. Choose 360 seconds if
   you want to exceed the manufacturer's five-minute threshold. An early
   pause, resume, phase change, release change or lock change waits in a single
@@ -160,7 +160,7 @@ resume charging. At most three automatic attempts are made while the fault
 persists; clearing a repair requires a confirmed error-free state.
 
 Recovery checks the current-write guard before sending its
-heartbeat/release/current sequence. In version 0.5.2b2, reasserting the same
+heartbeat/release/current sequence. Since 0.5.2b2, reasserting the same
 charging intent is exempt from the longer state-change interval; it must not
 turn a heartbeat fault into a five-minute recovery lockout. Recovery does not
 authorize a queued start to run early. A transport failure during the sequence

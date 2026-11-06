@@ -39,11 +39,11 @@ def test_direct_options_store_whole_seconds_and_pass_them_to_control(seconds):
         assert type(stored[CONF_PHASE_SWITCH_GRACE_SECONDS]) is int
         entry = FakeConfigEntry(options=stored)
         assert _control_options(entry).phase_switch_grace_seconds == seconds
-        defaults = {
-            marker.schema: marker.default()
-            for marker in options_schema(stored, max_current=16).schema
-        }
-        assert defaults[CONF_PHASE_SWITCH_GRACE_SECONDS] == seconds
+        grace_field = next(
+            marker for marker in options_schema(stored, max_current=16).schema
+            if marker.schema == CONF_PHASE_SWITCH_GRACE_SECONDS
+        )
+        assert grace_field.default() == seconds
 
     asyncio.run(run())
 

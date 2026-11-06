@@ -5,6 +5,20 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
+Charging targets, loss/cost estimates, revised status and command-result events
+in this guide are features of **beta 0.6.0b1**. Stable remains **0.5.1**;
+see [Beta testing](installation.md#beta-testing-060b1) to try them.
+
+## Optional charging losses and costs
+
+Choose a vehicle-energy source and a fixed or dynamic electricity price in the
+integration options. Both are independently optional and disabled by default. Tibber and other existing
+HA price sensors can be selected; §14a network components are configured
+separately. The optional current-cost entity must also be enabled explicitly;
+the last-cost sensor is sufficient if you only want completed charges in history.
+See [Charging losses and costs](charging-estimates.md) for setup,
+data-quality choices and restart behavior.
+
 ## Everyday controls
 
 For most charging sessions, you need just **Charging current limit** and
@@ -126,13 +140,20 @@ the exact state values available to templates.
 | Setting | Direct USB or LAN connection | Modbus service connection |
 |---|---|---|
 | Write permission | Integration options: **Control mode** | App configuration: **Read-only** |
-| USB adapter, or LAN protocol/host/TCP port, and wallbox address | Integration entry: **Reconfigure** | App configuration |
-| Baud rate and frame | USB: **Reconfigure**; LAN: gateway configuration | USB: app configuration; LAN: gateway configuration |
+| USB adapter, or LAN protocol/host/TCP port, and wallbox address | Integration entry: **Reconfigure** | App: **Open Web UI** |
+| Baud rate and frame | USB: **Reconfigure**; LAN: gateway configuration | USB: app **Open Web UI**; LAN: gateway configuration |
 | Status and measurement polling | Integration options | App configuration |
 | How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
 | Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
 | Minimum time between state changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 | Extra wait before phase changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
+
+App **0.6.0b1** moves USB/LAN connection selection to
+**Open Web UI**, with an adapter dropdown and fields for the chosen mode.
+Write permission and other operating settings stay in **Configuration**.
+Save and restart the app to apply changes; see [the connection page](upgrading.md#app-connection-page)
+for its Supervisor requirement. Older app **0.5.2b2** uses the native configuration
+for all app settings.
 
 The default status interval is **5 seconds** and the measurement interval is
 **30 seconds**. The available range is 2–300 seconds. In service mode, changing
@@ -182,7 +203,7 @@ The [PV blueprints](blueprints.md) adjust current and pause/resume charging from
 your available power budget. [Automation examples](automations.md) include a
 tariff schedule.
 
-**Solar charging mode** changes the mode shown on the wallbox; it does not
+**Solar display mode** (called **Solar charging mode** in 0.5.2b2) changes the mode shown on the wallbox; it does not
 measure PV surplus or run a surplus-charging algorithm. It requires the hardware
 configuration described in the [hardware guide](hardware.md).
 
@@ -200,7 +221,7 @@ Phase changes share
 the [configurable state-change interval](#waiting-between-charging-changes)
 and an early request is queued. Wait until the phase request has actually run
 before requesting resume; a new resume request would replace a queued phase
-request. Before changing phases, version 0.5.2b2 waits up to **30 seconds** for
+request. Before changing phases, the integration waits up to **30 seconds** for
 live confirmation that the vehicle has paused. It then waits an additional
 **5 seconds** by default and checks the state again before sending the phase
 command. Configure **Extra wait before phase changes** from **0 to 30 seconds** in
@@ -239,3 +260,101 @@ To generate a Recorder exclusion list using your actual entity IDs, run
 `mennekes_amtron_rtu.get_recorder_exclusions`. Choose your wallboxes and history
 profile, then merge the returned YAML into your configuration. See
 [Recorder profiles](recorder.md#configure-history-retention-and-detail-exclusions).
+
+## Energy target
+
+Set **Energy target** to the additional energy you want the wallbox to supply,
+for example **12 kWh**. The range is 0.1–1000 kWh in 0.1 kWh steps. Each positive
+setting establishes a new goal from a fresh lifetime-energy reading, even if
+you enter the same number again. It **only limits** a charge: it does not start
+charging, lift a pause, unlock the wallbox or enable charging release. Start
+charging yourself or through your existing automation.
+
+At the target, the owner requests a pause and cancels pending charging changes.
+The five-second current-write interval remains, but this stop does not wait for
+the longer state-change interval. **Energy target status** changes to `reached`;
+check **Charging paused** and actual power to confirm that charging stopped.
+The goal is not an exact energy cutoff: measurement cadence (normally up to
+60 seconds for the lifetime counter), meter resolution, communication delays
+and the remaining write interval can cause additional energy to be delivered.
+
+The target and meter baseline survive a controller restart. The independent
+service continues enforcing them during HA Core downtime. Direct mode can only
+monitor and pause while HA is running. A failed or unreadable meter pauses the
+charge instead of guessing how much energy was delivered. A falling counter
+requires your attention. After restart, a counter below the saved baseline
+is also detected; a counter reset during downtime that ends above the baseline
+cannot be distinguished reliably without saving every observation.
+
+With `meter_unavailable`, fresh valid meter readings automatically restore
+monitoring against the original target. If the goal itself paused a previously
+unpaused charge, it can resume through the normal waiting interval. A deliberate
+pause, another charging/current/phase/lock/release command, or a new goal cancels
+that automatic restart. An already
+reached goal, a reset counter, or another active goal's stop remains paused.
+Heartbeat-error recovery likewise respects active goals and deliberate pauses;
+this does not introduce an automatic reset of unrelated wallbox faults.
+Permission to restart after a meter outage lasts only for the running owner.
+After restarting that owner, the target is retained but its error pause stays
+paused until you resume it. Restarting HA alone does not restart the separate app.
+
+For `meter_reset`, check the meter and set a new goal or enter **0** to disable it.
+Neither setting nor disabling a goal resumes charging. A reached goal blocks
+start/resume until you change or disable it. Other limits, authorization, deliberate pauses,
+locks and release settings still apply. Read-only mode disables all writes,
+including goal enforcement.
+
+The goal requires the lifetime energy counter (Modbus layout v01.02 or later).
+An older compatible service keeps its existing functions; update the service to
+use the new goal controls. Switching an entry between direct and service mode
+does not transfer an active goal: the new connection owner has its own stored
+state. Set the intended goal with that owner before continuing the charge.
+
+## Optional vehicle percentage target
+
+The percentage target is **off by default**. In the integration's options,
+select **Vehicle charge level entity** from your existing vehicle integration.
+This adds **Vehicle charge target** and its status sensor. The integration only
+reads that vehicle entity; it does not change the car's settings or estimate
+battery capacity from wallbox energy.
+
+**Vehicle charge limit entity** is a separate, optional selection. Without it,
+you can choose a target up to **100%**. With it, the reported car limit becomes
+the maximum you can select. A falling car limit also lowers an existing target;
+a later increase never raises the target you chose. If this optional source is
+temporarily unavailable, the last valid maximum is kept. Before its first valid
+reading, setting a positive target is refused rather than assuming 100%.
+
+For example, with a reported charge level of 45%, set a target of **80%**.
+Charging pauses when the vehicle reports at least 80%. Setting a target never
+starts charging or lifts a pause; **0%** switches this target off without
+resuming. A reached target stays reached even if the reported charge level later
+falls. Setting a new positive target establishes a new limit. The independent
+kWh target can also remain active: reaching either target stops the charge.
+
+As selected for this integration, missing or invalid vehicle data **does not
+pause charging**. Monitoring resumes when a valid value returns. The same applies
+while HA is down: the service can keep charging, but cannot evaluate an external
+percentage until HA sends vehicle data again. Delayed or unchanged reports from
+the vehicle integration can therefore allow the target to be exceeded. This is
+not a replacement for the car's own charge limit. The five-second write floor
+and wallbox response time also still apply when a stop is requested.
+
+Changing or removing either selected source clears the old percentage target
+and remembered maximum without starting charging. Clear the SoC selection to
+turn off the whole percentage feature; also clear the maximum selection if one
+was configured. The kWh goal is independent. Service
+mode needs an app version advertising percentage-goal support; existing service
+functions remain available on older compatible versions.
+
+## Cancel a queued change
+
+While **Pending change** shows an action, press **Cancel pending change**.
+This removes the queue entry and does not send a wallbox command. A phase-change
+pause already performed stays paused. The remembered current setpoint is kept;
+cancellation does not undo a command that has already reached the wallbox.
+
+Direct-mode cancellation also works during a failed wallbox poll. Service mode
+requires the app to be reachable, authenticated and write-enabled, but its
+wallbox connection may be down. Older services need updating to support this
+button. It becomes unavailable again when there is no pending work.

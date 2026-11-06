@@ -626,6 +626,9 @@ def test_local_export_builds_the_checkout_instead_of_pulling_a_published_image(
     assert (output / "apparmor.txt").read_bytes() == (
         images.ROOT / "modbus_service/apparmor.txt"
     ).read_bytes()
+    device = "custom_components/mennekes_amtron_rtu/device"
+    for asset in ("app_settings.html", "app_settings.js", "app_settings.css"):
+        assert (output / device / asset).read_bytes() == (images.ROOT / device / asset).read_bytes()
     with pytest.raises(FileExistsError):
         export(output)
 

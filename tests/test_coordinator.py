@@ -62,6 +62,30 @@ def test_a_poll_reads_every_supported_block() -> None:
     asyncio.run(run())
 
 
+def test_recovery_observes_fresh_error_status_only() -> None:
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank())
+        coordinator = await _coordinator(transport)
+        observed: list[tuple[object, int]] = []
+        coordinator.observe_recovery = lambda error, generation: observed.append((error, generation))
+        transport.bank[R.ERROR_CODE.address] = 200
+        coordinator.data = await coordinator._async_update_data()
+        transport.bank[R.ERROR_CODE.address] = 0
+        coordinator.data = await coordinator._async_update_data()
+        assert observed == [(200, 0), (0, 0)]
+
+        # An unreadable error register must not confirm a cached zero.
+        transport.read_exceptions[R.ERROR_CODE.address] = 0x04
+        coordinator.data = await coordinator._async_update_data()
+        assert observed == [(200, 0), (0, 0), (None, 0)]
+        transport.read_exceptions[0x0100] = raise_connection_error()
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+        assert observed == [(200, 0), (0, 0), (None, 0)]
+
+    asyncio.run(run())
+
+
 def test_an_older_layout_polls_fewer_blocks() -> None:
     async def run() -> None:
         transport = FakeModbusClient(device_bank(layout=R.LAYOUT_V01_00))

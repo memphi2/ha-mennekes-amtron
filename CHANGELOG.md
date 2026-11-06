@@ -5,6 +5,37 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.6.0b1 — 2026-11-06
+
+Beta release of the integration and app. **0.5.1 remains stable**; the app beta
+is available only through **#apps-beta**.
+
+- Set an optional energy target in kWh or a vehicle charge-level target in percent.
+  Targets only limit charging; they never start a charge or lift a deliberate pause.
+  Energy goals recover automatically after a temporary meter outage.
+- Estimate charging losses from BavarianData history or a selected vehicle-energy
+  sensor, with a weighted average. Estimate charging costs from fixed or dynamic
+  prices, including optional network tariffs. All estimates are optional.
+- See clearer charging and connection status, cancel queued changes and optionally
+  trigger automations from command results.
+- Configure charging-state waits in seconds, see pending changes and wait for the
+  vehicle to confirm a pause before changing phases.
+- Set up the app through a guided USB/LAN page with an adapter dropdown. Switching
+  to LAN no longer fails because an old USB adapter is missing.
+- Improve reconnect and heartbeat-error recovery while preserving deliberate
+  pauses and the latest requested current; correct vehicle-presence reporting
+  during wallbox faults.
+- Add AppArmor protection for the service, clearer entity grouping and icons,
+  and quieter Recorder defaults. Optional estimates add no extra Modbus polling
+  or growing session history.
+
+**Updating:** keep your existing entry and app data. Update the app to **0.6.0b1**
+from **#apps-beta** first to use the new service features, then select the
+integration prerelease in HACS/Marketplace and restart
+Core. Older API 2 services from **0.5.0** remain compatible with their existing
+functions. The app's connection page requires stable **Supervisor 2026.11.0+**;
+the integration still supports **Home Assistant 2026.9+**.
+
 ## 0.5.2b2 — 2026-11-06
 
 - Persist executed queued stop intent before refreshing wallbox status, so a

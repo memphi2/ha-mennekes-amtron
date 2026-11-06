@@ -1,7 +1,7 @@
 configuration:
   serial_port:
-    name: Adattatore seriale
-    description: "Solo per USB / RS-485: seleziona l’adattatore USB RS-485 esclusivo, preferibilmente tramite /dev/serial/by-id. Lascia vuoto per LAN."
+    name: Adattatore seriale (percorso)
+    description: "Scegli l’adattatore USB dal menu Apri interfaccia Web. Il percorso viene salvato qui. Ignorato per LAN e rimosso salvando LAN nell’interfaccia Web."
   device_id:
     name: Indirizzo della wallbox
     description: Indirizzo Modbus configurato nella wallbox.
@@ -37,7 +37,7 @@ configuration:
     description: Fissa a 8765; esporre la porta sull'host è facoltativo e normalmente non necessario.
   connection_type:
     name: Connessione wallbox
-    description: "USB / RS-485: adattatore locale. LAN: Modbus RTU (TCP): adattatore di rete trasparente. LAN: Modbus TCP: gateway che traduce TCP in RTU."
+    description: "Apri l’interfaccia Web per scegliere un adattatore USB o inserire host e porta LAN. Salva le modifiche e riavvia l’app."
   host:
     name: Host / indirizzo IP adattatore
     description: "Obbligatorio per LAN: nome host o indirizzo IP dell’adattatore, senza schema o percorso URL. Lascia vuoto per USB / RS-485. Usa una rete privata affidabile."

@@ -9,7 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ._client_write import WriteRateLimiter
+from .charging_session import SessionHistory
+from .energy_goal import EnergyGoal
 from .registers import CHARGING_CURRENT_EMS, REQUESTED_PHASES
+from .soc_goal import SocGoal
 
 
 @dataclass(slots=True)
@@ -25,6 +28,12 @@ class WriteState:
     charging_release_requested: bool | None = None
     pause_requested: bool | None = None
     current_write_generation: int = 0
+    command_intent_generation: int = 0
+    energy_goal_generation: int = 0
+    energy_goal: EnergyGoal = field(default_factory=EnergyGoal)
+    soc_goal_generation: int = 0
+    soc_goal: SocGoal = field(default_factory=SocGoal)
+    session_history: SessionHistory = field(default_factory=SessionHistory)
 
     @classmethod
     def cold_start(cls, now: float) -> WriteState:

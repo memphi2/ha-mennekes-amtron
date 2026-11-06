@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
 ENTITY_REFERENCE = ROOT / "docs" / "entities.md"
 REGISTER_REFERENCE = ROOT / "docs" / "modbus-registers.md"
-LANGUAGES = ("en", "de")
+LANGUAGES = ("en", "de", "fr", "it", "nl")
 
 # Rows of the three tables in docs/modbus-registers.md. The row patterns are
 # anchored at both ends so a table with a different column count cannot match
@@ -312,6 +312,7 @@ def _device_classes_with_icon() -> dict[str, dict[str, str]]:
     )
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         CONTROL_SENSOR_DESCRIPTIONS,
+        ESTIMATE_SENSOR_DESCRIPTIONS,
         SENSOR_DESCRIPTIONS,
     )
 
@@ -319,7 +320,7 @@ def _device_classes_with_icon() -> dict[str, dict[str, str]]:
         platform: {} for platform in _entity_keys()
     }
     for platform, descriptions in (
-        ("sensor", (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS)),
+        ("sensor", (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS, *ESTIMATE_SENSOR_DESCRIPTIONS)),
         ("binary_sensor", BINARY_SENSOR_DESCRIPTIONS),
     ):
         for description in descriptions:
@@ -328,6 +329,7 @@ def _device_classes_with_icon() -> dict[str, dict[str, str]]:
             if device_class is not None and device_class.value != "enum":
                 classes[platform][description.key] = str(device_class.value)
     classes["number"]["charging_current_limit"] = "current"
+    classes["number"]["energy_goal"] = "energy"
     classes["switch"]["charging_release"] = "switch"
     classes["button"]["restart"] = "restart"
     return classes
@@ -388,21 +390,23 @@ def _entity_keys() -> dict[str, set[str]]:
     )
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         CONTROL_SENSOR_DESCRIPTIONS,
+        ESTIMATE_SENSOR_DESCRIPTIONS,
         SENSOR_DESCRIPTIONS,
     )
 
     return {
         "sensor": {
             description.key
-            for description in (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS)
+            for description in (*SENSOR_DESCRIPTIONS, *CONTROL_SENSOR_DESCRIPTIONS, *ESTIMATE_SENSOR_DESCRIPTIONS)
         },
         "binary_sensor": {
             description.key for description in BINARY_SENSOR_DESCRIPTIONS
         } | {"heartbeat"},
-        "number": {"charging_current_limit"},
+        "number": {"charging_current_limit", "energy_goal", "soc_goal"},
         "switch": {"charging_paused", "charging_release", "lock_evse"},
         "select": {"solar_charging_mode", "requested_phases"},
-        "button": {"recover_from_error", "restart"},
+        "button": {"recover_from_error", "restart", "cancel_pending_change", "assign_vehicle_charge"},
+        "event": {"control_result"},
     }
 
 
@@ -414,6 +418,7 @@ def _enum_states() -> dict[tuple[str, str], tuple[str, ...]]:
     )
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         CONTROL_SENSOR_DESCRIPTIONS,
+        ESTIMATE_SENSOR_DESCRIPTIONS,
         SENSOR_DESCRIPTIONS,
     )
 
@@ -426,7 +431,7 @@ def _enum_states() -> dict[tuple[str, str], tuple[str, ...]]:
             expected[("sensor", description.key)] = enum_options(
                 description.enum_class
             )
-    for control_description in CONTROL_SENSOR_DESCRIPTIONS:
+    for control_description in (*CONTROL_SENSOR_DESCRIPTIONS, *ESTIMATE_SENSOR_DESCRIPTIONS):
         if control_description.options is not None:
             expected[("sensor", control_description.key)] = tuple(control_description.options)
     return expected

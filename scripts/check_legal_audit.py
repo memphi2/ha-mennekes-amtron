@@ -76,6 +76,9 @@ VENDOR_MARKER_SOURCES = {
     "tests/test_gates.py",
 }
 TEXT_SUFFIXES = {
+    ".css",
+    ".html",
+    ".js",
     ".csv",
     ".in",
     ".json",

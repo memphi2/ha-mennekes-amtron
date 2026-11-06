@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mennekes Amtron</title>
+  <link rel="stylesheet" href="./app_settings.css">
+  <script src="./app_settings.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Mennekes Amtron</p>
+      <h1 data-i18n="title">Wallbox connection</h1>
+      <p data-i18n="intro">Choose the adapter used by this app. Charging permissions and other settings remain in the app Configuration tab.</p>
+    </header>
+    <p id="error" role="alert" hidden></p>
+    <p id="status" role="status" aria-live="polite" data-i18n="loading">Loading settings…</p>
+    <form id="connection_form" hidden>
+      <label for="connection_type" data-i18n="transport">Connection</label>
+      <select id="connection_type" name="connection_type" required>
+        <option value="serial" data-i18n="usb">USB / RS-485</option>
+        <option value="rtu_over_tcp" data-i18n="rtu">LAN: Modbus RTU over TCP</option>
+        <option value="modbus_tcp" data-i18n="tcp">LAN: Modbus TCP</option>
+      </select>
+      <fieldset id="serial_fields">
+        <legend data-i18n="usb_settings">USB adapter</legend>
+        <label for="serial_port" data-i18n="adapter">Serial adapter</label>
+        <select id="serial_port" name="serial_port" required></select>
+        <p class="hint" data-i18n="adapter_hint">Choose your adapter from the list. Stable device names are preferred automatically; an adapter is never selected for you.</p>
+        <div class="columns">
+          <div>
+            <label for="baudrate" data-i18n="baudrate">Baud rate</label>
+            <select id="baudrate" name="baudrate" required>
+              <option>9600</option><option>14400</option><option>19200</option><option>28800</option>
+              <option>38400</option><option>56000</option><option selected>57600</option>
+            </select>
+          </div>
+          <div>
+            <label for="frame" data-i18n="frame">Serial format</label>
+            <select id="frame" name="frame" required>
+              <option value="8n2">8N2</option><option value="8e1">8E1</option><option value="8o1">8O1</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+      <fieldset id="network_fields" hidden disabled>
+        <legend data-i18n="lan_settings">LAN adapter</legend>
+        <label for="host" data-i18n="host">Adapter IP address or hostname</label>
+        <input id="host" name="host" type="text" maxlength="253" autocomplete="off" spellcheck="false" required>
+        <label for="tcp_port" data-i18n="port">Adapter TCP port</label>
+        <input id="tcp_port" name="tcp_port" type="number" min="1" max="65535" step="1" value="502" required>
+        <p class="hint" data-i18n="lan_hint">Set the serial baud rate and format on the LAN adapter. Saving LAN settings removes any old USB adapter selection.</p>
+      </fieldset>
+      <label for="device_id" data-i18n="address">Wallbox Modbus address</label>
+      <input id="device_id" name="device_id" type="number" min="10" max="50" step="1" value="50" required>
+      <p class="hint" data-i18n="restart_hint">Saving keeps the current connection running. Restart the app afterwards to apply the change; this briefly interrupts its heartbeat.</p>
+      <div class="actions">
+        <button id="reload" type="button" class="secondary" data-i18n="reload">Reload settings and adapters</button>
+        <button id="save" type="submit" data-i18n="save">Save connection</button>
+      </div>
+    </form>
+    <footer data-i18n="security">Available to Home Assistant administrators with Supervisor 2026.11.0 or newer. No device or service credentials are needed here.</footer>
+  </main>
+</body>
+</html>

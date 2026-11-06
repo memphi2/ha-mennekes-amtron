@@ -4,26 +4,33 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from contextlib import suppress
 from dataclasses import asdict
 from pathlib import Path
+from time import time as wall_clock
 from typing import Any
 
+from .charging_session import SessionHistory
 from .client import MennekesModbusClient
 from .client_errors import AmtronBusError
 from .control import AmtronControl, ControlOptions
 from .data import ConnectionState, DeviceIdentity, WallboxData, WriteDiagnostics
+from .energy_goal import EnergyGoal
+from .energy_goal_controller import EnergyGoalController
 from .enums import RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
 from .poller import DevicePoller
 from .register_blocks import REGISTER_BLOCKS
-from .registers import ERROR_CODE, REGISTERS_BY_KEY
+from .registers import ENERGY_TOTAL, ERROR_CODE, REGISTERS_BY_KEY
 from .service_config import ServerConfig, integer, number
 from .service_store import IntentStore
 from .service_version import SERVICE_VERSION
+from .soc_goal import SocGoal
+from .soc_goal_controller import SocGoalController
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,10 +63,16 @@ class ModbusService:
         self.connection = ConnectionState(available=False)
         self.heartbeat = HeartbeatTask(self.client, self.diagnostics)
         self.control: AmtronControl | None = None
+        self.goal: EnergyGoalController | None = None
+        self.soc_goal: SocGoalController | None = None
         self._poller: DevicePoller | None = None
         self._store: IntentStore | None = None
         self._poll_lock = asyncio.Lock()
         self._store_lock = asyncio.Lock()
+        self._saved_session_history = self.client.write_state.session_history.snapshot()
+        self._session_history_dirty = False
+        self._session_history_retry_at = 0.0
+        self._session_history_error_logged = False
         self._logged_unavailable = False
         self._command_lock = asyncio.Lock()
         self._task: asyncio.Task[None] | None = None
@@ -69,6 +82,7 @@ class ModbusService:
         self._attempts = 0
         self._retry_at = 0.0
         self._updated_at: float | None = None
+        self._energy_sample: dict[str, float | None] | None = None
         self._stopping = False
         self._phase = f"opening {self._connection_name} connection"
         self.heartbeat.async_add_listener(self._log_heartbeat_health)
@@ -101,6 +115,7 @@ class ModbusService:
         )
         self._phase = "loading saved control intent"
         await asyncio.to_thread(store.load, self.client.write_state)
+        self._saved_session_history = self.client.write_state.session_history.snapshot()
         self.identity = identity
         self._store = store
         self._poller = DevicePoller(
@@ -124,6 +139,8 @@ class ModbusService:
             request_refresh=self._control_updated,
             validate_deferred=self._validate_deferred,
         )
+        goal = EnergyGoalController(control, self.client, self._persist)
+        soc_goal = SocGoalController(control, self._persist)
         await self.refresh()
         # With no saved resume limit, a migrated pause must not default to the
         # maximum available current. Only an explicit command may resume it.
@@ -135,6 +152,10 @@ class ModbusService:
                 )
         await self._persist()
         self.control = control
+        self.goal = goal
+        self.soc_goal = soc_goal
+        goal.observe(self.data)
+        soc_goal.retry_stop()
         _LOGGER.info(
             "%s connection established; wallbox initialized",
             self._connection_name[0].upper() + self._connection_name[1:],
@@ -210,15 +231,66 @@ class ModbusService:
             self._phase = "polling the wallbox"
             if self._poller is None:
                 raise DeviceError("service_unavailable")
+            goal_generation = self.client.write_state.energy_goal_generation
             try:
                 self.data = await self._poller.async_poll(
                     self.data, last_success=self._success
                 )
             except AmtronBusError:
                 self._success = False
+                self._energy_sample = None
+                self.data.energy_observed_at = None
+                if self.identity.layout_version >= ENERGY_TOTAL.min_layout:
+                    self.client.write_state.session_history.observe(None, now=wall_clock())
+                if self.goal is not None:
+                    self.goal.observe(WallboxData(
+                        energy_read=True, energy_goal_generation=goal_generation,
+                    ))
                 raise
             self._success = True
             self._updated_at = time.monotonic()
+            if self.data.energy_read:
+                energy = self.data.get(ENERGY_TOTAL.key)
+                # Keep the timestamp of a failed meter attempt as well. A
+                # cached value must never turn a measurement gap into energy.
+                self._energy_sample = {
+                    "observed_at": wall_clock(),
+                    "value": (
+                        float(energy) if isinstance(energy, (int, float)) and not isinstance(energy, bool)
+                        and math.isfinite(energy) and energy >= 0 else None
+                    ),
+                }
+            self.data.energy_observed_at = (
+                self._energy_sample["observed_at"] if self._energy_sample is not None else None
+            )
+            if self.control is not None:
+                self.control.observe_recovery(
+                    self.data.get("error_code"), self.data.current_write_generation,
+                )
+            if self.goal is not None:
+                self.goal.observe(self.data)
+            if self.soc_goal is not None:
+                self.soc_goal.retry_stop()
+            if self.identity.layout_version >= ENERGY_TOTAL.min_layout:
+                history = self.client.write_state.session_history
+                self._session_history_dirty |= history.observe(self.data, now=wall_clock())
+                self.data.session_summary_supported = True
+                self.data.charging_session = history.latest.as_dict() if history.latest else None
+                await self._persist_session_history()
+
+    async def _persist_session_history(self) -> None:
+        """Save completed summaries without making optional metrics a bus failure."""
+        if not self._session_history_dirty or time.monotonic() < self._session_history_retry_at:
+            return
+        try:
+            await self._persist(include_session_history=True)
+        except (OSError, ValueError) as err:
+            self._session_history_retry_at = time.monotonic() + 60
+            if not self._session_history_error_logged:
+                _LOGGER.warning("Cannot save completed charging session (%s)", type(err).__name__)
+                self._session_history_error_logged = True
+        else:
+            self._session_history_error_logged = False
 
     async def _recover(self) -> None:
         self._phase = "recovering the wallbox error"
@@ -251,22 +323,35 @@ class ModbusService:
         finally:
             await self._persist()
 
-    async def _persist(self) -> None:
+    async def _persist(self, *, include_session_history: bool = False) -> None:
         if self._store is not None:
             async with self._store_lock:
                 self._phase = "saving control intent"
                 original = self.client.write_state
+                history = (
+                    original.session_history.snapshot() if include_session_history
+                    else self._saved_session_history
+                )
                 state = WriteState(
                     charging_setpoint=original.charging_setpoint,
                     pause_requested=original.pause_requested,
                     charging_release_requested=original.charging_release_requested,
+                    energy_goal=EnergyGoal.restore(original.energy_goal.snapshot()),
+                    soc_goal=SocGoal.restore(original.soc_goal.snapshot()),
+                    session_history=SessionHistory.restore(history),
                 )
                 saving = asyncio.create_task(asyncio.to_thread(self._store.save, state))
                 try:
                     await asyncio.shield(saving)
                 except asyncio.CancelledError:
                     await saving
+                    if include_session_history:
+                        self._saved_session_history = history
+                        self._session_history_dirty = original.session_history.snapshot() != history
                     raise
+                if include_session_history:
+                    self._saved_session_history = history
+                    self._session_history_dirty = original.session_history.snapshot() != history
 
     async def _control_updated(self) -> None:
         """Publish queue changes and persist commands executed by the worker."""
@@ -300,8 +385,25 @@ class ModbusService:
             "values": self.data.values,
             "failed_blocks": list(self.data.failed_blocks),
             "current_write_generation": self.data.current_write_generation,
+            "connection_quality": self.data.connection_quality,
+            "energy_sample": dict(self._energy_sample) if self._energy_sample is not None else None,
+            "charging_session": {
+                "supported": self.identity.layout_version >= ENERGY_TOTAL.min_layout,
+                "latest": (
+                    self.client.write_state.session_history.latest.as_dict()
+                    if self.identity.layout_version >= ENERGY_TOTAL.min_layout
+                    and self.client.write_state.session_history.latest is not None
+                    else None
+                ),
+            },
+            "command_events": control.events.snapshot() if control else None,
             "control": {
+                "supports_energy_goal": control.supports_energy_goal if control else False,
+                "supports_soc_goal": control.supports_soc_goal if control else False,
+                "soc_goal": control.soc_goal.snapshot() if control else None,
+                "energy_goal": control.energy_goal.snapshot() if control else None,
                 "read_only": self.config.read_only,
+                "supports_cancel_pending": True,
                 "current_cap": self.config.current_cap,
                 "state_change_interval_seconds": self.config.state_change_interval_seconds,
                 "phase_switch_grace_seconds": self.config.phase_switch_grace_seconds,
@@ -338,7 +440,8 @@ class ModbusService:
 
     async def command(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload.keys() - {
-            "command", "value", "allow_unlimited", "current_cap", "expected_serial_number"
+            "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
+            "source", "soc", "maximum"
         }:
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
@@ -352,17 +455,21 @@ class ModbusService:
             control = self.control
             # A request can age while another command owns the lock. Only admit
             # it against the same current state that the API reports as usable.
-            if control is None or not self._is_available():
+            command = payload.get("command")
+            cancelling = command == "cancel_pending"
+            metadata = command in ("soc_source", "soc_observation")
+            if control is None or self._stopping or (not cancelling and not metadata and not self._is_available()):
                 raise DeviceError("service_unavailable")
             # The service can restart against another wallbox between HA polls,
             # or while this command waits. Bind the write before any bus access.
             # Explicit null matches only a device without a readable serial.
             if expected_serial != self.identity.serial_number:
                 raise DeviceError("device_identity_changed")
-            command = payload.get("command")
             value = payload.get("value")
             try:
-                if command == "set_current":
+                if cancelling:
+                    await control.async_cancel_pending_change()
+                elif command == "set_current":
                     unlimited = payload.get("allow_unlimited", False)
                     if not isinstance(unlimited, bool):
                         raise ValueError("allow_unlimited must be boolean")
@@ -371,6 +478,30 @@ class ModbusService:
                     )
                 elif command == "pause":
                     await control.async_pause_charging()
+                elif command == "energy_goal":
+                    await control.async_set_energy_goal(number(value, 0, 1000))
+                elif command == "soc_source":
+                    source = payload.get("source")
+                    if source is not None and not isinstance(source, str):
+                        raise ValueError("source must be a string or null")
+                    await control.async_configure_soc(source)
+                elif command in ("soc_goal", "soc_observation"):
+                    source = payload.get("source")
+                    if not isinstance(source, str):
+                        raise ValueError("source is required")
+                    soc = payload.get("soc")
+                    maximum = payload.get("maximum")
+                    if command == "soc_goal":
+                        await control.async_set_soc_goal(
+                            number(value, 0, 100), source=source,
+                            soc=None if soc is None else number(soc, 0, 100),
+                            maximum=None if maximum is None else number(maximum, 0, 100),
+                        )
+                    else:
+                        await control.async_observe_soc(
+                            None if soc is None else number(soc, 0, 100),
+                            None if maximum is None else number(maximum, 0, 100), source=source,
+                        )
                 elif command == "resume":
                     await control.async_resume_charging(
                         current_cap=number(
@@ -400,7 +531,8 @@ class ModbusService:
                     raise ValueError("unknown command")
             finally:
                 await self._persist()
-            await self.refresh()
+            if not cancelling and not metadata:
+                await self.refresh()
             return self.snapshot()
 
     async def read(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -445,7 +577,13 @@ class ModbusService:
                 if heartbeat_running:
                     _LOGGER.info("Heartbeat stopped")
                 if self.control is not None:
+                    if self.goal is not None:
+                        await self.goal.async_stop()
+                    if self.soc_goal is not None:
+                        await self.soc_goal.async_stop()
                     await self.control.async_shutdown()
+                self._session_history_retry_at = 0.0
+                await self._persist_session_history()
                 await self._persist()
         finally:
             await self.client.async_close()

@@ -22,6 +22,7 @@ from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout, web
 from amtron_device import registers
+from amtron_device.app_settings import serial_adapters
 from amtron_device.decode import encode_register
 from pymodbus import FramerType
 from pymodbus.server import ModbusSerialServer, ModbusTcpServer
@@ -32,6 +33,7 @@ SERIAL = "APPARMOR-PROBE"
 SUPERVISOR_TOKEN = "isolated-supervisor-probe-credential"  # noqa: S105 - isolated fixture
 DATA = Path("/data")
 API = "http://127.0.0.1:8765"
+SETTINGS_API = "http://127.0.0.1:8099"
 
 
 class ProbeError(Exception):
@@ -83,8 +85,12 @@ class Child:
         code = (
             "from pathlib import Path; "
             f"assert Path('/proc/self/attr/current').read_text().strip() == {self.profile + ' (enforce)'!r}; "
-            "from amtron_device import service_discovery, server; "
+            "from amtron_device import app_settings, service_discovery, server; "
             "service_discovery.SUPERVISOR_URL = 'http://supervisor:8766'; "
+            # This isolated proxy fixture uses loopback. Real-peer rejection is
+            # tested separately; production ingress keeps its fixed Supervisor IP.
+            "app_settings.SUPERVISOR_URL = 'http://supervisor:8766'; "
+            "app_settings.SUPERVISOR_PEER = '127.0.0.1'; "
             "server.main()"
         )
         self.process = await asyncio.create_subprocess_exec(
@@ -178,10 +184,53 @@ def check_temporary_files() -> None:
     require(not list(DATA.glob(".token-*")) and not list(DATA.glob(".intent-*")), "atomic save left temporary files")
 
 
+async def check_connection_page(session: ClientSession, mode: str, original: dict[str, Any]) -> None:
+    """Exercise installed assets, local enumeration and the self API under policy."""
+    headers = {"X-Remote-User-Id": "a" * 32, "X-Remote-User-Groups": "system-admin"}
+    for path, expected_type in (("/", "text/html"), ("/app_settings.js", "text/javascript"), ("/app_settings.css", "text/css")):
+        async with session.get(SETTINGS_API + path, headers={"Accept-Language": "de-DE"}) as response:
+            require(response.status == 200 and response.content_type == expected_type, "connection asset was not served")
+            content = await response.text()
+            require(bool(content) and SUPERVISOR_TOKEN not in content, "connection asset was empty or exposed a credential")
+            if path == "/":
+                require('lang="de"' in content and 'id="serial_port"' in content, "translated connection page or adapter selector missing")
+    async with session.get(SETTINGS_API + "/api/config") as response:
+        require(response.status == 403, "connection settings accepted a non-admin request")
+    async with session.get(SETTINGS_API + "/api/config", headers=headers) as response:
+        require(response.status == 200, "connection settings could not be read")
+        configuration = await response.json()
+        require(configuration["settings"]["connection_type"] == mode, "connection settings selected a different transport")
+        require("token" not in configuration["settings"], "connection settings exposed credentials")
+        if mode == "serial":
+            require(any(adapter["value"] == "/dev/serial/by-id/amtron-test" for adapter in configuration["adapters"]), "connection dropdown omitted the stable adapter")
+    payload = {
+        "revision": configuration["revision"], "connection_type": "rtu_over_tcp",
+        "device_id": original["device_id"], "host": "wallbox", "tcp_port": 5020,
+    }
+    async with session.post(SETTINGS_API + "/api/config", json=payload, headers=headers) as response:
+        require(response.status == 403, "connection settings accepted a write without CSRF")
+    headers["X-Amtron-CSRF"] = configuration["csrf"]
+    async with session.post(SETTINGS_API + "/api/config", json=payload, headers=headers) as response:
+        result = await response.json()
+        require(response.status == 200 and result.get("restart_required") is True, "connection settings could not save through the self API")
+    async with session.get(SETTINGS_API + "/api/config", headers=headers) as response:
+        result = await response.json()
+        require(response.status == 200 and result["settings"]["connection_type"] == "rtu_over_tcp", "saved connection settings could not be read")
+        require("serial_port" not in result["settings"], "LAN save retained an obsolete serial path")
+    # The mock Supervisor retains changes only in RAM. Running Modbus and the
+    # restart fixture must still use the original, read-only options file.
+    require(json.loads((DATA / "options.json").read_text()) == original, "connection settings wrote the read-only options file")
+
+
 async def probe(profile: str, mode: str) -> dict[str, object]:
     check_environment(profile)
+    adapters = serial_adapters()
+    if mode == "serial":
+        require(any(adapter.value == "/dev/serial/by-id/amtron-test" and adapter.device == "/dev/ttyUSB99" for adapter in adapters), "serial settings did not enumerate the stable virtual adapter")
     writes: list[tuple[int, list[int]]] = []
     discoveries: list[str] = []
+    original_options = json.loads((DATA / "options.json").read_text())
+    supervisor_options = dict(original_options)
 
     async def action(_function: int, _start: int, address: int, _count: int,
                      _registers: list[int], values: list[int] | list[bool] | None) -> None:
@@ -199,10 +248,20 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
                                  address=("0.0.0.0", 5020))  # noqa: S104 - isolated probe network
 
     async def supervisor(request: web.Request) -> web.Response:
+        nonlocal supervisor_options
         require(request.headers.get("Authorization") == f"Bearer {SUPERVISOR_TOKEN}", "Supervisor authentication differs")
+        if request.path == "/info":
+            return web.json_response({"result": "ok", "data": {"supervisor": "2026.11.0"}})
         if request.path == "/addons/self/info":
-            return web.json_response({"result": "ok", "data": {"hostname": "local-mennekes-amtron-modbus"}})
+            return web.json_response({"result": "ok", "data": {"hostname": "local-mennekes-amtron-modbus", "options": supervisor_options}})
         payload = await request.json()
+        if request.path == "/addons/self/options":
+            require(set(payload) == {"options"} and isinstance(payload["options"], dict), "self API received an unexpected payload")
+            updated = payload["options"]
+            connection_fields = {"connection_type", "serial_port", "host", "tcp_port", "device_id", "baudrate", "frame"}
+            require({key: value for key, value in updated.items() if key not in connection_fields} == {key: value for key, value in original_options.items() if key not in connection_fields}, "connection page changed unrelated app options")
+            supervisor_options = updated
+            return web.json_response({"result": "ok", "data": {}})
         require(payload["service"] == "mennekes_amtron_rtu", "discovery service differs")
         require(payload["config"]["port"] == 8765, "discovery API port differs")
         token = payload["config"]["token"]
@@ -211,7 +270,9 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
         return web.json_response({"result": "ok", "data": {}})
 
     app = web.Application()
+    app.router.add_get("/info", supervisor)
     app.router.add_get("/addons/self/info", supervisor)
+    app.router.add_post("/addons/self/options", supervisor)
     app.router.add_post("/discovery", supervisor)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
@@ -240,6 +301,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
 
             await child.start()
             await ready()
+            await check_connection_page(session, mode, original_options)
             require(discoveries == [token], "discovery token differs from persistent token")
             require(stat.S_IMODE((DATA / "service-token").stat().st_mode) == 0o600, "token file is not private")
             await asyncio.sleep(5.1)
@@ -274,7 +336,8 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
                 require(b"Heartbeat started" in instance.output and b"Heartbeat stopped" in instance.output, "heartbeat lifecycle logging is incomplete")
         return {"status": "passed", "mode": mode, "profile": profile, "enforcing": True,
                 "discovery": True, "heartbeat": True, "pause_restart": True,
-                "token_preserved": True, "denials": 4, "shutdown": True}
+                "token_preserved": True, "denials": 4, "shutdown": True,
+                "serial_settings": True, "connection_ui": True}
     finally:
         for instance in children:
             await instance.stop(clean=False)

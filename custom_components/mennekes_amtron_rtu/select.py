@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
+from enum import IntEnum
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .coordinator import MennekesAmtronCoordinator
 from .device.capabilities import capability_is_supported
+from .device.decode import RegisterValue
 from .device.enums import (
     RequestedPhases,
     SolarChargingMode,
@@ -49,13 +52,12 @@ class AmtronSolarModeSelect(MennekesAmtronControlEntity, SelectEntity):
     """
 
     _attr_translation_key = "solar_charging_mode"
+    _attr_entity_category = EntityCategory.CONFIG
     # Home Assistant declares _attr_options as an instance attribute, so
     # annotating it ClassVar does not type-check. The list is never mutated.
     _attr_options = list(enum_options(SolarChargingMode))  # noqa: RUF012
 
-    def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: Any
-    ) -> None:
+    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
         super().__init__(
             entry,
             coordinator,
@@ -65,12 +67,12 @@ class AmtronSolarModeSelect(MennekesAmtronControlEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        """Return the active solar charging mode."""
+        """Return the solar mode shown by the wallbox."""
 
         return _option_of(SolarChargingMode, self.register_value)
 
     async def async_select_option(self, option: str) -> None:
-        """Set the solar charging mode."""
+        """Set the solar mode shown by the wallbox."""
 
         await self.runtime_data.control.async_set_solar_charging_mode(
             SolarChargingMode[option.upper()]
@@ -82,16 +84,14 @@ class AmtronRequestedPhasesSelect(MennekesAmtronControlEntity, SelectEntity):
 
     This entity only exists when the hardware can switch phases. Switching
     phases can abort a charging session and some EVs do not tolerate it, so
-    the control layer pauses the charge first and the vendor's own interval
-    recommendation is enforced.
+    the control layer pauses the charge first and applies the configured
+    vehicle-protection interval when a vehicle is connected.
     """
 
     _attr_translation_key = "requested_phases"
     _attr_options = list(enum_options(RequestedPhases))  # noqa: RUF012
 
-    def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: Any
-    ) -> None:
+    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
         super().__init__(
             entry,
             coordinator,
@@ -113,7 +113,7 @@ class AmtronRequestedPhasesSelect(MennekesAmtronControlEntity, SelectEntity):
         )
 
 
-def _option_of(enum_class: Any, value: Any) -> str | None:
+def _option_of(enum_class: type[IntEnum], value: RegisterValue) -> str | None:
     if not isinstance(value, int):
         return None
     try:

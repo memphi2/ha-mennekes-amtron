@@ -50,6 +50,10 @@ profile mennekes_amtron_modbus flags=(attach_disconnected,mediate_deleted) {
 
   # Serial adapters and persistent by-id/by-path names. Supervisor still
   # determines which devices are actually mapped into the container.
+  # The connection picker enumerates names only; no sysfs metadata is needed.
+  /dev/ r,
+  /dev/serial/ r,
+  /dev/serial/{by-id,by-path}/ r,
   /dev/tty{USB,ACM,AMA,S,SC,THS,XRUSB}[0-9]* rwk,
   /dev/serial/{by-id,by-path}/* rwk,
 

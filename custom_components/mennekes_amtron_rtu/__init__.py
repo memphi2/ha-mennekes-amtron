@@ -19,8 +19,16 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .blueprint_installer import async_install_blueprints
+from .charge_loss_const import (
+    CONF_CHARGE_LOSS_SOURCE,
+    LOSS_SOURCE_DISABLED,
+    LOSS_SOURCE_SENSOR,
+)
+from .charge_loss_observer import ChargeLossObserver
+from .charging_cost_const import CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED
 from .control import AmtronControl, ControlOptions
 from .coordinator import MennekesAmtronCoordinator
+from .cost_observer import ChargingCostObserver, LastChargingCost
 from .data import (
     ConnectionState,
     MennekesAmtronRuntimeData,
@@ -60,11 +68,15 @@ from .device.const import (
     DEFAULT_TCP_PORT,
     DOMAIN,
 )
+from .device.energy_goal_controller import EnergyGoalController
 from .device.errors import device_error
 from .device.heartbeat import HeartbeatTask
 from .device.identity import async_read_identity
+from .device.soc_goal_controller import SocGoalController
 from .device.write_state import WriteState
 from .entry_types import MennekesAmtronConfigEntry
+from .goal_store import GoalStore, ModelStore, SessionHistoryStore, SocGoalStore
+from .loss_store import LossStore
 from .options_flow import control_mode_is_master
 from .recovery import HeartbeatRecovery
 from .remote import (
@@ -78,10 +90,13 @@ from .remote import (
 from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
+from .session_observer import SessionObserver
+from .vehicle_soc import VehicleSocObserver
+from .vehicle_soc_const import CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_ENTITY
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-READ_PLATFORMS = (Platform.SENSOR, Platform.BINARY_SENSOR)
+READ_PLATFORMS = (Platform.SENSOR, Platform.BINARY_SENSOR, Platform.EVENT)
 CONTROL_PLATFORMS = (
     Platform.NUMBER,
     Platform.SELECT,
@@ -180,6 +195,15 @@ async def async_setup_entry(
             )
         ),
     )
+
+    def notify_pending() -> None:
+        # Cancelling queued work or changing a goal is not a successful poll.
+        # Notify entities without clearing a connection failure or reading the bus.
+        if coordinator.data is not None:
+            coordinator.data.pending_change = control.pending_action
+            coordinator.data.pending_change_until = control.pending_until
+        coordinator.async_update_listeners()
+
     if isinstance(client, RemoteClient):
         control: AmtronControl = RemoteControl(
             client,
@@ -187,6 +211,7 @@ async def async_setup_entry(
             options=_control_options(entry),
             state=coordinator.current_data,
             request_refresh=coordinator.async_refresh,
+            notify_pending=notify_pending,
         )
     else:
         def validate_deferred() -> None:
@@ -202,8 +227,10 @@ async def async_setup_entry(
             request_refresh=coordinator.async_request_refresh,
             notify_write_error=lambda: async_check_repairs(hass, entry),
             validate_deferred=validate_deferred,
+            notify_pending=notify_pending,
         )
         coordinator.control_status = lambda: (control.pending_action, control.pending_until)
+        coordinator.observe_recovery = control.observe_recovery
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -214,6 +241,58 @@ async def async_setup_entry(
     )
 
     try:
+        loss_enabled = entry.options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+        cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
+        if loss_enabled or cost_enabled:
+            if not remote:
+                entry.runtime_data.sessions = SessionObserver(hass, entry, identity, coordinator)
+                await entry.runtime_data.sessions.async_setup()
+            if cost_enabled:
+                entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry, remote=remote)
+                await entry.runtime_data.charging_cost.async_start()
+
+            async def observe_estimates(data: WallboxData | None) -> None:
+                if entry.runtime_data.sessions is not None:
+                    await entry.runtime_data.sessions.async_observe(data)
+                if entry.runtime_data.charging_cost is not None:
+                    await entry.runtime_data.charging_cost.async_observe(data)
+
+            coordinator.observe_session = observe_estimates
+        if not remote:
+            soc_store = SocGoalStore(
+                hass, entry.entry_id,
+                identity.serial_number or f"{client.config.port}:{client.config.device_id}",
+            )
+            try:
+                client.write_state.soc_goal = await soc_store.async_load()
+            except (OSError, ValueError) as err:
+                raise ConfigEntryNotReady(
+                    translation_domain=DOMAIN, translation_key="soc_goal_state_invalid"
+                ) from err
+
+            async def persist_soc_goal() -> None:
+                await soc_store.async_save(control.soc_goal)
+
+            entry.runtime_data.soc_goal = SocGoalController(control, persist_soc_goal, notify_pending)
+            coordinator.retry_soc_goal = entry.runtime_data.soc_goal.retry_stop
+        if not remote and control.supports_energy_goal:
+            store = GoalStore(
+                hass, entry.entry_id,
+                identity.serial_number or f"{client.config.port}:{client.config.device_id}",
+            )
+            try:
+                client.write_state.energy_goal = await store.async_load()
+            except (OSError, ValueError) as err:
+                raise ConfigEntryNotReady(
+                    translation_domain=DOMAIN, translation_key="energy_goal_state_invalid"
+                ) from err
+
+            async def persist_goal() -> None:
+                await store.async_save(control.energy_goal)
+
+            goal = EnergyGoalController(control, client, persist_goal, notify_pending)
+            entry.runtime_data.goal = goal
+            coordinator.observe_goal = goal.observe
         if isinstance(client, RemoteClient):
             client.on_auth_failed = lambda: entry.async_start_reauth(hass)
             heartbeat = RemoteHeartbeat(client, diagnostics)
@@ -257,6 +336,23 @@ async def async_setup_entry(
                 hass, entry, client, diagnostics
             )
         await coordinator.async_config_entry_first_refresh()
+        if loss_enabled:
+            entry.runtime_data.charge_loss = ChargeLossObserver(hass, entry)
+            await entry.runtime_data.charge_loss.async_start()
+        if entry.options.get(CONF_VEHICLE_SOC_ENTITY) or control.soc_goal.source is not None:
+            observer = VehicleSocObserver(
+                hass, control, coordinator,
+                entry.options.get(CONF_VEHICLE_SOC_ENTITY),
+                entry.options.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY),
+            )
+            entry.runtime_data.vehicle_soc = observer
+            await observer.async_start()
+        if remote:
+            # The service owns its own durable goal. Old direct-mode intent must
+            # not return when this entry later switches back from the service.
+            await GoalStore(hass, entry.entry_id, "").async_remove()
+            await SocGoalStore(hass, entry.entry_id, "").async_remove()
+            await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
         platforms = tuple(_entry_platforms(entry))
         await hass.config_entries.async_forward_entry_setups(
             entry, platforms
@@ -268,6 +364,13 @@ async def async_setup_entry(
             entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)
             entry.runtime_data.recovery.start()
     except BaseException:
+        await _async_stop_estimates(entry.runtime_data)
+        if entry.runtime_data.vehicle_soc is not None:
+            await entry.runtime_data.vehicle_soc.async_stop()
+        if entry.runtime_data.soc_goal is not None:
+            await entry.runtime_data.soc_goal.async_stop()
+        if entry.runtime_data.goal is not None:
+            await entry.runtime_data.goal.async_stop()
         if entry.runtime_data.recovery is not None:
             await entry.runtime_data.recovery.async_stop()
         if entry.runtime_data.heartbeat is not None:
@@ -300,6 +403,13 @@ async def async_unload_entry(
     )
     if not unloaded:
         return False
+    await _async_stop_estimates(runtime_data)
+    if runtime_data.vehicle_soc is not None:
+        await runtime_data.vehicle_soc.async_stop()
+    if runtime_data.soc_goal is not None:
+        await runtime_data.soc_goal.async_stop()
+    if runtime_data.goal is not None:
+        await runtime_data.goal.async_stop()
     if runtime_data.recovery is not None:
         await runtime_data.recovery.async_stop()
     if runtime_data.heartbeat is not None:
@@ -307,6 +417,17 @@ async def async_unload_entry(
     await runtime_data.control.async_shutdown()
     await runtime_data.client.async_close()
     return unloaded
+
+
+async def _async_stop_estimates(runtime: MennekesAmtronRuntimeData) -> None:
+    """Detach the poll hook before closing optional estimate owners."""
+    runtime.coordinator.observe_session = None
+    if runtime.charge_loss is not None:
+        await runtime.charge_loss.async_stop()
+    if runtime.charging_cost is not None:
+        await runtime.charging_cost.async_stop()
+    if runtime.sessions is not None:
+        await runtime.sessions.async_close()
 
 
 async def async_reload_entry(
@@ -323,6 +444,11 @@ async def async_remove_entry(
     """Remove repairs owned by a deleted entry, also on HA before 2026.11."""
 
     hass.data.get(f"{DOMAIN}_write_states", {}).pop(entry.entry_id, None)
+    await GoalStore(hass, entry.entry_id, "").async_remove()
+    await SocGoalStore(hass, entry.entry_id, "").async_remove()
+    await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
+    await LossStore(hass, entry.entry_id, "").async_remove()
+    await ModelStore(hass, entry.entry_id, "", kind="charging_cost", model=LastChargingCost).async_remove()
     prefix = f"{entry.entry_id}_"
     for domain, issue_id in tuple(ir.async_get(hass).issues):
         if domain == DOMAIN and issue_id.startswith(prefix):
@@ -339,6 +465,8 @@ def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:
     platforms = list(READ_PLATFORMS)
     if CONF_SERVER_URL in entry.data or control_mode_is_master(dict(entry.options)):
         platforms.extend(CONTROL_PLATFORMS)
+    elif entry.options.get(CONF_CHARGE_LOSS_SOURCE) == LOSS_SOURCE_SENSOR:
+        platforms.append(Platform.BUTTON)
     return platforms
 
 

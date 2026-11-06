@@ -29,6 +29,12 @@ class AmtronIdentityError(AmtronConnectionError):
 class AmtronProtocolError(AmtronBusError):
     """The device answered, but not with usable data."""
 
+    def __init__(self, message: str, *, exception_code: int | None = None) -> None:
+        super().__init__(message)
+        # A valid Modbus exception reply is a device refusal, not evidence of
+        # a broken link. Keep this separate from malformed/missing responses.
+        self.exception_code = exception_code
+
 
 class AmtronIllegalAddressError(AmtronProtocolError):
     """The device rejected the address as unknown.
@@ -63,13 +69,14 @@ def protocol_error_for(exception_code: int, address: int) -> AmtronProtocolError
     location = f"0x{address:04X}"
     if exception_code == ILLEGAL_DATA_ADDRESS:
         return AmtronIllegalAddressError(
-            f"device reports register {location} as unknown"
+            f"device reports register {location} as unknown", exception_code=exception_code,
         )
     if exception_code in (ILLEGAL_FUNCTION, ILLEGAL_DATA_VALUE):
         return AmtronWriteRejectedError(
             f"device rejected the access to {location} "
-            f"(modbus exception {exception_code})"
+            f"(modbus exception {exception_code})", exception_code=exception_code,
         )
     return AmtronProtocolError(
-        f"device returned modbus exception {exception_code} for {location}"
+        f"device returned modbus exception {exception_code} for {location}",
+        exception_code=exception_code,
     )

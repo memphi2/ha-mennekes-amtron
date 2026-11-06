@@ -15,6 +15,7 @@ from pymodbus.exceptions import ConnectionException, ModbusException, ModbusIOEx
 from pymodbus.pdu import ExceptionResponse
 
 from .client_errors import (
+    AmtronBusError,
     AmtronConnectionError,
     AmtronIllegalAddressError,
     AmtronProtocolError,
@@ -34,8 +35,34 @@ async def read_words(
     count: int,
     device_id: int,
     retries: int = 0,
+    observe: Callable[[BaseException | None], None] | None = None,
 ) -> list[int]:
     """Read words, retrying unanswered reads without retrying any writes."""
+
+    try:
+        words = await _read_words(
+            client, address=address, count=count, device_id=device_id,
+            retries=retries, observe=observe,
+        )
+    except AmtronBusError as err:
+        if observe is not None:
+            observe(err)
+        raise
+    if observe is not None:
+        observe(None)
+    return words
+
+
+async def _read_words(
+    client: ModbusTransport,
+    *,
+    address: int,
+    count: int,
+    device_id: int,
+    retries: int,
+    observe: Callable[[BaseException | None], None] | None,
+) -> list[int]:
+    """Validate each response, retaining failures hidden by successful retries."""
 
     remaining = retries
     while True:
@@ -53,6 +80,8 @@ async def read_words(
                 raise err.__cause__ from None
             if remaining <= 0:
                 raise AmtronProtocolError(str(err) or "modbus read failed") from err
+            if observe is not None:
+                observe(AmtronProtocolError("modbus read retry"))
             remaining -= 1
         except ModbusException as err:
             raise AmtronProtocolError(str(err) or "modbus transaction failed") from err

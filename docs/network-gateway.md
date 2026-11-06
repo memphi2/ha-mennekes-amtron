@@ -49,14 +49,19 @@ can still interrupt delivery; configure the wallbox's
 
 ### Service app
 
+App **0.6.0b1** includes **Open Web UI**. Older app 0.5.2b2 uses the native
+Configuration tab described below.
+
 1. Follow the [service installation](modbus-service.md) and prepare any existing
    connection for handover before starting a second bus owner.
-2. Set **Wallbox connection** to **LAN: Modbus RTU (TCP)** or **LAN: Modbus TCP**,
-   matching the gateway. Enter **Adapter host / IP** as a hostname or IP address,
-   without `http://` or a URL path, and set its TCP port. The host field is always
-   visible in app 0.5.1; choosing LAN does not rearrange the configuration form.
-3. Leave **Serial adapter** unset. If switching from USB, clear an old adapter
-   value that no longer exists. USB baud/frame fields are ignored for LAN;
+2. If the app offers **Open Web UI**, start it and open that page. It requires an
+   administrator and stable Supervisor **2026.11.0+**. Select **LAN: Modbus RTU
+   (TCP)** or **LAN: Modbus TCP**, matching the gateway. Enter the adapter's host/IP
+   without `http://` or a URL path, and its TCP port. The page shows the LAN fields
+   and removes any saved USB path when you save.
+3. On older apps, use the native **Configuration** tab instead. The host field is
+   always visible from app 0.5.1; those older apps may require clearing an obsolete
+   USB selection before saving. USB baud/frame fields are ignored for LAN;
    configure those on the gateway instead. Keep **Read-only** on initially.
 4. Save and restart the app. Confirm its HA discovery and compare readings.
    When ready, disable **Read-only**, save and restart the app again.

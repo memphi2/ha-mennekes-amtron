@@ -13,6 +13,7 @@ from unittest.mock import patch
 import pytest
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.tasks import StatisticsTask
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.recorder import async_initialize_recorder
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
@@ -20,7 +21,12 @@ from homeassistant.util import dt as dt_util
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
-from tests.recorder_replay import DETAILS, EXTRAS
+from tests.recorder_replay import (
+    DEFAULT_STATISTICS,
+    DETAILS,
+    EXTRAS,
+    OPTIONAL_MEASUREMENTS,
+)
 from tests.test_home_assistant_smoke import _boot
 
 PREFIX = "sensor.mennekes_amtron_"
@@ -33,7 +39,8 @@ def test_hourly_statistics_and_recorder_exclusions(
     """Keep energy sums and power means while excluded sensors remain live."""
 
     async def run() -> None:
-        transport = FakeModbusClient(device_bank())
+        serial = "ABC123456789"
+        transport = FakeModbusClient(device_bank(serial=serial))
         # Explicit event timestamps avoid dependence on the wall clock or on
         # crossing an hour boundary. Recorder itself and its compiler are real.
         start = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
@@ -49,6 +56,14 @@ def test_hourly_statistics_and_recorder_exclusions(
             ),
         ):
             hass = await _boot(tmp_path / "config")
+            # Preserve the user's previously enabled detail readings. This
+            # scenario tests Recorder exclusion, not the new-install defaults.
+            registry = er.async_get(hass)
+            for key in OPTIONAL_MEASUREMENTS:
+                registry.async_get_or_create(
+                    "sensor", DOMAIN, f"{serial}_{key}",
+                    suggested_object_id=f"mennekes_amtron_{key}", disabled_by=None,
+                )
             async_initialize_recorder(hass)
             database = tmp_path / "recorder.db"
             try:
@@ -114,7 +129,16 @@ def test_hourly_statistics_and_recorder_exclusions(
                         )
                     }
                 stats = {row[0]: row[1:] for row in rows}
-                assert len(rows) == len(stats) == 17 - len(excluded)
+                expected_statistics = {
+                    PREFIX + key
+                    for key in (DEFAULT_STATISTICS | set(OPTIONAL_MEASUREMENTS)).difference(excluded)
+                }
+                assert set(stats) == expected_statistics
+                assert len(rows) == len(stats)
+                duration = hass.states.get(PREFIX + "session_duration")
+                assert duration is not None
+                assert "state_class" not in duration.attributes
+                assert PREFIX + "session_duration" not in stats
                 energy = stats[PREFIX + "total_energy"]
                 assert energy[:3] == ("kWh", "energy", 0)
                 assert energy[3] is None

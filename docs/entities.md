@@ -5,6 +5,9 @@ Use **Charging current limit** and **Charging paused** for everyday charging.
 energy and connection health. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
 
+The new targets, estimates, status entities, command events and grouping changes
+described here belong to **beta 0.6.0b1**, not stable 0.5.1.
+
 The first column shows default **English** entity-ID patterns. `*` stands
 for the device prefix; it is not part of a literal entity ID. For example,
 Total energy normally becomes `sensor.mennekes_amtron_total_energy`.
@@ -24,6 +27,47 @@ failed read makes an existing entity unavailable until communication recovers.
 | **Direct USB or LAN** | Select **Control mode → Modbus master** in the integration options. Read-only entries provide readings without adding controls. |
 | **Modbus service** | Disable **Read-only** in the app configuration, save and restart the app. Controls become available after fresh service status arrives; HA needs no restart for this switch. Their IDs stay registered while the service is read-only, disconnected or not ready. |
 
+## Device-page grouping
+
+Daily charging controls stay in **Controls**. The display-only solar selector,
+recovery and restart buttons belong to **Configuration**. Technical CP status
+and detailed error codes belong to **Diagnostic**, alongside heartbeat health,
+internal temperature, installation limits and fallback settings. The general
+**Error** sensor stays in the main status section.
+
+The wallbox's phase selection is shown with the normal sensors; it describes
+which phases the next relay closure will use. **Requested phases** is your
+command, while **Detected vehicle phases** describes the vehicle's session.
+These values can legitimately differ during a pending change.
+
+Status-dependent icons distinguish paused/unpaused, locked/unlocked and
+healthy/faulted states. An inactive pause does not claim that a car is charging.
+Existing entity IDs, custom names and user-selected icons are retained.
+
+**Vehicle connected** uses EVSE and CP status together. A wallbox error is not
+a disconnect: a valid connected CP signal keeps it on. Insufficient or conflicting
+evidence becomes unknown instead of inventing an unplug event. A definite
+connected EVSE state remains connected if CP is missing. Older layouts
+without CP use known EVSE idle/connected states and leave fault states unknown.
+
+## New controls and status
+
+**Charging status** explains observed state: initialization, a wallbox fault,
+service mode, no connected vehicle, charging, a lock, disabled release, pause,
+missing authorization, preparation or waiting for the vehicle. Faults take
+priority; for a connected vehicle, lock, release, pause and authorization are
+checked in that order. Missing or contradictory evidence is unknown. A queued
+request is shown by **Pending change**, not presented as an executed change.
+The status does not infer a full battery or identify an undocumented restriction.
+
+**Connection quality** describes Modbus communication, including heartbeat and
+write responses. It becomes degraded after a timeout or malformed response,
+including a failed read that a retry subsequently recovers. A valid device error
+reply still proves communication. It returns to good after 300 seconds without
+a communication error and a new confirmed response. Before the first response
+it is unknown; loss of the connection is still handled by normal availability.
+It exposes no frequently changing counters or timestamps.
+
 ## Controls
 
 For availability, use the connection table above. Service controls follow the
@@ -31,19 +75,29 @@ app's **Read-only** setting; direct controls require **Modbus master**.
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
+| `number.*_vehicle_charge_target` | Vehicle charge target | optional configured vehicle SoC source; compatible service in service mode | Percentage ceiling, 0 = off. Only limits charging. Up to 100%, or the separately optional vehicle charge-limit source. Neither setting nor disabling resumes charging. |
+| `number.*_energy_target` | Energy target | lifetime energy counter; compatible service in service mode | Additional kWh from the time you set it, in 0.1 kWh steps, up to 1000. Setting a positive value never starts or resumes charging. Zero disables the goal without resuming. |
+| `button.*_cancel_pending_change` | Cancel pending change | new direct controller or supporting service | Removes the queued action without a wallbox write. Already executed preparation, such as a phase-change pause, remains. Available only while an action is pending. |
 | `number.*_charging_current_limit` | Charging current limit | always | Slider: 0 A removes the energy-manager limit and bypasses extra current caps; 6 A or more sets a limit. Hardware limits still apply. While paused it shows the remembered setpoint; changing it can resume charging. |
 | `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. |
 | `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. |
 | `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
-| `select.*_solar_charging_mode` | Solar charging mode | always | The solar mode shown on the wallbox display. Drives the HMI only, and needs DIP 7 on. |
 | `select.*_requested_phases` | Requested phases | hardware that can switch phases | Single-phase or all-phase charging. A change while charging first pauses; resume separately after the waiting interval. Only exists on capable hardware. |
+
+## Configuration
+
+These controls change display behavior or perform maintenance.
+
+| Entity | Name | Needs | Meaning |
+|---|---|---|---|
+| `select.*_solar_display_mode` | Solar display mode | always | The solar mode shown on the wallbox display. Drives the HMI only, and needs DIP 7 on. |
 | `button.*_recover_from_error` | Recover from error | always | Manually retries heartbeat-error recovery when automatic recovery cannot complete. Preserves a deliberate pause, lock, disabled release and current setting. |
 | `button.*_restart` | Restart | layout v01.03 | Restarts the wallbox. Refused unless the wallbox is idle. |
 
 ## Sensors
 
-Version 0.5.2b2 adds **Pending change** (enum) and **Pending change due**
-(timestamp), enabled by default.
+**Pending change** (enum) and **Pending change due**
+(timestamp) are enabled by default.
 The action states are `none`, `pause`, `resume`, `set_current`, `single_phase`,
 `all_phases`, `enable_charging`, `disable_charging`, `unlock` and `lock`.
 The due timestamp is empty when no change is queued or while a phase change
@@ -58,27 +112,29 @@ remembered resume target while paused, which may be the pending target. See
 
 | Entity | Name | Unit | Class | Needs | Meaning |
 |---|---|---|---|---|---|
-| `sensor.*_pending_change` | Pending change |  | enum | 0.5.2b2; new service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |
-| `sensor.*_pending_change_due` | Pending change due |  | timestamp | 0.5.2b2; new service for service-owned queues | Planned execution time when known. Empty with no pending action or while awaiting vehicle pause confirmation; afterward shows the end of the extra wait. Enabled by default, with no per-second countdown writes. |
+| `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. |
+| `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. |
+| `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
+| `sensor.*_pending_change` | Pending change |  | enum | since 0.5.2b2; supporting service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |
+| `sensor.*_pending_change_due` | Pending change due |  | timestamp | since 0.5.2b2; supporting service for service-owned queues | Planned execution time when known. Empty with no pending action or while awaiting vehicle pause confirmation; afterward shows the end of the extra wait. Enabled by default, with no per-second countdown writes. |
 | `sensor.*_evse_state` | EVSE state |  | enum | always | What the wallbox itself thinks it is doing. The main state sensor. |
-| `sensor.*_cp_state` | CP state |  | enum | layout v01.02 | The control-pilot signal between wallbox and vehicle. `c2` means the vehicle is actually drawing current. |
 | `sensor.*_authorization` | Authorization |  | enum | always | Whether RFID or the energy manager has released this session. |
-| `sensor.*_error_code` | Error code |  | enum | always | The active error, as a documented category. The raw number is in the `code` attribute. |
+| `sensor.*_wallbox_phase_selection` | Wallbox phase selection |  | enum | layout v01.02 | Which phases the wallbox will use when it next closes the relay. |
 | `sensor.*_detected_vehicle_phases` | Detected vehicle phases |  | enum | layout v01.02 | How many phases the vehicle used in this session. |
 | `sensor.*_signaled_current` | Signaled current | A | current | layout v01.03 | What the wallbox offers the vehicle on the pilot line. This is the number that should follow your charging-current limit. |
 | `sensor.*_current_l1` | Current L1 | A | current | always | RMS output current on L1. |
 | `sensor.*_current_l2` | Current L2 | A | current | always | RMS output current on L2. |
 | `sensor.*_current_l3` | Current L3 | A | current | always | RMS output current on L3. |
-| `sensor.*_voltage_l1` | Voltage L1 | V | voltage | always | RMS output voltage on L1. |
-| `sensor.*_voltage_l2` | Voltage L2 | V | voltage | always | RMS output voltage on L2. |
-| `sensor.*_voltage_l3` | Voltage L3 | V | voltage | always | RMS output voltage on L3. |
-| `sensor.*_power_l1` | Power L1 | W | power | always | Active power on L1. |
-| `sensor.*_power_l2` | Power L2 | W | power | always | Active power on L2. |
-| `sensor.*_power_l3` | Power L3 | W | power | always | Active power on L3. |
+| `sensor.*_voltage_l1` | Voltage L1 | V | voltage | always | RMS output voltage on L1. Disabled by default for new installations. |
+| `sensor.*_voltage_l2` | Voltage L2 | V | voltage | always | RMS output voltage on L2. Disabled by default for new installations. |
+| `sensor.*_voltage_l3` | Voltage L3 | V | voltage | always | RMS output voltage on L3. Disabled by default for new installations. |
+| `sensor.*_power_l1` | Power L1 | W | power | always | Active power on L1. Disabled by default for new installations. |
+| `sensor.*_power_l2` | Power L2 | W | power | always | Active power on L2. Disabled by default for new installations. |
+| `sensor.*_power_l3` | Power L3 | W | power | always | Active power on L3. Disabled by default for new installations. |
 | `sensor.*_total_power` | Total power | W | power | always | Active power on all phases. |
 | `sensor.*_session_maximum_current` | Session maximum current | A | current | always | The highest current this session may use, after every static limit the wallbox applies. |
 | `sensor.*_session_energy` | Session energy | kWh | energy | always | Energy transferred in the current session. |
-| `sensor.*_session_duration` | Session duration | s | duration | always | Length of the current session. |
+| `sensor.*_session_duration` | Session duration | s | duration | always | Length of the current session. Live/history value without new long-term statistics. |
 | `sensor.*_total_energy` | Total energy | kWh | energy | layout v01.02 | Lifetime energy on the AC port. Usable as an Energy dashboard source; the manufacturer marks it as **not usable for billing**. |
 | `sensor.*_charging_sessions` | Charging sessions |  |  | layout v01.02 | Lifetime number of charging sessions. |
 
@@ -88,6 +144,9 @@ These sit under *Diagnostic* on the device page.
 
 | Entity | Name | Unit | Needs | Meaning |
 |---|---|---|---|---|
+| `sensor.*_cp_state` | CP state |  | layout v01.02 | The control-pilot state between wallbox and vehicle. Use the current and power sensors to check actual consumption. |
+| `sensor.*_error_code` | Error code |  | always | The active error, as a documented category. The raw number is in the `code` attribute. |
+| `sensor.*_connection_quality` | Connection quality |  | direct connection or supporting service | `good` or `degraded`; a stable communication-health summary, without recurring counter changes. |
 | `sensor.*_temperature` | Temperature | °C | layout v01.02 | Temperature inside the wallbox. |
 | `sensor.*_modbus_layout_version` | Modbus layout version |  | always | The register layout the firmware implements. Decides which entities exist. Disabled by default. |
 | `sensor.*_downgrade_current` | Downgrade current | A | always | The current limit the wallbox applies while a grid-operator downgrade is active. |
@@ -99,7 +158,6 @@ These sit under *Diagnostic* on the device page.
 | `sensor.*_sunshine_minimum_current` | Sunshine+ minimum current | A | layout v01.02 | Minimum current in Sunshine+ mode. |
 | `sensor.*_phase_switching_pause` | Phase switching pause | s | layout v01.02 | How long the wallbox pauses when it switches between one and three phases. |
 | `sensor.*_phase_rotation` | Phase rotation |  | always | The order of the connected phases, which matters for load management. |
-| `sensor.*_switched_phases` | Switched phases |  | layout v01.02 | Which phases the wallbox will use when it next closes the relay. |
 | `sensor.*_cable_lock` | Cable lock |  | always | Cable locking. A 4You 310 has a fixed cable and reports `fixed_cable`. |
 | `sensor.*_phase_switching_mode` | Phase switching mode |  | always | How the wallbox's internal solar algorithm may use phases. |
 | `sensor.*_connected_grid_phases` | Connected grid phases |  | layout v01.02 | How many grid phases are wired to the wallbox. |
@@ -108,7 +166,7 @@ These sit under *Diagnostic* on the device page.
 
 | Entity | Name | Class | Needs | Meaning |
 |---|---|---|---|---|
-| `binary_sensor.*_vehicle_connected` | Vehicle connected | plug | always | A vehicle is plugged in, in any state from connected to charging. |
+| `binary_sensor.*_vehicle_connected` | Vehicle connected | plug | always | EVSE and CP confirm a connected vehicle, including during faults. Conflicting or insufficient status is unknown. |
 | `binary_sensor.*_charging` | Charging | battery_charging | always | The wallbox reports the charging state. |
 | `binary_sensor.*_downgrade_active` | Downgrade active |  | always | The grid operator's downgrade input is active and the wallbox is limiting the current. |
 | `binary_sensor.*_error` | Error | problem | always | An error code other than zero is active. |
@@ -118,6 +176,43 @@ These sit under *Diagnostic* on the device page.
 | `binary_sensor.*_grid_imbalance_monitoring` | Grid imbalance monitoring |  | layout v01.02 | Imbalance monitoring is switched on. |
 | `binary_sensor.*_permanent_cable_lock` | Permanent cable lock |  | layout v01.02 | Permanent cable locking is switched on. |
 | `binary_sensor.*_phase_switching_supported` | Phase switching supported |  | layout v01.01 | The hardware can switch between one and three phases. |
+
+## Command events
+
+| Entity | Name | Needs | Meaning |
+|---|---|---|---|
+| `event.*_control_result` | Control result | direct connection, or a service supporting command events | Last observed command outcome, with `event_type`, `action` and `reason` attributes. Disabled by default; enable for automations when needed. |
+
+The timestamp is when HA received the event. `executed` means the command was
+accepted by the controller, not that the vehicle has started charging. Use
+**Charging** and actual power to check that. A queued request creates its result
+when it runs, is replaced, or is cancelled; the pending sensors show the wait.
+
+| Event type | Meaning |
+|---|---|
+| `executed` | The controller accepted the command. |
+| `replaced` | A newer request replaced a pending action. |
+| `cancelled` | Pending work was cancelled by the user, an energy stop, or controller shutdown. |
+| `failed` | The command failed, including a phase-pause timeout. |
+| `uncertain` | A write may have reached the wallbox but could not be confirmed. Inspect readback before retrying. |
+| `recovery_succeeded` | Fresh status confirmed error code 0 after recovery commands. |
+| `recovery_failed` | A recovery write was rejected, or fresh status still showed an error after the confirmation window. |
+
+The feed covers current, pause/resume, phase selection, release, locking and
+error recovery. Cancelling a queued action reports `cancelled` with reason
+`user_cancelled`; a kWh or percentage goal can cancel queued work with reason
+`energy_goal`. Solar display selection and restart do not publish command
+outcomes.
+
+This is a live notification feed, not a durable audit log. It keeps at most 32
+outcomes in service memory. Startup, reconnect and service restart establish a
+new baseline without replaying historical outcomes. Heartbeats, polling and
+countdown ticks create no events. Older compatible services keep working;
+the event entity stays unavailable until their service supports this feature.
+See the [notification example](automations.md#react-to-command-results).
+
+The [energy-target guide](user-guide.md#energy-target)
+explains restart behavior, measurement failures and stopping accuracy.
 
 ## Enumerated states
 
@@ -133,11 +228,11 @@ and templates see.
 | `sensor.*_detected_vehicle_phases` | `not_initialized`, `one_phase`, `three_phases`, `two_phases` |
 | `sensor.*_energy_manager_fallback` | `disabled`, `fallback_current`, `pause_on_timeout` |
 | `sensor.*_phase_rotation` | `l1_l2_l3`, `l2_l3_l1`, `l3_l1_l2` |
-| `sensor.*_switched_phases` | `all_available`, `single_phase` |
+| `sensor.*_wallbox_phase_selection` | `all_available`, `single_phase` |
 | `sensor.*_cable_lock` | `fixed_cable`, `locked`, `undetermined`, `unlocked` |
 | `sensor.*_phase_switching_mode` | `solar_dynamic`, `solar_one_phase`, `solar_three_phases` |
 | `sensor.*_connected_grid_phases` | `l1`, `l1_l2_l3` |
-| `select.*_solar_charging_mode` | `fast`, `not_active`, `sunshine`, `sunshine_plus` |
+| `select.*_solar_display_mode` | `fast`, `not_active`, `sunshine`, `sunshine_plus` |
 | `select.*_requested_phases` | `all_available`, `single_phase` |
 
 ## Actions
@@ -145,3 +240,23 @@ and templates see.
 `mennekes_amtron_rtu.set_charging_current` writes the charging-current limit.
 Both the action and the slider accept 0 A to remove the limit. See
 [user-guide.md](user-guide.md#actions).
+
+
+## Optional charging estimates
+
+| Entity | Name | Unit | Needs | Meaning |
+|---|---|---|---|---|
+| `sensor.*_estimated_charging_loss_last_charge` | Estimated charging loss, last charge | % | Configured vehicle energy source | Last matched connection cycle; unknown when the newest completed cycle cannot be matched. |
+| `sensor.*_average_estimated_charging_loss` | Average estimated charging loss | % | Configured vehicle energy source | Energy-weighted average of accepted matches; `sample_count` counts accepted cycles. |
+| `button.*_assign_vehicle_charge_energy` | Assign vehicle charge energy | | Vehicle energy sensor selected | Explicitly pair the current vehicle kWh value with the latest completed wallbox cycle while unplugged. Also works read-only. |
+| `sensor.*_estimated_charging_cost_current_charge` | Estimated charging cost, current charge | EUR | Fixed or dynamic price configured; enable entity manually | Disabled by default to reduce Recorder writes. Running variable cost estimate; unknown for incomplete observations. |
+| `sensor.*_estimated_charging_cost_last_charge` | Estimated charging cost, last charge | EUR | Fixed or dynamic price configured | Cost of the latest completed cycle, retained across restarts. |
+
+All estimates require layout v01.02 or newer and completed-session support in
+service mode. Costs additionally require timestamped service energy samples.
+They have no state class and create no long-term statistics. Losses update per
+match/session; costs are rounded to cents. The current-cost sensor exposes only
+`complete`; the last-cost sensor also exposes `energy_kwh` and `unpriced_kwh`,
+rounded to 0.01 kWh. Setup, units, §14a tariff handling,
+matching limits and Recorder behavior are described in
+[Charging losses and costs](charging-estimates.md).

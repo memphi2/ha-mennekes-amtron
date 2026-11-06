@@ -83,7 +83,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mennekes-amtron-modbus-service"
-version = "0.5.2b2"
+version = "0.6.0b1"
 description = "Independent Modbus RTU owner for Mennekes Amtron wallboxes"
 requires-python = ">=3.14"
 license = "Apache-2.0"
@@ -96,3 +96,6 @@ amtron-modbus-service = "amtron_device.server:main"
 [tool.setuptools]
 packages = ["amtron_device"]
 package-dir = {amtron_device = "custom_components/mennekes_amtron_rtu/device"}
+
+[tool.setuptools.package-data]
+amtron_device = ["app_settings.html", "app_settings.js", "app_settings.css"]

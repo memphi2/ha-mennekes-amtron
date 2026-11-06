@@ -33,8 +33,8 @@ must be recorded as a blocker; a missing rule cannot silently pass.
 | Gold | Supervisor discovers the service app and refreshes an existing entry without replacing its devices or entities. Names, enumerated states and user-facing errors are translated into English, German, French, Dutch and Italian. Diagnostics, repairs, connection changes and user guides cover supported functions and limitations. | [Discovery tests](../tests/test_service_discovery.py), [translations](../custom_components/mennekes_amtron_rtu/translations), [register/translation gate](../scripts/check_register_map.py), [user guide](user-guide.md), [troubleshooting](troubleshooting.md) |
 | Platinum | Modbus and service HTTP requests use asynchronous clients. HA supplies its shared web session to the service client. Strict typing covers integration and tooling code against the current supported HA annotations. | [Device client](../custom_components/mennekes_amtron_rtu/device/client.py), [remote client](../custom_components/mennekes_amtron_rtu/remote.py), [typing gate](../scripts/check_typing.py), [validation guide](validation.md) |
 
-The heartbeat entity subscribes when added to HA and unregisters its listener
-when removed. It therefore satisfies `entity-event-setup`; using a coordinator
+The heartbeat and command-result event entities subscribe when added to HA and
+unregister their listeners when removed. It therefore satisfies `entity-event-setup`; using a coordinator
 does not make that rule inapplicable. Service entries also make `discovery`,
 `discovery-update-info`, `reauthentication-flow` and `inject-websession`
 applicable, even though direct Modbus connections have no credentials.
@@ -73,7 +73,7 @@ Only these four rules are exempt; the same reasons are recorded in the YAML:
 - `docs-conditions`: the integration defines no custom automation conditions.
   Automations can use HA's standard entity-state and numeric-state conditions.
 - `docs-triggers`: the integration defines no custom automation triggers.
-  Its blueprints use HA's standard triggers instead.
+  Its blueprints and command-result event examples use HA's standard triggers instead.
 - `dynamic-devices`: one config entry represents one wallbox. It does not
   discover or add child devices at runtime.
 - `stale-devices`: the entry has no dynamically discovered child devices to

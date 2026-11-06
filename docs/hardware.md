@@ -150,7 +150,7 @@ Give the adapter to the component that opens the serial connection:
 
 | Connection | Where the adapter must be available |
 |---|---|
-| Service app on HA OS | Select it in the app's **Serial adapter** setting. If HA OS runs in a virtual machine, pass the USB device through to that VM first. |
+| Service app on HA OS | In app **0.6.0b1**, select the adapter under **Open Web UI**; see [connection setup](upgrading.md#app-connection-page). Older app 0.5.2b2 uses the Configuration tab. If HA OS runs in a virtual machine, pass the USB device through to that VM first. |
 | Standalone service | Pass it to the service container or process; see [standalone setup](service-standalone.md). |
 | Direct serial | Make it available to Home Assistant itself. |
 

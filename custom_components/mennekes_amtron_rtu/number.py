@@ -7,27 +7,30 @@ between is rejected by the control layer. Pausing has its own switch.
 from __future__ import annotations
 
 import math
-from typing import Any
 
 from homeassistant.components.number import (
     NumberDeviceClass,
     NumberEntity,
     NumberMode,
 )
-from homeassistant.const import UnitOfElectricCurrent
+from homeassistant.const import PERCENTAGE, UnitOfElectricCurrent, UnitOfEnergy
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
+from .coordinator import MennekesAmtronCoordinator
 from .device.const import (
     CHARGING_CURRENT_DECIMALS,
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_STEP,
     CHARGING_CURRENT_UNLIMITED,
 )
-from .device.registers import CHARGING_CURRENT_EMS
+from .device.energy_goal import ENERGY_GOAL_STEP_KWH, MAX_ENERGY_GOAL_KWH
+from .device.registers import CHARGING_CURRENT_EMS, ENERGY_TOTAL, EVSE_STATE
 from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
+from .exceptions import service_validation_error
+from .vehicle_soc_const import CONF_VEHICLE_SOC_ENTITY
 
 PARALLEL_UPDATES = 1
 
@@ -39,9 +42,79 @@ async def async_setup_entry(
 ) -> None:
     """Add the charging-current limit."""
 
-    async_add_entities(
-        [AmtronChargingCurrentNumber(entry, entry.runtime_data.coordinator)]
-    )
+    entities: list[NumberEntity] = [
+        AmtronChargingCurrentNumber(entry, entry.runtime_data.coordinator)
+    ]
+    if entry.runtime_data.identity.layout_version >= ENERGY_TOTAL.min_layout:
+        entities.append(AmtronEnergyGoalNumber(entry, entry.runtime_data.coordinator))
+    if entry.options.get(CONF_VEHICLE_SOC_ENTITY):
+        entities.append(AmtronSocGoalNumber(entry, entry.runtime_data.coordinator))
+    async_add_entities(entities)
+
+
+class AmtronSocGoalNumber(MennekesAmtronControlEntity, NumberEntity):
+    """An optional percentage ceiling using the vehicle's reported charge."""
+
+    _attr_translation_key = "soc_goal"
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_min_value = 0.0
+    _attr_native_step = 1.0
+    _attr_mode = NumberMode.SLIDER
+
+    def __init__(
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator,
+    ) -> None:
+        super().__init__(entry, coordinator, "soc_goal", register_key=EVSE_STATE.key)
+
+    @property
+    def available(self) -> bool:
+        return (
+            super().available and self.runtime_data.control.supports_soc_goal
+            and self.runtime_data.vehicle_soc is not None
+        )
+
+    @property
+    def native_max_value(self) -> float:
+        cap = self.runtime_data.control.soc_goal.maximum_percent
+        return 100.0 if cap is None else cap
+
+    @property
+    def native_value(self) -> float:
+        return self.runtime_data.control.soc_goal.target_percent
+
+    async def async_set_native_value(self, value: float) -> None:
+        observer = self.runtime_data.vehicle_soc
+        if observer is None:
+            raise service_validation_error("soc_goal_unavailable")
+        await observer.async_set_target(value)
+
+
+class AmtronEnergyGoalNumber(MennekesAmtronControlEntity, NumberEntity):
+    """Limit additional energy without starting or resuming a charge."""
+
+    _attr_translation_key = "energy_goal"
+    _attr_device_class = NumberDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_native_min_value = 0.0
+    _attr_native_max_value = MAX_ENERGY_GOAL_KWH
+    _attr_native_step = ENERGY_GOAL_STEP_KWH
+    _attr_mode = NumberMode.BOX
+
+    def __init__(
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator,
+    ) -> None:
+        super().__init__(entry, coordinator, "energy_goal", register_key=EVSE_STATE.key)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.runtime_data.control.supports_energy_goal
+
+    @property
+    def native_value(self) -> float:
+        return self.runtime_data.control.energy_goal.target_kwh
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self.runtime_data.control.async_set_energy_goal(value)
 
 
 class AmtronChargingCurrentNumber(MennekesAmtronControlEntity, NumberEntity, RestoreEntity):
@@ -55,7 +128,7 @@ class AmtronChargingCurrentNumber(MennekesAmtronControlEntity, NumberEntity, Res
     _attr_mode = NumberMode.SLIDER
 
     def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: Any
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
     ) -> None:
         super().__init__(
             entry,

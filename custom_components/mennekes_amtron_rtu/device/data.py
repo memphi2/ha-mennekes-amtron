@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from .decode import RegisterValue
 from .registers import LAYOUT_V01_00
@@ -34,6 +35,7 @@ class WallboxData:
     # A service permission change must notify controls even with identical
     # register values. This is internal metadata, never an entity attribute.
     service_read_only: bool | None = field(default=None, repr=False)
+    service_supports_cancel_pending: bool = field(default=False, repr=False)
     # The service can change the slider range or retained paused setpoint
     # without changing a register. Compare these stable control values too.
     service_max_charging_current: float | None = field(default=None, repr=False)
@@ -41,6 +43,19 @@ class WallboxData:
     # Fixed queue metadata changes only when intent changes, never each second.
     pending_change: str | None = field(default=None, repr=False)
     pending_change_until: datetime | None = field(default=None, repr=False)
+    # Stable communication-quality enum, never transaction counters/timestamps.
+    connection_quality: str | None = None
+    # Goal settings/latches change independently of register readback.
+    energy_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
+    soc_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
+    # A goal may only act on a counter attempted in this poll, never a cached one.
+    energy_read: bool = field(default=False, compare=False, repr=False)
+    # Actual service-side meter attempt time, not a repeated API cache read.
+    energy_observed_at: float | None = field(default=None, compare=False, repr=False)
+    energy_goal_generation: int = field(default=0, compare=False, repr=False)
+    # Only completed-session metadata changes; no per-poll progress is exposed.
+    charging_session: dict[str, Any] | None = field(default=None, repr=False)
+    session_summary_supported: bool = field(default=False, repr=False)
 
     def get(self, key: str) -> RegisterValue:
         """Return one decoded register value, or ``None`` when unavailable."""

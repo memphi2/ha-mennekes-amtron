@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
@@ -21,6 +21,7 @@ from .device.client import MennekesModbusClient
 from .device.client_errors import AmtronBusError
 from .device.const import DEFAULT_MEASUREMENT_INTERVAL_SECONDS
 from .device.poller import DevicePoller
+from .device.registers import ERROR_CODE
 from .device.runtime_events import EventTimeline
 from .entry_types import MennekesAmtronConfigEntry
 
@@ -54,6 +55,10 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         self._client = client
         self._identity = identity
         self.control_status: Callable[[], tuple[str | None, datetime | None]] | None = None
+        self.observe_recovery: Callable[[object, int], None] | None = None
+        self.observe_goal: Callable[[WallboxData | None], None] | None = None
+        self.retry_soc_goal: Callable[[], None] | None = None
+        self.observe_session: Callable[[WallboxData | None], Awaitable[None]] | None = None
         self._poller = DevicePoller(
             client,
             identity,
@@ -75,12 +80,29 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         return self.data or WallboxData()
 
     async def _async_update_data(self) -> WallboxData:
+        goal_generation = self._client.write_state.energy_goal_generation
         try:
             data = await self._poller.async_poll(
                 self.current_data(), last_success=self.last_update_success
             )
             if self.control_status is not None:
                 data.pending_change, data.pending_change_until = self.control_status()
+            if self.observe_recovery is not None:
+                self.observe_recovery(
+                    data.values.get(ERROR_CODE.key), data.current_write_generation,
+                )
+            if self.observe_goal is not None:
+                self.observe_goal(data)
+            if self.retry_soc_goal is not None:
+                self.retry_soc_goal()
+            if self.observe_session is not None:
+                await self.observe_session(data)
             return data
         except AmtronBusError as err:
+            if self.observe_session is not None:
+                await self.observe_session(None)
+            if self.observe_goal is not None:
+                self.observe_goal(WallboxData(
+                    energy_read=True, energy_goal_generation=goal_generation,
+                ))
             raise UpdateFailed(str(err)) from err

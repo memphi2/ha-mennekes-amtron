@@ -185,11 +185,23 @@
       },
       "restart": {
         "name": "Herstarten"
+      },
+      "cancel_pending_change": {
+        "name": "Wachtende wijziging annuleren"
+      },
+      "assign_vehicle_charge": {
+        "name": "Laadenergie van voertuig koppelen"
       }
     },
     "number": {
       "charging_current_limit": {
         "name": "Laadstroomlimiet"
+      },
+      "energy_goal": {
+        "name": "Energiedoel"
+      },
+      "soc_goal": {
+        "name": "Laaddoel van voertuig"
       }
     },
     "select": {
@@ -201,7 +213,7 @@
         }
       },
       "solar_charging_mode": {
-        "name": "Laadmodus voor zonnestroom",
+        "name": "Weergavemodus zonnestroom",
         "state": {
           "fast": "Snel laden",
           "not_active": "Niet actief",
@@ -372,7 +384,7 @@
         "name": "Minimale stroom Zonnestroom+"
       },
       "switched_phases": {
-        "name": "Ingeschakelde fasen",
+        "name": "Fasekeuze van de laadpaal",
         "state": {
           "all_available": "Alle beschikbare fasen",
           "single_phase": "Eén fase"
@@ -407,6 +419,93 @@
       },
       "pending_change_until": {
         "name": "Wijziging gepland om"
+      },
+      "charging_status": {
+        "name": "Laadstatus",
+        "state": {
+          "initializing": "Initialiseren",
+          "wallbox_error": "Storing van de wallbox",
+          "service_mode": "Onderhoudsmodus",
+          "no_vehicle": "Geen voertuig aangesloten",
+          "charging": "Bezig met laden",
+          "locked": "Wallbox vergrendeld",
+          "release_disabled": "Laadvrijgave uitgeschakeld",
+          "paused": "Laden gepauzeerd",
+          "authorization_required": "Autorisatie vereist",
+          "preparing": "Laden voorbereiden",
+          "waiting_for_vehicle": "Wachten op het voertuig"
+        }
+      },
+      "connection_quality": {
+        "name": "Verbindingskwaliteit",
+        "state": {
+          "good": "Goed",
+          "degraded": "Communicatiefouten gedetecteerd"
+        }
+      },
+      "energy_goal_status": {
+        "name": "Status energiedoel",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "active": "Actief",
+          "reached": "Energiedoel bereikt",
+          "meter_unavailable": "Energiemeting niet beschikbaar",
+          "meter_reset": "Meterstand gedaald"
+        }
+      },
+      "soc_goal_status": {
+        "name": "Status van laaddoel van voertuig",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "active": "Actief",
+          "reached": "Doel bereikt"
+        }
+      },
+      "last_charging_loss": {
+        "name": "Geschat laadverlies, laatste laadsessie",
+        "state_attributes": {
+          "association": {
+            "name": "Koppeling van laatste laadsessie",
+            "state": {
+              "history": "Bijpassende laadgeschiedenis",
+              "changed_value": "Gewijzigde sensorwaarde",
+              "manual": "Handmatige koppeling"
+            }
+          },
+          "sample_count": {
+            "name": "Meegetelde laadsessies"
+          }
+        }
+      },
+      "average_charging_loss": {
+        "name": "Gemiddeld geschat laadverlies",
+        "state_attributes": {
+          "sample_count": {
+            "name": "Meegetelde laadsessies"
+          }
+        }
+      },
+      "current_estimated_charging_cost": {
+        "name": "Geschatte laadkosten, huidige laadsessie",
+        "state_attributes": {
+          "complete": {
+            "name": "Alle energie heeft een prijs"
+          }
+        }
+      },
+      "last_estimated_charging_cost": {
+        "name": "Geschatte laadkosten, laatste laadsessie",
+        "state_attributes": {
+          "complete": {
+            "name": "Alle energie heeft een prijs"
+          },
+          "energy_kwh": {
+            "name": "Laadenergie"
+          },
+          "unpriced_kwh": {
+            "name": "Energie zonder prijs"
+          }
+        }
       }
     },
     "switch": {
@@ -418,6 +517,58 @@
       },
       "lock_evse": {
         "name": "Wallbox vergrendeld"
+      }
+    },
+    "event": {
+      "control_result": {
+        "name": "Besturingsresultaat",
+        "state_attributes": {
+          "event_type": {
+            "name": "Resultaat",
+            "state": {
+              "executed": "Opdracht geaccepteerd",
+              "replaced": "Vervangen",
+              "cancelled": "Geannuleerd",
+              "failed": "Mislukt",
+              "uncertain": "Resultaat niet bevestigd",
+              "recovery_succeeded": "Foutherstel bevestigd",
+              "recovery_failed": "Foutherstel mislukt"
+            }
+          },
+          "action": {
+            "name": "Actie",
+            "state": {
+              "pause": "Laden pauzeren",
+              "resume": "Laden hervatten",
+              "set_current": "Laadstroom instellen",
+              "single_phase": "Eén fase gebruiken",
+              "all_phases": "Alle beschikbare fasen gebruiken",
+              "enable_charging": "Laden toestaan",
+              "disable_charging": "Laadtoestemming uitschakelen",
+              "unlock": "Wallbox ontgrendelen",
+              "lock": "Wallbox vergrendelen",
+              "recover": "Fout verhelpen"
+            }
+          },
+          "reason": {
+            "name": "Reden",
+            "state": {
+              "completed": "Voltooid",
+              "replaced": "Vervangen door een andere opdracht",
+              "shutdown": "Integratie gestopt",
+              "phase_timeout": "Het voertuig was niet op tijd gereed",
+              "phase_unconfirmed": "De fasekeuze kon niet worden bevestigd",
+              "connection_error": "Verbinding mislukt",
+              "write_rejected": "Schrijfactie geweigerd",
+              "permission_denied": "Schrijven niet toegestaan",
+              "status_refresh_failed": "Status bijwerken mislukt",
+              "error_still_active": "De fout is nog actief",
+              "unknown": "Onbekende reden",
+              "user_cancelled": "Geannuleerd door de gebruiker",
+              "energy_goal": "Stop door een laaddoel"
+            }
+          }
+        }
       }
     }
   },
@@ -484,6 +635,54 @@
     },
     "control_state_unknown": {
       "message": "De huidige status van de wallbox kon niet worden bevestigd. Er is geen opdracht verstuurd om laden toe te staan, de wallbox te ontgrendelen of de fasen te wisselen. Controleer de verbinding en probeer het opnieuw."
+    },
+    "energy_goal_invalid": {
+      "message": "Voer 0 in om het energiedoel uit te schakelen, of 0,1–1000 kWh in stappen van 0,1 kWh."
+    },
+    "energy_goal_unavailable": {
+      "message": "Een energiedoel vereist een ondersteunde meter voor totale energie en een recente geldige meting. Controleer de verbinding en probeer het opnieuw."
+    },
+    "energy_goal_stop_active": {
+      "message": "Een laaddoel vereist een pauze. Controleer de status. Stel na het bereiken van het doel of een meterreset een nieuw doel in of schakel het uit met 0 voordat je hervat. Het wijzigen van een doel start het laden niet."
+    },
+    "energy_goal_state_invalid": {
+      "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."
+    },
+    "energy_goal_not_supported": {
+      "message": "Deze Modbus-dienst ondersteunt geen energiedoelen. Werk eerst de app of de zelfstandige dienst bij."
+    },
+    "cancel_pending_not_supported": {
+      "message": "Deze Modbus-dienst kan wachtende wijzigingen niet annuleren. Werk eerst de app of de zelfstandige dienst bij."
+    },
+    "soc_goal_invalid": {
+      "message": "Voer een doel van 0 tot 100% in, niet hoger dan de laadlimiet van het voertuig. 0 schakelt het percentagedoel uit."
+    },
+    "soc_goal_unavailable": {
+      "message": "Het laaddoel van het voertuig kan nu niet worden gewijzigd. Controleer de gekozen bronnen en probeer opnieuw."
+    },
+    "soc_goal_limit_unavailable": {
+      "message": "De gekozen laadlimiet heeft nog geen geldige waarde gemeld. Wacht op een beschikbare waarde voordat je een percentagedoel instelt. Met 0 kun je het doel nog steeds uitschakelen."
+    },
+    "soc_goal_source_changed": {
+      "message": "De voertuigbronnen zijn gewijzigd. Herlaad de integratie voordat je het percentagedoel wijzigt."
+    },
+    "soc_goal_not_supported": {
+      "message": "De Modbus-dienst ondersteunt geen percentagedoelen voor het voertuig. Werk de app bij om deze optionele functie te gebruiken."
+    },
+    "soc_goal_state_invalid": {
+      "message": "Het opgeslagen laaddoel van het voertuig kon niet worden hersteld. Controleer de logboeken voordat je laden opnieuw toestaat."
+    },
+    "loss_source_invalid": {
+      "message": "Selecteer een ondersteunde bron voor laadverliezen en stel het bijbehorende voertuig of de sensor in."
+    },
+    "loss_unavailable": {
+      "message": "Er is geen volledig waargenomen laadsessie beschikbaar om te koppelen. De verbinding met de laadpaal moet van aansluiten tot loskoppelen beschikbaar blijven."
+    },
+    "loss_energy_invalid": {
+      "message": "De voertuigenergie kan niet worden gekoppeld. Gebruik geldige accu-energie voor deze laadsessie, groter dan nul en niet hoger dan de energie van de laadpaal. Je mag de laatste koppeling corrigeren."
+    },
+    "loss_storage_unavailable": {
+      "message": "Het laadverlies kon niet worden opgeslagen. Controleer of opslag beschikbaar is en probeer het opnieuw."
     }
   },
   "issues": {
@@ -528,7 +727,11 @@
           "measurement_interval_seconds": "Meetinterval",
           "scan_interval_seconds": "Statusinterval",
           "state_change_interval_seconds": "Minimale tijd tussen statuswijzigingen",
-          "phase_switch_grace_seconds": "Extra wachttijd vóór fasewisselingen"
+          "phase_switch_grace_seconds": "Extra wachttijd vóór fasewisselingen",
+          "vehicle_soc_entity": "Entiteit voor laadniveau van voertuig (optioneel)",
+          "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig (optioneel)",
+          "charge_loss_source": "Gegevensbron voor laadverliezen",
+          "charging_cost_source": "Laadkosten berekenen"
         },
         "data_description": {
           "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
@@ -536,7 +739,11 @@
           "measurement_interval_seconds": "Vermogen, spanning, stroom en sessiewaarden: 30 seconden vermindert de databasebelasting. Bij statuswijzigingen worden metingen direct vernieuwd. Zonder voertuig geldt minimaal 60 seconden. Het statusinterval bepaalt de kortst mogelijke tijd tussen uitlezingen.",
           "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk.",
           "state_change_interval_seconds": "Minimaal aantal seconden tussen starten, pauzeren en wijzigingen van de laadtoestemming, vergrendeling of fasen (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen.",
-          "phase_switch_grace_seconds": "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist."
+          "phase_switch_grace_seconds": "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist.",
+          "vehicle_soc_entity": "Optioneel: selecteer de sensor die het werkelijke laadniveau van het voertuig in % meldt. Dit schakelt een apart percentagedoel in; zonder selectie blijft het uitgeschakeld. Bij ontbrekende gegevens gaat het laden ongewijzigd door tot geldige gegevens terugkeren. Een bron wijzigen of verwijderen wist dit doel zonder het laden te hervatten.",
+          "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd.",
+          "charge_loss_source": "Optionele vergelijking van de energie van de laadpaal met de energie die aan de voertuigaccu is toegevoegd. Selecteer een bron om deze in de volgende stap in te stellen. De laadregeling blijft onafhankelijk.",
+          "charging_cost_source": "Optionele kostenraming met een vaste stroomprijs inclusief belastingen of een prijssensor. Stel de prijs in de volgende stap in. Standaard uitgeschakeld; dit beïnvloedt de laadregeling niet."
         },
         "title": "Opties"
       },
@@ -544,14 +751,89 @@
         "title": "Serviceopties",
         "data": {
           "current_limit": "Maximale laadstroom",
-          "scan_interval_seconds": "Statusinterval"
+          "scan_interval_seconds": "Statusinterval",
+          "vehicle_soc_entity": "Entiteit voor laadniveau van voertuig (optioneel)",
+          "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig (optioneel)",
+          "charge_loss_source": "Gegevensbron voor laadverliezen",
+          "charging_cost_source": "Laadkosten berekenen"
         },
         "data_description": {
           "current_limit": "Extra bovengrens voor stroomwaarden die Home Assistant aanvraagt. De servicegrens blijft van toepassing. Door bewust 0 A te selecteren, schakel je de EMS-limiet uit.",
-          "scan_interval_seconds": "Hoe vaak Home Assistant de servicestatus uitleest. Dit verandert noch het uitleesinterval van de Modbus-metingen, noch het heartbeatinterval."
+          "scan_interval_seconds": "Hoe vaak Home Assistant de servicestatus uitleest. Dit verandert noch het uitleesinterval van de Modbus-metingen, noch het heartbeatinterval.",
+          "vehicle_soc_entity": "Optioneel: selecteer de sensor die het werkelijke laadniveau van het voertuig in % meldt. Dit schakelt een apart percentagedoel in; zonder selectie blijft het uitgeschakeld. Bij ontbrekende gegevens gaat het laden ongewijzigd door tot geldige gegevens terugkeren. Een bron wijzigen of verwijderen wist dit doel zonder het laden te hervatten.",
+          "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd.",
+          "charge_loss_source": "Optionele vergelijking van de energie van de laadpaal met de energie die aan de voertuigaccu is toegevoegd. Selecteer een bron om deze in de volgende stap in te stellen. De laadregeling blijft onafhankelijk.",
+          "charging_cost_source": "Optionele kostenraming met een vaste stroomprijs inclusief belastingen of een prijssensor. Stel de prijs in de volgende stap in. Standaard uitgeschakeld; dit beïnvloedt de laadregeling niet."
         },
         "description": "De instelling Alleen lezen van de app bepaalt ook of Home Assistant mag schrijven. Schakel deze in de app uit, sla de wijziging op en herstart de app om de bedieningselementen in te schakelen. Deze blijven niet beschikbaar zolang Alleen lezen is ingeschakeld of de service nog niet gereed is. Stel de minimale tijd tussen statuswijzigingen en de extra wachttijd vóór fasewisselingen in bij de appconfiguratie; de service handhaaft beide ook tijdens een herstart van Home Assistant."
+      },
+      "loss_bavariandata": {
+        "title": "Laadverliezen via BavarianData",
+        "description": "Selecteer het voertuig dat op deze laadpaal is aangesloten. De koppeling gebruikt de tijden en de geschatte accu-energie uit de opgeslagen laadgeschiedenis. Alleen bestaande gegevens in Home Assistant worden gelezen; er wordt geen voertuigupdate aangevraagd. Zonder bijpassende laadsessie wordt geen verlies berekend.",
+        "data": {
+          "charge_loss_bavarian_device": "Voertuig"
+        }
+      },
+      "loss_sensor": {
+        "title": "Laadverliezen via een sensor",
+        "description": "Selecteer een sensor voor de energie die tijdens de laatste laadsessie aan de voertuigaccu is toegevoegd, in kWh of Wh. Gebruik geen energie gemeten aan de laadpaal of een totaalteller. Zonder laadtijden is het resultaat een schatting. Bevestig standaard de bijpassende laadsessie met de knop ‘Laadenergie van voertuig koppelen’.",
+        "data": {
+          "vehicle_last_charge_energy_entity": "Accu-energie van het voertuig, laatste laadsessie",
+          "charge_loss_auto_match": "Gewijzigde energiewaarde automatisch koppelen"
+        },
+        "data_description": {
+          "charge_loss_auto_match": "Optioneel: koppel een gewijzigde sensorwaarde die binnen 30 minuten na het loskoppelen wordt ontvangen, als deze integratie de hele laadsessie heeft waargenomen. Een gewijzigde waarde bewijst niet dat beide metingen bij dezelfde laadsessie horen. Laat dit uitgeschakeld om elke koppeling zelf te bevestigen."
+        }
+      },
+      "cost_fixed": {
+        "title": "Vaste stroomprijs",
+        "description": "Voer de prijs per kWh inclusief belastingen in. Negatieve prijzen zijn toegestaan. Zonder aanpassing van netkosten moet dit je eindprijs inclusief netkosten zijn. Vaste kosten en jaarlijkse kortingen worden niet meegenomen.",
+        "data": {
+          "charging_price": "Stroomprijs inclusief belastingen",
+          "charging_network_module": "Aanpassing van netkosten"
+        },
+        "data_description": {
+          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen."
+        }
+      },
+      "cost_sensor": {
+        "title": "Stroomprijssensor",
+        "description": "Selecteer een sensor met de actuele stroomprijs inclusief belastingen in EUR/kWh, ct/kWh of EUR/MWh (het €-teken wordt ook ondersteund). Negatieve prijzen zijn toegestaan. Zonder netaanpassing moet de prijs netkosten bevatten. Een gemelde waarde blijft 90 minuten geldig; dezelfde waarde opnieuw melden verlengt dit. Bij ontbrekende of verlopen prijzen krijgt die energie geen prijs. Vaste kosten en jaarlijkse kortingen worden niet meegenomen.",
+        "data": {
+          "charging_price_entity": "Stroomprijssensor",
+          "charging_network_module": "Aanpassing van netkosten"
+        },
+        "data_description": {
+          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen."
+        }
+      },
+      "cost_network": {
+        "title": "Nettarief: module {module}",
+        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de tijdzone van Home Assistant en hele minuten. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet.",
+        "data": {
+          "regular_network": "Normaal nettarief (standaardtarief)",
+          "price_includes_network": "De stroomprijs bevat al het normale nettarief",
+          "high_network": "Hoog nettarief (HT)",
+          "low_network": "Laag nettarief (NT)",
+          "high_start": "Hoog tarief begint",
+          "high_end": "Hoog tarief eindigt",
+          "low_start": "Laag tarief begint",
+          "low_end": "Laag tarief eindigt",
+          "active_quarters": "Kwartalen met tijdsafhankelijke nettarieven",
+          "tariff_year": "Jaar van de prijslijst"
+        },
+        "data_description": {
+          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen."
+        }
       }
+    },
+    "error": {
+      "vehicle_soc_required": "Selecteer eerst een entiteit voor het laadniveau voordat je de optionele laadlimiet toevoegt.",
+      "invalid_vehicle_entity": "Selecteer een entiteit van het ondersteunde type.",
+      "loss_source_invalid": "Selecteer een ondersteunde bron voor laadverliezen en stel het bijbehorende voertuig of de sensor in.",
+      "cost_source_invalid": "Selecteer een ondersteunde kostenbron en een sensorentiteit voor een prijs uit een sensor.",
+      "cost_price_invalid": "Voer een eindige prijs inclusief belastingen tussen −1000 en 1000 EUR/kWh in. Negatieve prijzen zijn toegestaan.",
+      "network_tariff_invalid": "Controleer nettarieven inclusief belastingen, het tariefjaar, twee tot vier actieve kwartalen en tijdvakken. HT moet hoger zijn dan het standaardtarief; NT moet lager en niet negatief zijn. Tijdvakken moeten hele minuten gebruiken, niet overlappen en tijd voor het standaardtarief overlaten."
     }
   },
   "selector": {
@@ -586,6 +868,35 @@
       "options": {
         "rtu_over_tcp": "RTU over TCP (transparante adapter)",
         "modbus_tcp": "Modbus TCP (vertalende gateway)"
+      }
+    },
+    "charge_loss_source": {
+      "options": {
+        "disabled": "Uitgeschakeld",
+        "bavariandata": "Laadgeschiedenis van BavarianData",
+        "sensor": "Energiesensor van het voertuig"
+      }
+    },
+    "charging_cost_source": {
+      "options": {
+        "disabled": "Uitgeschakeld",
+        "fixed": "Vaste stroomprijs",
+        "sensor": "Stroomprijssensor"
+      }
+    },
+    "charging_network_module": {
+      "options": {
+        "none": "Geen; de bron geeft de eindprijs",
+        "module_2": "Module 2; verlaagd nettarief",
+        "module_3": "Module 3; tijdsafhankelijk nettarief"
+      }
+    },
+    "charging_tariff_quarter": {
+      "options": {
+        "1": "K1: januari–maart",
+        "2": "K2: april–juni",
+        "3": "K3: juli–september",
+        "4": "K4: oktober–december"
       }
     }
   },

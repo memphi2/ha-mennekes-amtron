@@ -25,6 +25,7 @@ def test_states_are_derived_from_the_registers() -> None:
     async def run() -> None:
         sensors, entry = await _sensors()
         values = entry.runtime_data.coordinator.data.values
+        values["cp_state"] = 10  # Idle and CP A1 consistently mean unplugged.
         assert sensors["vehicle_connected"].is_on is False
         assert sensors["charging"].is_on is False
         assert sensors["downgrade_active"].is_on is False
@@ -36,6 +37,7 @@ def test_states_are_derived_from_the_registers() -> None:
         assert sensors["phase_switch_capable"].is_on is True
 
         values["evse_state"] = EvseState.CHARGING
+        values["cp_state"] = 28
         values["downgrade_status"] = 2
         values["error_code"] = 200
         assert sensors["vehicle_connected"].is_on is True

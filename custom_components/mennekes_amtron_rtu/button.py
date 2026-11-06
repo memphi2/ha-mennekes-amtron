@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .charge_loss_const import LOSS_SOURCE_SENSOR
+from .coordinator import MennekesAmtronCoordinator
 from .device.capabilities import capability_is_supported
 from .device.registers import ERROR_CODE, SYSTEM_RESTART
-from .entity import MennekesAmtronControlEntity
+from .entity import MennekesAmtronControlEntity, MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
+from .exceptions import service_validation_error
+from .remote import CONF_SERVER_URL
 
 if TYPE_CHECKING:
     from homeassistant.components.button.const import ButtonDeviceClass
@@ -32,12 +36,36 @@ async def async_setup_entry(
     runtime_data = entry.runtime_data
     identity = runtime_data.identity
     coordinator = runtime_data.coordinator
-    entities: list[ButtonEntity] = [AmtronRecoverButton(entry, coordinator)]
+    entities: list[ButtonEntity] = [
+        AmtronRecoverButton(entry, coordinator), AmtronCancelPendingButton(entry, coordinator),
+    ]
     if capability_is_supported(
         identity.layout_version, identity.phase_options_hw, SYSTEM_RESTART.key
     ):
         entities.append(AmtronRestartButton(entry, coordinator))
+    if runtime_data.charge_loss is not None and runtime_data.charge_loss.mode == LOSS_SOURCE_SENSOR:
+        entities.append(AmtronAssignChargeButton(entry, coordinator))
+    if runtime_data.control.read_only and CONF_SERVER_URL not in entry.data:
+        entities = [entity for entity in entities if isinstance(entity, AmtronAssignChargeButton)]
     async_add_entities(entities)
+
+
+class AmtronCancelPendingButton(MennekesAmtronControlEntity, ButtonEntity):
+    """Remove a queued change without changing the current charging state."""
+
+    _attr_translation_key = "cancel_pending_change"
+
+    def __init__(
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
+    ) -> None:
+        super().__init__(entry, coordinator, "cancel_pending_change")
+
+    @property
+    def available(self) -> bool:
+        return self.runtime_data.control.can_cancel_pending
+
+    async def async_press(self) -> None:
+        await self.runtime_data.control.async_cancel_pending_change()
 
 
 class AmtronRecoverButton(MennekesAmtronControlEntity, ButtonEntity):
@@ -47,7 +75,7 @@ class AmtronRecoverButton(MennekesAmtronControlEntity, ButtonEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: Any
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
     ) -> None:
         super().__init__(
             entry, coordinator, "recover_from_error", register_key=ERROR_CODE.key
@@ -71,7 +99,7 @@ class AmtronRestartButton(MennekesAmtronControlEntity, ButtonEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: Any
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
     ) -> None:
         super().__init__(entry, coordinator, "restart", register_key="evse_state")
 
@@ -79,3 +107,24 @@ class AmtronRestartButton(MennekesAmtronControlEntity, ButtonEntity):
         """Restart the wallbox."""
 
         await self.runtime_data.control.async_restart()
+
+
+class AmtronAssignChargeButton(MennekesAmtronEntity, ButtonEntity):
+    """Explicitly pair external battery energy; no physical write permission needed."""
+
+    _attr_translation_key = "assign_vehicle_charge"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
+        super().__init__(entry, coordinator, "assign_vehicle_charge")
+
+    @property
+    def available(self) -> bool:
+        observer = self.runtime_data.charge_loss
+        return observer is not None and observer.can_assign
+
+    async def async_press(self) -> None:
+        observer = self.runtime_data.charge_loss
+        if observer is None:
+            raise service_validation_error("loss_unavailable")
+        await observer.async_assign()

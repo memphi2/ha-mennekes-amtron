@@ -8,6 +8,36 @@ The integration does not set a database size limit. Keep automatic purging
 enabled and monitor free disk space; hourly long-term statistics continue growing
 even with short history retention.
 
+## Recorder defaults in 0.6.0b1
+
+These defaults apply to **beta 0.6.0b1**; stable 0.5.1 retains its existing defaults.
+
+On new installations, the three phase-voltage and three phase-power entities
+start disabled. Enable individual readings under **Settings → Devices & services
+→ Entities** when needed. Existing entity choices are preserved. Phase currents,
+total power and energy stay enabled. Session duration remains visible but no
+longer creates new long-term statistics; existing statistics are retained.
+
+The **Control result** event entity starts disabled because frequent PV current
+commands can create many outcomes. Enable it only if you need those events for
+automations. Its feed is bounded in memory, but recording an enabled entity adds
+one state change per observed outcome: a command every five seconds could add
+17,280 rows per day. Exclude its actual entity ID from `recorder.exclude.entities`
+if you only need live notifications. Exclusion does not stop automation triggers.
+Heartbeats and polls create no command events.
+
+The new charging/quality/goal status entities use stable enum states and have
+no long-term statistics. The energy target changes only when you set it. Its
+baseline and stop state are saved outside Recorder, only on changes; ordinary
+meter progress creates no extra storage writes. The existing total-energy sensor
+keeps its normal measurement/history behavior.
+
+The optional vehicle percentage target listens to existing HA entity updates;
+it adds no vehicle polling and no duplicate SoC history sensor. Only the chosen
+target, optional maximum and reached state are saved, not every vehicle report.
+Changing a dynamic vehicle maximum can update the target number's maximum
+attribute; stable values produce no additional Recorder changes.
+
 ## Choose the history you need
 
 Keep **30-second measurements** unless your automations need faster readings.

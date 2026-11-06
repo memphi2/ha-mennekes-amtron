@@ -79,6 +79,9 @@ itself, or configure those fields in the app when the service owns it.
 | **App responds, but its data was not accepted** / `invalid service snapshot` | Copy the field named in parentheses in the HA log, such as `identity.max_evse_current`, and download diagnostics before restarting the app. Include both component versions. This is a data-validation error; differing release numbers or a bad token are not implied. |
 | **Different wallbox / identity cannot be confirmed** | Check the Modbus address, gateway route and service configuration; see [wallbox identity](#a-different-wallbox-is-reported). |
 | App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
+| Older app **0.5.2b2** rejects LAN settings because an old USB device no longer exists | Update to **0.6.0b1**, which removes this validation conflict. Before updating, clear the saved **Serial adapter** selection in the native Configuration tab, then save LAN settings and restart. LAN needs no local USB device. |
+| **Connection setup required** | Open the app's **Web UI**, choose USB or LAN, save and restart. Until then, the app runs only setup and health checks, without Modbus, heartbeat or discovery. |
+| Web UI requests a Supervisor update | The guided connection page requires an administrator and stable **Supervisor 2026.11.0+**. The native Configuration tab remains available; see [connection setup](upgrading.md#app-connection-page). This does not change the integration's HA minimum version. |
 
 An app that starts successfully can still be waiting for the wallbox. The log
 separates API startup, USB/LAN connection, heartbeat start/stop and shutdown.
@@ -266,7 +269,7 @@ request replaces a phase change that is still waiting. Check your vehicle's
 support; some vehicles abort the session after a phase change. The selector
 exists only on capable wallbox hardware.
 
-In version 0.5.2b2, the phase command is sent only after live status confirms
+Since 0.5.2b2, the phase command is sent only after live status confirms
 that the vehicle has paused. If confirmation fails or times out, the requested
 pause remains and no phase command is sent. Check the wallbox connection and
 vehicle state before trying again; a pause command being accepted does not by

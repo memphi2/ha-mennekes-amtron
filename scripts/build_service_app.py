@@ -37,8 +37,11 @@ def export(destination: Path) -> None:
     shutil.copytree(ROOT / "modbus_service/translations", destination / "translations")
     target = destination / "custom_components/mennekes_amtron_rtu/device"
     target.mkdir(parents=True)
-    for source in (ROOT / "custom_components/mennekes_amtron_rtu/device").glob("*.py"):
+    source_directory = ROOT / "custom_components/mennekes_amtron_rtu/device"
+    for source in source_directory.glob("*.py"):
         shutil.copy2(source, target / source.name)
+    for filename in ("app_settings.html", "app_settings.js", "app_settings.css"):
+        shutil.copy2(source_directory / filename, target / filename)
 
 
 def main() -> None:

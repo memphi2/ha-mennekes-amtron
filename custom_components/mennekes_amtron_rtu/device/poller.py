@@ -54,6 +54,7 @@ class DevicePoller:
         # A poll spans multiple bus transactions. If a current write overlaps
         # any part of it, its old readback must not undo the accepted command.
         generation = self._client.write_state.current_write_generation
+        goal_generation = self._client.write_state.energy_goal_generation
         # Configuration registers change when somebody reconfigures the
         # wallbox, not while it charges, so they are carried forward between
         # the slow reads instead of occupying the bus every few seconds.
@@ -119,6 +120,9 @@ class DevicePoller:
             values=values,
             failed_blocks=tuple(sorted(failed)),
             current_write_generation=generation,
+            connection_quality=self._client.link_quality.state,
+            energy_read="energy_total" in read or "energy_total" in stale,
+            energy_goal_generation=goal_generation,
         )
 
     def _log_unavailable(self, err: Exception) -> None:

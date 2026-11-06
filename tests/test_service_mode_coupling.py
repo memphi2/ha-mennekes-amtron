@@ -24,7 +24,7 @@ CONTROL_ENTITY_IDS = (
     "switch.mennekes_amtron_charging_paused",
     "switch.mennekes_amtron_charging_release",
     "switch.mennekes_amtron_wallbox_locked",
-    "select.mennekes_amtron_solar_charging_mode",
+    "select.mennekes_amtron_solar_display_mode",
     "select.mennekes_amtron_requested_phases",
     "button.mennekes_amtron_recover_from_error",
     "button.mennekes_amtron_restart",

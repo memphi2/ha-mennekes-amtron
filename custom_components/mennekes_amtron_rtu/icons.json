@@ -2,10 +2,16 @@
   "entity": {
     "binary_sensor": {
       "authorization_enabled": {
-        "default": "mdi:card-account-details"
+        "default": "mdi:card-account-details-outline",
+        "state": {
+          "on": "mdi:card-account-details"
+        }
       },
       "cable_lock_enabled": {
-        "default": "mdi:lock-check"
+        "default": "mdi:lock-outline",
+        "state": {
+          "on": "mdi:lock-check-outline"
+        }
       },
       "downgrade_active": {
         "default": "mdi:transmission-tower-export"
@@ -17,47 +23,95 @@
         "default": "mdi:swap-horizontal"
       },
       "heartbeat": {
-        "default": "mdi:heart-pulse"
+        "default": "mdi:heart-outline",
+        "state": {
+          "on": "mdi:heart-off",
+          "off": "mdi:heart-pulse"
+        }
       }
     },
     "button": {
       "recover_from_error": {
         "default": "mdi:restore-alert"
+      },
+      "cancel_pending_change": {
+        "default": "mdi:timer-cancel-outline"
+      },
+      "assign_vehicle_charge": {
+        "default": "mdi:link-variant-plus"
       }
     },
-    "number": {},
+    "number": {
+      "soc_goal": {
+        "default": "mdi:battery-arrow-up-outline"
+      }
+    },
     "select": {
       "requested_phases": {
-        "default": "mdi:swap-horizontal"
+        "default": "mdi:swap-horizontal",
+        "state": {
+          "single_phase": "mdi:numeric-1-circle"
+        }
       },
       "solar_charging_mode": {
-        "default": "mdi:solar-power-variant"
+        "default": "mdi:solar-power-variant-outline",
+        "state": {
+          "fast": "mdi:lightning-bolt",
+          "sunshine": "mdi:weather-sunny",
+          "sunshine_plus": "mdi:solar-power-variant"
+        }
       }
     },
     "sensor": {
       "authorization_status": {
-        "default": "mdi:card-account-details"
+        "default": "mdi:card-account-details-outline",
+        "state": {
+          "authorized": "mdi:check-circle-outline",
+          "not_authorized": "mdi:close-circle-outline"
+        }
       },
       "cable_lock_status": {
-        "default": "mdi:lock"
+        "default": "mdi:lock-question",
+        "state": {
+          "locked": "mdi:lock",
+          "unlocked": "mdi:lock-open-variant",
+          "fixed_cable": "mdi:ev-plug-type2"
+        }
       },
       "cp_state": {
         "default": "mdi:sine-wave"
       },
       "detected_ev_phases": {
-        "default": "mdi:numeric"
+        "default": "mdi:help-circle-outline",
+        "state": {
+          "one_phase": "mdi:numeric-1-circle",
+          "two_phases": "mdi:numeric-2-circle",
+          "three_phases": "mdi:numeric-3-circle"
+        }
       },
       "ems_fallback_behaviour": {
         "default": "mdi:lan-disconnect"
       },
       "error_code": {
-        "default": "mdi:alert-circle-outline"
+        "default": "mdi:alert-circle-outline",
+        "state": {
+          "no_error": "mdi:check-circle-outline"
+        }
       },
       "evse_state": {
-        "default": "mdi:ev-station"
+        "default": "mdi:ev-station",
+        "state": {
+          "charging": "mdi:lightning-bolt",
+          "error": "mdi:alert-circle-outline",
+          "service_mode": "mdi:wrench-outline"
+        }
       },
       "grid_phases_connected": {
-        "default": "mdi:transmission-tower"
+        "default": "mdi:transmission-tower",
+        "state": {
+          "l1": "mdi:numeric-1-circle",
+          "l1_l2_l3": "mdi:numeric-3-circle"
+        }
       },
       "modbus_layout_version": {
         "default": "mdi:tag-text-outline"
@@ -66,24 +120,104 @@
         "default": "mdi:rotate-right"
       },
       "pending_change": {
-        "default": "mdi:timer-sand"
+        "default": "mdi:timer-sand",
+        "state": {
+          "none": "mdi:timer-off-outline"
+        }
       },
       "phase_switching_mode": {
-        "default": "mdi:swap-horizontal"
+        "default": "mdi:swap-horizontal",
+        "state": {
+          "solar_one_phase": "mdi:numeric-1-circle",
+          "solar_three_phases": "mdi:numeric-3-circle"
+        }
       },
       "sessions_total": {
         "default": "mdi:counter"
       },
       "switched_phases": {
-        "default": "mdi:swap-horizontal"
+        "default": "mdi:swap-horizontal",
+        "state": {
+          "single_phase": "mdi:numeric-1-circle"
+        }
+      },
+      "charging_status": {
+        "default": "mdi:ev-station",
+        "state": {
+          "initializing": "mdi:progress-clock",
+          "wallbox_error": "mdi:alert-circle-outline",
+          "service_mode": "mdi:wrench-outline",
+          "no_vehicle": "mdi:car-off",
+          "charging": "mdi:lightning-bolt",
+          "locked": "mdi:lock",
+          "release_disabled": "mdi:power-plug-off",
+          "paused": "mdi:pause-circle",
+          "authorization_required": "mdi:card-account-details-outline",
+          "preparing": "mdi:timer-sand",
+          "waiting_for_vehicle": "mdi:car-clock"
+        }
+      },
+      "connection_quality": {
+        "default": "mdi:connection",
+        "state": {
+          "good": "mdi:check-circle-outline",
+          "degraded": "mdi:alert-circle-outline"
+        }
+      },
+      "energy_goal_status": {
+        "default": "mdi:target",
+        "state": {
+          "reached": "mdi:check-circle-outline",
+          "meter_unavailable": "mdi:alert-circle-outline",
+          "meter_reset": "mdi:alert-circle-outline"
+        }
+      },
+      "soc_goal_status": {
+        "default": "mdi:battery-outline",
+        "state": {
+          "active": "mdi:battery-charging-outline",
+          "reached": "mdi:battery-check-outline"
+        }
+      },
+      "last_charging_loss": {
+        "default": "mdi:battery-minus-outline"
+      },
+      "average_charging_loss": {
+        "default": "mdi:chart-line"
       }
     },
     "switch": {
       "charging_paused": {
-        "default": "mdi:pause-circle"
+        "default": "mdi:pause-circle-outline",
+        "state": {
+          "on": "mdi:pause-circle"
+        }
       },
       "lock_evse": {
-        "default": "mdi:lock"
+        "default": "mdi:lock-outline",
+        "state": {
+          "on": "mdi:lock",
+          "off": "mdi:lock-open-variant"
+        }
+      }
+    },
+    "event": {
+      "control_result": {
+        "default": "mdi:clipboard-text-outline",
+        "state_attributes": {
+          "event_type": {
+            "default": "mdi:clipboard-text-outline",
+            "state": {
+              "executed": "mdi:clipboard-check-outline",
+              "replaced": "mdi:clipboard-arrow-right-outline",
+              "cancelled": "mdi:clipboard-remove-outline",
+              "failed": "mdi:clipboard-alert-outline",
+              "uncertain": "mdi:help-circle-outline",
+              "recovery_succeeded": "mdi:check-circle-outline",
+              "recovery_failed": "mdi:alert-circle-outline"
+            }
+          }
+        }
       }
     }
   },

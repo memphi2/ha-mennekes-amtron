@@ -22,6 +22,7 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from .capabilities import phase_switch_is_supported
 from .client import MennekesModbusClient
@@ -32,6 +33,7 @@ from .client_errors import (
     AmtronRateLimitedError,
     AmtronWriteRejectedError,
 )
+from .command_events import CONTROL_ACTIONS, CommandEvents
 from .const import (
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_UNLIMITED,
@@ -47,12 +49,14 @@ from .const import (
     SYSTEM_RESTART_VALUE,
 )
 from .data import DeviceIdentity, WallboxData, WriteDiagnostics
+from .energy_goal import EnergyGoal
 from .enums import CpState, EvseState, RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError, device_error, validation_error
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
     CP_STATE,
+    ENERGY_TOTAL,
     ERROR_CODE,
     EVSE_STATE,
     HEARTBEAT,
@@ -63,12 +67,15 @@ from .registers import (
     RegisterSpec,
 )
 from .runtime_events import EventType
+from .soc_goal import SocGoal
+from .write_state import WriteState
+
+if TYPE_CHECKING:
+    from .energy_goal_controller import EnergyGoalController
+    from .soc_goal_controller import SocGoalController
 
 _LOGGER = logging.getLogger(__name__)
-PENDING_ACTIONS = (
-    "pause", "resume", "set_current", "single_phase", "all_phases",
-    "disable_charging", "enable_charging", "lock", "unlock",
-)
+PENDING_ACTIONS = CONTROL_ACTIONS
 _PHASE_PAUSE_TIMEOUT = 30.0
 
 
@@ -90,6 +97,8 @@ class _PhaseWaitError(Exception):
 class _PendingCommand:
     action: str
     value: float
+    energy_goal_stop: bool = False
+    recovery_generation: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +142,7 @@ class AmtronControl:
         state: Callable[[], WallboxData],
         request_refresh: Callable[[], Awaitable[None]] | None = None,
         notify_write_error: Callable[[], None] | None = None,
+        notify_pending: Callable[[], None] | None = None,
         validate_deferred: Callable[[], None] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         monotonic: Callable[[], float] = time.monotonic,
@@ -144,6 +154,7 @@ class AmtronControl:
         self._state = state
         self._request_refresh = request_refresh
         self._notify_write_error = notify_write_error
+        self._notify_pending = notify_pending
         self._validate_deferred = validate_deferred
         self._sleep = sleep
         self._monotonic = monotonic
@@ -155,6 +166,140 @@ class AmtronControl:
         self._current_lock = asyncio.Lock()
         self._flush_task: asyncio.Task[None] | None = None
         self._write_state = client.write_state
+        self._events = CommandEvents()
+        self._active_command: _PendingCommand | None = None
+        self._command_acknowledged = False
+        self._command_write_started = False
+        self._recovery_deadline: float | None = None
+        self._recovery_generation = 0
+        self.goal_controller: EnergyGoalController | None = None
+        self.soc_goal_controller: SocGoalController | None = None
+
+    @property
+    def write_state(self) -> WriteState:
+        """Share bounded control intent with the goal owners."""
+        return self._write_state
+
+    @property
+    def energy_goal(self) -> EnergyGoal:
+        """Return the shared durable energy limit, including its stop latch."""
+        return self._write_state.energy_goal
+
+    @property
+    def supports_energy_goal(self) -> bool:
+        """Energy goals require the wallbox's lifetime energy counter."""
+        return self._identity.layout_version >= ENERGY_TOTAL.min_layout
+
+    @property
+    def energy_goal_stop_requested(self) -> bool:
+        """Include already observed stop evidence waiting for the command lock."""
+        return (
+            self.goal_controller.stop_requested if self.goal_controller is not None
+            else self.energy_goal.stop_requested
+        ) or (
+            self.soc_goal_controller.stop_requested if self.soc_goal_controller is not None
+            else self.soc_goal.stop_requested
+        )
+
+    @property
+    def energy_goal_guard(self) -> asyncio.Lock:
+        """Serialize the goal owner with ordinary and deferred commands."""
+        return self._current_lock
+
+    async def async_set_energy_goal(self, value: float) -> None:
+        """Change the energy ceiling without starting or resuming charging."""
+        if self.goal_controller is None or not self.supports_energy_goal:
+            raise validation_error("energy_goal_not_supported")
+        await self.goal_controller.async_set_target(value)
+
+    async def async_pause_for_energy_goal(self) -> None:
+        """Enforce a latched energy stop, retaining only the current-write floor."""
+        async with self._current_lock:
+            if not self.energy_goal_stop_requested:
+                return
+            self._require_write_access()
+            self._clear_pending(outcome="cancelled", reason="energy_goal")
+            if self.is_paused is True:
+                self.pause_requested = True
+                return
+            await self._async_observe_command(_PendingCommand(
+                "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=True,
+            ))
+
+    @property
+    def soc_goal(self) -> SocGoal:
+        """Return the vehicle percentage ceiling for the configured sources."""
+        return self._write_state.soc_goal
+
+    @property
+    def supports_soc_goal(self) -> bool:
+        return True
+
+    async def async_configure_soc(self, source: str | None) -> None:
+        if self.soc_goal_controller is None:
+            raise validation_error("soc_goal_not_supported")
+        await self.soc_goal_controller.async_configure_source(source)
+
+    async def async_set_soc_goal(
+        self, value: float, *, source: str, soc: float | None = None,
+        maximum: float | None = None,
+    ) -> None:
+        if self.soc_goal_controller is None:
+            raise validation_error("soc_goal_not_supported")
+        await self.soc_goal_controller.async_set_target(value, source=source, soc=soc, maximum=maximum)
+
+    async def async_observe_soc(
+        self, soc: float | None, maximum: float | None = None, *, source: str,
+    ) -> None:
+        if self.soc_goal_controller is None:
+            raise validation_error("soc_goal_not_supported")
+        await self.soc_goal_controller.async_observe(soc, maximum, source=source)
+
+    def cancel_goal_resume(self) -> None:
+        """Invalidate only the automatic start associated with an old goal."""
+        if self._pending is not None and self._pending.recovery_generation is not None:
+            self._clear_pending(outcome="cancelled", reason="energy_goal")
+            if self._notify_pending is not None:
+                self._notify_pending()
+
+    async def async_energy_goal_recovery_ready(self) -> bool:
+        """Confirm a cleared error before restoring only our own outage pause."""
+        if self.read_only or self.energy_goal_stop_requested:
+            return False
+        return await self._client.async_read_register(ERROR_CODE) == 0
+
+    async def async_resume_for_energy_goal_locked(self, generation: int) -> None:
+        """Resume our outage pause while the caller owns the command lock."""
+        self._require_write_access()
+        maximum = self.max_charging_current
+        target = self.charging_setpoint
+        if target is None:
+            target = maximum
+        elif target != CHARGING_CURRENT_UNLIMITED:
+            target = max(CHARGING_CURRENT_MINIMUM, min(target, maximum))
+        await self._async_submit_locked(
+            _PendingCommand("resume", target, recovery_generation=generation), automatic=True,
+        )
+
+    @property
+    def events(self) -> CommandEvents:
+        """Expose discrete outcomes without per-poll entity updates."""
+        return self._events
+
+    def observe_recovery(self, error_code: object, current_write_generation: int) -> None:
+        """Confirm a completed recovery from a subsequent successful fresh poll."""
+        if (
+            self._recovery_deadline is None or type(error_code) is not int
+            or current_write_generation < self._recovery_generation
+        ):
+            return
+        if error_code == 0:
+            self.events.record("recovery_succeeded", "recover")
+        elif self._monotonic() >= self._recovery_deadline:
+            self.events.record("recovery_failed", "recover", "error_still_active")
+        else:
+            return
+        self._recovery_deadline = None
 
     @property
     def pending_action(self) -> str | None:
@@ -165,6 +310,24 @@ class AmtronControl:
     def pending_until(self) -> datetime | None:
         """Return a stable deadline; a UI can derive remaining time locally."""
         return self._pending_until
+
+    @property
+    def supports_cancel_pending(self) -> bool:
+        """This controller can remove queued work without touching the wallbox."""
+        return True
+
+    @property
+    def can_cancel_pending(self) -> bool:
+        """Cancellation needs permission and pending work, not a healthy bus."""
+        return self.supports_cancel_pending and not self.read_only and self.pending_action is not None
+
+    async def async_cancel_pending_change(self) -> None:
+        """Discard future work, retaining any pause or setpoint already applied."""
+        async with self._current_lock:
+            self._require_write_access()
+            changed = self._clear_pending(outcome="cancelled", reason="user_cancelled")
+            if changed and self._notify_pending is not None:
+                self._notify_pending()
 
     @property
     def charging_setpoint(self) -> float | None:
@@ -384,7 +547,10 @@ class AmtronControl:
                     "write_rate_limited", {"seconds": f"{err.retry_after:.0f}"}
                 ) from err
             remembered = self.charging_setpoint
-            paused = self.pause_requested is True or 0 < current < CHARGING_CURRENT_MINIMUM
+            paused = (
+                self.energy_goal_stop_requested or self.pause_requested is True
+                or 0 < current < CHARGING_CURRENT_MINIMUM
+            )
             if paused:
                 target = CHARGING_PAUSE_CURRENT
             elif current == CHARGING_CURRENT_UNLIMITED:
@@ -396,15 +562,25 @@ class AmtronControl:
                     else current
                 )
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
-            await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
-            await self._async_write(CHARGING_RELEASE, int(self.charging_release_requested is not False))
-            await self._async_apply_current(
-                min(target, self.max_charging_current),
-                preserve_setpoint=paused,
-                recovery=True,
-            )
+            try:
+                await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
+                await self._async_write(CHARGING_RELEASE, int(self.charging_release_requested is not False))
+                await self._async_apply_current(
+                    min(target, self.max_charging_current),
+                    preserve_setpoint=paused,
+                    recovery=True,
+                )
+            except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError, asyncio.CancelledError) as err:
+                self._recovery_deadline = None
+                self.events.record(
+                    "uncertain" if self._uncertain(err) else "recovery_failed", "recover",
+                    "connection_error" if self._uncertain(err) else "write_rejected",
+                )
+                raise
         self._diagnostics.recoveries += 1
         self._diagnostics.timeline.record(EventType.RECOVERY_COMPLETED)
+        self._recovery_generation = self._write_state.current_write_generation
+        self._recovery_deadline = self._monotonic() + 30
         return True
 
     async def async_restart(self) -> None:
@@ -431,7 +607,7 @@ class AmtronControl:
     async def async_shutdown(self) -> None:
         """Cancel deferred work; a new owner never inherits a delayed start."""
 
-        self._clear_pending()
+        self._clear_pending(outcome="cancelled", reason="shutdown")
         task = self._flush_task
         self._flush_task = None
         if task is not None and not task.done():
@@ -482,13 +658,18 @@ class AmtronControl:
 
     async def _async_apply_current(
         self, value: float, *, preserve_setpoint: bool = False, recovery: bool = False,
-        phase_preparation: bool = False,
+        phase_preparation: bool = False, energy_goal_stop: bool = False,
     ) -> None:
-        transition = self._current_transition(value) and not recovery
+        transition = not recovery and (
+            self._current_transition(value)
+            or (energy_goal_stop and self.is_paused is not True)
+        )
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._write_state.confirmed_current
-        if transition and not phase_preparation:
+        if transition and not phase_preparation and not energy_goal_stop:
             await self._async_check_transition_interval()
+        if not paused and self.energy_goal_stop_requested:
+            raise validation_error("energy_goal_stop_active")
         try:
             await self._async_write(
                 CHARGING_CURRENT_EMS, value,
@@ -552,6 +733,11 @@ class AmtronControl:
         self, spec: RegisterSpec, value: int, *, changed: bool,
         min_interval: float = 0.0,
     ) -> None:
+        if self.energy_goal_stop_requested and (
+            (spec == CHARGING_RELEASE and value == 1)
+            or (spec == LOCK_EVSE and value == 0)
+        ):
+            raise validation_error("energy_goal_stop_active")
         try:
             await self._async_write(spec, value, min_interval=min_interval, refresh=False)
         except (DeviceError, asyncio.CancelledError) as err:
@@ -663,8 +849,19 @@ class AmtronControl:
 
     async def _async_apply_command(self, command: _PendingCommand) -> None:
         self._require_write_access()
+        if (
+            command.recovery_generation is not None
+            and command.recovery_generation != self._write_state.energy_goal_generation
+        ):
+            raise validation_error("energy_goal_stop_active")
+        if self.energy_goal_stop_requested and command.action in (
+            "set_current", "resume", "enable_charging", "unlock",
+        ):
+            raise validation_error("energy_goal_stop_active")
         if command.action == "pause":
-            await self._async_apply_current(CHARGING_PAUSE_CURRENT)
+            await self._async_apply_current(
+                CHARGING_PAUSE_CURRENT, energy_goal_stop=command.energy_goal_stop,
+            )
         elif command.action in ("set_current", "resume"):
             # A configuration change can lower the available current while
             # an accepted request is waiting. Reapply the active limit.
@@ -678,13 +875,50 @@ class AmtronControl:
         else:
             await self._async_apply_lock(bool(command.value))
 
-    async def _async_submit_locked(self, command: _PendingCommand) -> None:
+    async def _async_observe_command(self, command: _PendingCommand, *, deferred: bool = False) -> None:
+        """Report the bus outcome independently of status/persistence callbacks."""
+        self._active_command = command
+        self._command_acknowledged = False
+        self._command_write_started = False
+        try:
+            if deferred and self._validate_deferred is not None:
+                self._validate_deferred()
+            await self._async_apply_command(command)
+        except (_PhaseWaitError, AmtronRateLimitedError):
+            raise
+        except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError, asyncio.CancelledError) as err:
+            key = err.translation_key if isinstance(err, DeviceError) else ""
+            reason = {
+                "phase_pause_timeout": "phase_timeout",
+                "phase_pause_state_unknown": "phase_unconfirmed",
+                "phase_state_unknown": "phase_unconfirmed",
+                "read_only_mode": "permission_denied",
+                "energy_goal_stop_active": "energy_goal",
+            }.get(key, "write_rejected" if not self._uncertain(err) else "connection_error")
+            if self._command_acknowledged:
+                self.events.record("executed", command.action, "status_refresh_failed")
+            else:
+                uncertain = self._command_write_started and self._uncertain(err)
+                self.events.record("uncertain" if uncertain else "failed", command.action, reason)
+            raise
+        else:
+            self._record_replaced(command)
+            self.events.record("executed", command.action)
+        finally:
+            self._active_command = None
+
+    async def _async_submit_locked(self, command: _PendingCommand, *, automatic: bool = False) -> None:
         """Accept the latest request, coalescing all deferred commands together."""
+        if not automatic:
+            self._write_state.command_intent_generation += 1
+            if self.goal_controller is not None:
+                await self.goal_controller.async_cancel_recovery_locked()
         if self._phase_change is not None and command != self._pending:
+            self._record_replaced(command)
             await self._async_cancel_pending()
         had_pending = self._pending is not None
         try:
-            await self._async_apply_command(command)
+            await self._async_observe_command(command)
         except _PhaseWaitError as err:
             await self._async_queue(command, err.retry_after, preserve_deadline=err.preserve_deadline)
             return
@@ -712,6 +946,7 @@ class AmtronControl:
             return
         if self._pending == command and abs(self._pending_due - due) < 0.01:
             return
+        self._record_replaced(command)
         self._pending = command
         self._pending_due = due
         self._pending_until = (
@@ -725,8 +960,17 @@ class AmtronControl:
             )
         await self._async_publish_pending()
 
-    def _clear_pending(self) -> bool:
+    def _record_replaced(self, command: _PendingCommand | None) -> None:
+        if self._pending is not None and self._pending != command:
+            self.events.record("replaced", self._pending.action, "replaced")
+
+    def _clear_pending(self, *, outcome: str | None = None, reason: str = "completed") -> bool:
         changed = self._pending is not None
+        if self._pending is not None:
+            if outcome is not None and self._active_command is None:
+                self.events.record(outcome, self._pending.action, reason)
+            elif self._active_command is not None:
+                self._record_replaced(self._active_command)
         self._pending = None
         self._phase_change = None
         self._pending_until = None
@@ -773,9 +1017,7 @@ class AmtronControl:
                         delay = 0
                     if delay <= 0:
                         try:
-                            if self._validate_deferred is not None:
-                                self._validate_deferred()
-                            await self._async_apply_command(command)
+                            await self._async_observe_command(command, deferred=True)
                         except _PhaseWaitError as err:
                             await self._async_queue(
                                 command, err.retry_after, preserve_deadline=err.preserve_deadline,
@@ -817,6 +1059,8 @@ class AmtronControl:
         min_interval: float = 0.0,
         refresh: bool = True,
     ) -> None:
+        if self._active_command is not None:
+            self._command_write_started = True
         try:
             await self._client.async_write_register(
                 spec, value, min_interval=min_interval
@@ -838,6 +1082,16 @@ class AmtronControl:
                 "write_failed", {"register": spec.key, "error": str(err)}
             ) from err
         self._diagnostics.writes_sent += 1
+        if self._active_command is not None:
+            action = self._active_command.action
+            expected = (
+                CHARGING_CURRENT_EMS if action in ("pause", "resume", "set_current")
+                else REQUESTED_PHASES if action in ("single_phase", "all_phases")
+                else CHARGING_RELEASE if action in ("enable_charging", "disable_charging")
+                else LOCK_EVSE
+            )
+            if spec == expected:
+                self._command_acknowledged = True
         if spec.key in self._diagnostics.write_errors:
             self._diagnostics.write_errors.remove(spec.key)
             if self._notify_write_error is not None:
