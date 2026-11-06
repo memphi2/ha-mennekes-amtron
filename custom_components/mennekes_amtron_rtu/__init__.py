@@ -15,6 +15,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -25,7 +26,11 @@ from .charge_loss_const import (
     LOSS_SOURCE_SENSOR,
 )
 from .charge_loss_observer import ChargeLossObserver
-from .charging_cost_const import CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED
+from .charging_cost_const import (
+    CONF_AUTO_TARIFF_REFRESH,
+    CONF_CHARGING_COST_SOURCE,
+    COST_SOURCE_DISABLED,
+)
 from .control import AmtronControl, ControlOptions
 from .coordinator import MennekesAmtronCoordinator
 from .cost_observer import ChargingCostObserver, LastChargingCost
@@ -77,6 +82,7 @@ from .device.write_state import WriteState
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import GoalStore, ModelStore, SessionHistoryStore, SocGoalStore
 from .loss_store import LossStore
+from .network_tariff_year import async_refresh_tariff_year, needs_year_refresh
 from .options_flow import control_mode_is_master
 from .recovery import HeartbeatRecovery
 from .remote import (
@@ -359,6 +365,19 @@ async def async_setup_entry(
         )
         entry.runtime_data.loaded_platforms = platforms
         entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+        if cost_enabled and needs_year_refresh(dict(entry.options)):
+            # A stale tariff is refreshed after setup, so the wallbox and its
+            # heartbeat are already running before any external HTTP request.
+            hass.async_create_task(async_refresh_tariff_year(hass, entry))
+        if cost_enabled and entry.options.get(CONF_AUTO_TARIFF_REFRESH) is True:
+            async def refresh_new_tariff_year(_now: object) -> None:
+                await async_refresh_tariff_year(hass, entry)
+
+            entry.async_on_unload(async_track_time_change(
+                hass,
+                refresh_new_tariff_year,
+                hour=0, minute=0, second=5,
+            ))
         async_setup_repairs(hass, entry)
         if not control.read_only and not remote:
             entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)
@@ -435,6 +454,10 @@ async def async_reload_entry(
 ) -> None:
     """Reload the entry after its options changed."""
 
+    runtime = getattr(entry, "runtime_data", None)
+    cost = runtime.charging_cost if runtime is not None else None
+    if cost is not None and cost.apply_tariff_only_update():
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 

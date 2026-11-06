@@ -793,7 +793,7 @@
           "charging_network_module": "Ajustement du prix réseau"
         },
         "data_description": {
-          "charging_network_module": "Calcul facultatif des tarifs réseau allemands selon le §14a. Utilisez uniquement le module et les prix convenus avec votre gestionnaire de réseau. Sinon, sélectionnez Aucun."
+          "charging_network_module": "Calcul facultatif des tarifs réseau allemands selon le §14a. Utilisez uniquement le module et les prix convenus avec votre gestionnaire de réseau. Sinon, sélectionnez Aucun. Le choix du module 3 envoie une fois les coordonnées du domicile Home Assistant à VNBdigital et récupère les tarifs de Par14a-Database. Vérifiez les valeurs dans la fiche tarifaire liée."
         }
       },
       "cost_sensor": {
@@ -804,12 +804,12 @@
           "charging_network_module": "Ajustement du prix réseau"
         },
         "data_description": {
-          "charging_network_module": "Calcul facultatif des tarifs réseau allemands selon le §14a. Utilisez uniquement le module et les prix convenus avec votre gestionnaire de réseau. Sinon, sélectionnez Aucun."
+          "charging_network_module": "Calcul facultatif des tarifs réseau allemands selon le §14a. Utilisez uniquement le module et les prix convenus avec votre gestionnaire de réseau. Sinon, sélectionnez Aucun. Le choix du module 3 envoie une fois les coordonnées du domicile Home Assistant à VNBdigital et récupère les tarifs de Par14a-Database. Vérifiez les valeurs dans la fiche tarifaire liée."
         }
       },
       "cost_network": {
         "title": "Tarif réseau : module {module}",
-        "description": "Recopiez les prix TTC du barème de votre gestionnaire de réseau. Le module 2 utilise 40 % du prix réseau normal. Le module 3 applique les prix hauts et bas publiés pendant les trimestres et l’année sélectionnés ; le tarif standard s’applique le reste du temps. Utilisez le fuseau horaire de Home Assistant et des quarts d’heure. Les plages peuvent traverser minuit mais ne doivent pas se chevaucher. Ces paramètres estiment les coûts variables de charge ; ils ne confirment pas l’éligibilité et ne modifient pas votre contrat.",
+        "description": "Recopiez les prix TTC du barème de votre gestionnaire de réseau. Le module 2 utilise 40 % du prix réseau normal. Le module 3 applique les prix hauts et bas publiés pendant les trimestres et l’année sélectionnés ; le tarif standard s’applique le reste du temps. Utilisez le fuseau horaire de Home Assistant et des quarts d’heure. Les plages peuvent traverser minuit mais ne doivent pas se chevaucher. Ces paramètres estiment les coûts variables de charge ; ils ne confirment pas l’éligibilité et ne modifient pas votre contrat. Source des valeurs préremplies : {source} Le symbole ⚠ signale une fiche tarifaire provisoire susceptible de changer.",
         "data": {
           "regular_network": "Prix réseau normal (tarif standard)",
           "price_includes_network": "Le prix d’électricité inclut déjà le prix réseau normal",
@@ -818,12 +818,14 @@
           "active_quarters": "Trimestres à prix réseau variables",
           "tariff_year": "Année du barème",
           "high_periods": "Périodes tarif haut",
-          "low_periods": "Périodes tarif bas"
+          "low_periods": "Périodes tarif bas",
+          "auto_tariff_refresh": "Actualiser automatiquement le tarif du module 3 au nouvel an"
         },
         "data_description": {
           "price_includes_network": "Activé : retirer le prix réseau normal avant d’ajouter le tarif choisi. Désactivé : la source exclut les frais réseau, donc ajouter le tarif réseau. Choisissez selon votre source pour éviter un double comptage.",
           "high_periods": "Une période HH:MM-HH:MM par ligne, aux quarts d’heure. Le passage de minuit est possible.",
-          "low_periods": "Une période HH:MM-HH:MM par ligne, aux quarts d’heure. Le passage de minuit est possible."
+          "low_periods": "Une période HH:MM-HH:MM par ligne, aux quarts d’heure. Le passage de minuit est possible.",
+          "auto_tariff_refresh": "Le 1er janvier, les tarifs publiés pour la nouvelle année sont recherchés et appliqués s’ils sont sans ambiguïté. En l’absence de données valides, une nouvelle tentative est faite chaque jour. Les valeurs provisoires peuvent être appliquées ; vérifiez ensuite la fiche définitive."
         }
       }
     },

@@ -14,6 +14,7 @@ from custom_components.mennekes_amtron_rtu.charge_loss_const import (
 )
 from custom_components.mennekes_amtron_rtu.charging_cost_const import (
     CONF_ACTIVE_QUARTERS,
+    CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_COST_SOURCE,
     CONF_CHARGING_NETWORK_MODULE,
     CONF_CHARGING_NETWORK_TARIFF,
@@ -62,13 +63,124 @@ def _values(source=COST_SOURCE_FIXED, *, service=False):
     )
 
 
-def _flow(*, options=None, service=False):
+def _flow(*, options=None, service=False, country="DE"):
     flow = Flow(FakeConfigEntry(
         options=options,
         data={"server_url": "http://service:8765"} if service else None,
     ))
-    flow.hass = SimpleNamespace(config=SimpleNamespace(time_zone="Europe/Paris"))
+    flow.hass = SimpleNamespace(config=SimpleNamespace(time_zone="Europe/Paris", country=country))
     return flow
+
+
+def test_network_module_is_hidden_outside_germany():
+    async def run():
+        flow = _flow(country="FR")
+        await flow.async_step_init(_values())
+        form = await flow.async_step_cost_fixed()
+        fields = {key.schema for key in form["data_schema"].schema}
+        assert CONF_CHARGING_PRICE in fields
+        assert CONF_CHARGING_NETWORK_MODULE not in fields
+        rejected = await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3,
+            CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        assert rejected["errors"] == {CONF_CHARGING_NETWORK_MODULE: "network_tariff_invalid"}
+        accepted = await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3})
+        assert accepted["type"] == "create_entry"
+
+    asyncio.run(run())
+
+
+def test_module_three_imports_home_tariff_once_and_shows_source(monkeypatch):
+    calls = []
+
+    async def lookup(hass):
+        calls.append(hass)
+        return {"_source_url": "https://example.org/price.pdf", **NETWORK}
+
+    monkeypatch.setattr(
+        "custom_components.mennekes_amtron_rtu.options_flow.async_lookup_home_tariff",
+        lookup,
+    )
+
+    async def run():
+        flow = _flow()
+        await flow.async_step_init(_values())
+        form = await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        assert form["step_id"] == "cost_network"
+        assert form["description_placeholders"]["source"] == "https://example.org/price.pdf"
+        marker = next(key for key in form["data_schema"].schema if key.schema == CONF_HIGH_PERIODS)
+        assert marker.description["suggested_value"] == NETWORK[CONF_HIGH_PERIODS]
+        await flow.async_step_cost_fixed()
+        await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        assert len(calls) == 1
+        saved = await flow.async_step_cost_network({**NETWORK, CONF_AUTO_TARIFF_REFRESH: True})
+        assert saved["data"][CONF_AUTO_TARIFF_REFRESH] is True
+
+    asyncio.run(run())
+
+
+def test_old_module_three_tariff_is_refreshed_when_options_reopen(monkeypatch):
+    async def lookup(_hass):
+        return {"_source_url": "https://example.org/new.pdf", **NETWORK}
+
+    monkeypatch.setattr(
+        "custom_components.mennekes_amtron_rtu.options_flow.async_lookup_home_tariff",
+        lookup,
+    )
+
+    async def run():
+        old = {"module": NETWORK_MODULE_3, CONF_TARIFF_YEAR: 2025}
+        flow = _flow(options={
+            CONF_CHARGING_COST_SOURCE: COST_SOURCE_FIXED,
+            CONF_CHARGING_PRICE: 0.3,
+            CONF_CHARGING_NETWORK_TARIFF: old,
+        })
+        await flow.async_step_init(_values())
+        result = await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        assert result["description_placeholders"]["source"] == "https://example.org/new.pdf"
+
+    asyncio.run(run())
+
+
+def test_provisional_import_is_clearly_marked_before_confirmation(monkeypatch):
+    async def lookup(_hass):
+        return {"_source_status": "vorlaeufig", "_source_url": "https://example.org/preliminary.pdf", **NETWORK}
+
+    monkeypatch.setattr(
+        "custom_components.mennekes_amtron_rtu.options_flow.async_lookup_home_tariff",
+        lookup,
+    )
+
+    async def run():
+        flow = _flow()
+        await flow.async_step_init(_values())
+        form = await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        assert form["description_placeholders"]["source"].startswith("⚠ ")
+        assert flow.config_entry.options == {}
+
+    asyncio.run(run())
+
+
+def test_annual_refresh_option_rejects_non_boolean_value():
+    async def run():
+        flow = _flow()
+        await flow.async_step_init(_values())
+        await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        result = await flow.async_step_cost_network({**NETWORK, CONF_AUTO_TARIFF_REFRESH: "yes"})
+        assert result["errors"] == {"base": "network_tariff_invalid"}
+
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize("service", [False, True])

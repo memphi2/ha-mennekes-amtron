@@ -38,6 +38,29 @@ def entry(*, dynamic=False):
     )
 
 
+def test_tariff_only_update_keeps_cost_observer_and_modbus_connection(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        configured = entry()
+        observer = ChargingCostObserver(hass, configured, remote=False)
+        original_accumulator = observer._accumulator
+        configured.options = {
+            **configured.options,
+            "charging_network_tariff": {
+                "module": "module_2", "regular_network": 0.1,
+                "price_includes_network": True,
+            },
+        }
+        assert observer.apply_tariff_only_update()
+        assert observer._accumulator is original_accumulator
+        assert observer._accumulator.tariff.module == "module_2"
+        configured.options["charging_price"] = 0.4
+        assert not observer.apply_tariff_only_update()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
 def data(at, energy, *, present=False, fresh=True, session=None):
     return WallboxData(
         values={ENERGY_TOTAL.key: energy, EVSE_STATE.key: EvseState.CHARGING if present else EvseState.IDLE, CP_STATE.key: CpState.C2 if present else CpState.A1},

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 from homeassistant.const import Platform
@@ -252,6 +253,19 @@ def test_reload_asks_home_assistant_to_reload(
         entry = FakeConfigEntry()
         await async_reload_entry(hass, entry)
         assert hass.config_entries.reloaded == [entry.entry_id]
+
+    asyncio.run(run())
+
+
+def test_tariff_only_option_update_does_not_restart_modbus() -> None:
+    async def run() -> None:
+        hass = FakeHass()
+        entry = FakeConfigEntry()
+        entry.runtime_data = SimpleNamespace(
+            charging_cost=SimpleNamespace(apply_tariff_only_update=lambda: True),
+        )
+        await async_reload_entry(hass, entry)
+        assert hass.config_entries.reloaded == []
 
     asyncio.run(run())
 

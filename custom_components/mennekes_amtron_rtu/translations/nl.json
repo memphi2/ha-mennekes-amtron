@@ -793,7 +793,7 @@
           "charging_network_module": "Aanpassing van netkosten"
         },
         "data_description": {
-          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen."
+          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen. Bij selectie van module 3 worden de Home Assistant Home-coördinaten eenmaal naar VNBdigital verzonden en tariefgegevens uit Par14a-Database opgehaald. Controleer de ingevulde waarden met het gekoppelde tariefblad."
         }
       },
       "cost_sensor": {
@@ -804,12 +804,12 @@
           "charging_network_module": "Aanpassing van netkosten"
         },
         "data_description": {
-          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen."
+          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen. Bij selectie van module 3 worden de Home Assistant Home-coördinaten eenmaal naar VNBdigital verzonden en tariefgegevens uit Par14a-Database opgehaald. Controleer de ingevulde waarden met het gekoppelde tariefblad."
         }
       },
       "cost_network": {
         "title": "Nettarief: module {module}",
-        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de tijdzone van Home Assistant en kwartiergrenzen. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet.",
+        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de tijdzone van Home Assistant en kwartiergrenzen. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet. Bron van vooraf ingevulde waarden: {source} Het symbool ⚠ markeert een voorlopig tariefblad dat nog kan veranderen.",
         "data": {
           "regular_network": "Normaal nettarief (standaardtarief)",
           "price_includes_network": "De stroomprijs bevat al het normale nettarief",
@@ -818,12 +818,14 @@
           "active_quarters": "Kwartalen met tijdsafhankelijke nettarieven",
           "tariff_year": "Jaar van de prijslijst",
           "high_periods": "Hoogtariefperioden",
-          "low_periods": "Laagtariefperioden"
+          "low_periods": "Laagtariefperioden",
+          "auto_tariff_refresh": "Module 3-tarief automatisch bij de jaarwisseling bijwerken"
         },
         "data_description": {
           "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen.",
           "high_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan.",
-          "low_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan."
+          "low_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan.",
+          "auto_tariff_refresh": "Op 1 januari worden gepubliceerde tarieven voor het nieuwe jaar opgehaald en toegepast als de gegevens eenduidig zijn. Als er nog geen geldige gegevens zijn, wordt dagelijks opnieuw geprobeerd. Voorlopige waarden kunnen worden gebruikt; controleer later het definitieve tariefblad."
         }
       }
     },

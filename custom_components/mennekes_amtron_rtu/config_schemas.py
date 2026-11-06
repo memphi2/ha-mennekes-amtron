@@ -34,6 +34,7 @@ from .charge_loss_const import (
 )
 from .charging_cost_const import (
     CONF_ACTIVE_QUARTERS,
+    CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_COST_SOURCE,
     CONF_CHARGING_NETWORK_MODULE,
     CONF_CHARGING_PRICE,
@@ -349,7 +350,9 @@ def loss_sensor_schema(current: dict[str, Any]) -> probatio.Schema:
     })
 
 
-def cost_source_schema(current: dict[str, Any], *, source: str) -> probatio.Schema:
+def cost_source_schema(
+    current: dict[str, Any], *, source: str, allow_network: bool = True,
+) -> probatio.Schema:
     """Select a gross electricity price and optional network-tariff calculation."""
     fields: dict[Any, Any] = {}
     if source == COST_SOURCE_FIXED:
@@ -362,14 +365,15 @@ def cost_source_schema(current: dict[str, Any], *, source: str) -> probatio.Sche
             CONF_CHARGING_PRICE_ENTITY,
             description={"suggested_value": current.get(CONF_CHARGING_PRICE_ENTITY)},
         )] = EntitySelector(EntitySelectorConfig(filter={"domain": "sensor"}))
-    fields[probatio.Required(
-        CONF_CHARGING_NETWORK_MODULE,
-        default=current.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE),
-    )] = SelectSelector(SelectSelectorConfig(
-        options=list(NETWORK_MODULES),
-        translation_key="charging_network_module",
-        mode=SelectSelectorMode.DROPDOWN,
-    ))
+    if allow_network:
+        fields[probatio.Required(
+            CONF_CHARGING_NETWORK_MODULE,
+            default=current.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE),
+        )] = SelectSelector(SelectSelectorConfig(
+            options=list(NETWORK_MODULES),
+            translation_key="charging_network_module",
+            mode=SelectSelectorMode.DROPDOWN,
+        ))
     return probatio.Schema(fields)
 
 
@@ -386,6 +390,10 @@ def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Sch
         ): BooleanSelector(),
     }
     if module == NETWORK_MODULE_3:
+        fields[probatio.Required(
+            CONF_AUTO_TARIFF_REFRESH,
+            default=current.get(CONF_AUTO_TARIFF_REFRESH, False),
+        )] = BooleanSelector()
         for key in (CONF_HIGH_NETWORK, CONF_LOW_NETWORK):
             fields[probatio.Required(
                 key, description={"suggested_value": current.get(key)},

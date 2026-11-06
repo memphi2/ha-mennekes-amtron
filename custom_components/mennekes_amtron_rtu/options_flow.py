@@ -22,6 +22,7 @@ from .charge_loss_const import (
 )
 from .charging_cost_const import (
     CONF_ACTIVE_QUARTERS,
+    CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_COST_SOURCE,
     CONF_CHARGING_NETWORK_MODULE,
     CONF_CHARGING_NETWORK_TARIFF,
@@ -61,6 +62,7 @@ from .device.const import (
     DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
 )
+from .network_tariff_lookup import async_lookup_home_tariff
 from .remote import CONF_SERVER_URL
 from .vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
@@ -78,6 +80,9 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         super().__init__()
         self._pending_options: dict[str, Any] | None = None
         self._pending_step: str | None = None
+        self._home_tariff_lookup_done = False
+        self._home_tariff_values: dict[str, Any] | None = None
+        self._home_tariff_source = "—"
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -98,6 +103,9 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
 
         self._pending_options = None
         self._pending_step = None
+        self._home_tariff_lookup_done = False
+        self._home_tariff_values = None
+        self._home_tariff_source = "—"
         errors = _vehicle_errors(user_input) if user_input is not None else {}
         source = (user_input or {}).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED)
         if source not in LOSS_SOURCES:
@@ -197,7 +205,11 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
             or self._pending_step not in (f"cost_{source}", "cost_network")
         ):
             return await self.async_step_init()
-        errors = _cost_errors(source, user_input) if user_input is not None else {}
+        allow_network = getattr(self.hass.config, "country", None) == "DE"
+        errors = (
+            _cost_errors(source, user_input, allow_network=allow_network)
+            if user_input is not None else {}
+        )
         if user_input is not None and not errors:
             if source == COST_SOURCE_FIXED:
                 pending[CONF_CHARGING_PRICE] = float(user_input[CONF_CHARGING_PRICE])
@@ -221,7 +233,9 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
             )
         return self.async_show_form(
             step_id=f"cost_{source}",
-            data_schema=cost_source_schema(current, source=source),
+            data_schema=cost_source_schema(
+                current, source=source, allow_network=allow_network,
+            ),
             errors=errors,
         )
 
@@ -236,6 +250,8 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         errors = {}
         if user_input is not None:
             try:
+                if module == NETWORK_MODULE_3 and type(user_input.get(CONF_AUTO_TARIFF_REFRESH, False)) is not bool:
+                    raise ValueError("auto tariff refresh must be boolean")
                 pending[CONF_CHARGING_NETWORK_TARIFF] = _network_tariff(
                     user_input, module=module,
                     timezone=self.hass.config.time_zone,
@@ -243,16 +259,41 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
             except (KeyError, TypeError, ValueError):
                 errors["base"] = "network_tariff_invalid"
             else:
+                if module == NETWORK_MODULE_3:
+                    pending[CONF_AUTO_TARIFF_REFRESH] = user_input.get(
+                        CONF_AUTO_TARIFF_REFRESH, False,
+                    )
                 return self._finish_options(pending)
         previous = dict(self.config_entry.options).get(CONF_CHARGING_NETWORK_TARIFF)
         current = (
             _network_form_values(previous if isinstance(previous, dict) else {})
             if user_input is None else user_input
         )
+        if user_input is None:
+            current[CONF_AUTO_TARIFF_REFRESH] = self.config_entry.options.get(
+                CONF_AUTO_TARIFF_REFRESH, False,
+            )
+        if user_input is None and module == NETWORK_MODULE_3:
+            if not self._home_tariff_lookup_done:
+                self._home_tariff_values = await async_lookup_home_tariff(self.hass)
+                self._home_tariff_lookup_done = True
+            if self._home_tariff_values is not None:
+                status = self._home_tariff_values.get("_source_status")
+                prefix = "⚠ " if status == "vorlaeufig" else ""
+                self._home_tariff_source = prefix + str(self._home_tariff_values.get("_source_url") or "—")
+                current.update({
+                    key: value for key, value in self._home_tariff_values.items()
+                    if not key.startswith("_source_")
+                })
+                if not (isinstance(previous, dict) and previous.get("module") == NETWORK_MODULE_3):
+                    current[CONF_AUTO_TARIFF_REFRESH] = True
         return self.async_show_form(
             step_id="cost_network",
             data_schema=cost_network_schema(current, module=module),
-            description_placeholders={"module": "2" if module != NETWORK_MODULE_3 else "3"},
+            description_placeholders={
+                "module": "2" if module != NETWORK_MODULE_3 else "3",
+                "source": self._home_tariff_source,
+            },
             errors=errors,
         )
 
@@ -326,7 +367,9 @@ def _loss_errors(source: str, values: dict[str, Any]) -> dict[str, str]:
     return errors
 
 
-def _cost_errors(source: str, values: dict[str, Any]) -> dict[str, str]:
+def _cost_errors(
+    source: str, values: dict[str, Any], *, allow_network: bool = True,
+) -> dict[str, str]:
     errors = {}
     if source == COST_SOURCE_FIXED:
         value = values.get(CONF_CHARGING_PRICE)
@@ -336,7 +379,8 @@ def _cost_errors(source: str, values: dict[str, Any]) -> dict[str, str]:
         value = values.get(CONF_CHARGING_PRICE_ENTITY)
         if not isinstance(value, str) or not valid_entity_id(value) or not value.startswith("sensor."):
             errors[CONF_CHARGING_PRICE_ENTITY] = "cost_source_invalid"
-    if values.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE) not in NETWORK_MODULES:
+    module = values.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE)
+    if module not in NETWORK_MODULES or (not allow_network and module != NETWORK_MODULE_NONE):
         errors[CONF_CHARGING_NETWORK_MODULE] = "network_tariff_invalid"
     return errors
 

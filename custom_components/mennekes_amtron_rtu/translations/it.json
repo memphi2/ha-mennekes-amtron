@@ -793,7 +793,7 @@
           "charging_network_module": "Adeguamento del prezzo di rete"
         },
         "data_description": {
-          "charging_network_module": "Calcolo facoltativo delle tariffe di rete tedesche ai sensi del §14a. Usa solo il modulo e i prezzi concordati con il gestore di rete. Altrimenti seleziona Nessuno."
+          "charging_network_module": "Calcolo facoltativo delle tariffe di rete tedesche ai sensi del §14a. Usa solo il modulo e i prezzi concordati con il gestore di rete. Altrimenti seleziona Nessuno. Selezionando il modulo 3, le coordinate di Home Assistant vengono inviate una volta a VNBdigital e i dati tariffari vengono recuperati da Par14a-Database. Verifica i valori nel listino collegato."
         }
       },
       "cost_sensor": {
@@ -804,12 +804,12 @@
           "charging_network_module": "Adeguamento del prezzo di rete"
         },
         "data_description": {
-          "charging_network_module": "Calcolo facoltativo delle tariffe di rete tedesche ai sensi del §14a. Usa solo il modulo e i prezzi concordati con il gestore di rete. Altrimenti seleziona Nessuno."
+          "charging_network_module": "Calcolo facoltativo delle tariffe di rete tedesche ai sensi del §14a. Usa solo il modulo e i prezzi concordati con il gestore di rete. Altrimenti seleziona Nessuno. Selezionando il modulo 3, le coordinate di Home Assistant vengono inviate una volta a VNBdigital e i dati tariffari vengono recuperati da Par14a-Database. Verifica i valori nel listino collegato."
         }
       },
       "cost_network": {
         "title": "Tariffa di rete: modulo {module}",
-        "description": "Copia i prezzi lordi dal tariffario del gestore di rete. Il modulo 2 usa il 40% del prezzo di rete ordinario. Il modulo 3 usa i prezzi alti e bassi pubblicati nei trimestri e nell’anno selezionati; negli altri periodi si applica il prezzo standard. Usa il fuso orario di Home Assistant e intervalli di 15 minuti. Le fasce possono attraversare la mezzanotte ma non sovrapporsi. Queste impostazioni stimano i costi variabili di ricarica; non confermano l’idoneità e non modificano il contratto.",
+        "description": "Copia i prezzi lordi dal tariffario del gestore di rete. Il modulo 2 usa il 40% del prezzo di rete ordinario. Il modulo 3 usa i prezzi alti e bassi pubblicati nei trimestri e nell’anno selezionati; negli altri periodi si applica il prezzo standard. Usa il fuso orario di Home Assistant e intervalli di 15 minuti. Le fasce possono attraversare la mezzanotte ma non sovrapporsi. Queste impostazioni stimano i costi variabili di ricarica; non confermano l’idoneità e non modificano il contratto. Fonte dei valori precompilati: {source} Il simbolo ⚠ indica un listino provvisorio che potrebbe cambiare.",
         "data": {
           "regular_network": "Prezzo di rete ordinario (tariffa standard)",
           "price_includes_network": "Il prezzo dell’elettricità include già il prezzo di rete ordinario",
@@ -818,12 +818,14 @@
           "active_quarters": "Trimestri con prezzi di rete variabili",
           "tariff_year": "Anno del tariffario",
           "high_periods": "Periodi tariffa alta",
-          "low_periods": "Periodi tariffa bassa"
+          "low_periods": "Periodi tariffa bassa",
+          "auto_tariff_refresh": "Aggiorna automaticamente la tariffa del modulo 3 a inizio anno"
         },
         "data_description": {
           "price_includes_network": "Attivato: sottrai il prezzo di rete ordinario prima di aggiungere la tariffa scelta. Disattivato: la fonte esclude gli oneri di rete, quindi aggiungi la tariffa di rete. Scegli in base alla fonte per evitare un doppio conteggio.",
           "high_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte.",
-          "low_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte."
+          "low_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte.",
+          "auto_tariff_refresh": "Il 1° gennaio vengono cercati e applicati i dati pubblicati per il nuovo anno se univoci. Se non disponibili, il tentativo viene ripetuto ogni giorno. Possono essere usati anche valori provvisori; verifica in seguito il listino definitivo."
         }
       }
     },

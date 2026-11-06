@@ -793,7 +793,7 @@
           "charging_network_module": "Network price adjustment"
         },
         "data_description": {
-          "charging_network_module": "Optional German §14a network tariff calculation. Use only the module and prices agreed with your network operator. Otherwise leave this at None."
+          "charging_network_module": "Optional German §14a network tariff calculation. Use only the module and prices agreed with your network operator. Otherwise leave this at None. Selecting Module 3 sends your HA Home coordinates once to VNBdigital and retrieves tariff data from Par14a-Database. Check the prefilled values against the linked price sheet."
         }
       },
       "cost_sensor": {
@@ -804,12 +804,12 @@
           "charging_network_module": "Network price adjustment"
         },
         "data_description": {
-          "charging_network_module": "Optional German §14a network tariff calculation. Use only the module and prices agreed with your network operator. Otherwise leave this at None."
+          "charging_network_module": "Optional German §14a network tariff calculation. Use only the module and prices agreed with your network operator. Otherwise leave this at None. Selecting Module 3 sends your HA Home coordinates once to VNBdigital and retrieves tariff data from Par14a-Database. Check the prefilled values against the linked price sheet."
         }
       },
       "cost_network": {
         "title": "Network tariff: module {module}",
-        "description": "Copy gross prices from your network operator’s price sheet. Module 2 uses 40% of the regular network price. Module 3 uses the published high and low prices in the selected quarters and tariff year; remaining times use the standard price. Use Home Assistant’s time zone and quarter-hour boundaries. Windows may cross midnight but must not overlap. These settings estimate variable charging costs; they do not establish eligibility or change your contract.",
+        "description": "Copy gross prices from your network operator’s price sheet. Module 2 uses 40% of the regular network price. Module 3 uses the published high and low prices in the selected quarters and tariff year; remaining times use the standard price. Use Home Assistant’s time zone and quarter-hour boundaries. Windows may cross midnight but must not overlap. These settings estimate variable charging costs; they do not establish eligibility or change your contract. Source of prefilled values: {source} The ⚠ symbol marks a provisional price sheet that may change.",
         "data": {
           "regular_network": "Regular network price (standard tariff)",
           "price_includes_network": "Electricity price already includes the regular network price",
@@ -818,12 +818,14 @@
           "active_quarters": "Quarters with time-variable network prices",
           "tariff_year": "Price-sheet year",
           "high_periods": "High tariff periods",
-          "low_periods": "Low tariff periods"
+          "low_periods": "Low tariff periods",
+          "auto_tariff_refresh": "Refresh Module 3 tariff automatically at the new year"
         },
         "data_description": {
           "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice.",
           "high_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed.",
-          "low_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed."
+          "low_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed.",
+          "auto_tariff_refresh": "When enabled, the integration fetches the new year’s published tariff on 1 January and applies a valid unambiguous result. It retries daily if no valid data is available. Provisional published values may be used; review the final price sheet later."
         }
       }
     },

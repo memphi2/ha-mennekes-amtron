@@ -793,7 +793,7 @@
           "charging_network_module": "Netzentgelt-Anpassung"
         },
         "data_description": {
-          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen."
+          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen. Bei Auswahl von Modul 3 werden die HA-Home-Koordinaten einmalig an VNBdigital gesendet und Tarifdaten aus der Par14a-Database abgerufen. Prüfe vorausgefüllte Werte anhand des verlinkten Preisblatts."
         }
       },
       "cost_sensor": {
@@ -804,12 +804,12 @@
           "charging_network_module": "Netzentgelt-Anpassung"
         },
         "data_description": {
-          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen."
+          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen. Bei Auswahl von Modul 3 werden die HA-Home-Koordinaten einmalig an VNBdigital gesendet und Tarifdaten aus der Par14a-Database abgerufen. Prüfe vorausgefüllte Werte anhand des verlinkten Preisblatts."
         }
       },
       "cost_network": {
         "title": "Netzentgelt: Modul {module}",
-        "description": "Übernimm die Bruttopreise aus dem Preisblatt deines Netzbetreibers. Modul 2 verwendet 40 % des regulären Netzentgelts. Modul 3 verwendet in den gewählten Quartalen und im angegebenen Tarifjahr die veröffentlichten Hoch- und Niedrigtarife; sonst gilt der Standardtarif. Es gelten die Zeitzone von Home Assistant und Viertelstundengrenzen. Zeitfenster dürfen über Mitternacht reichen, sich aber nicht überschneiden. Diese Angaben schätzen variable Ladekosten; sie bestätigen keine Berechtigung und ändern keinen Vertrag.",
+        "description": "Übernimm die Bruttopreise aus dem Preisblatt deines Netzbetreibers. Modul 2 verwendet 40 % des regulären Netzentgelts. Modul 3 verwendet in den gewählten Quartalen und im angegebenen Tarifjahr die veröffentlichten Hoch- und Niedrigtarife; sonst gilt der Standardtarif. Es gelten die Zeitzone von Home Assistant und Viertelstundengrenzen. Zeitfenster dürfen über Mitternacht reichen, sich aber nicht überschneiden. Diese Angaben schätzen variable Ladekosten; sie bestätigen keine Berechtigung und ändern keinen Vertrag. Quelle der vorausgefüllten Werte: {source} Das Zeichen ⚠ kennzeichnet ein vorläufiges Preisblatt, dessen Werte sich ändern können.",
         "data": {
           "regular_network": "Reguläres Netzentgelt (Standardtarif)",
           "price_includes_network": "Der Strompreis enthält bereits das reguläre Netzentgelt",
@@ -818,12 +818,14 @@
           "active_quarters": "Quartale mit zeitvariablen Netzentgelten",
           "tariff_year": "Jahr des Preisblatts",
           "high_periods": "Hochtarif-Zeiträume",
-          "low_periods": "Niedrigtarif-Zeiträume"
+          "low_periods": "Niedrigtarif-Zeiträume",
+          "auto_tariff_refresh": "Modul-3-Tarif zum Jahreswechsel automatisch aktualisieren"
         },
         "data_description": {
           "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden.",
           "high_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich.",
-          "low_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich."
+          "low_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich.",
+          "auto_tariff_refresh": "Am 1. Januar werden veröffentlichte Werte für das neue Jahr abgerufen und bei eindeutiger Zuordnung übernommen. Falls noch keine passenden Daten vorliegen, wird täglich erneut versucht. Auch vorläufige Werte können übernommen werden; prüfe später das endgültige Preisblatt."
         }
       }
     },
