@@ -12,6 +12,9 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
 
+from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronConnectionError,
+)
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.registers import CHARGING_RELEASE
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
@@ -25,6 +28,10 @@ from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 def test_remote_write_repairs_change_without_register_or_entity_updates(tmp_path):
     async def run():
         service, transport, clock = await service_fixture(tmp_path)
+        # Keep communication quality stable: this test isolates repair updates
+        # from real sensor changes, including the new quality diagnostic.
+        service.client.link_quality.observe(AmtronConnectionError("earlier timeout"))
+        await service.refresh()
         hass = await _boot(tmp_path / "ha")
         assert await async_setup_component(hass, "network", {})
         try:

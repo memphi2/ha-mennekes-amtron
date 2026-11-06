@@ -119,6 +119,7 @@ class DevicePoller:
             values=values,
             failed_blocks=tuple(sorted(failed)),
             current_write_generation=generation,
+            connection_quality=self._client.link_quality.state,
         )
 
     def _log_unavailable(self, err: Exception) -> None:

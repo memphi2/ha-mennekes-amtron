@@ -420,7 +420,9 @@ class RemoteClient(MennekesModbusClient):
                 raise DeviceError("service_version_mismatch") from err
             raise DeviceError("service_unavailable") from err
 
-    async def async_read_register(self, spec: RegisterSpec) -> RegisterValue:
+    async def async_read_register(
+        self, spec: RegisterSpec, *, verify_identity: bool = False,
+    ) -> RegisterValue:
         if spec == ERROR_CODE:
             data = await self.request("POST", "/v2/read", {"register": spec.key})
             value = data.get("value")

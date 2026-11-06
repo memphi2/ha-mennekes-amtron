@@ -41,6 +41,8 @@ class WallboxData:
     # Fixed queue metadata changes only when intent changes, never each second.
     pending_change: str | None = field(default=None, repr=False)
     pending_change_until: datetime | None = field(default=None, repr=False)
+    # Stable communication-quality enum, never transaction counters/timestamps.
+    connection_quality: str | None = None
 
     def get(self, key: str) -> RegisterValue:
         """Return one decoded register value, or ``None`` when unavailable."""

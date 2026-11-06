@@ -38,6 +38,7 @@ from .const import (
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
 )
 from .decode import RegisterValue, decode_register
+from .link_quality import LinkQuality
 from .register_blocks import RegisterBlock
 from .registers import HEARTBEAT, SERIAL_NUMBER, RegisterSpec
 from .transport import ModbusTransport
@@ -112,6 +113,7 @@ class MennekesModbusClient:
     ) -> None:
         self._config = config
         self._monotonic = monotonic
+        self.link_quality = LinkQuality(monotonic=monotonic)
         self.write_trace = WriteTrace(
             clock=monotonic, packet_trace=client_factory is create_modbus_client
         )
@@ -194,6 +196,7 @@ class MennekesModbusClient:
                 words = await _client_read.read_words(
                     client, address=SERIAL_NUMBER.address, count=SERIAL_NUMBER.count,
                     device_id=self._config.device_id, retries=self._config.retries,
+                    observe=self.link_quality.observe,
                 )
             except asyncio.CancelledError as err:
                 # No write was attempted. Preserve cancellation, but distinguish
@@ -230,10 +233,12 @@ class MennekesModbusClient:
             connected = await client.connect()
         # Drivers raise unrelated exception types; callers handle one bus error.
         except Exception as err:
+            self.link_quality.observe(AmtronConnectionError("cannot open transport"))
             raise AmtronConnectionError(
                 f"cannot open {self._config.port}: {err}"
             ) from err
         if not connected:
+            self.link_quality.observe(AmtronConnectionError("cannot open transport"))
             raise AmtronConnectionError(f"cannot open {self._config.port}")
         _LOGGER.debug("Opened %s", self._config.port)
 
@@ -298,19 +303,23 @@ class MennekesModbusClient:
                 count=count,
                 device_id=self._config.device_id,
                 retries=self._config.retries,
+                observe=self.link_quality.observe,
             )
 
-    async def async_read_register(self, spec: RegisterSpec) -> RegisterValue:
+    async def async_read_register(
+        self, spec: RegisterSpec, *, verify_identity: bool = False,
+    ) -> RegisterValue:
         """Read one register range."""
 
         async with self._queue, self._lock:
-            client = await self._async_transaction_client()
+            client = await self._async_transaction_client(verify_identity=verify_identity)
             words = await _client_read.read_words(
                 client,
                 address=spec.address,
                 count=spec.count,
                 device_id=self._config.device_id,
                 retries=self._config.retries,
+                observe=self.link_quality.observe,
             )
         return decode_register(spec, words)
 
@@ -325,6 +334,7 @@ class MennekesModbusClient:
                 count=count,
                 device_id=self._config.device_id,
                 retries=self._config.retries,
+                observe=self.link_quality.observe,
             )
 
     async def async_write_register(
@@ -416,6 +426,7 @@ class MennekesModbusClient:
                 raise
             finally:
                 self.write_trace.finish(error=error, connected=self.connected)
+                self.link_quality.observe(error)
                 if not rejected:
                     if spec.key == "charging_current_ems":
                         self.write_state.current_write_generation += 1
