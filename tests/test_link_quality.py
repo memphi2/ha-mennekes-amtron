@@ -171,3 +171,64 @@ def test_heartbeat_failure_latches_until_a_fresh_success_after_the_window() -> N
         await client.async_close()
 
     asyncio.run(run())
+
+
+def test_energy_read_marks_fresh_and_failed_attempts_without_changing_snapshot_equality() -> None:
+    async def run():
+        clock = [0.0]
+        transport = FakeModbusClient(device_bank())
+        client = _client(transport, clock)
+        await client.async_connect()
+        poller = DevicePoller(
+            client, DeviceIdentity(layout_version=R.LAYOUT_V01_03),
+            connection_state=ConnectionState(), monotonic=lambda: clock[0],
+        )
+        first = await poller.async_poll(WallboxData(), last_success=True)
+        assert first.energy_read
+        cached = await poller.async_poll(first, last_success=True)
+        assert not cached.energy_read
+        assert first == cached
+        clock[0] = 60
+        transport.read_exceptions[0x1000] = 4
+        failed = await poller.async_poll(cached, last_success=True)
+        assert failed.energy_read
+        assert failed.get("energy_total") is None
+        assert failed.connection_quality == "good"  # Device error, not a bad link.
+        await client.async_close()
+
+    asyncio.run(run())
+
+
+def test_poll_keeps_goal_generation_from_before_its_first_read() -> None:
+    async def run():
+        entered, resume = asyncio.Event(), asyncio.Event()
+
+        class PausedTransport(FakeModbusClient):
+            paused_once = False
+
+            async def read_holding_registers(self, address, *, count, device_id):
+                if not self.paused_once:
+                    self.paused_once = True
+                    entered.set()
+                    await resume.wait()
+                return await super().read_holding_registers(address, count=count, device_id=device_id)
+
+        client = _client(PausedTransport(device_bank()), [0.0])
+        await client.async_connect()
+        poller = DevicePoller(
+            client, DeviceIdentity(layout_version=R.LAYOUT_V01_03),
+            connection_state=ConnectionState(),
+        )
+        pending = asyncio.create_task(poller.async_poll(WallboxData(), last_success=True))
+        await asyncio.wait_for(entered.wait(), 1)
+        client.write_state.energy_goal_generation += 1
+        resume.set()
+        old = await asyncio.wait_for(pending, 1)
+        assert old.energy_goal_generation == 0
+        assert client.write_state.energy_goal_generation == 1
+        new = await poller.async_poll(old, last_success=True)
+        assert new.energy_goal_generation == 1
+        assert old == new  # Internal ordering must not create Recorder updates.
+        await client.async_close()
+
+    asyncio.run(run())

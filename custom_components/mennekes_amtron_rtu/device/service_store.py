@@ -8,7 +8,9 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from .energy_goal import EnergyGoal
 from .service_config import number
+from .soc_goal import SocGoal
 from .write_state import WriteState
 
 
@@ -38,9 +40,13 @@ class IntentStore:
             current = number(current, 0, 32)
             if 0 < current < 6:
                 raise ValueError("invalid saved resume current")
+        goal = EnergyGoal.restore(payload["energy_goal"]) if "energy_goal" in payload else EnergyGoal()
+        soc_goal = SocGoal.restore(payload["soc_goal"]) if "soc_goal" in payload else SocGoal()
         state.pause_requested = payload.get("pause_requested")
         state.charging_release_requested = payload.get("charging_release_requested")
         state.charging_setpoint = current
+        state.energy_goal = goal
+        state.soc_goal = soc_goal
         self._last = payload
 
     def save(self, state: WriteState) -> None:
@@ -50,6 +56,8 @@ class IntentStore:
             "pause_requested": state.pause_requested,
             "charging_release_requested": state.charging_release_requested,
             "charging_setpoint": state.charging_setpoint,
+            "energy_goal": state.energy_goal.snapshot(),
+            "soc_goal": state.soc_goal.snapshot(),
         }
         if payload == self._last:
             return

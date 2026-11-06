@@ -45,8 +45,33 @@ class AmtronControl(DeviceControl):
         await super().async_set_charging_current(value, allow_unlimited=allow_unlimited)
 
     @ha_command
+    async def async_set_energy_goal(self, value: float) -> None:
+        await super().async_set_energy_goal(value)
+
+    @ha_command
+    async def async_configure_soc(self, source: str | None) -> None:
+        await super().async_configure_soc(source)
+
+    @ha_command
+    async def async_set_soc_goal(
+        self, value: float, *, source: str, soc: float | None = None,
+        maximum: float | None = None,
+    ) -> None:
+        await super().async_set_soc_goal(value, source=source, soc=soc, maximum=maximum)
+
+    @ha_command
+    async def async_observe_soc(
+        self, soc: float | None, maximum: float | None = None, *, source: str,
+    ) -> None:
+        await super().async_observe_soc(soc, maximum, source=source)
+
+    @ha_command
     async def async_pause_charging(self) -> None:
         await super().async_pause_charging()
+
+    @ha_command
+    async def async_cancel_pending_change(self) -> None:
+        await super().async_cancel_pending_change()
 
     @ha_command
     async def async_resume_charging(self, *, current_cap: float | None = None) -> None:

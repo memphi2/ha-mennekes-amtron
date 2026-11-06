@@ -34,6 +34,7 @@ class WallboxData:
     # A service permission change must notify controls even with identical
     # register values. This is internal metadata, never an entity attribute.
     service_read_only: bool | None = field(default=None, repr=False)
+    service_supports_cancel_pending: bool = field(default=False, repr=False)
     # The service can change the slider range or retained paused setpoint
     # without changing a register. Compare these stable control values too.
     service_max_charging_current: float | None = field(default=None, repr=False)
@@ -43,6 +44,12 @@ class WallboxData:
     pending_change_until: datetime | None = field(default=None, repr=False)
     # Stable communication-quality enum, never transaction counters/timestamps.
     connection_quality: str | None = None
+    # Goal settings/latches change independently of register readback.
+    energy_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
+    soc_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
+    # A goal may only act on a counter attempted in this poll, never a cached one.
+    energy_read: bool = field(default=False, compare=False, repr=False)
+    energy_goal_generation: int = field(default=0, compare=False, repr=False)
 
     def get(self, key: str) -> RegisterValue:
         """Return one decoded register value, or ``None`` when unavailable."""

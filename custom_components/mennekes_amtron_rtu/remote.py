@@ -29,12 +29,15 @@ from .device.const import (
 from .device.control import PENDING_ACTIONS
 from .device.data import DeviceIdentity, WallboxData, WriteDiagnostics
 from .device.decode import RegisterValue
+from .device.energy_goal import EnergyGoal
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
 from .device.heartbeat import HeartbeatTask
 from .device.identity import usable_max_evse_current
+from .device.link_quality import CONNECTION_QUALITY_STATES
 from .device.register_blocks import REGISTER_BLOCKS
 from .device.registers import ERROR_CODE, RegisterSpec
+from .device.soc_goal import SocGoal
 from .remote_compat import SUPPORTED_API_VERSION, validate_service_version
 from .remote_errors import ServiceConnectionError, ServiceFailure
 
@@ -211,7 +214,9 @@ class RemoteClient(MennekesModbusClient):
             payload = await self.request("GET", "/v2/state")
             return self.apply_snapshot(payload)
 
-    def apply_snapshot(self, payload: dict[str, Any]) -> WallboxData:
+    def apply_snapshot(
+        self, payload: dict[str, Any], *, require_available: bool = True,
+    ) -> WallboxData:
         section = "api_version"
         try:
             if type(payload.get("api_version")) is not int:
@@ -222,6 +227,10 @@ class RemoteClient(MennekesModbusClient):
             validate_service_version(payload)
             section = "command_events"
             command_events = CommandEvents.parse(payload.get("command_events"))
+            section = "connection_quality"
+            quality = payload.get("connection_quality")
+            if quality is not None and quality not in CONNECTION_QUALITY_STATES:
+                raise ValueError("invalid connection quality")
             section = "values"
             values = payload["values"]
             control = payload["control"]
@@ -243,6 +252,25 @@ class RemoteClient(MennekesModbusClient):
                 raise ValueError("invalid controls")
             section = "control.pending_change"
             pending_action, pending_until = _pending_status(control)
+            section = "control.supports_cancel_pending"
+            if not isinstance(control.get("supports_cancel_pending", False), bool):
+                raise ValueError("invalid cancellation capability")
+            section = "control.energy_goal"
+            goal_supported = control.get("supports_energy_goal", False)
+            if type(goal_supported) is not bool:
+                raise ValueError("invalid energy goal capability")
+            goal_raw = control.get("energy_goal")
+            goal = EnergyGoal.restore(goal_raw) if goal_raw is not None else EnergyGoal()
+            if goal_supported and goal_raw is None:
+                raise ValueError("missing energy goal state")
+            section = "control.soc_goal"
+            soc_supported = control.get("supports_soc_goal", False)
+            if type(soc_supported) is not bool:
+                raise ValueError("invalid percentage goal capability")
+            soc_raw = control.get("soc_goal")
+            soc_goal = SocGoal.restore(soc_raw) if soc_raw is not None else SocGoal()
+            if soc_supported and soc_raw is None:
+                raise ValueError("missing percentage goal state")
             section = "control.state_change_interval_seconds"
             interval = control.get("state_change_interval_seconds")
             if interval is not None and (
@@ -377,19 +405,25 @@ class RemoteClient(MennekesModbusClient):
         self.write_state.charging_setpoint = current
         self.write_state.current_write_generation = generation
         self.write_state.confirmed_current = values.get("charging_current_ems")
+        self.write_state.energy_goal = goal
+        self.write_state.soc_goal = soc_goal
         if self.on_update is not None:
             self.on_update()
-        if payload.get("available") is not True:
+        if require_available and payload.get("available") is not True:
             raise ServiceConnectionError("service_not_ready", "wallbox is unavailable at the service")
         return WallboxData(
             values=values,
             failed_blocks=tuple(failed),
             current_write_generation=generation,
             service_read_only=control["read_only"],
+            service_supports_cancel_pending=control.get("supports_cancel_pending", False),
             service_max_charging_current=control["max_charging_current"],
             service_charging_setpoint=current,
             pending_change=pending_action,
             pending_change_until=pending_until,
+            connection_quality=quality,
+            energy_goal=goal.snapshot() if goal_supported else None,
+            soc_goal=soc_goal.snapshot() if soc_supported else None,
         )
 
     async def execute(self, command: str, **values: Any) -> None:
@@ -401,15 +435,26 @@ class RemoteClient(MennekesModbusClient):
                 # Permission may have changed while this command waited for a
                 # poll. In particular, a mismatched identity must block an
                 # already queued command before it reaches the service.
-                if not self._connected or self.snapshot.get("available") is not True:
+                cancelling = command == "cancel_pending"
+                metadata = command in {"soc_source", "soc_observation"}
+                if not self._connected or (
+                    not cancelling and not metadata and self.snapshot.get("available") is not True
+                ):
                     raise ServiceConnectionError("service_not_ready", "wallbox is unavailable at the service")
+                if cancelling and self.snapshot.get("control", {}).get("supports_cancel_pending") is not True:
+                    raise DeviceValidationError("cancel_pending_not_supported")
+                if cancelling and self.snapshot.get("control", {}).get("read_only") is not False:
+                    raise DeviceValidationError("read_only_mode")
+                if metadata and self.snapshot.get("control", {}).get("supports_soc_goal") is not True:
+                    raise DeviceValidationError("soc_goal_not_supported")
                 self.apply_snapshot(
                     await self.request(
                         "POST", "/v2/command", {
                             "command": command, **values,
                             "expected_serial_number": self._bound_serial or self.identity.serial_number,
                         }
-                    )
+                    ),
+                    require_available=not (cancelling or metadata),
                 )
         except AmtronConnectionError as err:
             if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
@@ -523,6 +568,7 @@ class RemoteControl(AmtronControl):
         options: ControlOptions,
         state: Callable[[], WallboxData],
         request_refresh: Callable[[], Awaitable[None]],
+        notify_pending: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(
             client,
@@ -531,6 +577,7 @@ class RemoteControl(AmtronControl):
             options=options,
             state=state,
             request_refresh=request_refresh,
+            notify_pending=notify_pending,
         )
         self._remote = client
 
@@ -538,6 +585,55 @@ class RemoteControl(AmtronControl):
     def events(self) -> CommandEvents:
         """Expose only the bus owner's outcomes, never guessed HTTP results."""
         return self._remote.events
+
+    @property
+    def supports_energy_goal(self) -> bool:
+        return self._remote.snapshot.get("control", {}).get("supports_energy_goal") is True
+
+    @ha_command
+    async def async_set_energy_goal(self, value: float) -> None:
+        if not self.supports_energy_goal:
+            raise DeviceValidationError("energy_goal_not_supported")
+        candidate = EnergyGoal()
+        try:
+            candidate.set_target(value, 0)
+        except ValueError as err:
+            raise DeviceValidationError("energy_goal_invalid") from err
+        await self._command("energy_goal", value=value)
+
+    @property
+    def supports_soc_goal(self) -> bool:
+        return self._remote.snapshot.get("control", {}).get("supports_soc_goal") is True
+
+    async def _soc_command(self, command: str, **values: Any) -> None:
+        if not self.supports_soc_goal:
+            raise DeviceValidationError("soc_goal_not_supported")
+        if command == "soc_goal":
+            self._require_write_access()
+        await self._remote.execute(command, **values)
+        # The command returns the authoritative cached snapshot. External car
+        # telemetry must not cause an additional wallbox read or HTTP poll.
+        if self._notify_pending is not None:
+            self._notify_pending()
+
+    @ha_command
+    async def async_configure_soc(self, source: str | None) -> None:
+        if source == self.soc_goal.source:
+            return
+        await self._soc_command("soc_source", source=source)
+
+    @ha_command
+    async def async_set_soc_goal(
+        self, value: float, *, source: str, soc: float | None = None,
+        maximum: float | None = None,
+    ) -> None:
+        await self._soc_command("soc_goal", value=value, source=source, soc=soc, maximum=maximum)
+
+    @ha_command
+    async def async_observe_soc(
+        self, soc: float | None, maximum: float | None = None, *, source: str,
+    ) -> None:
+        await self._soc_command("soc_observation", source=source, soc=soc, maximum=maximum)
 
     @property
     def pending_action(self) -> str | None:
@@ -548,6 +644,26 @@ class RemoteControl(AmtronControl):
     @property
     def pending_until(self) -> datetime | None:
         return self._remote.pending_until
+
+    @property
+    def supports_cancel_pending(self) -> bool:
+        return self._remote.snapshot.get("control", {}).get("supports_cancel_pending") is True
+
+    @property
+    def can_cancel_pending(self) -> bool:
+        return (
+            self.supports_cancel_pending and self._remote.connected
+            and self._remote.snapshot.get("control", {}).get("read_only") is False
+            and self.pending_action is not None
+        )
+
+    @ha_command
+    async def async_cancel_pending_change(self) -> None:
+        """Cancel only service-owned future work, even while its wallbox is down."""
+        previous = (self.pending_action, self.pending_until)
+        await self._remote.execute("cancel_pending")
+        if previous != (self.pending_action, self.pending_until) and self._notify_pending is not None:
+            self._notify_pending()
 
     @property
     def read_only(self) -> bool:
