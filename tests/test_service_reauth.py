@@ -148,6 +148,49 @@ def test_auth_failure_starts_real_ha_reauth_and_preserves_entities(
     asyncio.run(asyncio.wait_for(run(), 60))
 
 
+@pytest.mark.parametrize("update", ["reauth", "entry_data"])
+def test_credentials_change_reloads_remote_client_when_costs_are_enabled(tmp_path, monkeypatch, update):
+    async def run():
+        service, transport, _clock = await service_fixture(tmp_path)
+        hass = await _boot(tmp_path / "ha")
+        try:
+            async with TestServer(create_app(service)) as server:
+                entry = await add_entry(hass, str(server.make_url("/")))
+                hass.config_entries.async_update_entry(entry, options={
+                    **entry.options, "charging_cost_source": "fixed", "charging_price": 0.3,
+                })
+                await hass.async_block_till_done()
+                old_runtime = entry.runtime_data
+                assert old_runtime.charging_cost is not None
+                service.config = replace(service.config, token=NEW_TOKEN)
+                setup = AsyncMock(wraps=integration.async_setup_entry)
+                monkeypatch.setattr(integration, "async_setup_entry", setup)
+                if update == "reauth":
+                    flow = await reauth(hass, entry)
+                    result = await hass.config_entries.flow.async_configure(
+                        flow["flow_id"], {"server_token": NEW_TOKEN},
+                    )
+                    assert result["reason"] == "reauth_successful"
+                else:
+                    hass.config_entries.async_update_entry(
+                        entry, data={**entry.data, "server_token": NEW_TOKEN},
+                    )
+                await hass.async_block_till_done()
+                setup.assert_awaited_once()
+                assert entry.runtime_data is not old_runtime
+                assert not old_runtime.client.connected
+                assert entry.runtime_data.charging_cost is not None
+                await entry.runtime_data.coordinator.async_refresh()
+                assert entry.runtime_data.coordinator.last_update_success
+                assert not hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+                assert not [address for address, _ in transport.writes if address != R.HEARTBEAT.address]
+        finally:
+            await hass.async_stop()
+            await service.stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))
+
+
 @pytest.mark.parametrize(
     "scenario", ["short", "wrong_token", "offline", "not_ready", "invalid", "wrong_device", "missing_serial", "same_token", "legacy"]
 )

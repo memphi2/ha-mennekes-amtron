@@ -94,6 +94,7 @@ class ChargingCostObserver:
         self._fixed = entry.options.get(CONF_CHARGING_COST_SOURCE) == COST_SOURCE_FIXED
         self._tariff = TariffConfig.parse(entry.options.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
         self._configured_options = dict(entry.options)
+        self._configured_data = dict(entry.data)
         max_gap = 660 if remote else max(600, float(entry.options.get(CONF_MEASUREMENT_INTERVAL_SECONDS, 30)) + float(entry.options.get(CONF_SCAN_INTERVAL_SECONDS, 5)) + 60)
         self._accumulator = CostAccumulator(self._tariff, max_gap=max_gap)
         self._store = ModelStore(
@@ -119,6 +120,10 @@ class ChargingCostObserver:
     def apply_tariff_only_update(self) -> bool:
         """Change only the cost model without restarting the Modbus connection."""
         current = dict(self._entry.options)
+        # The shared entry listener also runs for credential and connection
+        # changes. Only an actual tariff-options delta may bypass a reload.
+        if current == self._configured_options or dict(self._entry.data) != self._configured_data:
+            return False
         old_other = {key: value for key, value in self._configured_options.items() if key != CONF_CHARGING_NETWORK_TARIFF}
         new_other = {key: value for key, value in current.items() if key != CONF_CHARGING_NETWORK_TARIFF}
         if self._closed or old_other != new_other:

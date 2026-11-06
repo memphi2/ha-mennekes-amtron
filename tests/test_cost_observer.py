@@ -31,7 +31,7 @@ from custom_components.mennekes_amtron_rtu.device.registers import (
 
 def entry(*, dynamic=False):
     return SimpleNamespace(
-        entry_id="entry", options={
+        entry_id="entry", data={}, options={
             "charging_cost_source": "sensor" if dynamic else "fixed",
             "charging_price_entity": "sensor.price", "charging_price": 0.3,
         }, runtime_data=SimpleNamespace(identity=SimpleNamespace(serial_number="123", layout_version=0x0103)),
@@ -56,6 +56,26 @@ def test_tariff_only_update_keeps_cost_observer_and_modbus_connection(tmp_path):
         assert observer._accumulator.tariff.module == "module_2"
         configured.options["charging_price"] = 0.4
         assert not observer.apply_tariff_only_update()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("change", ["unchanged", "credentials", "connection_with_tariff"])
+def test_only_actual_tariff_changes_with_unchanged_connection_can_skip_reload(tmp_path, change):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        configured = entry()
+        observer = ChargingCostObserver(hass, configured, remote=True)
+        if change != "unchanged":
+            configured.data = {"server_token": "replacement-credential"}
+        if change == "connection_with_tariff":
+            configured.options = {
+                **configured.options,
+                "charging_network_tariff": {"module": "module_2", "regular_network": 0.1, "price_includes_network": True},
+            }
+        assert not observer.apply_tariff_only_update()
+        assert observer._tariff.module == "none"
         await hass.async_stop()
 
     asyncio.run(run())
