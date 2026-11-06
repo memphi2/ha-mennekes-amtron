@@ -59,6 +59,10 @@ On HA Container, run the service as a [separate container](docs/service-standalo
 Already using the integration? **Keep your existing entry** and follow
 [Updates and switching connections](docs/upgrading.md).
 
+**Beta 0.5.2b1** adds AppArmor protection and charging/recovery fixes.
+Stable remains **0.5.1**. To try the beta integration and app, follow
+[Beta testing](docs/installation.md#beta-testing-052b1).
+
 You need a compatible wallbox, a USB RS-485 adapter or supported LAN gateway,
 and exclusive access to its bus. LAN needs no USB device on the HA/service host.
 Have the [hardware and fallback settings](docs/hardware.md) prepared before

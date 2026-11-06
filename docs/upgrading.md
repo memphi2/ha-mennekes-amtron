@@ -4,6 +4,10 @@
 do not require deleting devices, entities or automations. Moving from HACS to
 the Marketplace also keeps the same integration and entry.
 
+**Testing 0.5.2b1?** Follow [Beta testing](installation.md#beta-testing-052b1)
+to select the integration prerelease and beta app catalog. Check the
+[app connection choice](#app-connection-choice) before updating the app.
+
 ## Routine updates
 
 Back up Home Assistant, read the offered release notes and follow
@@ -19,7 +23,7 @@ If an app update is offered or the integration raises its minimum service
 requirement, follow the release notes. **When both need updating, update the
 app or standalone service first**, then the integration and restart Core.
 An app or host restart interrupts the heartbeat. Older 0.5.0 beta installations
-need the stable service first because their service API differs.
+need an API 2 service first because their service API differs.
 See the [service guide](modbus-service.md) for the current release channel and
 update instructions. Do not add the wallbox again to refresh its credentials or
 restore missing controls.
@@ -28,7 +32,7 @@ After blueprint changes, follow [Updating existing blueprint automations](bluepr
 
 ## App connection choice
 
-The beta app has exactly three choices. If your saved choice already has a
+App **0.5.2b1** has exactly three choices. If your saved choice already has a
 readable name, keep it. Otherwise select the matching name once:
 
 | Older saved value | Select |

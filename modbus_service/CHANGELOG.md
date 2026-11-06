@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased
+## 0.5.2b1
 
 - Check the physical serial after reconnects and before control writes, including
   recovery. A replaced or unidentifiable wallbox makes the service unavailable;

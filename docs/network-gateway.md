@@ -12,7 +12,7 @@ from automated protocol tests.
 Check the adapter's configured operating mode, not just its product name.
 These two modes are different and must match the integration/service setting:
 
-| Adapter mode | App 0.5.1 choice | Standalone setting | What travels over the network |
+| Adapter mode | App choice | Standalone setting | What travels over the network |
 |---|---|---|---|
 | Transparent serial server | **LAN: Modbus RTU (TCP)** | `rtu_over_tcp` | Modbus RTU frames, including their CRC, passed through to RS-485. |
 | Modbus TCP-to-RTU gateway | **LAN: Modbus TCP** | `modbus_tcp` | Modbus TCP requests that the gateway translates to RTU on the bus. |
@@ -70,7 +70,7 @@ For a standalone service, use the [LAN configuration example](service-standalone
 
 App 0.5.0 remains compatible with the integration. Its list uses the values
 `serial`, `rtu_over_tcp` and `modbus_tcp`. App 0.5.1 shows those values alongside
-the readable choices. The beta removes the duplicates; before updating from
+the readable choices. App 0.5.2b1 removes the duplicates; before updating from
 0.5.1, select the matching readable choice once. See
 [Updating the connection choice](upgrading.md#app-connection-choice).
 

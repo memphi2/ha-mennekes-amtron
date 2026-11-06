@@ -70,8 +70,8 @@ What matters for security here is different from a cloud integration:
 
 ## Service AppArmor profile
 
-The beta development branch adds a custom Supervisor-app profile; released
-0.5.1 does not include it. Supervisor loads the packaged `apparmor.txt` for the
+The 0.5.2b1 prerelease adds a custom Supervisor-app profile; stable 0.5.1 does
+not include it. Supervisor loads the packaged `apparmor.txt` for the
 installed app without disabling protection mode. The allowlist permits the
 Python runtime, USB/LAN communication and the service's private token and intent
 files. Options are read-only; there is no general filesystem-write or shell

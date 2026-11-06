@@ -9,9 +9,10 @@ The service can reach the RTU wallbox through **USB or a LAN-to-RS-485 adapter**
 LAN needs no USB device on its host; see [LAN setup](network-gateway.md) for the
 two supported gateway protocols.
 
-**Current service release: 0.5.1.** The integration and app are installed and
+**Stable service: 0.5.1 · Beta: 0.5.2b1.** The integration and app are installed and
 updated independently. Their version numbers do not need to match.
 Check the [handover](#check-the-handover) on your hardware before relying on it.
+For the prerelease, follow [Beta testing](installation.md#beta-testing-052b1).
 
 [Install on HA OS](#install-on-home-assistant-os) ·
 [Move an existing wallbox](#move-an-existing-wallbox) ·
@@ -83,7 +84,7 @@ Changing the connection choice does not hide or reveal other fields.
 | Current cap | The permitted charging current for your installation; default **6 A**. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. The measurement interval helps limit database traffic. |
 
-The beta app shows exactly these three connection choices. When updating an
+App 0.5.2b1 shows exactly these three connection choices. When updating an
 older app with a saved technical connection name, select the matching readable
 choice once; see [Updating the connection choice](upgrading.md#app-connection-choice).
 The transport is never changed automatically to USB.
@@ -179,8 +180,8 @@ health changes rather than every beat. For smaller HA history, use a
 
 ## AppArmor protection
 
-**Beta development:** the custom AppArmor profile is not part of released 0.5.1.
-When an app containing it is installed, Supervisor loads the profile automatically;
+**Available in 0.5.2b1:** the custom AppArmor profile is not part of stable 0.5.1.
+When 0.5.2b1 is installed, Supervisor loads the profile automatically;
 keep **Protection mode on**. It limits the service to its runtime files, USB/LAN
 communication and its own token and charging-state files. App options remain
 read-only to the service. Normal heartbeat and charging operation are intended
@@ -216,15 +217,17 @@ app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
 **Updating the app itself briefly interrupts its heartbeat.**
 
-**From a 0.5.0 beta:** update the app/service to stable **0.5.1 first**, then the
-integration. The old beta integration may show unavailable controls between the
-updates because its API differs. Keep the existing HA entry and app. Stable app
-releases are offered in both `#apps` and `#apps-beta`, so no reinstall or
-repository change is needed. The existing token and saved charging state are
-retained. USB settings remain valid; LAN is an optional connection change.
+**From a 0.5.0 beta:** update the app/service to an API 2 release first:
+**0.5.1** for stable use, or **0.5.2b1** in the beta catalog. Then update the
+integration. The old beta integration may show unavailable controls between
+updates because its API differs. Keep the existing HA entry, app and data.
+The token, saved charging state and USB settings are retained; for 0.5.2b1,
+check the [connection choice](upgrading.md#app-connection-choice) before starting.
+LAN remains an optional connection change.
 
 The beta and stable repositories end in `#apps-beta` and `#apps`. The beta catalog
-also offers future prereleases; the stable catalog offers stable releases only.
+offers **0.5.2b1**; the stable catalog remains on **0.5.1**. Before a beta update,
+check the [connection-choice change](upgrading.md#app-connection-choice).
 An optional switch to the stable-only catalog creates a different app in Supervisor.
 For that channel change, back up app data, note the charging settings and
 disconnect the vehicle. Copy the options, set the new app to **Read-only**, stop

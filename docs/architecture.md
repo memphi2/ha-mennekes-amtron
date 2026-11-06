@@ -51,7 +51,7 @@ host, TCP port and device address; serial baud/frame are configured on the
 gateway. HA-to-service HTTP remains a separate connection. See
 [LAN setup](network-gateway.md) and the [security boundary](../SECURITY.md#threat-model).
 
-The beta driver binds a readable serial number to the client. Reconnection
+The 0.5.2b1 driver binds a readable serial number to the client. Reconnection
 invalidates that verification; the next transaction checks it again under the
 bus lock. Control writes also read the serial to catch a downstream gateway
 change without a TCP disconnect. A mismatch blocks writes and preserves saved

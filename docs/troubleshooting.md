@@ -210,7 +210,7 @@ of damaged packets.
 
 In `write_transactions`, a high `queue_wait_ms` means the request waited inside
 the client. `tx_packets: 1` with `rx_callbacks: 0` means no receive callback was
-observed during that transaction. In the beta driver, these counters and timings
+observed during that transaction. From 0.5.2b1, these counters and timings
 also include any preceding identity check; a sent packet alone does not prove
 that the actual write was sent. Received bytes do not necessarily form a valid
 response. `io_error` identifies a library I/O error, not its physical cause; a

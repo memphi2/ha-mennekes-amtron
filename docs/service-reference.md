@@ -19,18 +19,20 @@ are unchanged. It sends no HA commands or restored values to the service.
 Direct USB and LAN entries retain their separate HA control-mode option.
 
 For standalone configuration, `connection_type` selects `serial` (the default),
-`rtu_over_tcp` or `modbus_tcp`. App 0.5.1 displays **USB / RS-485** (default),
-**LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP** instead. The service normalizes
-these names to the same three protocols. The original raw choices remain valid
-for saved configurations; no automatic connection change is performed.
+`rtu_over_tcp` or `modbus_tcp`. App 0.5.2b1 offers exactly **USB / RS-485** (default),
+**LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP**. The service normalizes these
+names to the same three protocols. Standalone JSON keeps accepting the technical
+names. Saved app choices using those names need a one-time
+[selection of the matching readable choice](upgrading.md#app-connection-choice);
+no automatic connection change is performed.
 USB uses `serial_port`, `baudrate` and `frame`. LAN uses `host` and `tcp_port`
 (default 502); UART settings belong on the adapter. `device_id` remains the
 wallbox address from 10 to 50. The HTTP API's `port` is independent and defaults
 to 8765. Neither LAN mode expands the supported RTU register/model scope.
 
 The app's serial-device schema is optional, with no default device path, so a
-LAN-only installation needs no `/dev/ttyUSB0`. Existing saved USB settings remain
-valid; the runtime validates connection-specific required fields. App 0.5.1
+LAN-only installation needs no `/dev/ttyUSB0`. USB device paths and serial settings
+remain unchanged; the runtime validates connection-specific required fields. Since 0.5.1 the app
 supplies an empty host default so the host field stays visible: empty is valid
 for USB, while LAN requires a hostname/IP. The form does not conditionally hide
 USB or LAN fields. Optional schema fields follow [Supervisor's options rules](https://contributors.home-assistant.io/apps/guides/options/).
@@ -174,7 +176,7 @@ cannot independently verify the physical wallbox. Clients with a known serial
 number must retain that binding instead of accepting a newly observed device.
 
 The released 0.5.1 service compares the identity read during initialization.
-The beta driver additionally verifies a known serial over Modbus after a
+The 0.5.2b1 driver additionally verifies a known serial over Modbus after a
 reconnection and before control writes. This also detects a changed wallbox
 behind a gateway whose TCP connection stayed open. A missing or different
 serial blocks the write without changing saved intent; the service reports
