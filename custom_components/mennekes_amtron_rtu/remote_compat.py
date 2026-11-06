@@ -9,7 +9,7 @@ from packaging.version import Version
 from .remote_errors import ServiceConnectionError
 
 SUPPORTED_API_VERSION = 2
-MIN_SERVICE_VERSION = "0.5.0"
+MIN_SERVICE_VERSION = "0.6.1"
 # Released API 2 initially had no service_version field. This is a fixed known
 # baseline, never the running integration's minimum or latest service version.
 LEGACY_API2_SERVICE_VERSION = "0.5.0"

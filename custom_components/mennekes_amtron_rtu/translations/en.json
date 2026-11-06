@@ -191,6 +191,15 @@
       },
       "assign_vehicle_charge": {
         "name": "Assign vehicle charge energy"
+      },
+      "timed_next_calendar_event": {
+        "name": "Use next calendar event"
+      },
+      "timed_clear_departure": {
+        "name": "Clear departure time"
+      },
+      "timed_bmw_departure": {
+        "name": "Use BMW departure"
       }
     },
     "number": {
@@ -506,6 +515,26 @@
             "name": "Energy without a price"
           }
         }
+      },
+      "timed_goal_status": {
+        "name": "Timed charging status",
+        "state": {
+          "disabled": "Disabled",
+          "waiting_for_target": "Waiting for percentage target",
+          "waiting_for_capacity": "Waiting for battery capacity",
+          "waiting_for_soc": "Waiting for vehicle charge level",
+          "waiting_for_device": "Waiting for wallbox",
+          "read_only": "Read only",
+          "queued": "Change queued",
+          "paused_until_start": "Paused until start",
+          "paced": "Adjusting current",
+          "early_at_minimum": "May finish early at minimum current",
+          "unreachable": "Target may be unreachable",
+          "late": "Deadline passed",
+          "reached": "Target reached",
+          "write_pending": "Write pending",
+          "error": "Error"
+        }
       }
     },
     "switch": {
@@ -565,10 +594,16 @@
               "error_still_active": "Error is still active",
               "unknown": "Unknown reason",
               "user_cancelled": "Cancelled by user",
-              "energy_goal": "Charge target stop"
+              "energy_goal": "Charge target stop",
+              "deadline_expired": "Departure time expired"
             }
           }
         }
+      }
+    },
+    "datetime": {
+      "timed_departure": {
+        "name": "Next departure"
       }
     }
   },
@@ -683,6 +718,12 @@
     },
     "loss_storage_unavailable": {
       "message": "The charging loss could not be saved. Check storage availability and try again."
+    },
+    "timed_goal_state_invalid": {
+      "message": "The saved departure time could not be restored. Check the stored plan before charging again."
+    },
+    "timed_bavarian_unavailable": {
+      "message": "No active, complete BMW departure timer is available. Enable the timer action, hour and minute sensors in BavarianData; recurring timers also need their weekdays in the integration options."
     }
   },
   "issues": {
@@ -731,7 +772,16 @@
           "vehicle_soc_entity": "Vehicle charge level entity (optional)",
           "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)",
           "charge_loss_source": "Charging loss data source",
-          "charging_cost_source": "Charging cost calculation"
+          "charging_cost_source": "Charging cost calculation",
+          "timed_capacity_kwh": "Usable battery capacity (kWh, optional)",
+          "timed_capacity_entity": "Usable battery capacity entity (optional)",
+          "timed_departure_entity": "Departure time entity (optional)",
+          "timed_calendar_entity": "Departure calendar (optional)",
+          "timed_calendar_title": "Exact calendar event title (optional)",
+          "timed_bavarian_device": "BavarianData vehicle for departure (optional)",
+          "timed_vehicle_time_zone": "Vehicle time zone (optional)",
+          "timed_timer1_days": "BMW timer 1 weekdays (optional)",
+          "timed_timer2_days": "BMW timer 2 weekdays (optional)"
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
@@ -743,7 +793,16 @@
           "vehicle_soc_entity": "Optional: select the vehicle sensor reporting its actual charge level in %. This enables a separate percentage target; leave empty to keep it disabled. Missing vehicle data leaves charging unchanged until valid data returns. Changing or removing a source clears the percentage target without resuming charging.",
           "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle.",
           "charge_loss_source": "Optional comparison of wallbox energy with the energy added to the vehicle battery. Select a source to configure it in the next step. Charging controls are unaffected.",
-          "charging_cost_source": "Optional cost estimate using a fixed gross electricity price or a price sensor. Configure the price in the next step. Disabled by default; this does not control charging."
+          "charging_cost_source": "Optional cost estimate using a fixed gross electricity price or a price sensor. Configure the price in the next step. Disabled by default; this does not control charging.",
+          "timed_capacity_kwh": "Enter the usable, not nominal, battery capacity. Leave empty when using a capacity entity.",
+          "timed_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh.",
+          "timed_departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip.",
+          "timed_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
+          "timed_calendar_title": "Only events with this exact title are eligible. All-day events are ignored.",
+          "timed_bavarian_device": "Select your vehicle once to enable Use BMW departure. Manual and calendar selection remain available. Enable the selected timer’s action, hour and minute sensors in BavarianData.",
+          "timed_vehicle_time_zone": "Vehicle time zone, for example Europe/Berlin. Leave empty to use the Home Assistant time zone. BMW timer clocks contain no time zone.",
+          "timed_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
+          "timed_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer."
         },
         "title": "Options"
       },
@@ -755,7 +814,16 @@
           "vehicle_soc_entity": "Vehicle charge level entity (optional)",
           "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)",
           "charge_loss_source": "Charging loss data source",
-          "charging_cost_source": "Charging cost calculation"
+          "charging_cost_source": "Charging cost calculation",
+          "timed_capacity_kwh": "Usable battery capacity (kWh, optional)",
+          "timed_capacity_entity": "Usable battery capacity entity (optional)",
+          "timed_departure_entity": "Departure time entity (optional)",
+          "timed_calendar_entity": "Departure calendar (optional)",
+          "timed_calendar_title": "Exact calendar event title (optional)",
+          "timed_bavarian_device": "BavarianData vehicle for departure (optional)",
+          "timed_vehicle_time_zone": "Vehicle time zone (optional)",
+          "timed_timer1_days": "BMW timer 1 weekdays (optional)",
+          "timed_timer2_days": "BMW timer 2 weekdays (optional)"
         },
         "data_description": {
           "current_limit": "Additional cap for currents requested by Home Assistant. The service cap still applies. Explicitly selecting 0 A disables the EMS limit.",
@@ -763,7 +831,16 @@
           "vehicle_soc_entity": "Optional: select the vehicle sensor reporting its actual charge level in %. This enables a separate percentage target; leave empty to keep it disabled. Missing vehicle data leaves charging unchanged until valid data returns. Changing or removing a source clears the percentage target without resuming charging.",
           "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle.",
           "charge_loss_source": "Optional comparison of wallbox energy with the energy added to the vehicle battery. Select a source to configure it in the next step. Charging controls are unaffected.",
-          "charging_cost_source": "Optional cost estimate using a fixed gross electricity price or a price sensor. Configure the price in the next step. Disabled by default; this does not control charging."
+          "charging_cost_source": "Optional cost estimate using a fixed gross electricity price or a price sensor. Configure the price in the next step. Disabled by default; this does not control charging.",
+          "timed_capacity_kwh": "Enter the usable, not nominal, battery capacity. Leave empty when using a capacity entity.",
+          "timed_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh.",
+          "timed_departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip.",
+          "timed_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
+          "timed_calendar_title": "Only events with this exact title are eligible. All-day events are ignored.",
+          "timed_bavarian_device": "Select your vehicle once to enable Use BMW departure. Manual and calendar selection remain available. Enable the selected timer’s action, hour and minute sensors in BavarianData.",
+          "timed_vehicle_time_zone": "Vehicle time zone, for example Europe/Berlin. Leave empty to use the Home Assistant time zone. BMW timer clocks contain no time zone.",
+          "timed_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
+          "timed_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer."
         },
         "description": "The app's Read-only setting also controls write permission in Home Assistant. Disable it in the app, save and restart the app to enable controls. Control entities remain unavailable while the service is read-only or not ready. Set the minimum time between state changes and the extra wait before phase changes in the app configuration; the service applies both even while Home Assistant is restarting."
       },
@@ -835,7 +912,16 @@
       "loss_source_invalid": "Select a supported charging loss source and configure its matching vehicle or sensor.",
       "cost_source_invalid": "Select a supported cost source and a sensor entity for a sensor-based price.",
       "cost_price_invalid": "Enter a finite gross price in EUR/kWh between −1000 and 1000. Negative prices are allowed.",
-      "network_tariff_invalid": "Check the gross prices, tariff year, two to four active quarters and HT/NT periods. Use one 15-minute-aligned HH:MM-HH:MM period per line; periods must not overlap and must leave standard-tariff time."
+      "network_tariff_invalid": "Check the gross prices, tariff year, two to four active quarters and HT/NT periods. Use one 15-minute-aligned HH:MM-HH:MM period per line; periods must not overlap and must leave standard-tariff time.",
+      "timed_source_invalid": "Invalid timed-goal source",
+      "timed_capacity_ambiguous": "Choose either a fixed or a dynamic battery capacity",
+      "timed_calendar_required": "Choose a calendar for this event title",
+      "timed_calendar_title_required": "Enter the exact event title",
+      "timed_capacity_invalid": "Enter a usable capacity between 1 and 250 kWh",
+      "timed_bavarian_invalid": "Select a BavarianData vehicle",
+      "timed_bavarian_required": "Select a BavarianData vehicle before configuring its timers",
+      "timed_weekdays_invalid": "Choose valid weekdays",
+      "timed_timezone_invalid": "Enter a valid time zone, for example Europe/Berlin"
     }
   },
   "selector": {
@@ -899,6 +985,17 @@
         "2": "Q2: April–June",
         "3": "Q3: July–September",
         "4": "Q4: October–December"
+      }
+    },
+    "timed_weekdays": {
+      "options": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
       }
     }
   },

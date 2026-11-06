@@ -5,6 +5,8 @@ from datetime import datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
+from homeassistant.config_entries import ConfigEntryState
+
 from custom_components.mennekes_amtron_rtu.charging_cost_const import (
     CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_NETWORK_TARIFF,
@@ -18,7 +20,7 @@ from tests.test_charging_cost_options import NETWORK
 
 def _entry():
     year = datetime.now(ZoneInfo("Europe/Berlin")).year
-    return SimpleNamespace(options={
+    return SimpleNamespace(runtime_data=object(), state=ConfigEntryState.LOADED, options={
         CONF_AUTO_TARIFF_REFRESH: True,
         CONF_CHARGING_NETWORK_TARIFF: {
             "module": "module_3", "tariff_year": year - 1,
@@ -142,3 +144,40 @@ def test_concurrent_options_edit_is_not_overwritten(monkeypatch):
     ))
     assert not asyncio.run(async_refresh_tariff_year(hass, entry))
     assert entry.options["charging_price"] == 0.4
+
+
+def test_stopped_entry_never_starts_tariff_lookup(monkeypatch):
+    async def unexpected_lookup(_hass):
+        raise AssertionError("unloaded entry must not request data")
+
+    monkeypatch.setattr(
+        "custom_components.mennekes_amtron_rtu.network_tariff_year.async_lookup_home_tariff",
+        unexpected_lookup,
+    )
+    entry = _entry()
+    entry.state = ConfigEntryState.NOT_LOADED
+    assert not asyncio.run(async_refresh_tariff_year(SimpleNamespace(), entry))
+    entry.state = ConfigEntryState.LOADED
+    entry.runtime_data = None
+    assert not asyncio.run(async_refresh_tariff_year(SimpleNamespace(), entry))
+
+
+def test_inflight_tariff_lookup_does_not_mutate_unloaded_or_replaced_runtime(monkeypatch):
+    for replace_runtime in (False, True):
+        entry = _entry()
+
+        async def lookup(_hass, *, replace=replace_runtime, target=entry):
+            if replace:
+                target.runtime_data = object()
+            else:
+                target.state = ConfigEntryState.NOT_LOADED
+            return {**NETWORK, "tariff_year": datetime.now(ZoneInfo("Europe/Berlin")).year}
+
+        monkeypatch.setattr(
+            "custom_components.mennekes_amtron_rtu.network_tariff_year.async_lookup_home_tariff",
+            lookup,
+        )
+        hass = SimpleNamespace(config_entries=SimpleNamespace(
+            async_update_entry=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected update")),
+        ))
+        assert not asyncio.run(async_refresh_tariff_year(hass, entry))

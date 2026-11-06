@@ -344,6 +344,7 @@ class MennekesModbusClient:
         *,
         min_interval: float = 0.0,
         priority: bool = False,
+        before_write: Callable[[], None] | None = None,
     ) -> None:
         """Write one register range, honouring its minimum write interval.
 
@@ -356,13 +357,13 @@ class MennekesModbusClient:
         if priority:
             await self._async_write_locked(
                 spec, value, min_interval=min_interval, queued=queued,
-                verify_identity=spec != HEARTBEAT,
+                verify_identity=spec != HEARTBEAT, before_write=before_write,
             )
             return
         async with self._queue:
             await self._async_write_locked(
                 spec, value, min_interval=min_interval, queued=queued,
-                verify_identity=True,
+                verify_identity=True, before_write=before_write,
             )
 
     def check_write_interval(
@@ -390,10 +391,17 @@ class MennekesModbusClient:
         min_interval: float,
         queued: float,
         verify_identity: bool,
+        before_write: Callable[[], None] | None = None,
     ) -> None:
         async with self._lock:
             self.check_write_interval(spec, min_interval=min_interval)
             client = self._require_client()
+            if before_write is not None:
+                # A scheduled command can expire while waiting for this bus or
+                # for identity verification. A rejected guard sends no write,
+                # consumes no write interval and is not a transport failure.
+                client = await self._async_transaction_client(verify_identity=verify_identity)
+                before_write()
             rejected = False
             error: BaseException | None = None
             self.write_trace.begin(
@@ -403,9 +411,10 @@ class MennekesModbusClient:
                 # A transparent gateway may retain its TCP connection while
                 # its downstream wallbox changes. Check every control write;
                 # ordinary heartbeats reuse the connection's confirmed identity.
-                client = await self._async_transaction_client(
-                    verify_identity=verify_identity
-                )
+                if before_write is None:
+                    client = await self._async_transaction_client(
+                        verify_identity=verify_identity
+                    )
                 await _client_write.write_register(
                     client,
                     spec=spec,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 from homeassistant.core import valid_entity_id
@@ -64,6 +65,18 @@ from .device.const import (
 )
 from .network_tariff_lookup import async_lookup_home_tariff
 from .remote import CONF_SERVER_URL
+from .timed_goal_const import (
+    CONF_TIMED_BAVARIAN_DEVICE,
+    CONF_TIMED_CALENDAR_ENTITY,
+    CONF_TIMED_CALENDAR_TITLE,
+    CONF_TIMED_CAPACITY_ENTITY,
+    CONF_TIMED_CAPACITY_KWH,
+    CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_TIMER1_DAYS,
+    CONF_TIMED_TIMER2_DAYS,
+    CONF_TIMED_VEHICLE_TIME_ZONE,
+    TIMED_WEEKDAYS,
+)
 from .vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
     CONF_VEHICLE_SOC_ENTITY,
@@ -107,6 +120,12 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         self._home_tariff_values = None
         self._home_tariff_source = "—"
         errors = _vehicle_errors(user_input) if user_input is not None else {}
+        if user_input is not None:
+            errors.update(_timed_errors(user_input))
+            if user_input.get(CONF_TIMED_BAVARIAN_DEVICE) and bavarian_vehicle_vin(
+                self.hass, user_input[CONF_TIMED_BAVARIAN_DEVICE]
+            ) is None:
+                errors[CONF_TIMED_BAVARIAN_DEVICE] = "timed_bavarian_invalid"
         source = (user_input or {}).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED)
         if source not in LOSS_SOURCES:
             errors[CONF_CHARGE_LOSS_SOURCE] = "loss_source_invalid"
@@ -326,10 +345,62 @@ def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, 
                 CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS
             )
         )
-    for key in (CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY):
+    for key in (
+        CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
+        CONF_TIMED_CAPACITY_ENTITY, CONF_TIMED_DEPARTURE_ENTITY,
+        CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_CALENDAR_TITLE,
+        CONF_TIMED_BAVARIAN_DEVICE, CONF_TIMED_VEHICLE_TIME_ZONE,
+        CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS,
+    ):
         if value := user_input.get(key):
             options[key] = value
+    if (value := user_input.get(CONF_TIMED_CAPACITY_KWH)) is not None:
+        options[CONF_TIMED_CAPACITY_KWH] = float(value)
     return options
+
+
+def _timed_errors(values: dict[str, Any]) -> dict[str, str]:
+    """Reject ambiguous sources and an unbounded/unknown battery capacity."""
+    errors: dict[str, str] = {}
+    for key, domain in (
+        (CONF_TIMED_CAPACITY_ENTITY, ("sensor",)),
+        (CONF_TIMED_DEPARTURE_ENTITY, ("sensor", "input_datetime")),
+        (CONF_TIMED_CALENDAR_ENTITY, ("calendar",)),
+    ):
+        value = values.get(key)
+        if value and (not isinstance(value, str) or not valid_entity_id(value)
+                      or value.split(".", 1)[0] not in domain):
+            errors[key] = "timed_source_invalid"
+    if values.get(CONF_TIMED_CAPACITY_ENTITY) and values.get(CONF_TIMED_CAPACITY_KWH) is not None:
+        errors[CONF_TIMED_CAPACITY_ENTITY] = "timed_capacity_ambiguous"
+    if values.get(CONF_TIMED_CALENDAR_TITLE) and not values.get(CONF_TIMED_CALENDAR_ENTITY):
+        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_required"
+    if values.get(CONF_TIMED_CALENDAR_ENTITY) and not str(values.get(CONF_TIMED_CALENDAR_TITLE, "")).strip():
+        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_title_required"
+    if any(values.get(key) for key in (
+        CONF_TIMED_DEPARTURE_ENTITY, CONF_TIMED_CALENDAR_ENTITY,
+        CONF_TIMED_CAPACITY_ENTITY, CONF_TIMED_CAPACITY_KWH, CONF_TIMED_BAVARIAN_DEVICE,
+    )) and not values.get(CONF_VEHICLE_SOC_ENTITY):
+        errors[CONF_VEHICLE_SOC_ENTITY] = "vehicle_soc_required"
+    for key in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
+        days = values.get(key, [])
+        if not isinstance(days, list) or any(day not in TIMED_WEEKDAYS for day in days):
+            errors[key] = "timed_weekdays_invalid"
+    zone = values.get(CONF_TIMED_VEHICLE_TIME_ZONE)
+    if zone:
+        try:
+            ZoneInfo(zone)
+        except (ValueError, TypeError, ZoneInfoNotFoundError):
+            errors[CONF_TIMED_VEHICLE_TIME_ZONE] = "timed_timezone_invalid"
+    if any(values.get(key) for key in (
+        CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS, CONF_TIMED_VEHICLE_TIME_ZONE,
+    )) and not values.get(CONF_TIMED_BAVARIAN_DEVICE):
+        errors[CONF_TIMED_BAVARIAN_DEVICE] = "timed_bavarian_required"
+    capacity = values.get(CONF_TIMED_CAPACITY_KWH)
+    if capacity is not None and (isinstance(capacity, bool) or not isinstance(capacity, (int, float))
+                                 or not math.isfinite(capacity) or not 1 <= capacity <= 250):
+        errors[CONF_TIMED_CAPACITY_KWH] = "timed_capacity_invalid"
+    return errors
 
 
 def _vehicle_errors(values: dict[str, Any]) -> dict[str, str]:

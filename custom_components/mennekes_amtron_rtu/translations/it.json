@@ -191,6 +191,15 @@
       },
       "assign_vehicle_charge": {
         "name": "Abbina l’energia di ricarica del veicolo"
+      },
+      "timed_next_calendar_event": {
+        "name": "Usa prossimo evento calendario"
+      },
+      "timed_clear_departure": {
+        "name": "Cancella ora di partenza"
+      },
+      "timed_bmw_departure": {
+        "name": "Importa partenza BMW"
       }
     },
     "number": {
@@ -506,6 +515,26 @@
             "name": "Energia senza prezzo"
           }
         }
+      },
+      "timed_goal_status": {
+        "name": "Stato ricarica programmata",
+        "state": {
+          "disabled": "Disattivato",
+          "waiting_for_target": "In attesa obiettivo %",
+          "waiting_for_capacity": "In attesa capacità",
+          "waiting_for_soc": "In attesa livello di carica",
+          "waiting_for_device": "In attesa wallbox",
+          "read_only": "Sola lettura",
+          "queued": "Modifica in coda",
+          "paused_until_start": "In pausa fino all’avvio",
+          "paced": "Corrente regolata",
+          "early_at_minimum": "Possibile fine anticipata",
+          "unreachable": "Obiettivo forse irraggiungibile",
+          "late": "Scadenza superata",
+          "reached": "Obiettivo raggiunto",
+          "write_pending": "Scrittura in attesa",
+          "error": "Errore"
+        }
       }
     },
     "switch": {
@@ -565,10 +594,16 @@
               "error_still_active": "L’errore è ancora attivo",
               "unknown": "Motivo sconosciuto",
               "user_cancelled": "Annullato dall’utente",
-              "energy_goal": "Arresto richiesto da un obiettivo di ricarica"
+              "energy_goal": "Arresto richiesto da un obiettivo di ricarica",
+              "deadline_expired": "Ora di partenza trascorsa"
             }
           }
         }
+      }
+    },
+    "datetime": {
+      "timed_departure": {
+        "name": "Prossima partenza"
       }
     }
   },
@@ -683,6 +718,12 @@
     },
     "loss_storage_unavailable": {
       "message": "Impossibile salvare la perdita di ricarica. Verifica la disponibilità dello spazio di archiviazione e riprova."
+    },
+    "timed_goal_state_invalid": {
+      "message": "Impossibile ripristinare l’ora di partenza salvata. Controlla il piano prima di ricaricare."
+    },
+    "timed_bavarian_unavailable": {
+      "message": "Nessun timer di partenza BMW attivo e completo disponibile. Attiva i sensori di azione, ora e minuto in BavarianData. Per i timer ricorrenti, specifica anche i giorni nelle opzioni."
     }
   },
   "issues": {
@@ -731,7 +772,16 @@
           "vehicle_soc_entity": "Entità del livello di carica del veicolo (facoltativa)",
           "vehicle_charge_limit_entity": "Entità del limite di carica del veicolo (facoltativa)",
           "charge_loss_source": "Fonte dei dati sulle perdite di ricarica",
-          "charging_cost_source": "Calcolo dei costi di ricarica"
+          "charging_cost_source": "Calcolo dei costi di ricarica",
+          "timed_capacity_kwh": "Capacità utile batteria (kWh, facoltativa)",
+          "timed_capacity_entity": "Entità capacità utile (facoltativa)",
+          "timed_departure_entity": "Entità ora di partenza (facoltativa)",
+          "timed_calendar_entity": "Calendario partenze (facoltativo)",
+          "timed_calendar_title": "Titolo esatto evento (facoltativo)",
+          "timed_bavarian_device": "Veicolo BavarianData per la partenza (facoltativo)",
+          "timed_vehicle_time_zone": "Fuso orario del veicolo (facoltativo)",
+          "timed_timer1_days": "Giorni del timer BMW 1 (facoltativo)",
+          "timed_timer2_days": "Giorni del timer BMW 2 (facoltativo)"
         },
         "data_description": {
           "control_mode": "Entrambe le modalità inviano richieste di lettura e richiedono l'accesso esclusivo al bus. Sola lettura non scrive registri. Master Modbus invia anche l'heartbeat e abilita le entità di controllo. Non condividere questo bus con un altro master.",
@@ -743,7 +793,16 @@
           "vehicle_soc_entity": "Facoltativo: seleziona il sensore che indica il livello di carica reale del veicolo in %. Abilita un obiettivo percentuale separato; senza selezione rimane disattivato. Se mancano i dati, la ricarica continua fino al ritorno di valori validi. Cambiare o rimuovere una fonte cancella questo obiettivo senza riprendere la ricarica.",
           "vehicle_charge_limit_entity": "Facoltativo: limita ulteriormente l’obiettivo con l’entità del limite di carica del veicolo. Senza questa entità sono possibili obiettivi fino al 100%. Un limite inferiore riduce l’obiettivo esistente; un aumento non lo alza. Se l’entità non è disponibile rimane valido l’ultimo limite noto. Nessuna impostazione del veicolo viene modificata.",
           "charge_loss_source": "Confronto facoltativo tra l’energia della wallbox e quella aggiunta alla batteria del veicolo. Seleziona una fonte per configurarla nel passaggio successivo. Il controllo della ricarica rimane indipendente.",
-          "charging_cost_source": "Stima facoltativa con un prezzo fisso dell’elettricità comprensivo di imposte o un sensore di prezzo. Configura il prezzo nel passaggio successivo. Disattivata per impostazione predefinita; il controllo della ricarica rimane indipendente."
+          "charging_cost_source": "Stima facoltativa con un prezzo fisso dell’elettricità comprensivo di imposte o un sensore di prezzo. Configura il prezzo nel passaggio successivo. Disattivata per impostazione predefinita; il controllo della ricarica rimane indipendente.",
+          "timed_capacity_kwh": "Inserisci la capacità utile, non quella nominale. Lascia vuoto se usi un’entità.",
+          "timed_capacity_entity": "Seleziona un sensore di capacità utile in kWh o Wh.",
+          "timed_departure_entity": "Seleziona un timestamp con data e ora o un input_datetime completo. La sola ora non basta.",
+          "timed_calendar_entity": "Seleziona un calendario, poi copia un evento con il pulsante dedicato.",
+          "timed_calendar_title": "Sono validi solo gli eventi con questo titolo esatto. Gli eventi di tutto il giorno sono ignorati.",
+          "timed_bavarian_device": "Seleziona il veicolo una volta per importare la partenza BMW. L’inserimento manuale e il calendario restano disponibili. Attiva in BavarianData i sensori di azione, ora e minuto del timer.",
+          "timed_vehicle_time_zone": "Fuso orario del veicolo, ad esempio Europe/Rome. Se vuoto, viene usato quello di Home Assistant. Gli orari BMW non includono un fuso orario.",
+          "timed_timer1_days": "Seleziona i giorni impostati nel BMW per il timer climatizzazione 1. BavarianData non fornisce questi giorni. Lascia vuoto per ignorare il timer.",
+          "timed_timer2_days": "Seleziona i giorni impostati nel BMW per il timer 2. Lascia vuoto per ignorarlo."
         },
         "title": "Opzioni"
       },
@@ -755,7 +814,16 @@
           "vehicle_soc_entity": "Entità del livello di carica del veicolo (facoltativa)",
           "vehicle_charge_limit_entity": "Entità del limite di carica del veicolo (facoltativa)",
           "charge_loss_source": "Fonte dei dati sulle perdite di ricarica",
-          "charging_cost_source": "Calcolo dei costi di ricarica"
+          "charging_cost_source": "Calcolo dei costi di ricarica",
+          "timed_capacity_kwh": "Capacità utile batteria (kWh, facoltativa)",
+          "timed_capacity_entity": "Entità capacità utile (facoltativa)",
+          "timed_departure_entity": "Entità ora di partenza (facoltativa)",
+          "timed_calendar_entity": "Calendario partenze (facoltativo)",
+          "timed_calendar_title": "Titolo esatto evento (facoltativo)",
+          "timed_bavarian_device": "Veicolo BavarianData per la partenza (facoltativo)",
+          "timed_vehicle_time_zone": "Fuso orario del veicolo (facoltativo)",
+          "timed_timer1_days": "Giorni del timer BMW 1 (facoltativo)",
+          "timed_timer2_days": "Giorni del timer BMW 2 (facoltativo)"
         },
         "data_description": {
           "current_limit": "Limite aggiuntivo per le correnti richieste da Home Assistant. Si applica anche il limite del servizio. Selezionare esplicitamente 0 A disattiva il limite EMS.",
@@ -763,7 +831,16 @@
           "vehicle_soc_entity": "Facoltativo: seleziona il sensore che indica il livello di carica reale del veicolo in %. Abilita un obiettivo percentuale separato; senza selezione rimane disattivato. Se mancano i dati, la ricarica continua fino al ritorno di valori validi. Cambiare o rimuovere una fonte cancella questo obiettivo senza riprendere la ricarica.",
           "vehicle_charge_limit_entity": "Facoltativo: limita ulteriormente l’obiettivo con l’entità del limite di carica del veicolo. Senza questa entità sono possibili obiettivi fino al 100%. Un limite inferiore riduce l’obiettivo esistente; un aumento non lo alza. Se l’entità non è disponibile rimane valido l’ultimo limite noto. Nessuna impostazione del veicolo viene modificata.",
           "charge_loss_source": "Confronto facoltativo tra l’energia della wallbox e quella aggiunta alla batteria del veicolo. Seleziona una fonte per configurarla nel passaggio successivo. Il controllo della ricarica rimane indipendente.",
-          "charging_cost_source": "Stima facoltativa con un prezzo fisso dell’elettricità comprensivo di imposte o un sensore di prezzo. Configura il prezzo nel passaggio successivo. Disattivata per impostazione predefinita; il controllo della ricarica rimane indipendente."
+          "charging_cost_source": "Stima facoltativa con un prezzo fisso dell’elettricità comprensivo di imposte o un sensore di prezzo. Configura il prezzo nel passaggio successivo. Disattivata per impostazione predefinita; il controllo della ricarica rimane indipendente.",
+          "timed_capacity_kwh": "Inserisci la capacità utile, non quella nominale. Lascia vuoto se usi un’entità.",
+          "timed_capacity_entity": "Seleziona un sensore di capacità utile in kWh o Wh.",
+          "timed_departure_entity": "Seleziona un timestamp con data e ora o un input_datetime completo. La sola ora non basta.",
+          "timed_calendar_entity": "Seleziona un calendario, poi copia un evento con il pulsante dedicato.",
+          "timed_calendar_title": "Sono validi solo gli eventi con questo titolo esatto. Gli eventi di tutto il giorno sono ignorati.",
+          "timed_bavarian_device": "Seleziona il veicolo una volta per importare la partenza BMW. L’inserimento manuale e il calendario restano disponibili. Attiva in BavarianData i sensori di azione, ora e minuto del timer.",
+          "timed_vehicle_time_zone": "Fuso orario del veicolo, ad esempio Europe/Rome. Se vuoto, viene usato quello di Home Assistant. Gli orari BMW non includono un fuso orario.",
+          "timed_timer1_days": "Seleziona i giorni impostati nel BMW per il timer climatizzazione 1. BavarianData non fornisce questi giorni. Lascia vuoto per ignorare il timer.",
+          "timed_timer2_days": "Seleziona i giorni impostati nel BMW per il timer 2. Lascia vuoto per ignorarlo."
         },
         "description": "L'impostazione Sola lettura dell'app controlla anche il permesso di scrittura in Home Assistant. Disattivala nell'app, salva e riavvia l'app per abilitare i controlli. Le entità di controllo rimangono non disponibili mentre il servizio è in sola lettura o non è pronto. Imposta l’intervallo minimo tra cambiamenti di stato e l’attesa aggiuntiva prima del cambio delle fasi nella configurazione dell’app; il servizio applica entrambi anche durante un riavvio di Home Assistant."
       },
@@ -835,7 +912,16 @@
       "loss_source_invalid": "Seleziona una fonte supportata per le perdite di ricarica e configura il veicolo o il sensore corrispondente.",
       "cost_source_invalid": "Seleziona una fonte di costo supportata e un’entità sensore per un prezzo basato su sensore.",
       "cost_price_invalid": "Inserisci un prezzo lordo finito compreso tra −1000 e 1000 EUR/kWh. Sono ammessi prezzi negativi.",
-      "network_tariff_invalid": "Controlla prezzi lordi, anno, da due a quattro trimestri e periodi alti/bassi. Un periodo HH:MM-HH:MM per riga, ogni 15 minuti, senza sovrapposizioni e lasciando un periodo standard."
+      "network_tariff_invalid": "Controlla prezzi lordi, anno, da due a quattro trimestri e periodi alti/bassi. Un periodo HH:MM-HH:MM per riga, ogni 15 minuti, senza sovrapposizioni e lasciando un periodo standard.",
+      "timed_source_invalid": "Fonte oraria non valida",
+      "timed_capacity_ambiguous": "Scegli capacità fissa o dinamica",
+      "timed_calendar_required": "Seleziona un calendario",
+      "timed_calendar_title_required": "Inserisci il titolo esatto",
+      "timed_capacity_invalid": "Inserisci capacità utile da 1 a 250 kWh",
+      "timed_bavarian_invalid": "Seleziona un veicolo BavarianData",
+      "timed_bavarian_required": "Seleziona un veicolo BavarianData prima di configurare i timer",
+      "timed_weekdays_invalid": "Seleziona giorni validi",
+      "timed_timezone_invalid": "Inserisci un fuso orario valido, ad esempio Europe/Rome"
     }
   },
   "selector": {
@@ -899,6 +985,17 @@
         "2": "T2: aprile–giugno",
         "3": "T3: luglio–settembre",
         "4": "T4: ottobre–dicembre"
+      }
+    },
+    "timed_weekdays": {
+      "options": {
+        "mon": "Lunedì",
+        "tue": "Martedì",
+        "wed": "Mercoledì",
+        "thu": "Giovedì",
+        "fri": "Venerdì",
+        "sat": "Sabato",
+        "sun": "Domenica"
       }
     }
   },

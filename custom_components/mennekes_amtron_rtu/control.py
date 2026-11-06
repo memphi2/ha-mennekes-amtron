@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Coroutine
+from datetime import datetime
 from functools import wraps
 from typing import Any
 
@@ -68,6 +69,16 @@ class AmtronControl(DeviceControl):
     @ha_command
     async def async_pause_charging(self) -> None:
         await super().async_pause_charging()
+
+    @ha_command
+    async def async_set_timed_current(
+        self, value: float | None, *, deadline: datetime, owner: str,
+    ) -> None:
+        await super().async_set_timed_current(value, deadline=deadline, owner=owner)
+
+    @ha_command
+    async def async_cancel_timed_current(self, owner: str) -> None:
+        await super().async_cancel_timed_current(owner)
 
     @ha_command
     async def async_cancel_pending_change(self) -> None:

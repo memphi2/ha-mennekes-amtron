@@ -17,6 +17,7 @@ from .entity import MennekesAmtronControlEntity, MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
 from .remote import CONF_SERVER_URL
+from .timed_goal_const import CONF_TIMED_BAVARIAN_DEVICE, CONF_TIMED_CALENDAR_ENTITY
 
 if TYPE_CHECKING:
     from homeassistant.components.button.const import ButtonDeviceClass
@@ -45,9 +46,71 @@ async def async_setup_entry(
         entities.append(AmtronRestartButton(entry, coordinator))
     if runtime_data.charge_loss is not None and runtime_data.charge_loss.mode == LOSS_SOURCE_SENSOR:
         entities.append(AmtronAssignChargeButton(entry, coordinator))
+    if runtime_data.timed_goal is not None and entry.options.get(CONF_TIMED_CALENDAR_ENTITY):
+        entities.append(AmtronNextDepartureButton(entry, coordinator))
+    if runtime_data.timed_goal is not None and entry.options.get(CONF_TIMED_BAVARIAN_DEVICE):
+        entities.append(AmtronBmwDepartureButton(entry, coordinator))
+    if runtime_data.timed_goal is not None:
+        entities.append(AmtronClearDepartureButton(entry, coordinator))
     if runtime_data.control.read_only and CONF_SERVER_URL not in entry.data:
         entities = [entity for entity in entities if isinstance(entity, AmtronAssignChargeButton)]
     async_add_entities(entities)
+
+
+class AmtronNextDepartureButton(MennekesAmtronControlEntity, ButtonEntity):
+    """Choose exactly one upcoming calendar event as the next trip."""
+
+    _attr_translation_key = "timed_next_calendar_event"
+
+    def __init__(
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
+    ) -> None:
+        super().__init__(entry, coordinator, "timed_next_calendar_event")
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and not self.runtime_data.control.read_only
+
+    async def async_press(self) -> None:
+        observer = self.runtime_data.timed_goal
+        if observer is not None:
+            await observer.async_use_next_calendar_event()
+
+
+class AmtronBmwDepartureButton(AmtronNextDepartureButton):
+    """Copy one active BMW climate departure without enabling recurrence."""
+
+    _attr_translation_key = "timed_bmw_departure"
+
+    def __init__(
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
+    ) -> None:
+        MennekesAmtronControlEntity.__init__(self, entry, coordinator, "timed_bmw_departure")
+
+    async def async_press(self) -> None:
+        observer = self.runtime_data.timed_goal
+        if observer is not None:
+            await observer.async_use_bmw_departure()
+
+
+class AmtronClearDepartureButton(MennekesAmtronControlEntity, ButtonEntity):
+    """Cancel the selected one-off trip without changing the SoC ceiling."""
+
+    _attr_translation_key = "timed_clear_departure"
+
+    def __init__(
+        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
+    ) -> None:
+        super().__init__(entry, coordinator, "timed_clear_departure")
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and not self.runtime_data.control.read_only
+
+    async def async_press(self) -> None:
+        observer = self.runtime_data.timed_goal
+        if observer is not None:
+            await observer.async_set_deadline(None)
 
 
 class AmtronCancelPendingButton(MennekesAmtronControlEntity, ButtonEntity):

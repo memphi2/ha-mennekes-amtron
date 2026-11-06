@@ -91,6 +91,18 @@ from .device.const import (
     SUPPORTED_BAUDRATES,
     SUPPORTED_FRAMES,
 )
+from .timed_goal_const import (
+    CONF_TIMED_BAVARIAN_DEVICE,
+    CONF_TIMED_CALENDAR_ENTITY,
+    CONF_TIMED_CALENDAR_TITLE,
+    CONF_TIMED_CAPACITY_ENTITY,
+    CONF_TIMED_CAPACITY_KWH,
+    CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_TIMER1_DAYS,
+    CONF_TIMED_TIMER2_DAYS,
+    CONF_TIMED_VEHICLE_TIME_ZONE,
+    TIMED_WEEKDAYS,
+)
 from .vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
     CONF_VEHICLE_SOC_ENTITY,
@@ -304,10 +316,39 @@ def options_schema(
     for key, domains in (
         (CONF_VEHICLE_SOC_ENTITY, VEHICLE_SOC_DOMAINS),
         (CONF_VEHICLE_CHARGE_LIMIT_ENTITY, VEHICLE_CHARGE_LIMIT_DOMAINS),
+        (CONF_TIMED_CAPACITY_ENTITY, ("sensor",)),
+        (CONF_TIMED_DEPARTURE_ENTITY, ("sensor", "input_datetime")),
+        (CONF_TIMED_CALENDAR_ENTITY, ("calendar",)),
     ):
         fields[probatio.Optional(
             key, description={"suggested_value": current.get(key)},
         )] = EntitySelector(EntitySelectorConfig(filter={"domain": list(domains)}))
+    fields[probatio.Optional(
+        CONF_TIMED_CAPACITY_KWH,
+        description={"suggested_value": current.get(CONF_TIMED_CAPACITY_KWH)},
+    )] = NumberSelector(NumberSelectorConfig(
+        min=1, max=250, step=0.1, unit_of_measurement="kWh",
+        mode=NumberSelectorMode.BOX,
+    ))
+    fields[probatio.Optional(
+        CONF_TIMED_CALENDAR_TITLE,
+        description={"suggested_value": current.get(CONF_TIMED_CALENDAR_TITLE)},
+    )] = cv.string
+    fields[probatio.Optional(
+        CONF_TIMED_BAVARIAN_DEVICE,
+        description={"suggested_value": current.get(CONF_TIMED_BAVARIAN_DEVICE)},
+    )] = DeviceSelector(DeviceSelectorConfig(integration="bavariandata"))
+    fields[probatio.Optional(
+        CONF_TIMED_VEHICLE_TIME_ZONE,
+        description={"suggested_value": current.get(CONF_TIMED_VEHICLE_TIME_ZONE)},
+    )] = TextSelector()
+    for key in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
+        fields[probatio.Optional(
+            key, description={"suggested_value": current.get(key)},
+        )] = SelectSelector(SelectSelectorConfig(
+            options=list(TIMED_WEEKDAYS), multiple=True,
+            translation_key="timed_weekdays", mode=SelectSelectorMode.DROPDOWN,
+        ))
     fields[probatio.Required(
         CONF_CHARGE_LOSS_SOURCE,
         default=current.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED),

@@ -1,0 +1,119 @@
+"""Optional departure entities follow connectivity and service write access."""
+
+import asyncio
+from datetime import UTC, datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import pytest
+
+from custom_components.mennekes_amtron_rtu.button import (
+    async_setup_entry as setup_buttons,
+)
+from custom_components.mennekes_amtron_rtu.datetime import (
+    async_setup_entry as setup_datetime,
+)
+from custom_components.mennekes_amtron_rtu.sensor import (
+    async_setup_entry as setup_sensors,
+)
+from tests.ha_fakes import build_runtime, collect
+
+
+async def _entities(hass, entry):
+    datetimes, buttons, sensors = {}, {}, {}
+    await setup_datetime(hass, entry, lambda items: datetimes.update(collect(items)))
+    await setup_buttons(hass, entry, lambda items: buttons.update(collect(items)))
+    await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
+    return datetimes, buttons, sensors
+
+
+def _timed_observer():
+    return SimpleNamespace(
+        goal=SimpleNamespace(deadline=datetime(2026, 11, 10, 7, tzinfo=UTC)),
+        status="paced",
+        async_set_deadline=AsyncMock(),
+        async_use_next_calendar_event=AsyncMock(),
+        async_use_bmw_departure=AsyncMock(),
+    )
+
+
+def test_departure_entities_are_absent_when_timed_goals_are_disabled():
+    async def run():
+        hass, entry, transport = await build_runtime()
+        datetimes, buttons, sensors = await _entities(hass, entry)
+        assert not datetimes
+        assert "timed_clear_departure" not in buttons
+        assert "timed_next_calendar_event" not in buttons
+        assert "timed_goal_status" not in sensors
+        assert not transport.writes
+        await entry.runtime_data.control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_departure_status_remains_visible_without_calendar_configuration():
+    async def run():
+        hass, entry, transport = await build_runtime()
+        entry.runtime_data.timed_goal = _timed_observer()
+        datetimes, buttons, sensors = await _entities(hass, entry)
+        assert "timed_next_calendar_event" not in buttons
+        assert buttons["timed_clear_departure"].available
+        assert datetimes["timed_departure"].available
+        status = sensors["timed_goal_status"]
+        assert status.available
+        assert status.native_value == "paced"
+        entry.runtime_data.timed_goal.status = "waiting_for_soc"
+        assert status.native_value == "waiting_for_soc"
+        entry.runtime_data.coordinator.last_update_success = False
+        assert not status.available
+        assert not datetimes["timed_departure"].available
+        assert not buttons["timed_clear_departure"].available
+        entry.runtime_data.timed_goal = None
+        assert status.native_value is None
+        assert not transport.writes
+        await entry.runtime_data.control.async_shutdown()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("remote", [False, True])
+def test_departure_controls_respect_read_only_but_status_is_observable(remote):
+    async def run():
+        hass, entry, transport = await build_runtime(read_only=True)
+        if remote:
+            entry.data["server_url"] = "http://service:8765"
+        entry.options["timed_calendar_entity"] = "calendar.trips"
+        entry.runtime_data.timed_goal = _timed_observer()
+        datetimes, buttons, sensors = await _entities(hass, entry)
+        assert not datetimes["timed_departure"].available
+        assert sensors["timed_goal_status"].available
+        if remote:
+            assert not buttons["timed_next_calendar_event"].available
+            assert not buttons["timed_clear_departure"].available
+        else:
+            assert "timed_next_calendar_event" not in buttons
+            assert "timed_clear_departure" not in buttons
+        assert not transport.writes
+        await entry.runtime_data.control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_bmw_import_button_is_explicit_optional_and_respects_read_only():
+    async def run():
+        hass, entry, transport = await build_runtime()
+        entry.runtime_data.timed_goal = observer = _timed_observer()
+        _, buttons, _ = await _entities(hass, entry)
+        assert "timed_bmw_departure" not in buttons
+        entry.options["timed_bavarian_device"] = "bmw"
+        _, buttons, _ = await _entities(hass, entry)
+        button = buttons["timed_bmw_departure"]
+        assert button.available
+        await button.async_press()
+        observer.async_use_bmw_departure.assert_awaited_once()
+        entry.runtime_data.timed_goal = None
+        await button.async_press()
+        observer.async_use_bmw_departure.assert_awaited_once()
+        assert not transport.writes
+        await entry.runtime_data.control.async_shutdown()
+    asyncio.run(run())

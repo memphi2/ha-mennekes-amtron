@@ -8,6 +8,7 @@ import math
 import time
 from contextlib import suppress
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 from time import time as wall_clock
 from typing import Any
@@ -441,7 +442,7 @@ class ModbusService:
     async def command(self, payload: dict[str, Any]) -> dict[str, Any]:
         if payload.keys() - {
             "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
-            "source", "soc", "maximum"
+            "source", "soc", "maximum", "deadline", "owner"
         }:
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
@@ -456,7 +457,7 @@ class ModbusService:
             # A request can age while another command owns the lock. Only admit
             # it against the same current state that the API reports as usable.
             command = payload.get("command")
-            cancelling = command == "cancel_pending"
+            cancelling = command in ("cancel_pending", "cancel_timed_current")
             metadata = command in ("soc_source", "soc_observation")
             if control is None or self._stopping or (not cancelling and not metadata and not self._is_available()):
                 raise DeviceError("service_unavailable")
@@ -467,8 +468,23 @@ class ModbusService:
                 raise DeviceError("device_identity_changed")
             value = payload.get("value")
             try:
-                if cancelling:
+                owner = payload.get("owner")
+                if command == "cancel_timed_current":
+                    if not isinstance(owner, str):
+                        raise ValueError("invalid timed command owner")
+                    await control.async_cancel_timed_current(owner)
+                elif cancelling:
                     await control.async_cancel_pending_change()
+                elif command == "timed_current":
+                    if not isinstance(owner, str):
+                        raise ValueError("invalid timed command owner")
+                    deadline = payload.get("deadline")
+                    if not isinstance(deadline, str) or len(deadline) > 64:
+                        raise ValueError("invalid timed command deadline")
+                    await control.async_set_timed_current(
+                        None if value is None else number(value, 6, 32),
+                        deadline=datetime.fromisoformat(deadline), owner=owner,
+                    )
                 elif command == "set_current":
                     unlimited = payload.get("allow_unlimited", False)
                     if not isinstance(unlimited, bool):

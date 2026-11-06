@@ -1,0 +1,135 @@
+blueprint:
+  name: MENNEKES AMTRON - plan the next trip from a calendar
+  description: >-
+    Turn on an input_boolean helper to copy the next matching calendar event
+    into the wallbox's Next departure. Only timed events with the exact title
+    are used. The helper turns off after one trip is selected; later events
+    do not automatically start another plan. Configure the vehicle's SoC
+    target and battery capacity first. This automation sets a departure time,
+    not a charge target, and preserves an already planned future departure.
+  domain: automation
+  homeassistant:
+    min_version: "2026.9.0"
+  input:
+    calendar_entity:
+      name: Trip calendar
+      description: Home Assistant calendar containing the departure events.
+      selector:
+        entity:
+          filter:
+            - domain: calendar
+    event_title:
+      name: Exact event title
+      description: Only events with this exact, case-sensitive title are selected.
+      default: Departure
+      selector:
+        text:
+    arm_next_trip:
+      name: Plan next trip helper
+      description: >-
+        Create a Toggle helper (input_boolean). Turn it on to select one trip;
+        the automation turns it off after copying the departure time.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    departure_time:
+      name: Next departure
+      description: The Mennekes Amtron RTU Next departure entity for this wallbox.
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron_rtu
+              domain: datetime
+    planning_lead_hours:
+      name: Plan up to this many hours ahead
+      description: >-
+        Search this far ahead while the helper is on. Checked immediately on
+        arming, after a Home Assistant restart and every 15 minutes. Allow
+        enough time to charge the vehicle from its current SoC.
+      default: 12
+      selector:
+        number:
+          min: 1
+          max: 336
+          step: 1
+          unit_of_measurement: h
+          mode: box
+
+mode: single
+max_exceeded: silent
+
+variables:
+  calendar_entity: !input calendar_entity
+  event_title: !input event_title
+  arm_entity: !input arm_next_trip
+  departure_entity: !input departure_time
+  lead_hours: !input planning_lead_hours
+
+triggers:
+  - trigger: state
+    entity_id: !input arm_next_trip
+    to: "on"
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    minutes: "/15"
+
+conditions:
+  - condition: state
+    entity_id: !input arm_next_trip
+    state: "on"
+  - condition: template
+    value_template: >-
+      {{ states(calendar_entity) in ['on', 'off'] and event_title | trim != ''
+         and states[departure_entity] is not none
+         and states(departure_entity) != 'unavailable'
+         and as_timestamp(states(departure_entity), 0) <= as_timestamp(now()) }}
+
+actions:
+  - variables:
+      search_start: "{{ now().isoformat() }}"
+      search_end: "{{ (now() + timedelta(hours=lead_hours | float)).isoformat() }}"
+  - action: calendar.get_events
+    target:
+      entity_id: !input calendar_entity
+    data:
+      start_date_time: "{{ search_start }}"
+      end_date_time: "{{ search_end }}"
+    response_variable: agenda
+  - variables:
+      selected_start: >-
+        {% set result = agenda.get(calendar_entity, {}) if agenda is mapping else {} %}
+        {% set events = result.get('events', []) if result is mapping else [] %}
+        {% set found = namespace(start='', timestamp=as_timestamp(search_end)) %}
+        {% if events is iterable and events is not string and events is not mapping %}
+          {% for event in events if event is mapping %}
+            {% set raw = event.get('start') %}
+            {% if event.get('summary') == event_title and raw is string and 'T' in raw %}
+              {% set start = as_datetime(raw, none) %}
+              {% if start is not none and start.tzinfo is not none %}
+                {% set timestamp = as_timestamp(start, 0) %}
+                {% if as_timestamp(now()) < timestamp <= found.timestamp %}
+                  {% set found.start = start.isoformat() %}
+                  {% set found.timestamp = timestamp %}
+                {% endif %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {{ found.start }}
+  - condition: template
+    value_template: >-
+      {{ is_state(arm_entity, 'on')
+         and as_timestamp(selected_start, 0) > as_timestamp(now())
+         and states[departure_entity] is not none
+         and states(departure_entity) != 'unavailable'
+         and as_timestamp(states(departure_entity), 0) <= as_timestamp(now()) }}
+  - action: datetime.set_value
+    target:
+      entity_id: !input departure_time
+    data:
+      datetime: "{{ selected_start }}"
+  - action: input_boolean.turn_off
+    target:
+      entity_id: !input arm_next_trip

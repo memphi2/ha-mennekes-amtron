@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
@@ -80,7 +80,13 @@ from .device.identity import async_read_identity
 from .device.soc_goal_controller import SocGoalController
 from .device.write_state import WriteState
 from .entry_types import MennekesAmtronConfigEntry
-from .goal_store import GoalStore, ModelStore, SessionHistoryStore, SocGoalStore
+from .goal_store import (
+    GoalStore,
+    ModelStore,
+    SessionHistoryStore,
+    SocGoalStore,
+    TimedGoalStore,
+)
 from .loss_store import LossStore
 from .network_tariff_year import async_refresh_tariff_year, needs_year_refresh
 from .options_flow import control_mode_is_master
@@ -97,6 +103,7 @@ from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
 from .session_observer import SessionObserver
+from .timed_goal_observer import TimedGoalObserver
 from .vehicle_soc import VehicleSocObserver
 from .vehicle_soc_const import CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_ENTITY
 
@@ -105,6 +112,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 READ_PLATFORMS = (Platform.SENSOR, Platform.BINARY_SENSOR, Platform.EVENT)
 CONTROL_PLATFORMS = (
     Platform.NUMBER,
+    Platform.DATETIME,
     Platform.SELECT,
     Platform.SWITCH,
     Platform.BUTTON,
@@ -353,6 +361,15 @@ async def async_setup_entry(
             )
             entry.runtime_data.vehicle_soc = observer
             await observer.async_start()
+        if entry.options.get(CONF_VEHICLE_SOC_ENTITY):
+            timed = TimedGoalObserver(hass, entry)
+            entry.runtime_data.timed_goal = timed
+            try:
+                await timed.async_start()
+            except (OSError, ValueError) as err:
+                raise ConfigEntryNotReady(
+                    translation_domain=DOMAIN, translation_key="timed_goal_state_invalid"
+                ) from err
         if remote:
             # The service owns its own durable goal. Old direct-mode intent must
             # not return when this entry later switches back from the service.
@@ -368,10 +385,17 @@ async def async_setup_entry(
         if cost_enabled and needs_year_refresh(dict(entry.options)):
             # A stale tariff is refreshed after setup, so the wallbox and its
             # heartbeat are already running before any external HTTP request.
-            hass.async_create_task(async_refresh_tariff_year(hass, entry))
+            entry.async_create_background_task(
+                hass, async_refresh_tariff_year(hass, entry),
+                "amtron_tariff_refresh", eager_start=False,
+            )
         if cost_enabled and entry.options.get(CONF_AUTO_TARIFF_REFRESH) is True:
-            async def refresh_new_tariff_year(_now: object) -> None:
-                await async_refresh_tariff_year(hass, entry)
+            @callback
+            def refresh_new_tariff_year(_now: object) -> None:
+                entry.async_create_background_task(
+                    hass, async_refresh_tariff_year(hass, entry),
+                    "amtron_tariff_refresh", eager_start=False,
+                )
 
             entry.async_on_unload(async_track_time_change(
                 hass,
@@ -384,6 +408,8 @@ async def async_setup_entry(
             entry.runtime_data.recovery.start()
     except BaseException:
         await _async_stop_estimates(entry.runtime_data)
+        if entry.runtime_data.timed_goal is not None:
+            await entry.runtime_data.timed_goal.async_stop()
         if entry.runtime_data.vehicle_soc is not None:
             await entry.runtime_data.vehicle_soc.async_stop()
         if entry.runtime_data.soc_goal is not None:
@@ -423,6 +449,8 @@ async def async_unload_entry(
     if not unloaded:
         return False
     await _async_stop_estimates(runtime_data)
+    if runtime_data.timed_goal is not None:
+        await runtime_data.timed_goal.async_stop()
     if runtime_data.vehicle_soc is not None:
         await runtime_data.vehicle_soc.async_stop()
     if runtime_data.soc_goal is not None:
@@ -469,6 +497,7 @@ async def async_remove_entry(
     hass.data.get(f"{DOMAIN}_write_states", {}).pop(entry.entry_id, None)
     await GoalStore(hass, entry.entry_id, "").async_remove()
     await SocGoalStore(hass, entry.entry_id, "").async_remove()
+    await TimedGoalStore(hass, entry.entry_id, "").async_remove()
     await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
     await LossStore(hass, entry.entry_id, "").async_remove()
     await ModelStore(hass, entry.entry_id, "", kind="charging_cost", model=LastChargingCost).async_remove()

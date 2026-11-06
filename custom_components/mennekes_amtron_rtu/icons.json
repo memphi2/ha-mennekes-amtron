@@ -39,6 +39,15 @@
       },
       "assign_vehicle_charge": {
         "default": "mdi:link-variant-plus"
+      },
+      "timed_next_calendar_event": {
+        "default": "mdi:calendar-import"
+      },
+      "timed_clear_departure": {
+        "default": "mdi:calendar-remove"
+      },
+      "timed_bmw_departure": {
+        "default": "mdi:car-clock"
       }
     },
     "number": {
@@ -184,6 +193,16 @@
       },
       "average_charging_loss": {
         "default": "mdi:chart-line"
+      },
+      "timed_goal_status": {
+        "default": "mdi:ev-station",
+        "state": {
+          "paused_until_start": "mdi:timer-pause-outline",
+          "paced": "mdi:current-ac",
+          "reached": "mdi:battery-check-outline",
+          "unreachable": "mdi:timer-alert-outline",
+          "error": "mdi:alert-circle-outline"
+        }
       }
     },
     "switch": {
@@ -218,6 +237,11 @@
             }
           }
         }
+      }
+    },
+    "datetime": {
+      "timed_departure": {
+        "default": "mdi:calendar-clock"
       }
     }
   },

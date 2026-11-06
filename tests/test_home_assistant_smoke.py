@@ -38,6 +38,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     SEARCH_OFF,
 )
 from tests.fakes import device_bank, put
+from tests.test_blueprints import EXPECTED as EXPECTED_BLUEPRINTS
 from tests.test_serial_loopback import (
     REGISTER_COUNT,
     _server_context,
@@ -410,12 +411,9 @@ def test_the_bundled_blueprints_run_as_automations(
 
             # setting the integration up installed them
             folder = tmp_path / "config" / "blueprints" / "automation" / DOMAIN
-            assert {path.name for path in folder.glob("*.yaml")} == {
-                "solar_surplus_charging.yaml",
-                "pause_and_resume_on_surplus.yaml",
-                "recover_from_lost_heartbeat.yaml",
-                "downgrade_notification.yaml",
-            }
+            assert {path.name for path in folder.glob("*.yaml")} == EXPECTED_BLUEPRINTS
+            # Calendar/climate behavior runs separately with real HA automations
+            # in test_calendar_blueprint_behavior.py, including helper restoration.
 
             entities = sorted(
                 entity.entity_id

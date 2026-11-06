@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 
 from .charging_cost_const import (
@@ -20,6 +21,7 @@ from .entry_types import MennekesAmtronConfigEntry
 from .network_tariff_lookup import async_lookup_home_tariff
 
 _LOGGER = logging.getLogger(__name__)
+_RUNNING_STATES = (ConfigEntryState.LOADED, ConfigEntryState.SETUP_IN_PROGRESS)
 
 
 def needs_year_refresh(options: dict[str, Any], *, year: int | None = None) -> bool:
@@ -38,10 +40,18 @@ async def async_refresh_tariff_year(
     hass: HomeAssistant, entry: MennekesAmtronConfigEntry,
 ) -> bool:
     """Apply a valid published tariff once, keeping all other options intact."""
+    runtime = getattr(entry, "runtime_data", None)
+    if runtime is None or entry.state not in _RUNNING_STATES:
+        return False
     options = dict(entry.options)
     if not needs_year_refresh(options):
         return False
     values = await async_lookup_home_tariff(hass)
+    if (
+        getattr(entry, "runtime_data", None) is not runtime
+        or entry.state not in _RUNNING_STATES
+    ):
+        return False
     if values is None:
         _LOGGER.warning("No unambiguous published Module 3 tariff found for the new year; cost estimates remain unavailable until updated")
         return False
