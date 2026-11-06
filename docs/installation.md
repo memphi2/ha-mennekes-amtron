@@ -115,7 +115,7 @@ restart the compatible app; its heartbeat and charging intent continue through
 Core's restart when writes are enabled.
 
 **Still using a 0.5.0 beta?** Update the app/service to an API 2 release first:
-**0.5.1** for stable use, or **0.5.2b1** when testing this beta. Then update the
+**0.5.1** for stable use, or **0.5.2b2** when testing this beta. Then update the
 integration. The old beta integration may show unavailable controls between
 these updates because its API differs. Keep the existing app and follow
 [service updates](modbus-service.md#updates), including the connection choice.
@@ -129,15 +129,15 @@ adding the wallbox again; [HA carries over the existing repositories](https://co
 For blueprint changes, follow
 [Updating existing automations](blueprints.md#updating-existing-blueprint-automations).
 
-## Beta testing 0.5.2b1
+## Beta testing 0.5.2b2
 
-**0.5.2b1 is a prerelease of both the integration and service.** Stable remains
+**0.5.2b2 is a prerelease of both the integration and service.** Stable remains
 0.5.1. Keep the existing HA entry and back up the app's data before testing.
 
 - **Marketplace:** open this repository, enable its **Pre-release** switch and
-  select **0.5.2b1**. See [Marketplace prereleases](https://contributors.home-assistant.io/marketplace/guides/releases/#pre-releases).
+  select **0.5.2b2**. See [Marketplace prereleases](https://contributors.home-assistant.io/marketplace/guides/releases/#pre-releases).
 - **HACS:** open Mennekes Amtron RTU, choose **⋮ → Redownload → Need a different
-  version?**, then select **v0.5.2b1**, download and restart Core.
+  version?**, then select **v0.5.2b2**, download and restart Core.
 - **App:** the beta is offered through
   `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`. Existing users of that
   catalog can use **Check for updates** and update normally. The stable `#apps`

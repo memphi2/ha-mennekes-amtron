@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased
+## 0.5.2b2
 
 - Add `state_change_interval_seconds`, default 300 and configurable from 0 to
   3600 seconds. Queue early pause/resume, phase, release and lock changes;
@@ -13,6 +13,10 @@
   confirmation or timeout keeps the phase command unsent and retains the pause.
   Add `phase_switch_grace_seconds` (default 5, range 0–30) after confirmation,
   followed by another live state check before switching.
+
+- Skip the long transition wait and vehicle grace time only when fresh EVSE
+  and CP status confirm no vehicle is connected. Detect unplugging during
+  pending waits; retain five-second write floors and heartbeat.
 
 ## 0.5.2b1
 

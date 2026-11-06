@@ -19,7 +19,7 @@ are unchanged. It sends no HA commands or restored values to the service.
 Direct USB and LAN entries retain their separate HA control-mode option.
 
 For standalone configuration, `connection_type` selects `serial` (the default),
-`rtu_over_tcp` or `modbus_tcp`. App 0.5.2b1 offers exactly **USB / RS-485** (default),
+`rtu_over_tcp` or `modbus_tcp`. App 0.5.2b2 offers exactly **USB / RS-485** (default),
 **LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP**. The service normalizes these
 names to the same three protocols. Standalone JSON keeps accepting the technical
 names. Saved app choices using those names need a one-time
@@ -50,7 +50,7 @@ constrain limited-current commands. On resume, the service applies HA's cap to i
 latest saved setpoint while holding the current-write lock; a deliberately
 unlimited setpoint stays unlimited.
 
-### State-change interval — next beta, unreleased
+### State-change interval
 
 `state_change_interval_seconds` accepts whole seconds from 0 to 3600 and defaults
 to 300. The app and standalone service use the same setting; HA's service-mode
@@ -87,7 +87,7 @@ and heartbeat remain active.
 The queue belongs to the running service, so it can execute while HA is offline.
 Restarting the service cancels pending work and begins a conservative guard
 period. Neither HA reconnect nor saved intent replays a cancelled queued start.
-See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
 ## Supervisor discovery and distribution
 
@@ -172,7 +172,7 @@ sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
 use the [Recorder guide](recorder.md) to control that traffic.
 
-In the next beta, the pending action and its UTC due time, when known, are kept in
+In version 0.5.2b2, the pending action and its UTC due time, when known, are kept in
 memory. These fields change on scheduling, replacement or completion, not on
 every second of the wait. The frontend can display the due time relatively;
 the database does not need a changing countdown value. Pending work is not
@@ -193,7 +193,7 @@ An unsupported API or a service below the minimum produces the compatibility
 error. A malformed version or snapshot produces the data-validation error.
 Neither condition asks for new credentials. See [Updates](modbus-service.md#updates).
 
-The next beta adds these fields to the snapshot's `control` object:
+Version 0.5.2b2 adds these fields to the snapshot's `control` object:
 
 | Field | Meaning |
 |---|---|
@@ -238,7 +238,7 @@ cannot independently verify the physical wallbox. Clients with a known serial
 number must retain that binding instead of accepting a newly observed device.
 
 The released 0.5.1 service compares the identity read during initialization.
-The 0.5.2b1 driver additionally verifies a known serial over Modbus after a
+The 0.5.2b2 driver additionally verifies a known serial over Modbus after a
 reconnection and before control writes. This also detects a changed wallbox
 behind a gateway whose TCP connection stayed open. A missing or different
 serial blocks the write without changing saved intent; the service reports
@@ -257,7 +257,7 @@ is unavailable or older than the greater of 30 seconds and three status-poll
 intervals. This is checked after waiting for the command lock; a queued request
 cannot use readiness that expired while it waited. Rejected commands are not
 replayed later, and this check does not stop the heartbeat or change saved pause
-intent. In the next beta, an accepted command can instead be queued for its
+intent. In version 0.5.2b2, an accepted command can instead be queued for its
 state-change deadline; execution rechecks its prerequisites, and an execution
 failure clears pending work rather than retrying an uncertain write indefinitely.
 Failed or timed-out commands are not automatically

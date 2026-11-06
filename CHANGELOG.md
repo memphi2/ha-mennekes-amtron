@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.5.2b2 — 2026-11-06
 
 - Add a configurable interval between charging-state changes, in seconds,
   defaulting to 300. Queue early pause/resume, phase, release and lock changes,
@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   command if confirmation fails or times out, retaining the requested pause.
   Add a separate configurable grace time after confirmation, default 5 seconds,
   and recheck the state before switching.
+
+- Skip the long transition wait and vehicle grace time only when fresh EVSE
+  and CP status confirm no vehicle is connected. Detect unplugging during
+  pending waits; retain five-second write floors and heartbeat.
 
 ## 0.5.2b1 — 2026-11-06
 

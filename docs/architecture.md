@@ -51,7 +51,7 @@ host, TCP port and device address; serial baud/frame are configured on the
 gateway. HA-to-service HTTP remains a separate connection. See
 [LAN setup](network-gateway.md) and the [security boundary](../SECURITY.md#threat-model).
 
-The 0.5.2b1 driver binds a readable serial number to the client. Reconnection
+The 0.5.2b2 driver binds a readable serial number to the client. Reconnection
 invalidates that verification; the next transaction checks it again under the
 bus lock. Control writes also read the serial to catch a downstream gateway
 change without a TCP disconnect. A mismatch blocks writes and preserves saved
@@ -208,7 +208,7 @@ of them are dangerous. Centralising it means the minimum current, the
 `allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics
 counters are written once and cannot be forgotten by a new platform.
 
-**Next beta, unreleased:** current writes retain their five-second register
+**New in 0.5.2b2:** current writes retain their five-second register
 floor. A separate `state_change_interval_seconds` option defaults to 300 and
 accepts 0–3600 seconds; zero disables the longer guard. The direct integration
 owns this option in direct mode, while the service configuration owns it in
@@ -247,10 +247,6 @@ separate from requested state. Shutdown cancels pending work, so a new owner
 never silently replays a queued start. The running service and its queue survive
 an HA restart. Entry reloads retain timing in memory; cold process starts use
 a conservative fresh guard because previous timing is unknown.
-
-Published 0.5.2b1 instead rejects early pause/resume commands and retains its
-separate five-minute phase guard. The new configurable queue is not included
-in that release.
 
 ### Three polling cadences, and one of them is about the database
 

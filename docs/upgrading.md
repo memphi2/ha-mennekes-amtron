@@ -4,13 +4,13 @@
 do not require deleting devices, entities or automations. Moving from HACS to
 the Marketplace also keeps the same integration and entry.
 
-**Testing 0.5.2b1?** Follow [Beta testing](installation.md#beta-testing-052b1)
+**Testing 0.5.2b2?** Follow [Beta testing](installation.md#beta-testing-052b2)
 to select the integration prerelease and beta app catalog. Check the
 [app connection choice](#app-connection-choice) before updating the app.
 
-## Next beta: configurable charging transitions — unreleased
+## 0.5.2b2: configurable charging transitions
 
-The next beta adds **Minimum time between state changes**, default **300
+Version 0.5.2b2 adds **Minimum time between state changes**, default **300
 seconds** and configurable from **0 to 3600 seconds**. Early pause/resume,
 phase, release and lock changes are queued; the latest charging request wins.
 **A stop request also waits**, replacing any older pending start. **Pending
@@ -20,7 +20,7 @@ While paused, the current slider instead shows the remembered resume target,
 which may already reflect a pending current request. Pausing within five
 seconds of a current write is queued too and does not need to be requested again.
 
-Before a phase change, the next beta waits up to 30 seconds for live confirmation
+Before a phase change, version 0.5.2b2 waits up to 30 seconds for live confirmation
 that the vehicle has paused, then adds a configurable grace time (default
 **5 seconds**, range **0–30 seconds**) and checks the state again. A failed
 confirmation or timeout leaves the phase command unsent and retains the pause.
@@ -43,7 +43,7 @@ After a direct-entry reload or an app/service restart, pending work is cancelled
 request it again if still wanted. Restarting HA Core alone does not cancel a
 running service's queue. Check pending status before that restart because its
 command can execute while HA is offline. See the
-[user guide](user-guide.md#waiting-between-charging-changes--next-beta-unreleased)
+[user guide](user-guide.md#waiting-between-charging-changes)
 for the interval, stop behavior and manufacturer recommendation.
 
 ## Routine updates
@@ -70,7 +70,7 @@ After blueprint changes, follow [Updating existing blueprint automations](bluepr
 
 ## App connection choice
 
-App **0.5.2b1** has exactly three choices. If your saved choice already has a
+App **0.5.2b2** has exactly three choices. If your saved choice already has a
 readable name, keep it. Otherwise select the matching name once:
 
 | Older saved value | Select |

@@ -42,8 +42,8 @@ app's **Read-only** setting; direct controls require **Modbus master**.
 
 ## Sensors
 
-The next beta adds **Pending change** (enum) and **Pending change due**
-(timestamp), enabled by default. These are not part of published 0.5.2b1.
+Version 0.5.2b2 adds **Pending change** (enum) and **Pending change due**
+(timestamp), enabled by default.
 The action states are `none`, `pause`, `resume`, `set_current`, `single_phase`,
 `all_phases`, `enable_charging`, `disable_charging`, `unlock` and `lock`.
 The due timestamp is empty when no change is queued or while a phase change
@@ -54,12 +54,12 @@ as a remaining time without recording a changing number every second. Pause,
 release, lock and
 phase entities still report actual readback. The current slider shows the
 remembered resume target while paused, which may be the pending target. See
-[Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+[Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
 | Entity | Name | Unit | Class | Needs | Meaning |
 |---|---|---|---|---|---|
-| `sensor.*_pending_change` | Pending change |  | enum | next beta; new service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |
-| `sensor.*_pending_change_due` | Pending change due |  | timestamp | next beta; new service for service-owned queues | Planned execution time when known. Empty with no pending action or while awaiting vehicle pause confirmation; afterward shows the end of the extra wait. Enabled by default, with no per-second countdown writes. |
+| `sensor.*_pending_change` | Pending change |  | enum | 0.5.2b2; new service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |
+| `sensor.*_pending_change_due` | Pending change due |  | timestamp | 0.5.2b2; new service for service-owned queues | Planned execution time when known. Empty with no pending action or while awaiting vehicle pause confirmation; afterward shows the end of the extra wait. Enabled by default, with no per-second countdown writes. |
 | `sensor.*_evse_state` | EVSE state |  | enum | always | What the wallbox itself thinks it is doing. The main state sensor. |
 | `sensor.*_cp_state` | CP state |  | enum | layout v01.02 | The control-pilot signal between wallbox and vehicle. `c2` means the vehicle is actually drawing current. |
 | `sensor.*_authorization` | Authorization |  | enum | always | Whether RFID or the energy manager has released this session. |

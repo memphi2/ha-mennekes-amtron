@@ -47,11 +47,11 @@ current needs correspondingly higher thresholds. The default hold time is
 six minutes; keep it longer than five minutes. These examples do not switch
 phases automatically.
 
-In the next beta, the bus owner's configurable state-change interval adds a
+In version 0.5.2b2, the bus owner's configurable state-change interval adds a
 separate guard (default 300 seconds). It does not replace these power thresholds
 or their hold times. Early pause and resume requests can be queued; a later
 pause replaces the pending resume and also waits for its due time. See
-[Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+[Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
 ## What to expect
 

@@ -31,11 +31,10 @@ can change a manual setting later; disable it if you want that setting to stay.
 
 Current writes have a **five-second minimum interval**. During charging, a new
 current request may wait until that interval ends; the latest request wins.
-The next beta adds a separate configurable wait before starting or changing
-the charging state, described below. Published 0.5.2b1 still rejects early
-pause/resume and phase commands with a remaining wait time.
+A separate configurable wait applies before starting or changing the charging
+state, described below.
 
-## Waiting between charging changes — next beta, unreleased
+## Waiting between charging changes
 
 **Minimum time between state changes** defaults to **300 seconds**. Enter a
 whole number from **0 to 3600 seconds**. With a direct USB or LAN connection,
@@ -132,8 +131,8 @@ the exact state values available to templates.
 | Status and measurement polling | Integration options | App configuration |
 | How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
 | Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
-| Minimum time between state changes — next beta | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
-| Extra wait before phase changes — next beta | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
+| Minimum time between state changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
+| Extra wait before phase changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 
 The default status interval is **5 seconds** and the measurement interval is
 **30 seconds**. The available range is 2–300 seconds. In service mode, changing
@@ -197,12 +196,11 @@ your vehicle's support before using it. Switching during charging pauses first
 and **does not resume automatically**. Resume explicitly after the waiting
 interval and check the result; some vehicles abort the session.
 
-In published 0.5.2b1, phase changes have a five-minute minimum interval, including
-after the controlling process starts. In the next beta, phase changes share
-the [configurable state-change interval](#waiting-between-charging-changes--next-beta-unreleased)
+Phase changes share
+the [configurable state-change interval](#waiting-between-charging-changes)
 and an early request is queued. Wait until the phase request has actually run
 before requesting resume; a new resume request would replace a queued phase
-request. Before changing phases, the next beta waits up to **30 seconds** for
+request. Before changing phases, version 0.5.2b2 waits up to **30 seconds** for
 live confirmation that the vehicle has paused. It then waits an additional
 **5 seconds** by default and checks the state again before sending the phase
 command. Configure **Extra wait before phase changes** from **0 to 30 seconds** in

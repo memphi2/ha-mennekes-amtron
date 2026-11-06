@@ -32,7 +32,7 @@ These tests use real decoders, the shared control/poll paths and simulated
 Modbus or HTTP responses. They complement hardware tests; passing them does
 not establish that every possible device or timing fault has been covered.
 
-## State-change queue — next beta, unreleased
+## State-change queue
 
 The queue's regression contract covers configurable intervals, the unchanged
 five-second current-write floor, and a shared guard for pause/resume, phase
@@ -156,7 +156,7 @@ A partial report cannot pass validation.
 
 ## AppArmor enforcement
 
-App 0.5.2b1 adds a custom profile for the Supervisor app. Syntax validation and
+App 0.5.2b1 and newer include a custom profile for the Supervisor app. Syntax validation and
 runtime enforcement are separate checks. A parser run must accept the pinned
 ABI and rules without warnings; it does not prove that the service can operate
 under those rules.

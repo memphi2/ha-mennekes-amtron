@@ -10,13 +10,11 @@ app's **Read-only** switch off in service mode, saving and restarting the app,
 or **Modbus master** in the integration options for a direct USB or LAN connection.
 Current writes retain a **five-second minimum interval**. For automatic
 pause/resume, use different start/stop thresholds and hold times; the PV blueprint
-defaults to six minutes. **Next beta, unreleased:** early pause/resume, phase,
+defaults to six minutes. **New in 0.5.2b2:** early pause/resume, phase,
 release and lock changes are queued using the configurable state-change
 interval (default 300 seconds). A newer charging request replaces older pending
 work. A stop replaces a pending start and also waits for its due time. See
-[Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
-Published 0.5.2b1 still rejects early pause/resume and phase requests rather than
-retrying them automatically.
+[Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
 ## PV charging
 
@@ -79,10 +77,9 @@ mode: single
 ```
 
 A fixed time trigger is missed if Home Assistant is stopped at that time.
-It does not restore the schedule when HA starts later. In the next beta, a recent
+It does not restore the schedule when HA starts later. In version 0.5.2b2, a recent
 pause can delay an accepted start: inspect **Pending change** and **Pending
-change due**, as well as the **automation trace**. In published 0.5.2b1 the early
-start is rejected instead. A running service can execute an already queued
+change due**, as well as the **automation trace**. A running service can execute an already queued
 command while HA is offline. Check the current state after a restart rather
 than assuming the schedule ran.
 
@@ -95,7 +92,7 @@ Select **Requested phases** on the device page before automating a change.
 The integration pauses first when the wallbox reports charging and leaves it
 paused. Resume separately after the waiting interval, once the vehicle and
 wallbox are ready. The PV blueprints do not coordinate dynamic phase switching.
-In the next beta, the phase command waits for live pause confirmation and the
+In version 0.5.2b2, the phase command waits for live pause confirmation and the
 configured extra wait, then checks the state again. A failed confirmation leaves
 the phase command unsent and retains the pause.
 See [Phase switching](user-guide.md#phase-switching).
