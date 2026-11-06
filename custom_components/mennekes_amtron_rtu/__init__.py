@@ -39,6 +39,7 @@ from .device.const import (
     CONF_HOST,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
     CONF_PARITY,
+    CONF_PHASE_SWITCH_GRACE_SECONDS,
     CONF_PORT,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SERIAL_NUMBER,
@@ -52,6 +53,7 @@ from .device.const import (
     DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
     DEFAULT_NAME,
     DEFAULT_PARITY,
+    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
     DEFAULT_STOPBITS,
@@ -380,6 +382,9 @@ def _control_options(entry: MennekesAmtronConfigEntry) -> ControlOptions:
         current_cap=float(cap) if isinstance(cap, (int, float)) else None,
         state_change_interval_seconds=float(options.get(
             CONF_STATE_CHANGE_INTERVAL_SECONDS, DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
+        )),
+        phase_switch_grace_seconds=float(options.get(
+            CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS
         )),
     )
 

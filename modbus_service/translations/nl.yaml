@@ -19,7 +19,10 @@ configuration:
     description: Maximale aangevraagde EMS-stroom in ampère. Uitdrukkelijke opdrachten voor 0 A verwijderen de EMS-limiet.
   state_change_interval_seconds:
     name: Minimale tijd tussen statuswijzigingen
-    description: "Seconden vóór opnieuw starten of een fasewisseling (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Stoppen annuleert een geplande start zonder op dit interval te wachten. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen."
+    description: "Minimaal aantal seconden tussen starten, pauzeren en wijzigingen van de laadtoestemming, vergrendeling of fasen (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen."
+  phase_switch_grace_seconds:
+    name: "Extra wachttijd vóór fasewisselingen"
+    description: "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist."
   scan_interval:
     name: Statusinterval
     description: Aantal seconden tussen statusuitlezingen. De heartbeat loopt onafhankelijk.

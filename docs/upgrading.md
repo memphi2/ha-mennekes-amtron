@@ -11,14 +11,21 @@ to select the integration prerelease and beta app catalog. Check the
 ## Next beta: configurable charging transitions — unreleased
 
 The next beta adds **Minimum time between state changes**, default **300
-seconds** and configurable from **0 to 3600 seconds**. Early starts and phase
-changes are queued; the latest charging request wins and a stop cancels pending
-work. **Pending change** and **Pending change due** show what will happen and
-when. The regular controls continue to show the wallbox's actual state.
+seconds** and configurable from **0 to 3600 seconds**. Early pause/resume,
+phase, release and lock changes are queued; the latest charging request wins.
+**A stop request also waits**, replacing any older pending start. **Pending
+change** and **Pending change due** show what will happen and when. The regular
+controls continue to show the wallbox's actual state.
 While paused, the current slider instead shows the remembered resume target,
 which may already reflect a pending current request. Pausing within five
-seconds of a current write cancels pending work but returns a short wait error;
-request pause again after that wait.
+seconds of a current write is queued too and does not need to be requested again.
+
+Before a phase change, the next beta waits up to 30 seconds for live confirmation
+that the vehicle has paused, then adds a configurable grace time (default
+**5 seconds**, range **0–30 seconds**) and checks the state again. A failed
+confirmation or timeout leaves the phase command unsent and retains the pause.
+The grace time is separate from the 300-second state-change interval and is set
+in the same place.
 
 In direct mode, configure the interval in the integration options. In service
 mode, the app/service must include this feature and owns the setting; updating

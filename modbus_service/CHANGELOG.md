@@ -3,12 +3,16 @@
 ## Unreleased
 
 - Add `state_change_interval_seconds`, default 300 and configurable from 0 to
-  3600 seconds. Queue early charging starts and phase changes; newer requests
-  replace old pending work, and stop commands cancel a pending start.
+  3600 seconds. Queue early pause/resume, phase, release and lock changes;
+  newer requests replace old pending work, including a stop replacing a start.
 - Report the pending action and fixed due time to HA. A running service keeps
   the queue through HA restarts; restarting the service cancels pending work.
   Heartbeat and recovery that preserves the existing charging intent continue
   without waiting for this interval.
+- Wait for live pause confirmation before sending a phase change; a failed
+  confirmation or timeout keeps the phase command unsent and retains the pause.
+  Add `phase_switch_grace_seconds` (default 5, range 0–30) after confirmation,
+  followed by another live state check before switching.
 
 ## 0.5.2b1
 

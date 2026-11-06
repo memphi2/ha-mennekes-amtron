@@ -216,16 +216,28 @@ service mode. Remote HA commands use the service's policy.
 
 One pending-command slot and worker coordinate both short current-write delays
 and longer state-change waits. A newer command supersedes older pending work.
-Pause, release-off and lock-on discard pending starts and bypass the long guard;
-the current-write floor remains. Resume, phase changes, release-on and unlock
-share the transition clock. A phase command's pause and phase write form one
-operation and retain the existing behavior of leaving charging paused.
+Pause/resume, phase changes, both release directions and lock/unlock share the
+transition clock; the current-write floor also remains. A stop request replaces
+an older pending start and can itself wait in that slot. A phase command's pause
+and phase write form one operation. Before sending the phase write, live status
+checks must confirm that charging has paused within a bounded 30-second wait.
+For a connected vehicle, layouts v01.02 and newer require EVSE state 2 and CP
+state B1; v01.01 uses EVSE state 2 because it has no CP-state register.
+The separate `phase_switch_grace_seconds` setting defaults to 5 and accepts
+0–30 seconds. After this additional wait, status is rechecked before the phase
+write. A read failure or timeout aborts the phase command and retains the pause.
+Zero grace time skips only the additional delay. The operation leaves charging
+paused afterward. With no vehicle and an idle EVSE, confirmation and grace time
+are unnecessary; the shared transition guard still applies.
 Idempotent commands do not restart the timer. Recovery reasserts existing intent
 without consuming a new transition or waiting for the longer interval.
 
 The worker releases locks while waiting and revalidates the operation before
-execution. It exposes a stable pending action and UTC due timestamp; no
-per-second state or timestamp writes are required. Register readback remains
+execution. It exposes a stable pending action and a UTC due timestamp during
+timed waits. While awaiting vehicle pause confirmation, the phase action remains
+visible with no due timestamp; confirmation sets a fixed timestamp for the end
+of the grace period. No per-second state or timestamp writes are required.
+Register readback remains
 separate from requested state. Shutdown cancels pending work, so a new owner
 never silently replays a queued start. The running service and its queue survive
 an HA restart. Entry reloads retain timing in memory; cold process starts use

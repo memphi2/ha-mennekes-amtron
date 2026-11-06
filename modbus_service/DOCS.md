@@ -64,6 +64,12 @@ instead: the app and integration can be updated independently.
 published 0.5.2b1. Zero disables the longer wait; the technical write guards
 remain. Save changes and restart this app. HA does not apply a second interval.
 
+The next beta also adds **Extra wait before phase changes**, default **5 seconds** and
+configurable from **0 to 30 seconds**. After the vehicle confirms a pause, the
+app waits this extra time and checks the state again before changing phases.
+Zero skips only the extra delay; pause confirmation and the state-change
+interval still apply.
+
 **Adapter host / IP** is always visible; enter it for LAN and
 leave it empty for USB. If **Serial adapter** is hidden, enable **Show unused
 optional configuration options** on the Configuration tab. The form does not
@@ -101,16 +107,27 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
 - **Heartbeat status:** check HA's **Heartbeat** diagnostic sensor. It records
   health changes rather than every beat.
 
-In the next beta, an early start or phase change is queued. HA's **Pending
-change** and **Pending change due** show the request and its scheduled time.
-The latest charging request replaces the old one, and stopping cancels a
-pending start. A pause within the five-second current-write interval cancels
-pending work but returns a short wait error; request pause again after that
-wait. A fixed due timestamp supplies the remaining-time display without
-database updates every second. Pause/release/lock/phase readback still shows the
+In the next beta, early pause/resume, phase, release and lock changes are queued.
+HA's **Pending change** and **Pending change due** show the request and its
+scheduled time. The latest charging request replaces the old one. **A stop
+request also waits**, replacing any pending start. A pause within the five-second
+current-write interval is queued too and does not need to be requested again.
+A fixed due timestamp supplies the remaining-time display during timed waits,
+without database updates every second. While a phase change waits for vehicle
+pause confirmation, its action stays visible but the due time is unknown. Once
+confirmed, the timestamp shows the end of the extra wait.
+Pause/release/lock/phase readback still shows the
 actual wallbox state; the slider while paused shows the remembered resume
-target, which may already reflect a queued request. Heartbeat and recovery that preserves the existing intent keep
-running during a wait.
+target, which may already reflect a queued request. Heartbeat and recovery that
+preserves the existing intent keep running during a wait.
+
+Before changing phases, the next beta waits up to 30 seconds for live confirmation
+that the vehicle has paused, followed by the configured grace time. If the
+confirmation or the final state check fails, the phase command is not sent and
+the requested pause remains in place. Resume separately after a successful
+phase change.
+An idle wallbox without a connected vehicle does not need pause confirmation or
+the extra wait; the shared state-change interval still applies.
 
 HA can remain offline indefinitely while the app holds the last charging state.
 Automations cannot produce new settings during that outage. In the next beta,

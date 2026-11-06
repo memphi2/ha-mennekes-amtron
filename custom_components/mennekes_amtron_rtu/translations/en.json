@@ -394,12 +394,15 @@
         "name": "Pending change",
         "state": {
           "none": "No pending change",
+          "pause": "Pause charging",
           "resume": "Resume charging",
           "set_current": "Set charging current",
           "single_phase": "Use one phase",
           "all_phases": "Use all available phases",
           "enable_charging": "Enable charging release",
-          "unlock": "Unlock wallbox"
+          "disable_charging": "Disable charging release",
+          "unlock": "Unlock wallbox",
+          "lock": "Lock wallbox"
         }
       },
       "pending_change_until": {
@@ -451,6 +454,12 @@
     },
     "phase_state_unknown": {
       "message": "The current charging state could not be confirmed. No phases were switched. Check the connection and try again."
+    },
+    "phase_pause_timeout": {
+      "message": "The vehicle did not confirm the charging pause in time. No phase-change command was sent. Check the charging state before trying again."
+    },
+    "phase_pause_state_unknown": {
+      "message": "The charging pause could not be confirmed. No phase-change command was sent. Check the connection and charging state before trying again."
     },
     "restart_state_unknown": {
       "message": "The current charging state could not be confirmed. No restart was requested. Check the connection and try again."
@@ -518,14 +527,16 @@
           "current_limit": "Charging current cap",
           "measurement_interval_seconds": "Measurement interval",
           "scan_interval_seconds": "Status polling interval",
-          "state_change_interval_seconds": "Minimum time between state changes"
+          "state_change_interval_seconds": "Minimum time between state changes",
+          "phase_switch_grace_seconds": "Extra wait before phase changes"
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
           "current_limit": "Upper bound of the charging-current entity, in addition to the limit the wallbox itself enforces.",
           "measurement_interval_seconds": "Power, voltage, current and session values: 30 seconds reduces database load. Status changes refresh immediately. Without a vehicle, at least 60 seconds. The status interval sets the shortest possible polling time.",
           "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently.",
-          "state_change_interval_seconds": "Seconds before a new start or phase change can run (default 300). Early commands are queued; the latest command replaces the previous one. Stopping cancels a queued start and does not wait for this interval. The five-second current-write interval still applies. Set 0 to disable the longer interval."
+          "state_change_interval_seconds": "Minimum seconds between charging starts, pauses, release changes, locking or unlocking, and phase changes (default 300). Early commands are queued; the latest command replaces the previous one. The five-second current-write interval still applies. Set 0 to disable the longer interval.",
+          "phase_switch_grace_seconds": "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required."
         },
         "title": "Options"
       },
@@ -539,7 +550,7 @@
           "current_limit": "Additional cap for currents requested by Home Assistant. The service cap still applies. Explicitly selecting 0 A disables the EMS limit.",
           "scan_interval_seconds": "How often Home Assistant reads the service state. This changes neither Modbus measurement polling nor the heartbeat interval."
         },
-        "description": "The app's Read-only setting also controls write permission in Home Assistant. Disable it in the app, save and restart the app to enable controls. Control entities remain unavailable while the service is read-only or not ready. Set the minimum time between state changes in the app configuration; the service applies it even while Home Assistant is restarting."
+        "description": "The app's Read-only setting also controls write permission in Home Assistant. Disable it in the app, save and restart the app to enable controls. Control entities remain unavailable while the service is read-only or not ready. Set the minimum time between state changes and the extra wait before phase changes in the app configuration; the service applies both even while Home Assistant is restarting."
       }
     }
   },

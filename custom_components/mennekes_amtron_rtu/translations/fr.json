@@ -394,12 +394,15 @@
         "name": "Changement en attente",
         "state": {
           "none": "Aucun changement en attente",
+          "pause": "Mettre la charge en pause",
           "resume": "Reprendre la charge",
           "set_current": "Régler le courant de charge",
           "single_phase": "Utiliser une phase",
           "all_phases": "Utiliser toutes les phases disponibles",
           "enable_charging": "Autoriser la charge",
-          "unlock": "Déverrouiller la borne"
+          "disable_charging": "Désactiver l’autorisation de charge",
+          "unlock": "Déverrouiller la borne",
+          "lock": "Verrouiller la borne"
         }
       },
       "pending_change_until": {
@@ -451,6 +454,12 @@
     },
     "phase_state_unknown": {
       "message": "L’état actuel de charge n’a pas pu être confirmé. Aucune commutation de phases n’a été effectuée. Vérifiez la connexion et réessayez."
+    },
+    "phase_pause_timeout": {
+      "message": "Le véhicule n’a pas confirmé la pause de charge à temps. Aucune commande de changement de phases n’a été envoyée. Vérifiez l’état de charge avant de réessayer."
+    },
+    "phase_pause_state_unknown": {
+      "message": "La pause de charge n’a pas pu être confirmée. Aucune commande de changement de phases n’a été envoyée. Vérifiez la connexion et l’état de charge avant de réessayer."
     },
     "restart_state_unknown": {
       "message": "L’état actuel de charge n’a pas pu être confirmé. Aucun redémarrage n’a été demandé. Vérifiez la connexion et réessayez."
@@ -518,14 +527,16 @@
           "current_limit": "Plafond du courant de charge",
           "measurement_interval_seconds": "Intervalle des mesures",
           "scan_interval_seconds": "Intervalle de lecture de l’état",
-          "state_change_interval_seconds": "Délai minimal entre changements d’état"
+          "state_change_interval_seconds": "Délai minimal entre changements d’état",
+          "phase_switch_grace_seconds": "Attente supplémentaire avant changement de phases"
         },
         "data_description": {
           "control_mode": "Les deux modes envoient des requêtes de lecture et nécessitent un accès exclusif au bus. Lecture seule n’écrit pas dans les registres. Maître Modbus envoie également le signal de présence et active les entités de commande. Ne partagez pas ce bus avec un autre maître.",
           "current_limit": "Limite supérieure de l’entité de courant de charge, en plus de la limite imposée par la borne elle-même.",
           "measurement_interval_seconds": "Puissance, tension, courant et données de session : un intervalle de 30 secondes réduit la charge de la base de données. Un changement d’état déclenche une actualisation immédiate. Sans véhicule, l’intervalle est d’au moins 60 secondes. L’intervalle de lecture de l’état fixe la fréquence maximale des lectures.",
           "scan_interval_seconds": "Fréquence de lecture de l’état de charge, des erreurs et des commandes. Le signal de présence fonctionne indépendamment.",
-          "state_change_interval_seconds": "Secondes avant un nouveau démarrage ou changement de phases (300 par défaut). Les commandes trop précoces sont mises en attente ; la dernière remplace la précédente. Un arrêt annule le démarrage en attente sans attendre ce délai. L’intervalle de cinq secondes entre écritures du courant reste applicable. La valeur 0 désactive le délai prolongé."
+          "state_change_interval_seconds": "Délai minimal en secondes entre les démarrages, les pauses et les changements d’autorisation de charge, de verrouillage ou de phases (300 par défaut). Les commandes trop précoces sont mises en attente ; la dernière remplace la précédente. L’intervalle de cinq secondes entre écritures du courant reste applicable. La valeur 0 désactive le délai prolongé.",
+          "phase_switch_grace_seconds": "Secondes d’attente supplémentaires entre la confirmation de la pause de charge par le véhicule et le changement de phases (5 par défaut, de 0 à 30). La valeur 0 supprime uniquement cette attente supplémentaire ; la confirmation de la pause reste obligatoire."
         },
         "title": "Options"
       },
@@ -539,7 +550,7 @@
           "current_limit": "Plafond supplémentaire pour les courants demandés par Home Assistant. Le plafond du service reste applicable. Sélectionner explicitement 0 A supprime la limite du gestionnaire d’énergie.",
           "scan_interval_seconds": "Fréquence à laquelle Home Assistant lit l’état du service. Cela ne modifie ni la fréquence des mesures Modbus ni l’intervalle du signal de présence."
         },
-        "description": "Le réglage Lecture seule de l’application contrôle aussi l’autorisation d’écriture dans Home Assistant. Désactivez-le dans l’application, enregistrez et redémarrez l’application pour activer les commandes. Les entités de commande restent indisponibles tant que le service est en lecture seule ou n’est pas prêt. Réglez le délai minimal entre changements d’état dans la configuration de l’application ; le service l’applique même pendant un redémarrage de Home Assistant."
+        "description": "Le réglage Lecture seule de l’application contrôle aussi l’autorisation d’écriture dans Home Assistant. Désactivez-le dans l’application, enregistrez et redémarrez l’application pour activer les commandes. Les entités de commande restent indisponibles tant que le service est en lecture seule ou n’est pas prêt. Réglez le délai minimal entre changements d’état et l’attente supplémentaire avant changement de phases dans la configuration de l’application ; le service applique les deux même pendant un redémarrage de Home Assistant."
       }
     }
   },

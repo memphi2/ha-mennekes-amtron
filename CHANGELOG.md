@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## Unreleased
 
 - Add a configurable interval between charging-state changes, in seconds,
-  defaulting to 300. Queue early starts and phase changes, with the latest
-  request replacing an older pending action and stop commands cancelling it.
+  defaulting to 300. Queue early pause/resume, phase, release and lock changes,
+  with the latest request replacing an older pending action.
 - Show the pending change and its scheduled time without per-second Recorder
   updates. Configure the interval in direct-mode HA options or in the app/service
   that owns the connection; heartbeat and same-state error recovery continue.
+- Confirm the vehicle has paused before sending a phase change. Abort the phase
+  command if confirmation fails or times out, retaining the requested pause.
+  Add a separate configurable grace time after confirmation, default 5 seconds,
+  and recheck the state before switching.
 
 ## 0.5.2b1 — 2026-11-06
 

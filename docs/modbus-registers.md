@@ -212,3 +212,7 @@ block.
   and a five-second write floor for pause/resume. The next beta adds a shared,
   configurable state-change interval and queues early requests; see
   [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+- **Phase-switch sequence — next beta:** after requesting a pause, confirm it
+  through live status before writing `0x0D04`, as shown in the manufacturer's
+  example. A failed confirmation or timeout aborts the phase command and retains
+  the pause; the integration does not resume automatically afterward.

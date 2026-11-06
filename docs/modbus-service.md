@@ -162,12 +162,18 @@ a saved limited setpoint. A deliberately selected **0 A** remains unlimited;
 the wallbox's hardware limits still apply. See the [user guide](user-guide.md)
 for charging controls and automations.
 
-**Next beta, unreleased:** early starts and phase changes wait in one pending
-slot. **Pending change** and **Pending change due** show the action and when
-it can run. A newer charging request replaces it, and stopping cancels a
-pending start. Heartbeat and recovery that preserves the current intent keep
-running. Zero disables the longer wait, while technical write guards remain.
+**Next beta, unreleased:** early pause/resume, phase, release and lock changes
+wait in one pending slot. **Pending change** and **Pending change due** show
+the action and when it can run. A newer charging request replaces it. A stop
+replaces a pending start and also waits for its due time. Heartbeat and recovery
+that preserves the current intent keep running. Zero disables the longer wait,
+while technical write guards remain.
 See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+
+For phase changes, the next beta confirms that the vehicle has paused, waits
+the configured **Extra wait before phase changes** (default 5 seconds, range
+0–30), then checks the state again before switching. Configure this separately
+from the 300-second state-change interval in the app/service settings.
 
 ### What continues during an outage?
 

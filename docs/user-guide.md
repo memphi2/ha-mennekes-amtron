@@ -43,25 +43,29 @@ change it in the integration options. With the Modbus service, change it in
 the app configuration or standalone `state_change_interval_seconds` setting,
 then restart the service. HA does not apply a second interval on top of it.
 
-An early resume, phase change, charging-release enable or unlock is **queued**
-and runs when the applicable interval has elapsed. Changing the current while
-paused can also queue a resume. The latest charging request replaces an older
-pending request. Repeating the same requested state does not extend the wait.
+An early pause, resume, phase change, charging-release change or wallbox lock
+change is **queued** and runs when the applicable interval has elapsed.
+Changing the current while paused can also queue a resume. The latest charging
+request replaces an older pending request. Repeating the same requested state
+does not extend the wait.
 
 **Pending change** shows what is waiting, and **Pending change due** shows
-when it can run. Home Assistant can display that timestamp relative to the
-current time. The stored timestamp stays fixed while waiting, so a countdown
-does not create a database update every second. Pause, release, lock and phase
+the planned execution time when known. While a phase change waits for the
+vehicle to confirm its pause, the action stays visible but its due time is
+unknown. Once confirmed, the due time shows the end of the extra wait. Home
+Assistant can display a known timestamp relative to the current time. That
+timestamp stays fixed during a timed wait, so a countdown does not create a
+database update every second. Pause, release, lock and phase
 controls continue to show the wallbox's actual state. While paused, the current
 slider shows the remembered resume target, which can already reflect the queued
 request; it does not indicate that charging has started.
 
-Pausing, disabling charging release or locking the wallbox cancels a pending
-start. These stop commands do not wait for the long interval. A pause within
-five seconds of the previous current write cancels the pending start, but is
-itself rejected with the remaining wait time; request pause again after that
-short wait. It is not silently queued. Error recovery can
-reassert the existing state and the heartbeat continues throughout the wait.
+Pausing, disabling charging release or locking the wallbox replaces a pending
+start with that new request. **These commands also wait for the interval:**
+charging may continue until the displayed due time. A pause within five seconds
+of the previous current write is also queued, so it does not need to be sent
+again. Error recovery can reassert the existing state and the heartbeat
+continues throughout the wait.
 Setting the interval to **0** disables the longer wait, while the technical
 write guards remain.
 
@@ -122,6 +126,7 @@ the exact state values available to templates.
 | How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
 | Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
 | Minimum time between state changes — next beta | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
+| Extra wait before phase changes — next beta | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 
 The default status interval is **5 seconds** and the measurement interval is
 **30 seconds**. The available range is 2–300 seconds. In service mode, changing
@@ -190,7 +195,16 @@ after the controlling process starts. In the next beta, phase changes share
 the [configurable state-change interval](#waiting-between-charging-changes--next-beta-unreleased)
 and an early request is queued. Wait until the phase request has actually run
 before requesting resume; a new resume request would replace a queued phase
-request.
+request. Before changing phases, the next beta waits up to **30 seconds** for
+live confirmation that the vehicle has paused. It then waits an additional
+**5 seconds** by default and checks the state again before sending the phase
+command. Configure **Extra wait before phase changes** from **0 to 30 seconds** in
+the integration options for direct connections, or in the app/service for
+service connections. Zero removes only the extra grace time, not pause
+confirmation or the separate 300-second state-change interval. If confirmation
+fails or times out, the phase command is not sent and the requested pause
+remains in place. With no vehicle connected and the wallbox idle, there is no
+vehicle pause to confirm or extra wait; the state-change interval still applies.
 See [phase-switching troubleshooting](troubleshooting.md#phase-switching-leaves-charging-paused).
 
 ## Actions

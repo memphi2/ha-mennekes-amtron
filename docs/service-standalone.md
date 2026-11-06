@@ -50,11 +50,18 @@ the credential and saved charging intent.
 
 **Next beta, unreleased:** the service also accepts
 `"state_change_interval_seconds": 300` (whole seconds, 0–3600). It controls
-the wait between charging-state changes; early starts and phase changes are
-queued, while a stop cancels pending work. Zero disables the longer wait;
+the wait between charging-state changes; early pause/resume, phase, release and
+lock changes are queued. A stop replaces older pending work and also waits for
+its due time. Zero disables the longer wait;
 technical write guards remain. Do not add this option to published 0.5.2b1 or
 older services, which reject unknown configuration fields. See
 [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+
+The next beta also accepts `"phase_switch_grace_seconds": 5` (whole seconds,
+0–30). This is an additional wait after live pause confirmation, before the
+final status check and phase write. Zero disables only this grace time. It does
+not replace the state-change interval or the bounded pause-confirmation check.
+Published 0.5.2b1 and older services do not accept this field.
 
 The API uses plain HTTP. Put it on a trusted private network or use an HTTPS
 reverse proxy outside that network. Do not expose it to the Internet. The HA

@@ -35,10 +35,21 @@ not establish that every possible device or timing fault has been covered.
 ## State-change queue — next beta, unreleased
 
 The queue's regression contract covers configurable intervals, the unchanged
-five-second current-write floor, and a shared guard for resume, phase changes,
-charging-release enable and unlock. Tests must also cover repeated identical
-commands, newer requests superseding pending work, stop cancelling a pending
-start, and same-intent recovery while the longer interval is active.
+five-second current-write floor, and a shared guard for pause/resume, phase
+changes, both charging-release directions and lock/unlock. Tests must also cover
+repeated identical commands, newer requests superseding pending work, a queued
+stop replacing a pending start, and same-intent recovery while the longer
+interval is active.
+
+Phase-switch tests must prove that the pause command alone does not authorize
+the phase write: live status must first confirm the paused state. Cover delayed
+confirmation, invalid or failed reads, timeout and cancellation without a phase
+write or automatic resume. Verify the configurable grace time (default 5 seconds,
+range 0–30), the live recheck after that wait and the independence of the shared
+state-change interval. Zero grace time must not skip pause confirmation.
+Connected vehicles require EVSE state 2 and, when the layout provides it, CP
+state B1. An idle EVSE without a vehicle needs neither confirmation nor grace
+time. Test the corresponding register-layout and idle paths.
 
 Use a controlled clock for delay and cancellation cases. Check that a worker
 does not hold the command lock while waiting, revalidates execution, and cannot
@@ -47,9 +58,11 @@ must distinguish an HA restart from a service restart: only the latter stops
 the service-owned queue. Configuration bounds and optional API 2 status fields
 need their own invalid-input checks.
 
-The two status entities must publish a stable action and due timestamp while
-waiting. Repeated snapshots and elapsed seconds must not generate countdown
-state updates in Recorder. These software checks do not replace hardware
+The two status entities must publish a stable action and due timestamp during
+timed waits. While awaiting vehicle pause confirmation, the phase action stays
+visible with no due timestamp. Confirmation sets the fixed grace-end timestamp.
+Repeated snapshots and elapsed seconds must not generate countdown state updates
+in Recorder. These software checks do not replace hardware
 acceptance of deliberate pause, resume and phase switching.
 
 ## Coverage requirements

@@ -10,10 +10,11 @@ app's **Read-only** switch off in service mode, saving and restarting the app,
 or **Modbus master** in the integration options for a direct USB or LAN connection.
 Current writes retain a **five-second minimum interval**. For automatic
 pause/resume, use different start/stop thresholds and hold times; the PV blueprint
-defaults to six minutes. **Next beta, unreleased:** early starts and phase
-changes are queued using the configurable state-change interval (default
-300 seconds). A newer charging request replaces older pending work, and a stop
-clears a pending start. See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
+defaults to six minutes. **Next beta, unreleased:** early pause/resume, phase,
+release and lock changes are queued using the configurable state-change
+interval (default 300 seconds). A newer charging request replaces older pending
+work. A stop replaces a pending start and also waits for its due time. See
+[Waiting between charging changes](user-guide.md#waiting-between-charging-changes--next-beta-unreleased).
 Published 0.5.2b1 still rejects early pause/resume and phase requests rather than
 retrying them automatically.
 
@@ -94,6 +95,9 @@ Select **Requested phases** on the device page before automating a change.
 The integration pauses first when the wallbox reports charging and leaves it
 paused. Resume separately after the waiting interval, once the vehicle and
 wallbox are ready. The PV blueprints do not coordinate dynamic phase switching.
+In the next beta, the phase command waits for live pause confirmation and the
+configured extra wait, then checks the state again. A failed confirmation leaves
+the phase command unsent and retains the pause.
 See [Phase switching](user-guide.md#phase-switching).
 
 ## Recovery and notifications

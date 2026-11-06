@@ -56,6 +56,9 @@ def test_independent_process_keeps_pause_and_heartbeat_across_core_restart(
                     "read_only": False,
                     "current_cap": 16,
                     "port": port,
+                    # Exercise the real transition guard without making this
+                    # process/restart test sleep five minutes at startup.
+                    "state_change_interval_seconds": 5,
                 }
             )
         )

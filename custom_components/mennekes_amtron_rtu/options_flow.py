@@ -11,10 +11,12 @@ from .device.const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
     CONF_MEASUREMENT_INTERVAL_SECONDS,
+    CONF_PHASE_SWITCH_GRACE_SECONDS,
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_STATE_CHANGE_INTERVAL_SECONDS,
     CONTROL_MODE_MASTER,
     DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
+    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
 )
 from .remote import CONF_SERVER_URL
@@ -69,6 +71,11 @@ def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, 
         options[CONF_STATE_CHANGE_INTERVAL_SECONDS] = int(
             user_input.get(
                 CONF_STATE_CHANGE_INTERVAL_SECONDS, DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
+            )
+        )
+        options[CONF_PHASE_SWITCH_GRACE_SECONDS] = int(
+            user_input.get(
+                CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS
             )
         )
     return options

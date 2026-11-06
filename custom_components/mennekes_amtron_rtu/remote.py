@@ -20,7 +20,11 @@ from .control import AmtronControl, ControlOptions, ha_command
 from .coordinator import MennekesAmtronCoordinator
 from .device.client import MennekesModbusClient, SerialConfig
 from .device.client_errors import AmtronConnectionError, AmtronWriteRejectedError
-from .device.const import DOMAIN, MAX_STATE_CHANGE_INTERVAL_SECONDS
+from .device.const import (
+    DOMAIN,
+    MAX_PHASE_SWITCH_GRACE_SECONDS,
+    MAX_STATE_CHANGE_INTERVAL_SECONDS,
+)
 from .device.control import PENDING_ACTIONS
 from .device.data import DeviceIdentity, WallboxData, WriteDiagnostics
 from .device.decode import RegisterValue
@@ -47,6 +51,10 @@ def _pending_status(control: dict[str, Any]) -> tuple[str | None, datetime | Non
         return None, None
     if not isinstance(action, str) or action not in PENDING_ACTIONS:
         raise ValueError("invalid pending action")
+    if action in ("single_phase", "all_phases") and until is None:
+        # The car has not acknowledged its pause yet; no execution time is
+        # known. The timestamp appears once the additional grace starts.
+        return action, None
     if not isinstance(until, str) or len(until) > 40:
         raise ValueError("invalid pending deadline")
     deadline = datetime.fromisoformat(until)
@@ -238,6 +246,15 @@ class RemoteClient(MennekesModbusClient):
                 or not 0 <= interval <= MAX_STATE_CHANGE_INTERVAL_SECONDS
             ):
                 raise ValueError("invalid state-change interval")
+            section = "control.phase_switch_grace_seconds"
+            if "phase_switch_grace_seconds" in control:
+                grace = control["phase_switch_grace_seconds"]
+                if (
+                    type(grace) not in (int, float)
+                    or not 0 <= grace <= MAX_PHASE_SWITCH_GRACE_SECONDS
+                    or int(grace) != grace
+                ):
+                    raise ValueError("invalid phase-switch grace time")
             section = "identity"
             identity = DeviceIdentity(**payload["identity"])
             if (

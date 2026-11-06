@@ -47,6 +47,7 @@ class Harness:
         clock: list[float] | None = None,
         error_code: int = 0,
         state_change_interval_seconds: float = 0,
+        phase_switch_grace_seconds: float = 5,
     ) -> None:
         self.transport = FakeModbusClient(device_bank(
             error_code=error_code,
@@ -75,6 +76,7 @@ class Harness:
             options=ControlOptions(
                 read_only=read_only, current_cap=current_cap,
                 state_change_interval_seconds=state_change_interval_seconds,
+                phase_switch_grace_seconds=phase_switch_grace_seconds,
             ),
             state=lambda: self.snapshot,
             request_refresh=self._refresh,
@@ -98,6 +100,13 @@ class Harness:
         return [
             words for address, words in self.transport.writes if address == spec.address
         ]
+
+    async def confirm_phase_pause(self) -> None:
+        """Explicitly simulate the vehicle acknowledging the requested pause."""
+        self.transport.bank[R.EVSE_STATE.address] = int(EvseState.EV_CONNECTED)
+        self.transport.bank[R.CP_STATE.address] = 11
+        if self.control._flush_task is not None:
+            await asyncio.wait_for(self.control._flush_task, 1)
 
 
 def _run(coro_factory) -> Harness:
@@ -359,6 +368,7 @@ def test_the_phase_switch_pauses_a_running_charge_first() -> None:
     async def run() -> None:
         control = await harness.connect()
         await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        await harness.confirm_phase_pause()
 
     asyncio.run(run())
     assert harness.written(R.CHARGING_CURRENT_EMS)
@@ -381,7 +391,10 @@ def test_phase_pause_restores_the_actual_pre_pause_current(remembered) -> None:
 
         control._request_refresh = refresh
         await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
-        assert observed == [8.0, 8.0]
+        await harness.confirm_phase_pause()
+        assert observed
+        assert all(value == 8.0 for value in observed)
+        assert harness.written(R.REQUESTED_PHASES) == [[1]]
         assert control.charging_setpoint == 8.0
         harness.snapshot = WallboxData(values={"charging_current_ems": 1.0})
         harness.clock[0] += 301
@@ -513,10 +526,12 @@ def test_recovery_retains_a_pause_and_obeys_the_write_floor() -> None:
 
         harness.snapshot = WallboxData(values={"charging_current_ems": 16.0})
         harness.clock[0] += 1
-        with pytest.raises(ServiceValidationError) as err:
-            await control.async_pause_charging()
-        assert err.value.translation_placeholders == {"seconds": "4"}
+        await control.async_pause_charging()
+        assert control.pending_action == "pause"
         assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
+        await asyncio.wait_for(control._flush_task, 1)
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 3
+        assert harness.clock[0] == 1010
 
     asyncio.run(run())
 
@@ -752,12 +767,7 @@ def test_a_queued_mode_change_does_not_start_the_hysteresis_again() -> None:
 
 
 def test_the_five_second_floor_still_applies_to_a_pause() -> None:
-    """Dropping the five-minute block did not drop the register's own rule.
-
-    A pause is still a write to 0x0302, so it keeps the vendor's five-second
-    distance from the write before it -- it is simply no longer held for five
-    minutes.
-    """
+    """A queued pause keeps the current register's own five-second floor."""
 
     harness = Harness(clock=[1000.0])
 
@@ -766,12 +776,15 @@ def test_the_five_second_floor_still_applies_to_a_pause() -> None:
         await control.async_set_charging_current(10)
         harness.clock[0] += 2
         harness.snapshot = WallboxData(values={"charging_current_ems": 10.0})
-        with pytest.raises(ServiceValidationError) as excinfo:
-            await control.async_pause_charging()
-        assert excinfo.value.translation_key == "write_rate_limited"
+        await control.async_pause_charging()
+        assert control.pending_action == "pause"
+        assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+        await asyncio.wait_for(control._flush_task, 1)
+        assert harness.clock[0] == 1005
+        assert control.is_paused is True
 
     asyncio.run(run())
-    assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+    assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 2
 
 
 def test_the_unlimited_opt_in_cannot_undo_a_pause_early_either() -> None:
@@ -1013,6 +1026,8 @@ def test_phase_switch_rate_limit_queues_until_the_shared_interval(charging: bool
         assert harness.written(R.CHARGING_CURRENT_EMS) == []
         harness.clock[0] += 285
         await control.async_set_requested_phases(RequestedPhases.ALL_AVAILABLE)
+        if charging:
+            await harness.confirm_phase_pause()
         assert harness.written(R.REQUESTED_PHASES) == [[1], [0]]
         assert bool(harness.written(R.CHARGING_CURRENT_EMS)) == charging
 
@@ -1055,6 +1070,8 @@ def test_phase_switch_uses_fresh_device_status(cached, actual, pause):
         control = await harness.connect()
         await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
         assert bool(harness.written(R.CHARGING_CURRENT_EMS)) == pause
+        if pause:
+            await harness.confirm_phase_pause()
         assert harness.written(R.REQUESTED_PHASES) == [[1]]
         assert (R.EVSE_STATE.address, 1) in harness.transport.reads
 

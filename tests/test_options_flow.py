@@ -98,6 +98,7 @@ def test_submitting_normalises_the_values() -> None:
             CONF_MEASUREMENT_INTERVAL_SECONDS: 30,
             CONF_CURRENT_LIMIT: 11.5,
             CONF_STATE_CHANGE_INTERVAL_SECONDS: 300,
+            "phase_switch_grace_seconds": 5,
         }
 
     asyncio.run(run())

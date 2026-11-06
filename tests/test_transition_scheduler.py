@@ -27,6 +27,40 @@ def test_default_interval_is_300_seconds():
     assert ControlOptions().state_change_interval_seconds == 300
 
 
+@pytest.mark.parametrize("stop", ["pause", "release", "lock"])
+def test_every_stop_direction_waits_for_the_shared_interval(stop):
+    async def run():
+        harness = Harness(
+            state_change_interval_seconds=300, values={"charging_current_ems": 1},
+        )
+        control = await harness.connect()
+        await control.async_resume_charging()
+        harness.clock[0] += 10
+        action = (
+            control.async_pause_charging() if stop == "pause"
+            else control.async_set_charging_release(False) if stop == "release"
+            else control.async_set_lock_evse(True)
+        )
+        await action
+        assert control.pending_action == {
+            "pause": "pause", "release": "disable_charging", "lock": "lock",
+        }[stop]
+        assert len(harness.transport.writes) == 1
+        due = control.pending_until
+        assert due is not None
+        await asyncio.wait_for(control._flush_task, 1)
+        assert harness.clock[0] == 1300
+        assert len(harness.transport.writes) == 2
+        assert control.pending_action is None
+        if stop == "pause":
+            assert control.is_paused is True
+        else:
+            spec = R.CHARGING_RELEASE if stop == "release" else R.LOCK_EVSE
+            assert harness.written(spec) == [[int(stop == "lock")]]
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("interval", [0, 30, 300, 3600])
 def test_resume_waits_for_configured_interval_without_changing_pause(interval):
     async def run():
@@ -95,6 +129,7 @@ def test_phase_switch_and_resume_use_same_guard_without_blocking_internal_pause(
         )
         control = await harness.connect()
         await control.async_set_requested_phases(RequestedPhases.SINGLE_PHASE)
+        await harness.confirm_phase_pause()
         assert harness.written(R.REQUESTED_PHASES) == [[1]]
         assert control.is_paused is True
         changed = control._write_state.mode_change_at
@@ -105,7 +140,7 @@ def test_phase_switch_and_resume_use_same_guard_without_blocking_internal_pause(
         await control.async_resume_charging()
         assert control.pending_action == "resume"
         await asyncio.wait_for(control._flush_task, 1)
-        assert harness.clock[0] == 1300
+        assert harness.clock[0] == changed + 300
         assert control.charging_setpoint == 8
 
     asyncio.run(run())

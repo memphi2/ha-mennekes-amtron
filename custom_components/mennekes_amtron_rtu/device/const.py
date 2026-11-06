@@ -70,6 +70,9 @@ MIN_PHASE_CHANGE_INTERVAL_SECONDS: Final = 5.0
 CONF_STATE_CHANGE_INTERVAL_SECONDS: Final = "state_change_interval_seconds"
 DEFAULT_STATE_CHANGE_INTERVAL_SECONDS: Final = 300
 MAX_STATE_CHANGE_INTERVAL_SECONDS: Final = 3600
+CONF_PHASE_SWITCH_GRACE_SECONDS: Final = "phase_switch_grace_seconds"
+DEFAULT_PHASE_SWITCH_GRACE_SECONDS: Final = 5
+MAX_PHASE_SWITCH_GRACE_SECONDS: Final = 30
 
 # 0x0302 semantics. 0 A means "no limitation" and makes the wallbox signal its
 # maximum, 0.01-5.99 A is the vendor's documented pause value.

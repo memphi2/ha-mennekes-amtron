@@ -55,11 +55,11 @@ def test_pending_sensors_publish_fixed_deadlines_without_poll_churn():
                 await coordinator.async_refresh()
                 assert deadline.native_value == expected
             assert len(notifications) == before
-            # Block charging immediately: a pending start must disappear now.
+            # Replace the queued start with a block, subject to the same guard.
             await control.async_set_charging_release(False)
-            assert action.native_value == "none"
-            assert deadline.native_value is None
-            assert transport.bank[R.CHARGING_RELEASE.address] == 0
+            assert action.native_value == "disable_charging"
+            assert deadline.native_value is not None
+            assert transport.bank[R.CHARGING_RELEASE.address] == 1
             coordinator.last_update_success = False
             assert not action.available
             assert not deadline.available

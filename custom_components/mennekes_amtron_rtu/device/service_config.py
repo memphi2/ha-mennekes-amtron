@@ -7,7 +7,9 @@ from typing import Any, Literal, cast
 
 from .connection import ConnectionConfig, NetworkConfig, SerialConfig
 from .const import (
+    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
+    MAX_PHASE_SWITCH_GRACE_SECONDS,
     MAX_STATE_CHANGE_INTERVAL_SECONDS,
     SUPPORTED_BAUDRATES,
     frame_parts,
@@ -50,6 +52,7 @@ class ServerConfig:
     listen: str = "127.0.0.1"
     port: int = 8765
     state_change_interval_seconds: float = DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
+    phase_switch_grace_seconds: float = DEFAULT_PHASE_SWITCH_GRACE_SECONDS
 
     @classmethod
     def from_dict(cls, values: dict[str, Any]) -> ServerConfig:
@@ -69,6 +72,7 @@ class ServerConfig:
             "listen",
             "port",
             "state_change_interval_seconds",
+            "phase_switch_grace_seconds",
         }
         if values.keys() - allowed:
             raise ValueError("unknown service configuration option")
@@ -94,6 +98,10 @@ class ServerConfig:
             _integer_option(
                 values.get("state_change_interval_seconds", DEFAULT_STATE_CHANGE_INTERVAL_SECONDS),
                 "state_change_interval_seconds", 0, MAX_STATE_CHANGE_INTERVAL_SECONDS,
+            ),
+            _integer_option(
+                values.get("phase_switch_grace_seconds", DEFAULT_PHASE_SWITCH_GRACE_SECONDS),
+                "phase_switch_grace_seconds", 0, MAX_PHASE_SWITCH_GRACE_SECONDS,
             ),
         )
 

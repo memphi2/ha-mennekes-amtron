@@ -118,6 +118,7 @@ class ModbusService:
                 self.config.read_only,
                 self.config.current_cap,
                 state_change_interval_seconds=self.config.state_change_interval_seconds,
+                phase_switch_grace_seconds=self.config.phase_switch_grace_seconds,
             ),
             state=lambda: self.data,
             request_refresh=self._control_updated,
@@ -301,6 +302,7 @@ class ModbusService:
                 "read_only": self.config.read_only,
                 "current_cap": self.config.current_cap,
                 "state_change_interval_seconds": self.config.state_change_interval_seconds,
+                "phase_switch_grace_seconds": self.config.phase_switch_grace_seconds,
                 "pending_action": control.pending_action if control else None,
                 "pending_until": (
                     control.pending_until.isoformat()

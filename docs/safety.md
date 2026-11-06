@@ -102,13 +102,13 @@ the integration's extra current cap, while hardware limits remain in force.
 - **Next beta, unreleased:** one shared state-change interval defaults to
   **300 seconds** and can be set from 0 to 3600 seconds. Choose 360 seconds if
   you want to exceed the manufacturer's five-minute threshold. An early
-  resume, phase change, release enable or unlock waits in a single pending
-  slot; a newer charging request replaces the older one. Stops cancel pending
-  starts and bypass the longer interval. Current writes still observe their
-  five-second floor, including a pause requested just after another current
-  write. An early pause cancels pending work, then returns a remaining-wait
-  error; the pause must be requested again after that short wait. It is not
-  deferred. Zero disables the longer interval, not these technical write guards.
+  pause, resume, phase change, release change or lock change waits in a single
+  pending slot; a newer charging request replaces the older one. Stop requests
+  also wait, so charging can continue until their due time. Current writes
+  still observe their five-second floor, including a pause requested just after
+  another current write. An early pause is queued and does not need to be
+  requested again. Zero disables the longer interval, not these technical
+  write guards.
 - Repeating the same state and recovery that preserves existing intent do not
   restart the long timer. Timing guards survive an entry reload in memory.
   A cold process start uses a fresh guard period because prior timing is
@@ -134,6 +134,14 @@ option 2. Even there:
 - some vehicles need the charging current set to the pause value **before**
   the phase count changes. The integration does that automatically while the
   wallbox is charging;
+- **next beta, unreleased:** after requesting a pause, the integration waits
+  up to 30 seconds for live confirmation that charging has paused. A separate
+  grace time then defaults to 5 seconds and is configurable from 0 to 30
+  seconds. The state is checked again before sending the phase command. A
+  failed confirmation or timeout leaves the phase request unsent and retains
+  the pause. Zero grace time does not disable confirmation or the shared
+  state-change interval. An idle wallbox with no vehicle does not need pause
+  confirmation or the extra wait;
 - the integration leaves charging paused after this sequence. Resume
   explicitly after the waiting interval;
 - not every vehicle tolerates phase switching at all. Check your vehicle's

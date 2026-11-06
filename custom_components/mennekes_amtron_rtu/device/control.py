@@ -36,20 +36,23 @@ from .const import (
     CHARGING_CURRENT_MINIMUM,
     CHARGING_CURRENT_UNLIMITED,
     CHARGING_PAUSE_CURRENT,
+    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
     ERROR_CODE_EMS_UNAVAILABLE,
     HEARTBEAT_VALUE,
+    MAX_PHASE_SWITCH_GRACE_SECONDS,
     MAX_STATE_CHANGE_INTERVAL_SECONDS,
     MIN_CURRENT_WRITE_INTERVAL_SECONDS,
     MIN_PHASE_CHANGE_INTERVAL_SECONDS,
     SYSTEM_RESTART_VALUE,
 )
 from .data import DeviceIdentity, WallboxData, WriteDiagnostics
-from .enums import EvseState, RequestedPhases, SolarChargingMode
+from .enums import CpState, EvseState, RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError, device_error, validation_error
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
+    CP_STATE,
     ERROR_CODE,
     EVSE_STATE,
     HEARTBEAT,
@@ -63,8 +66,24 @@ from .runtime_events import EventType
 
 _LOGGER = logging.getLogger(__name__)
 PENDING_ACTIONS = (
-    "resume", "set_current", "single_phase", "all_phases", "enable_charging", "unlock",
+    "pause", "resume", "set_current", "single_phase", "all_phases",
+    "disable_charging", "enable_charging", "lock", "unlock",
 )
+_PHASE_PAUSE_TIMEOUT = 30.0
+
+
+@dataclass(slots=True)
+class _PhaseChange:
+    confirmation_deadline: float
+    ready_at: float | None = None
+
+
+class _PhaseWaitError(Exception):
+    """Yield the command lock while the car pauses or the grace time passes."""
+
+    def __init__(self, delay: float, *, preserve_deadline: bool = False) -> None:
+        self.retry_after = delay
+        self.preserve_deadline = preserve_deadline
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +99,7 @@ class ControlOptions:
     read_only: bool = True
     current_cap: float | None = None
     state_change_interval_seconds: float = DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
+    phase_switch_grace_seconds: float = DEFAULT_PHASE_SWITCH_GRACE_SECONDS
 
     def __post_init__(self) -> None:
         interval = self.state_change_interval_seconds
@@ -90,6 +110,14 @@ class ControlOptions:
             or not 0 <= interval <= MAX_STATE_CHANGE_INTERVAL_SECONDS
         ):
             raise ValueError("state_change_interval_seconds must be between 0 and 3600")
+        grace = self.phase_switch_grace_seconds
+        if (
+            isinstance(grace, bool)
+            or not isinstance(grace, (int, float))
+            or not math.isfinite(grace)
+            or not 0 <= grace <= MAX_PHASE_SWITCH_GRACE_SECONDS
+        ):
+            raise ValueError("phase_switch_grace_seconds must be between 0 and 30")
 
 
 class AmtronControl:
@@ -120,6 +148,7 @@ class AmtronControl:
         self._sleep = sleep
         self._monotonic = monotonic
         self._pending: _PendingCommand | None = None
+        self._phase_change: _PhaseChange | None = None
         self._pending_due = 0.0
         self._pending_until: datetime | None = None
         self._pending_changed = asyncio.Event()
@@ -254,11 +283,7 @@ class AmtronControl:
 
         self._require_write_access()
         async with self._current_lock:
-            await self._async_cancel_pending()
-            try:
-                await self._async_apply_current(CHARGING_PAUSE_CURRENT)
-            except AmtronRateLimitedError as err:
-                self._raise_rate_limited(err)
+            await self._async_submit_locked(_PendingCommand("pause", CHARGING_PAUSE_CURRENT))
 
     def _resume_current_maximum(self, current_cap: float | None) -> float:
         if current_cap is None:
@@ -288,22 +313,16 @@ class AmtronControl:
 
         self._require_write_access()
         async with self._current_lock:
-            if released:
-                await self._async_submit_locked(_PendingCommand("enable_charging", 1))
-            else:
-                await self._async_cancel_pending()
-                await self._async_apply_release(False)
+            await self._async_submit_locked(_PendingCommand(
+                "enable_charging" if released else "disable_charging", int(released),
+            ))
 
     async def async_set_lock_evse(self, locked: bool) -> None:
         """Lock or unlock the wallbox through 0x0D06."""
 
         self._require_write_access()
         async with self._current_lock:
-            if locked:
-                await self._async_cancel_pending()
-                await self._async_apply_lock(True)
-            else:
-                await self._async_submit_locked(_PendingCommand("unlock", 0))
+            await self._async_submit_locked(_PendingCommand("lock" if locked else "unlock", int(locked)))
 
     async def async_set_solar_charging_mode(self, mode: SolarChargingMode) -> None:
         """Set the solar charging mode shown on the wallbox HMI (0x0D03)."""
@@ -445,22 +464,14 @@ class AmtronControl:
         waited = self._monotonic() - self._write_state.mode_change_at
         return max(0.0, self._options.state_change_interval_seconds - waited)
 
-    def _raise_rate_limited(self, error: AmtronRateLimitedError) -> None:
-        self._diagnostics.writes_rate_limited += 1
-        self._diagnostics.timeline.record(
-            EventType.WRITE_RATE_LIMITED, register=CHARGING_CURRENT_EMS.address
-        )
-        raise validation_error(
-            "write_rate_limited", {"seconds": str(math.ceil(error.retry_after))}
-        ) from error
-
     async def _async_apply_current(
         self, value: float, *, preserve_setpoint: bool = False, recovery: bool = False,
+        phase_preparation: bool = False,
     ) -> None:
         transition = self._current_transition(value) and not recovery
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._write_state.confirmed_current
-        if transition and not paused:
+        if transition and not phase_preparation:
             self._check_transition_interval()
         try:
             await self._async_write(
@@ -487,7 +498,7 @@ class AmtronControl:
             self._remember_pause_setpoint(previous, preserve_setpoint)
         if transition:
             self._write_state.mode_change_at = self._monotonic()
-        if not recovery:
+        if not recovery and not phase_preparation:
             # The command reached the device. A failed visibility/persistence
             # callback must never allow an older queued command to run later.
             self._clear_pending()
@@ -540,7 +551,7 @@ class AmtronControl:
     async def _async_apply_release(self, released: bool) -> None:
         current = await self._async_read_switch(CHARGING_RELEASE, stopping=not released)
         changed = current != int(released)
-        if released and changed:
+        if changed:
             self._check_transition_interval()
         previous = self.charging_release_requested
         self.charging_release_requested = released
@@ -556,7 +567,7 @@ class AmtronControl:
     async def _async_apply_lock(self, locked: bool) -> None:
         current = await self._async_read_switch(LOCK_EVSE, stopping=locked)
         changed = current != int(locked)
-        if not locked and changed:
+        if changed:
             self._check_transition_interval()
         await self._async_transition_write(LOCK_EVSE, int(locked), changed=changed)
 
@@ -564,23 +575,71 @@ class AmtronControl:
         current = await self._async_read_switch(REQUESTED_PHASES)
         if current == phases:
             return
-        # Admit the entire pause/phase operation before changing either
-        # register. Its own pause must not block the following phase write.
-        self._check_transition_interval()
+        change = self._phase_change
+        if change is None:
+            # Admit the whole pause/phase operation once. Its own pause must
+            # not trigger another long wait within this operation.
+            self._check_transition_interval()
+            self._client.check_write_interval(
+                REQUESTED_PHASES, min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS
+            )
+            state = await self._async_current_evse_state("phase_state_unknown")
+            if state not in (EvseState.IDLE, EvseState.EV_CONNECTED,
+                             EvseState.PRECONDITIONS_VALID, EvseState.READY_TO_CHARGE,
+                             EvseState.CHARGING):
+                raise validation_error("phase_pause_state_unknown")
+            if state != EvseState.IDLE:
+                # Preparation physically pauses charging. Discard the older
+                # command before that write, including if persistence fails.
+                self._clear_pending()
+                await self._async_apply_current(CHARGING_PAUSE_CURRENT, phase_preparation=True)
+                change = _PhaseChange(self._monotonic() + _PHASE_PAUSE_TIMEOUT)
+                self._phase_change = change
+        if change is not None:
+            await self._async_confirm_phase_pause(change)
+        # Every resumed step rechecks live state and hardware identity through
+        # the client; no register lock is held during the waiting periods.
         self._client.check_write_interval(
             REQUESTED_PHASES, min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS
         )
-        state = await self._async_current_evse_state("phase_state_unknown")
-        if state == EvseState.CHARGING:
-            await self._async_apply_current(CHARGING_PAUSE_CURRENT)
         await self._async_transition_write(
             REQUESTED_PHASES, phases, changed=True,
             min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
         )
 
+    async def _async_confirm_phase_pause(self, change: _PhaseChange) -> None:
+        state = await self._async_current_evse_state("phase_pause_state_unknown")
+        if state in (EvseState.NOT_INITIALIZED, EvseState.ERROR, EvseState.SERVICE_MODE):
+            raise validation_error("phase_pause_state_unknown")
+        paused = state in (EvseState.IDLE, EvseState.EV_CONNECTED)
+        if self._identity.layout_version >= CP_STATE.min_layout:
+            try:
+                cp = await self._client.async_read_register(CP_STATE)
+            except AmtronBusError as err:
+                raise validation_error("phase_pause_state_unknown") from err
+            if type(cp) is not int or cp not in CpState or cp in (CpState.INIT, CpState.E, CpState.F):
+                raise validation_error("phase_pause_state_unknown")
+            paused = paused and (
+                cp in (CpState.A1, CpState.A2) if state == EvseState.IDLE else cp == CpState.B1
+            )
+        now = self._monotonic()
+        if not paused:
+            if change.ready_at is not None:
+                raise validation_error("phase_pause_state_unknown")
+            if now >= change.confirmation_deadline:
+                raise validation_error("phase_pause_timeout")
+            raise _PhaseWaitError(min(1.0, change.confirmation_deadline - now), preserve_deadline=True)
+        if change.ready_at is None:
+            change.ready_at = now + self._options.phase_switch_grace_seconds
+        remaining = change.ready_at - now
+        if remaining > 0:
+            raise _PhaseWaitError(remaining)
+
     async def _async_apply_command(self, command: _PendingCommand) -> None:
         self._require_write_access()
-        if command.action in ("set_current", "resume"):
+        if command.action == "pause":
+            await self._async_apply_current(CHARGING_PAUSE_CURRENT)
+        elif command.action in ("set_current", "resume"):
             # A configuration change can lower the available current while
             # an accepted request is waiting. Reapply the active limit.
             await self._async_apply_current(min(command.value, self.max_charging_current))
@@ -588,16 +647,21 @@ class AmtronControl:
             if not phase_switch_is_supported(self._identity.phase_options_hw):
                 raise validation_error("phase_switch_unsupported")
             await self._async_apply_phases(int(command.value))
-        elif command.action == "enable_charging":
-            await self._async_apply_release(True)
+        elif command.action in ("enable_charging", "disable_charging"):
+            await self._async_apply_release(bool(command.value))
         else:
-            await self._async_apply_lock(False)
+            await self._async_apply_lock(bool(command.value))
 
     async def _async_submit_locked(self, command: _PendingCommand) -> None:
         """Accept the latest request, coalescing all deferred commands together."""
+        if self._phase_change is not None and command != self._pending:
+            await self._async_cancel_pending()
         had_pending = self._pending is not None
         try:
             await self._async_apply_command(command)
+        except _PhaseWaitError as err:
+            await self._async_queue(command, err.retry_after, preserve_deadline=err.preserve_deadline)
+            return
         except AmtronRateLimitedError as err:
             self._diagnostics.writes_rate_limited += 1
             self._diagnostics.timeline.record(EventType.WRITE_RATE_LIMITED)
@@ -606,20 +670,28 @@ class AmtronControl:
             await self._async_queue(command, err.retry_after)
             return
         except (DeviceError, asyncio.CancelledError) as err:
-            if self._uncertain(err):
+            if self._phase_change is not None or self._uncertain(err):
                 self._clear_pending()
                 if had_pending:
                     await self._async_publish_pending()
             raise
         await self._async_cancel_pending()
 
-    async def _async_queue(self, command: _PendingCommand, delay: float) -> None:
+    async def _async_queue(
+        self, command: _PendingCommand, delay: float, *, preserve_deadline: bool = False,
+    ) -> None:
         due = self._monotonic() + delay
+        if preserve_deadline and self._pending == command:
+            self._pending_due = due
+            return
         if self._pending == command and abs(self._pending_due - due) < 0.01:
             return
         self._pending = command
         self._pending_due = due
-        self._pending_until = datetime.now(UTC) + timedelta(seconds=delay)
+        self._pending_until = (
+            None if self._phase_change is not None and self._phase_change.ready_at is None
+            else datetime.now(UTC) + timedelta(seconds=delay)
+        )
         self._pending_changed.set()
         if self._flush_task is None or self._flush_task.done():
             self._flush_task = asyncio.create_task(
@@ -630,6 +702,7 @@ class AmtronControl:
     def _clear_pending(self) -> bool:
         changed = self._pending is not None
         self._pending = None
+        self._phase_change = None
         self._pending_until = None
         self._pending_changed.set()
         return changed
@@ -670,6 +743,11 @@ class AmtronControl:
                             if self._validate_deferred is not None:
                                 self._validate_deferred()
                             await self._async_apply_command(command)
+                        except _PhaseWaitError as err:
+                            await self._async_queue(
+                                command, err.retry_after, preserve_deadline=err.preserve_deadline,
+                            )
+                            delay = err.retry_after
                         except AmtronRateLimitedError as err:
                             await self._async_queue(command, err.retry_after)
                             delay = err.retry_after
