@@ -4,17 +4,17 @@
 do not require deleting devices, entities or automations. Moving from HACS to
 the Marketplace also keeps the same integration and entry.
 
-**Testing 0.5.2b2?** Follow [Beta testing](installation.md#beta-testing-052b2)
-to select the integration prerelease and beta app catalog. Check the
-[app connection choice](#app-connection-choice) before updating the app.
+**Coming from a beta?** Select stable **0.6.0** for the integration. The same
+stable app is offered in both app catalogs, so keep your installed app and data.
+Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Next beta — unreleased
+## Updating to 0.6.0
 
-The next beta improves entity grouping and state-dependent icons, fixes false
+Version 0.6.0 improves entity grouping and state-dependent icons, fixes false
 vehicle-disconnected states during wallbox faults, and names the display-only
 solar selector **Solar display mode**. Existing entity IDs and user customizations
-are retained; no device or entity needs deleting. Documentation of these changes
-on this branch does not mean they are part of the published 0.5.2b2 release.
+are retained; no device or entity needs deleting. If using the service, update
+the app to **0.6.0** first to use its new capabilities, then update the integration.
 
 Six optional phase-voltage/power sensors now start disabled on new installations;
 existing registry settings are preserved. Session duration stops creating new
@@ -27,7 +27,7 @@ optional event feed. Older API 2 services remain compatible, but their event
 entity is unavailable. Existing commands are not replayed as events after
 startup or reconnect.
 
-The next beta also adds **Charging status**, **Connection quality**, **Cancel
+Version 0.6.0 also adds **Charging status**, **Connection quality**, **Cancel
 pending change**, **Energy target** and **Energy target status**. A target only
 limits energy and never starts charging. For service connections, target and
 cancel support are optional capabilities: an older service remains usable, while
@@ -39,14 +39,19 @@ calculated in HA and also works with existing compatible service readbacks.
 The vehicle percentage target is separately optional: select a vehicle SoC
 entity in the integration options to add it. Selecting the car's own percentage
 limit as a maximum is another optional setting. With no SoC source configured,
-no percentage controls are added. See [Percentage targets](user-guide.md#optional-vehicle-percentage-target--next-beta-unreleased)
+no percentage controls are added. See [Percentage targets](user-guide.md#optional-vehicle-percentage-target)
 for behavior when the car or HA is unavailable. Existing kWh goals can recover
 from temporary meter outages without resetting their baseline or lifting a
 deliberate pause.
 
+Optional [charging losses and costs](charging-estimates.md) use existing vehicle
+and price data. They add no vehicle polling or growing history. All sources are
+off by default; configure only the estimates you want. Service mode needs app
+**0.6.0** for these measurements. Existing compatible apps retain their other functions.
+
 ### App connection page
 
-**Next beta, unreleased:** the app adds **Open Web UI** for connection setup.
+App **0.6.0** adds **Open Web UI** for connection setup.
 Start the app, open that page as an administrator and choose USB or LAN. USB
 shows an adapter dropdown, preferring stable `/dev/serial/by-id/...` paths;
 LAN shows the gateway host/IP and TCP port. Saving LAN also clears any old USB
@@ -57,18 +62,18 @@ The page requires stable **Supervisor 2026.11.0 or newer** for its administrator
 access check. This is a requirement of the page, not a new minimum Home Assistant
 version for the integration. On older Supervisor versions, the native app
 **Configuration** tab remains available; its serial path is a text field in
-the next beta. Update Supervisor to use the guided USB dropdown.
+0.6.0. Update Supervisor to use the guided USB dropdown.
 
 Save, then restart the app from its **Info** tab. Saving does not change a running
 connection. **Read-only**, current limits and polling intervals remain in the
 native **Configuration** tab. Keep existing valid connection settings when
 updating; the transport is not changed automatically.
 
-With no serial path or no LAN host configured, the next app remains running for
+With no serial path or no LAN host configured, app 0.6.0 remains running for
 setup and its health check. It starts neither Modbus nor heartbeat nor discovery
 until a valid connection is saved and the app restarted. A configured USB adapter
 that is temporarily unplugged instead keeps its identity and is retried.
-Published **0.5.2b2** has no connection Web UI and still uses the native fields
+Older app **0.5.2b2** has no connection Web UI and uses the native fields
 described [below](#app-connection-choice).
 
 ## 0.5.2b2: configurable charging transitions

@@ -39,7 +39,7 @@ replaced when that durable state changes, with no growing history. Heartbeats,
 ordinary polls and progress within a running cycle are not persisted. Protect
 service data and backups.
 
-The next beta's **unreleased connection page** displays locally mapped adapter
+The app's **connection page**, available from 0.6.0, displays locally mapped adapter
 names and paths to an authenticated administrator through Supervisor Ingress.
 Those names can contain the adapter's serial number. Connection changes are
 saved in the app's Supervisor options. The page does not send the service token

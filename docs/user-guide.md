@@ -5,7 +5,7 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
-## Optional charging losses and costs — next beta, unreleased
+## Optional charging losses and costs
 
 Choose a vehicle-energy source and a fixed or dynamic electricity price in the
 integration options. Both are independently optional and disabled by default. Tibber and other existing
@@ -136,19 +136,19 @@ the exact state values available to templates.
 | Setting | Direct USB or LAN connection | Modbus service connection |
 |---|---|---|
 | Write permission | Integration options: **Control mode** | App configuration: **Read-only** |
-| USB adapter, or LAN protocol/host/TCP port, and wallbox address | Integration entry: **Reconfigure** | App configuration |
-| Baud rate and frame | USB: **Reconfigure**; LAN: gateway configuration | USB: app configuration; LAN: gateway configuration |
+| USB adapter, or LAN protocol/host/TCP port, and wallbox address | Integration entry: **Reconfigure** | App: **Open Web UI** |
+| Baud rate and frame | USB: **Reconfigure**; LAN: gateway configuration | USB: app **Open Web UI**; LAN: gateway configuration |
 | Status and measurement polling | Integration options | App configuration |
 | How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
 | Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
 | Minimum time between state changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 | Extra wait before phase changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 
-**Next beta, unreleased:** the app moves USB/LAN connection selection to
+App **0.6.0** moves USB/LAN connection selection to
 **Open Web UI**, with an adapter dropdown and fields for the chosen mode.
 Write permission and other operating settings stay in **Configuration**.
 Save and restart the app to apply changes; see [the connection page](upgrading.md#app-connection-page)
-for its Supervisor requirement. Published **0.5.2b2** uses the native configuration
+for its Supervisor requirement. Older app **0.5.2b2** uses the native configuration
 for all app settings.
 
 The default status interval is **5 seconds** and the measurement interval is
@@ -217,7 +217,7 @@ Phase changes share
 the [configurable state-change interval](#waiting-between-charging-changes)
 and an early request is queued. Wait until the phase request has actually run
 before requesting resume; a new resume request would replace a queued phase
-request. Before changing phases, version 0.5.2b2 waits up to **30 seconds** for
+request. Before changing phases, the integration waits up to **30 seconds** for
 live confirmation that the vehicle has paused. It then waits an additional
 **5 seconds** by default and checks the state again before sending the phase
 command. Configure **Extra wait before phase changes** from **0 to 30 seconds** in
@@ -257,7 +257,7 @@ To generate a Recorder exclusion list using your actual entity IDs, run
 profile, then merge the returned YAML into your configuration. See
 [Recorder profiles](recorder.md#configure-history-retention-and-detail-exclusions).
 
-## Energy target — next beta, unreleased
+## Energy target
 
 Set **Energy target** to the additional energy you want the wallbox to supply,
 for example **12 kWh**. The range is 0.1–1000 kWh in 0.1 kWh steps. Each positive
@@ -306,7 +306,7 @@ use the new goal controls. Switching an entry between direct and service mode
 does not transfer an active goal: the new connection owner has its own stored
 state. Set the intended goal with that owner before continuing the charge.
 
-## Optional vehicle percentage target — next beta, unreleased
+## Optional vehicle percentage target
 
 The percentage target is **off by default**. In the integration's options,
 select **Vehicle charge level entity** from your existing vehicle integration.
@@ -343,7 +343,7 @@ was configured. The kWh goal is independent. Service
 mode needs an app version advertising percentage-goal support; existing service
 functions remain available on older compatible versions.
 
-## Cancel a queued change — next beta, unreleased
+## Cancel a queued change
 
 While **Pending change** shows an action, press **Cancel pending change**.
 This removes the queue entry and does not send a wallbox command. A phase-change

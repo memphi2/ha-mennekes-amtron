@@ -9,10 +9,10 @@ The service can reach the RTU wallbox through **USB or a LAN-to-RS-485 adapter**
 LAN needs no USB device on its host; see [LAN setup](network-gateway.md) for the
 two supported gateway protocols.
 
-**Stable service: 0.5.1 · Beta: 0.5.2b2.** The integration and app are installed and
+**Stable service: 0.6.0.** The integration and app are installed and
 updated independently. Their version numbers do not need to match.
 Check the [handover](#check-the-handover) on your hardware before relying on it.
-For the prerelease, follow [Beta testing](installation.md#beta-testing-052b2).
+Existing beta installations can [update in place](installation.md#moving-from-beta-to-stable).
 
 [Install on HA OS](#install-on-home-assistant-os) ·
 [Move an existing wallbox](#move-an-existing-wallbox) ·
@@ -68,7 +68,7 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
-**Next beta, unreleased:** if the app offers **Open Web UI**, start it and open that page as an
+In app **0.6.0**, start the app and choose **Open Web UI** as an
 administrator. It requires stable **Supervisor 2026.11.0 or newer**. Choose USB
 or LAN; USB provides an adapter dropdown, while LAN shows the host/IP and port.
 A missing USB adapter is never replaced automatically. Saving LAN removes its
@@ -92,7 +92,7 @@ options**. Those older forms do not rearrange fields when the connection changes
 | Current cap | The permitted charging current for your installation; default **6 A**. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. The measurement interval helps limit database traffic. |
 
-App 0.5.2b2 shows exactly these three connection choices. When updating an
+App 0.6.0 shows exactly these three connection choices. When updating an
 older app with a saved technical connection name, select the matching readable
 choice once; see [Updating the connection choice](upgrading.md#app-connection-choice).
 The transport is never changed automatically to USB.
@@ -170,7 +170,7 @@ a saved limited setpoint. A deliberately selected **0 A** remains unlimited;
 the wallbox's hardware limits still apply. See the [user guide](user-guide.md)
 for charging controls and automations.
 
-**New in 0.5.2b2:** early pause/resume, phase, release and lock changes
+**Since 0.5.2b2:** early pause/resume, phase, release and lock changes
 wait in one pending slot. **Pending change** and **Pending change due** show
 the action and when it can run. A newer charging request replaces it. A stop
 replaces a pending start and also waits for its due time. Heartbeat and recovery
@@ -178,7 +178,7 @@ that preserves the current intent keep running. Zero disables the longer wait,
 while technical write guards remain.
 See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
-For phase changes, version 0.5.2b2 confirms that the vehicle has paused, waits
+For phase changes, the app confirms that the vehicle has paused, waits
 the configured **Extra wait before phase changes** (default 5 seconds, range
 0–30), then checks the state again before switching. Configure this separately
 from the 300-second state-change interval in the app/service settings.
@@ -192,12 +192,12 @@ register-write guards and heartbeat remain active.
 
 | Event | What happens |
 |---|---|
-| HA Core restarts or stays offline | The running app keeps heartbeat and accepted charging intent. In version 0.5.2b2, an already queued command can execute while HA is offline. |
+| HA Core restarts or stays offline | The running app keeps heartbeat and accepted charging intent. Since 0.5.2b2, an already queued command can execute while HA is offline. |
 | HA automation is unavailable | No new schedule or surplus calculation runs; the app holds the last chosen state. |
 | App, host, power, USB or LAN/gateway connection fails | The heartbeat can stop. The wallbox's configured fallback applies. |
 | HA reconnects | HA reads the current app state; it does not restore old commands. |
 
-In version 0.5.2b2, an app/service restart cancels pending commands; it does not
+Since 0.5.2b2, an app/service restart cancels pending commands; it does not
 cancel an already applied pause. HA Core restarts leave the independent
 service's queue running.
 
@@ -211,8 +211,8 @@ health changes rather than every beat. For smaller HA history, use a
 
 ## AppArmor protection
 
-**Available in 0.5.2b2:** the custom AppArmor profile is not part of stable 0.5.1.
-When 0.5.2b2 is installed, Supervisor loads the profile automatically;
+App **0.6.0** includes the custom AppArmor profile first introduced in 0.5.2b1.
+Supervisor loads it automatically when the app is installed;
 keep **Protection mode on**. It limits the service to its runtime files, USB/LAN
 communication and its own token and charging-state files. App options remain
 read-only to the service. Normal heartbeat and charging operation are intended
@@ -249,16 +249,18 @@ app store; for a separate service, follow the
 **Updating the app itself briefly interrupts its heartbeat.**
 
 **From a 0.5.0 beta:** update the app/service to an API 2 release first:
-**0.5.1** for stable use, or **0.5.2b2** in the beta catalog. Then update the
+**0.6.0** in either app catalog. Then update the
 integration. The old beta integration may show unavailable controls between
 updates because its API differs. Keep the existing HA entry, app and data.
-The token, saved charging state and USB settings are retained; for 0.5.2b2,
+The token, saved charging state and USB settings are retained;
 check the [connection choice](upgrading.md#app-connection-choice) before starting.
 LAN remains an optional connection change.
 
-The beta and stable repositories end in `#apps-beta` and `#apps`. The beta catalog
-offers **0.5.2b2**; the stable catalog remains on **0.5.1**. Before a beta update,
-check the [connection-choice change](upgrading.md#app-connection-choice).
+The beta and stable repositories end in `#apps-beta` and `#apps`. Both offer
+stable **0.6.0**. An existing beta app updates normally with its data intact;
+no catalog switch or reinstall is needed. The beta catalog can offer future
+prereleases. When updating from 0.5.1, check the
+[connection-choice change](upgrading.md#app-connection-choice).
 An optional switch to the stable-only catalog creates a different app in Supervisor.
 For that channel change, back up app data, note the charging settings and
 disconnect the vehicle. Copy the options, set the new app to **Read-only**, stop

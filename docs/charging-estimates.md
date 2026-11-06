@@ -1,4 +1,4 @@
-# Charging losses and costs — next beta, unreleased
+# Charging losses and costs
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure** and choose the sources you want. They work with a

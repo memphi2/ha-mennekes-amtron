@@ -24,7 +24,7 @@ failed read makes an existing entity unavailable until communication recovers.
 | **Direct USB or LAN** | Select **Control mode → Modbus master** in the integration options. Read-only entries provide readings without adding controls. |
 | **Modbus service** | Disable **Read-only** in the app configuration, save and restart the app. Controls become available after fresh service status arrives; HA needs no restart for this switch. Their IDs stay registered while the service is read-only, disconnected or not ready. |
 
-## Device-page grouping — next beta, unreleased
+## Device-page grouping
 
 Daily charging controls stay in **Controls**. The display-only solar selector,
 recovery and restart buttons belong to **Configuration**. Technical CP status
@@ -47,7 +47,7 @@ evidence becomes unknown instead of inventing an unplug event. A definite
 connected EVSE state remains connected if CP is missing. Older layouts
 without CP use known EVSE idle/connected states and leave fault states unknown.
 
-## New controls and status — next beta, unreleased
+## New controls and status
 
 **Charging status** explains observed state: initialization, a wallbox fault,
 service mode, no connected vehicle, charging, a lock, disabled release, pause,
@@ -93,8 +93,8 @@ These controls change display behavior or perform maintenance.
 
 ## Sensors
 
-Version 0.5.2b2 adds **Pending change** (enum) and **Pending change due**
-(timestamp), enabled by default.
+**Pending change** (enum) and **Pending change due**
+(timestamp) are enabled by default.
 The action states are `none`, `pause`, `resume`, `set_current`, `single_phase`,
 `all_phases`, `enable_charging`, `disable_charging`, `unlock` and `lock`.
 The due timestamp is empty when no change is queued or while a phase change
@@ -112,8 +112,8 @@ remembered resume target while paused, which may be the pending target. See
 | `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
-| `sensor.*_pending_change` | Pending change |  | enum | 0.5.2b2; new service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |
-| `sensor.*_pending_change_due` | Pending change due |  | timestamp | 0.5.2b2; new service for service-owned queues | Planned execution time when known. Empty with no pending action or while awaiting vehicle pause confirmation; afterward shows the end of the extra wait. Enabled by default, with no per-second countdown writes. |
+| `sensor.*_pending_change` | Pending change |  | enum | since 0.5.2b2; supporting service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |
+| `sensor.*_pending_change_due` | Pending change due |  | timestamp | since 0.5.2b2; supporting service for service-owned queues | Planned execution time when known. Empty with no pending action or while awaiting vehicle pause confirmation; afterward shows the end of the extra wait. Enabled by default, with no per-second countdown writes. |
 | `sensor.*_evse_state` | EVSE state |  | enum | always | What the wallbox itself thinks it is doing. The main state sensor. |
 | `sensor.*_authorization` | Authorization |  | enum | always | Whether RFID or the energy manager has released this session. |
 | `sensor.*_wallbox_phase_selection` | Wallbox phase selection |  | enum | layout v01.02 | Which phases the wallbox will use when it next closes the relay. |
@@ -174,7 +174,7 @@ These sit under *Diagnostic* on the device page.
 | `binary_sensor.*_permanent_cable_lock` | Permanent cable lock |  | layout v01.02 | Permanent cable locking is switched on. |
 | `binary_sensor.*_phase_switching_supported` | Phase switching supported |  | layout v01.01 | The hardware can switch between one and three phases. |
 
-## Command events — next beta, unreleased
+## Command events
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
@@ -206,9 +206,9 @@ outcomes in service memory. Startup, reconnect and service restart establish a
 new baseline without replaying historical outcomes. Heartbeats, polling and
 countdown ticks create no events. Older compatible services keep working;
 the event entity stays unavailable until their service supports this feature.
-See the [notification example](automations.md#react-to-command-results--next-beta-unreleased).
+See the [notification example](automations.md#react-to-command-results).
 
-The [energy-target guide](user-guide.md#energy-target--next-beta-unreleased)
+The [energy-target guide](user-guide.md#energy-target)
 explains restart behavior, measurement failures and stopping accuracy.
 
 ## Enumerated states
@@ -239,7 +239,7 @@ Both the action and the slider accept 0 A to remove the limit. See
 [user-guide.md](user-guide.md#actions).
 
 
-## Optional charging estimates — next beta, unreleased
+## Optional charging estimates
 
 | Entity | Name | Unit | Needs | Meaning |
 |---|---|---|---|---|

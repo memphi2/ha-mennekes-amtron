@@ -62,7 +62,7 @@ The service continues running when the Home Assistant part restarts.
 1. Open the repository with the button, or search **Settings → Marketplace**
    for **Mennekes Amtron RTU** by **memphi2**.
 2. Accept the community-content notice when prompted.
-3. Select the stable **0.5.1** release. Pre-release access is not required.
+3. Select the stable **0.6.0** release. Pre-release access is not required.
 4. Install the integration and follow any restart request.
 
 The first Marketplace installation can be used without a Core restart.
@@ -72,7 +72,7 @@ Replacing code already loaded by HA needs a restart; see
 ### Home Assistant 2026.9 and 2026.10
 
 1. Open **HACS** and search for **Mennekes Amtron RTU** by **memphi2**.
-2. Select the stable **0.5.1** release; beta releases are not required.
+2. Select the stable **0.6.0** release; beta releases are not required.
 3. Download the integration and restart Home Assistant.
 
 If the repository is missing from the catalog, add
@@ -96,12 +96,11 @@ The service is a separate app: installing the integration from the Marketplace
 or HACS does not install it. It remains optional, and choosing it never deletes
 your existing device or entity IDs.
 
-The **next beta, unreleased**, adds an app **Open Web UI** page for USB/LAN
+App **0.6.0** adds an **Open Web UI** page for USB/LAN
 setup. That page requires an administrator and stable **Supervisor 2026.11.0+**;
-it does not raise the integration's Home Assistant minimum version. Published
-**0.5.2b2** still uses the native **Configuration** tab. See
-[the new connection page](upgrading.md#app-connection-page) before trying an
-unreleased development build.
+it does not raise the integration's Home Assistant minimum version. Older app
+**0.5.2b2** uses the native **Configuration** tab. See
+[the connection page](upgrading.md#app-connection-page) for setup and updates.
 
 ## Updates
 
@@ -122,7 +121,7 @@ restart the compatible app; its heartbeat and charging intent continue through
 Core's restart when writes are enabled.
 
 **Still using a 0.5.0 beta?** Update the app/service to an API 2 release first:
-**0.5.1** for stable use, or **0.5.2b2** when testing this beta. Then update the
+**0.6.0**. Then update the
 integration. The old beta integration may show unavailable controls between
 these updates because its API differs. Keep the existing app and follow
 [service updates](modbus-service.md#updates), including the connection choice.
@@ -136,20 +135,19 @@ adding the wallbox again; [HA carries over the existing repositories](https://co
 For blueprint changes, follow
 [Updating existing automations](blueprints.md#updating-existing-blueprint-automations).
 
-## Beta testing 0.5.2b2
+## Moving from beta to stable
 
-**0.5.2b2 is a prerelease of both the integration and service.** Stable remains
-0.5.1. Keep the existing HA entry and back up the app's data before testing.
+Stable **0.6.0** includes the features from **0.5.2b1/b2**. Keep the existing HA
+entry and back up the app's data before updating.
 
-- **Marketplace:** open this repository, enable its **Pre-release** switch and
-  select **0.5.2b2**. See [Marketplace prereleases](https://contributors.home-assistant.io/marketplace/guides/releases/#pre-releases).
-- **HACS:** open Mennekes Amtron RTU, choose **⋮ → Redownload → Need a different
-  version?**, then select **v0.5.2b2**, download and restart Core.
-- **App:** the beta is offered through
-  `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`. Existing users of that
-  catalog can use **Check for updates** and update normally. The stable `#apps`
-  catalog stays on 0.5.1. Switching catalogs creates a separate app; follow the
-  [channel handover](modbus-service.md#updates) instead of running both apps.
+- **Marketplace:** select **0.6.0** and turn off prerelease access if you only
+  want stable updates.
+- **HACS:** select **v0.6.0** and disable beta releases if you prefer stable updates.
+- **App:** both `#apps` and `#apps-beta` offer stable **0.6.0**. Use **Check for
+  updates** and update your installed app normally; no catalog switch or reinstall
+  is needed. `#apps-beta` can offer future prereleases. Switching catalogs creates
+  a separate app; follow the [channel handover](modbus-service.md#updates) if you
+  explicitly want to switch, and never run both apps on the same bus.
 
 Before updating the app from 0.5.1, save one of the three readable connection
 choices if a technical value such as `serial` is still selected; see
@@ -164,8 +162,9 @@ pause, current limiting and heartbeat on your hardware after the update.
 - **Direct LAN:** use **Reconfigure** for protocol, host, TCP port and wallbox
   address; the integration options control writes, intervals and current cap.
   Set serial baud rate/frame on the gateway itself.
-- **Service:** use the app configuration for the adapter, bus settings, write
-  permission and measurement interval. The integration options contain the HA
+- **Service:** use **Open Web UI** for USB/LAN connection settings and the native
+  Configuration tab for write permission, limits and measurement interval.
+  The integration options contain the HA
   status interval and an additional current cap.
 
 Save app configuration changes and restart the app to apply them. HA picks up

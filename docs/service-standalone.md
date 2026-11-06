@@ -4,11 +4,11 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-**Stable service: 0.5.1 · Beta: 0.5.2b2.** The service and integration are installed and
+**Stable service: 0.6.0.** The service and integration are installed and
 updated independently. Their version numbers may differ; the current integration
 requires **service 0.5.0 or newer with API 2**. See [Updates](#operation-and-updates).
-To test the beta, use the **v0.5.2b2** release's container reference or source
-archive in the installation steps below; the defaults remain stable.
+Use the **v0.6.0** release's container reference or source archive for all new
+service features. An older compatible service retains its existing functions.
 
 ## 1. Prepare the serial handover
 
@@ -48,7 +48,7 @@ The service also accepts `scan_interval` and `measurement_interval`, which defau
 to 5 and 30 seconds. Protect this directory and its backups: they contain both
 the credential and saved charging intent.
 
-**New in 0.5.2b2:** the service also accepts
+**Since 0.5.2b2:** the service also accepts
 `"state_change_interval_seconds": 300` (whole seconds, 0–3600). It controls
 the wait between charging-state changes; early pause/resume, phase, release and
 lock changes are queued. A stop replaces older pending work and also waits for
@@ -57,7 +57,7 @@ technical write guards remain. Both timing options require service 0.5.2b2 or ne
 these configuration fields. See
 [Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
-Version 0.5.2b2 also accepts `"phase_switch_grace_seconds": 5` (whole seconds,
+Since 0.5.2b2, the service also accepts `"phase_switch_grace_seconds": 5` (whole seconds,
 0–30). This is an additional wait after live pause confirmation, before the
 final status check and phase write. Zero disables only this grace time. It does
 not replace the state-change interval or the bounded pause-confirmation check.
@@ -175,7 +175,7 @@ If both need updating, replace the service first, retaining its data directory,
 and wait for initialization. Then update the integration and restart Core.
 Retaining the same data mount preserves saved intent and credentials; no new HA
 entry is needed. For older 0.5.0 betas, upgrade the service to API 2 first
-(stable **0.5.1**, or **0.5.2b2** for beta testing), then update the integration:
+(stable **0.6.0**), then update the integration:
 the old beta integration may show
 unavailable controls between those updates because its API differs. With writes enabled, the updated service keeps
 its heartbeat and charging intent while HA updates.

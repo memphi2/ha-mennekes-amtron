@@ -8,7 +8,7 @@ The integration does not set a database size limit. Keep automatic purging
 enabled and monitor free disk space; hourly long-term statistics continue growing
 even with short history retention.
 
-## New defaults in the next beta — unreleased
+## Recorder defaults in 0.6.0
 
 On new installations, the three phase-voltage and three phase-power entities
 start disabled. Enable individual readings under **Settings → Devices & services

@@ -52,7 +52,7 @@ host, TCP port and device address; serial baud/frame are configured on the
 gateway. HA-to-service HTTP remains a separate connection. See
 [LAN setup](network-gateway.md) and the [security boundary](../SECURITY.md#threat-model).
 
-**Next beta, unreleased:** an administrator connection page runs on a separate
+Since **0.6.0**, an administrator connection page runs on a separate
 internal Ingress listener. It requires stable Supervisor 2026.11.0+, enumerates
 only locally mapped serial adapters and saves connection fields through the
 Supervisor API for this app. It neither exposes the service token to the browser
@@ -221,7 +221,7 @@ of them are dangerous. Centralising it means the minimum current, the
 `allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics
 counters are written once and cannot be forgotten by a new platform.
 
-**New in 0.5.2b2:** current writes retain their five-second register
+**Since 0.5.2b2:** current writes retain their five-second register
 floor. A separate `state_change_interval_seconds` option defaults to 300 and
 accepts 0–3600 seconds; zero disables the longer guard. The direct integration
 owns this option in direct mode, while the service configuration owns it in

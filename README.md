@@ -59,14 +59,10 @@ On HA Container, run the service as a [separate container](docs/service-standalo
 Already using the integration? **Keep your existing entry** and follow
 [Updates and switching connections](docs/upgrading.md).
 
-**Beta 0.5.2b2** adds configurable charging waits, pending-change sensors and
-vehicle-aware phase switching. It includes the earlier AppArmor protection and
-charging/recovery fixes.
-Stable remains **0.5.1**. To try the beta integration and app, follow
-[Beta testing](docs/installation.md#beta-testing-052b2).
-
-The **next beta, not yet released**, adds a guided USB/LAN connection page in
-the app; see [what changes](docs/upgrading.md#app-connection-page).
+**Stable 0.6.0** adds optional kWh and vehicle-percentage targets, charging-loss
+and cost estimates, clearer status and configurable charging waits. The app adds
+a guided USB/LAN connection page and AppArmor protection.
+See [what changes and how to update](docs/upgrading.md#updating-to-060).
 
 You need a compatible wallbox, a USB RS-485 adapter or supported LAN gateway,
 and exclusive access to its bus. LAN needs no USB device on the HA/service host.
@@ -82,6 +78,8 @@ enabling control. Read-only mode also needs exclusive bus access.
 | Pause or resume charging | **Charging paused** switch; 0 A does **not** pause charging |
 | See whether the heartbeat is working | **Heartbeat** diagnostic sensor |
 | Track consumption | **Total energy** in the Energy dashboard |
+| Limit charging | **Energy target**, or an optional **Vehicle charge target** from your car's SoC sensor |
+| Estimate losses and costs | [Optional charging estimates](docs/charging-estimates.md) using existing vehicle and price data |
 | Charge from solar surplus | [Ready-made PV blueprints](docs/blueprints.md) |
 | Keep history manageable | [Recorder settings](docs/recorder.md); the heartbeat records status changes, not a timestamp every five seconds |
 
@@ -93,7 +91,7 @@ direct USB or LAN mode, select **Modbus master** in the integration options.
 
 - [Installation](docs/installation.md) · [User guide](docs/user-guide.md) · [All entities](docs/entities.md)
 - [Troubleshooting](docs/troubleshooting.md) · [Safety and limitations](docs/safety.md)
-- [Optional charging losses and costs (next beta, unreleased)](docs/charging-estimates.md)
+- [Optional charging losses and costs](docs/charging-estimates.md)
 - [All documentation](docs/README.md) · [Release notes](CHANGELOG.md) · [Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)
 
 Unofficial community project, not affiliated with MENNEKES.

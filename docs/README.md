@@ -29,7 +29,7 @@ configured fallback.
 | Understand a sensor or find its template states | [Entity reference](entities.md) |
 | Charge from PV surplus | [Blueprints](blueprints.md) |
 | Set up a tariff schedule or action | [Automations](automations.md) |
-| Estimate charging losses or costs (next beta, unreleased) | [Charging estimates](charging-estimates.md) |
+| Estimate charging losses or costs | [Charging estimates](charging-estimates.md) |
 | Use the Energy dashboard and reduce database growth | [Recorder](recorder.md) |
 | Solve a connection, control or heartbeat problem | [Troubleshooting](troubleshooting.md) |
 | Update or remove the integration | [Installation and updates](installation.md) |

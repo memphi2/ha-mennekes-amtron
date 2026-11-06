@@ -19,7 +19,7 @@ are unchanged. It sends no HA commands or restored values to the service.
 Direct USB and LAN entries retain their separate HA control-mode option.
 
 For standalone configuration, `connection_type` selects `serial` (the default),
-`rtu_over_tcp` or `modbus_tcp`. App 0.5.2b2 offers exactly **USB / RS-485** (default),
+`rtu_over_tcp` or `modbus_tcp`. App 0.6.0 offers exactly **USB / RS-485** (default),
 **LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP**. The service normalizes these
 names to the same three protocols. Standalone JSON keeps accepting the technical
 names. Saved app choices using those names need a one-time
@@ -30,14 +30,14 @@ USB uses `serial_port`, `baudrate` and `frame`. LAN uses `host` and `tcp_port`
 wallbox address from 10 to 50. The HTTP API's `port` is independent and defaults
 to 8765. Neither LAN mode expands the supported RTU register/model scope.
 
-In published apps **0.5.1–0.5.2b2**, the native Configuration tab has an optional
+In older apps **0.5.1–0.5.2b2**, the native Configuration tab has an optional
 serial-device selector with no default device path. It keeps the host field
 visible, accepts an empty host for USB and does not hide fields when changing
 protocol. A stale saved USB device can prevent Supervisor from saving LAN
 settings; clear that serial selection first. A LAN-only installation needs no
 local serial device.
 
-**Next beta, unreleased:** `serial_port` becomes an optional string in the native
+In **0.6.0**, `serial_port` is an optional string in the native
 schema. A separate **Open Web UI** page supplies a USB dropdown and only the
 fields relevant to the selected transport. It prefers stable adapter paths and
 removes the serial path when saving LAN. USB runtime validation still restricts
@@ -167,7 +167,7 @@ and invalid option. A missing serial adapter is retried while the API remains
 running. An unexpected worker exit is logged and closes the Modbus connection;
 a fatal process failure reports its error class and errno.
 
-In the **next beta, unreleased**, an app missing the selected transport's serial
+In **0.6.0**, an app missing the selected transport's serial
 path or LAN host stays in setup mode after validating all other options. Its
 health endpoint reports `configured: false`; Modbus, heartbeat and discovery do
 not start. Save the connection in **Open Web UI** or native Configuration, then
@@ -196,7 +196,7 @@ sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
 use the [Recorder guide](recorder.md) to control that traffic.
 
-In version 0.5.2b2, the pending action and its UTC due time, when known, are kept in
+Since 0.5.2b2, the pending action and its UTC due time, when known, are kept in
 memory. These fields change on scheduling, replacement or completion, not on
 every second of the wait. The frontend can display the due time relatively;
 the database does not need a changing countdown value. Pending work is not
@@ -217,7 +217,7 @@ An unsupported API or a service below the minimum produces the compatibility
 error. A malformed version or snapshot produces the data-validation error.
 Neither condition asks for new credentials. See [Updates](modbus-service.md#updates).
 
-Version 0.5.2b2 adds these fields to the snapshot's `control` object:
+Since 0.5.2b2, these fields are included in the snapshot's `control` object:
 
 | Field | Meaning |
 |---|---|
@@ -261,8 +261,8 @@ no readable serial number; it is **not a wildcard**. Such endpoint-bound setups
 cannot independently verify the physical wallbox. Clients with a known serial
 number must retain that binding instead of accepting a newly observed device.
 
-The released 0.5.1 service compares the identity read during initialization.
-The 0.5.2b2 driver additionally verifies a known serial over Modbus after a
+The older 0.5.1 service compares the identity read during initialization.
+Since 0.5.2b2, the driver additionally verifies a known serial over Modbus after a
 reconnection and before control writes. This also detects a changed wallbox
 behind a gateway whose TCP connection stayed open. A missing or different
 serial blocks the write without changing saved intent; the service reports
@@ -281,7 +281,7 @@ is unavailable or older than the greater of 30 seconds and three status-poll
 intervals. This is checked after waiting for the command lock; a queued request
 cannot use readiness that expired while it waited. Rejected commands are not
 replayed later, and this check does not stop the heartbeat or change saved pause
-intent. In version 0.5.2b2, an accepted command can instead be queued for its
+intent. Since 0.5.2b2, an accepted command can instead be queued for its
 state-change deadline; execution rechecks its prerequisites, and an execution
 failure clears pending work rather than retrying an uncertain write indefinitely.
 Failed or timed-out commands are not automatically

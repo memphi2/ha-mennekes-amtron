@@ -5,47 +5,32 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.6.0 — 2026-11-06
 
-- Fix app LAN saves blocked by an old USB device path. Add an administrator-only
-  connection page with an adapter dropdown and fields for the selected transport;
-  start unconfigured apps in setup mode without wallbox traffic.
+- Set an optional energy target in kWh or a vehicle charge-level target in percent.
+  Targets only limit charging; they never start a charge or lift a deliberate pause.
+  Energy goals recover automatically after a temporary meter outage.
+- Estimate charging losses from BavarianData history or a selected vehicle-energy
+  sensor, with a weighted average. Estimate charging costs from fixed or dynamic
+  prices, including optional network tariffs. All estimates are optional.
+- See clearer charging and connection status, cancel queued changes and optionally
+  trigger automations from command results.
+- Configure charging-state waits in seconds, see pending changes and wait for the
+  vehicle to confirm a pause before changing phases.
+- Set up the app through a guided USB/LAN page with an adapter dropdown. Switching
+  to LAN no longer fails because an old USB adapter is missing.
+- Improve reconnect and heartbeat-error recovery while preserving deliberate
+  pauses and the latest requested current; correct vehicle-presence reporting
+  during wallbox faults.
+- Add AppArmor protection for the service, clearer entity grouping and icons,
+  and quieter Recorder defaults. Optional estimates add no extra Modbus polling
+  or growing session history.
 
-- Add optional charging-loss estimates from matched BavarianData local history
-  or a selected last-charge battery-energy sensor, with explicit assignment and
-  a bounded energy-weighted average.
-- Add optional charging-cost estimates using fixed prices or existing dynamic
-  HA price sensors such as Tibber, including negative prices and partial-data
-  handling. Keep §14a Module 2 and Module 1+3 network tariffs separate.
-- Retain one completed wallbox cycle and timestamp service meter observations
-  without extra Modbus polling or a growing session/price history.
-
-- Explain verified charging state and known blockers in one readable status.
-- Add cancellation of queued commands without changing the current wallbox state.
-- Add a persistent additional-energy target that only limits charging and never
-  starts it. Pause when the target is reached or its meter becomes unreliable;
-  retain the five-second write floor and guard against stale observations.
-- Automatically resume a charge paused only for a temporary energy-meter outage
-  after valid readings recover; retain the original goal and deliberate pauses.
-- Add an optional vehicle percentage target using an existing HA SoC entity,
-  with a separately optional vehicle limit as its maximum. Missing vehicle data
-  leaves charging unchanged; neither setting nor disabling a goal starts charging.
-- Summarize Modbus communication quality without extra polling, recurring counters
-  or long-term statistics; include read retries, heartbeat and write responses.
-
-- Preserve vehicle presence during wallbox faults when CP confirms a connected
-  vehicle; report unknown for ambiguous or conflicting status.
-- Improve state-dependent entity icons and group technical details under
-  diagnostics. Name the display-only solar control and wallbox phase feedback
-  according to their actual function, retaining existing entity identities.
-
-- Add an opt-in command-result event entity for accepted, replaced, cancelled, failed and uncertain
-  requests, plus verified recovery outcomes. Bound the service feed and suppress
-  historical replay on startup or reconnect; older compatible services still work.
-- Disable optional per-phase voltage/power entities on new installations and stop
-  creating long-term statistics for session duration. Keep existing user choices.
-- Share pause/release intent restoration and tighten entity typing without changing
-  saved intent, device identities or the HA-independent device boundary.
+**Updating:** keep your existing entry and app data. Update the app to **0.6.0**
+first to use the new service features, then update the integration and restart
+Core. Older API 2 services from **0.5.0** remain compatible with their existing
+functions. The app's connection page requires stable **Supervisor 2026.11.0+**;
+the integration still supports **Home Assistant 2026.9+**.
 
 ## 0.5.2b2 — 2026-11-06
 

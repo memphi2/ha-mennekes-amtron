@@ -10,7 +10,7 @@ app's **Read-only** switch off in service mode, saving and restarting the app,
 or **Modbus master** in the integration options for a direct USB or LAN connection.
 Current writes retain a **five-second minimum interval**. For automatic
 pause/resume, use different start/stop thresholds and hold times; the PV blueprint
-defaults to six minutes. **New in 0.5.2b2:** early pause/resume, phase,
+defaults to six minutes. **Since 0.5.2b2:** early pause/resume, phase,
 release and lock changes are queued using the configurable state-change
 interval (default 300 seconds). A newer charging request replaces older pending
 work. A stop replaces a pending start and also waits for its due time. See
@@ -77,7 +77,7 @@ mode: single
 ```
 
 A fixed time trigger is missed if Home Assistant is stopped at that time.
-It does not restore the schedule when HA starts later. In version 0.5.2b2, a recent
+It does not restore the schedule when HA starts later. Since 0.5.2b2, a recent
 pause can delay an accepted start: inspect **Pending change** and **Pending
 change due**, as well as the **automation trace**. A running service can execute an already queued
 command while HA is offline. Check the current state after a restart rather
@@ -92,7 +92,7 @@ Select **Requested phases** on the device page before automating a change.
 The integration pauses first when the wallbox reports charging and leaves it
 paused. Resume separately after the waiting interval, once the vehicle and
 wallbox are ready. The PV blueprints do not coordinate dynamic phase switching.
-In version 0.5.2b2, the phase command waits for live pause confirmation and the
+Since 0.5.2b2, the phase command waits for live pause confirmation and the
 configured extra wait, then checks the state again. A failed confirmation leaves
 the phase command unsent and retains the pause.
 See [Phase switching](user-guide.md#phase-switching).
@@ -110,11 +110,11 @@ Repeated recovery is not a substitute for a functioning connection.
 Use **Notify on a grid-operator downgrade** to see when a hardware restriction
 starts and ends. The integration observes that restriction; it cannot remove it.
 
-## React to command results — next beta, unreleased
+## React to command results
 
 Enable **Control result** under **Settings → Devices & services → Entities**
 first; it starts disabled to avoid history growth from frequent current commands.
-You can [exclude it from Recorder](recorder.md#new-defaults-in-the-next-beta--unreleased)
+You can [exclude it from Recorder](recorder.md#recorder-defaults-in-060)
 while keeping live automation triggers. Use it to notify you about a rejected command, an uncertain
 write, a phase-pause timeout or a recovery that did not clear the error. In the
 UI, add a state trigger for the event entity, then filter its `event_type`
@@ -124,7 +124,7 @@ Use a state trigger, not a raw event-bus trigger.
 This example excludes startup/restored state and availability-only changes.
 Replace the entity ID with your actual **Control result** entity. The action
 and reason in the message are stable automation values, so they work in every
-UI language. Read the [event meanings](entities.md#command-events--next-beta-unreleased)
+UI language. Read the [event meanings](entities.md#command-events)
 before using an outcome to issue another command.
 
 ```yaml

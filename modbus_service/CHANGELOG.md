@@ -1,30 +1,25 @@
 # Changes
 
-## Unreleased
+## 0.6.0
 
-- Supply one durable completed charging cycle and timestamped meter observations
-  for optional HA loss and cost estimates, without additional Modbus polling.
-  Invalid optional session metadata cannot prevent heartbeat startup.
+- Add a guided USB/LAN connection page with a real adapter dropdown. An absent
+  old USB adapter no longer blocks LAN setup. Save, then restart to apply changes.
+- Keep energy targets running independently of HA, with recovery after temporary
+  meter outages. Support optional vehicle percentage targets supplied by HA;
+  setting either target never starts charging.
+- Let HA cancel pending commands and show connection quality and command results.
+  Supply the measurements needed for optional charging-loss and cost estimates.
+- Make charging-state waits configurable and confirm the vehicle has paused
+  before switching phases. Improve heartbeat recovery and reconnect handling
+  while retaining deliberate pauses and the latest current setting.
+- Include AppArmor protection and start unconfigured installations in setup mode,
+  ready for connection settings without wallbox traffic.
 
-- Add an administrator-only connection page with a real USB adapter dropdown
-  and transport-specific fields, available on stable Supervisor 2026.11.0+.
-  Saving LAN settings removes an obsolete USB path. New installations can start
-  in connection setup mode; applying saved changes still requires an app restart.
-- Allow native LAN configuration to be saved when a formerly selected USB
-  adapter is no longer connected, without expanding app privileges.
-- Add durable energy goals, independent of HA: setting a target never starts or
-  resumes charging; reaching it or losing reliable meter data requests a pause.
-- Recover from a temporary meter outage without resetting the energy target,
-  while preserving deliberate pauses and completed goals.
-- Accept optional source-bound vehicle percentage goals and observations from
-  HA. Missing vehicle data keeps the charge unchanged; reached targets persist.
-- Allow pending-command cancellation without a live wallbox transaction.
-- Report stable Modbus communication quality and advertise new controls through
-  optional capabilities, retaining existing API 2 compatibility.
-
-- Expose a bounded optional command-outcome feed for HA automations. Confirm recovery
-  success from fresh error status; keep polling and heartbeats out of the feed.
-  Existing API 2 clients remain compatible.
+Keep the app's existing data and update it before the integration. An app restart
+briefly interrupts the heartbeat. The connection page requires an administrator
+and stable **Supervisor 2026.11.0+**; the native Configuration tab remains available.
+The stable app is offered in both **#apps** and **#apps-beta**, so existing beta
+installations can update in place.
 
 ## 0.5.2b2
 
