@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Supply one durable completed charging cycle and timestamped meter observations
+  for optional HA loss and cost estimates, without additional Modbus polling.
+  Invalid optional session metadata cannot prevent heartbeat startup.
+
+- Add an administrator-only connection page with a real USB adapter dropdown
+  and transport-specific fields, available on stable Supervisor 2026.11.0+.
+  Saving LAN settings removes an obsolete USB path. New installations can start
+  in connection setup mode; applying saved changes still requires an app restart.
+- Allow native LAN configuration to be saved when a formerly selected USB
+  adapter is no longer connected, without expanding app privileges.
 - Add durable energy goals, independent of HA: setting a target never starts or
   resumes charging; reaching it or losing reliable meter data requests a pause.
 - Recover from a temporary meter outage without resetting the energy target,

@@ -1,7 +1,7 @@
 configuration:
   serial_port:
-    name: Seriële adapter
-    description: "Alleen voor USB / RS-485: selecteer de exclusieve USB-RS-485-adapter, bij voorkeur via het vaste /dev/serial/by-id-pad. Laat dit leeg voor LAN."
+    name: Seriële adapter (pad)
+    description: "Kies de USB-adapter in de keuzelijst via Webinterface openen. Het pad wordt hier opgeslagen. Genegeerd voor LAN en verwijderd bij het opslaan van LAN via de webinterface."
   device_id:
     name: Wallboxadres
     description: Het Modbus-adres dat in de wallbox is ingesteld.
@@ -37,7 +37,7 @@ configuration:
     description: Vast ingesteld op 8765; het beschikbaar stellen van een hostpoort is optioneel en meestal niet nodig.
   connection_type:
     name: Wallboxverbinding
-    description: "USB / RS-485: lokale adapter. LAN: Modbus RTU (TCP): transparante netwerkadapter. LAN: Modbus TCP: gateway die TCP naar RTU vertaalt."
+    description: "Kies via Webinterface openen een USB-adapter of vul de LAN-host en poort in. Sla de wijzigingen op en herstart daarna de app."
   host:
     name: Adapterhost / IP-adres
     description: "Verplicht voor LAN: hostnaam of IP-adres van de adapter, zonder URL-schema of pad. Laat dit leeg voor USB / RS-485. Gebruik een vertrouwd privénetwerk."

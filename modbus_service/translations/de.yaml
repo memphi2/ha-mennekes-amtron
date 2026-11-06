@@ -1,7 +1,7 @@
 configuration:
   serial_port:
-    name: Serieller Adapter
-    description: "Nur für USB / RS-485: exklusiven USB-RS-485-Adapter wählen, möglichst über den stabilen /dev/serial/by-id-Pfad. Bei LAN nicht ausfüllen."
+    name: Serieller Adapter (Pfad)
+    description: "USB-Adapter unter „Weboberfläche öffnen“ aus der Liste wählen. Dieser Pfad wird dort gespeichert. Bei LAN wird er ignoriert und beim Speichern über die Weboberfläche entfernt."
   device_id:
     name: Wallbox-Adresse
     description: Die in der Wallbox eingestellte Modbus-Adresse.
@@ -37,7 +37,7 @@ configuration:
     description: Fest auf 8765; eine Freigabe am Host ist optional und normalerweise unnötig.
   connection_type:
     name: Wallbox-Verbindung
-    description: "USB / RS-485: lokaler Adapter. LAN: Modbus RTU (TCP): transparenter Netzwerkadapter. LAN: Modbus TCP: Gateway übersetzt TCP in RTU."
+    description: "Die Verbindung am einfachsten unter „Weboberfläche öffnen“ einstellen: USB-Adapterliste oder LAN-Host und Port. Änderungen speichern und die App anschließend neu starten."
   host:
     name: Adapter-Host / IP-Adresse
     description: "Bei LAN erforderlich: Hostname oder IP-Adresse des Adapters, ohne URL-Schema oder Pfad. Bei USB / RS-485 leer lassen. Ein vertrauenswürdiges privates Netzwerk verwenden."

@@ -44,6 +44,33 @@ for behavior when the car or HA is unavailable. Existing kWh goals can recover
 from temporary meter outages without resetting their baseline or lifting a
 deliberate pause.
 
+### App connection page
+
+**Next beta, unreleased:** the app adds **Open Web UI** for connection setup.
+Start the app, open that page as an administrator and choose USB or LAN. USB
+shows an adapter dropdown, preferring stable `/dev/serial/by-id/...` paths;
+LAN shows the gateway host/IP and TCP port. Saving LAN also clears any old USB
+path, so an unplugged adapter cannot block the change. A missing USB adapter is
+never replaced automatically.
+
+The page requires stable **Supervisor 2026.11.0 or newer** for its administrator
+access check. This is a requirement of the page, not a new minimum Home Assistant
+version for the integration. On older Supervisor versions, the native app
+**Configuration** tab remains available; its serial path is a text field in
+the next beta. Update Supervisor to use the guided USB dropdown.
+
+Save, then restart the app from its **Info** tab. Saving does not change a running
+connection. **Read-only**, current limits and polling intervals remain in the
+native **Configuration** tab. Keep existing valid connection settings when
+updating; the transport is not changed automatically.
+
+With no serial path or no LAN host configured, the next app remains running for
+setup and its health check. It starts neither Modbus nor heartbeat nor discovery
+until a valid connection is saved and the app restarted. A configured USB adapter
+that is temporarily unplugged instead keeps its identity and is retried.
+Published **0.5.2b2** has no connection Web UI and still uses the native fields
+described [below](#app-connection-choice).
+
 ## 0.5.2b2: configurable charging transitions
 
 Version 0.5.2b2 adds **Minimum time between state changes**, default **300

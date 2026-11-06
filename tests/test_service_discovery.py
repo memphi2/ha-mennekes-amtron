@@ -80,7 +80,7 @@ def test_app_cli_owns_credentials_and_ignores_legacy_manual_tokens(
 
     options = tmp_path / "options.json"
     options.write_text(
-        json.dumps({"serial_port": "/dev/fake", "token": TOKEN if configured else ""})
+        json.dumps({"serial_port": "/dev/ttyUSB999", "token": TOKEN if configured else ""})
     )
     state = tmp_path / "intent.json"
     monkeypatch.setattr(

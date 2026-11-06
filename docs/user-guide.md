@@ -144,6 +144,13 @@ the exact state values available to templates.
 | Minimum time between state changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 | Extra wait before phase changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 
+**Next beta, unreleased:** the app moves USB/LAN connection selection to
+**Open Web UI**, with an adapter dropdown and fields for the chosen mode.
+Write permission and other operating settings stay in **Configuration**.
+Save and restart the app to apply changes; see [the connection page](upgrading.md#app-connection-page)
+for its Supervisor requirement. Published **0.5.2b2** uses the native configuration
+for all app settings.
+
 The default status interval is **5 seconds** and the measurement interval is
 **30 seconds**. The available range is 2–300 seconds. In service mode, changing
 HA's refresh interval does not change how often the app reads the wallbox.

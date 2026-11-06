@@ -19,6 +19,10 @@ for transparent RTU over TCP versus translating Modbus TCP-to-RTU gateways.
 
 ## First setup
 
+The **Open Web UI** steps below describe the **next beta, not yet released**.
+Published app 0.5.2b2 still uses its native Configuration tab for connection
+settings; it does not have this page. See [Connection-page changes](https://github.com/memphi2/ha-mennekes-amtron/blob/beta/docs/upgrading.md#app-connection-page).
+
 For a new setup, install the **Mennekes Amtron RTU integration** and restart Home
 Assistant Core. For beta testing, select **0.5.2b2** in the Marketplace or HACS
 using the [beta guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.2b2/docs/installation.md#beta-testing-052b2).
@@ -30,11 +34,15 @@ instead: the app and integration can be updated independently.
    and charging-release settings. Disconnect the vehicle for the first handover.
    Disable the existing direct USB or LAN integration entry to release its connection;
    keep the entry so its device and entity IDs are retained.
-2. **Configure the app.** Choose **USB / RS-485** or the matching LAN protocol.
-   Enter the wallbox address and connection settings below. For LAN, configure
-   baud rate/frame on the gateway. Leave **Read-only on** initially.
-3. **Start the app.** Enable **Start on boot** and **Watchdog**. Check the log for
-   its USB/LAN connection. Read-only mode deliberately leaves the heartbeat off.
+2. **Start and configure the app.** Leave **Read-only on**, start the app and
+   choose **Open Web UI**. Select **USB / RS-485** or the matching LAN protocol.
+   USB shows a dropdown of detected adapters; LAN shows the host/IP and TCP port.
+   Enter the wallbox address and save. For LAN, set baud rate/frame on the gateway.
+   With no connection configured, the app stays running for setup without opening
+   a Modbus connection or publishing discovery.
+3. **Restart the app.** Return to its **Info** tab and restart to apply the saved
+   connection. Enable **Start on boot** and **Watchdog**. Check the log for the
+   USB/LAN connection. Read-only mode deliberately leaves the heartbeat off.
 4. **Connect HA.** Under **Settings → Devices & services**, configure the
    discovered **Mennekes Amtron** entry. Address and token are automatic; there is
    nothing to copy. The existing entry is reused for the same wallbox. Re-enable
@@ -51,7 +59,7 @@ instead: the app and integration can be updated independently.
 | App option | Initial setting |
 |---|---|
 | Wallbox connection | **USB / RS-485** (default), **LAN: Modbus RTU (TCP)** (transparent adapter), or **LAN: Modbus TCP** (translating gateway). |
-| Serial adapter | USB only: select the adapter; prefer `/dev/serial/by-id/...`. Leave unset for LAN. |
+| Serial adapter | USB only: choose the adapter in **Open Web UI**; stable `/dev/serial/by-id/...` names are preferred automatically. Switching to LAN removes the old USB selection when saved. |
 | Adapter host / IP + TCP port | LAN: hostname/IP without a URL scheme, and gateway port; default **502**. For USB, leave the host empty. |
 | Wallbox address | Match the wallbox; factory default **50**. |
 | Baud rate / frame | USB only: match the wallbox, factory defaults **57600 / 8n2**. For LAN, configure these on the gateway. |
@@ -74,10 +82,29 @@ state-change wait and vehicle grace time. Pending waits check for unplugging
 every five seconds. Unknown or inconsistent status retains the wait;
 five-second register-write guards and heartbeat remain active.
 
-**Adapter host / IP** is always visible; enter it for LAN and
-leave it empty for USB. If **Serial adapter** is hidden, enable **Show unused
-optional configuration options** on the Configuration tab. The form does not
-show or hide other fields when you change the connection choice.
+### Connection page
+
+**Next beta, unreleased; not included in published 0.5.2b2.**
+
+**Open Web UI** provides exactly three connection choices and shows only the
+fields needed for that connection. A disconnected USB adapter is marked missing;
+another adapter is never selected automatically. Reconnect it or explicitly
+choose its replacement. Switching to LAN does not require the old USB adapter
+to exist. Saving leaves the running connection unchanged until you restart the
+app; that restart briefly interrupts the heartbeat.
+
+This page requires a Home Assistant administrator and **Supervisor 2026.11.0 or
+newer** (stable). Older Supervisor versions can still save LAN settings in the
+native **Configuration** tab, including when an old USB adapter is absent. For
+the USB dropdown, update Supervisor. Read-only, current limits and polling
+intervals remain in the native Configuration tab. Avoid editing both forms at
+once; reload the connection page after changing native options.
+
+The native Configuration form cannot show fields conditionally or require a
+dropdown for its device selector; see the [Supervisor option schema](https://contributors.home-assistant.io/apps/guides/options/).
+The separate [Ingress page](https://contributors.home-assistant.io/apps/guides/ingress/)
+does not require a host port, an API token in your browser or extra Supervisor
+roles. Supervisor 2026.11.0 supplies the required server-side administrator check.
 
 App **0.5.2b2** shows exactly three connection choices. If an older app still has
 a technical name saved, select its matching readable choice once:
@@ -182,8 +209,9 @@ settings as in the first setup before reconnecting the vehicle.
 **Included in 0.5.2b2:** stable 0.5.1 does not contain this custom profile.
 Supervisor loads it automatically when installing this beta app.
 Keep **Protection mode on**. The profile allows USB/LAN communication, heartbeat
-and the service's own token and saved charging state; app options remain
-read-only to the service.
+and the service's own token and saved charging state. The options file remains
+read-only; the authenticated connection page saves through Supervisor's own-app
+API. Adapter names are read locally without requesting host-wide hardware access.
 
 With default settings, **8/8** is possible after the installed custom profile
 has loaded. **7/8 before installation** is normal; the store rating is not
@@ -205,6 +233,9 @@ uses HA's own security policy and does not automatically use this service profil
 | Service API or minimum version is incompatible | Check the API and minimum service version required in the integration’s release notes. Version numbers do not need to match. Follow [Updates](#updates) if needed; changing the token does not fix this. |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
+| Connection setup required | Open **Web UI**, configure USB or LAN, save and restart the app. Setup mode is running but does not advertise ready wallbox data. |
+| Web UI asks for a Supervisor update | Update Supervisor to stable **2026.11.0 or newer**. This requirement concerns the connection page, not the integration's HA minimum version. |
+| Serial adapter marked missing | Reconnect the saved adapter or choose its replacement from the dropdown. For LAN, change the connection type and save; the old serial path is removed. |
 | Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. |
 
 The log shows service startup, the USB/LAN connection and heartbeat start/stop.

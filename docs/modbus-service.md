@@ -68,10 +68,18 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
-In app **0.5.1**, **Adapter host / IP** is always visible. Enter the adapter's
-hostname or IP for LAN; leave it empty for USB. If **Serial adapter** is hidden,
-enable **Show unused optional configuration options** in the Configuration tab.
-Changing the connection choice does not hide or reveal other fields.
+**Next beta, unreleased:** if the app offers **Open Web UI**, start it and open that page as an
+administrator. It requires stable **Supervisor 2026.11.0 or newer**. Choose USB
+or LAN; USB provides an adapter dropdown, while LAN shows the host/IP and port.
+A missing USB adapter is never replaced automatically. Saving LAN removes its
+old serial path. Save and restart the app from the Info tab to apply changes.
+Without a configured connection, the app remains running for setup and does not
+start Modbus or discovery. Leave **Read-only** on in the native Configuration tab.
+
+Older apps use the native Configuration tab for all settings. From app **0.5.1**,
+**Adapter host / IP** is always visible. Enter it for LAN and leave it empty for
+USB. If **Serial adapter** is hidden, enable **Show unused optional configuration
+options**. Those older forms do not rearrange fields when the connection changes.
 
 | App option | What to enter |
 |---|---|

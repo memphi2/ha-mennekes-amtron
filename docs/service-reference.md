@@ -30,12 +30,28 @@ USB uses `serial_port`, `baudrate` and `frame`. LAN uses `host` and `tcp_port`
 wallbox address from 10 to 50. The HTTP API's `port` is independent and defaults
 to 8765. Neither LAN mode expands the supported RTU register/model scope.
 
-The app's serial-device schema is optional, with no default device path, so a
-LAN-only installation needs no `/dev/ttyUSB0`. USB device paths and serial settings
-remain unchanged; the runtime validates connection-specific required fields. Since 0.5.1 the app
-supplies an empty host default so the host field stays visible: empty is valid
-for USB, while LAN requires a hostname/IP. The form does not conditionally hide
-USB or LAN fields. Optional schema fields follow [Supervisor's options rules](https://contributors.home-assistant.io/apps/guides/options/).
+In published apps **0.5.1–0.5.2b2**, the native Configuration tab has an optional
+serial-device selector with no default device path. It keeps the host field
+visible, accepts an empty host for USB and does not hide fields when changing
+protocol. A stale saved USB device can prevent Supervisor from saving LAN
+settings; clear that serial selection first. A LAN-only installation needs no
+local serial device.
+
+**Next beta, unreleased:** `serial_port` becomes an optional string in the native
+schema. A separate **Open Web UI** page supplies a USB dropdown and only the
+fields relevant to the selected transport. It prefers stable adapter paths and
+removes the serial path when saving LAN. USB runtime validation still restricts
+paths to supported serial devices; the schema change grants no additional device
+access. See [connection setup](upgrading.md#app-connection-page).
+
+The new page uses a separate internal Ingress listener on port 8099 and requires
+an administrator with stable Supervisor **2026.11.0+**. It accepts requests only
+from Supervisor, validates administrator identity and protects writes against
+cross-site requests and concurrent option changes. It reads only locally mapped
+serial devices, saves through Supervisor's own-app API and never sends the
+service token to the browser. There is no host-published settings port or need
+for additional Supervisor roles. Native Configuration remains available for
+read-only mode, current limits, intervals and manual configuration.
 
 Service settings are read only at startup: save configuration changes and restart
 the service to apply them. This briefly interrupts the heartbeat; HA does not need
@@ -150,6 +166,14 @@ and callback counts do not identify a faulty cable by themselves; see
 and invalid option. A missing serial adapter is retried while the API remains
 running. An unexpected worker exit is logged and closes the Modbus connection;
 a fatal process failure reports its error class and errno.
+
+In the **next beta, unreleased**, an app missing the selected transport's serial
+path or LAN host stays in setup mode after validating all other options. Its
+health endpoint reports `configured: false`; Modbus, heartbeat and discovery do
+not start. Save the connection in **Open Web UI** or native Configuration, then
+restart the app. A configured but temporarily absent adapter still uses normal
+retries. Invalid values and standalone configuration errors remain fatal rather
+than being silently converted into setup mode.
 
 The heartbeat worker is supervised independently of polling. If it exits
 unexpectedly, the service stops so Supervisor's enabled Watchdog can restart it.

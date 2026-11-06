@@ -293,8 +293,9 @@ def test_the_settings_script_sends_nothing_without_apply(
     assert "Nothing was sent" in output
 
 
+@pytest.mark.parametrize("suffix", [".txt", ".html", ".css", ".js"])
 def test_the_legal_gate_rejects_a_copy_of_the_vendor_specification(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, suffix: str
 ) -> None:
     """A text extraction of the manufacturer's PDF is still the PDF."""
 
@@ -308,7 +309,7 @@ def test_the_legal_gate_rejects_a_copy_of_the_vendor_specification(
         "Release information\n"
         "The following functional codes can be used\n"
     )
-    (tmp_path / "notes.txt").write_text(extraction, encoding="utf-8")
+    (tmp_path / f"notes{suffix}").write_text(extraction, encoding="utf-8")
     (tmp_path / "citation.md").write_text(
         'See MENNEKES, "Modbus RTU Specification", revision 2.5.\n',
         encoding="utf-8",
@@ -316,10 +317,10 @@ def test_the_legal_gate_rejects_a_copy_of_the_vendor_specification(
     monkeypatch.setattr(check_legal_audit, "ROOT", tmp_path)
 
     failures = check_legal_audit._check_vendor_documents(
-        [Path("notes.txt"), Path("citation.md")]
+        [Path(f"notes{suffix}"), Path("citation.md")]
     )
     assert len(failures) == 1
-    assert "notes.txt" in failures[0]
+    assert f"notes{suffix}" in failures[0]
 
 
 def test_the_legal_gate_allows_a_citation_of_the_specification() -> None:

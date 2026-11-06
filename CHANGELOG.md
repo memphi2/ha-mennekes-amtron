@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Fix app LAN saves blocked by an old USB device path. Add an administrator-only
+  connection page with an adapter dropdown and fields for the selected transport;
+  start unconfigured apps in setup mode without wallbox traffic.
+
 - Add optional charging-loss estimates from matched BavarianData local history
   or a selected last-charge battery-energy sensor, with explicit assignment and
   a bounded energy-weighted average.

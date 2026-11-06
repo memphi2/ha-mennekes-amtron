@@ -22,6 +22,7 @@ from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout, web
 from amtron_device import registers
+from amtron_device.app_settings import serial_adapters
 from amtron_device.decode import encode_register
 from pymodbus import FramerType
 from pymodbus.server import ModbusSerialServer, ModbusTcpServer
@@ -180,6 +181,9 @@ def check_temporary_files() -> None:
 
 async def probe(profile: str, mode: str) -> dict[str, object]:
     check_environment(profile)
+    adapters = serial_adapters()
+    if mode == "serial":
+        require(any(adapter.value == "/dev/serial/by-id/amtron-test" and adapter.device == "/dev/ttyUSB99" for adapter in adapters), "serial settings did not enumerate the stable virtual adapter")
     writes: list[tuple[int, list[int]]] = []
     discoveries: list[str] = []
 
@@ -274,7 +278,8 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
                 require(b"Heartbeat started" in instance.output and b"Heartbeat stopped" in instance.output, "heartbeat lifecycle logging is incomplete")
         return {"status": "passed", "mode": mode, "profile": profile, "enforcing": True,
                 "discovery": True, "heartbeat": True, "pause_restart": True,
-                "token_preserved": True, "denials": 4, "shutdown": True}
+                "token_preserved": True, "denials": 4, "shutdown": True,
+                "serial_settings": True}
     finally:
         for instance in children:
             await instance.stop(clean=False)

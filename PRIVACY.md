@@ -39,6 +39,14 @@ replaced when that durable state changes, with no growing history. Heartbeats,
 ordinary polls and progress within a running cycle are not persisted. Protect
 service data and backups.
 
+The next beta's **unreleased connection page** displays locally mapped adapter
+names and paths to an authenticated administrator through Supervisor Ingress.
+Those names can contain the adapter's serial number. Connection changes are
+saved in the app's Supervisor options. The page does not send the service token
+to the browser, request cloud data or keep a device-scan history. The HA user ID
+is used transiently for access and request validation, without being saved or
+logged by the page.
+
 ## What diagnostics contain
 
 The diagnostics download is built from an allowlist. It deliberately omits:

@@ -11,6 +11,10 @@ This prerelease is offered through `#apps-beta`; stable remains **0.5.1** in
 for integration installation and app updates.
 
 App settings are available in English, German, French, Dutch and Italian.
+**Next beta, unreleased:** use **Open Web UI** for the connection. USB adapters appear in a dropdown, while
+LAN shows host/IP and port. Save, then restart the app from its Info tab.
+This page needs an administrator and stable Supervisor **2026.11.0 or newer**;
+read-only, limits and polling settings remain in the Configuration tab.
 
 **New in 0.5.2b2:** a configurable state-change interval (default
 **300 seconds**) queues early pause/resume, phase, release and lock changes.
