@@ -7,6 +7,8 @@ from datetime import datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
+import pytest
+
 from custom_components.mennekes_amtron_rtu.charging_cost_const import (
     CONF_ACTIVE_QUARTERS,
     CONF_HIGH_PERIODS,
@@ -62,9 +64,10 @@ def test_import_rejects_unusable_source_and_price_sheet_values():
 
 
 class _Response:
-    def __init__(self, body):
+    def __init__(self, body, *, chunk_size=65_536):
         self.content = self
         self._body = body
+        self._chunk_size = chunk_size
 
     async def __aenter__(self):
         return self
@@ -75,14 +78,18 @@ class _Response:
     def raise_for_status(self):
         return None
 
-    async def read(self, _limit):
-        return self._body
+    async def read(self, limit):
+        count = min(limit, self._chunk_size)
+        result, self._body = self._body[:count], self._body[count:]
+        await asyncio.sleep(0)
+        return result
 
 
 class _Session:
-    def __init__(self, operators):
+    def __init__(self, operators, *, chunk_size=65_536):
         self.operators = operators
         self.urls = []
+        self.chunk_size = chunk_size
 
     def post(self, _url, *, json, timeout):
         assert json["variables"]["coordinates"] == "50.775300,6.083900"
@@ -90,7 +97,7 @@ class _Session:
         import json as json_module
 
         body = json_module.dumps({"data": {"vnb_coordinates": {"vnbs": self.operators}}}).encode()
-        return _Response(body)
+        return _Response(body, chunk_size=self.chunk_size)
 
     def get(self, url, *, timeout):
         self.urls.append(url)
@@ -102,11 +109,12 @@ class _Session:
         writer = csv.DictWriter(output, fieldnames=rows[0].keys())
         writer.writeheader()
         writer.writerows(rows)
-        return _Response(output.getvalue().encode())
+        return _Response(output.getvalue().encode(), chunk_size=self.chunk_size)
 
 
-def test_home_lookup_uses_coordinates_and_reads_data_once(monkeypatch):
-    session = _Session([{"_id": "3", "name": "Regionetz"}])
+@pytest.mark.parametrize("chunk_size", [7, 65_536])
+def test_home_lookup_uses_coordinates_and_reads_complete_fragmented_bodies(monkeypatch, chunk_size):
+    session = _Session([{"_id": "3", "name": "Regionetz"}], chunk_size=chunk_size)
     monkeypatch.setattr(
         "custom_components.mennekes_amtron_rtu.network_tariff_lookup.async_get_clientsession",
         lambda _hass: session,
@@ -171,9 +179,35 @@ def test_tariff_csv_download_is_bounded():
             return _Response(b"x" * 2_000_001)
 
     async def run():
-        import pytest
-
         with pytest.raises(ValueError, match="too large"):
             await _csv_rows(HugeSession(), "https://example.org/data.csv")
 
     asyncio.run(run())
+
+
+def test_malformed_csv_cells_and_periods_reject_import_without_exception():
+    for periods in ("17:00", "17:00-18:00-extra"):
+        malformed = [{**row, "ht": periods} for row in WINDOWS]
+        assert _tariff_values("3", 2026, [PRICE], malformed) is None
+    assert _tariff_values("3", 2026, [{**PRICE, "preisblatt_url": None}], WINDOWS) is None
+    assert _tariff_values("3", 2026, [{**PRICE, None: ["extra"]}], WINDOWS) is None
+    assert _tariff_values("3", 2026, [PRICE], [{**row, "quartal": "bad"} for row in WINDOWS]) is None
+    assert _tariff_values("3", 2026, [{**PRICE, "std_arbeitspreis_ct_kwh": "nan"}], WINDOWS) is None
+
+
+def test_malformed_external_csv_leaves_options_lookup_available(monkeypatch):
+    class BadCsvSession(_Session):
+        def get(self, url, *, timeout):
+            # DictReader's per-field limit is deliberately exceeded while the
+            # complete body stays below our HTTP response size limit.
+            return _Response(b"field\n" + b"x" * 150_000)
+
+    session = BadCsvSession([{"_id": "3"}])
+    monkeypatch.setattr(
+        "custom_components.mennekes_amtron_rtu.network_tariff_lookup.async_get_clientsession",
+        lambda _hass: session,
+    )
+    hass = SimpleNamespace(config=SimpleNamespace(
+        country="DE", latitude=50.7753, longitude=6.0839,
+    ))
+    assert asyncio.run(async_lookup_home_tariff(hass)) is None

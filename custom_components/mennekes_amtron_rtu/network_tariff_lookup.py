@@ -10,6 +10,7 @@ import asyncio
 import csv
 import io
 import json
+import math
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -65,9 +66,7 @@ async def async_lookup_home_tariff(hass: Any) -> dict[str, Any] | None:
             timeout=ClientTimeout(total=10),
         ) as response:
             response.raise_for_status()
-            raw = await response.content.read(100_001)
-            if len(raw) > 100_000:
-                return None
+            raw = await _read_bounded(response.content, 100_000)
             payload = json.loads(raw)
         vnbs = payload["data"]["vnb_coordinates"]["vnbs"]
         if not isinstance(vnbs, list) or len(vnbs) != 1:
@@ -78,16 +77,24 @@ async def async_lookup_home_tariff(hass: Any) -> dict[str, Any] | None:
             _csv_rows(session, f"{_DATA_BASE}/{year}/m3_zeitfenster.csv"),
         )
         return _tariff_values(vnb_id, year, prices, windows)
-    except (ClientError, KeyError, TypeError, ValueError, OSError, TimeoutError, RuntimeError):
+    except (ClientError, csv.Error, KeyError, TypeError, ValueError, OSError, TimeoutError, RuntimeError):
         return None
+
+
+async def _read_bounded(stream: Any, limit: int) -> bytes:
+    """Consume the complete HTTP body without trusting network chunk sizes."""
+    body = bytearray()
+    while chunk := await stream.read(min(65_536, limit + 1 - len(body))):
+        body.extend(chunk)
+        if len(body) > limit:
+            raise ValueError("tariff data too large")
+    return bytes(body)
 
 
 async def _csv_rows(session: Any, url: str) -> list[dict[str, str]]:
     async with session.get(url, timeout=ClientTimeout(total=10)) as response:
         response.raise_for_status()
-        raw = await response.content.read(2_000_001)
-    if len(raw) > 2_000_000:
-        raise ValueError("tariff data too large")
+        raw = await _read_bounded(response.content, 2_000_000)
     body = raw.decode("utf-8-sig")
     return list(csv.DictReader(io.StringIO(body)))
 
@@ -97,6 +104,24 @@ def _tariff_values(
     windows: list[dict[str, str]],
 ) -> dict[str, Any] | None:
     """Accept one identifiable price sheet with a representable daily schedule."""
+    # DictReader uses None for missing cells and surplus-column keys. Reject
+    # these rows before treating values as text or invoking the tariff model.
+    if any(
+        not isinstance(key, str) or not isinstance(value, str)
+        for row in (*prices, *windows) for key, value in row.items()
+    ):
+        return None
+    try:
+        return _parse_tariff_values(vnb_id, year, prices, windows)
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _parse_tariff_values(
+    vnb_id: str, year: int, prices: list[dict[str, str]],
+    windows: list[dict[str, str]],
+) -> dict[str, Any] | None:
+    """Parse structurally valid CSV rows; malformed fields reject the import."""
     matches = [row for row in prices if row.get("vnb_id") == vnb_id and row.get("jahr") == str(year)]
     if len(matches) != 1 or matches[0].get("status") not in ("endgueltig", "vorlaeufig"):
         return None
@@ -111,7 +136,7 @@ def _tariff_values(
         standard = float(price["m3_st_ct_kwh"])
     except (KeyError, TypeError, ValueError):
         return None
-    if abs(ordinary - standard) > 1e-6:
+    if not math.isclose(ordinary, standard, rel_tol=0, abs_tol=1e-6):
         return None
     rows = [row for row in windows if row.get("vnb_id") == vnb_id and row.get("jahr") == str(year)]
     quarters = sorted({int(row["quartal"]) for row in rows if row.get("ht") or row.get("nt")})
@@ -136,6 +161,11 @@ def _tariff_values(
         CONF_ACTIVE_QUARTERS: [str(q) for q in quarters],
         CONF_TARIFF_YEAR: year,
     }
+    parsed_windows = []
+    for rate, key in (("ht", CONF_HIGH_PERIODS), ("nt", CONF_LOW_PERIODS)):
+        for part in values[key].splitlines():
+            start, end = part.split("-")
+            parsed_windows.append({"start": start, "end": end, "rate": rate})
     try:
         TariffConfig.parse({
             "module": "module_3",
@@ -146,11 +176,7 @@ def _tariff_values(
             "tariff_year": year,
             "price_includes_network": True,
             "timezone": "Europe/Berlin",
-            "windows": [
-                {"start": part.split("-")[0], "end": part.split("-")[1], "rate": rate}
-                for rate, key in (("ht", CONF_HIGH_PERIODS), ("nt", CONF_LOW_PERIODS))
-                for part in values[key].splitlines()
-            ],
+            "windows": parsed_windows,
         })
     except (ValueError, TypeError):
         return None
