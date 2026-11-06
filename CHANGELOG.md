@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Retain confirmed heartbeat and fallback repairs when their status register
+  temporarily cannot be read; clear them only after a healthy reading.
 - Treat excessively nested service responses as invalid and mark the connection
   unavailable instead of leaving cached availability after a decoder error.
 - Show exactly three readable app connection choices. Older technical choices

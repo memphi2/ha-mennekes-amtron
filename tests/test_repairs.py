@@ -125,6 +125,49 @@ def test_an_unchanged_issue_is_not_written_again(
     asyncio.run(run())
 
 
+@pytest.mark.parametrize(
+    ("register", "block_address", "issue", "healthy_value"),
+    [
+        (R.ERROR_CODE, R.ERROR_CODE.address, "ems_heartbeat_lost", 0),
+        (R.EMS_FALLBACK_CURRENT, 0x030D, "ems_fallback_not_configured", 6),
+    ],
+)
+def test_failed_register_read_does_not_clear_a_confirmed_repair(
+    monkeypatch, register, block_address, issue, healthy_value
+):
+    async def run():
+        registry = _patch(monkeypatch)
+        hass, entry, transport = await build_runtime(
+            bank=device_bank(error_code=200, fallback_current=0)
+        )
+        coordinator = entry.runtime_data.coordinator
+        clock = [coordinator._poller._monotonic()]
+        coordinator._poller._monotonic = lambda: clock[0]
+        repairs.async_setup_repairs(hass, entry)
+        issue_id = f"{entry.entry_id}_{issue}"
+        assert issue_id in registry.created
+        registry.deleted.clear()
+
+        transport.read_exceptions[block_address] = 0x04
+        for _ in range(2):
+            clock[0] += 61
+            await coordinator.async_refresh()
+            assert coordinator.last_update_success
+            assert not coordinator.current_data().has(register.key)
+            assert issue_id in registry.created
+            assert issue_id not in registry.deleted
+
+        del transport.read_exceptions[block_address]
+        put(transport.bank, register, healthy_value)
+        clock[0] += 61
+        await coordinator.async_refresh()
+        assert issue_id not in registry.created
+        assert registry.deleted.count(issue_id) == 1
+        await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
 def test_changed_placeholders_are_written_again(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
