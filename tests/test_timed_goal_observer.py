@@ -285,6 +285,70 @@ def test_store_failure_preserves_current_trip(monkeypatch: pytest.MonkeyPatch) -
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("operation", ["replace", "clear", "finish"])
+def test_cancelled_save_keeps_live_and_durable_trip_consistent(monkeypatch, operation):
+    async def run():
+        observer, control, _hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=8))
+        original = observer.goal
+        started, finish = asyncio.Event(), asyncio.Event()
+        save = observer._store.async_save
+
+        async def slow_save(goal):
+            started.set()
+            await finish.wait()
+            await save(goal)
+
+        observer._store.async_save = slow_save
+        if operation == "finish":
+            action = observer._finish("reached", original)
+        else:
+            deadline = None if operation == "clear" else NOW + timedelta(hours=9)
+            action = observer.async_set_deadline(deadline)
+        task = asyncio.create_task(action)
+        await started.wait()
+        task.cancel()
+        await asyncio.sleep(0)
+        task.cancel()
+        finish.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert observer._store.saved[-1] == observer.goal.snapshot()
+        if operation == "finish":
+            assert observer.goal.finished == "reached"
+        else:
+            assert observer.goal.deadline == deadline
+        await observer._evaluate()
+        if operation != "replace":
+            assert control.commands == []
+
+    asyncio.run(run())
+
+
+def test_cancelled_failed_save_preserves_live_trip(monkeypatch):
+    async def run():
+        observer, _control, _hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=8))
+        original = observer.goal
+        started, finish = asyncio.Event(), asyncio.Event()
+
+        async def failed_save(_goal):
+            started.set()
+            await finish.wait()
+            raise OSError("disk failed")
+
+        observer._store.async_save = failed_save
+        task = asyncio.create_task(observer.async_set_deadline(None))
+        await started.wait()
+        task.cancel()
+        finish.set()
+        with pytest.raises(OSError, match="disk failed"):
+            await task
+        assert observer.goal is original
+
+    asyncio.run(run())
+
+
 def test_detected_vehicle_phases_bound_the_plan(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, control, _hass = setup_observer(monkeypatch)

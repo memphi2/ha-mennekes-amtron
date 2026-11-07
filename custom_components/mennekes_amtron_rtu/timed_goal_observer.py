@@ -211,8 +211,7 @@ class TimedGoalObserver:
             if not changed:
                 return
             await self._cancel_command()
-            await self._store.async_save(candidate)
-            self.goal = candidate
+            await self._save_goal(candidate)
         self._notify()
         self.request_evaluate()
 
@@ -225,10 +224,30 @@ class TimedGoalObserver:
             candidate = TimedGoal.restore(expected.snapshot())
             candidate.finish(reason, clear_deadline=clear_deadline)
             await self._cancel_command()
-            await self._store.async_save(candidate)
-            self.goal = candidate
+            await self._save_goal(candidate)
         self._set_status(reason)
         self._notify()
+
+    async def _save_goal(self, candidate: TimedGoal) -> None:
+        """Keep the live trip aligned with a save that survives cancellation."""
+        task = asyncio.create_task(self._store.async_save(candidate))
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            # The store finishes atomic writes even when its caller is
+            # cancelled. Shield the whole save, including lock acquisition,
+            # so we know whether the candidate was actually committed.
+            while not task.done():
+                try:
+                    await asyncio.shield(task)
+                except asyncio.CancelledError:
+                    continue
+            task.result()
+            self.goal = candidate
+            self._notify()
+            self.request_evaluate()
+            raise
+        self.goal = candidate
 
     async def async_use_next_calendar_event(self) -> None:
         """Select a single matching future event; later events never roll in."""
