@@ -138,6 +138,7 @@ class VehicleSocObserver:
         self._unsubscribers: list[CALLBACK_TYPE] = []
         self._pending: _Observations | None = None
         self._inflight: _Observations | None = None
+        self._previous_target_model: SocGoal | None = None
         self._target_model: SocGoal | None = None
         self._target_pending: _Observations | None = None
         self._last_sent: _Observation | None = None
@@ -227,7 +228,10 @@ class VehicleSocObserver:
         if self._pending is None and observation == self._last_sent:
             return
         if self._pending is None:
-            model = self._inflight.model if self._inflight is not None else self._control.soc_goal
+            model = (
+                self._previous_target_model or
+                (self._inflight.model if self._inflight is not None else self._control.soc_goal)
+            )
             self._pending = _Observations(model, self.source)
         self._pending.add(observation)
         self._ensure_task()
@@ -290,8 +294,9 @@ class VehicleSocObserver:
             previous = self._pending
             self._pending = None
             soc, maximum = self.latest_soc, self.maximum
-            original = self._control.soc_goal.snapshot()
-            candidate = copy(self._control.soc_goal)
+            self._previous_target_model = copy(self._control.soc_goal)
+            original = self._previous_target_model.snapshot()
+            candidate = copy(self._previous_target_model)
             try:
                 candidate.set_target(value, soc, maximum)
             except ValueError:
@@ -324,6 +329,7 @@ class VehicleSocObserver:
                 if candidate is not None:
                     self._pending = self._target_pending
             finally:
+                self._previous_target_model = None
                 self._target_model = None
                 self._target_pending = None
                 self._ensure_task()

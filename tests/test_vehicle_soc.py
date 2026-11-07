@@ -187,8 +187,12 @@ def test_failed_target_keeps_threshold_evidence_for_previous_goal(tmp_path):
         started, release = asyncio.Event(), asyncio.Event()
 
         async def failing_set(value, *, source, soc, maximum):
+            original = control.soc_goal
+            control.soc_goal = copy(original)
+            await control.set_goal(value, source=source, soc=soc, maximum=maximum)
             started.set()
             await release.wait()
+            control.soc_goal = original
             raise DeviceError("service_unavailable")
 
         try:
