@@ -10,13 +10,17 @@ import pytest
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.data import (
+    ConnectionState,
+    WallboxData,
+)
 from custom_components.mennekes_amtron_rtu.device.energy_goal import EnergyGoal
 from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import (
     EnergyGoalController,
 )
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceValidationError
+from custom_components.mennekes_amtron_rtu.device.poller import DevicePoller
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
 from tests.fakes import put, raise_connection_error
@@ -153,6 +157,96 @@ def test_reached_goal_persists_before_pause_and_bypasses_only_the_long_wait():
         assert current_writes(harness.transport) == [12, 1]
         await runner.async_stop()
         await control.async_shutdown()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("fresh_read", ["running", "unreadable"])
+def test_reached_goal_does_not_trust_an_old_paused_poll(fresh_read):
+    async def run():
+        harness, control, runner, _saved = await _runner(paused=True)
+        poller = DevicePoller(
+            harness.client, harness.identity, connection_state=ConnectionState(),
+            monotonic=lambda: harness.clock[0],
+        )
+        await runner.async_set_target(0.1)
+        harness.snapshot = await poller.async_poll(WallboxData(), last_success=True)
+        assert control.is_paused is True
+
+        # The device changes, but the next poll cannot read current_limits.
+        # Keep the old owner snapshot while the goal processes the new poll,
+        # as can happen while HA awaits an optional session observer.
+        put(harness.transport.bank, R.CHARGING_CURRENT_EMS, 16)
+        put(harness.transport.bank, R.ENERGY_TOTAL, 1234.8)
+        harness.transport.read_exceptions[R.DOWNGRADE_CURRENT.address] = 0x04
+        if fresh_read == "unreadable":
+            harness.transport.read_exceptions[R.CHARGING_CURRENT_EMS.address] = 0x04
+        harness.clock[0] += 60
+        observed = await poller.async_poll(harness.snapshot, last_success=True)
+        assert "current_limits" in observed.failed_blocks
+        assert observed.get("charging_current_ems") is None
+        runner.observe(observed)
+        await _settle(runner)
+        assert control.energy_goal.status == "reached"
+        assert current_writes(harness.transport) == [1]
+        assert harness.client.write_state.mode_change_at == harness.clock[0]
+        assert control.charging_setpoint == (16 if fresh_read == "running" else 10)
+        harness.transport.read_exceptions.clear()
+        assert await harness.client.async_read_register(R.CHARGING_CURRENT_EMS) == 1
+        await runner.async_stop()
+        await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_reached_goal_confirms_current_pause_without_an_unneeded_write():
+    async def run():
+        harness, control, runner, _saved = await _runner(paused=True)
+        await runner.async_set_target(0.1)
+        harness.transport.reads.clear()
+        runner.observe(_snapshot(harness, 1234.8))
+        await _settle(runner)
+        assert control.energy_goal.status == "reached"
+        assert (R.CHARGING_CURRENT_EMS.address, R.CHARGING_CURRENT_EMS.count) in harness.transport.reads
+        assert current_writes(harness.transport) == []
+        assert control.pause_requested is True
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("applied", [False, True])
+def test_uncertain_goal_pause_checks_actual_state_before_retrying(applied):
+    async def run():
+        harness, control, runner, _saved = await _runner(paused=True)
+        await runner.async_set_target(0.1)
+        put(harness.transport.bank, R.CHARGING_CURRENT_EMS, 16)
+        original = harness.transport.write_registers
+
+        async def unconfirmed_write(address, values, **kwargs):
+            if applied:
+                await original(address, values, **kwargs)
+            raise raise_connection_error()
+
+        harness.transport.write_registers = unconfirmed_write
+        runner.observe(_snapshot(harness, 1234.8))
+        await _settle(runner)
+        assert control.energy_goal.status == "reached"
+        assert control.pause_requested is True
+        assert control.charging_setpoint == 16
+        assert current_writes(harness.transport) == ([1] if applied else [])
+        harness.transport.write_registers = original
+
+        # If the old write reached the wallbox, confirmation avoids a second
+        # write. Otherwise the idempotent retry still observes the 5-s floor.
+        harness.clock[0] += 1
+        runner.observe(_snapshot(harness, 1234.8, energy_read=False))
+        await _settle(runner)
+        assert current_writes(harness.transport) == [1]
+        assert harness.slept == ([] if applied else [4])
+        assert control.pause_requested is True
+        await runner.async_stop()
+        await control.async_shutdown()
+
     asyncio.run(run())
 
 
