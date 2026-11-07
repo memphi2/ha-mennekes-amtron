@@ -308,7 +308,7 @@ def test_reconfigure_quiesces_old_client_and_restores_only_after_verified_rollba
         flow = Flow(hass)
         flow.reconfigure_entry = entry
 
-        async def unload(_entry_id):
+        async def unload(_entry_id, *, _lock=True):
             events.append("unload")
             if failure == "unload":
                 return False
@@ -316,7 +316,7 @@ def test_reconfigure_quiesces_old_client_and_restores_only_after_verified_rollba
             entry.state = ConfigEntryState.NOT_LOADED
             return True
 
-        async def restore(_entry_id):
+        async def restore(_entry_id, *, _lock=True):
             events.append("restore")
             await entry.runtime_data.client.async_connect()
             entry.state = ConfigEntryState.LOADED

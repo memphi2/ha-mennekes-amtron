@@ -9,6 +9,7 @@
       "service_identity_changed": "La wallbox rilevata è cambiata. Riavvia la configurazione.",
       "service_discovery_updated": "L'integrazione esistente ora usa la connessione dell'app rilevata.",
       "multiple_service_apps": "Sono state trovate più app Modbus. Seleziona l'app rilevata corretta in Dispositivi e servizi.",
+      "connection_settings_changed": "Le impostazioni di connessione sono cambiate durante l’autenticazione. Le credenziali verificate non sono state salvate. Controlla la connessione attuale prima di riprovare.",
       "reauth_not_supported": "Questo collegamento non usa l’accesso TCP dell’adattatore. Modifica le impostazioni tramite « Cambia collegamento »."
     },
     "error": {
