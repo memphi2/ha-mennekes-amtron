@@ -697,7 +697,11 @@ class RemoteControl(AmtronControl):
 
     def _apply_soc_transaction_result(self, result: dict[str, Any], previous_revision: str | None) -> str:
         outcome, snapshot, revision = result.get("outcome"), result.get("snapshot"), result.get("revision")
-        if outcome not in ("applied", "rejected", "cancelled", "unknown") or not isinstance(snapshot, dict):
+        if (
+            not isinstance(outcome, str)
+            or outcome not in ("applied", "rejected", "cancelled", "unknown")
+            or not isinstance(snapshot, dict)
+        ):
             raise DeviceError("service_unavailable")
         self._remote.apply_snapshot(snapshot, require_available=False, consume_energy=False)
         if outcome == "unknown":

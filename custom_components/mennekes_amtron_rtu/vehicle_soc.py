@@ -8,7 +8,7 @@ import math
 from contextlib import suppress
 from copy import copy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from homeassistant.core import (
     CALLBACK_TYPE,
@@ -49,14 +49,34 @@ class SocControl(Protocol):
 
     async def async_observe_soc(
         self, soc: float | None, maximum: float | None = None, *, source: str,
-        expected_soc_revision: str | None = None,
     ) -> None: ...
-
-    async def async_resolve_soc_goal(self) -> str: ...
 
     async def async_set_soc_goal(
         self, value: float, *, source: str,
         soc: float | None = None, maximum: float | None = None,
+    ) -> None: ...
+
+
+@runtime_checkable
+class TransactionalSocControl(Protocol):
+    """Service-only transaction operations, absent from direct controllers."""
+
+    @property
+    def soc_goal_revision(self) -> str | None: ...
+
+    @property
+    def soc_goal_resolution_pending(self) -> bool: ...
+
+    @property
+    def soc_goal_resolution_fenced(self) -> bool: ...
+
+    def abandon_fenced_soc_goal(self) -> None: ...
+
+    async def async_resolve_soc_goal(self) -> str: ...
+
+    async def async_observe_soc(
+        self, soc: float | None, maximum: float | None = None, *, source: str,
+        expected_soc_revision: str | None = None,
     ) -> None: ...
 
 
@@ -261,8 +281,11 @@ class VehicleSocObserver:
             while (self._pending is not None or self._resolution_pending()) and not self._stopping:
                 async with self._command_lock:
                     if self._resolution_pending():
+                        transaction = self._transaction_control()
+                        if transaction is None:
+                            return
                         try:
-                            outcome = await self._control.async_resolve_soc_goal()
+                            outcome = await transaction.async_resolve_soc_goal()
                         except (HomeAssistantError, DeviceError, AmtronBusError, OSError):
                             return
                         if outcome == "unknown":
@@ -293,10 +316,16 @@ class VehicleSocObserver:
                             self._configured = True
                         if self.source is not None:
                             for observation in observations.outgoing():
-                                kwargs = {"expected_soc_revision": observations.revision} if observations.revision is not None else {}
-                                await self._control.async_observe_soc(
-                                    observation.soc, observation.maximum, source=self.source, **kwargs,
-                                )
+                                transaction = self._transaction_control()
+                                if observations.revision is not None and transaction is not None:
+                                    await transaction.async_observe_soc(
+                                        observation.soc, observation.maximum, source=self.source,
+                                        expected_soc_revision=observations.revision,
+                                    )
+                                else:
+                                    await self._control.async_observe_soc(
+                                        observation.soc, observation.maximum, source=self.source,
+                                    )
                     except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
                         self._pending = (
                             observations.combine(self._pending)
@@ -320,11 +349,12 @@ class VehicleSocObserver:
             await asyncio.shield(self._task)
         async with self._command_lock:
             if self._resolution_pending():
-                if getattr(self._control, "soc_goal_resolution_fenced", False) is not True:
+                transaction = self._transaction_control()
+                if transaction is None or not transaction.soc_goal_resolution_fenced:
                     raise service_validation_error("soc_goal_unavailable")
                 # The service has fenced the earlier request. An explicit new
                 # selection supersedes its unknown outcome and both folds.
-                self._control.abandon_fenced_soc_goal()
+                transaction.abandon_fenced_soc_goal()
                 self._pending = None
                 self._last_sent = None
                 self._clear_target_models()
@@ -339,12 +369,15 @@ class VehicleSocObserver:
             self._previous_target_model = copy(self._control.soc_goal)
             self._previous_target_revision = getattr(self._control, "soc_goal_revision", None)
             original = self._previous_target_model.snapshot()
-            candidate = copy(self._previous_target_model)
+            candidate_model = copy(self._previous_target_model)
+            candidate: SocGoal | None
             try:
-                candidate.set_target(value, soc, maximum)
+                candidate_model.set_target(value, soc, maximum)
             except ValueError:
                 # The control remains responsible for validating the request.
                 candidate = None
+            else:
+                candidate = candidate_model
             self._target_model = candidate
             self._target_pending = None
             try:
@@ -382,7 +415,13 @@ class VehicleSocObserver:
                 self._ensure_task()
 
     def _resolution_pending(self) -> bool:
-        return getattr(self._control, "soc_goal_resolution_pending", False) is True
+        transaction = self._transaction_control()
+        return transaction is not None and transaction.soc_goal_resolution_pending
+
+    def _transaction_control(self) -> TransactionalSocControl | None:
+        if isinstance(self._control, TransactionalSocControl):
+            return self._control
+        return None
 
     def _clear_target_models(self) -> None:
         self._previous_target_model = None
