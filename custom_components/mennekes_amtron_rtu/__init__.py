@@ -19,7 +19,6 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -92,7 +91,11 @@ from .goal_store import (
     TimedGoalStore,
 )
 from .loss_store import LossStore
-from .network_tariff_year import async_refresh_tariff_year, needs_year_refresh
+from .network_tariff_year import (
+    async_refresh_tariff_year,
+    async_track_tariff_midnight,
+    needs_year_refresh,
+)
 from .options_flow import control_mode_is_master
 from .recovery import HeartbeatRecovery
 from .remote import (
@@ -405,11 +408,7 @@ async def async_setup_entry(
                     "amtron_tariff_refresh", eager_start=False,
                 )
 
-            entry.async_on_unload(async_track_time_change(
-                hass,
-                refresh_new_tariff_year,
-                hour=0, minute=0, second=5,
-            ))
+            entry.async_on_unload(async_track_tariff_midnight(hass, refresh_new_tariff_year))
         async_setup_repairs(hass, entry)
         if not control.read_only and not remote:
             entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)

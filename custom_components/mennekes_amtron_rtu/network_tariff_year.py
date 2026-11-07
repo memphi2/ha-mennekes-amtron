@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from collections.abc import Callable
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers.event import async_track_point_in_utc_time
+from homeassistant.util import dt as dt_util
 
 from .charging_cost_const import (
     CONF_AUTO_TARIFF_REFRESH,
@@ -22,6 +25,37 @@ from .network_tariff_lookup import async_lookup_home_tariff
 
 _LOGGER = logging.getLogger(__name__)
 _RUNNING_STATES = (ConfigEntryState.LOADED, ConfigEntryState.SETUP_IN_PROGRESS)
+_TARIFF_ZONE = ZoneInfo("Europe/Berlin")
+
+
+@callback
+def async_track_tariff_midnight(
+    hass: HomeAssistant, action: Callable[[datetime], None],
+) -> CALLBACK_TYPE:
+    """Retry expired tariffs at German midnight, independently of HA's zone."""
+    unsubscribe: CALLBACK_TYPE
+
+    def schedule() -> CALLBACK_TYPE:
+        now = dt_util.utcnow().astimezone(_TARIFF_ZONE)
+        next_run = datetime.combine(now.date(), time(0, 0, 5), _TARIFF_ZONE)
+        if next_run <= now:
+            next_run += timedelta(days=1)
+        return async_track_point_in_utc_time(hass, fire, next_run.astimezone(UTC))
+
+    @callback
+    def fire(now: datetime) -> None:
+        nonlocal unsubscribe
+        # Recompute each local date so DST cannot shift the daily retry.
+        unsubscribe = schedule()
+        action(now)
+
+    unsubscribe = schedule()
+
+    @callback
+    def cancel() -> None:
+        unsubscribe()
+
+    return cancel
 
 
 def needs_year_refresh(options: dict[str, Any], *, year: int | None = None) -> bool:
