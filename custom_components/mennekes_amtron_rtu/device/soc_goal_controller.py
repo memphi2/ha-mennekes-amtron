@@ -11,6 +11,7 @@ from copy import copy
 from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .control import AmtronControl
 from .errors import DeviceError, validation_error
+from .persistence import finish_goal_save
 from .soc_goal import SocGoal, percentage
 
 _LOGGER = logging.getLogger(__name__)
@@ -92,13 +93,17 @@ class SocGoalController:
         self._pending = None
         self._pending_soc = self._pending_maximum = None
         try:
-            await self._persist()
+            await finish_goal_save(self._persist())
             self._dirty = False
         except asyncio.CancelledError:
-            if self._control.goal_controller is not None:
-                await self._control.goal_controller.async_cancel_recovery_locked()
-            self.retry_stop()
-            self._changed()
+            try:
+                if self._control.goal_controller is not None:
+                    await self._control.goal_controller.async_cancel_recovery_locked()
+            finally:
+                # Recovery persistence can itself be cancelled. A committed
+                # reached target must still arrange its stop before we exit.
+                self.retry_stop()
+                self._changed()
             raise
         except Exception:
             restored = copy(pending or original)

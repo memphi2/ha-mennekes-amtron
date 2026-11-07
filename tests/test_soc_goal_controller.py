@@ -20,7 +20,13 @@ from custom_components.mennekes_amtron_rtu.device.soc_goal_controller import (
 )
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
 from tests.fakes import put
-from tests.test_energy_goal_controller import _runner, _settle, _snapshot
+from tests.test_energy_goal_controller import (
+    _assert_service_cancelled_store_wait,
+    _runner,
+    _settle,
+    _snapshot,
+)
+from tests.test_goal_store import store_at
 from tests.test_modbus_service import current_writes, service_fixture
 
 SOURCE = "sensor.car_soc|number.car_limit"
@@ -333,6 +339,86 @@ def test_cancelled_committed_save_retains_new_goal(with_energy):
         await soc.async_stop()
         await energy.async_stop()
     asyncio.run(run())
+
+
+def test_repeated_cancellation_still_enforces_committed_reached_goal():
+    async def run():
+        harness, control, energy, soc, _ = await _soc_runner()
+        recovery_started = asyncio.Event()
+        release = asyncio.Event()
+        calls = 0
+
+        async def persist():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise asyncio.CancelledError
+
+        async def slow_recovery_cancel():
+            recovery_started.set()
+            await release.wait()
+
+        soc._persist = persist
+        energy.async_cancel_recovery_locked = slow_recovery_cancel
+        task = asyncio.create_task(soc.async_set_target(50, source=SOURCE, soc=80))
+        await recovery_started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert control.soc_goal.status == "reached"
+        await _settle(soc)
+        assert current_writes(harness.transport) == [1]
+        await soc.async_stop()
+        await energy.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_cancelled_soc_target_waiting_for_store_lock_finishes_or_rolls_back(tmp_path, fails):
+    async def run():
+        _harness, control, energy, soc, _ = await _soc_runner()
+        from custom_components.mennekes_amtron_rtu.goal_store import SocGoalStore
+
+        base = store_at(tmp_path)
+        store = SocGoalStore(base._hass, "entry", "wallbox")
+        await store.async_save(control.soc_goal)
+        old = control.soc_goal.snapshot()
+        started = asyncio.Event()
+
+        async def save():
+            started.set()
+            await store.async_save(control.soc_goal)
+
+        def failed_write(_payload):
+            raise OSError("disk failed")
+
+        if fails:
+            store._write = failed_write
+        soc._persist = save
+        async with store._lock:
+            task = asyncio.create_task(soc.async_set_target(80, source=SOURCE, soc=20))
+            await started.wait()
+            task.cancel()
+            await asyncio.sleep(0)
+            task.cancel()
+            await asyncio.sleep(0)
+            assert not task.done()
+        with pytest.raises(OSError if fails else asyncio.CancelledError):
+            await task
+        assert control.soc_goal.snapshot() == (old if fails else (await store.async_load()).snapshot())
+        if fails:
+            assert (await store.async_load()).snapshot() == old
+        else:
+            assert control.soc_goal.target_percent == 80
+        await soc.async_stop()
+        await energy.async_stop()
+
+    asyncio.run(run())
+
+
+def test_cancelled_soc_target_waiting_for_service_store_lock_is_saved(tmp_path):
+    asyncio.run(_assert_service_cancelled_store_wait(tmp_path, kind="soc"))
 
 
 def test_failed_source_change_does_not_apply_the_new_cars_soc_to_old_goal():
