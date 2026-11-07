@@ -140,6 +140,7 @@ class EnergyGoalController:
                 # on-disk limit can be assumed. Fence starts and schedule a
                 # pause, including when the requested candidate is disabled.
                 self._storage_unknown = True
+                self._dirty = True
                 self._pending = copy(candidate)
                 self._pending_generation = state.energy_goal_generation
                 self._ensure_task()

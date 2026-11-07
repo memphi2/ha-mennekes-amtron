@@ -535,6 +535,25 @@ def test_unknown_worker_save_fences_until_a_later_poll_saves():
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("retry_fails", [False, True])
+def test_shutdown_retries_unknown_disabled_target_save(retry_fails):
+    async def run():
+        _harness, control, runner, _saved = await _runner()
+        await runner.async_set_target(12)
+        retry = StorageStateUnknownError("still unreadable") if retry_fails else None
+        persist = AsyncMock(side_effect=[StorageStateUnknownError("readback failed"), retry])
+        runner._persist = persist
+        with pytest.raises(StorageStateUnknownError):
+            await runner.async_set_target(0)
+        assert runner.stop_requested
+        await runner.async_stop()
+        assert persist.await_count == 2
+        assert control.energy_goal.status == "disabled"
+        assert runner.stop_requested is retry_fails
+
+    asyncio.run(run())
+
+
 def test_unknown_recovery_save_never_resumes_before_storage_recovers():
     async def run():
         harness, control, runner, _saved = await _runner()
