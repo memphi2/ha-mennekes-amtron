@@ -121,7 +121,11 @@ from .timed_goal_const import (
     timed_goal_is_enabled,
 )
 from .timed_goal_observer import TimedGoalObserver
-from .vehicle_detection import VehicleDetectionObserver, prepare_vehicle_selection
+from .vehicle_detection import (
+    VehicleDetectionObserver,
+    prepare_vehicle_selection,
+    vehicle_selection_matches,
+)
 from .vehicle_profiles import (
     CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_LIMIT_USE_PROFILE,
@@ -169,6 +173,14 @@ async def async_setup_entry(
     prepare_vehicle_selection(hass, entry)
     timed_reset_complete = await _async_reset_disabled_trip(hass, entry)
     options = vehicle_options(entry.options)
+
+    def validate_vehicle_selection() -> None:
+        if not vehicle_selection_matches(hass, entry, options.get(CONF_VEHICLE_PROFILE_ID)):
+            prepare_vehicle_selection(hass, entry)
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN, translation_key="vehicle_selection_changed",
+            )
+
     if CONF_VEHICLE_PROFILES in entry.options:
         catalog = profiles(entry.options)
         raw_catalog = entry.options.get(CONF_VEHICLE_PROFILES)
@@ -214,6 +226,7 @@ async def async_setup_entry(
             # Legacy endpoint-only entries keep their registry identifiers, but
             # can still bind this running client to a serial it has just read.
             client.bind_identity(identity.serial_number)
+        validate_vehicle_selection()
     except BaseException as err:
         await client.async_close()
         if isinstance(err, WaveshareAuthenticationRejectedError):
@@ -304,6 +317,7 @@ async def async_setup_entry(
     )
 
     try:
+        validate_vehicle_selection()
         if (
             vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is False
             or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
@@ -355,7 +369,6 @@ async def async_setup_entry(
                 await soc_store.async_save(control.soc_goal)
 
             entry.runtime_data.soc_goal = SocGoalController(control, persist_soc_goal, notify_pending)
-            coordinator.retry_soc_goal = entry.runtime_data.soc_goal.retry_stop
         if not remote and control.supports_energy_goal:
             store = GoalStore(
                 hass, entry.entry_id,
@@ -417,9 +430,11 @@ async def async_setup_entry(
                 hass, entry, client, diagnostics
             )
         await coordinator.async_config_entry_first_refresh()
+        validate_vehicle_selection()
         if loss_enabled:
             entry.runtime_data.charge_loss = ChargeLossObserver(hass, entry)
             await entry.runtime_data.charge_loss.async_start()
+        validate_vehicle_selection()
         entry.runtime_data.vehicle_telemetry = resolve_telemetry_source(hass, options)
         if vehicle_soc_is_configured(options) or control.soc_goal.source is not None:
             observer = VehicleSocObserver(
@@ -436,6 +451,11 @@ async def async_setup_entry(
                 await observer.async_start()
             except (AmtronBusError, HomeAssistantError, OSError) as err:
                 _raise_optional_setup_error(client, err, "soc_goal_unavailable")
+        validate_vehicle_selection()
+        if entry.runtime_data.soc_goal is not None:
+            # The first poll must never retry a restored old vehicle's stop
+            # before its source has been rebound or deliberately cleared.
+            coordinator.retry_soc_goal = entry.runtime_data.soc_goal.retry_stop
         if (
             timed_reset_complete and vehicle_soc_is_configured(options)
             and timed_goal_is_enabled(options)

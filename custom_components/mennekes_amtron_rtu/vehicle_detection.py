@@ -21,6 +21,7 @@ from .vehicle_profiles import (
     CONF_VEHICLE_AUTO_SELECTION,
     VehicleProfile,
     activate_profile,
+    active_profile,
     profiles,
     vehicle_options,
 )
@@ -191,3 +192,22 @@ def prepare_vehicle_selection(hass: HomeAssistant, entry: MennekesAmtronConfigEn
 def automatic_selection_available(options: Mapping[str, Any]) -> bool:
     """Offer automatic mode only after at least one explicit source selection."""
     return any(profile.detection is not None for profile in profiles(options).values())
+
+
+def vehicle_selection_matches(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, expected: str | None,
+) -> bool:
+    """Fence old profile goals after any setup operation that yields control.
+
+    An unselected runtime is safe to start and must be allowed to finish so its
+    detector can settle a new candidate. Only an existing selection can revive
+    a stored vehicle goal and therefore requires fresh matching evidence.
+    """
+    profile = active_profile(entry.options)
+    if (profile.id if profile is not None else None) != expected:
+        return False
+    return (
+        expected is None
+        or entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is not True
+        or VehicleDetectionObserver(hass, entry).selected() == expected
+    )
