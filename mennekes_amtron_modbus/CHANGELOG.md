@@ -1,5 +1,79 @@
 # Changes
 
+## 0.6.1
+
+- Expire queued timed charging commands at their deadline even while Home
+  Assistant is offline. Preserve the last applied charging state and heartbeat;
+  an expired request cannot start charging later.
+- Add the API 2 commands needed for timed-plan current changes and cancellation.
+  Integration 0.6.1 requires this service version or newer; update the app first.
+- Validate quarter-hour boundaries in the shared Module 3 tariff model.
+- Keep existing app settings and data. Stable 0.6.1 is available through **#apps**
+  and also updates existing **#apps-beta** installations.
+
+## 0.6.0b1
+
+Beta release; stable remains **0.5.1**.
+
+- Add a guided USB/LAN connection page with a real adapter dropdown. An absent
+  old USB adapter no longer blocks LAN setup. Save, then restart to apply changes.
+- Keep energy targets running independently of HA, with recovery after temporary
+  meter outages. Support optional vehicle percentage targets supplied by HA;
+  setting either target never starts charging.
+- Let HA cancel pending commands and show connection quality and command results.
+  Supply the measurements needed for optional charging-loss and cost estimates.
+- Make charging-state waits configurable and confirm the vehicle has paused
+  before switching phases. Improve heartbeat recovery and reconnect handling
+  while retaining deliberate pauses and the latest current setting.
+- Include AppArmor protection and start unconfigured installations in setup mode,
+  ready for connection settings without wallbox traffic.
+
+Keep the app's existing data and update it before the integration. An app restart
+briefly interrupts the heartbeat. The connection page requires an administrator
+and stable **Supervisor 2026.11.0+**; the native Configuration tab remains available.
+This beta app is offered only in **#apps-beta**, where existing beta installations
+can update in place. **#apps** remains on stable **0.5.1**.
+
+## 0.5.2b2
+
+- Persist executed queued stop intent before refreshing wallbox status, so a
+  failed or cancelled read cannot leave stale intent for the next service start.
+- Add `state_change_interval_seconds`, default 300 and configurable from 0 to
+  3600 seconds. Queue early pause/resume, phase, release and lock changes;
+  newer requests replace old pending work, including a stop replacing a start.
+- Report the pending action and fixed due time to HA. A running service keeps
+  the queue through HA restarts; restarting the service cancels pending work.
+  Heartbeat and recovery that preserves the existing charging intent continue
+  without waiting for this interval.
+- Wait for live pause confirmation before sending a phase change; a failed
+  confirmation or timeout keeps the phase command unsent and retains the pause.
+  Add `phase_switch_grace_seconds` (default 5, range 0–30) after confirmation,
+  followed by another live state check before switching.
+
+- Skip the long transition wait and vehicle grace time only when fresh EVSE
+  and CP status confirm no vehicle is connected. Detect unplugging during
+  pending waits; retain five-second write floors and heartbeat.
+
+## 0.5.2b1
+
+- Check the physical serial after reconnects and before control writes, including
+  recovery. A replaced or unidentifiable wallbox makes the service unavailable;
+  saved intent stays intact until the original wallbox can be verified again.
+- Tolerate malformed optional firmware, article and serial text so other valid
+  readings remain usable; existing serial-number identity checks still apply.
+- Keep the latest requested current after a lost write reply or cancellation;
+  an older queued slider value must not return later or after a service restart.
+- Remove duplicate connection choices: only **USB / RS-485**, **LAN: Modbus RTU
+  (TCP)** and **LAN: Modbus TCP** are shown. If an old technical name is saved,
+  select its matching readable choice once; 0.5.1 supports doing this before
+  the update. Existing readable selections and other settings stay unchanged.
+- Add a custom AppArmor profile that Supervisor loads with protection mode on.
+  App options stay read-only; the service can maintain its own token and charging
+  state and communicate over USB/LAN. Native AMD64/ARM64 tests exercise all three
+  transports under enforcement, including restart and rejected unrelated access.
+- Document permission-denial troubleshooting and why an installed app's rating
+  can differ from the app-store rating before installation.
+
 ## 0.5.1
 
 - Always show **Adapter host / IP** in the app configuration. Enter it for LAN;

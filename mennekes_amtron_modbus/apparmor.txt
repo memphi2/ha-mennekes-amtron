@@ -1,0 +1,66 @@
+abi <abi/3.0>,
+
+# Mennekes Amtron service. Supervisor replaces this profile name with the
+# installed app ID. No host-wide attachment and no complain-mode fallback.
+# Keep this allowlist independent of distribution-specific abstractions.
+profile mennekes_amtron_modbus flags=(attach_disconnected,mediate_deleted) {
+  # Docker's init forwards shutdown signals to the Python service. All children
+  # inherit this profile; there is no shell or unconfined execution rule.
+  /dev/init rix,
+  /{usr/,}sbin/docker-init rix,
+  /usr/local/bin/amtron-modbus-service rix,
+  /usr/local/bin/python{,3,3.14} rix,
+  signal (send,receive) peer=@{profile_name},
+  signal (receive) set=(term,int,kill,quit,hup,cont),
+
+  # CPython, extension modules and the dynamic loader in python:3.14-slim.
+  /usr/local/lib/ r,
+  /usr/local/lib/python3.14/{,**} r,
+  /usr/local/lib/python3.14/**.so* m,
+  /usr/local/lib/libpython3.14.so* mr,
+  /{usr/,}lib{,64}/{,**} mr,
+  /etc/ld.so.cache r,
+  /app/ r,
+
+  # Address resolution, local time and libc runtime information.
+  /etc/{hosts,host.conf,resolv.conf,nsswitch.conf,gai.conf,localtime,timezone} r,
+  # aiohttp creates SSL contexts on import even for the local HTTP API.
+  /etc/ssl/openssl.cnf r,
+  /etc/ssl/certs/{,**} r,
+  /usr/share/zoneinfo/{,**} r,
+  /proc/{meminfo,cpuinfo,stat,filesystems} r,
+  /proc/sys/{vm/overcommit_memory,kernel/cap_last_cap} r,
+  /proc/[0-9]*/{maps,auxv,status} r,
+  /proc/[0-9]*/attr/{current,apparmor/current} r,
+  /sys/devices/system/cpu/{online,possible} r,
+  /sys/kernel/mm/transparent_hugepage/hpage_pmd_size r,
+  /dev/null rw,
+  /dev/{random,urandom} r,
+
+  # API, Supervisor discovery, DNS and either TCP Modbus framing. This permits
+  # socket types, not arbitrary raw IP sockets or network-administration rights.
+  network inet stream,
+  network inet6 stream,
+  network inet dgram,
+  network inet6 dgram,
+  network netlink raw,
+  # asyncio's anonymous socketpair stays within the app's profile.
+  unix (create,getattr,getopt,setopt,shutdown),
+  unix (connect,send,receive) peer=(label=@{profile_name}),
+
+  # Serial adapters and persistent by-id/by-path names. Supervisor still
+  # determines which devices are actually mapped into the container.
+  # The connection picker enumerates names only; no sysfs metadata is needed.
+  /dev/ r,
+  /dev/serial/ r,
+  /dev/serial/{by-id,by-path}/ r,
+  /dev/tty{USB,ACM,AMA,S,SC,THS,XRUSB}[0-9]* rwk,
+  /dev/serial/{by-id,by-path}/* rwk,
+
+  # Options are read-only. Token and accepted charging intent use same-directory
+  # temporary files, fsync and atomic rename; no general /data or /tmp writes.
+  /data/ r,
+  /data/options.json r,
+  /data/{service-token,intent.json} rw,
+  /data/.{token,intent}-* rw,
+}

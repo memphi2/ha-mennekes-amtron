@@ -1,7 +1,7 @@
 configuration:
   serial_port:
-    name: Serieller Adapter
-    description: "Nur für USB / RS-485: exklusiven USB-RS-485-Adapter wählen, möglichst über den stabilen /dev/serial/by-id-Pfad. Bei LAN nicht ausfüllen."
+    name: Serieller Adapter (Pfad)
+    description: "USB-Adapter unter „Weboberfläche öffnen“ aus der Liste wählen. Dieser Pfad wird dort gespeichert. Bei LAN wird er ignoriert und beim Speichern über die Weboberfläche entfernt."
   device_id:
     name: Wallbox-Adresse
     description: Die in der Wallbox eingestellte Modbus-Adresse.
@@ -17,6 +17,12 @@ configuration:
   current_cap:
     name: Stromobergrenze
     description: Höchster angeforderter EMS-Strom in Ampere. Bewusste Befehle mit 0 A heben die EMS-Begrenzung auf.
+  state_change_interval_seconds:
+    name: Mindestabstand zwischen Zustandswechseln
+    description: "Mindestabstand in Sekunden zwischen Start, Pause, Freigabe-, Sperr- und Phasenwechseln (Standard 300). Zu frühe Befehle werden vorgemerkt; der neueste ersetzt den vorherigen. Der Schreibabstand von fünf Sekunden für den Ladestrom bleibt bestehen. Mit 0 entfällt die längere Wartezeit."
+  phase_switch_grace_seconds:
+    name: "Zusätzliche Wartezeit vor Phasenwechseln"
+    description: "Zusätzliche Sekunden zwischen der bestätigten Ladepause des Fahrzeugs und dem Phasenwechsel (Standard 5, Bereich 0–30). Mit 0 entfällt nur diese zusätzliche Wartezeit; die Ladepause muss weiterhin bestätigt werden."
   scan_interval:
     name: Statusintervall
     description: Sekunden zwischen Statusabfragen. Der Heartbeat läuft unabhängig davon.
@@ -31,7 +37,7 @@ configuration:
     description: Fest auf 8765; eine Freigabe am Host ist optional und normalerweise unnötig.
   connection_type:
     name: Wallbox-Verbindung
-    description: "USB / RS-485: lokaler Adapter. LAN: Modbus RTU (TCP): transparenter Netzwerkadapter. LAN: Modbus TCP: Gateway übersetzt TCP in RTU. Die alten Werte serial, rtu_over_tcp und modbus_tcp bleiben für bestehende Konfigurationen gültig."
+    description: "Die Verbindung am einfachsten unter „Weboberfläche öffnen“ einstellen: USB-Adapterliste oder LAN-Host und Port. Änderungen speichern und die App anschließend neu starten."
   host:
     name: Adapter-Host / IP-Adresse
     description: "Bei LAN erforderlich: Hostname oder IP-Adresse des Adapters, ohne URL-Schema oder Pfad. Bei USB / RS-485 leer lassen. Ein vertrauenswürdiges privates Netzwerk verwenden."

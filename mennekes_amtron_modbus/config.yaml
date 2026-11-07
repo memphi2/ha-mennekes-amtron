@@ -1,5 +1,5 @@
 name: Mennekes Amtron Modbus Service
-version: 0.5.1
+version: 0.6.1
 url: https://github.com/memphi2/ha-mennekes-amtron
 slug: mennekes_amtron_modbus
 description: Independent Modbus connection and heartbeat for Mennekes Amtron
@@ -12,6 +12,10 @@ init: true
 uart: true
 udev: true
 apparmor: true
+ingress: true
+ingress_port: 8099
+panel_admin: true
+panel_icon: mdi:ev-station
 discovery:
   - mennekes_amtron_rtu
 ports:
@@ -28,13 +32,15 @@ options:
   frame: 8n2
   read_only: true
   current_cap: 6
+  state_change_interval_seconds: 300
+  phase_switch_grace_seconds: 5
   scan_interval: 5
   measurement_interval: 30
   listen: 0.0.0.0
   port: 8765
 schema:
-  connection_type: 'list(USB / RS-485|LAN: Modbus RTU (TCP)|LAN: Modbus TCP|serial|rtu_over_tcp|modbus_tcp)'
-  serial_port: device(subsystem=tty)?
+  connection_type: 'list(USB / RS-485|LAN: Modbus RTU (TCP)|LAN: Modbus TCP)'
+  serial_port: str?
   host: str?
   tcp_port: port
   device_id: int(10,50)
@@ -42,6 +48,8 @@ schema:
   frame: list(8n2|8e1|8o1)
   read_only: bool
   current_cap: float(6,32)
+  state_change_interval_seconds: int(0,3600)
+  phase_switch_grace_seconds: int(0,30)
   scan_interval: int(2,300)
   measurement_interval: int(2,300)
   listen: str

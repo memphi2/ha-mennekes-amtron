@@ -1,7 +1,7 @@
 configuration:
   serial_port:
-    name: Adaptateur série
-    description: "Pour USB / RS-485 uniquement : sélectionnez l’adaptateur USB RS-485 exclusif, de préférence via /dev/serial/by-id. Laissez vide pour une connexion réseau."
+    name: Adaptateur série (chemin)
+    description: "Choisissez l’adaptateur USB dans la liste de l’interface Web. Son chemin est enregistré ici. Ignoré pour le réseau et supprimé lors de l’enregistrement réseau dans l’interface Web."
   device_id:
     name: Adresse de la borne
     description: Adresse Modbus configurée sur la borne.
@@ -17,6 +17,12 @@ configuration:
   current_cap:
     name: Plafond du courant
     description: Courant de charge maximal demandé par le gestionnaire d’énergie, en ampères. Une commande explicite à 0 A supprime la limite du gestionnaire d’énergie.
+  state_change_interval_seconds:
+    name: Délai minimal entre changements d’état
+    description: "Délai minimal en secondes entre les démarrages, les pauses et les changements d’autorisation de charge, de verrouillage ou de phases (300 par défaut). Les commandes trop précoces sont mises en attente ; la dernière remplace la précédente. L’intervalle de cinq secondes entre écritures du courant reste applicable. La valeur 0 désactive le délai prolongé."
+  phase_switch_grace_seconds:
+    name: "Attente supplémentaire avant changement de phases"
+    description: "Secondes d’attente supplémentaires entre la confirmation de la pause de charge par le véhicule et le changement de phases (5 par défaut, de 0 à 30). La valeur 0 supprime uniquement cette attente supplémentaire ; la confirmation de la pause reste obligatoire."
   scan_interval:
     name: Intervalle de lecture de l’état
     description: Secondes entre les lectures de l’état. Le signal de présence fonctionne indépendamment.
@@ -31,7 +37,7 @@ configuration:
     description: Fixé à 8765 ; la publication du port sur l’hôte est facultative et généralement inutile.
   connection_type:
     name: Connexion à la borne
-    description: "USB / RS-485 : adaptateur local. LAN: Modbus RTU (TCP) : adaptateur réseau transparent. LAN: Modbus TCP : passerelle traduisant TCP en RTU. Les anciennes valeurs serial, rtu_over_tcp et modbus_tcp restent valides pour les configurations existantes."
+    description: "Ouvrez l’interface Web pour choisir un adaptateur USB ou saisir l’hôte et le port réseau. Enregistrez puis redémarrez l’application."
   host:
     name: Hôte / adresse IP de l’adaptateur
     description: "Obligatoire en mode réseau : nom d’hôte ou adresse IP de l’adaptateur, sans schéma ni chemin d’URL. Laissez vide pour USB / RS-485. Utilisez un réseau privé de confiance."

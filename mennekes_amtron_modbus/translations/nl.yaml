@@ -1,7 +1,7 @@
 configuration:
   serial_port:
-    name: Seriële adapter
-    description: "Alleen voor USB / RS-485: selecteer de exclusieve USB-RS-485-adapter, bij voorkeur via het vaste /dev/serial/by-id-pad. Laat dit leeg voor LAN."
+    name: Seriële adapter (pad)
+    description: "Kies de USB-adapter in de keuzelijst via Webinterface openen. Het pad wordt hier opgeslagen. Genegeerd voor LAN en verwijderd bij het opslaan van LAN via de webinterface."
   device_id:
     name: Wallboxadres
     description: Het Modbus-adres dat in de wallbox is ingesteld.
@@ -17,6 +17,12 @@ configuration:
   current_cap:
     name: Maximale stroom
     description: Maximale aangevraagde EMS-stroom in ampère. Uitdrukkelijke opdrachten voor 0 A verwijderen de EMS-limiet.
+  state_change_interval_seconds:
+    name: Minimale tijd tussen statuswijzigingen
+    description: "Minimaal aantal seconden tussen starten, pauzeren en wijzigingen van de laadtoestemming, vergrendeling of fasen (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen."
+  phase_switch_grace_seconds:
+    name: "Extra wachttijd vóór fasewisselingen"
+    description: "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist."
   scan_interval:
     name: Statusinterval
     description: Aantal seconden tussen statusuitlezingen. De heartbeat loopt onafhankelijk.
@@ -31,7 +37,7 @@ configuration:
     description: Vast ingesteld op 8765; het beschikbaar stellen van een hostpoort is optioneel en meestal niet nodig.
   connection_type:
     name: Wallboxverbinding
-    description: "USB / RS-485: lokale adapter. LAN: Modbus RTU (TCP): transparante netwerkadapter. LAN: Modbus TCP: gateway die TCP naar RTU vertaalt. De oude waarden serial, rtu_over_tcp en modbus_tcp blijven geldig voor bestaande configuraties."
+    description: "Kies via Webinterface openen een USB-adapter of vul de LAN-host en poort in. Sla de wijzigingen op en herstart daarna de app."
   host:
     name: Adapterhost / IP-adres
     description: "Verplicht voor LAN: hostnaam of IP-adres van de adapter, zonder URL-schema of pad. Laat dit leeg voor USB / RS-485. Gebruik een vertrouwd privénetwerk."

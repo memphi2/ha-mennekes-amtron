@@ -1,7 +1,7 @@
 configuration:
   serial_port:
-    name: Serial adapter
-    description: "For USB / RS-485 only: select the exclusive USB/RS-485 adapter, preferably its stable /dev/serial/by-id path. Leave unset for LAN."
+    name: Serial adapter (path)
+    description: "Choose the USB adapter from the dropdown in Open Web UI. Its path is saved here. Ignored for LAN and removed when saving LAN through the Web UI."
   device_id:
     name: Wallbox address
     description: Modbus address configured in the wallbox.
@@ -17,6 +17,12 @@ configuration:
   current_cap:
     name: Current cap
     description: Maximum requested EMS current in amperes. Explicit 0 A commands remove the EMS limit.
+  state_change_interval_seconds:
+    name: Minimum time between state changes
+    description: "Minimum seconds between charging starts, pauses, release changes, locking or unlocking, and phase changes (default 300). Early commands are queued; the latest command replaces the previous one. The five-second current-write interval still applies. Set 0 to disable the longer interval."
+  phase_switch_grace_seconds:
+    name: "Extra wait before phase changes"
+    description: "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required."
   scan_interval:
     name: Status interval
     description: Seconds between status polls. The heartbeat runs independently.
@@ -31,7 +37,7 @@ configuration:
     description: Fixed at 8765; host port publication is optional and normally unnecessary.
   connection_type:
     name: Wallbox connection
-    description: "USB / RS-485: local adapter. LAN: Modbus RTU (TCP): transparent network adapter. LAN: Modbus TCP: gateway translating TCP to RTU. The old serial, rtu_over_tcp and modbus_tcp choices remain valid for existing configurations."
+    description: "Use Open Web UI to choose a USB adapter or enter the LAN host and port. Save changes, then restart the app."
   host:
     name: Adapter host / IP
     description: "Required for LAN: adapter host name or IP address, without a URL scheme or path. Leave empty for USB / RS-485. Use a trusted private network."
