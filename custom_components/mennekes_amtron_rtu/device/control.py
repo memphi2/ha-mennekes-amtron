@@ -25,7 +25,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from .capabilities import phase_switch_is_supported
-from .client import LockedRegisterReader, MennekesModbusClient
+from .client import LockedRegisterReader, MennekesModbusClient, WritePrecondition
 from .client_errors import (
     AmtronBusError,
     AmtronIdentityError,
@@ -83,6 +83,7 @@ _PHASE_PAUSE_TIMEOUT = 30.0
 class _PhaseChange:
     confirmation_deadline: float
     ready_at: float | None = None
+    unplug_confirmed: bool = False
 
 
 class _PhaseWaitError(Exception):
@@ -672,16 +673,23 @@ class AmtronControl:
 
         self._require_write_access()
         async with self._current_lock:
-            state = await self._async_current_evse_state("restart_state_unknown")
-            if state != EvseState.IDLE:
-                raise validation_error("restart_requires_idle")
-            await self._async_write(SYSTEM_RESTART, SYSTEM_RESTART_VALUE)
+            await self._async_require_restart_idle()
+            await self._async_write(
+                SYSTEM_RESTART, SYSTEM_RESTART_VALUE, precondition=self._async_require_restart_idle,
+            )
 
-    async def _async_current_evse_state(self, error_key: str) -> EvseState:
+    async def _async_require_restart_idle(self, read: LockedRegisterReader | None = None) -> None:
+        state = await self._async_current_evse_state("restart_state_unknown", read=read)
+        if state != EvseState.IDLE:
+            raise validation_error("restart_requires_idle")
+
+    async def _async_current_evse_state(
+        self, error_key: str, *, read: LockedRegisterReader | None = None,
+    ) -> EvseState:
         """Confirm the device state immediately before a guarded operation."""
 
         try:
-            state = await self._client.async_read_register(EVSE_STATE)
+            state = await (read or self._client.async_read_register)(EVSE_STATE)
         except AmtronBusError as err:
             raise validation_error(error_key) from err
         if not isinstance(state, int) or state not in EvseState:
@@ -817,6 +825,7 @@ class AmtronControl:
     async def _async_transition_write(
         self, spec: RegisterSpec, value: int, *, changed: bool,
         min_interval: float = 0.0,
+        precondition: WritePrecondition | None = None,
     ) -> None:
         if self.energy_goal_stop_requested and (
             (spec == CHARGING_RELEASE and value == 1)
@@ -824,7 +833,9 @@ class AmtronControl:
         ):
             raise validation_error("energy_goal_stop_active")
         try:
-            await self._async_write(spec, value, min_interval=min_interval, refresh=False)
+            await self._async_write(
+                spec, value, min_interval=min_interval, refresh=False, precondition=precondition,
+            )
         except (DeviceError, asyncio.CancelledError) as err:
             if changed and self._uncertain(err):
                 self._write_state.mode_change_at = self._monotonic()
@@ -898,16 +909,42 @@ class AmtronControl:
         await self._async_transition_write(
             REQUESTED_PHASES, phases, changed=True,
             min_interval=MIN_PHASE_CHANGE_INTERVAL_SECONDS,
+            precondition=lambda read: self._async_check_phase_write(change, read),
         )
 
-    async def _async_confirm_phase_pause(self, change: _PhaseChange) -> None:
-        state = await self._async_current_evse_state("phase_pause_state_unknown")
+    async def _async_check_phase_write(
+        self, change: _PhaseChange | None, read: LockedRegisterReader,
+    ) -> None:
+        """Revalidate the relevant status while holding the final bus transaction."""
+        if change is not None:
+            await self._async_confirm_phase_pause(change, read=read)
+            return
+        state = await self._async_current_evse_state("phase_pause_state_unknown", read=read)
+        if state != EvseState.IDLE:
+            raise validation_error("phase_pause_state_unknown")
+        if self._identity.layout_version >= CP_STATE.min_layout:
+            try:
+                cp = await read(CP_STATE)
+            except AmtronBusError as err:
+                raise validation_error("phase_pause_state_unknown") from err
+            if type(cp) is not int or cp not in (CpState.A1, CpState.A2):
+                raise validation_error("phase_pause_state_unknown")
+
+    async def _async_confirm_phase_pause(
+        self, change: _PhaseChange, *, read: LockedRegisterReader | None = None,
+    ) -> None:
+        read = read or self._client.async_read_register
+        state = await self._async_current_evse_state("phase_pause_state_unknown", read=read)
         if state in (EvseState.NOT_INITIALIZED, EvseState.ERROR, EvseState.SERVICE_MODE):
+            raise validation_error("phase_pause_state_unknown")
+        if change.unplug_confirmed and state != EvseState.IDLE:
+            # An observed unplug ends this vehicle's phase operation. A later
+            # connection may be another car and cannot inherit its grace bypass.
             raise validation_error("phase_pause_state_unknown")
         paused = state in (EvseState.IDLE, EvseState.EV_CONNECTED)
         if self._identity.layout_version >= CP_STATE.min_layout:
             try:
-                cp = await self._client.async_read_register(CP_STATE)
+                cp = await read(CP_STATE)
             except AmtronBusError as err:
                 raise validation_error("phase_pause_state_unknown") from err
             if type(cp) is not int or cp not in CpState or cp in (CpState.INIT, CpState.E, CpState.F):
@@ -918,6 +955,7 @@ class AmtronControl:
         now = self._monotonic()
         if paused and state == EvseState.IDLE:
             # Unplugging also ends an already pending vehicle grace period.
+            change.unplug_confirmed = True
             change.ready_at = now
             return
         if not paused:
@@ -1151,19 +1189,27 @@ class AmtronControl:
         min_interval: float = 0.0,
         refresh: bool = True,
         recovery_release: bool = False,
+        precondition: WritePrecondition | None = None,
     ) -> None:
         self._check_timed_command()
         if self._active_command is not None:
             self._command_write_started = True
         try:
             timed = self._active_command is not None and self._active_command.owner is not None
-            if self._write_enables_charging(spec, value) or timed:
+
+            async def check_preconditions(read: LockedRegisterReader) -> None:
+                if timed:
+                    await self._async_check_timed_vehicle(read)
+                if precondition is not None:
+                    await precondition(read)
+
+            if self._write_enables_charging(spec, value) or timed or precondition is not None:
                 await self._client.async_write_register(
                     spec, value, min_interval=min_interval,
                     before_write=lambda: self._check_write_allowed(
                         spec, value, recovery_release=recovery_release,
                     ),
-                    precondition=self._async_check_timed_vehicle if timed else None,
+                    precondition=check_preconditions if timed or precondition is not None else None,
                 )
             else:
                 await self._client.async_write_register(
