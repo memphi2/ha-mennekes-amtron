@@ -92,7 +92,8 @@ in; optional multiple-vehicle profiles are not part of this implementation.
 
 Under **Charging costs**, choose **Fixed electricity price** or
 **Electricity price sensor**. For a fixed rate enter your gross
-price in **EUR/kWh**, for example `0.30` for 30 cents. With Tibber or another
+price in **EUR/kWh**. New configurations suggest **0.40 EUR/kWh**; replace this
+with your own price. Saved prices are retained. With Tibber or another
 provider, select its existing HA sensor for the **current electricity price**.
 Supported units are `EUR/kWh`, `€/kWh`, `ct/kWh`, `EUR/MWh` and `€/MWh`.
 Negative prices are supported. Other currencies or a missing unit are not guessed.

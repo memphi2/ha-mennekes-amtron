@@ -522,7 +522,7 @@ def cost_source_schema(
             probatio.Required(
                 CONF_CHARGING_PRICE,
                 description={
-                    "suggested_value": current.get(CONF_CHARGING_PRICE),
+                    "suggested_value": current.get(CONF_CHARGING_PRICE, 0.40),
                 },
             )
         ] = _price_selector(allow_negative=True)
