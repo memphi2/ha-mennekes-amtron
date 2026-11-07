@@ -22,6 +22,7 @@ HEADERS = {"X-Remote-User-Id": USER, "X-Remote-User-Groups": "system-admin"}
 BASE = {
     "connection_type": "USB / RS-485", "serial_port": "/dev/serial/by-id/missing",
     "device_id": 50, "baudrate": "57600", "frame": "8n2", "read_only": True,
+    "tcp_authentication": False, "tcp_auth_password": "",
     "current_cap": 6, "scan_interval": 5, "measurement_interval": 30,
     "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5,
 }
@@ -163,6 +164,27 @@ def test_save_changes_only_connection_and_allows_another_save(settings, transpor
         assert (await invoke(settings, request("POST", headers=headers, payload=payload))).status == 200
         assert settings.options["device_id"] == 49
         assert all(path in ("/info", "/addons/self/info", "/addons/self/options") for _method, path, _payload in settings.calls)
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("transport", ["serial", "rtu_over_tcp", "modbus_tcp"])
+def test_save_keeps_native_login_fields_visible_and_clears_old_secret(settings, transport):
+    async def check():
+        settings.options.update(
+            connection_type="LAN: Modbus RTU (TCP)", host="192.0.2.50", tcp_port=502,
+            tcp_authentication=True, tcp_auth_password="Demo123",  # noqa: S106 - synthetic fixture
+        )
+        headers, payload = await prepare(settings, transport)
+        if transport != "serial":
+            payload.update(tcp_authentication=False, tcp_auth_password="")
+        response = await invoke(settings, request("POST", headers=headers, payload=payload))
+        assert response.status == 200
+        assert settings.options["tcp_authentication"] is False
+        assert settings.options["tcp_auth_password"] == ""
+        assert "Demo123" not in response.text
+        # Supervisor merges config defaults into persisted options; a second
+        # save using the returned revision must still see the same options.
+        assert body(response)["revision"] == settings._revision(settings.options)
     asyncio.run(check())
 
 

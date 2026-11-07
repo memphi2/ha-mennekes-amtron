@@ -49,6 +49,6 @@ configuration:
     description: "Dies ändert nur die Verbindung der App. Um die Anmeldung auch am kompatiblen Adapter ein- oder auszuschalten, zuerst dessen Einstellungen auslesen und „Adaptereinstellungen beim Speichern anwenden“ auswählen. Die Adaptereinrichtung findest du unter „Weboberfläche öffnen“. Die Anmeldung verschlüsselt nicht und ist bei Firmware 1.523 umgehbar. Ein geschütztes lokales Netz verwenden."
   tcp_auth_password:
     name: "Vorhandenes Webpasswort des Adapters"
-    description: "Vorhandenes Webpasswort des Adapters für die TCP-Anmeldung: 1–9 druckbare ASCII-Zeichen ohne Leerzeichen. Das Adapterpasswort wird dadurch nicht geändert."
+    description: "Vorhandenes Webpasswort des Adapters für die TCP-Anmeldung: 1–9 druckbare ASCII-Zeichen ohne Leerzeichen. Bei ausgeschalteter TCP-Anmeldung leer lassen. Das Adapterpasswort wird dadurch nicht geändert."
 network:
   8765/tcp: Geschützte Dienst-API; interner Zugriff benötigt keine Portfreigabe am Host.

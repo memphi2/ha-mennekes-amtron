@@ -49,6 +49,6 @@ configuration:
     description: "Dit wijzigt alleen de appverbinding. Lees eerst de instellingen van een compatibele adapter en kies toepassen bij opslaan om de aanmelding ook op de adapter in of uit te schakelen. Gebruik Webinterface openen voor de adapterinstellingen. Aanmelding versleutelt niet en is bij firmware 1.523 te omzeilen. Gebruik een beschermd lokaal netwerk."
   tcp_auth_password:
     name: "Huidig webwachtwoord van de adapter"
-    description: "Huidig webwachtwoord voor TCP-aanmelding: 1–9 afdrukbare ASCII-tekens zonder spaties. Het adapterwachtwoord wordt hierdoor niet gewijzigd."
+    description: "Huidig webwachtwoord voor TCP-aanmelding: 1–9 afdrukbare ASCII-tekens zonder spaties. Laat leeg als TCP-aanmelding is uitgeschakeld. Het adapterwachtwoord wordt hierdoor niet gewijzigd."
 network:
   8765/tcp: Service-API met authenticatie; interne toegang vereist geen hostpoort.

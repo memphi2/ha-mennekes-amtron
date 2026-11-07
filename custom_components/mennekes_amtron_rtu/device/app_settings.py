@@ -322,8 +322,10 @@ class AppSettings:
             updated["connection_type"] = _TRANSPORT_LABELS[transport]
             password = ""
             if transport == "serial":
-                updated.pop("tcp_authentication", None)
-                updated.pop("tcp_auth_password", None)
+                # Keep the native Supervisor form fields visible while
+                # removing any old LAN credential from the saved options.
+                updated["tcp_authentication"] = False
+                updated["tcp_auth_password"] = ""
                 adapters = await asyncio.to_thread(serial_adapters)
                 if not isinstance(payload["serial_port"], str) or payload["serial_port"] not in {adapter.value for adapter in adapters}:
                     raise SettingsError("adapter_missing")
@@ -348,9 +350,7 @@ class AppSettings:
                     raise SettingsError("connection_invalid")
                 updated["host"] = host
                 updated["tcp_authentication"] = auth
-                updated.pop("tcp_auth_password", None)
-                if auth:
-                    updated["tcp_auth_password"] = password
+                updated["tcp_auth_password"] = password if auth else ""
                 if "adapter_token" in payload:
                     updated["baudrate"] = str(payload["adapter_baudrate"])
                     updated["frame"] = payload["adapter_frame"]

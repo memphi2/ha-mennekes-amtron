@@ -27,6 +27,8 @@ options:
   connection_type: USB / RS-485
   host: ""
   tcp_port: 502
+  tcp_authentication: false
+  tcp_auth_password: ""
   device_id: 50
   baudrate: "57600"
   frame: 8n2

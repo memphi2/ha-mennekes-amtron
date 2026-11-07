@@ -49,6 +49,6 @@ configuration:
     description: "Ce réglage ne change que la connexion de l’application. Pour activer ou désactiver l’authentification sur un adaptateur compatible, lisez ses réglages et sélectionnez leur application à l’enregistrement. Utilisez l’interface Web pour configurer l’adaptateur. L’authentification ne chiffre pas les données et peut être contournée avec le firmware 1.523. Utilisez un réseau local protégé."
   tcp_auth_password:
     name: "Mot de passe web actuel de l’adaptateur"
-    description: "Mot de passe web actuel pour l’authentification TCP : 1 à 9 caractères ASCII imprimables sans espaces. Le mot de passe de l’adaptateur n’est pas modifié."
+    description: "Mot de passe web actuel pour l’authentification TCP : 1 à 9 caractères ASCII imprimables sans espaces. Laisser vide si l’authentification TCP est désactivée. Le mot de passe de l’adaptateur n’est pas modifié."
 network:
   8765/tcp: API du service avec authentification ; l’accès interne ne nécessite aucun port publié sur l’hôte.

@@ -49,6 +49,6 @@ configuration:
     description: "Questo cambia solo la connessione dell’app. Per attivare o disattivare l’accesso anche su un adattatore compatibile, leggi le sue impostazioni e seleziona l’applicazione al salvataggio. Apri l’interfaccia Web per configurare l’adattatore. L’accesso non cifra i dati ed è aggirabile con il firmware 1.523. Usa una rete locale protetta."
   tcp_auth_password:
     name: "Password web attuale dell’adattatore"
-    description: "Password web attuale per l’accesso TCP: da 1 a 9 caratteri ASCII stampabili senza spazi. La password dell’adattatore non viene modificata."
+    description: "Password web attuale per l’accesso TCP: da 1 a 9 caratteri ASCII stampabili senza spazi. Lascia vuoto se l’accesso TCP è disattivato. La password dell’adattatore non viene modificata."
 network:
   8765/tcp: API del servizio con autenticazione; l'accesso interno non richiede una porta esposta sull'host.

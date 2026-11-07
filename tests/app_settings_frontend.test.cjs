@@ -94,6 +94,23 @@ test('transport dropdown retains precisely three choices', () => {
   assert.deepEqual([...select.matchAll(/value="([^"]+)"/g)].map(match => match[1]), ['serial', 'rtu_over_tcp', 'modbus_tcp']);
 });
 
+for (const transport of ['rtu_over_tcp', 'modbus_tcp']) {
+  test(`TCP login exposes a usable password field for ${transport}`, async () => {
+    const ui = await harness({ ...baseSettings, connection_type: transport });
+    assert.equal(ui.el('password_fields').hidden, true);
+    ui.el('tcp_authentication').checked = true;
+    await ui.el('tcp_authentication').emit('change');
+    assert.equal(ui.el('network_fields').hidden, false);
+    assert.equal(ui.el('password_fields').hidden, false);
+    assert.equal(ui.el('tcp_auth_password').disabled, false);
+    assert.equal(ui.el('tcp_auth_password').required, true);
+    ui.el('tcp_auth_password').value = 'Demo123';
+    ui.responses.push(result({ revision: 'revision-2' }));
+    await ui.el('connection_form').emit('submit');
+    assert.equal(ui.calls.at(-1).payload.tcp_auth_password, 'Demo123');
+  });
+}
+
 test('manual login keeps a saved password only for the same endpoint and never pre-fills it', async () => {
   const ui = await harness({ ...baseSettings, tcp_authentication: true, tcp_auth_password_set: true });
   assert.equal(ui.el('tcp_auth_password').value, '');

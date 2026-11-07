@@ -49,6 +49,6 @@ configuration:
     description: "This changes the app connection only. To enable or disable login on a compatible adapter, first read its settings and select “Apply adapter settings when saving”. Use Open Web UI for adapter setup. Login does not encrypt traffic; it can be bypassed on firmware 1.523. Use a protected local network."
   tcp_auth_password:
     name: "Existing adapter web password"
-    description: "Existing adapter web password for TCP login: 1–9 printable ASCII characters without spaces. This does not change the adapter password."
+    description: "Existing adapter web password for TCP login: 1–9 printable ASCII characters without spaces. Leave empty when TCP login is disabled. This does not change the adapter password."
 network:
   8765/tcp: Authenticated service API; internal access needs no host port.
