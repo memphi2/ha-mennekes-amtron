@@ -5,6 +5,7 @@ from collections.abc import Callable, Collection
 from datetime import datetime
 
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 
 from custom_components.mennekes_amtron_rtu.device.charging_session import (
     CompletedSession,
@@ -60,7 +61,12 @@ class BavarianChargeHistorySource:
 
     @property
     def available(self) -> bool:
-        return self._vin is not None and bavarian_vehicle_vin(self._hass, self._device_id) == self._vin
+        current_vin = bavarian_vehicle_vin(self._hass, self._device_id)
+        if self._vin is None:
+            # A vehicle registry entry can appear after this observer starts.
+            # Bind once; a later replacement must never be followed implicitly.
+            self._vin = current_vin
+        return self._vin is not None and current_vin == self._vin
 
     async def async_match(self, session: CompletedSession) -> HistoryMatch | None:
         if not self.available:
@@ -76,4 +82,19 @@ class BavarianChargeHistorySource:
             # bound to the selected vehicle before and after the service call.
             on_change()
 
-        return self._hass.bus.async_listen("bavariandata_charging_stopped", changed)
+        @callback
+        def registry_changed(event: Event[dr.EventDeviceRegistryUpdatedData]) -> None:
+            if event.data.get("device_id") == self._device_id:
+                on_change()
+
+        unsubs = (
+            self._hass.bus.async_listen("bavariandata_charging_stopped", changed),
+            self._hass.bus.async_listen(dr.EVENT_DEVICE_REGISTRY_UPDATED, registry_changed),
+        )
+
+        @callback
+        def unsubscribe() -> None:
+            for unsub in unsubs:
+                unsub()
+
+        return unsubscribe

@@ -402,6 +402,65 @@ def test_generic_history_selection_keeps_the_existing_average_after_reload(tmp_p
     asyncio.run(run())
 
 
+def test_temporarily_missing_history_vehicle_preserves_statistics_and_recovers(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        original, coordinator = build(hass, "bavariandata")
+        replacement = None
+        with patch(
+            "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history",
+            return_value=HistoryMatch(8, 1),
+        ) as read:
+            try:
+                await original.async_start()
+                coordinator.complete(energy=10)
+                await hass.async_block_till_done()
+                expected = original.statistics.snapshot()
+                assert original.statistics.sample_count == 1
+                await original.async_stop()
+                saved = original._store.path.read_bytes()
+
+                # The selected HA device is temporarily absent/invalid on restart.
+                hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "account-entry")})
+                replacement, replacement_coordinator = build(hass, "bavariandata")
+                replacement_coordinator.data = coordinator.data
+                await replacement.async_start()
+                assert not replacement.available
+                assert replacement.statistics.snapshot() == expected
+                assert original._store.path.read_bytes() == saved
+                assert read.await_count == 1
+
+                # A registry event recovers even when identical wallbox polls
+                # do not notify coordinator listeners.
+                hass.data[dr.DATA_REGISTRY] = vehicle_registry()
+                hass.bus.async_fire(dr.EVENT_DEVICE_REGISTRY_UPDATED, {"device_id": "car-device", "action": "create"})
+                await hass.async_block_till_done()
+                assert replacement.available
+                assert replacement.statistics.sample_count == 1
+                assert replacement.statistics.average_loss_percent == pytest.approx(20)
+                assert replacement.statistics.source == expected["source"]
+
+                # The same registry ID acquiring another VIN cannot rebind the
+                # live observer or replace the established statistics.
+                before_rebind = replacement.statistics.snapshot()
+                hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "WBA98765432109876")})
+                hass.bus.async_fire(dr.EVENT_DEVICE_REGISTRY_UPDATED, {"device_id": "car-device", "action": "update"})
+                await hass.async_block_till_done()
+                assert not replacement.available
+                assert replacement.statistics.snapshot() == before_rebind
+                hass.data[dr.DATA_REGISTRY] = vehicle_registry()
+                hass.bus.async_fire(dr.EVENT_DEVICE_REGISTRY_UPDATED, {"device_id": "car-device", "action": "update"})
+                await hass.async_block_till_done()
+                assert replacement.available
+                assert replacement.statistics.source == expected["source"]
+            finally:
+                await original.async_stop()
+                if replacement is not None:
+                    await replacement.async_stop()
+                await hass.async_stop()
+    asyncio.run(run())
+
+
 def test_explicitly_disabled_history_provider_cannot_match_a_retained_legacy_vehicle(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))

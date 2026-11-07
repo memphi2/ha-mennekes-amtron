@@ -38,6 +38,10 @@ For example, 10 kWh at the wallbox and 9 kWh reaching the battery gives 10%.
 Correcting the latest assignment replaces that sample instead of adding it twice.
 Changing the selected vehicle or source starts a new average.
 
+If a selected vehicle is temporarily missing from Home Assistant, its loss
+estimates become unavailable while the saved history is retained. They resume
+when the same vehicle identity becomes available again.
+
 The vehicle value must describe **energy entering the battery**. A vehicle's
 AC-input or grid-energy value is a different measurement boundary and does not
 establish these losses. Unknown, zero, negative or greater-than-wallbox values

@@ -68,6 +68,12 @@ class ChargeLossObserver:
         self._auto = entry.options.get(CONF_LOSS_AUTO_MATCH, False)
         self._history_source = resolve_history_source(hass, entry.options) if self.mode == LOSS_SOURCE_VEHICLE_HISTORY else None
         self._source = self._history_source.source_key if self._history_source is not None else f"{self.mode}:{self._entity}"
+        self._source_ready = self.mode != LOSS_SOURCE_VEHICLE_HISTORY or (
+            self._history_source is not None and self._history_source.available
+        )
+        self._history_available = (
+            self._history_source is not None and self._history_source.available
+        )
         identity = entry.runtime_data.identity.serial_number or entry.entry_id
         self._store = LossStore(hass, entry.entry_id, identity)
         self.statistics = LossStatistics()
@@ -90,7 +96,8 @@ class ChargeLossObserver:
     @property
     def available(self) -> bool:
         return (
-            self._storage_ok and self._coordinator.current_data().session_summary_supported
+            self._storage_ok and self._source_ready
+            and self._coordinator.current_data().session_summary_supported
             and (self.mode != LOSS_SOURCE_VEHICLE_HISTORY or (
                 self._history_source is not None and self._history_source.available
             ))
@@ -117,7 +124,10 @@ class ChargeLossObserver:
             self._storage_ok = False
             self._storage_corrupt = True
             _LOGGER.warning("Charging-loss storage cannot be read; optional loss estimates are unavailable")
-        self.statistics.configure_source(self._source)
+        self._source_ready = self._configure_source()
+        self._history_available = (
+            self._history_source is not None and self._history_source.available
+        )
         self._unsubscribers.append(self._coordinator.async_add_listener(self._updated))
         if self.mode == LOSS_SOURCE_SENSOR and self._entity:
             self._unsubscribers.append(async_track_state_change_event(
@@ -129,6 +139,15 @@ class ChargeLossObserver:
         if self._task is not None:
             await asyncio.shield(self._task)
 
+    def _configure_source(self) -> bool:
+        """Wait for a real vehicle identity before replacing a saved aggregate."""
+        if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
+            if self._history_source is None or not self._history_source.available:
+                return False
+            self._source = self._history_source.source_key
+        self.statistics.configure_source(self._source)
+        return True
+
     @callback
     def _vehicle_changed(self, event: Event[EventStateChangedData]) -> None:
         old, new = vehicle_energy(event.data["old_state"]), vehicle_energy(event.data["new_state"])
@@ -138,12 +157,30 @@ class ChargeLossObserver:
 
     @callback
     def _history_changed(self) -> None:
+        available = self._history_source is not None and self._history_source.available
+        changed = available != self._history_available
+        self._history_available = available
+        if not self._source_ready:
+            self._updated(initial=True)
+        if changed:
+            # Device-registry changes do not necessarily alter the wallbox
+            # snapshot, so notify entities even when polling stays identical.
+            self._coordinator.async_update_listeners()
+        if not available:
+            return
+        if changed:
+            self._last_query = float("-inf")
         if time.monotonic() - self._last_query >= 30:
             self._query_history = True
             self._queue()
 
     @callback
     def _updated(self, *, initial: bool = False) -> None:
+        if not self._source_ready:
+            self._source_ready = self._configure_source()
+            if not self._source_ready:
+                return
+            initial = True
         data = self._coordinator.current_data()
         session = CompletedSession.parse(data.charging_session) if data.charging_session else None
         if session != self._session or initial:
@@ -163,7 +200,7 @@ class ChargeLossObserver:
 
     @callback
     def _queue(self) -> None:
-        if self._stopping or self._storage_corrupt:
+        if self._stopping or self._storage_corrupt or not self._source_ready:
             return
         self._pending = True
         if self._task is None or self._task.done():
