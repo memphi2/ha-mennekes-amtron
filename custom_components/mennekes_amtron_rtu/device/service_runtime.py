@@ -342,17 +342,22 @@ class ModbusService:
                     session_history=SessionHistory.restore(history),
                 )
                 saving = asyncio.create_task(asyncio.to_thread(self._store.save, state))
-                try:
-                    await asyncio.shield(saving)
-                except asyncio.CancelledError:
-                    await saving
-                    if include_session_history:
-                        self._saved_session_history = history
-                        self._session_history_dirty = original.session_history.snapshot() != history
-                    raise
+                cancelled = False
+                # The worker thread cannot be cancelled. Keep the store lock
+                # until it completes, even if shutdown or the HTTP handler is
+                # cancelled again; otherwise an older save can overwrite a
+                # newer intent after that newer save has already returned.
+                while not saving.done():
+                    try:
+                        await asyncio.shield(saving)
+                    except asyncio.CancelledError:
+                        cancelled = True
+                saving.result()
                 if include_session_history:
                     self._saved_session_history = history
                     self._session_history_dirty = original.session_history.snapshot() != history
+                if cancelled:
+                    raise asyncio.CancelledError
 
     async def _control_updated(self) -> None:
         """Publish queue changes and persist commands executed by the worker."""
