@@ -99,7 +99,7 @@ HA's flow/action type annotations changed in 2026.10. Scheduled preview checks
 are additional compatibility evidence. See the [support policy](../SUPPORT.md).
 
 The suite enforces **at least 99% overall**, **more than 95% per production
-integration module**, and **100% in the six configuration-flow modules**,
+integration module**, and **100% in configuration-flow modules and their shared helpers**,
 counting statements and branches together. Checks use unrounded counters and
 report the remaining gaps; see [coverage requirements](validation.md#coverage-requirements).
 Neither these percentages nor this badge mean every possible fault has been tested.
