@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import math
 import time
@@ -21,15 +20,12 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 
-from .bavarian_history import async_read_history, bavarian_vehicle_vin
 from .charge_loss_const import (
-    CONF_CHARGE_LOSS_SOURCE,
     CONF_LOSS_AUTO_MATCH,
-    CONF_LOSS_BAVARIAN_DEVICE,
     CONF_VEHICLE_LAST_CHARGE_ENERGY,
     LOSS_MATCH_WINDOW_SECONDS,
-    LOSS_SOURCE_BAVARIANDATA,
     LOSS_SOURCE_SENSOR,
+    LOSS_SOURCE_VEHICLE_HISTORY,
 )
 from .device.charge_loss import LossStatistics
 from .device.charging_session import CompletedSession
@@ -37,6 +33,7 @@ from .device.registers import CP_STATE, EVSE_STATE
 from .device.vehicle import vehicle_connected
 from .exceptions import service_validation_error
 from .loss_store import LossStore
+from .vehicle_sources import loss_source, resolve_history_source
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
@@ -66,14 +63,11 @@ class ChargeLossObserver:
         self._hass = hass
         self._entry = entry
         self._coordinator = entry.runtime_data.coordinator
-        self.mode = entry.options[CONF_CHARGE_LOSS_SOURCE]
+        self.mode = loss_source(entry.options)
         self._entity = str(entry.options.get(CONF_VEHICLE_LAST_CHARGE_ENERGY, ""))
-        self._device = str(entry.options.get(CONF_LOSS_BAVARIAN_DEVICE, ""))
         self._auto = entry.options.get(CONF_LOSS_AUTO_MATCH, False)
-        self._source = f"{self.mode}:{self._device if self.mode == LOSS_SOURCE_BAVARIANDATA else self._entity}"
-        self._vin = bavarian_vehicle_vin(hass, self._device) if self.mode == LOSS_SOURCE_BAVARIANDATA else None
-        if self._vin is not None:
-            self._source += ":" + hashlib.sha256(self._vin.encode()).hexdigest()
+        self._history_source = resolve_history_source(hass, entry.options) if self.mode == LOSS_SOURCE_VEHICLE_HISTORY else None
+        self._source = self._history_source.source_key if self._history_source is not None else f"{self.mode}:{self._entity}"
         identity = entry.runtime_data.identity.serial_number or entry.entry_id
         self._store = LossStore(hass, entry.entry_id, identity)
         self.statistics = LossStatistics()
@@ -97,8 +91,8 @@ class ChargeLossObserver:
     def available(self) -> bool:
         return (
             self._storage_ok and self._coordinator.current_data().session_summary_supported
-            and (self.mode != LOSS_SOURCE_BAVARIANDATA or (
-                self._vin is not None and bavarian_vehicle_vin(self._hass, self._device) == self._vin
+            and (self.mode != LOSS_SOURCE_VEHICLE_HISTORY or (
+                self._history_source is not None and self._history_source.available
             ))
         )
 
@@ -129,10 +123,8 @@ class ChargeLossObserver:
             self._unsubscribers.append(async_track_state_change_event(
                 self._hass, [self._entity], self._vehicle_changed,
             ))
-        elif self.mode == LOSS_SOURCE_BAVARIANDATA:
-            self._unsubscribers.append(self._hass.bus.async_listen(
-                "bavariandata_charging_stopped", self._history_changed,
-            ))
+        elif self._history_source is not None:
+            self._unsubscribers.append(self._history_source.subscribe(self._history_changed))
         self._updated(initial=True)
         if self._task is not None:
             await asyncio.shield(self._task)
@@ -145,9 +137,7 @@ class ChargeLossObserver:
             self._queue()
 
     @callback
-    def _history_changed(self, event: Event) -> None:
-        # The public history service selects the configured device. An event
-        # from another car may prompt a local read, never a cross-car match.
+    def _history_changed(self) -> None:
         if time.monotonic() - self._last_query >= 30:
             self._query_history = True
             self._queue()
@@ -162,13 +152,13 @@ class ChargeLossObserver:
             if self._retry is not None:
                 self._retry()
                 self._retry = None
-            self._query_history = self.mode == LOSS_SOURCE_BAVARIANDATA
+            self._query_history = self._history_source is not None
             self._queue()
         elif not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
             # A failed save discarded the candidate, including its matched
             # history energy. Re-read the local history for the current session
             # before retrying storage; otherwise only the empty match is saved.
-            self._query_history = self.mode == LOSS_SOURCE_BAVARIANDATA
+            self._query_history = self._history_source is not None
             self._queue()
 
     @callback
@@ -190,9 +180,7 @@ class ChargeLossObserver:
             if session is not None and query:
                 self._last_query = time.monotonic()
                 try:
-                    match = await async_read_history(
-                        self._hass, self._device, session, expected_vin=self._vin,
-                    ) if self._vin is not None else None
+                    match = await self._history_source.async_match(session) if self._history_source is not None else None
                 except (HomeAssistantError, TimeoutError):
                     match = None
                 energy = match.vehicle_kwh if match is not None else None

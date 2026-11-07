@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -26,6 +27,11 @@ ROOT = Path(__file__).resolve().parents[1]
 ARCHITECTURES = {"amd64", "aarch64"}
 OCI_ARCH = {"amd64": "amd64", "aarch64": "arm64"}
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+APP_ASSETS = {
+    "/": "app_settings.html",
+    "/app_settings.js": "app_settings.js",
+    "/app_settings.css": "app_settings.css",
+}
 
 
 def release_info(repository: str, tag: str) -> dict[str, str]:
@@ -49,6 +55,20 @@ def release_info(repository: str, tag: str) -> dict[str, str]:
         "channel": catalog_branch(version),
         "repository": repository,
     }
+
+
+def check_installed_assets(container: str) -> None:
+    """Exercise packaged UI handlers in an isolated process in the running image."""
+    asset_directory = ROOT / "custom_components/mennekes_amtron_rtu/device"
+    expected_assets = {
+        path: hashlib.sha256((asset_directory / filename).read_bytes()).hexdigest()
+        for path, filename in APP_ASSETS.items()
+    }
+    run(
+        "docker", "exec", container, "python", "-c",
+        (ROOT / "scripts/check_service_assets.py").read_text(),
+        json.dumps(expected_assets),
+    )
 
 
 def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
@@ -150,6 +170,10 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
                 or data["heartbeat"]["running"] is not False
             ):
                 raise ValueError("container did not report the missing device safely")
+            # Read through the installed package's HTTP handlers, not through
+            # the source checkout. This runs for both native architecture builds
+            # under their actual AppArmor profile before any candidate is pushed.
+            check_installed_assets(container)
             run("docker", "stop", "--time", "15", container)
             if (
                 json.loads(run("docker", "inspect", container))[0]["State"]["ExitCode"]

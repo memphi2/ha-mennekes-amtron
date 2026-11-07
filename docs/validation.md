@@ -176,6 +176,13 @@ restart and shutdown. Negative probes must reject writes outside the service's
 state files, modification of options, protected-file reads and shell execution.
 A successful startup alone cannot pass the enforcement check.
 
+The native image smoke also serves the installed package's HTML, JavaScript and
+CSS through its actual asset handlers. A separate loopback-only probe compares
+the HTTP content types and SHA-256 hashes with the reviewed source; missing,
+changed or unservable resources fail the check. This probe needs no Supervisor
+or hardware, cannot read or save configuration, and leaves the running service's
+Ingress access guard unchanged.
+
 The native AMD64 and ARM64 CI jobs run this check on every `beta`/`main` push and
 pull request. Release builds require it before pushing an app image. Missing
 AppArmor support or a failed enforcement check stops the job. On development

@@ -5,8 +5,9 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
-This guide describes **stable 0.6.1**, including optional charging targets,
-departure planning, loss/cost estimates and command-result events. For service
+The setup instructions below follow **beta 0.7.0b1** and its separate feature
+menus. **0.6.1 remains the stable release.** Optional charging targets,
+departure planning, loss/cost estimates and command-result events are described here. For service
 connections, [update the app first](installation.md#updating-to-061).
 
 ## Optional charging losses and costs
@@ -137,9 +138,24 @@ the exact state values available to templates.
 
 ## Configuration and options
 
+Open **Settings → Devices & services → Mennekes Amtron RTU → Configure**.
+Choose one of five independent sections:
+
+| Section | What you configure |
+|---|---|
+| **Wallbox** | Control mode, polling, current cap and transition timing, as applicable to the connection |
+| **Vehicle charge target** | An optional SoC sensor and, separately, the car's maximum-charge sensor |
+| **Next departure** | Optional planning for the next trip, battery capacity and the departure sources you want |
+| **Charging costs** | A fixed price or price entity; German network tariffs when applicable |
+| **Charging losses** | A last-charge energy entity or a supported vehicle history adapter |
+
+Only the fields for your selected choices appear. Finish with **Save** to
+apply that section. **Edit** returns to it; **Back** discards its unsaved
+changes and returns to the menu. Other sections keep their settings.
+
 | Setting | Direct USB or LAN connection | Modbus service connection |
 |---|---|---|
-| Write permission | Integration options: **Control mode** | App configuration: **Read-only** |
+| Write permission | **Configure → Wallbox → Current limit and polling → Control mode** | App configuration: **Read-only** |
 | USB adapter, or LAN protocol/host/TCP port, and wallbox address | Integration entry: **Reconfigure** | App: **Open Web UI** |
 | Baud rate and frame | USB: **Reconfigure**; LAN: gateway configuration | USB: app **Open Web UI**; LAN: gateway configuration |
 | Status and measurement polling | Integration options | App configuration |
@@ -312,13 +328,15 @@ state. Set the intended goal with that owner before continuing the charge.
 
 ## Optional vehicle percentage target
 
-The percentage target is **off by default**. In the integration's options,
-select **Vehicle charge level entity** from your existing vehicle integration.
+The percentage target is **off by default**. Open **Configure → Vehicle charge
+target → Configure charge level** and select **Vehicle charge level entity** from
+your existing vehicle integration.
 This adds **Vehicle charge target** and its status sensor. The integration only
 reads that vehicle entity; it does not change the car's settings or estimate
 battery capacity from wallbox energy.
 
-**Vehicle charge limit entity** is a separate, optional selection. Without it,
+Enable the separate option to use the car's maximum if you want to select a
+**Vehicle charge limit entity**. Its entity picker appears only then. Without it,
 you can choose a target up to **100%**. With it, the reported car limit becomes
 the maximum you can select. A falling car limit also lowers an existing target;
 a later increase never raises the target you chose. If this optional source is
@@ -341,35 +359,44 @@ not a replacement for the car's own charge limit. The five-second write floor
 and wallbox response time also still apply when a stop is requested.
 
 Changing or removing either selected source clears the old percentage target
-and remembered maximum without starting charging. Clear the SoC selection to
-turn off the whole percentage feature; also clear the maximum selection if one
-was configured. The kWh goal is independent. Service
+and remembered maximum without starting charging. Disable **Vehicle charge
+target** in its section to remove this optional feature. This also disables
+departure planning and clears its trip, because that plan needs the SoC source.
+The kWh goal is independent. Service
 mode needs an app version advertising percentage-goal support; existing service
 functions remain available on older compatible versions.
 
 ## Charge for the next departure
 
-Available from **0.6.1**. Set up a vehicle charge-level entity and a positive **Vehicle charge target** first.
-In the integration options, enter the **usable battery capacity** in kWh, or
-select an entity that reports that capacity in kWh or Wh. Select only one
-capacity source. The integration never guesses it from the nominal model
-capacity.
+Set up a vehicle charge-level entity and a positive **Vehicle charge target**
+first. Open **Configure → Next departure → Configure departure planning** and enable departure planning. Choose
+a fixed **usable battery capacity** in kWh, or an entity that reports it in kWh
+or Wh. Only the chosen capacity input appears. The integration never guesses
+it from the nominal model capacity.
+
+Manual entry is available once planning is enabled. Calendar, dated entity
+and vehicle-provider inputs are separate optional choices; select only the
+ones you want to use. They do not require each other.
 
 Set **Next departure** to a full date and time. This is a one-trip target, not
-a repeating daily plan. Manual entry, calendar selection and optional BMW timer
+a repeating daily plan. Manual entry, calendar selection and optional vehicle timer
 selection can coexist; choose the source you want for each trip.
 
-For a calendar, select a **Departure calendar** and enter the **exact event
-title** in the options. Press **Use next calendar event** to copy the first
+For a calendar, enable the calendar option in **Next departure**, then select a
+**Departure calendar** and enter the **exact event title**. Press **Use next
+calendar event** to copy the first
 matching timed event within the next 14 days into **Next departure**. All-day
 events are ignored. Calendar changes after selection do not alter the copied
 time; press the button again to import the updated event. The
 [calendar blueprint](blueprints.md#plan-the-next-trip-from-a-calendar) can
 perform this selection ahead of the next trip using a Toggle helper.
 
-For **BavarianData**, select **BavarianData vehicle for departure** once in the
-integration options, then use **Use BMW departure** when you want to copy the
-next active climate timer. The integration reads the vehicle's last locally
+For the optional vehicle adapter, choose **BavarianData**, then the vehicle
+in the **Next departure** section. Use **Use vehicle departure** when you want to
+copy the next active climate timer. BavarianData is currently the only
+implemented provider for this adapter. Other vehicle integrations can supply
+the generic SoC, capacity and dated departure entities described here.
+The adapter reads the vehicle's last locally
 published Home Assistant states; it does not fetch BMW cloud data or change the
 vehicle's timers. Those states may be cached, so check **Next departure** after
 importing, especially after changing the timer in your car or the BMW app.
@@ -380,24 +407,30 @@ importing, especially after changing the timer in your car or the BMW app.
   unavailable values are ignored.
 - The one-off timer (`overwriteTimer`) supplies a clock time, without a date.
   The import uses its next occurrence within the coming 24 hours.
-- For recurring timer 1 or 2, select **BMW timer 1 weekdays** or **BMW timer 2
-  weekdays** to match the days configured in your vehicle. BavarianData does
+- For recurring timer 1 or 2, select the timer's weekdays
+  to match the days configured in your vehicle. BavarianData does
   not expose those days. Leave a timer's day selection empty to ignore it.
 - **Vehicle time zone** defaults to Home Assistant's time zone. Override it
   when the vehicle's timer uses another zone, for example `Europe/Berlin`.
   Nonexistent clock times during a daylight-saving change are skipped.
 
-The BMW button selects the earliest usable upcoming occurrence once. It does
+The vehicle departure button selects the earliest usable upcoming occurrence once. It does
 not turn a recurring vehicle timer into a recurring HA charging plan. A copied
-BMW or calendar time stays selected until you replace or clear it.
+vehicle or calendar time stays selected until you replace or clear it.
 
 A vehicle integration that already supplies a full dated timestamp can instead
-be selected as **Departure time entity**. An `input_datetime` with both date
+be selected by enabling the optional **Departure time entity** source. An `input_datetime` with both date
 and time also works. This optional source can automatically select a new future
-timestamp. A manual, calendar or BMW selection takes priority over the source's
+timestamp. A manual, calendar or vehicle selection takes priority over the source's
 current timestamp; it can be replaced when that timestamp changes to a new
-trip. **Clear departure time** cancels the selected plan without changing the
+trip. A different time-zone representation of the same instant is still the
+same trip and does not reactivate a cleared plan. **Clear departure time** cancels the selected plan without changing the
 percentage ceiling or immediately changing the wallbox.
+
+Disabling **Next departure** clears its selected trip and cancels commands queued
+by that plan. It keeps the ordinary percentage target and the current pause
+state. Existing configured sources are recognized after an update; the vehicle
+departure button keeps its existing entity identity and automations.
 
 The planner uses the current vehicle SoC, remaining time, usable capacity,
 known wallbox limits and phase information to choose a charging current.
@@ -414,6 +447,8 @@ charging targets still apply. Once the target is reached, the charging plan
 cannot resume another charge. **Next departure** remains visible until that
 time so the climate blueprint can still run, then clears automatically.
 The planner assumes 230 V per phase and initially 90% transfer efficiency.
+Until the vehicle's charging phases are detected, it plans conservatively with
+one phase. It adapts when reliable phase information becomes available.
 Car limits, missing or delayed SoC reports, unknown vehicle power, the 6 A
 minimum, the wallbox's configured transition delay and HA outages can make
 the exact target time impossible. Missing SoC or capacity data leaves the

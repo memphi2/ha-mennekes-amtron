@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from .bavarian_history import HISTORY_DOMAIN, bavarian_vehicle_vin
+from .history import HISTORY_DOMAIN, bavarian_vehicle_vin
 
 _PREFIX = "vehicle.cabin.climate.timers"
 _WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")

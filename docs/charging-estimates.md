@@ -3,9 +3,11 @@
 These optional features are available in **stable 0.6.1**, including automatic
 tariff import and yearly refresh. For service connections,
 [update the app first](installation.md#updating-to-061).
+The setup steps below follow the separate menus in **beta 0.7.0b1**.
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
-Amtron RTU → Configure** and choose the sources you want. They work with a
+Amtron RTU → Configure**, then **Charging costs** or **Charging losses**.
+Choose a source to see only its relevant inputs; finish with **Save**. They work with a
 direct USB/LAN connection and with the Modbus app/service. No extra Modbus
 polling, vehicle commands or electricity-provider login is needed.
 
@@ -26,7 +28,7 @@ cycle cannot be matched; a previous result is not passed off as the new one.
 | Source | What you select | How the charge is matched |
 |---|---|---|
 | Disabled | Nothing | No charging-loss entities or vehicle subscriptions. |
-| BavarianData charging history | The vehicle in the device picker | Complete local charging history with matching start/end times. |
+| Vehicle charging history | A supported provider, then the vehicle | Complete local charging history with matching start/end times; currently implemented for BavarianData. |
 | Vehicle energy sensor | An existing sensor for battery energy from the last charge | Explicit assignment, or an optional new-value heuristic. |
 
 The two sensors are **Estimated charging loss, last charge** and **Average
@@ -44,7 +46,9 @@ creates long-term statistics.
 
 ### BavarianData
 
-Select **BavarianData charging history**, then the vehicle. The integration reads
+In **Charging losses**, select **Vehicle charging history**, choose
+**BavarianData**, then the vehicle. This selection is independent of the
+vehicle used for departure timers. The integration reads
 BavarianData's existing local history through its public
 [`get_charging_sessions` action](https://justchr.github.io/BavarianData/docs/services/).
 It never requests a BMW history refresh or spends the BMW API quota.
@@ -82,7 +86,7 @@ in; optional multiple-vehicle profiles are not part of this implementation.
 
 ## Charging costs: fixed or dynamic price
 
-Under **Charging cost calculation**, choose **Fixed electricity price** or
+Under **Charging costs**, choose **Fixed electricity price** or
 **Electricity price sensor**. For a fixed rate enter your gross
 price in **EUR/kWh**, for example `0.30` for 30 cents. With Tibber or another
 provider, select its existing HA sensor for the **current electricity price**.
@@ -138,8 +142,9 @@ Choose one model:
 | Module 2 | Regular network work price and whether the selected energy price already includes it | Replace the regular network component with 40% of that component. |
 | Module 1 + 3 | Standard, high and low network prices; daily high/low windows; active quarters; tariff year | Replace the regular network component with the price for that local time. |
 
-Whenever you open the Module 3 form, the integration makes a
-**one-time lookup for that options flow**: it sends the configured HA Home coordinates to
+After choosing Module 3, select **Enter or edit manually** or **Import for HA Home**.
+Manual entry opens the price and time-window forms without an external lookup.
+Choosing the import makes a **one-time lookup**: it sends the configured HA Home coordinates to
 [VNBdigital](https://www.vnbdigital.de/) to find the responsible low-voltage
 network operator, then reads the current year's public data from
 [Par14a-Database](https://github.com/the78mole/Par14a-Database). It sends no
@@ -158,15 +163,16 @@ not guess an operator or tariff. If the Module 3 standard rate differs from
 the ordinary network rate, this model cannot represent the sheet correctly;
 use a sensor supplying the complete price instead. The data is attributed
 to Par14a-Database (the78mole), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-The network operator's original price sheet governs. Reopen the settings at
-any time to retrieve the current published values. **Automatic yearly refresh**
-is an optional switch in the Module 3 form. When enabled, the integration
-checks the new year's tariff on 1 January and applies it only if the operator
+The network operator's original price sheet governs. Choose **Import for HA
+Home** again whenever you want to retrieve the current published values.
+**Automatic yearly refresh** is a separate optional switch in the Module 3
+time-window form. When enabled, the integration checks the new year's tariff
+on 1 January in **Europe/Berlin** and applies it only if the operator
 and published schedule are unambiguous and valid. If no usable sheet is
 available, it retries once a day; cost estimates remain unknown for that year
 until a valid tariff is found. A provisional sheet may be applied and is logged
 as provisional. The next final sheet is not silently substituted during the
-same year; reopen settings to review changes. The annual update changes only
+same year; import again to review changes. The annual update changes only
 the cost model and does not restart the Modbus connection or add Recorder
 history.
 
@@ -181,7 +187,8 @@ Module 1 and cannot be combined with Module 2 for the same market location.
 Eligibility and the price structure are explained by the
 [Bundesnetzagentur](https://www.bundesnetzagentur.de/DE/Vportal/Energie/SteuerbareVBE/artikel.html).
 
-The Module 3 form supports multiple high-price and low-price daily windows.
+Module 3 asks for prices first, then daily windows and active quarters. Its
+time-window form supports multiple high-price and low-price daily windows.
 Enter one period per line as `HH:MM-HH:MM`, for example `06:00-09:00` and
 `17:00-20:00` on separate lines. Windows may cross midnight; all other times
 use the standard rate. Window boundaries must fall on quarter hours, must not

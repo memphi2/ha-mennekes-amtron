@@ -8,33 +8,15 @@ import probatio
 import pytest
 
 from custom_components.mennekes_amtron_rtu._flow_serial import PortOption
-from custom_components.mennekes_amtron_rtu.charge_loss_const import (
-    CONF_CHARGE_LOSS_SOURCE,
-)
-from custom_components.mennekes_amtron_rtu.charging_cost_const import (
-    CONF_CHARGING_COST_SOURCE,
-)
 from custom_components.mennekes_amtron_rtu.config_schemas import (
+    advanced_schema,
     options_schema,
     user_schema,
-)
-from custom_components.mennekes_amtron_rtu.device.const import (
-    CONF_CONTROL_MODE,
-    CONF_CURRENT_LIMIT,
-    CONF_MEASUREMENT_INTERVAL_SECONDS,
-    CONF_SCAN_INTERVAL_SECONDS,
-    CONF_STATE_CHANGE_INTERVAL_SECONDS,
-    CONTROL_MODE_MASTER,
-    CONTROL_MODE_READ_ONLY,
 )
 from custom_components.mennekes_amtron_rtu.options_flow import (
     MennekesAmtronOptionsFlow,
     _max_current,
     control_mode_is_master,
-)
-from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
-    CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
-    CONF_VEHICLE_SOC_ENTITY,
 )
 from tests.ha_fakes import FakeConfigEntry
 
@@ -43,6 +25,7 @@ class Flow(MennekesAmtronOptionsFlow):
     def __init__(self, entry: FakeConfigEntry) -> None:
         super().__init__()
         self._entry = entry
+        self.hass = SimpleNamespace(config=SimpleNamespace(country="DE"))
 
     @property
     def config_entry(self) -> Any:
@@ -51,228 +34,259 @@ class Flow(MennekesAmtronOptionsFlow):
     def async_show_form(self, **kwargs: Any) -> dict[str, Any]:
         return {"type": "form", **kwargs}
 
+    def async_show_menu(self, **kwargs: Any) -> dict[str, Any]:
+        return {"type": "menu", **kwargs}
+
     def async_create_entry(self, **kwargs: Any) -> dict[str, Any]:
         return {"type": "create_entry", **kwargs}
 
 
-def test_the_control_mode_decides_whether_writes_are_allowed() -> None:
-    assert control_mode_is_master({CONF_CONTROL_MODE: CONTROL_MODE_MASTER})
-    assert not control_mode_is_master({CONF_CONTROL_MODE: CONTROL_MODE_READ_ONLY})
+def fields(result):
+    return {
+        marker.schema: selector
+        for marker, selector in result["data_schema"].schema.items()
+    }
+
+
+def test_control_mode_and_hardware_current():
+    assert control_mode_is_master({"control_mode": "master"})
+    assert not control_mode_is_master({"control_mode": "read_only"})
     assert not control_mode_is_master({})
-
-
-def test_the_maximum_comes_from_the_device_when_it_is_loaded() -> None:
     entry = FakeConfigEntry()
-    assert _max_current(entry) == 16.0
-    entry.runtime_data = SimpleNamespace(
-        identity=SimpleNamespace(max_evse_current=32.0)
-    )
-    assert _max_current(entry) == 32.0
-    entry.runtime_data = SimpleNamespace(identity=SimpleNamespace(max_evse_current=2))
-    assert _max_current(entry) == 16.0
+    assert _max_current(entry) == 16
+    entry.runtime_data = SimpleNamespace(identity=SimpleNamespace(max_evse_current=32))
+    assert _max_current(entry) == 32
+    entry.runtime_data.identity.max_evse_current = 2
+    assert _max_current(entry) == 16
 
 
-def test_the_form_defaults_to_the_stored_options() -> None:
-    async def run() -> None:
+@pytest.mark.parametrize("service", [False, True])
+def test_five_independent_sections_and_scoped_wallbox_save(service):
+    async def run():
         entry = FakeConfigEntry(
+            data={"server_url": "http://app:8765"} if service else None,
             options={
-                CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
-                CONF_SCAN_INTERVAL_SECONDS: 10,
-                CONF_CURRENT_LIMIT: 12.0,
-                CONF_STATE_CHANGE_INTERVAL_SECONDS: 175,
-            }
-        )
-        result = await Flow(entry).async_step_init()
-        assert result["type"] == "form"
-        defaults = {
-            marker.schema: marker.default() for marker in result["data_schema"].schema
-            if callable(marker.default)
-        }
-        assert defaults[CONF_CONTROL_MODE] == CONTROL_MODE_MASTER
-        assert defaults[CONF_SCAN_INTERVAL_SECONDS] == 10
-        assert defaults[CONF_STATE_CHANGE_INTERVAL_SECONDS] == 175
-
-    asyncio.run(run())
-
-
-def test_submitting_normalises_the_values() -> None:
-    async def run() -> None:
-        result = await Flow(FakeConfigEntry()).async_step_init(
-            {
-                CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
-                CONF_SCAN_INTERVAL_SECONDS: "7",
-                CONF_CURRENT_LIMIT: "11.5",
-            }
-        )
-        assert result["data"] == {
-            CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
-            CONF_SCAN_INTERVAL_SECONDS: 7,
-            CONF_MEASUREMENT_INTERVAL_SECONDS: 30,
-            CONF_CURRENT_LIMIT: 11.5,
-            CONF_STATE_CHANGE_INTERVAL_SECONDS: 300,
-            "phase_switch_grace_seconds": 5,
-        }
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("stale_mode", [None, CONTROL_MODE_READ_ONLY, CONTROL_MODE_MASTER])
-def test_service_options_keep_device_settings_in_service_and_ha_sources_in_ha(stale_mode) -> None:
-    async def run() -> None:
-        entry = FakeConfigEntry(
-            data={"server_url": "http://service:8765"},
-            options={CONF_CONTROL_MODE: CONTROL_MODE_READ_ONLY},
+                "charging_price": 0.3,
+                "timed_capacity_kwh": 80,
+                "state_change_interval_seconds": 175,
+            },
         )
         flow = Flow(entry)
-        result = await flow.async_step_init()
-        assert result["step_id"] == "service"
-        assert (await flow.async_step_service())["step_id"] == "service"
-        fields = {
-            marker.schema: selector
-            for marker, selector in result["data_schema"].schema.items()
-        }
-        assert set(fields) == {
-            CONF_CHARGE_LOSS_SOURCE,
-            CONF_CHARGING_COST_SOURCE,
-            CONF_CURRENT_LIMIT,
-            CONF_SCAN_INTERVAL_SECONDS,
-            CONF_VEHICLE_SOC_ENTITY,
-            CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
-            "timed_capacity_kwh",
-            "timed_capacity_entity",
-            "timed_departure_entity",
-            "timed_calendar_entity",
-            "timed_calendar_title",
-            "timed_bavarian_device",
-            "timed_vehicle_time_zone",
-            "timed_timer1_days",
-            "timed_timer2_days",
-        }
-        submitted = {
-            CONF_CURRENT_LIMIT: 8,
-            CONF_SCAN_INTERVAL_SECONDS: 10,
-            CONF_MEASUREMENT_INTERVAL_SECONDS: 60,
-            CONF_STATE_CHANGE_INTERVAL_SECONDS: 123,
-        }
-        if stale_mode is not None:
-            submitted[CONF_CONTROL_MODE] = stale_mode
-        result = await flow.async_step_service(submitted)
-        assert result["data"] == {
-            CONF_CURRENT_LIMIT: 8,
-            CONF_SCAN_INTERVAL_SECONDS: 10,
-        }
+        root = await flow.async_step_init()
+        assert root["menu_options"] == [
+            "wallbox",
+            "vehicle",
+            "departure",
+            "costs",
+            "losses",
+        ]
+        menu = await flow.async_step_wallbox()
+        assert ("wallbox_advanced" in menu["menu_options"]) is not service
+        form = await flow.async_step_wallbox_basic()
+        assert set(fields(form)) == {"scan_interval_seconds", "current_limit"} | (
+            set() if service else {"control_mode"}
+        )
+        values = form["data_schema"](
+            {"scan_interval_seconds": 7, "current_limit": 11.5}
+        )
+        assert (await flow.async_step_wallbox_basic(values))["step_id"] == "review"
+        assert entry.options["charging_price"] == 0.3
+        assert (await flow.async_step_review())["step_id"] == "review"
+        result = await flow.async_step_save()
+        assert result["data"]["scan_interval_seconds"] == 7
+        assert result["data"]["state_change_interval_seconds"] == 175
+        assert result["data"]["timed_capacity_kwh"] == 80
+        assert ("control_mode" in result["data"]) is not service
 
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("seconds", [0, 1, 175, 300, 3600])
-def test_state_change_interval_is_saved_as_whole_seconds(seconds: int) -> None:
-    async def run() -> None:
-        form = await Flow(FakeConfigEntry()).async_step_init()
-        values = form["data_schema"]({CONF_STATE_CHANGE_INTERVAL_SECONDS: float(seconds)})
-        result = await Flow(FakeConfigEntry()).async_step_init(values)
-        stored = result["data"][CONF_STATE_CHANGE_INTERVAL_SECONDS]
-        assert stored == seconds
-        assert type(stored) is int
+def test_wallbox_edit_advanced_and_back_discard():
+    async def run():
+        entry = FakeConfigEntry()
+        entry.runtime_data = SimpleNamespace(
+            identity=SimpleNamespace(phase_options_hw=2)
+        )
+        flow = Flow(entry)
+        await flow.async_step_wallbox()
+        basic = await flow.async_step_wallbox_basic()
+        await flow.async_step_wallbox_basic(basic["data_schema"]({"current_limit": 10}))
+        assert (await flow.async_step_edit())["step_id"] == "wallbox"
+        advanced = await flow.async_step_wallbox_advanced()
+        await flow.async_step_wallbox_advanced(
+            advanced["data_schema"]({"state_change_interval_seconds": 175})
+        )
+        result = await flow.async_step_save()
+        assert result["data"]["current_limit"] == 10
+        assert result["data"]["state_change_interval_seconds"] == 175
+        await flow.async_step_wallbox()
+        await flow.async_step_wallbox_basic(basic["data_schema"]({"current_limit": 8}))
+        assert (await flow.async_step_back())["step_id"] == "init"
+        assert (await flow.async_step_save())["step_id"] == "init"
+        assert not entry.options
+
+    asyncio.run(run())
+
+
+def test_live_unrelated_changes_merge_but_section_changes_conflict():
+    async def run():
+        entry = FakeConfigEntry(options={"current_limit": 16, "charging_price": 0.3})
+        flow = Flow(entry)
+        await flow.async_step_wallbox()
+        form = await flow.async_step_wallbox_basic()
+        await flow.async_step_wallbox_basic(form["data_schema"]({"current_limit": 10}))
+        entry.options["charging_price"] = 0.4
+        assert (await flow.async_step_save())["data"]["charging_price"] == 0.4
+        await flow.async_step_wallbox()
+        await flow.async_step_wallbox_basic(form["data_schema"]({"current_limit": 8}))
+        entry.options["current_limit"] = 12
+        conflict = await flow.async_step_save()
+        assert conflict["step_id"] == "options_changed"
+        assert (await flow.async_step_options_changed({}))["step_id"] == "init"
+        assert entry.options["current_limit"] == 12
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize(
-    "value", [-1, 3601, 1.5, True, None, "300", float("nan"), float("inf")]
+    "step",
+    [
+        "review",
+        "edit",
+        "save",
+        "wallbox_basic",
+        "wallbox_advanced",
+        "vehicle_disable",
+        "vehicle_soc",
+        "vehicle_limit",
+        "departure_disable",
+        "departure_configure",
+        "departure_capacity_fixed",
+        "departure_capacity_entity",
+        "departure_calendar",
+        "departure_entity",
+        "departure_vehicle",
+        "departure_vehicle_details",
+    ],
 )
-def test_state_change_interval_rejects_invalid_ui_values(value: Any) -> None:
-    schema = options_schema({}, max_current=16)
-    with pytest.raises(probatio.Invalid):
-        schema({CONF_STATE_CHANGE_INTERVAL_SECONDS: value})
-
-
-def test_state_change_interval_default_is_300_seconds() -> None:
-    values = options_schema({}, max_current=16)({})
-    assert values[CONF_STATE_CHANGE_INTERVAL_SECONDS] == 300
-
-
-BUS = {"port": "/dev/a", "device_id": 50, "baudrate": 57600, "frame": "8n2"}
-
-
-def test_the_user_schema_bounds_the_device_address() -> None:
-    schema = user_schema([PortOption(value="/dev/a", label="a")])
-    assert schema(dict(BUS))["device_id"] == 50
-    try:
-        schema({**BUS, "device_id": 9})
-    except probatio.Invalid:
-        pass
-    else:  # pragma: no cover - the schema must reject this
-        raise AssertionError("device id 9 must be rejected")
-
-
-def test_the_setup_form_asks_for_five_things() -> None:
-    """The device documents three frames, so it is one field, not three."""
-
-    fields = {str(marker.schema) for marker in user_schema([]).schema}
-    assert fields == {"port", "device_id", "baudrate", "frame", "search"}
-    assert "bytesize" not in fields
-    assert "parity" not in fields
-    assert "stopbits" not in fields
-
-
-def test_the_user_schema_falls_back_to_free_text_without_ports() -> None:
-    assert user_schema([])({**BUS, "port": "/dev/custom"})["port"] == "/dev/custom"
-
-
-def test_the_options_schema_never_offers_less_than_six_ampere() -> None:
-    schema = options_schema({}, max_current=4.0)
-    marker = next(
-        marker for marker in schema.schema if marker.schema == CONF_CURRENT_LIMIT
-    )
-    assert schema.schema[marker].config["max"] == 6
-
-
-@pytest.mark.parametrize("service_mode", [False, True])
-def test_vehicle_sources_are_optional_preserved_and_removable(service_mode):
-    async def run():
-        sources = {
-            CONF_VEHICLE_SOC_ENTITY: "sensor.car_battery",
-            CONF_VEHICLE_CHARGE_LIMIT_ENTITY: "number.car_limit",
-        }
-        entry = FakeConfigEntry(
-            data={"server_url": "http://service:8765"} if service_mode else None,
-            options=sources,
-        )
-        flow = Flow(entry)
-        form = await flow.async_step_init()
-        markers = {marker.schema: marker for marker in form["data_schema"].schema}
-        for key, value in sources.items():
-            assert isinstance(markers[key], probatio.Optional)
-            assert markers[key].description["suggested_value"] == value
-            assert not callable(markers[key].default)
-        # Empty optional selectors have no schema default that resurrects them.
-        values = form["data_schema"]({})
-        assert not sources.keys() & values.keys()
-        cleared = await flow.async_step_init(values)
-        assert not sources.keys() & cleared["data"].keys()
-        selected = await flow.async_step_init({**values, **sources})
-        assert sources.items() <= selected["data"].items()
-        alone = await flow.async_step_init({**values, CONF_VEHICLE_SOC_ENTITY: sources[CONF_VEHICLE_SOC_ENTITY]})
-        assert CONF_VEHICLE_SOC_ENTITY in alone["data"]
-        assert CONF_VEHICLE_CHARGE_LIMIT_ENTITY not in alone["data"]
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize(("sources", "field", "error"), [
-    ({CONF_VEHICLE_CHARGE_LIMIT_ENTITY: "number.limit"}, CONF_VEHICLE_SOC_ENTITY, "vehicle_soc_required"),
-    ({CONF_VEHICLE_SOC_ENTITY: "switch.car"}, CONF_VEHICLE_SOC_ENTITY, "invalid_vehicle_entity"),
-    ({CONF_VEHICLE_SOC_ENTITY: "not_an_entity"}, CONF_VEHICLE_SOC_ENTITY, "invalid_vehicle_entity"),
-    ({CONF_VEHICLE_SOC_ENTITY: True}, CONF_VEHICLE_SOC_ENTITY, "invalid_vehicle_entity"),
-    ({CONF_VEHICLE_SOC_ENTITY: "sensor.car", CONF_VEHICLE_CHARGE_LIMIT_ENTITY: "switch.limit"},
-     CONF_VEHICLE_CHARGE_LIMIT_ENTITY, "invalid_vehicle_entity"),
-])
-def test_invalid_vehicle_sources_are_field_errors_without_live_reads(sources, field, error):
+def test_missing_section_cannot_skip_into_detail_or_save(step):
     async def run():
         flow = Flow(FakeConfigEntry())
-        result = await flow.async_step_init(sources)
-        assert result["type"] == "form"
-        assert result["errors"][field] == error
+        assert (await getattr(flow, f"async_step_{step}")())["step_id"] == "init"
 
     asyncio.run(run())
+
+
+def test_service_cannot_open_direct_only_advanced_step():
+    async def run():
+        flow = Flow(FakeConfigEntry(data={"server_url": "http://app"}))
+        await flow.async_step_wallbox()
+        assert (await flow.async_step_wallbox_advanced())["step_id"] == "init"
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("limit", [False, True])
+def test_vehicle_source_limit_is_conditional_and_disable_resets_departure(limit):
+    async def run():
+        entry = FakeConfigEntry(
+            options={"timed_goal_enabled": True, "timed_capacity_kwh": 80}
+        )
+        flow = Flow(entry)
+        await flow.async_step_vehicle()
+        assert set(fields(await flow.async_step_vehicle_soc())) == {
+            "vehicle_soc_entity",
+            "use_vehicle_limit",
+        }
+        result = await flow.async_step_vehicle_soc(
+            {"vehicle_soc_entity": "sensor.car", "use_vehicle_limit": limit}
+        )
+        if limit:
+            assert result["step_id"] == "vehicle_limit"
+            result = await flow.async_step_vehicle_limit(
+                {"vehicle_charge_limit_entity": "number.car_limit"}
+            )
+        assert result["step_id"] == "review"
+        stored = (await flow.async_step_save())["data"]
+        assert ("vehicle_charge_limit_entity" in stored) is limit
+        entry.options = stored
+        await flow.async_step_vehicle()
+        await flow.async_step_vehicle_disable()
+        disabled = (await flow.async_step_save())["data"]
+        assert "vehicle_soc_entity" not in disabled
+        assert disabled["timed_goal_enabled"] is False
+        assert disabled["timed_goal_reset_pending"] is True
+        assert disabled["timed_capacity_kwh"] == 80
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("value", [None, True, "switch.car", "wrong"])
+def test_vehicle_validation_and_correction(value):
+    async def run():
+        flow = Flow(FakeConfigEntry())
+        await flow.async_step_vehicle()
+        assert (await flow.async_step_vehicle_soc({"vehicle_soc_entity": value}))[
+            "errors"
+        ]
+        await flow.async_step_vehicle_soc(
+            {"vehicle_soc_entity": "sensor.car", "use_vehicle_limit": True}
+        )
+        assert (
+            await flow.async_step_vehicle_limit({"vehicle_charge_limit_entity": value})
+        )["errors"]
+        assert (
+            await flow.async_step_vehicle_limit(
+                {"vehicle_charge_limit_entity": "number.limit"}
+            )
+        )["step_id"] == "review"
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("seconds", [0, 1, 175, 300, 3600])
+def test_state_interval_whole_seconds(seconds):
+    values = advanced_schema({}, phase_switch=True)(
+        {"state_change_interval_seconds": float(seconds)}
+    )
+    assert values["state_change_interval_seconds"] == seconds
+    assert type(values["state_change_interval_seconds"]) is int
+
+
+@pytest.mark.parametrize(
+    "value", [-1, 3601, 1.5, True, None, "300", float("nan"), float("inf")]
+)
+def test_state_interval_rejects_invalid(value):
+    with pytest.raises(probatio.Invalid):
+        advanced_schema({}, phase_switch=True)({"state_change_interval_seconds": value})
+
+
+def test_basic_and_setup_schema_bounds():
+    assert (
+        advanced_schema({}, phase_switch=False)({})["state_change_interval_seconds"]
+        == 300
+    )
+    assert "phase_switch_grace_seconds" not in advanced_schema({}, phase_switch=False)(
+        {}
+    )
+    schema = options_schema({}, max_current=4)
+    assert (
+        next(
+            value
+            for key, value in schema.schema.items()
+            if key.schema == "current_limit"
+        ).config["max"]
+        == 6
+    )
+    bus = {"port": "/dev/a", "device_id": 50, "baudrate": 57600, "frame": "8n2"}
+    assert user_schema([PortOption(value="/dev/a", label="a")])(bus)["device_id"] == 50
+    with pytest.raises(probatio.Invalid):
+        user_schema([])({**bus, "device_id": 9})
+    assert set(fields({"data_schema": user_schema([])})) == {
+        "port",
+        "device_id",
+        "baudrate",
+        "frame",
+        "search",
+    }
+    assert user_schema([])({**bus, "port": "/dev/custom"})["port"] == "/dev/custom"

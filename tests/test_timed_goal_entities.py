@@ -33,7 +33,9 @@ def _timed_observer():
         status="paced",
         async_set_deadline=AsyncMock(),
         async_use_next_calendar_event=AsyncMock(),
-        async_use_bmw_departure=AsyncMock(),
+        async_use_vehicle_departure=AsyncMock(),
+        vehicle_departure_configured=False,
+        vehicle_departure_available=False,
     )
 
 
@@ -84,36 +86,45 @@ def test_departure_controls_respect_read_only_but_status_is_observable(remote):
             entry.data["server_url"] = "http://service:8765"
         entry.options["timed_calendar_entity"] = "calendar.trips"
         entry.runtime_data.timed_goal = _timed_observer()
+        entry.runtime_data.timed_goal.vehicle_departure_configured = True
+        entry.runtime_data.timed_goal.vehicle_departure_available = True
         datetimes, buttons, sensors = await _entities(hass, entry)
         assert not datetimes["timed_departure"].available
         assert sensors["timed_goal_status"].available
         if remote:
             assert not buttons["timed_next_calendar_event"].available
             assert not buttons["timed_clear_departure"].available
+            assert not buttons["timed_vehicle_departure"].available
         else:
             assert "timed_next_calendar_event" not in buttons
             assert "timed_clear_departure" not in buttons
+            assert "timed_vehicle_departure" not in buttons
         assert not transport.writes
         await entry.runtime_data.control.async_shutdown()
 
     asyncio.run(run())
 
 
-def test_bmw_import_button_is_explicit_optional_and_respects_read_only():
+def test_vehicle_import_button_keeps_its_identity_and_tracks_provider_availability():
     async def run():
         hass, entry, transport = await build_runtime()
         entry.runtime_data.timed_goal = observer = _timed_observer()
         _, buttons, _ = await _entities(hass, entry)
-        assert "timed_bmw_departure" not in buttons
-        entry.options["timed_bavarian_device"] = "bmw"
+        assert "timed_vehicle_departure" not in buttons
+        observer.vehicle_departure_configured = True
         _, buttons, _ = await _entities(hass, entry)
-        button = buttons["timed_bmw_departure"]
+        button = buttons["timed_vehicle_departure"]
+        assert button.unique_id.endswith("_timed_bmw_departure")
+        assert button.translation_key == "timed_vehicle_departure"
+        assert not button.available
+        observer.vehicle_departure_available = True
         assert button.available
         await button.async_press()
-        observer.async_use_bmw_departure.assert_awaited_once()
+        observer.async_use_vehicle_departure.assert_awaited_once()
         entry.runtime_data.timed_goal = None
+        assert not button.available
         await button.async_press()
-        observer.async_use_bmw_departure.assert_awaited_once()
+        observer.async_use_vehicle_departure.assert_awaited_once()
         assert not transport.writes
         await entry.runtime_data.control.async_shutdown()
     asyncio.run(run())

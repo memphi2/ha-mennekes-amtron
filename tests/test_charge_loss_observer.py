@@ -13,7 +13,6 @@ from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 
-from custom_components.mennekes_amtron_rtu.bavarian_history import HistoryMatch
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
     CONF_LOSS_AUTO_MATCH,
@@ -30,6 +29,9 @@ from custom_components.mennekes_amtron_rtu.device.charging_session import (
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.registers import CP_STATE, EVSE_STATE
+from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.history import (
+    HistoryMatch,
+)
 from tests.test_bavarian_history import VIN, vehicle_registry
 
 
@@ -59,7 +61,7 @@ class Coordinator:
 
 
 def build(hass, mode="sensor", *, auto=False):
-    if mode == "bavariandata":
+    if mode in ("bavariandata", "vehicle_history"):
         hass.data.setdefault(dr.DATA_REGISTRY, vehicle_registry())
     coordinator = Coordinator()
     entry = SimpleNamespace(
@@ -71,6 +73,10 @@ def build(hass, mode="sensor", *, auto=False):
             coordinator=coordinator, identity=SimpleNamespace(serial_number="123", layout_version=0x0103),
         ),
     )
+    if mode == "vehicle_history":
+        entry.options.update({
+            "charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "car-device",
+        })
     return ChargeLossObserver(hass, entry), coordinator
 
 
@@ -166,16 +172,17 @@ def test_auto_only_live_changed_values_and_no_old_session_replay(tmp_path):
     asyncio.run(run())
 
 
-def test_history_uses_public_adapter_retries_and_does_not_call_on_each_poll(tmp_path):
+@pytest.mark.parametrize("mode", ["bavariandata", "vehicle_history"])
+def test_history_uses_public_adapter_retries_and_does_not_call_on_each_poll(tmp_path, mode):
     async def run():
         hass = HomeAssistant(str(tmp_path))
-        observer, coordinator = build(hass, "bavariandata")
+        observer, coordinator = build(hass, mode)
         callbacks = []
         cancellations = []
         def schedule(_hass, delay, callback):
             callbacks.append((delay, callback))
             return lambda: cancellations.append(delay)
-        with patch("custom_components.mennekes_amtron_rtu.charge_loss_observer.async_read_history", new=AsyncMock(side_effect=[TimeoutError, HomeAssistantError(), None, HistoryMatch(8, 2)])) as read, patch("custom_components.mennekes_amtron_rtu.charge_loss_observer.async_call_later", side_effect=schedule):
+        with patch("custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history", new=AsyncMock(side_effect=[TimeoutError, HomeAssistantError(), None, HistoryMatch(8, 2)])) as read, patch("custom_components.mennekes_amtron_rtu.charge_loss_observer.async_call_later", side_effect=schedule):
             try:
                 await observer.async_start()
                 read.assert_not_awaited()
@@ -263,7 +270,7 @@ def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_
         hass = HomeAssistant(str(tmp_path))
         observer, coordinator = build(hass, "bavariandata")
         with patch(
-            "custom_components.mennekes_amtron_rtu.charge_loss_observer.async_read_history",
+            "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history",
             new=AsyncMock(return_value=HistoryMatch(8, 1)),
         ) as read:
             try:
@@ -319,7 +326,7 @@ def test_old_history_response_is_discarded_and_inflight_query_cancels_on_unload(
             started.set()
             await release.wait()
             return HistoryMatch(8, 1)
-        with patch("custom_components.mennekes_amtron_rtu.charge_loss_observer.async_read_history", side_effect=read):
+        with patch("custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history", side_effect=read):
             try:
                 await observer.async_start()
                 coordinator.complete()
@@ -347,7 +354,7 @@ def test_account_or_rebound_device_is_unavailable_and_never_matches_a_different_
         hass = HomeAssistant(str(tmp_path))
         hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "account-entry")})
         observer, coordinator = build(hass, "bavariandata")
-        with patch("custom_components.mennekes_amtron_rtu.charge_loss_observer.async_read_history", new=AsyncMock()) as read:
+        with patch("custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history", new=AsyncMock()) as read:
             try:
                 await observer.async_start()
                 coordinator.complete()
@@ -364,6 +371,58 @@ def test_account_or_rebound_device_is_unavailable_and_never_matches_a_different_
         assert not observer.available
         await observer.async_stop()
         await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_generic_history_selection_keeps_the_existing_average_after_reload(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        original, coordinator = build(hass, "bavariandata")
+        replacement = None
+        try:
+            with patch(
+                "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history",
+                return_value=HistoryMatch(8, 1),
+            ):
+                await original.async_start()
+                coordinator.complete(energy=10)
+                await hass.async_block_till_done()
+                assert original.statistics.sample_count == 1
+                await original.async_stop()
+                replacement, _coordinator = build(hass, "vehicle_history")
+                await replacement.async_start()
+                assert replacement.statistics.average_loss_percent == pytest.approx(20)
+                assert replacement.statistics.sample_count == 1
+                assert replacement.statistics.source == original.statistics.source
+        finally:
+            await original.async_stop()
+            if replacement is not None:
+                await replacement.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_explicitly_disabled_history_provider_cannot_match_a_retained_legacy_vehicle(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        old, coordinator = build(hass, "bavariandata")
+        old._entry.options["charge_loss_vehicle_provider"] = "none"
+        observer = ChargeLossObserver(hass, old._entry)
+        try:
+            with patch(
+                "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history",
+            ) as read:
+                await observer.async_start()
+                coordinator.complete()
+                hass.bus.async_fire("bavariandata_charging_stopped", {})
+                await hass.async_block_till_done()
+                assert not observer.available
+                assert not observer.can_assign
+                assert observer.statistics.sample_count == 0
+                read.assert_not_called()
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
     asyncio.run(run())
 
 

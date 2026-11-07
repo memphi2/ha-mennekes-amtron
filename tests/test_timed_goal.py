@@ -20,7 +20,6 @@ from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.energy_goal import EnergyGoal
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.options_flow import (
-    _normalized,
     _timed_errors,
 )
 from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
@@ -85,7 +84,6 @@ def test_time_and_capacity_sources_need_dated_valid_data() -> None:
     ({"timed_capacity_entity": "switch.bad"}, "timed_source_invalid"),
     ({"timed_departure_entity": "switch.bad"}, "timed_source_invalid"),
     ({"timed_calendar_entity": "sensor.bad"}, "timed_source_invalid"),
-    ({"timed_capacity_entity": "sensor.cap", "timed_capacity_kwh": 80}, "timed_capacity_ambiguous"),
     ({"timed_calendar_title": "Trip"}, "timed_calendar_required"),
     ({"timed_calendar_entity": "calendar.trip"}, "timed_calendar_title_required"),
     ({"timed_capacity_kwh": 0}, "timed_capacity_invalid"),
@@ -103,11 +101,7 @@ def test_timed_options_accept_separate_fixed_and_dynamic_sources() -> None:
     dynamic = {"vehicle_soc_entity": "sensor.soc", "timed_capacity_entity": "sensor.cap",
                "timed_departure_entity": "input_datetime.trip"}
     assert _timed_errors(dynamic) == {}
-    options = _normalized({"scan_interval_seconds": 10, "current_limit": 16, **dynamic}, service_mode=True)
-    assert options["timed_capacity_entity"] == "sensor.cap"
-    assert options["timed_departure_entity"] == "input_datetime.trip"
-    fixed_options = _normalized({"scan_interval_seconds": 10, "current_limit": 16, **fixed}, service_mode=True)
-    assert fixed_options["timed_capacity_kwh"] == 80
+
 
 
 class FakeStore:
@@ -160,6 +154,7 @@ def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, 
         "charging_current_ems": 16.0,
         "switched_phases": 0,
         "grid_phases_connected": 2,
+        "detected_ev_phases": 3,
         "evse_state": EvseState.CHARGING,
         "cp_state": CpState.C2,
     })
@@ -444,6 +439,7 @@ def test_departure_controls_show_saved_trip_and_delegate_actions() -> None:
         timed = SimpleNamespace(
             goal=goal, async_set_deadline=AsyncMock(),
             async_use_next_calendar_event=AsyncMock(),
+            vehicle_departure_configured=False,
         )
         entry.runtime_data.timed_goal = timed
         entry.options["timed_calendar_entity"] = "calendar.trips"

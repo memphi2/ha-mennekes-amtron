@@ -546,7 +546,11 @@ class AmtronControl:
         """Set the solar charging mode shown on the wallbox HMI (0x0D03)."""
 
         self._require_write_access()
-        await self._async_write(SOLAR_CHARGING_MODE, int(mode))
+        # Command context belongs to the operation holding this lock. An
+        # unrelated solar setting must not inherit a timed current's expiry
+        # or goal cancellation while that current awaits the shared bus.
+        async with self._current_lock:
+            await self._async_write(SOLAR_CHARGING_MODE, int(mode))
 
     async def async_set_requested_phases(self, phases: RequestedPhases) -> None:
         """Request single-phase or all-phase charging through 0x0D04.

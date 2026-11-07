@@ -66,9 +66,11 @@ https://github.com/memphi2/ha-mennekes-amtron#apps
 Install **Mennekes Amtron Modbus Service**. During installation, Supervisor may
 show **Building**. Enable **Start on boot** and **Watchdog**.
 
-The repository above provides stable **0.6.1**. Existing users of
-`https://github.com/memphi2/ha-mennekes-amtron#apps-beta` receive this stable
-update there too; no reinstall or catalog switch is needed.
+The repository above provides stable **0.6.1**. The separate
+`https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog provides beta
+**0.7.0b1**. Existing beta-catalog installations update in place. To switch
+catalogs, follow the [channel handover](#updates) and
+[beta update guide](upgrading.md#trying-070b1).
 
 ### 3. Configure and start read-only
 
@@ -263,11 +265,12 @@ The token, saved charging state and USB settings are retained;
 check the [connection choice](upgrading.md#app-connection-choice) before starting.
 LAN remains an optional connection change.
 
-Stable **0.6.1** is published to `#apps` and also reaches existing
-`#apps-beta` installations. An existing beta app updates normally with its data
-intact; no catalog switch or reinstall is needed. When updating from 0.5.1, check the
+Stable **0.6.1** is published to `#apps`; beta **0.7.0b1** is published to
+`#apps-beta`. For the shared control fixes in 0.7.0b1, update that beta app too;
+the minimum compatible service remains **0.6.1 with API 2**. An existing beta
+app updates in place with its data intact. When updating from 0.5.1, check the
 [connection-choice change](upgrading.md#app-connection-choice).
-An optional switch to the stable-only catalog creates a different app in Supervisor.
+Switching between stable and beta catalogs creates a different app in Supervisor.
 For that channel change, back up app data, note the charging settings and
 disconnect the vehicle. Copy the options, set the new app to **Read-only**, stop
 the old app before starting the new one, and confirm its discovery.

@@ -66,6 +66,12 @@ it expires obsolete queued departure commands even while HA is offline.
 See [how to update](docs/installation.md#updating-to-061) and
 [what changes](docs/upgrading.md#updating-to-061).
 
+**Beta 0.7.0b1** introduces the separate feature menus described below and keeps
+existing configurations. Opt into prereleases to select this integration
+version; its app update is offered through **#apps-beta**. Stable **0.6.1**
+remains available. See [trying the beta](docs/upgrading.md#trying-070b1) before
+switching an app between channels.
+
 You need a compatible wallbox, a USB RS-485 adapter or supported LAN gateway,
 and exclusive access to its bus. LAN needs no USB device on the HA/service host.
 Have the [hardware and fallback settings](docs/hardware.md) prepared before
@@ -85,12 +91,20 @@ Charging targets, departure planning and estimates are optional features of **0.
 | Limit charging | **Energy target**, or an optional **Vehicle charge target** from your car's SoC sensor |
 | Estimate losses and costs | [Optional charging estimates](docs/charging-estimates.md) using existing vehicle and price data |
 | Charge from solar surplus | [Ready-made PV blueprints](docs/blueprints.md) |
-| Charge for the next trip | [Next departure](docs/user-guide.md#charge-for-the-next-departure), with optional calendar, BMW timer and climate automation |
+| Charge for the next trip | [Next departure](docs/user-guide.md#charge-for-the-next-departure), with optional calendar, vehicle departure and climate automation |
 | Keep history manageable | [Recorder settings](docs/recorder.md); the heartbeat records status changes, not a timestamp every five seconds |
 
 **Where do I enable control?** With the service, turn off **Read-only** in the
 app configuration, save and restart the app. HA controls follow automatically. With
-direct USB or LAN mode, select **Modbus master** in the integration options.
+direct USB or LAN mode, select **Wallbox → Current limit and polling → Control mode → Modbus master** in
+the integration options.
+
+**Choose only the extras you need.** Under **Configure**, separate sections
+cover **Wallbox**, **Vehicle charge target**, **Next departure**, **Charging costs**
+and **Charging losses**. Each feature asks for its own sources and settings.
+Vehicle SoC, capacity, price and energy sensors can come from other HA
+integrations. The optional vehicle adapter currently supports BavarianData's
+local departure timers and charging history.
 
 ## Find your way
 

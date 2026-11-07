@@ -20,6 +20,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
     CONF_VEHICLE_SOC_ENTITY,
 )
 from tests.fakes import FakeModbusClient, device_bank
+from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_modbus_service import current_writes
 
@@ -43,17 +44,17 @@ async def _entry(hass):
 
 
 async def _options(hass, entry, *, limit=False):
-    flow = await hass.config_entries.options.async_init(entry.entry_id)
-    result = await hass.config_entries.options.async_configure(
-        flow["flow_id"],
-        {"control_mode": CONTROL_MODE_MASTER, "scan_interval_seconds": 300,
-         "measurement_interval_seconds": 300, "current_limit": 16,
-         "state_change_interval_seconds": 0, "phase_switch_grace_seconds": 0,
-         CONF_VEHICLE_SOC_ENTITY: SOC,
-         **({CONF_VEHICLE_CHARGE_LIMIT_ENTITY: LIMIT} if limit else {})},
+    await async_options(
+        hass, entry, "wallbox", "wallbox_basic",
+        {"control_mode": CONTROL_MODE_MASTER, "scan_interval_seconds": 300, "current_limit": 16},
+        "edit", "wallbox_advanced",
+        {"measurement_interval_seconds": 300, "state_change_interval_seconds": 0, "phase_switch_grace_seconds": 0},
+        "save",
     )
-    assert result["type"] == "create_entry"
-    await hass.async_block_till_done()
+    steps = ["vehicle", "vehicle_soc", {CONF_VEHICLE_SOC_ENTITY: SOC, "use_vehicle_limit": limit}]
+    if limit:
+        steps.append({CONF_VEHICLE_CHARGE_LIMIT_ENTITY: LIMIT})
+    await async_options(hass, entry, *steps, "save")
 
 
 def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: Path):

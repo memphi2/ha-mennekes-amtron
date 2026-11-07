@@ -198,8 +198,8 @@
       "timed_clear_departure": {
         "name": "Clear departure time"
       },
-      "timed_bmw_departure": {
-        "name": "Use BMW departure"
+      "timed_vehicle_departure": {
+        "name": "Use vehicle departure"
       }
     },
     "number": {
@@ -722,11 +722,11 @@
     "timed_goal_state_invalid": {
       "message": "The saved departure time could not be restored. Check the stored plan before charging again."
     },
-    "timed_bavarian_unavailable": {
-      "message": "No active, complete BMW departure timer is available. Enable the timer action, hour and minute sensors in BavarianData; recurring timers also need their weekdays in the integration options."
-    },
     "timed_goal_unavailable": {
       "message": "Queued departure commands could not be checked. The integration will retry when the connection is available."
+    },
+    "timed_vehicle_unavailable": {
+      "message": "No usable upcoming departure was found for the selected vehicle. Check its integration, timer sensors and settings."
     }
   },
   "issues": {
@@ -765,94 +765,258 @@
   "options": {
     "step": {
       "init": {
+        "title": "Settings",
+        "menu_options": {
+          "wallbox": "Wallbox",
+          "vehicle": "Vehicle charge target",
+          "departure": "Next departure",
+          "costs": "Charging costs",
+          "losses": "Charging losses"
+        },
+        "description": "Choose a section. Changes are applied only when you save that section."
+      },
+      "wallbox": {
+        "title": "Wallbox",
+        "menu_options": {
+          "wallbox_basic": "Current limit and polling",
+          "wallbox_advanced": "Measurements and switching delays",
+          "back": "Back without saving"
+        },
+        "description": "For an app connection, write permission and Modbus timing are configured in the app. Change USB/LAN connection settings using Reconfigure."
+      },
+      "wallbox_basic": {
+        "title": "Current limit and polling",
         "data": {
           "control_mode": "Control mode",
           "current_limit": "Charging current cap",
-          "measurement_interval_seconds": "Measurement interval",
-          "scan_interval_seconds": "Status polling interval",
-          "state_change_interval_seconds": "Minimum time between state changes",
-          "phase_switch_grace_seconds": "Extra wait before phase changes",
-          "vehicle_soc_entity": "Vehicle charge level entity (optional)",
-          "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)",
-          "charge_loss_source": "Charging loss data source",
-          "charging_cost_source": "Charging cost calculation",
-          "timed_capacity_kwh": "Usable battery capacity (kWh, optional)",
-          "timed_capacity_entity": "Usable battery capacity entity (optional)",
-          "timed_departure_entity": "Departure time entity (optional)",
-          "timed_calendar_entity": "Departure calendar (optional)",
-          "timed_calendar_title": "Exact calendar event title (optional)",
-          "timed_bavarian_device": "BavarianData vehicle for departure (optional)",
-          "timed_vehicle_time_zone": "Vehicle time zone (optional)",
-          "timed_timer1_days": "BMW timer 1 weekdays (optional)",
-          "timed_timer2_days": "BMW timer 2 weekdays (optional)"
+          "scan_interval_seconds": "Status polling interval"
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
           "current_limit": "Upper bound of the charging-current entity, in addition to the limit the wallbox itself enforces.",
-          "measurement_interval_seconds": "Power, voltage, current and session values: 30 seconds reduces database load. Status changes refresh immediately. Without a vehicle, at least 60 seconds. The status interval sets the shortest possible polling time.",
-          "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently.",
-          "state_change_interval_seconds": "Minimum seconds between charging starts, pauses, release changes, locking or unlocking, and phase changes (default 300). Early commands are queued; the latest command replaces the previous one. The five-second current-write interval still applies. Set 0 to disable the longer interval.",
-          "phase_switch_grace_seconds": "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required.",
-          "vehicle_soc_entity": "Optional: select the vehicle sensor reporting its actual charge level in %. This enables a separate percentage target; leave empty to keep it disabled. Missing vehicle data leaves charging unchanged until valid data returns. Changing or removing a source clears the percentage target without resuming charging.",
-          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle.",
-          "charge_loss_source": "Optional comparison of wallbox energy with the energy added to the vehicle battery. Select a source to configure it in the next step. Charging controls are unaffected.",
-          "charging_cost_source": "Optional cost estimate using a fixed gross electricity price or a price sensor. Configure the price in the next step. Disabled by default; this does not control charging.",
-          "timed_capacity_kwh": "Enter the usable, not nominal, battery capacity. Leave empty when using a capacity entity.",
-          "timed_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh.",
-          "timed_departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip.",
-          "timed_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
-          "timed_calendar_title": "Only events with this exact title are eligible. All-day events are ignored.",
-          "timed_bavarian_device": "Select your vehicle once to enable Use BMW departure. Manual and calendar selection remain available. Enable the selected timer’s action, hour and minute sensors in BavarianData.",
-          "timed_vehicle_time_zone": "Vehicle time zone, for example Europe/Berlin. Leave empty to use the Home Assistant time zone. BMW timer clocks contain no time zone.",
-          "timed_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
-          "timed_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer."
+          "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently."
         },
-        "title": "Options"
+        "description": "The current cap limits requests from HA; the wallbox and service limits still apply. For app connections, the polling interval only affects HA’s service requests."
       },
-      "service": {
-        "title": "Service options",
+      "wallbox_advanced": {
+        "title": "Measurements and switching delays",
         "data": {
-          "current_limit": "Charging current cap",
-          "scan_interval_seconds": "Status polling interval",
-          "vehicle_soc_entity": "Vehicle charge level entity (optional)",
-          "vehicle_charge_limit_entity": "Vehicle charge limit entity (optional)",
-          "charge_loss_source": "Charging loss data source",
-          "charging_cost_source": "Charging cost calculation",
-          "timed_capacity_kwh": "Usable battery capacity (kWh, optional)",
-          "timed_capacity_entity": "Usable battery capacity entity (optional)",
-          "timed_departure_entity": "Departure time entity (optional)",
-          "timed_calendar_entity": "Departure calendar (optional)",
-          "timed_calendar_title": "Exact calendar event title (optional)",
-          "timed_bavarian_device": "BavarianData vehicle for departure (optional)",
+          "measurement_interval_seconds": "Measurement interval",
+          "state_change_interval_seconds": "Minimum time between state changes",
+          "phase_switch_grace_seconds": "Extra wait before phase changes"
+        },
+        "data_description": {
+          "measurement_interval_seconds": "Power, voltage, current and session values: 30 seconds reduces database load. Status changes refresh immediately. Without a vehicle, at least 60 seconds. The status interval sets the shortest possible polling time.",
+          "state_change_interval_seconds": "Minimum seconds between charging starts, pauses, release changes, locking or unlocking, and phase changes (default 300). Early commands are queued; the latest command replaces the previous one. The five-second current-write interval still applies. Set 0 to disable the longer interval.",
+          "phase_switch_grace_seconds": "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required."
+        }
+      },
+      "vehicle": {
+        "title": "Vehicle charge target",
+        "menu_options": {
+          "vehicle_soc": "Configure charge level",
+          "vehicle_disable": "Disable percentage target",
+          "back": "Back without saving"
+        },
+        "description": "Optional: use an existing vehicle charge-level entity for a percentage target. The vehicle’s own charge limit can be selected separately."
+      },
+      "vehicle_soc": {
+        "title": "Configure charge level",
+        "data": {
+          "vehicle_soc_entity": "Vehicle charge level entity",
+          "use_vehicle_limit": "Also use the vehicle’s charge limit"
+        },
+        "data_description": {
+          "vehicle_soc_entity": "Choose the vehicle sensor reporting its actual charge level in %. Missing data leaves charging unchanged until valid data returns. Changing the source clears the percentage target without resuming charging. To disable it, use the previous menu.",
+          "use_vehicle_limit": "Enable this to select the vehicle’s own charge limit as an additional maximum. No setting is written to the vehicle."
+        }
+      },
+      "vehicle_limit": {
+        "title": "Vehicle charge limit",
+        "data": {
+          "vehicle_charge_limit_entity": "Vehicle charge limit entity"
+        },
+        "data_description": {
+          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle."
+        }
+      },
+      "departure": {
+        "title": "Next departure",
+        "menu_options": {
+          "departure_configure": "Configure departure planning",
+          "departure_disable": "Disable departure planning",
+          "back": "Back without saving"
+        },
+        "description": "Plan one next trip using the percentage target and usable battery capacity. Disabling planning clears the selected trip and its queued commands; the percentage target remains."
+      },
+      "departure_requires_vehicle": {
+        "title": "Charge level required",
+        "menu_options": {
+          "vehicle": "Vehicle charge target",
+          "back": "Back without saving"
+        },
+        "description": "Configure a vehicle charge-level entity first, then return to departure planning."
+      },
+      "departure_configure": {
+        "title": "Configure departure planning",
+        "data": {
+          "capacity_source": "Battery capacity source",
+          "use_calendar": "Use a calendar",
+          "use_departure_entity": "Use a departure time entity",
+          "use_vehicle_timer": "Use vehicle departure timers"
+        },
+        "description": "Manual date and time entry is always available. Enable only the additional sources you want; their settings appear next. An active plan can resume a manual pause to meet departure."
+      },
+      "departure_capacity_fixed": {
+        "title": "Usable battery capacity",
+        "data": {
+          "timed_capacity_kwh": "Usable battery capacity (kWh)"
+        },
+        "data_description": {
+          "timed_capacity_kwh": "Enter the usable battery capacity, not the nominal capacity."
+        }
+      },
+      "departure_capacity_entity": {
+        "title": "Battery capacity entity",
+        "data": {
+          "timed_capacity_entity": "Usable battery capacity entity"
+        },
+        "data_description": {
+          "timed_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh."
+        }
+      },
+      "departure_calendar": {
+        "title": "Departure calendar",
+        "data": {
+          "timed_calendar_entity": "Departure calendar",
+          "timed_calendar_title": "Exact calendar event title"
+        },
+        "data_description": {
+          "timed_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
+          "timed_calendar_title": "Only events with this exact title are eligible. All-day events are ignored."
+        }
+      },
+      "departure_entity": {
+        "title": "Departure time entity",
+        "data": {
+          "timed_departure_entity": "Departure time entity"
+        },
+        "data_description": {
+          "timed_departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip."
+        }
+      },
+      "departure_vehicle": {
+        "title": "Vehicle integration",
+        "data": {
+          "timed_vehicle_provider": "Vehicle integration"
+        },
+        "description": "Choose an installed integration with a supported adapter. Generic HA entities can be selected without an adapter. Only existing local vehicle data is read."
+      },
+      "departure_vehicle_details": {
+        "title": "Vehicle departure timers",
+        "data": {
+          "timed_vehicle_device": "Vehicle",
           "timed_vehicle_time_zone": "Vehicle time zone (optional)",
           "timed_timer1_days": "BMW timer 1 weekdays (optional)",
           "timed_timer2_days": "BMW timer 2 weekdays (optional)"
         },
         "data_description": {
-          "current_limit": "Additional cap for currents requested by Home Assistant. The service cap still applies. Explicitly selecting 0 A disables the EMS limit.",
-          "scan_interval_seconds": "How often Home Assistant reads the service state. This changes neither Modbus measurement polling nor the heartbeat interval.",
-          "vehicle_soc_entity": "Optional: select the vehicle sensor reporting its actual charge level in %. This enables a separate percentage target; leave empty to keep it disabled. Missing vehicle data leaves charging unchanged until valid data returns. Changing or removing a source clears the percentage target without resuming charging.",
-          "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle.",
-          "charge_loss_source": "Optional comparison of wallbox energy with the energy added to the vehicle battery. Select a source to configure it in the next step. Charging controls are unaffected.",
-          "charging_cost_source": "Optional cost estimate using a fixed gross electricity price or a price sensor. Configure the price in the next step. Disabled by default; this does not control charging.",
-          "timed_capacity_kwh": "Enter the usable, not nominal, battery capacity. Leave empty when using a capacity entity.",
-          "timed_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh.",
-          "timed_departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip.",
-          "timed_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
-          "timed_calendar_title": "Only events with this exact title are eligible. All-day events are ignored.",
-          "timed_bavarian_device": "Select your vehicle once to enable Use BMW departure. Manual and calendar selection remain available. Enable the selected timer’s action, hour and minute sensors in BavarianData.",
           "timed_vehicle_time_zone": "Vehicle time zone, for example Europe/Berlin. Leave empty to use the Home Assistant time zone. BMW timer clocks contain no time zone.",
           "timed_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
           "timed_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer."
         },
-        "description": "The app's Read-only setting also controls write permission in Home Assistant. Disable it in the app, save and restart the app to enable controls. Control entities remain unavailable while the service is read-only or not ready. Set the minimum time between state changes and the extra wait before phase changes in the app configuration; the service applies both even while Home Assistant is restarting."
+        "description": "Select the vehicle once. Use the departure button to copy one active timer. For BavarianData, enable its action, hour and minute timer sensors; enter recurring weekdays here because the integration does not publish them."
       },
-      "loss_bavariandata": {
-        "title": "Charging losses from BavarianData",
-        "description": "Select the vehicle connected to this wallbox. Matching uses the times and estimated battery energy in its stored charging history. Only existing Home Assistant data is read; no vehicle update is requested. Without matching history, no loss is calculated.",
+      "costs": {
+        "title": "Charging costs",
+        "menu_options": {
+          "cost_fixed": "Fixed electricity price",
+          "cost_sensor": "Electricity price sensor",
+          "cost_disable": "Disable cost estimates",
+          "back": "Back without saving"
+        },
+        "description": "Optional estimates from a fixed price or a price sensor. This does not control charging. Network tariff adjustments are offered only for Germany."
+      },
+      "cost_fixed": {
+        "title": "Fixed electricity price",
         "data": {
-          "charge_loss_bavarian_device": "Vehicle"
-        }
+          "charging_price": "Gross electricity price",
+          "charging_network_module": "Network price adjustment"
+        },
+        "data_description": {
+          "charging_network_module": "Use only the module agreed with your network operator. Module 3 offers manual entry or a separate import choice."
+        },
+        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded."
+      },
+      "cost_sensor": {
+        "title": "Electricity price sensor",
+        "data": {
+          "charging_price_entity": "Electricity price sensor",
+          "charging_network_module": "Network price adjustment"
+        },
+        "data_description": {
+          "charging_network_module": "Use only the module agreed with your network operator. Module 3 offers manual entry or a separate import choice."
+        },
+        "description": "Select a sensor with the current gross electricity price in EUR/kWh, ct/kWh or EUR/MWh (the € symbol is also supported). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded."
+      },
+      "cost_module2": {
+        "title": "Module 2: reduced network price",
+        "data": {
+          "regular_network": "Regular network price (standard tariff)",
+          "price_includes_network": "Electricity price already includes the regular network price"
+        },
+        "data_description": {
+          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice."
+        },
+        "description": "Enter the gross regular network price. Module 2 applies 40% of this component, not 40% of the whole electricity price."
+      },
+      "cost_module3_source": {
+        "title": "Module 3: tariff source",
+        "menu_options": {
+          "cost_module3_manual": "Enter or edit manually",
+          "cost_module3_import": "Import for HA Home",
+          "back": "Back without saving"
+        },
+        "description": "Manual entry sends no location data. Import sends HA Home coordinates once to VNBdigital, then retrieves public tariffs from Par14a-Database. Review the source, prices and time windows before saving."
+      },
+      "cost_module3_prices": {
+        "title": "Module 3: prices and year",
+        "data": {
+          "regular_network": "Regular network price (standard tariff)",
+          "high_network": "High network price (HT)",
+          "low_network": "Low network price (NT)",
+          "price_includes_network": "Electricity price already includes the regular network price",
+          "tariff_year": "Price-sheet year",
+          "auto_tariff_refresh": "Refresh Module 3 tariff automatically at the new year"
+        },
+        "data_description": {
+          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice.",
+          "auto_tariff_refresh": "When enabled, the integration fetches the new year’s published tariff on 1 January and applies a valid unambiguous result. It retries daily if no valid data is available. Provisional published values may be used; review the final price sheet later."
+        },
+        "description": "Copy gross prices and year from the operator’s price sheet. Source: {source}. ⚠ marks provisional data. Check these values before saving."
+      },
+      "cost_module3_windows": {
+        "title": "Module 3: time windows",
+        "data": {
+          "high_periods": "High tariff periods",
+          "low_periods": "Low tariff periods",
+          "active_quarters": "Quarters with time-variable network prices"
+        },
+        "data_description": {
+          "high_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed.",
+          "low_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed."
+        },
+        "description": "Use German local time (Europe/Berlin) and quarter-hour boundaries. Overnight windows are allowed; windows must not overlap and must leave time at the standard rate."
+      },
+      "losses": {
+        "title": "Charging losses",
+        "menu_options": {
+          "loss_sensor": "Charging losses from a sensor",
+          "loss_vehicle": "Vehicle charging history",
+          "loss_disable": "Disable loss estimates",
+          "back": "Back without saving"
+        },
+        "description": "Optional comparison of wallbox energy with energy added to the vehicle battery. Choose existing charging history or a last-charge energy sensor."
       },
       "loss_sensor": {
         "title": "Charging losses from a sensor",
@@ -865,48 +1029,31 @@
           "charge_loss_auto_match": "Optional: assign a changed sensor value received within 30 minutes after unplugging, if this integration observed the complete charge. A changed value cannot prove that both readings belong to the same charge. Leave disabled to confirm each match yourself."
         }
       },
-      "cost_fixed": {
-        "title": "Fixed electricity price",
-        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded.",
+      "loss_vehicle": {
+        "title": "Vehicle charging history",
         "data": {
-          "charging_price": "Gross electricity price",
-          "charging_network_module": "Network price adjustment"
+          "charge_loss_vehicle_provider": "Vehicle integration"
         },
-        "data_description": {
-          "charging_network_module": "Optional German §14a network tariff calculation. Use only the module and prices agreed with your network operator. Otherwise leave this at None. Selecting Module 3 sends your HA Home coordinates once to VNBdigital and retrieves tariff data from Par14a-Database. Check the prefilled values against the linked price sheet."
-        }
+        "description": "Choose an installed integration with a supported adapter. Generic HA entities can be selected without an adapter. Only existing local vehicle data is read."
       },
-      "cost_sensor": {
-        "title": "Electricity price sensor",
-        "description": "Select a sensor with the current gross electricity price in EUR/kWh, ct/kWh or EUR/MWh (the € symbol is also supported). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded.",
+      "loss_vehicle_details": {
+        "title": "Vehicle for charging history",
         "data": {
-          "charging_price_entity": "Electricity price sensor",
-          "charging_network_module": "Network price adjustment"
+          "charge_loss_vehicle_device": "Vehicle"
         },
-        "data_description": {
-          "charging_network_module": "Optional German §14a network tariff calculation. Use only the module and prices agreed with your network operator. Otherwise leave this at None. Selecting Module 3 sends your HA Home coordinates once to VNBdigital and retrieves tariff data from Par14a-Database. Check the prefilled values against the linked price sheet."
-        }
+        "description": "Select the vehicle connected to this wallbox. Only existing local charging history is read; no vehicle refresh is requested. Missing or ambiguous matches remain unknown."
       },
-      "cost_network": {
-        "title": "Network tariff: module {module}",
-        "description": "Copy gross prices from your network operator’s price sheet. Module 2 uses 40% of the regular network price. Module 3 uses the published high and low prices in the selected quarters and tariff year; remaining times use the standard price. Use German local tariff time (Europe/Berlin, including daylight saving time) and quarter-hour boundaries. Windows may cross midnight but must not overlap. These settings estimate variable charging costs; they do not establish eligibility or change your contract. Source of prefilled values: {source} The ⚠ symbol marks a provisional price sheet that may change.",
-        "data": {
-          "regular_network": "Regular network price (standard tariff)",
-          "price_includes_network": "Electricity price already includes the regular network price",
-          "high_network": "High network price (HT)",
-          "low_network": "Low network price (NT)",
-          "active_quarters": "Quarters with time-variable network prices",
-          "tariff_year": "Price-sheet year",
-          "high_periods": "High tariff periods",
-          "low_periods": "Low tariff periods",
-          "auto_tariff_refresh": "Refresh Module 3 tariff automatically at the new year"
+      "review": {
+        "title": "Save this section?",
+        "menu_options": {
+          "save": "Save",
+          "edit": "Edit this section",
+          "back": "Back without saving"
         },
-        "data_description": {
-          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice.",
-          "high_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed.",
-          "low_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed.",
-          "auto_tariff_refresh": "When enabled, the integration fetches the new year’s published tariff on 1 January and applies a valid unambiguous result. It retries daily if no valid data is available. Provisional published values may be used; review the final price sheet later."
-        }
+        "description": "Save the completed settings for this section, edit them, or return without saving. Other sections keep their current settings."
+      },
+      "options_changed": {
+        "title": "Settings have changed"
       }
     },
     "error": {
@@ -917,14 +1064,16 @@
       "cost_price_invalid": "Enter a finite gross price in EUR/kWh between −1000 and 1000. Negative prices are allowed.",
       "network_tariff_invalid": "Check the gross prices, tariff year, two to four active quarters and HT/NT periods. Use one 15-minute-aligned HH:MM-HH:MM period per line; periods must not overlap and must leave standard-tariff time.",
       "timed_source_invalid": "Invalid timed-goal source",
-      "timed_capacity_ambiguous": "Choose either a fixed or a dynamic battery capacity",
       "timed_calendar_required": "Choose a calendar for this event title",
       "timed_calendar_title_required": "Enter the exact event title",
       "timed_capacity_invalid": "Enter a usable capacity between 1 and 250 kWh",
-      "timed_bavarian_invalid": "Select a BavarianData vehicle",
-      "timed_bavarian_required": "Select a BavarianData vehicle before configuring its timers",
       "timed_weekdays_invalid": "Choose valid weekdays",
-      "timed_timezone_invalid": "Enter a valid time zone, for example Europe/Berlin"
+      "timed_timezone_invalid": "Enter a valid time zone, for example Europe/Berlin",
+      "options_changed": "This section changed while you were editing it. Return and reopen it to use the latest values; your draft was not saved.",
+      "vehicle_provider_invalid": "Select a supported vehicle integration.",
+      "vehicle_device_invalid": "Select a vehicle belonging to the chosen integration.",
+      "capacity_source_invalid": "Select a fixed capacity or a capacity entity.",
+      "tariff_lookup_failed": "No unambiguous supported tariff was found. Enter the price-sheet values manually or try importing again later."
     }
   },
   "selector": {
@@ -961,20 +1110,6 @@
         "modbus_tcp": "Modbus TCP (translating gateway)"
       }
     },
-    "charge_loss_source": {
-      "options": {
-        "disabled": "Disabled",
-        "bavariandata": "BavarianData charging history",
-        "sensor": "Vehicle energy sensor"
-      }
-    },
-    "charging_cost_source": {
-      "options": {
-        "disabled": "Disabled",
-        "fixed": "Fixed electricity price",
-        "sensor": "Electricity price sensor"
-      }
-    },
     "charging_network_module": {
       "options": {
         "none": "None; source is the final price",
@@ -999,6 +1134,17 @@
         "fri": "Friday",
         "sat": "Saturday",
         "sun": "Sunday"
+      }
+    },
+    "capacity_source": {
+      "options": {
+        "fixed": "Fixed capacity in kWh",
+        "entity": "Capacity from an entity"
+      }
+    },
+    "vehicle_provider": {
+      "options": {
+        "bavariandata": "BavarianData"
       }
     }
   },

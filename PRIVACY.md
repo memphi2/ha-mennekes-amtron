@@ -21,16 +21,17 @@ itself is unencrypted and unauthenticated; restrict it to a trusted private LAN.
   unique id and in the device registry.
 - Register values, as entity states and in Home Assistant's recorder database
   like any other entity.
-- If configured, vehicle source entity IDs, the selected BavarianData device ID,
+- If configured, vehicle source entity IDs, optional vehicle-provider and device
+  selections for departure and charging history,
   and electricity-price/tariff settings in the integration options. Optional
   charging estimates retain the latest completed cycle, latest cost result and
   bounded loss totals with one correctable match in HA's local storage, outside
   Recorder. They do not retain a growing vehicle-history or price-history list.
 - Optional timed charging stores the selected source entities, calendar and
   exact event title in the integration options, plus one departure and its
-  source/finished marker in local storage. BMW departure imports read the last
-  locally published BavarianData timer sensors for the selected vehicle; no
-  BMW cloud refresh is requested. Timer weekdays and the vehicle time zone
+  source/finished marker in local storage. The optional BavarianData adapter
+  reads the last locally published timer sensors for the selected vehicle; no
+  vehicle cloud refresh is requested. Timer weekdays and the vehicle time zone
   are optional local settings. The preconditioning blueprint's HA
   Text helper remembers the last attempted departure to avoid duplicate actions.
   A selected preconditioning action uses its vehicle integration, which may
@@ -96,13 +97,17 @@ you decide to share their contents.
 
 ## Optional German tariff import
 
-Opening Module 3 options sends HA Home latitude and longitude to VNBdigital
+Selecting **Import for HA Home** in the Module 3 setup sends HA Home latitude and longitude to VNBdigital
 to identify the local low-voltage network operator. Public tariff CSV data is
 downloaded from Par14a-Database through GitHub. Both services see the requesting
 IP address; GitHub receives no Home coordinates. No vehicle history, wallbox
 identity or access token is sent.
 
+Opening the settings or selecting manual entry does not make this request.
+Imported values remain a draft until you save the section. A lookup already
+performed cannot be undone by leaving that draft.
+
 Optional yearly refresh repeats the lookup after the tariff year expires, with
-one scheduled attempt per day until a valid tariff is found, plus a retry after
+one scheduled attempt per day, using the German tariff time zone, until a valid tariff is found, plus a retry after
 an HA restart. Values are saved locally without a growing download history.
 Disable yearly refresh to stop background imports.

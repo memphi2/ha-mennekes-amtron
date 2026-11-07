@@ -46,7 +46,7 @@
       "timed_clear_departure": {
         "default": "mdi:calendar-remove"
       },
-      "timed_bmw_departure": {
+      "timed_vehicle_departure": {
         "default": "mdi:car-clock"
       }
     },

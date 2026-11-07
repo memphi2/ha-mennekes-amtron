@@ -11,9 +11,9 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
-import custom_components.mennekes_amtron_rtu.bavarian_departure as module
-import custom_components.mennekes_amtron_rtu.timed_goal_observer as observer_module
-from custom_components.mennekes_amtron_rtu.bavarian_departure import (
+import custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata as adapter
+import custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.departure as module
+from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.departure import (
     next_timer_occurrence,
     read_bavarian_departure,
 )
@@ -158,10 +158,11 @@ def test_dst_gap_is_skipped_and_ambiguous_clock_uses_first_future_instant() -> N
     assert next_timer_occurrence(before_long_day, zone, 0, 30) is None
 
 
-def test_bmw_import_uses_local_options_once_and_retains_manual_override_marker(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_vehicle_import_uses_local_options_once_and_retains_manual_override_marker(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, _control, hass = setup_observer(monkeypatch)
         hass.config = SimpleNamespace(time_zone="Europe/Berlin")
+        hass.data[dr.DATA_REGISTRY] = vehicle_registry()
         observer._entry.options.update({
             "timed_bavarian_device": "vehicle", "timed_vehicle_time_zone": "Europe/Paris",
             "timed_timer1_days": ["mon"], "timed_timer2_days": ["tue"],
@@ -169,8 +170,10 @@ def test_bmw_import_uses_local_options_once_and_retains_manual_override_marker(m
         })
         hass.states["sensor.trip"] = state("sensor.trip", (NOW + timedelta(hours=3)).isoformat())
         reader = Mock(return_value=NOW + timedelta(hours=2))
-        monkeypatch.setattr(observer_module, "read_bavarian_departure", reader)
-        await observer.async_use_bmw_departure()
+        monkeypatch.setattr(adapter, "read_bavarian_departure", reader)
+        assert observer.vehicle_departure_configured
+        assert observer.vehicle_departure_available
+        await observer.async_use_vehicle_departure()
         reader.assert_called_once_with(
             hass, "vehicle", now=NOW, time_zone="Europe/Paris", timer1_days=["mon"], timer2_days=["tue"],
         )
@@ -179,7 +182,14 @@ def test_bmw_import_uses_local_options_once_and_retains_manual_override_marker(m
         reader.return_value = None
         before = observer.goal
         with pytest.raises(ServiceValidationError):
-            await observer.async_use_bmw_departure()
+            await observer.async_use_vehicle_departure()
+        assert observer.goal is before
+        observer._entry.options["timed_vehicle_provider"] = "none"
+        assert not observer.vehicle_departure_configured
+        assert not observer.vehicle_departure_available
+        with pytest.raises(ServiceValidationError) as error:
+            await observer.async_use_vehicle_departure()
+        assert error.value.translation_key == "timed_vehicle_unavailable"
         assert observer.goal is before
 
     asyncio.run(run())

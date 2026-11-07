@@ -16,6 +16,7 @@ from custom_components.mennekes_amtron_rtu.device.service_config import ServerCo
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.service_runtime import ModbusService
 from tests.fakes import device_bank
+from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import _boot
 from tests.test_modbus_service import TOKEN
 from tests.test_network_wire import PROTOCOLS, network_peer, register_reply
@@ -51,11 +52,13 @@ def test_real_ha_network_setup_read_only_master_pause_and_unload(tmp_path, proto
                 assert entry.runtime_data.client.config.connection_type == protocol
                 assert entry.runtime_data.control.read_only
                 assert all(payload[1] == 3 for payload in requests)
-                options = await hass.config_entries.options.async_init(entry.entry_id)
-                await hass.config_entries.options.async_configure(options["flow_id"], {
-                    "control_mode": "master", "current_limit": 16,
-                    "scan_interval_seconds": 5, "measurement_interval_seconds": 30,
-                })
+                await async_options(
+                    hass, entry, "wallbox", "wallbox_basic",
+                    {"control_mode": "master", "current_limit": 16, "scan_interval_seconds": 5},
+                    "edit", "wallbox_advanced",
+                    {"measurement_interval_seconds": 30, "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5},
+                    "save",
+                )
                 await hass.async_block_till_done()
                 assert not entry.runtime_data.control.read_only
                 heartbeat = entry.runtime_data.heartbeat

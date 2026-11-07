@@ -146,9 +146,9 @@ newer**; update it before the integration, even if you do not use timed planning
 - **HACS:** select **v0.6.1**. Existing beta installations can move to this stable
   version without adding the integration again.
 - **App:** `https://github.com/memphi2/ha-mennekes-amtron#apps` offers stable
-  **0.6.1**. Existing `#apps-beta` users also receive this stable app; use
-  **Check for updates** and update normally, keeping the existing app data.
-  No catalog switch is needed. An optional catalog switch creates a separate
+  **0.6.1**. Use **Check for updates** and keep the existing app data.
+  The `#apps-beta` catalog may offer a newer prerelease; see
+  [trying 0.7.0b1](upgrading.md#trying-070b1). A catalog switch creates a separate
   app; follow the [channel handover](modbus-service.md#updates).
 
 Before updating the app from 0.5.1, save one of the three readable connection
@@ -158,6 +158,10 @@ first, wait for initialization, then update the integration. Check charging,
 pause, current limiting and heartbeat on your hardware after the update.
 
 ## Change settings later
+
+Open **Configure → Wallbox** for the integration's operating settings.
+**Vehicle charge target**, **Next departure**, **Charging costs** and **Charging
+losses** are separate optional sections; see [feature setup](user-guide.md#configuration-and-options).
 
 - **Direct serial:** use **Reconfigure** for the adapter and bus settings;
   use the integration options for write permission, intervals and current cap.

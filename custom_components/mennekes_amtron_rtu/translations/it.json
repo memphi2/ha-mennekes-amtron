@@ -198,8 +198,8 @@
       "timed_clear_departure": {
         "name": "Cancella ora di partenza"
       },
-      "timed_bmw_departure": {
-        "name": "Importa partenza BMW"
+      "timed_vehicle_departure": {
+        "name": "Usa la partenza del veicolo"
       }
     },
     "number": {
@@ -722,11 +722,11 @@
     "timed_goal_state_invalid": {
       "message": "Impossibile ripristinare l’ora di partenza salvata. Controlla il piano prima di ricaricare."
     },
-    "timed_bavarian_unavailable": {
-      "message": "Nessun timer di partenza BMW attivo e completo disponibile. Attiva i sensori di azione, ora e minuto in BavarianData. Per i timer ricorrenti, specifica anche i giorni nelle opzioni."
-    },
     "timed_goal_unavailable": {
       "message": "Non è stato possibile verificare i comandi di partenza in attesa. L’integrazione riproverà quando la connessione sarà disponibile."
+    },
+    "timed_vehicle_unavailable": {
+      "message": "Nessuna prossima partenza utilizzabile trovata per il veicolo scelto. Controlla l’integrazione, i sensori dei timer e le impostazioni."
     }
   },
   "issues": {
@@ -765,94 +765,258 @@
   "options": {
     "step": {
       "init": {
+        "title": "Impostazioni",
+        "menu_options": {
+          "wallbox": "Wallbox",
+          "vehicle": "Obiettivo di carica del veicolo",
+          "departure": "Prossima partenza",
+          "costs": "Costi di ricarica",
+          "losses": "Perdite di ricarica"
+        },
+        "description": "Scegli una sezione. Le modifiche vengono applicate solo quando la salvi."
+      },
+      "wallbox": {
+        "title": "Wallbox",
+        "menu_options": {
+          "wallbox_basic": "Limite di corrente e lettura",
+          "wallbox_advanced": "Misure e tempi di attesa",
+          "back": "Indietro senza salvare"
+        },
+        "description": "Con l’app, i permessi di scrittura e gli intervalli Modbus si impostano nell’app. Usa Riconfigura per modificare la connessione USB/LAN."
+      },
+      "wallbox_basic": {
+        "title": "Limite di corrente e lettura",
         "data": {
           "control_mode": "Modalità di controllo",
           "current_limit": "Corrente massima di ricarica",
-          "measurement_interval_seconds": "Intervallo delle misurazioni",
-          "scan_interval_seconds": "Intervallo di lettura dello stato",
-          "state_change_interval_seconds": "Intervallo minimo tra cambiamenti di stato",
-          "phase_switch_grace_seconds": "Attesa aggiuntiva prima del cambio delle fasi",
-          "vehicle_soc_entity": "Entità del livello di carica del veicolo (facoltativa)",
-          "vehicle_charge_limit_entity": "Entità del limite di carica del veicolo (facoltativa)",
-          "charge_loss_source": "Fonte dei dati sulle perdite di ricarica",
-          "charging_cost_source": "Calcolo dei costi di ricarica",
-          "timed_capacity_kwh": "Capacità utile batteria (kWh, facoltativa)",
-          "timed_capacity_entity": "Entità capacità utile (facoltativa)",
-          "timed_departure_entity": "Entità ora di partenza (facoltativa)",
-          "timed_calendar_entity": "Calendario partenze (facoltativo)",
-          "timed_calendar_title": "Titolo esatto evento (facoltativo)",
-          "timed_bavarian_device": "Veicolo BavarianData per la partenza (facoltativo)",
-          "timed_vehicle_time_zone": "Fuso orario del veicolo (facoltativo)",
-          "timed_timer1_days": "Giorni del timer BMW 1 (facoltativo)",
-          "timed_timer2_days": "Giorni del timer BMW 2 (facoltativo)"
+          "scan_interval_seconds": "Intervallo di lettura dello stato"
         },
         "data_description": {
           "control_mode": "Entrambe le modalità inviano richieste di lettura e richiedono l'accesso esclusivo al bus. Sola lettura non scrive registri. Master Modbus invia anche l'heartbeat e abilita le entità di controllo. Non condividere questo bus con un altro master.",
           "current_limit": "Limite superiore dell'entità della corrente di ricarica, oltre al limite applicato dalla wallbox stessa.",
-          "measurement_interval_seconds": "Potenza, tensione, corrente e valori di sessione: 30 secondi riducono il carico sul database. I cambiamenti di stato aggiornano subito le letture. Senza veicolo, almeno 60 secondi. L'intervallo di stato determina il tempo minimo tra le letture.",
-          "scan_interval_seconds": "Frequenza di lettura dello stato di ricarica, degli errori e dei controlli. L'heartbeat funziona indipendentemente.",
-          "state_change_interval_seconds": "Intervallo minimo in secondi tra avvii, pause e cambiamenti del consenso alla ricarica, del blocco o delle fasi (predefinito 300). I comandi anticipati vengono accodati; l’ultimo sostituisce il precedente. Rimane l’intervallo di cinque secondi tra le scritture della corrente. Impostare 0 per disabilitare l’intervallo più lungo.",
-          "phase_switch_grace_seconds": "Secondi di attesa aggiuntivi tra la conferma della pausa di ricarica da parte del veicolo e il cambio delle fasi (predefinito 5, da 0 a 30). Impostare 0 per eliminare solo questa attesa aggiuntiva; la conferma della pausa rimane obbligatoria.",
-          "vehicle_soc_entity": "Facoltativo: seleziona il sensore che indica il livello di carica reale del veicolo in %. Abilita un obiettivo percentuale separato; senza selezione rimane disattivato. Se mancano i dati, la ricarica continua fino al ritorno di valori validi. Cambiare o rimuovere una fonte cancella questo obiettivo senza riprendere la ricarica.",
-          "vehicle_charge_limit_entity": "Facoltativo: limita ulteriormente l’obiettivo con l’entità del limite di carica del veicolo. Senza questa entità sono possibili obiettivi fino al 100%. Un limite inferiore riduce l’obiettivo esistente; un aumento non lo alza. Se l’entità non è disponibile rimane valido l’ultimo limite noto. Nessuna impostazione del veicolo viene modificata.",
-          "charge_loss_source": "Confronto facoltativo tra l’energia della wallbox e quella aggiunta alla batteria del veicolo. Seleziona una fonte per configurarla nel passaggio successivo. Il controllo della ricarica rimane indipendente.",
-          "charging_cost_source": "Stima facoltativa con un prezzo fisso dell’elettricità comprensivo di imposte o un sensore di prezzo. Configura il prezzo nel passaggio successivo. Disattivata per impostazione predefinita; il controllo della ricarica rimane indipendente.",
-          "timed_capacity_kwh": "Inserisci la capacità utile, non quella nominale. Lascia vuoto se usi un’entità.",
-          "timed_capacity_entity": "Seleziona un sensore di capacità utile in kWh o Wh.",
-          "timed_departure_entity": "Seleziona un timestamp con data e ora o un input_datetime completo. La sola ora non basta.",
-          "timed_calendar_entity": "Seleziona un calendario, poi copia un evento con il pulsante dedicato.",
-          "timed_calendar_title": "Sono validi solo gli eventi con questo titolo esatto. Gli eventi di tutto il giorno sono ignorati.",
-          "timed_bavarian_device": "Seleziona il veicolo una volta per importare la partenza BMW. L’inserimento manuale e il calendario restano disponibili. Attiva in BavarianData i sensori di azione, ora e minuto del timer.",
-          "timed_vehicle_time_zone": "Fuso orario del veicolo, ad esempio Europe/Rome. Se vuoto, viene usato quello di Home Assistant. Gli orari BMW non includono un fuso orario.",
-          "timed_timer1_days": "Seleziona i giorni impostati nel BMW per il timer climatizzazione 1. BavarianData non fornisce questi giorni. Lascia vuoto per ignorare il timer.",
-          "timed_timer2_days": "Seleziona i giorni impostati nel BMW per il timer 2. Lascia vuoto per ignorarlo."
+          "scan_interval_seconds": "Frequenza di lettura dello stato di ricarica, degli errori e dei controlli. L'heartbeat funziona indipendentemente."
         },
-        "title": "Opzioni"
+        "description": "Il limite di corrente si applica alle richieste HA; restano validi i limiti della wallbox e del servizio. Con l’app, l’intervallo riguarda solo le richieste HA al servizio."
       },
-      "service": {
-        "title": "Opzioni del servizio",
+      "wallbox_advanced": {
+        "title": "Misure e tempi di attesa",
         "data": {
-          "current_limit": "Corrente massima di ricarica",
-          "scan_interval_seconds": "Intervallo di lettura dello stato",
-          "vehicle_soc_entity": "Entità del livello di carica del veicolo (facoltativa)",
-          "vehicle_charge_limit_entity": "Entità del limite di carica del veicolo (facoltativa)",
-          "charge_loss_source": "Fonte dei dati sulle perdite di ricarica",
-          "charging_cost_source": "Calcolo dei costi di ricarica",
-          "timed_capacity_kwh": "Capacità utile batteria (kWh, facoltativa)",
-          "timed_capacity_entity": "Entità capacità utile (facoltativa)",
-          "timed_departure_entity": "Entità ora di partenza (facoltativa)",
+          "measurement_interval_seconds": "Intervallo delle misurazioni",
+          "state_change_interval_seconds": "Intervallo minimo tra cambiamenti di stato",
+          "phase_switch_grace_seconds": "Attesa aggiuntiva prima del cambio delle fasi"
+        },
+        "data_description": {
+          "measurement_interval_seconds": "Potenza, tensione, corrente e valori di sessione: 30 secondi riducono il carico sul database. I cambiamenti di stato aggiornano subito le letture. Senza veicolo, almeno 60 secondi. L'intervallo di stato determina il tempo minimo tra le letture.",
+          "state_change_interval_seconds": "Intervallo minimo in secondi tra avvii, pause e cambiamenti del consenso alla ricarica, del blocco o delle fasi (predefinito 300). I comandi anticipati vengono accodati; l’ultimo sostituisce il precedente. Rimane l’intervallo di cinque secondi tra le scritture della corrente. Impostare 0 per disabilitare l’intervallo più lungo.",
+          "phase_switch_grace_seconds": "Secondi di attesa aggiuntivi tra la conferma della pausa di ricarica da parte del veicolo e il cambio delle fasi (predefinito 5, da 0 a 30). Impostare 0 per eliminare solo questa attesa aggiuntiva; la conferma della pausa rimane obbligatoria."
+        }
+      },
+      "vehicle": {
+        "title": "Obiettivo di carica del veicolo",
+        "menu_options": {
+          "vehicle_soc": "Configura il livello di carica",
+          "vehicle_disable": "Disattiva l’obiettivo percentuale",
+          "back": "Indietro senza salvare"
+        },
+        "description": "Facoltativo: usa un’entità del livello di carica per un obiettivo percentuale. Il limite del veicolo si può aggiungere separatamente."
+      },
+      "vehicle_soc": {
+        "title": "Configura il livello di carica",
+        "data": {
+          "vehicle_soc_entity": "Entità del livello di carica del veicolo",
+          "use_vehicle_limit": "Usa anche il limite di carica del veicolo"
+        },
+        "data_description": {
+          "vehicle_soc_entity": "Scegli il sensore del livello reale di carica in %. In assenza di dati, la ricarica prosegue invariata finché tornano valori validi. Cambiare fonte cancella l’obiettivo senza avviare la carica. Per disattivarlo usa il menu precedente.",
+          "use_vehicle_limit": "Attiva questa opzione per usare il limite del veicolo come massimo aggiuntivo. Non vengono modificate le impostazioni del veicolo."
+        }
+      },
+      "vehicle_limit": {
+        "title": "Limite di carica del veicolo",
+        "data": {
+          "vehicle_charge_limit_entity": "Entità del limite di carica del veicolo"
+        },
+        "data_description": {
+          "vehicle_charge_limit_entity": "Facoltativo: limita ulteriormente l’obiettivo con l’entità del limite di carica del veicolo. Senza questa entità sono possibili obiettivi fino al 100%. Un limite inferiore riduce l’obiettivo esistente; un aumento non lo alza. Se l’entità non è disponibile rimane valido l’ultimo limite noto. Nessuna impostazione del veicolo viene modificata."
+        }
+      },
+      "departure": {
+        "title": "Prossima partenza",
+        "menu_options": {
+          "departure_configure": "Configura la pianificazione della partenza",
+          "departure_disable": "Disattiva la pianificazione della partenza",
+          "back": "Indietro senza salvare"
+        },
+        "description": "Pianifica un solo prossimo viaggio con l’obiettivo percentuale e la capacità utile. La disattivazione cancella il viaggio e i suoi comandi in attesa; l’obiettivo percentuale resta attivo."
+      },
+      "departure_requires_vehicle": {
+        "title": "Livello di carica necessario",
+        "menu_options": {
+          "vehicle": "Obiettivo di carica del veicolo",
+          "back": "Indietro senza salvare"
+        },
+        "description": "Configura prima un’entità del livello di carica, poi torna alla pianificazione della partenza."
+      },
+      "departure_configure": {
+        "title": "Configura la pianificazione della partenza",
+        "data": {
+          "capacity_source": "Fonte della capacità della batteria",
+          "use_calendar": "Usa un calendario",
+          "use_departure_entity": "Usa un’entità per l’orario di partenza",
+          "use_vehicle_timer": "Usa gli orari di partenza del veicolo"
+        },
+        "description": "Data e ora restano sempre inseribili manualmente. Attiva solo le fonti aggiuntive desiderate; seguiranno le relative impostazioni. Un piano attivo può annullare una pausa manuale per raggiungere l’obiettivo di partenza."
+      },
+      "departure_capacity_fixed": {
+        "title": "Capacità utile della batteria",
+        "data": {
+          "timed_capacity_kwh": "Capacità utile batteria (kWh)"
+        },
+        "data_description": {
+          "timed_capacity_kwh": "Inserisci la capacità utile della batteria, non quella nominale."
+        }
+      },
+      "departure_capacity_entity": {
+        "title": "Entità della capacità della batteria",
+        "data": {
+          "timed_capacity_entity": "Entità capacità utile"
+        },
+        "data_description": {
+          "timed_capacity_entity": "Seleziona un sensore di capacità utile in kWh o Wh."
+        }
+      },
+      "departure_calendar": {
+        "title": "Calendario delle partenze",
+        "data": {
           "timed_calendar_entity": "Calendario partenze (facoltativo)",
-          "timed_calendar_title": "Titolo esatto evento (facoltativo)",
-          "timed_bavarian_device": "Veicolo BavarianData per la partenza (facoltativo)",
+          "timed_calendar_title": "Titolo esatto evento (facoltativo)"
+        },
+        "data_description": {
+          "timed_calendar_entity": "Seleziona un calendario, poi copia un evento con il pulsante dedicato.",
+          "timed_calendar_title": "Sono validi solo gli eventi con questo titolo esatto. Gli eventi di tutto il giorno sono ignorati."
+        }
+      },
+      "departure_entity": {
+        "title": "Entità dell’orario di partenza",
+        "data": {
+          "timed_departure_entity": "Entità ora di partenza"
+        },
+        "data_description": {
+          "timed_departure_entity": "Seleziona un timestamp con data e ora o un input_datetime completo. La sola ora non basta."
+        }
+      },
+      "departure_vehicle": {
+        "title": "Integrazione del veicolo",
+        "data": {
+          "timed_vehicle_provider": "Integrazione del veicolo"
+        },
+        "description": "Scegli un’integrazione installata con un adattatore supportato. Le entità HA generiche funzionano senza adattatore. Vengono letti solo dati locali già disponibili."
+      },
+      "departure_vehicle_details": {
+        "title": "Orari di partenza del veicolo",
+        "data": {
+          "timed_vehicle_device": "Veicolo",
           "timed_vehicle_time_zone": "Fuso orario del veicolo (facoltativo)",
           "timed_timer1_days": "Giorni del timer BMW 1 (facoltativo)",
           "timed_timer2_days": "Giorni del timer BMW 2 (facoltativo)"
         },
         "data_description": {
-          "current_limit": "Limite aggiuntivo per le correnti richieste da Home Assistant. Si applica anche il limite del servizio. Selezionare esplicitamente 0 A disattiva il limite EMS.",
-          "scan_interval_seconds": "Frequenza con cui Home Assistant legge lo stato del servizio. Non modifica né le letture Modbus né l'intervallo dell'heartbeat.",
-          "vehicle_soc_entity": "Facoltativo: seleziona il sensore che indica il livello di carica reale del veicolo in %. Abilita un obiettivo percentuale separato; senza selezione rimane disattivato. Se mancano i dati, la ricarica continua fino al ritorno di valori validi. Cambiare o rimuovere una fonte cancella questo obiettivo senza riprendere la ricarica.",
-          "vehicle_charge_limit_entity": "Facoltativo: limita ulteriormente l’obiettivo con l’entità del limite di carica del veicolo. Senza questa entità sono possibili obiettivi fino al 100%. Un limite inferiore riduce l’obiettivo esistente; un aumento non lo alza. Se l’entità non è disponibile rimane valido l’ultimo limite noto. Nessuna impostazione del veicolo viene modificata.",
-          "charge_loss_source": "Confronto facoltativo tra l’energia della wallbox e quella aggiunta alla batteria del veicolo. Seleziona una fonte per configurarla nel passaggio successivo. Il controllo della ricarica rimane indipendente.",
-          "charging_cost_source": "Stima facoltativa con un prezzo fisso dell’elettricità comprensivo di imposte o un sensore di prezzo. Configura il prezzo nel passaggio successivo. Disattivata per impostazione predefinita; il controllo della ricarica rimane indipendente.",
-          "timed_capacity_kwh": "Inserisci la capacità utile, non quella nominale. Lascia vuoto se usi un’entità.",
-          "timed_capacity_entity": "Seleziona un sensore di capacità utile in kWh o Wh.",
-          "timed_departure_entity": "Seleziona un timestamp con data e ora o un input_datetime completo. La sola ora non basta.",
-          "timed_calendar_entity": "Seleziona un calendario, poi copia un evento con il pulsante dedicato.",
-          "timed_calendar_title": "Sono validi solo gli eventi con questo titolo esatto. Gli eventi di tutto il giorno sono ignorati.",
-          "timed_bavarian_device": "Seleziona il veicolo una volta per importare la partenza BMW. L’inserimento manuale e il calendario restano disponibili. Attiva in BavarianData i sensori di azione, ora e minuto del timer.",
           "timed_vehicle_time_zone": "Fuso orario del veicolo, ad esempio Europe/Rome. Se vuoto, viene usato quello di Home Assistant. Gli orari BMW non includono un fuso orario.",
           "timed_timer1_days": "Seleziona i giorni impostati nel BMW per il timer climatizzazione 1. BavarianData non fornisce questi giorni. Lascia vuoto per ignorare il timer.",
           "timed_timer2_days": "Seleziona i giorni impostati nel BMW per il timer 2. Lascia vuoto per ignorarlo."
         },
-        "description": "L'impostazione Sola lettura dell'app controlla anche il permesso di scrittura in Home Assistant. Disattivala nell'app, salva e riavvia l'app per abilitare i controlli. Le entità di controllo rimangono non disponibili mentre il servizio è in sola lettura o non è pronto. Imposta l’intervallo minimo tra cambiamenti di stato e l’attesa aggiuntiva prima del cambio delle fasi nella configurazione dell’app; il servizio applica entrambi anche durante un riavvio di Home Assistant."
+        "description": "Seleziona il veicolo una volta. Il pulsante di partenza copia un timer attivo. Per BavarianData, attiva i sensori di azione, ora e minuto; indica qui i giorni ricorrenti perché non vengono pubblicati."
       },
-      "loss_bavariandata": {
-        "title": "Perdite di ricarica da BavarianData",
-        "description": "Seleziona il veicolo collegato a questa wallbox. L’abbinamento usa gli orari e l’energia stimata della batteria nella cronologia salvata. Vengono letti solo i dati già presenti in Home Assistant; non viene richiesto un aggiornamento del veicolo. Senza una ricarica corrispondente, non viene calcolata alcuna perdita.",
+      "costs": {
+        "title": "Costi di ricarica",
+        "menu_options": {
+          "cost_fixed": "Prezzo fisso dell’elettricità",
+          "cost_sensor": "Sensore del prezzo dell’elettricità",
+          "cost_disable": "Disattiva la stima dei costi",
+          "back": "Indietro senza salvare"
+        },
+        "description": "Stime facoltative con un prezzo fisso o un sensore di prezzo. Non controllano la ricarica. Gli adeguamenti di rete sono disponibili solo per la Germania."
+      },
+      "cost_fixed": {
+        "title": "Prezzo fisso dell’elettricità",
         "data": {
-          "charge_loss_bavarian_device": "Veicolo"
-        }
+          "charging_price": "Prezzo dell’elettricità lordo",
+          "charging_network_module": "Adeguamento del prezzo di rete"
+        },
+        "data_description": {
+          "charging_network_module": "Usa solo il modulo concordato con il gestore di rete. Il modulo 3 offre inserimento manuale o importazione separata."
+        },
+        "description": "Inserisci il prezzo per kWh comprensivo di imposte. Sono ammessi prezzi negativi. Senza adeguamento della rete, deve essere il prezzo finale comprensivo degli oneri di rete. Canoni fissi e accrediti annuali sono esclusi."
+      },
+      "cost_sensor": {
+        "title": "Sensore del prezzo dell’elettricità",
+        "data": {
+          "charging_price_entity": "Sensore del prezzo dell’elettricità",
+          "charging_network_module": "Adeguamento del prezzo di rete"
+        },
+        "data_description": {
+          "charging_network_module": "Usa solo il modulo concordato con il gestore di rete. Il modulo 3 offre inserimento manuale o importazione separata."
+        },
+        "description": "Seleziona un sensore con il prezzo attuale dell’elettricità comprensivo di imposte in EUR/kWh, ct/kWh o EUR/MWh (è accettato anche il simbolo €). Sono ammessi prezzi negativi. Senza adeguamento della rete, il prezzo deve includere gli oneri di rete. Un valore ricevuto è valido per 90 minuti; ricevere nuovamente lo stesso valore rinnova la durata. Prezzi assenti o scaduti lasciano l’energia interessata senza prezzo. Canoni fissi e accrediti annuali sono esclusi."
+      },
+      "cost_module2": {
+        "title": "Modulo 2: tariffa di rete ridotta",
+        "data": {
+          "regular_network": "Prezzo di rete ordinario (tariffa standard)",
+          "price_includes_network": "Il prezzo dell’elettricità include già il prezzo di rete ordinario"
+        },
+        "data_description": {
+          "price_includes_network": "Attivato: sottrai il prezzo di rete ordinario prima di aggiungere la tariffa scelta. Disattivato: la fonte esclude gli oneri di rete, quindi aggiungi la tariffa di rete. Scegli in base alla fonte per evitare un doppio conteggio."
+        },
+        "description": "Inserisci la tariffa di rete ordinaria lorda. Il modulo 2 applica il 40% a questa componente, non all’intero prezzo dell’elettricità."
+      },
+      "cost_module3_source": {
+        "title": "Modulo 3: fonte della tariffa",
+        "menu_options": {
+          "cost_module3_manual": "Inserisci o modifica manualmente",
+          "cost_module3_import": "Importa per la casa HA",
+          "back": "Indietro senza salvare"
+        },
+        "description": "L’inserimento manuale non trasmette la posizione. L’import invia una volta le coordinate della casa HA a VNBdigital e recupera le tariffe pubbliche da Par14a-Database. Verifica fonte, prezzi e fasce prima di salvare."
+      },
+      "cost_module3_prices": {
+        "title": "Modulo 3: prezzi e anno",
+        "data": {
+          "regular_network": "Prezzo di rete ordinario (tariffa standard)",
+          "high_network": "Prezzo di rete alto (HT)",
+          "low_network": "Prezzo di rete basso (NT)",
+          "price_includes_network": "Il prezzo dell’elettricità include già il prezzo di rete ordinario",
+          "tariff_year": "Anno del tariffario",
+          "auto_tariff_refresh": "Aggiorna automaticamente la tariffa del modulo 3 a inizio anno"
+        },
+        "data_description": {
+          "price_includes_network": "Attivato: sottrai il prezzo di rete ordinario prima di aggiungere la tariffa scelta. Disattivato: la fonte esclude gli oneri di rete, quindi aggiungi la tariffa di rete. Scegli in base alla fonte per evitare un doppio conteggio.",
+          "auto_tariff_refresh": "Il 1° gennaio vengono cercati e applicati i dati pubblicati per il nuovo anno se univoci. Se non disponibili, il tentativo viene ripetuto ogni giorno. Possono essere usati anche valori provvisori; verifica in seguito il listino definitivo."
+        },
+        "description": "Copia prezzi lordi e anno dal listino del gestore. Fonte: {source}. ⚠ indica dati provvisori. Verifica i valori prima di salvare."
+      },
+      "cost_module3_windows": {
+        "title": "Modulo 3: fasce orarie",
+        "data": {
+          "high_periods": "Periodi tariffa alta",
+          "low_periods": "Periodi tariffa bassa",
+          "active_quarters": "Trimestri con prezzi di rete variabili"
+        },
+        "data_description": {
+          "high_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte.",
+          "low_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte."
+        },
+        "description": "Usa l’ora locale tedesca (Europe/Berlin) e intervalli di un quarto d’ora. Le fasce possono attraversare mezzanotte, senza sovrapporsi, lasciando periodi a tariffa standard."
+      },
+      "losses": {
+        "title": "Perdite di ricarica",
+        "menu_options": {
+          "loss_sensor": "Perdite di ricarica da un sensore",
+          "loss_vehicle": "Cronologia di ricarica del veicolo",
+          "loss_disable": "Disattiva la stima delle perdite",
+          "back": "Indietro senza salvare"
+        },
+        "description": "Confronto facoltativo tra energia della wallbox ed energia immessa nella batteria. Scegli una cronologia esistente o un sensore di energia dell’ultima ricarica."
       },
       "loss_sensor": {
         "title": "Perdite di ricarica da un sensore",
@@ -865,48 +1029,31 @@
           "charge_loss_auto_match": "Facoltativo: abbina un valore modificato ricevuto entro 30 minuti dallo scollegamento, se l’integrazione ha osservato l’intera ricarica. Una variazione del valore non dimostra che entrambe le misure appartengano alla stessa ricarica. Lascia disattivato per confermare ogni abbinamento."
         }
       },
-      "cost_fixed": {
-        "title": "Prezzo fisso dell’elettricità",
-        "description": "Inserisci il prezzo per kWh comprensivo di imposte. Sono ammessi prezzi negativi. Senza adeguamento della rete, deve essere il prezzo finale comprensivo degli oneri di rete. Canoni fissi e accrediti annuali sono esclusi.",
+      "loss_vehicle": {
+        "title": "Cronologia di ricarica del veicolo",
         "data": {
-          "charging_price": "Prezzo dell’elettricità lordo",
-          "charging_network_module": "Adeguamento del prezzo di rete"
+          "charge_loss_vehicle_provider": "Integrazione del veicolo"
         },
-        "data_description": {
-          "charging_network_module": "Calcolo facoltativo delle tariffe di rete tedesche ai sensi del §14a. Usa solo il modulo e i prezzi concordati con il gestore di rete. Altrimenti seleziona Nessuno. Selezionando il modulo 3, le coordinate di Home Assistant vengono inviate una volta a VNBdigital e i dati tariffari vengono recuperati da Par14a-Database. Verifica i valori nel listino collegato."
-        }
+        "description": "Scegli un’integrazione installata con un adattatore supportato. Le entità HA generiche funzionano senza adattatore. Vengono letti solo dati locali già disponibili."
       },
-      "cost_sensor": {
-        "title": "Sensore del prezzo dell’elettricità",
-        "description": "Seleziona un sensore con il prezzo attuale dell’elettricità comprensivo di imposte in EUR/kWh, ct/kWh o EUR/MWh (è accettato anche il simbolo €). Sono ammessi prezzi negativi. Senza adeguamento della rete, il prezzo deve includere gli oneri di rete. Un valore ricevuto è valido per 90 minuti; ricevere nuovamente lo stesso valore rinnova la durata. Prezzi assenti o scaduti lasciano l’energia interessata senza prezzo. Canoni fissi e accrediti annuali sono esclusi.",
+      "loss_vehicle_details": {
+        "title": "Veicolo per la cronologia di ricarica",
         "data": {
-          "charging_price_entity": "Sensore del prezzo dell’elettricità",
-          "charging_network_module": "Adeguamento del prezzo di rete"
+          "charge_loss_vehicle_device": "Veicolo"
         },
-        "data_description": {
-          "charging_network_module": "Calcolo facoltativo delle tariffe di rete tedesche ai sensi del §14a. Usa solo il modulo e i prezzi concordati con il gestore di rete. Altrimenti seleziona Nessuno. Selezionando il modulo 3, le coordinate di Home Assistant vengono inviate una volta a VNBdigital e i dati tariffari vengono recuperati da Par14a-Database. Verifica i valori nel listino collegato."
-        }
+        "description": "Seleziona il veicolo collegato a questa wallbox. Viene letta solo la cronologia locale esistente, senza aggiornare il veicolo. Le corrispondenze mancanti o ambigue restano sconosciute."
       },
-      "cost_network": {
-        "title": "Tariffa di rete: modulo {module}",
-        "description": "Copia i prezzi lordi dal tariffario del gestore di rete. Il modulo 2 usa il 40% del prezzo di rete ordinario. Il modulo 3 usa i prezzi alti e bassi pubblicati nei trimestri e nell’anno selezionati; negli altri periodi si applica il prezzo standard. Usa l’ora locale tedesca della tariffa (Europe/Berlin, inclusa l’ora legale) e intervalli di 15 minuti. Le fasce possono attraversare la mezzanotte ma non sovrapporsi. Queste impostazioni stimano i costi variabili di ricarica; non confermano l’idoneità e non modificano il contratto. Fonte dei valori precompilati: {source} Il simbolo ⚠ indica un listino provvisorio che potrebbe cambiare.",
-        "data": {
-          "regular_network": "Prezzo di rete ordinario (tariffa standard)",
-          "price_includes_network": "Il prezzo dell’elettricità include già il prezzo di rete ordinario",
-          "high_network": "Prezzo di rete alto (HT)",
-          "low_network": "Prezzo di rete basso (NT)",
-          "active_quarters": "Trimestri con prezzi di rete variabili",
-          "tariff_year": "Anno del tariffario",
-          "high_periods": "Periodi tariffa alta",
-          "low_periods": "Periodi tariffa bassa",
-          "auto_tariff_refresh": "Aggiorna automaticamente la tariffa del modulo 3 a inizio anno"
+      "review": {
+        "title": "Salvare questa sezione?",
+        "menu_options": {
+          "save": "Salva",
+          "edit": "Modifica questa sezione",
+          "back": "Indietro senza salvare"
         },
-        "data_description": {
-          "price_includes_network": "Attivato: sottrai il prezzo di rete ordinario prima di aggiungere la tariffa scelta. Disattivato: la fonte esclude gli oneri di rete, quindi aggiungi la tariffa di rete. Scegli in base alla fonte per evitare un doppio conteggio.",
-          "high_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte.",
-          "low_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte.",
-          "auto_tariff_refresh": "Il 1° gennaio vengono cercati e applicati i dati pubblicati per il nuovo anno se univoci. Se non disponibili, il tentativo viene ripetuto ogni giorno. Possono essere usati anche valori provvisori; verifica in seguito il listino definitivo."
-        }
+        "description": "Salva le impostazioni complete di questa sezione, modificale o torna indietro senza salvare. Le altre sezioni mantengono le impostazioni attuali."
+      },
+      "options_changed": {
+        "title": "Le impostazioni sono cambiate"
       }
     },
     "error": {
@@ -917,14 +1064,16 @@
       "cost_price_invalid": "Inserisci un prezzo lordo finito compreso tra −1000 e 1000 EUR/kWh. Sono ammessi prezzi negativi.",
       "network_tariff_invalid": "Controlla prezzi lordi, anno, da due a quattro trimestri e periodi alti/bassi. Un periodo HH:MM-HH:MM per riga, ogni 15 minuti, senza sovrapposizioni e lasciando un periodo standard.",
       "timed_source_invalid": "Fonte oraria non valida",
-      "timed_capacity_ambiguous": "Scegli capacità fissa o dinamica",
       "timed_calendar_required": "Seleziona un calendario",
       "timed_calendar_title_required": "Inserisci il titolo esatto",
       "timed_capacity_invalid": "Inserisci capacità utile da 1 a 250 kWh",
-      "timed_bavarian_invalid": "Seleziona un veicolo BavarianData",
-      "timed_bavarian_required": "Seleziona un veicolo BavarianData prima di configurare i timer",
       "timed_weekdays_invalid": "Seleziona giorni validi",
-      "timed_timezone_invalid": "Inserisci un fuso orario valido, ad esempio Europe/Rome"
+      "timed_timezone_invalid": "Inserisci un fuso orario valido, ad esempio Europe/Rome",
+      "options_changed": "Questa sezione è cambiata durante la modifica. Torna indietro e riaprila con i valori aggiornati; la bozza non è stata salvata.",
+      "vehicle_provider_invalid": "Scegli un’integrazione del veicolo supportata.",
+      "vehicle_device_invalid": "Scegli un veicolo dell’integrazione selezionata.",
+      "capacity_source_invalid": "Scegli una capacità fissa o un’entità di capacità.",
+      "tariff_lookup_failed": "Non è stata trovata una tariffa supportata univoca. Inserisci i valori manualmente o riprova l’importazione più tardi."
     }
   },
   "selector": {
@@ -961,20 +1110,6 @@
         "modbus_tcp": "Modbus TCP (gateway di traduzione)"
       }
     },
-    "charge_loss_source": {
-      "options": {
-        "disabled": "Disattivato",
-        "bavariandata": "Cronologia delle ricariche BavarianData",
-        "sensor": "Sensore di energia del veicolo"
-      }
-    },
-    "charging_cost_source": {
-      "options": {
-        "disabled": "Disattivato",
-        "fixed": "Prezzo fisso dell’elettricità",
-        "sensor": "Sensore del prezzo dell’elettricità"
-      }
-    },
     "charging_network_module": {
       "options": {
         "none": "Nessuno; la fonte fornisce il prezzo finale",
@@ -999,6 +1134,17 @@
         "fri": "Venerdì",
         "sat": "Sabato",
         "sun": "Domenica"
+      }
+    },
+    "capacity_source": {
+      "options": {
+        "fixed": "Capacità fissa in kWh",
+        "entity": "Capacità da un’entità"
+      }
+    },
+    "vehicle_provider": {
+      "options": {
+        "bavariandata": "BavarianData"
       }
     }
   },

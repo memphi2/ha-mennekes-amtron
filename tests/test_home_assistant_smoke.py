@@ -38,6 +38,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     SEARCH_OFF,
 )
 from tests.fakes import device_bank, put
+from tests.options_flow_helpers import async_options
 from tests.test_blueprints import EXPECTED as EXPECTED_BLUEPRINTS
 from tests.test_serial_loopback import (
     REGISTER_COUNT,
@@ -211,15 +212,12 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             assert hass.services.has_service(DOMAIN, "set_charging_current")
             assert not hass.services.has_service("mennekes_amtron", "set_charging_current")
 
-            options = await hass.config_entries.options.async_init(entry.entry_id)
-            await hass.config_entries.options.async_configure(
-                options["flow_id"],
-                {
-                    CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
-                    CONF_SCAN_INTERVAL_SECONDS: 5,
-                    CONF_MEASUREMENT_INTERVAL_SECONDS: 60,
-                    "current_limit": 16.0,
-                },
+            await async_options(
+                hass, entry, "wallbox", "wallbox_basic",
+                {CONF_CONTROL_MODE: CONTROL_MODE_MASTER, CONF_SCAN_INTERVAL_SECONDS: 5, "current_limit": 16.0},
+                "edit", "wallbox_advanced",
+                {CONF_MEASUREMENT_INTERVAL_SECONDS: 60, "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5},
+                "save",
             )
             await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]
@@ -396,15 +394,12 @@ def test_the_bundled_blueprints_run_as_automations(
             )
             await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]
-            options = await hass.config_entries.options.async_init(entry.entry_id)
-            await hass.config_entries.options.async_configure(
-                options["flow_id"],
-                {
-                    CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
-                    CONF_SCAN_INTERVAL_SECONDS: 5,
-                    CONF_MEASUREMENT_INTERVAL_SECONDS: 60,
-                    "current_limit": 16.0,
-                },
+            await async_options(
+                hass, entry, "wallbox", "wallbox_basic",
+                {CONF_CONTROL_MODE: CONTROL_MODE_MASTER, CONF_SCAN_INTERVAL_SECONDS: 5, "current_limit": 16.0},
+                "edit", "wallbox_advanced",
+                {CONF_MEASUREMENT_INTERVAL_SECONDS: 60, "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5},
+                "save",
             )
             await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]

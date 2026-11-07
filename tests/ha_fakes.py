@@ -53,10 +53,15 @@ class FakeConfigEntries:
 
         return self.entries.get(entry_id)
 
-    def async_update_entry(self, entry: Any, *, title: str) -> None:
-        """Apply a generated display title update."""
+    def async_update_entry(
+        self, entry: Any, *, title: str | None = None, options: dict[str, Any] | None = None,
+    ) -> None:
+        """Apply a generated display title or persisted option update."""
 
-        entry.title = title
+        if title is not None:
+            entry.title = title
+        if options is not None:
+            entry.options = options
 
     async def async_forward_entry_setups(
         self, entry: Any, platforms: Iterable[Any]

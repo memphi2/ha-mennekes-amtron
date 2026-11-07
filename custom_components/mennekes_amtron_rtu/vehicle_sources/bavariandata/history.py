@@ -18,7 +18,10 @@ from itertools import pairwise
 from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.helpers import device_registry as dr
 
-from .device.charging_session import CompletedSession
+from custom_components.mennekes_amtron_rtu.device.charging_session import (
+    CompletedSession,
+)
+from custom_components.mennekes_amtron_rtu.vehicle_sources.types import HistoryMatch
 
 HISTORY_DOMAIN = "bavariandata"
 HISTORY_SERVICE = "get_charging_sessions"
@@ -49,14 +52,6 @@ def bavarian_vehicle_vin(hass: HomeAssistant, device_id: object) -> str | None:
         and re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", value.strip().upper())
     }
     return next(iter(candidates)) if len(candidates) == 1 else None
-
-
-@dataclass(frozen=True, slots=True)
-class HistoryMatch:
-    """A complete matching history interval, with estimated battery energy."""
-
-    vehicle_kwh: float
-    records: int
 
 
 @dataclass(frozen=True, slots=True)

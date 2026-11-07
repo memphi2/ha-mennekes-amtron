@@ -198,8 +198,8 @@
       "timed_clear_departure": {
         "name": "Vertrektijd wissen"
       },
-      "timed_bmw_departure": {
-        "name": "BMW-vertrek overnemen"
+      "timed_vehicle_departure": {
+        "name": "Vertrektijd van voertuig overnemen"
       }
     },
     "number": {
@@ -722,11 +722,11 @@
     "timed_goal_state_invalid": {
       "message": "De opgeslagen vertrektijd kon niet worden hersteld. Controleer het plan voordat je opnieuw laadt."
     },
-    "timed_bavarian_unavailable": {
-      "message": "Geen actieve, volledige BMW-vertrektimer beschikbaar. Schakel de sensoren voor actie, uur en minuut in BavarianData in. Stel voor herhalende timers ook de weekdagen in de opties in."
-    },
     "timed_goal_unavailable": {
       "message": "Wachtende vertrekopdrachten konden niet worden gecontroleerd. De integratie probeert het opnieuw zodra de verbinding beschikbaar is."
+    },
+    "timed_vehicle_unavailable": {
+      "message": "Er is geen bruikbare komende vertrektijd gevonden voor het gekozen voertuig. Controleer de integratie, timersensoren en instellingen."
     }
   },
   "issues": {
@@ -765,94 +765,258 @@
   "options": {
     "step": {
       "init": {
+        "title": "Instellingen",
+        "menu_options": {
+          "wallbox": "Wallbox",
+          "vehicle": "Laaddoel voertuig",
+          "departure": "Volgend vertrek",
+          "costs": "Laadkosten",
+          "losses": "Laadverliezen"
+        },
+        "description": "Kies een sectie. Wijzigingen worden pas toegepast wanneer je die sectie opslaat."
+      },
+      "wallbox": {
+        "title": "Wallbox",
+        "menu_options": {
+          "wallbox_basic": "Stroomlimiet en uitlezen",
+          "wallbox_advanced": "Metingen en wachttijden",
+          "back": "Terug zonder opslaan"
+        },
+        "description": "Bij een app-verbinding stel je schrijfrechten en Modbus-intervallen in de app in. Wijzig USB/LAN-verbindingsgegevens via Opnieuw configureren."
+      },
+      "wallbox_basic": {
+        "title": "Stroomlimiet en uitlezen",
         "data": {
           "control_mode": "Besturingsmodus",
           "current_limit": "Maximale laadstroom",
-          "measurement_interval_seconds": "Meetinterval",
-          "scan_interval_seconds": "Statusinterval",
-          "state_change_interval_seconds": "Minimale tijd tussen statuswijzigingen",
-          "phase_switch_grace_seconds": "Extra wachttijd vóór fasewisselingen",
-          "vehicle_soc_entity": "Entiteit voor laadniveau van voertuig (optioneel)",
-          "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig (optioneel)",
-          "charge_loss_source": "Gegevensbron voor laadverliezen",
-          "charging_cost_source": "Laadkosten berekenen",
-          "timed_capacity_kwh": "Bruikbare accucapaciteit (kWh, optioneel)",
-          "timed_capacity_entity": "Entiteit voor bruikbare capaciteit (optioneel)",
-          "timed_departure_entity": "Entiteit voor vertrektijd (optioneel)",
-          "timed_calendar_entity": "Vertrekkalender (optioneel)",
-          "timed_calendar_title": "Exacte titel van agenda-afspraak (optioneel)",
-          "timed_bavarian_device": "BavarianData-voertuig voor vertrek (optioneel)",
-          "timed_vehicle_time_zone": "Tijdzone van het voertuig (optioneel)",
-          "timed_timer1_days": "Weekdagen BMW-timer 1 (optioneel)",
-          "timed_timer2_days": "Weekdagen BMW-timer 2 (optioneel)"
+          "scan_interval_seconds": "Statusinterval"
         },
         "data_description": {
           "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
           "current_limit": "Bovengrens van de laadstroomentiteit, naast de limiet die de wallbox zelf handhaaft.",
-          "measurement_interval_seconds": "Vermogen, spanning, stroom en sessiewaarden: 30 seconden vermindert de databasebelasting. Bij statuswijzigingen worden metingen direct vernieuwd. Zonder voertuig geldt minimaal 60 seconden. Het statusinterval bepaalt de kortst mogelijke tijd tussen uitlezingen.",
-          "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk.",
-          "state_change_interval_seconds": "Minimaal aantal seconden tussen starten, pauzeren en wijzigingen van de laadtoestemming, vergrendeling of fasen (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen.",
-          "phase_switch_grace_seconds": "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist.",
-          "vehicle_soc_entity": "Optioneel: selecteer de sensor die het werkelijke laadniveau van het voertuig in % meldt. Dit schakelt een apart percentagedoel in; zonder selectie blijft het uitgeschakeld. Bij ontbrekende gegevens gaat het laden ongewijzigd door tot geldige gegevens terugkeren. Een bron wijzigen of verwijderen wist dit doel zonder het laden te hervatten.",
-          "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd.",
-          "charge_loss_source": "Optionele vergelijking van de energie van de laadpaal met de energie die aan de voertuigaccu is toegevoegd. Selecteer een bron om deze in de volgende stap in te stellen. De laadregeling blijft onafhankelijk.",
-          "charging_cost_source": "Optionele kostenraming met een vaste stroomprijs inclusief belastingen of een prijssensor. Stel de prijs in de volgende stap in. Standaard uitgeschakeld; dit beïnvloedt de laadregeling niet.",
-          "timed_capacity_kwh": "Voer de bruikbare, niet de nominale, capaciteit in. Laat leeg bij gebruik van een entiteit.",
-          "timed_capacity_entity": "Kies een sensor voor bruikbare capaciteit in kWh of Wh.",
-          "timed_departure_entity": "Kies een tijdstempel met datum en tijd of een volledige input_datetime. Alleen een tijdstip is onvoldoende.",
-          "timed_calendar_entity": "Kies een kalender en kopieer één afspraak met de bijbehorende knop.",
-          "timed_calendar_title": "Alleen afspraken met precies deze titel tellen mee. Afspraken voor de hele dag worden genegeerd.",
-          "timed_bavarian_device": "Kies eenmalig het voertuig om het BMW-vertrek over te nemen. Handmatige invoer en de kalender blijven beschikbaar. Schakel in BavarianData de sensoren voor actie, uur en minuut van de timer in.",
-          "timed_vehicle_time_zone": "Tijdzone van het voertuig, bijvoorbeeld Europe/Amsterdam. Leeg gebruikt de Home Assistant-tijdzone. BMW-tijden bevatten geen tijdzone.",
-          "timed_timer1_days": "Kies de in de BMW ingestelde dagen voor klimaattimer 1. BavarianData levert deze dagen niet. Laat leeg om deze timer te negeren.",
-          "timed_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren."
+          "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk."
         },
-        "title": "Opties"
+        "description": "De stroomlimiet begrenst verzoeken vanuit HA; de limieten van wallbox en dienst blijven gelden. Bij app-verbindingen betreft het uitleesinterval alleen HA-verzoeken aan de dienst."
       },
-      "service": {
-        "title": "Serviceopties",
+      "wallbox_advanced": {
+        "title": "Metingen en wachttijden",
         "data": {
-          "current_limit": "Maximale laadstroom",
-          "scan_interval_seconds": "Statusinterval",
-          "vehicle_soc_entity": "Entiteit voor laadniveau van voertuig (optioneel)",
-          "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig (optioneel)",
-          "charge_loss_source": "Gegevensbron voor laadverliezen",
-          "charging_cost_source": "Laadkosten berekenen",
-          "timed_capacity_kwh": "Bruikbare accucapaciteit (kWh, optioneel)",
-          "timed_capacity_entity": "Entiteit voor bruikbare capaciteit (optioneel)",
-          "timed_departure_entity": "Entiteit voor vertrektijd (optioneel)",
-          "timed_calendar_entity": "Vertrekkalender (optioneel)",
-          "timed_calendar_title": "Exacte titel van agenda-afspraak (optioneel)",
-          "timed_bavarian_device": "BavarianData-voertuig voor vertrek (optioneel)",
+          "measurement_interval_seconds": "Meetinterval",
+          "state_change_interval_seconds": "Minimale tijd tussen statuswijzigingen",
+          "phase_switch_grace_seconds": "Extra wachttijd vóór fasewisselingen"
+        },
+        "data_description": {
+          "measurement_interval_seconds": "Vermogen, spanning, stroom en sessiewaarden: 30 seconden vermindert de databasebelasting. Bij statuswijzigingen worden metingen direct vernieuwd. Zonder voertuig geldt minimaal 60 seconden. Het statusinterval bepaalt de kortst mogelijke tijd tussen uitlezingen.",
+          "state_change_interval_seconds": "Minimaal aantal seconden tussen starten, pauzeren en wijzigingen van de laadtoestemming, vergrendeling of fasen (standaard 300). Te vroege opdrachten worden ingepland; de nieuwste vervangt de vorige. Het schrijfinterval van vijf seconden voor de laadstroom blijft gelden. Stel 0 in om het langere interval uit te schakelen.",
+          "phase_switch_grace_seconds": "Extra seconden wachttijd nadat het voertuig de laadpauze heeft bevestigd, voordat de fasen worden gewisseld (standaard 5, bereik 0–30). Met 0 vervalt alleen deze extra wachttijd; bevestiging van de laadpauze blijft vereist."
+        }
+      },
+      "vehicle": {
+        "title": "Laaddoel voertuig",
+        "menu_options": {
+          "vehicle_soc": "Laadniveau instellen",
+          "vehicle_disable": "Procentdoel uitschakelen",
+          "back": "Terug zonder opslaan"
+        },
+        "description": "Optioneel: gebruik een bestaande laadniveau-entiteit voor een procentdoel. De laadlimiet van het voertuig is afzonderlijk te kiezen."
+      },
+      "vehicle_soc": {
+        "title": "Laadniveau instellen",
+        "data": {
+          "vehicle_soc_entity": "Entiteit voor laadniveau van voertuig",
+          "use_vehicle_limit": "Ook de laadlimiet van het voertuig gebruiken"
+        },
+        "data_description": {
+          "vehicle_soc_entity": "Kies de sensor voor het werkelijke laadniveau in %. Ontbrekende gegevens laten het laden ongewijzigd totdat geldige waarden terugkeren. Een andere bron wist het procentdoel zonder het laden te starten. Uitschakelen kan via het vorige menu.",
+          "use_vehicle_limit": "Schakel dit in om de laadlimiet van het voertuig als extra maximum te kiezen. Er wordt niets naar het voertuig geschreven."
+        }
+      },
+      "vehicle_limit": {
+        "title": "Laadlimiet van het voertuig",
+        "data": {
+          "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig"
+        },
+        "data_description": {
+          "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd."
+        }
+      },
+      "departure": {
+        "title": "Volgend vertrek",
+        "menu_options": {
+          "departure_configure": "Vertrekplanning instellen",
+          "departure_disable": "Vertrekplanning uitschakelen",
+          "back": "Terug zonder opslaan"
+        },
+        "description": "Plan één volgende rit met het procentdoel en de bruikbare accucapaciteit. Uitschakelen wist de gekozen rit en bijbehorende wachtende opdrachten; het procentdoel blijft behouden."
+      },
+      "departure_requires_vehicle": {
+        "title": "Laadniveau vereist",
+        "menu_options": {
+          "vehicle": "Laaddoel voertuig",
+          "back": "Terug zonder opslaan"
+        },
+        "description": "Stel eerst een laadniveau-entiteit in en ga daarna terug naar vertrekplanning."
+      },
+      "departure_configure": {
+        "title": "Vertrekplanning instellen",
+        "data": {
+          "capacity_source": "Bron van accucapaciteit",
+          "use_calendar": "Kalender gebruiken",
+          "use_departure_entity": "Entiteit voor vertrektijd gebruiken",
+          "use_vehicle_timer": "Vertrektijden van het voertuig gebruiken"
+        },
+        "description": "Datum en tijd kun je altijd handmatig invoeren. Kies alleen gewenste extra bronnen; hun instellingen volgen hierna. Een actief plan kan een handmatige pauze opheffen om het vertrekdoel te halen."
+      },
+      "departure_capacity_fixed": {
+        "title": "Bruikbare accucapaciteit",
+        "data": {
+          "timed_capacity_kwh": "Bruikbare accucapaciteit (kWh)"
+        },
+        "data_description": {
+          "timed_capacity_kwh": "Voer de bruikbare accucapaciteit in, niet de nominale capaciteit."
+        }
+      },
+      "departure_capacity_entity": {
+        "title": "Entiteit voor accucapaciteit",
+        "data": {
+          "timed_capacity_entity": "Entiteit voor bruikbare capaciteit"
+        },
+        "data_description": {
+          "timed_capacity_entity": "Kies een sensor voor bruikbare capaciteit in kWh of Wh."
+        }
+      },
+      "departure_calendar": {
+        "title": "Vertrekkalender",
+        "data": {
+          "timed_calendar_entity": "Vertrekkalender",
+          "timed_calendar_title": "Exacte titel van agenda-afspraak"
+        },
+        "data_description": {
+          "timed_calendar_entity": "Kies een kalender en kopieer één afspraak met de bijbehorende knop.",
+          "timed_calendar_title": "Alleen afspraken met precies deze titel tellen mee. Afspraken voor de hele dag worden genegeerd."
+        }
+      },
+      "departure_entity": {
+        "title": "Entiteit voor vertrektijd",
+        "data": {
+          "timed_departure_entity": "Entiteit voor vertrektijd"
+        },
+        "data_description": {
+          "timed_departure_entity": "Kies een tijdstempel met datum en tijd of een volledige input_datetime. Alleen een tijdstip is onvoldoende."
+        }
+      },
+      "departure_vehicle": {
+        "title": "Voertuigintegratie",
+        "data": {
+          "timed_vehicle_provider": "Voertuigintegratie"
+        },
+        "description": "Kies een geïnstalleerde integratie met een ondersteunde adapter. Algemene HA-entiteiten werken zonder adapter. Alleen bestaande lokale voertuiggegevens worden gelezen."
+      },
+      "departure_vehicle_details": {
+        "title": "Vertrektijden van het voertuig",
+        "data": {
+          "timed_vehicle_device": "Voertuig",
           "timed_vehicle_time_zone": "Tijdzone van het voertuig (optioneel)",
           "timed_timer1_days": "Weekdagen BMW-timer 1 (optioneel)",
           "timed_timer2_days": "Weekdagen BMW-timer 2 (optioneel)"
         },
         "data_description": {
-          "current_limit": "Extra bovengrens voor stroomwaarden die Home Assistant aanvraagt. De servicegrens blijft van toepassing. Door bewust 0 A te selecteren, schakel je de EMS-limiet uit.",
-          "scan_interval_seconds": "Hoe vaak Home Assistant de servicestatus uitleest. Dit verandert noch het uitleesinterval van de Modbus-metingen, noch het heartbeatinterval.",
-          "vehicle_soc_entity": "Optioneel: selecteer de sensor die het werkelijke laadniveau van het voertuig in % meldt. Dit schakelt een apart percentagedoel in; zonder selectie blijft het uitgeschakeld. Bij ontbrekende gegevens gaat het laden ongewijzigd door tot geldige gegevens terugkeren. Een bron wijzigen of verwijderen wist dit doel zonder het laden te hervatten.",
-          "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd.",
-          "charge_loss_source": "Optionele vergelijking van de energie van de laadpaal met de energie die aan de voertuigaccu is toegevoegd. Selecteer een bron om deze in de volgende stap in te stellen. De laadregeling blijft onafhankelijk.",
-          "charging_cost_source": "Optionele kostenraming met een vaste stroomprijs inclusief belastingen of een prijssensor. Stel de prijs in de volgende stap in. Standaard uitgeschakeld; dit beïnvloedt de laadregeling niet.",
-          "timed_capacity_kwh": "Voer de bruikbare, niet de nominale, capaciteit in. Laat leeg bij gebruik van een entiteit.",
-          "timed_capacity_entity": "Kies een sensor voor bruikbare capaciteit in kWh of Wh.",
-          "timed_departure_entity": "Kies een tijdstempel met datum en tijd of een volledige input_datetime. Alleen een tijdstip is onvoldoende.",
-          "timed_calendar_entity": "Kies een kalender en kopieer één afspraak met de bijbehorende knop.",
-          "timed_calendar_title": "Alleen afspraken met precies deze titel tellen mee. Afspraken voor de hele dag worden genegeerd.",
-          "timed_bavarian_device": "Kies eenmalig het voertuig om het BMW-vertrek over te nemen. Handmatige invoer en de kalender blijven beschikbaar. Schakel in BavarianData de sensoren voor actie, uur en minuut van de timer in.",
           "timed_vehicle_time_zone": "Tijdzone van het voertuig, bijvoorbeeld Europe/Amsterdam. Leeg gebruikt de Home Assistant-tijdzone. BMW-tijden bevatten geen tijdzone.",
           "timed_timer1_days": "Kies de in de BMW ingestelde dagen voor klimaattimer 1. BavarianData levert deze dagen niet. Laat leeg om deze timer te negeren.",
           "timed_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren."
         },
-        "description": "De instelling Alleen lezen van de app bepaalt ook of Home Assistant mag schrijven. Schakel deze in de app uit, sla de wijziging op en herstart de app om de bedieningselementen in te schakelen. Deze blijven niet beschikbaar zolang Alleen lezen is ingeschakeld of de service nog niet gereed is. Stel de minimale tijd tussen statuswijzigingen en de extra wachttijd vóór fasewisselingen in bij de appconfiguratie; de service handhaaft beide ook tijdens een herstart van Home Assistant."
+        "description": "Kies het voertuig eenmalig. Neem met de vertrekknop één actieve timer over. Schakel bij BavarianData de timersensoren voor actie, uur en minuut in; stel terugkerende weekdagen hier in omdat die niet worden gepubliceerd."
       },
-      "loss_bavariandata": {
-        "title": "Laadverliezen via BavarianData",
-        "description": "Selecteer het voertuig dat op deze laadpaal is aangesloten. De koppeling gebruikt de tijden en de geschatte accu-energie uit de opgeslagen laadgeschiedenis. Alleen bestaande gegevens in Home Assistant worden gelezen; er wordt geen voertuigupdate aangevraagd. Zonder bijpassende laadsessie wordt geen verlies berekend.",
+      "costs": {
+        "title": "Laadkosten",
+        "menu_options": {
+          "cost_fixed": "Vaste stroomprijs",
+          "cost_sensor": "Stroomprijssensor",
+          "cost_disable": "Kostenraming uitschakelen",
+          "back": "Terug zonder opslaan"
+        },
+        "description": "Optionele ramingen met een vaste prijs of prijssensor. Dit stuurt het laden niet aan. Nettariefaanpassingen worden alleen voor Duitsland aangeboden."
+      },
+      "cost_fixed": {
+        "title": "Vaste stroomprijs",
         "data": {
-          "charge_loss_bavarian_device": "Voertuig"
-        }
+          "charging_price": "Stroomprijs inclusief belastingen",
+          "charging_network_module": "Aanpassing van netkosten"
+        },
+        "data_description": {
+          "charging_network_module": "Gebruik alleen de module die je met je netbeheerder hebt afgesproken. Module 3 biedt handmatige invoer of een afzonderlijke importkeuze."
+        },
+        "description": "Voer de prijs per kWh inclusief belastingen in. Negatieve prijzen zijn toegestaan. Zonder aanpassing van netkosten moet dit je eindprijs inclusief netkosten zijn. Vaste kosten en jaarlijkse kortingen worden niet meegenomen."
+      },
+      "cost_sensor": {
+        "title": "Stroomprijssensor",
+        "data": {
+          "charging_price_entity": "Stroomprijssensor",
+          "charging_network_module": "Aanpassing van netkosten"
+        },
+        "data_description": {
+          "charging_network_module": "Gebruik alleen de module die je met je netbeheerder hebt afgesproken. Module 3 biedt handmatige invoer of een afzonderlijke importkeuze."
+        },
+        "description": "Selecteer een sensor met de actuele stroomprijs inclusief belastingen in EUR/kWh, ct/kWh of EUR/MWh (het €-teken wordt ook ondersteund). Negatieve prijzen zijn toegestaan. Zonder netaanpassing moet de prijs netkosten bevatten. Een gemelde waarde blijft 90 minuten geldig; dezelfde waarde opnieuw melden verlengt dit. Bij ontbrekende of verlopen prijzen krijgt die energie geen prijs. Vaste kosten en jaarlijkse kortingen worden niet meegenomen."
+      },
+      "cost_module2": {
+        "title": "Module 2: verlaagd nettarief",
+        "data": {
+          "regular_network": "Normaal nettarief (standaardtarief)",
+          "price_includes_network": "De stroomprijs bevat al het normale nettarief"
+        },
+        "data_description": {
+          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen."
+        },
+        "description": "Voer het reguliere bruto nettarief in. Module 2 gebruikt 40% van dit onderdeel, niet 40% van de totale stroomprijs."
+      },
+      "cost_module3_source": {
+        "title": "Module 3: tariefbron",
+        "menu_options": {
+          "cost_module3_manual": "Handmatig invoeren of wijzigen",
+          "cost_module3_import": "Importeren voor HA Thuis",
+          "back": "Terug zonder opslaan"
+        },
+        "description": "Handmatige invoer verstuurt geen locatiegegevens. Importeren stuurt de HA Thuis-coördinaten eenmalig naar VNBdigital en haalt openbare tarieven uit Par14a-Database. Controleer bron, prijzen en tijdvakken voordat je opslaat."
+      },
+      "cost_module3_prices": {
+        "title": "Module 3: prijzen en jaar",
+        "data": {
+          "regular_network": "Normaal nettarief (standaardtarief)",
+          "high_network": "Hoog nettarief (HT)",
+          "low_network": "Laag nettarief (NT)",
+          "price_includes_network": "De stroomprijs bevat al het normale nettarief",
+          "tariff_year": "Jaar van de prijslijst",
+          "auto_tariff_refresh": "Module 3-tarief automatisch bij de jaarwisseling bijwerken"
+        },
+        "data_description": {
+          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen.",
+          "auto_tariff_refresh": "Op 1 januari worden gepubliceerde tarieven voor het nieuwe jaar opgehaald en toegepast als de gegevens eenduidig zijn. Als er nog geen geldige gegevens zijn, wordt dagelijks opnieuw geprobeerd. Voorlopige waarden kunnen worden gebruikt; controleer later het definitieve tariefblad."
+        },
+        "description": "Neem brutoprijzen en jaar over uit het tariefblad van de netbeheerder. Bron: {source}. ⚠ duidt voorlopige gegevens aan. Controleer de waarden voor het opslaan."
+      },
+      "cost_module3_windows": {
+        "title": "Module 3: tijdvakken",
+        "data": {
+          "high_periods": "Hoogtariefperioden",
+          "low_periods": "Laagtariefperioden",
+          "active_quarters": "Kwartalen met tijdsafhankelijke nettarieven"
+        },
+        "data_description": {
+          "high_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan.",
+          "low_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan."
+        },
+        "description": "Gebruik Duitse lokale tijd (Europe/Berlin) en kwartiergrenzen. Tijdvakken mogen over middernacht lopen, maar niet overlappen; er moet tijd tegen standaardtarief overblijven."
+      },
+      "losses": {
+        "title": "Laadverliezen",
+        "menu_options": {
+          "loss_sensor": "Laadverliezen via een sensor",
+          "loss_vehicle": "Laadgeschiedenis van het voertuig",
+          "loss_disable": "Verliesraming uitschakelen",
+          "back": "Terug zonder opslaan"
+        },
+        "description": "Optionele vergelijking van wallboxenergie met energie in de voertuigaccu. Kies bestaande laadgeschiedenis of een sensor voor energie van de laatste laadbeurt."
       },
       "loss_sensor": {
         "title": "Laadverliezen via een sensor",
@@ -865,48 +1029,31 @@
           "charge_loss_auto_match": "Optioneel: koppel een gewijzigde sensorwaarde die binnen 30 minuten na het loskoppelen wordt ontvangen, als deze integratie de hele laadsessie heeft waargenomen. Een gewijzigde waarde bewijst niet dat beide metingen bij dezelfde laadsessie horen. Laat dit uitgeschakeld om elke koppeling zelf te bevestigen."
         }
       },
-      "cost_fixed": {
-        "title": "Vaste stroomprijs",
-        "description": "Voer de prijs per kWh inclusief belastingen in. Negatieve prijzen zijn toegestaan. Zonder aanpassing van netkosten moet dit je eindprijs inclusief netkosten zijn. Vaste kosten en jaarlijkse kortingen worden niet meegenomen.",
+      "loss_vehicle": {
+        "title": "Laadgeschiedenis van het voertuig",
         "data": {
-          "charging_price": "Stroomprijs inclusief belastingen",
-          "charging_network_module": "Aanpassing van netkosten"
+          "charge_loss_vehicle_provider": "Voertuigintegratie"
         },
-        "data_description": {
-          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen. Bij selectie van module 3 worden de Home Assistant Home-coördinaten eenmaal naar VNBdigital verzonden en tariefgegevens uit Par14a-Database opgehaald. Controleer de ingevulde waarden met het gekoppelde tariefblad."
-        }
+        "description": "Kies een geïnstalleerde integratie met een ondersteunde adapter. Algemene HA-entiteiten werken zonder adapter. Alleen bestaande lokale voertuiggegevens worden gelezen."
       },
-      "cost_sensor": {
-        "title": "Stroomprijssensor",
-        "description": "Selecteer een sensor met de actuele stroomprijs inclusief belastingen in EUR/kWh, ct/kWh of EUR/MWh (het €-teken wordt ook ondersteund). Negatieve prijzen zijn toegestaan. Zonder netaanpassing moet de prijs netkosten bevatten. Een gemelde waarde blijft 90 minuten geldig; dezelfde waarde opnieuw melden verlengt dit. Bij ontbrekende of verlopen prijzen krijgt die energie geen prijs. Vaste kosten en jaarlijkse kortingen worden niet meegenomen.",
+      "loss_vehicle_details": {
+        "title": "Voertuig voor laadgeschiedenis",
         "data": {
-          "charging_price_entity": "Stroomprijssensor",
-          "charging_network_module": "Aanpassing van netkosten"
+          "charge_loss_vehicle_device": "Voertuig"
         },
-        "data_description": {
-          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen. Bij selectie van module 3 worden de Home Assistant Home-coördinaten eenmaal naar VNBdigital verzonden en tariefgegevens uit Par14a-Database opgehaald. Controleer de ingevulde waarden met het gekoppelde tariefblad."
-        }
+        "description": "Kies het voertuig aan deze wallbox. Alleen bestaande lokale laadgeschiedenis wordt gelezen; er wordt geen voertuigupdate gevraagd. Ontbrekende of onduidelijke overeenkomsten blijven onbekend."
       },
-      "cost_network": {
-        "title": "Nettarief: module {module}",
-        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de Duitse lokale tarieftijd (Europe/Berlin, inclusief zomertijd) en kwartiergrenzen. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet. Bron van vooraf ingevulde waarden: {source} Het symbool ⚠ markeert een voorlopig tariefblad dat nog kan veranderen.",
-        "data": {
-          "regular_network": "Normaal nettarief (standaardtarief)",
-          "price_includes_network": "De stroomprijs bevat al het normale nettarief",
-          "high_network": "Hoog nettarief (HT)",
-          "low_network": "Laag nettarief (NT)",
-          "active_quarters": "Kwartalen met tijdsafhankelijke nettarieven",
-          "tariff_year": "Jaar van de prijslijst",
-          "high_periods": "Hoogtariefperioden",
-          "low_periods": "Laagtariefperioden",
-          "auto_tariff_refresh": "Module 3-tarief automatisch bij de jaarwisseling bijwerken"
+      "review": {
+        "title": "Deze sectie opslaan?",
+        "menu_options": {
+          "save": "Opslaan",
+          "edit": "Deze sectie bewerken",
+          "back": "Terug zonder opslaan"
         },
-        "data_description": {
-          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen.",
-          "high_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan.",
-          "low_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan.",
-          "auto_tariff_refresh": "Op 1 januari worden gepubliceerde tarieven voor het nieuwe jaar opgehaald en toegepast als de gegevens eenduidig zijn. Als er nog geen geldige gegevens zijn, wordt dagelijks opnieuw geprobeerd. Voorlopige waarden kunnen worden gebruikt; controleer later het definitieve tariefblad."
-        }
+        "description": "Sla de volledige instellingen van deze sectie op, bewerk ze of ga terug zonder opslaan. Andere secties behouden hun huidige instellingen."
+      },
+      "options_changed": {
+        "title": "Instellingen zijn gewijzigd"
       }
     },
     "error": {
@@ -917,14 +1064,16 @@
       "cost_price_invalid": "Voer een eindige prijs inclusief belastingen tussen −1000 en 1000 EUR/kWh in. Negatieve prijzen zijn toegestaan.",
       "network_tariff_invalid": "Controleer brutoprijzen, tariefjaar, twee tot vier actieve kwartalen en hoog/laagperioden. Eén HH:MM-HH:MM per regel op kwartiergrenzen, zonder overlap en met ruimte voor het standaardtarief.",
       "timed_source_invalid": "Ongeldige tijdbron",
-      "timed_capacity_ambiguous": "Kies vaste of dynamische capaciteit",
       "timed_calendar_required": "Kies een kalender",
       "timed_calendar_title_required": "Voer de exacte titel in",
       "timed_capacity_invalid": "Voer een bruikbare capaciteit in van 1 tot 250 kWh",
-      "timed_bavarian_invalid": "Kies een BavarianData-voertuig",
-      "timed_bavarian_required": "Kies eerst een BavarianData-voertuig voor de timers",
       "timed_weekdays_invalid": "Kies geldige weekdagen",
-      "timed_timezone_invalid": "Vul een geldige tijdzone in, bijvoorbeeld Europe/Amsterdam"
+      "timed_timezone_invalid": "Vul een geldige tijdzone in, bijvoorbeeld Europe/Amsterdam",
+      "options_changed": "Deze sectie is tijdens het bewerken gewijzigd. Ga terug en open haar opnieuw met de actuele waarden; je concept is niet opgeslagen.",
+      "vehicle_provider_invalid": "Kies een ondersteunde voertuigintegratie.",
+      "vehicle_device_invalid": "Kies een voertuig van de gekozen integratie.",
+      "capacity_source_invalid": "Kies een vaste capaciteit of een capaciteitsentiteit.",
+      "tariff_lookup_failed": "Er is geen eenduidig ondersteund tarief gevonden. Vul de waarden handmatig in of probeer later opnieuw te importeren."
     }
   },
   "selector": {
@@ -961,20 +1110,6 @@
         "modbus_tcp": "Modbus TCP (vertalende gateway)"
       }
     },
-    "charge_loss_source": {
-      "options": {
-        "disabled": "Uitgeschakeld",
-        "bavariandata": "Laadgeschiedenis van BavarianData",
-        "sensor": "Energiesensor van het voertuig"
-      }
-    },
-    "charging_cost_source": {
-      "options": {
-        "disabled": "Uitgeschakeld",
-        "fixed": "Vaste stroomprijs",
-        "sensor": "Stroomprijssensor"
-      }
-    },
     "charging_network_module": {
       "options": {
         "none": "Geen; de bron geeft de eindprijs",
@@ -999,6 +1134,17 @@
         "fri": "Vrijdag",
         "sat": "Zaterdag",
         "sun": "Zondag"
+      }
+    },
+    "capacity_source": {
+      "options": {
+        "fixed": "Vaste capaciteit in kWh",
+        "entity": "Capaciteit uit een entiteit"
+      }
+    },
+    "vehicle_provider": {
+      "options": {
+        "bavariandata": "BavarianData"
       }
     }
   },

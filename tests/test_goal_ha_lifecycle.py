@@ -16,6 +16,7 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     DOMAIN,
 )
 from tests.fakes import FakeModbusClient, device_bank, put
+from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_modbus_service import current_writes
 
@@ -43,12 +44,12 @@ def test_energy_goal_services_stop_and_restore_without_resuming(tmp_path: Path) 
                 assert result["type"] == "create_entry"
                 await hass.async_block_till_done()
                 entry = hass.config_entries.async_entries(DOMAIN)[0]
-                flow = await hass.config_entries.options.async_init(entry.entry_id)
-                await hass.config_entries.options.async_configure(
-                    flow["flow_id"],
-                    {"control_mode": CONTROL_MODE_MASTER, "scan_interval_seconds": 300,
-                     "measurement_interval_seconds": 300, "current_limit": 16,
-                     "state_change_interval_seconds": 0, "phase_switch_grace_seconds": 0},
+                await async_options(
+                    hass, entry, "wallbox", "wallbox_basic",
+                    {"control_mode": CONTROL_MODE_MASTER, "scan_interval_seconds": 300, "current_limit": 16},
+                    "edit", "wallbox_advanced",
+                    {"measurement_interval_seconds": 300, "state_change_interval_seconds": 0, "phase_switch_grace_seconds": 0},
+                    "save",
                 )
                 await hass.async_block_till_done()
                 runtime = entry.runtime_data

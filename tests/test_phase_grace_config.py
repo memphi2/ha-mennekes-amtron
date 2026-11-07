@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+from types import SimpleNamespace
 from typing import Any
 
 import probatio
@@ -11,7 +12,7 @@ import pytest
 from aiohttp import ClientSession
 
 from custom_components.mennekes_amtron_rtu import _control_options
-from custom_components.mennekes_amtron_rtu.config_schemas import options_schema
+from custom_components.mennekes_amtron_rtu.config_schemas import advanced_schema
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_PHASE_SWITCH_GRACE_SECONDS,
@@ -32,15 +33,20 @@ SERVICE_OPTIONS = {"serial_port": "/dev/fake", "token": TOKEN}
 @pytest.mark.parametrize("seconds", [0, 5, 13, 30])
 def test_direct_options_store_whole_seconds_and_pass_them_to_control(seconds):
     async def run():
-        form = await Flow(FakeConfigEntry()).async_step_init()
+        entry = FakeConfigEntry()
+        entry.runtime_data = SimpleNamespace(identity=SimpleNamespace(phase_options_hw=2))
+        flow = Flow(entry)
+        await flow.async_step_wallbox()
+        form = await flow.async_step_wallbox_advanced()
         submitted = form["data_schema"]({CONF_PHASE_SWITCH_GRACE_SECONDS: float(seconds)})
-        result = await Flow(FakeConfigEntry()).async_step_init(submitted)
+        await flow.async_step_wallbox_advanced(submitted)
+        result = await flow.async_step_save()
         stored = result["data"]
         assert type(stored[CONF_PHASE_SWITCH_GRACE_SECONDS]) is int
         entry = FakeConfigEntry(options=stored)
         assert _control_options(entry).phase_switch_grace_seconds == seconds
         grace_field = next(
-            marker for marker in options_schema(stored, max_current=16).schema
+            marker for marker in advanced_schema(stored, phase_switch=True).schema
             if marker.schema == CONF_PHASE_SWITCH_GRACE_SECONDS
         )
         assert grace_field.default() == seconds
@@ -49,7 +55,7 @@ def test_direct_options_store_whole_seconds_and_pass_them_to_control(seconds):
 
 
 def test_grace_defaults_to_five_seconds_in_direct_and_service_configuration():
-    assert options_schema({}, max_current=16)({})[CONF_PHASE_SWITCH_GRACE_SECONDS] == 5
+    assert advanced_schema({}, phase_switch=True)({})[CONF_PHASE_SWITCH_GRACE_SECONDS] == 5
     assert _control_options(FakeConfigEntry()).phase_switch_grace_seconds == 5
     assert ServerConfig.from_dict(SERVICE_OPTIONS).phase_switch_grace_seconds == 5
 
@@ -63,7 +69,7 @@ def test_core_rejects_invalid_grace_even_without_a_configuration_flow(value: Any
 @pytest.mark.parametrize("value", [-1, 31, 1.5, True, None, "5", float("nan"), float("inf")])
 def test_invalid_direct_grace_values_are_rejected(value: Any):
     with pytest.raises(probatio.Invalid):
-        options_schema({}, max_current=16)({CONF_PHASE_SWITCH_GRACE_SECONDS: value})
+        advanced_schema({}, phase_switch=True)({CONF_PHASE_SWITCH_GRACE_SECONDS: value})
 
 
 @pytest.mark.parametrize("value", [-1, 31, 1.5, 5.0, True, None, "5", float("nan"), float("inf")])
@@ -72,20 +78,22 @@ def test_service_grace_requires_an_integer_within_range(value: Any):
         ServerConfig.from_dict({**SERVICE_OPTIONS, "phase_switch_grace_seconds": value})
 
 
-def test_service_integration_options_hide_and_discard_local_grace_setting():
+def test_service_integration_options_do_not_edit_service_owned_grace_setting():
     async def run():
         flow = Flow(FakeConfigEntry(
             data={"server_url": "http://service:8765"},
             options={CONF_PHASE_SWITCH_GRACE_SECONDS: 20},
         ))
-        form = await flow.async_step_init()
+        await flow.async_step_wallbox()
+        form = await flow.async_step_wallbox_basic()
         schema = form["data_schema"]
         assert CONF_PHASE_SWITCH_GRACE_SECONDS not in {
             marker.schema for marker in schema.schema
         }
         submitted = {**schema({}), CONF_PHASE_SWITCH_GRACE_SECONDS: 20}
-        result = await flow.async_step_service(submitted)
-        assert CONF_PHASE_SWITCH_GRACE_SECONDS not in result["data"]
+        await flow.async_step_wallbox_basic(submitted)
+        result = await flow.async_step_save()
+        assert result["data"][CONF_PHASE_SWITCH_GRACE_SECONDS] == 20
 
     asyncio.run(run())
 

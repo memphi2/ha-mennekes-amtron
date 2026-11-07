@@ -21,6 +21,7 @@ from .charging_cost_const import (
     NETWORK_MODULE_3,
 )
 from .entry_types import MennekesAmtronConfigEntry
+from .network_tariff_config import parse_tariff_inputs
 from .network_tariff_lookup import async_lookup_home_tariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -90,10 +91,8 @@ async def async_refresh_tariff_year(
         _LOGGER.warning("No unambiguous published Module 3 tariff found for the new year; cost estimates remain unavailable until updated")
         return False
     try:
-        from .options_flow import _network_tariff
-
         previous = options[CONF_CHARGING_NETWORK_TARIFF]
-        tariff = _network_tariff(
+        tariff = parse_tariff_inputs(
             {**values, CONF_PRICE_INCLUDES_NETWORK: previous[CONF_PRICE_INCLUDES_NETWORK]},
             module=NETWORK_MODULE_3,
             timezone="Europe/Berlin",
