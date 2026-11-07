@@ -45,8 +45,8 @@ configuration:
     name: TCP-poort van adapter
     description: TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.
   tcp_authentication:
-    name: "TCP-aanmelding"
-    description: "Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk."
+    name: "TCP-aanmelding gebruiken in deze app"
+    description: "Dit wijzigt alleen de appverbinding. Lees eerst de instellingen van een compatibele adapter en kies toepassen bij opslaan om de aanmelding ook op de adapter in of uit te schakelen. Gebruik Webinterface openen voor de adapterinstellingen. Aanmelding versleutelt niet en is bij firmware 1.523 te omzeilen. Gebruik een beschermd lokaal netwerk."
   tcp_auth_password:
     name: "Huidig webwachtwoord van de adapter"
     description: "Huidig webwachtwoord voor TCP-aanmelding: 1–9 afdrukbare ASCII-tekens zonder spaties. Het adapterwachtwoord wordt hierdoor niet gewijzigd."

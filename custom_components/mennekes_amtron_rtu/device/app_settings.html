@@ -83,9 +83,9 @@
         </section>
         <label class="check" for="tcp_authentication">
           <input id="tcp_authentication" name="tcp_authentication" type="checkbox">
-          <span data-i18n="tcp_authentication">TCP login</span>
+          <span id="auth_label" data-i18n="tcp_authentication">Use TCP login in this app</span>
         </label>
-        <p class="hint" data-i18n="auth_hint">Use the existing web password of a compatible adapter. For an adapter already configured manually, no setup step is needed.</p>
+        <p id="auth_hint" class="hint" data-i18n="auth_hint">This changes the app connection only. To enable or disable login on a compatible adapter, first read its settings and select “Apply adapter settings when saving”.</p>
         <div id="password_fields" hidden>
           <label for="tcp_auth_password" data-i18n="tcp_auth_password">Existing adapter web password</label>
           <input id="tcp_auth_password" name="tcp_auth_password" type="password" maxlength="9" pattern="[!-~]{1,9}" autocomplete="off" spellcheck="false" disabled>
