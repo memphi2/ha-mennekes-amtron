@@ -16,7 +16,8 @@ The PV sensor comes from your inverter or energy-management setup.
 
 ## Plan the next trip from a calendar
 
-Configure the vehicle SoC source, SoC target and battery capacity first; see
+Configure the vehicle SoC source and SoC target, then enable **Next departure** and
+choose its battery-capacity source; see
 [Charge for the next departure](user-guide.md#charge-for-the-next-departure). The
 calendar supplies the departure time. It does not create a charge target.
 
@@ -44,9 +45,10 @@ an already selected plan.
 
 The built-in **Use next calendar event** button is an alternative for an
 immediate, single lookup using the calendar configured in integration options.
-Manual entry, the configured calendar and an optional BavarianData vehicle
-can coexist. **Use BMW departure** copies one upcoming timer from the selected
-vehicle's locally published states; see [BMW timer setup](user-guide.md#charge-for-the-next-departure).
+Manual entry, the configured calendar and an optional vehicle adapter can
+coexist. **Use vehicle departure** copies one upcoming timer from the selected
+vehicle's locally published states. The adapter currently supports BavarianData;
+see [vehicle timer setup](user-guide.md#charge-for-the-next-departure).
 It does not fetch cloud data or start a repeating HA plan. A separately
 configured dated departure source keeps its current timestamp from overriding
 an explicit selection; when that source changes to another future timestamp,
@@ -55,10 +57,10 @@ it can select the new trip.
 ## Start vehicle climate before departure
 
 This optional companion works with any selected **Next departure**, including
-one copied from a calendar or a BMW timer. Reaching the charging target early
+one copied from a calendar or a vehicle timer. Reaching the charging target early
 keeps the departure time available until departure, so climate can still start.
 The vehicle integration must provide a working climate-start action or script.
-Reading a BMW timer does not provide a remote climate-start command; select an
+Reading a vehicle timer does not provide a remote climate-start command; select an
 action only if your vehicle integration supplies one.
 
 1. Create a **Text** helper with the default length, for example **Last climate

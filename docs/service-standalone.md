@@ -95,8 +95,10 @@ that runs independently of Home Assistant.
 
 Copy the **standalone container reference** from the
 [published app catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps)
-for stable **0.6.1**. Existing [beta-catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta)
-installations receive this stable image too.
+for stable **0.6.1**, or from the
+[beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta)
+for **0.7.0b1**. Use the beta service to test its shared control fixes. The
+integration's minimum compatible service remains **0.6.1 with API 2**.
 Use the complete `ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference
 as the image. The digest selects the verified release even if a registry tag
 changes later. The same reference supports Linux amd64 and arm64.

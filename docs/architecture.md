@@ -112,7 +112,12 @@ control.py            HA command error adapter
 exceptions.py         translated Home Assistant errors
 entity.py             entity base: unique id, device info, availability
 config_flow.py        + _flow_serial.py, _flow_connect.py, config_schemas.py
-options_flow.py       direct control mode, poll interval, current cap
+options_flow.py       options menu and section routing
+_options_*.py         independent draft, vehicle, departure and estimate steps
+vehicle_sources/     optional provider capabilities and selection compatibility
+vehicle_sources/bavariandata/  local timer and charging-history adapters
+timed_goal_observer.py  departure plan from generic HA sources or a provider
+charge_loss_observer.py  bounded matching and durable loss aggregate
 sensor.py             + sensor_descriptions.py
 binary_sensor.py      + binary_sensor_descriptions.py
 number.py select.py switch.py button.py
@@ -122,7 +127,37 @@ diagnostics.py        allowlist dump + raw register image
 repairs.py            + repair_issues.py
 ```
 
-## Six decisions worth explaining
+## Design decisions
+
+### Vehicle integrations provide data through narrow capabilities
+
+Generic Home Assistant entities are the baseline for SoC, usable capacity,
+dated departure, price and last-charge energy. Manual departure and calendar
+selection work without a manufacturer adapter. The optional `vehicle_sources`
+package exposes only the implemented `departure` and `charge_history`
+capabilities. Its provider metadata also supplies the configuration's device
+filter. BavarianData is currently the only adapter; this structure does not
+claim support for other manufacturers' proprietary timer or history formats.
+
+The scheduling observer requests a next departure instant. The loss observer
+requests a bounded match and subscribes to local history changes. VIN parsing,
+entity descriptors, provider event names and the local public history service
+remain inside the adapter. Neither observer calls a vehicle cloud API or
+interprets manufacturer identities, and the Modbus control layer has no
+vehicle-provider dependency.
+
+Departure and loss history retain independent vehicle selections. Generic
+provider/device keys take precedence over saved legacy keys, including an
+explicitly disabled provider. Existing BavarianData settings are read without
+resetting the stored hashed source identity or loss average. History adapters
+bind that identity for their lifetime and reject a device rebound to another
+vehicle before and after an asynchronous read.
+
+Options edits are held in a section-local draft until **Save**. Saving merges
+only that section's keys into the latest options and rejects an edit to the
+same section made concurrently. Returning to the main menu discards the draft.
+Departure activation is independent of merely configuring an SoC sensor;
+disabling it clears the trip and cancels only its owned queued commands.
 
 ### One lock, because Modbus RTU has one master
 

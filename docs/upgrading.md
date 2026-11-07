@@ -5,9 +5,49 @@ do not require deleting devices, entities or automations. Moving from HACS to
 the Marketplace also keeps the same integration and entry.
 
 **Current stable release: 0.6.1.** In service mode, update the app/service first,
-then the integration. Keep existing app data and your HA entry. Existing
-**#apps-beta** users receive this stable app too and need no catalog switch.
+then the integration. Keep existing app data and your HA entry. The **#apps**
+catalog carries stable updates; **#apps-beta** follows the beta channel below.
 Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
+
+## Trying 0.7.0b1
+
+**0.7.0b1 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
+prereleases in your integration installer and select **v0.7.0b1**. Keep the
+existing HA entry. The beta app is offered through
+`https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
+catalog can use **Check for updates** and update their app in place.
+
+Moving from **#apps** to **#apps-beta** creates a separate app installation.
+Follow the [channel handover](modbus-service.md#updates), preserving its data
+and ensuring only one service owns the wallbox connection. The beta includes
+shared control fixes, so update the app as well when testing those fixes.
+The integration's minimum compatible service remains **0.6.1**; matching
+version numbers are not generally required.
+
+## Feature settings after an update
+
+The integration's **Configure** menu separates **Wallbox**, **Vehicle charge
+target**, **Next departure**, **Charging costs** and **Charging losses**. Each section
+shows the inputs for the features you enable and saves independently.
+Existing SoC, departure, cost and loss settings continue to work; you do not
+need to recreate them.
+
+The optional vehicle-provider selections now separate the provider from its
+vehicle. Existing BavarianData selections are retained, including independent
+vehicles for departure and charging history and the existing loss average.
+**Use vehicle departure** is the new display name of the former BMW button;
+its entity identity and existing automations are retained. BavarianData is the
+only implemented departure/history adapter. Generic HA entity sources remain
+available for other vehicle integrations; manual and calendar departure work
+independently of a provider.
+
+Departure planning has its own enable setting. Disabling it clears its active
+trip and cancels its queued commands while preserving the ordinary percentage
+target and current pause state. See [feature setup](user-guide.md#configuration-and-options).
+
+Module 3 now offers **Enter or edit manually** or **Import for HA Home**. Opening its
+settings alone makes no external lookup. Yearly refresh is still a separate
+optional choice; existing choices are retained.
 
 ## Updating to 0.6.1
 

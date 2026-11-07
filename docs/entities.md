@@ -5,8 +5,9 @@ Use **Charging current limit** and **Charging paused** for everyday charging.
 energy and connection health. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
 
-This reference describes **stable 0.6.1**, including optional targets,
-estimates, departure planning and command-result events. Service connections
+This reference follows **beta 0.7.0b1**, including optional targets,
+estimates, departure planning and command-result events. **0.6.1 remains the
+stable release.** Service connections
 require **app/service 0.6.1 or newer**.
 
 The first column shows default **English** entity-ID patterns. `*` stands
@@ -77,10 +78,10 @@ app's **Read-only** setting; direct controls require **Modbus master**.
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
 | `number.*_vehicle_charge_target` | Vehicle charge target | optional configured vehicle SoC source; compatible service in service mode | Percentage ceiling, 0 = off. Only limits charging. Up to 100%, or the separately optional vehicle charge-limit source. Neither setting nor disabling resumes charging. |
-| `datetime.*_next_departure` | Next departure | vehicle SoC source and usable battery capacity | One dated target for the next trip. A timed goal may resume a pause to meet this time; the ordinary percentage goal alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
+| `datetime.*_next_departure` | Next departure | Departure planning enabled, vehicle SoC source and usable battery capacity | One dated target for the next trip. A timed goal may resume a pause to meet this time; the ordinary percentage goal alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
 | `button.*_use_next_calendar_event` | Use next calendar event | optional calendar and exact event title | Copies one matching timed event from the next 14 days into Next departure. Later events are not selected automatically. |
-| `button.*_use_bmw_departure` | Use BMW departure | optional selected BavarianData vehicle and enabled timer sensors | Copies one upcoming active climate timer from locally published vehicle states. Recurring timers need explicitly configured weekdays. No cloud fetch or recurring HA schedule. |
-| `button.*_clear_departure_time` | Clear departure time | optional vehicle SoC source | Cancels the timed plan without changing the percentage ceiling or current wallbox state. |
+| `button.*_use_vehicle_departure` | Use vehicle departure | optional selected vehicle provider and enabled timer sensors | Copies one upcoming active climate timer from locally published vehicle states. Currently implemented for BavarianData; recurring timers need explicitly configured weekdays. No cloud fetch or recurring HA schedule. Existing installations retain their earlier entity ID. |
+| `button.*_clear_departure_time` | Clear departure time | Departure planning enabled | Cancels the timed plan without changing the percentage ceiling or current wallbox state. |
 | `number.*_energy_target` | Energy target | lifetime energy counter; compatible service in service mode | Additional kWh from the time you set it, in 0.1 kWh steps, up to 1000. Setting a positive value never starts or resumes charging. Zero disables the goal without resuming. |
 | `button.*_cancel_pending_change` | Cancel pending change | new direct controller or supporting service | Removes the queued action without a wallbox write. Already executed preparation, such as a phase-change pause, remains. Available only while an action is pending. |
 | `number.*_charging_current_limit` | Charging current limit | always | Slider: 0 A removes the energy-manager limit and bypasses extra current caps; 6 A or more sets a limit. Hardware limits still apply. While paused it shows the remembered setpoint; changing it can resume charging. |
@@ -118,7 +119,7 @@ remembered resume target while paused, which may be the pending target. See
 | Entity | Name | Unit | Class | Needs | Meaning |
 |---|---|---|---|---|---|
 | `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. |
-| `sensor.*_timed_charging_status` | Timed charging status | — | enum | optional vehicle SoC source | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure. |
+| `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
 | `sensor.*_pending_change` | Pending change |  | enum | since 0.5.2b2; supporting service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |

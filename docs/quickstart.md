@@ -97,7 +97,7 @@ current cap, then enable control in the place that owns the USB or LAN connectio
 | Connection | Enable control |
 |---|---|
 | Service | Disable **Read-only** in the app or service configuration, save and restart the service. HA controls become available after the next status refresh. There is no second HA write switch. |
-| Direct USB or LAN | In the integration entry's options, change **Control mode** to **Modbus master**. The entry reloads, starts the heartbeat and adds controls. |
+| Direct USB or LAN | Open **Configure → Wallbox → Current limit and polling** and change **Control mode** to **Modbus master**. The entry reloads, starts the heartbeat and adds controls. |
 
 For the service, HA's entry options offer an additional current cap. Resolve
 any repair messages and check the **Heartbeat** sensor before charging.
@@ -117,6 +117,11 @@ any repair messages and check the **Heartbeat** sensor before charging.
 Continue with the [user guide](user-guide.md) for everyday controls,
 [Recorder](recorder.md) for history size, and [blueprints](blueprints.md) for
 automations.
+
+Add optional features under **Configure** when you need them: **Vehicle charge
+target**, **Next departure**, **Charging costs** and **Charging losses** each have
+their own setup. For a departure plan, configure a vehicle SoC source first,
+then enable **Next departure** and choose the usable battery-capacity source.
 
 ## Optional command-line bus check
 
