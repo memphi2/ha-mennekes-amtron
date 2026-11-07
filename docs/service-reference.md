@@ -51,6 +51,13 @@ The app closes and suspends its old Modbus connection before an explicit apply;
 a successful save requires an app restart, while an uncertain restore keeps the
 old connection blocked. See [LAN adapter setup](lan-adapters.md).
 
+If a Supervisor options write cannot be confirmed, the running app rejects
+later connection saves, including ordinary saves, to avoid racing the delayed
+write. Reading settings and detecting an adapter remain available. This
+process-local block does not cancel the earlier Supervisor request or prevent
+changes made elsewhere; an app restart alone does not prove that the request has
+finished. Check the saved options and adapter before reconnecting.
+
 In older apps **0.5.1–0.5.2b2**, the native Configuration tab has an optional
 serial-device selector with no default device path. It keeps the host field
 visible, accepts an empty host for USB and does not hide fields when changing
