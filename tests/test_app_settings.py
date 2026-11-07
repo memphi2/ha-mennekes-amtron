@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 from copy import deepcopy
 from pathlib import Path
 from unittest.mock import Mock
@@ -230,6 +231,42 @@ def test_changed_options_and_concurrent_saves_do_not_overwrite_each_other(settin
         results = await asyncio.gather(*(invoke(settings, request("POST", headers=headers, payload=payload)) for _ in range(2)))
         assert sorted(result.status for result in results) == [200, 409]
         assert settings.options["current_cap"] == 12
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("transport", ["serial", "rtu_over_tcp"])
+@pytest.mark.parametrize(("key", "initial", "external"), [
+    ("read_only", False, True), ("current_cap", 6, 12),
+])
+def test_native_options_change_during_validation_is_not_overwritten(
+    settings, monkeypatch, transport, key, initial, external,
+):
+    async def check():
+        settings.options[key] = initial
+        headers, payload = await prepare(settings, transport)
+        entered, release = threading.Event(), threading.Event()
+        validate = ui.app_configuration
+
+        def blocked(values):
+            entered.set()
+            assert release.wait(5)
+            return validate(values)
+
+        monkeypatch.setattr(ui, "app_configuration", blocked)
+        task = asyncio.create_task(invoke(settings, request("POST", headers=headers, payload=payload)))
+        try:
+            assert await asyncio.to_thread(entered.wait, 5)
+            settings.options[key] = external
+            release.set()
+            response = await task
+            assert response.status == 409
+            assert body(response) == {"error": "settings_changed"}
+            assert settings.options[key] == external
+            assert not any(method == "POST" for method, *_ in settings.calls)
+        finally:
+            release.set()
+            await asyncio.gather(task, return_exceptions=True)
+
     asyncio.run(check())
 
 

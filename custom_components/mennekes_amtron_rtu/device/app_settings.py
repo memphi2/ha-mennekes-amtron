@@ -362,6 +362,11 @@ class AppSettings:
             if "adapter_token" in payload:
                 await self._save_with_adapter(payload, user, revision, options, updated, password)
             else:
+                # Validation and USB enumeration run in worker threads. The
+                # Supervisor configuration page can change unrelated options
+                # while they run, outside this process's ingress lock.
+                if await self._options() != options:
+                    raise SettingsError("settings_changed", 409)
                 await self._persist_options(options, updated, "options_save_uncertain")
         return web.json_response({"saved": True, "restart_required": True, "revision": self._revision(updated)})
 
