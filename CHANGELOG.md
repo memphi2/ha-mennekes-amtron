@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Preserve selected adapter settings when the app reads the device again;
+  clarify connection-only login versus changing the adapter in all five languages.
+- Wait for the adapter's TCP listener after applying settings, with bounded
+  retries and immediate password rejection; log setup and restoration stages.
 - Recheck live wallbox state immediately before restart and phase writes,
   including a vehicle disconnecting and reconnecting during the operation.
 - Keep saved targets and charging intent ordered when shutdown or a cancelled

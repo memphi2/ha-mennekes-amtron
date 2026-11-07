@@ -78,7 +78,8 @@ the integration or independent service still sends it.
 2. Enter the adapter host, desired TCP port and protocol, and the wallbox address.
    Enable **Set up LAN adapter**.
 3. Check the recognized model and firmware. Select the baud rate and frame that
-   match the wallbox. Choose whether TCP login should be enabled.
+   match the wallbox. Use **Enable TCP login on the adapter** to switch the
+   adapter's login on or off. Enabling it requires an existing web password.
 4. Submit the settings. The adapter briefly restarts, its settings are read back,
    and the integration checks the wallbox identity before completing setup.
 
@@ -87,17 +88,21 @@ reconfiguring, the existing direct connection is stopped before applying adapter
 changes. A different wallbox cannot silently replace the existing device.
 
 If TCP login is already configured on the adapter, leave **Set up LAN adapter**
-off and select **TCP login** instead. This authenticates the connection without
-changing the adapter.
+off and select **Connect using TCP login** instead. This authenticates the
+connection without changing the adapter. That connection-only checkbox does not
+enable or disable login on the hardware.
 
 ## Service app
 
 1. Open the app's **Web UI** as a Home Assistant administrator. Select a LAN
    connection and enter the adapter host.
-2. Use adapter detection and review its model, firmware and identifier. Only
-   this host is queried; detection itself changes nothing.
-3. Select the protocol, port, baud rate, frame and TCP login settings you want
-   to apply. Save the connection with adapter setup enabled.
+2. Select **Read LAN adapter settings** and review its model, firmware and
+   identifier. Only this host is queried; detection itself changes nothing.
+3. Select **Apply adapter settings when saving**, then choose the protocol,
+   port, baud rate and serial format. **Enable TCP login on the adapter** now
+   changes login on the adapter and configures the app to match. Enter the
+   adapter's existing web password when enabling login or disabling an existing
+   login. Select **Save connection** to apply the changes.
 4. After successful saving, **restart the app from its Info tab**. Check the
    connection log and Home Assistant readings.
 
@@ -107,6 +112,11 @@ configuration. The heartbeat is interrupted during this change, so the wallbox's
 configured fallback applies. Stop other bus owners before starting setup.
 Saving ordinary connection settings without adapter setup keeps the existing
 behavior: they take effect when the app next restarts.
+
+The native app **Configuration** tab's **Use TCP login in this app** switch
+configures the app connection only. Use **Open Web UI** and the steps above to
+change the adapter itself. Reading the adapter again keeps settings you have
+already edited; **Reload settings and adapters** discards those edits.
 
 ## TCP login and its limits
 
@@ -140,6 +150,18 @@ attempts to restore settings changed by this operation if validation or saving
 fails. It preserves unrelated adapter settings, including its IP
 configuration, web password and P2P options. Normal startup and reconnect never
 rewrite adapter settings.
+
+After the adapter confirms its new settings, setup allows up to 12 seconds for
+its TCP connection to become ready. A confirmed password rejection stops
+immediately. For a direct HA connection, the wallbox must also respond with the
+expected identity; a disconnected wallbox or incorrect bus settings cause the
+adapter changes to be restored. The app saves its connection after checking the
+adapter and reads the wallbox when restarted.
+
+The app log records adapter detection, applying settings, readback, connection
+verification and any restoration. For a direct connection these messages are
+available in the integration's debug log. Include the last completed step and
+the displayed error when reporting a failed setup; do not share passwords.
 
 Restoration needs the same adapter to remain reachable. If restoration cannot
 be confirmed, the old connection stays stopped: check the adapter locally

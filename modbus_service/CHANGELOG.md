@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep selected adapter settings during detection and explain which controls
+  change the app connection or the adapter itself in all five languages.
+- Allow the TCP listener to start after applying adapter settings and report
+  setup, verification and restoration in the app log without credentials.
 - Recheck live status before restart and phase writes, including reconnecting vehicles.
 - Finish interrupted intent saves in order, even after repeated cancellation.
 - Reject service tokens that cannot be used in an HTTP header and detect
