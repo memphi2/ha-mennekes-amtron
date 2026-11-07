@@ -213,6 +213,47 @@ def test_gaps_restart_and_unknown_price_do_not_manufacture_full_cost(tmp_path):
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("remote", [False, True])
+def test_unplug_without_fresh_meter_cannot_leak_cost_into_next_charge(tmp_path, remote):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer = ChargingCostObserver(hass, entry(), remote=remote)
+        at = time.time() + 1
+        session = completed(at)
+        try:
+            await observer.async_start()
+            for offset, energy, present, fresh, summary in (
+                (0, 100, False, True, None),
+                (10, 105, True, True, None),
+                (100, 105, False, False, session),
+            ):
+                with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + offset):
+                    await observer.async_observe(data(at + offset, energy, present=present, fresh=fresh, session=summary))
+            assert observer.current is None
+            assert observer.last.result is not None
+            assert not observer.last.result.complete
+
+            # Another plug cycle starts before an idle meter baseline arrives.
+            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 105):
+                await observer.async_observe(data(at + 105, 105, present=True, fresh=False, session=session))
+            assert observer.current is not None
+            assert not observer.current.complete
+            assert observer.current.energy_kwh == 0
+
+            # The first observed value during that cycle cannot reconstruct its
+            # missing idle baseline or count the preceding charge a second time.
+            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 110):
+                await observer.async_observe(data(at + 110, 110, present=True, session=session))
+            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 120):
+                await observer.async_observe(data(at + 120, 111, present=True, session=session))
+            assert not observer.current.complete
+            assert observer.current.energy_kwh == 1
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
 def test_failed_optional_storage_does_not_break_observation_or_unload(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
