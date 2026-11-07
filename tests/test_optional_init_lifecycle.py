@@ -56,13 +56,12 @@ def test_annual_import_starts_after_wallbox_setup_and_is_cancelled_on_unload(tmp
             finally:
                 cancelled.set()
 
-        def daily(_hass, callback, **kwargs):
-            assert kwargs == {"hour": 0, "minute": 0, "second": 5}
+        def daily(_hass, callback):
             callbacks.append(callback)
             return unsubscribe
 
         monkeypatch.setattr(integration, "async_refresh_tariff_year", refresh)
-        monkeypatch.setattr(integration, "async_track_time_change", daily)
+        monkeypatch.setattr(integration, "async_track_tariff_midnight", daily)
         with patch("custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient", return_value=transport):
             hass = await _boot(tmp_path / "ha")
             try:

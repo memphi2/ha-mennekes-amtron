@@ -165,6 +165,10 @@ class ChargeLossObserver:
             self._query_history = self.mode == LOSS_SOURCE_BAVARIANDATA
             self._queue()
         elif not self._storage_ok and not self._storage_corrupt and time.monotonic() - self._last_storage_attempt >= 60:
+            # A failed save discarded the candidate, including its matched
+            # history energy. Re-read the local history for the current session
+            # before retrying storage; otherwise only the empty match is saved.
+            self._query_history = self.mode == LOSS_SOURCE_BAVARIANDATA
             self._queue()
 
     @callback

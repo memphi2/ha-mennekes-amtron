@@ -101,7 +101,11 @@ class PriceInterval:
 
 @dataclass(frozen=True, slots=True)
 class TariffConfig:
-    """Explicit network-price replacement; Module 2 and 3 never combine."""
+    """Network-price replacement, retaining saved whole-minute schedules.
+
+    New user submissions and imports require quarter-hour boundaries at their
+    input boundary. Existing valid estimates must not prevent wallbox setup.
+    """
 
     module: str = "none"
     regular_network: float | None = None
@@ -150,8 +154,6 @@ class TariffConfig:
             raise ValueError("windows requires two to sixteen tariff windows")
         if {window.rate for window in self.windows} != {"ht", "nt"}:
             raise ValueError("windows requires both ht and nt")
-        if any(window.start % 15 or window.end % 15 for window in self.windows):
-            raise ValueError("module 3 windows require quarter-hour boundaries")
         occupied: set[int] = set()
         for window in self.windows:
             minutes = {minute for minute in range(1440) if window.contains(minute)}

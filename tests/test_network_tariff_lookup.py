@@ -211,3 +211,12 @@ def test_malformed_external_csv_leaves_options_lookup_available(monkeypatch):
         country="DE", latitude=50.7753, longitude=6.0839,
     ))
     assert asyncio.run(async_lookup_home_tariff(hass)) is None
+
+
+@pytest.mark.parametrize(("field", "periods"), [
+    ("ht", "16:31-20:15"), ("ht", "16:30-20:14"),
+    ("nt", "00:01-06:00"), ("nt", "00:00-06:01"),
+])
+def test_new_import_rejects_non_quarter_hour_start_and_end(field, periods):
+    rows = [{**row, field: periods} for row in WINDOWS]
+    assert _tariff_values("3", 2026, [PRICE], rows) is None
