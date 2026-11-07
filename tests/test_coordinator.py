@@ -476,11 +476,11 @@ def test_a_failed_measurement_stays_unavailable_until_read_again() -> None:
         clock[0] = 30
         coordinator.data = await coordinator._async_update_data()
         transport.read_exceptions.clear()
-        clock[0] = 35
+        clock[0] = 34
         coordinator.data = await coordinator._async_update_data()
         assert not coordinator.data.has("voltage_l1")
         assert coordinator.data.failed_blocks == ("measurements",)
-        clock[0] = 60
+        clock[0] = 35
         coordinator.data = await coordinator._async_update_data()
         assert coordinator.data.has("voltage_l1")
         assert coordinator.data.failed_blocks == ()
