@@ -18,7 +18,6 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
-from .bavarian_departure import read_bavarian_departure
 from .charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
 from .device.enums import DetectedEvPhases, GridPhasesConnected, SwitchedPhases
@@ -28,18 +27,15 @@ from .exceptions import service_validation_error
 from .goal_store import TimedGoalStore
 from .timed_goal import TimedGoal
 from .timed_goal_const import (
-    CONF_TIMED_BAVARIAN_DEVICE,
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
     CONF_TIMED_CAPACITY_ENTITY,
     CONF_TIMED_CAPACITY_KWH,
     CONF_TIMED_DEPARTURE_ENTITY,
-    CONF_TIMED_TIMER1_DAYS,
-    CONF_TIMED_TIMER2_DAYS,
-    CONF_TIMED_VEHICLE_TIME_ZONE,
 )
 from .vehicle_soc import vehicle_percentage
 from .vehicle_soc_const import CONF_VEHICLE_SOC_ENTITY
+from .vehicle_sources import resolve_departure_source
 
 if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
@@ -270,19 +266,24 @@ class TimedGoalObserver:
             min(starts), source=None, expected=original,
         )
 
-    async def async_use_bmw_departure(self) -> None:
-        """Copy one enabled local BMW timer; never arm a recurring schedule."""
-        options = self._entry.options
+    @property
+    def vehicle_departure_configured(self) -> bool:
+        """Keep the import button when a configured vehicle is temporarily absent."""
+        return resolve_departure_source(self._hass, self._entry.options) is not None
+
+    @property
+    def vehicle_departure_available(self) -> bool:
+        """Whether the optional adapter has a valid selected vehicle."""
+        source = resolve_departure_source(self._hass, self._entry.options)
+        return source is not None and source.available
+
+    async def async_use_vehicle_departure(self) -> None:
+        """Copy one enabled local vehicle timer; never arm a recurring schedule."""
         original = self.goal
-        value = read_bavarian_departure(
-            self._hass, options.get(CONF_TIMED_BAVARIAN_DEVICE),
-            now=dt_util.utcnow(),
-            time_zone=options.get(CONF_TIMED_VEHICLE_TIME_ZONE, self._hass.config.time_zone),
-            timer1_days=options.get(CONF_TIMED_TIMER1_DAYS, ()),
-            timer2_days=options.get(CONF_TIMED_TIMER2_DAYS, ()),
-        )
+        source = resolve_departure_source(self._hass, self._entry.options)
+        value = source.next_departure(dt_util.utcnow()) if source is not None else None
         if value is None:
-            raise service_validation_error("timed_bavarian_unavailable")
+            raise service_validation_error("timed_vehicle_unavailable")
         await self._set_deadline(value, source=None, expected=original)
 
     def _capacity(self) -> float | None:

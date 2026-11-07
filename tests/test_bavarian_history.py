@@ -15,13 +15,13 @@ from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 
-from custom_components.mennekes_amtron_rtu import bavarian_history as history
-from custom_components.mennekes_amtron_rtu.bavarian_history import (
-    HistoryMatch,
-    async_read_history,
-)
 from custom_components.mennekes_amtron_rtu.device.charging_session import (
     CompletedSession,
+)
+from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata import history
+from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.history import (
+    HistoryMatch,
+    async_read_history,
 )
 
 BASE = 1700000000.0

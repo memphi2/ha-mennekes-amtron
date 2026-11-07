@@ -11,6 +11,7 @@ from homeassistant.setup import async_setup_component
 
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank
+from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import _boot
 from tests.test_service_mode_coupling import CONTROL_ENTITY_IDS
 
@@ -55,15 +56,16 @@ def test_direct_mode_changes_unload_previous_controls_without_platform_warnings(
                 registered = None
 
                 for mode in ("master", "read_only", "master"):
-                    options = await hass.config_entries.options.async_init(entry.entry_id)
-                    await hass.config_entries.options.async_configure(
-                        options["flow_id"],
+                    await async_options(
+                        hass, entry, "wallbox", "wallbox_basic",
                         {
                             "control_mode": mode,
                             "current_limit": 16,
                             "scan_interval_seconds": 300,
-                            "measurement_interval_seconds": 300,
                         },
+                        "edit", "wallbox_advanced",
+                        {"measurement_interval_seconds": 300, "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5},
+                        "save",
                     )
                     await hass.async_block_till_done()
                     assert entry.state is ConfigEntryState.LOADED

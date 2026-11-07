@@ -1,56 +1,27 @@
-"""Options flow for the MENNEKES AMTRON integration."""
+"""Small, independently saved settings sections for one wallbox."""
 
 from __future__ import annotations
 
-import math
-import re
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import valid_entity_id
 
-from .bavarian_history import bavarian_vehicle_vin
-from .charge_loss_const import (
-    CONF_CHARGE_LOSS_SOURCE,
-    CONF_LOSS_AUTO_MATCH,
-    CONF_LOSS_BAVARIAN_DEVICE,
-    CONF_VEHICLE_LAST_CHARGE_ENERGY,
-    LOSS_SOURCE_BAVARIANDATA,
-    LOSS_SOURCE_DISABLED,
-    LOSS_SOURCE_SENSOR,
-    LOSS_SOURCES,
-)
-from .charging_cost_const import (
-    CONF_ACTIVE_QUARTERS,
-    CONF_AUTO_TARIFF_REFRESH,
-    CONF_CHARGING_COST_SOURCE,
-    CONF_CHARGING_NETWORK_MODULE,
-    CONF_CHARGING_NETWORK_TARIFF,
-    CONF_CHARGING_PRICE,
-    CONF_CHARGING_PRICE_ENTITY,
-    CONF_HIGH_NETWORK,
-    CONF_HIGH_PERIODS,
-    CONF_LOW_NETWORK,
-    CONF_LOW_PERIODS,
-    CONF_PRICE_INCLUDES_NETWORK,
-    CONF_REGULAR_NETWORK,
-    CONF_TARIFF_YEAR,
-    COST_SOURCE_DISABLED,
-    COST_SOURCE_FIXED,
-    COST_SOURCE_SENSOR,
-    COST_SOURCES,
-    NETWORK_MODULE_3,
-    NETWORK_MODULE_NONE,
-    NETWORK_MODULES,
-)
+from ._options_estimates import EstimateOptionsFlow
 from .config_schemas import (
-    cost_network_schema,
-    cost_source_schema,
-    loss_bavariandata_schema,
-    loss_sensor_schema,
+    advanced_schema,
+    departure_calendar_schema,
+    departure_capacity_schema,
+    departure_configure_schema,
+    departure_entity_schema,
     options_schema,
+    vehicle_device_schema,
+    vehicle_limit_schema,
+    vehicle_provider_schema,
+    vehicle_soc_schema,
 )
+from .device.capabilities import phase_switch_is_supported
 from .device.const import (
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
@@ -59,11 +30,7 @@ from .device.const import (
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_STATE_CHANGE_INTERVAL_SECONDS,
     CONTROL_MODE_MASTER,
-    DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
-    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
-    DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
 )
-from .network_tariff_lookup import async_lookup_home_tariff
 from .remote import CONF_SERVER_URL
 from .timed_goal_const import (
     CONF_TIMED_BAVARIAN_DEVICE,
@@ -72,6 +39,8 @@ from .timed_goal_const import (
     CONF_TIMED_CAPACITY_ENTITY,
     CONF_TIMED_CAPACITY_KWH,
     CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_GOAL_ENABLED,
+    CONF_TIMED_GOAL_RESET_PENDING,
     CONF_TIMED_TIMER1_DAYS,
     CONF_TIMED_TIMER2_DAYS,
     CONF_TIMED_VEHICLE_TIME_ZONE,
@@ -83,246 +52,466 @@ from .vehicle_soc_const import (
     VEHICLE_CHARGE_LIMIT_DOMAINS,
     VEHICLE_SOC_DOMAINS,
 )
+from .vehicle_sources import (
+    provider_definitions,
+    provider_device_is_valid,
+    provider_selection,
+)
+from .vehicle_sources.const import (
+    CONF_TIMED_VEHICLE_DEVICE,
+    CONF_TIMED_VEHICLE_PROVIDER,
+    PROVIDER_BAVARIANDATA,
+    PROVIDER_NONE,
+)
+
+WALLBOX_KEYS = {
+    CONF_CONTROL_MODE,
+    CONF_CURRENT_LIMIT,
+    CONF_MEASUREMENT_INTERVAL_SECONDS,
+    CONF_PHASE_SWITCH_GRACE_SECONDS,
+    CONF_SCAN_INTERVAL_SECONDS,
+    CONF_STATE_CHANGE_INTERVAL_SECONDS,
+}
+VEHICLE_KEYS = {
+    CONF_VEHICLE_SOC_ENTITY,
+    CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
+    CONF_TIMED_GOAL_ENABLED,
+    CONF_TIMED_GOAL_RESET_PENDING,
+}
+DEPARTURE_KEYS = {
+    CONF_TIMED_GOAL_ENABLED,
+    CONF_TIMED_GOAL_RESET_PENDING,
+    CONF_TIMED_CAPACITY_ENTITY,
+    CONF_TIMED_CAPACITY_KWH,
+    CONF_TIMED_CALENDAR_ENTITY,
+    CONF_TIMED_CALENDAR_TITLE,
+    CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_BAVARIAN_DEVICE,
+    CONF_TIMED_VEHICLE_PROVIDER,
+    CONF_TIMED_VEHICLE_DEVICE,
+    CONF_TIMED_VEHICLE_TIME_ZONE,
+    CONF_TIMED_TIMER1_DAYS,
+    CONF_TIMED_TIMER2_DAYS,
+}
 
 
-class MennekesAmtronOptionsFlow(OptionsFlow):
-    """Let the user choose the control mode, poll interval and current cap."""
-
-    def __init__(self) -> None:
-        """Keep changes private until the selected source is configured."""
-        super().__init__()
-        self._pending_options: dict[str, Any] | None = None
-        self._pending_step: str | None = None
-        self._home_tariff_lookup_done = False
-        self._home_tariff_values: dict[str, Any] | None = None
-        self._home_tariff_source = "—"
+class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
+    """Configure only the chosen feature, leaving all other options intact."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show and store the entry options."""
-        step_id = "service" if CONF_SERVER_URL in self.config_entry.data else "init"
-        return await self._async_options(step_id, user_input)
+        self._draft = None
+        self._ready = False
+        self._details = {}
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["wallbox", "vehicle", "departure", "costs", "losses"],
+        )
 
-    async def async_step_service(
+    async def async_step_wallbox(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Configure cache refresh and the additional HA current cap."""
-        return await self._async_options("service", user_input)
+        self._begin("wallbox", WALLBOX_KEYS)
+        choices = ["wallbox_basic"]
+        if CONF_SERVER_URL not in self.config_entry.data:
+            choices.append("wallbox_advanced")
+        return self.async_show_menu(step_id="wallbox", menu_options=[*choices, "back"])
 
-    async def _async_options(
-        self, step_id: str, user_input: dict[str, Any] | None
+    async def async_step_wallbox_basic(
+        self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-
-        self._pending_options = None
-        self._pending_step = None
-        self._home_tariff_lookup_done = False
-        self._home_tariff_values = None
-        self._home_tariff_source = "—"
-        errors = _vehicle_errors(user_input) if user_input is not None else {}
+        if (draft := self._section("wallbox")) is None:
+            return await self.async_step_init()
+        service = CONF_SERVER_URL in self.config_entry.data
         if user_input is not None:
-            errors.update(_timed_errors(user_input))
-            if user_input.get(CONF_TIMED_BAVARIAN_DEVICE) and bavarian_vehicle_vin(
-                self.hass, user_input[CONF_TIMED_BAVARIAN_DEVICE]
-            ) is None:
-                errors[CONF_TIMED_BAVARIAN_DEVICE] = "timed_bavarian_invalid"
-        source = (user_input or {}).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED)
-        if source not in LOSS_SOURCES:
-            errors[CONF_CHARGE_LOSS_SOURCE] = "loss_source_invalid"
-        cost_source = (user_input or {}).get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED)
-        if cost_source not in COST_SOURCES:
-            errors[CONF_CHARGING_COST_SOURCE] = "cost_source_invalid"
-        if user_input is not None and not errors:
-            options = _normalized(user_input, service_mode=step_id == "service")
-            if cost_source != COST_SOURCE_DISABLED:
-                options[CONF_CHARGING_COST_SOURCE] = cost_source
-            self._pending_options = options
-            if source != LOSS_SOURCE_DISABLED:
-                options[CONF_CHARGE_LOSS_SOURCE] = source
-                self._pending_step = f"loss_{source}"
-                return await self._async_loss_options(source, None)
-            return await self._async_start_cost_options(options)
-
+            draft.values.update(_normalized(user_input, service_mode=service))
+            return self._review()
         return self.async_show_form(
-            step_id=step_id,
+            step_id="wallbox_basic",
             data_schema=options_schema(
-                dict(self.config_entry.options) if user_input is None else user_input,
+                draft.values,
                 max_current=_max_current(self.config_entry),
-                service_mode=step_id == "service",
+                service_mode=service,
             ),
-            errors=errors,
         )
 
-    async def async_step_loss_bavariandata(
+    async def async_step_wallbox_advanced(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Use a vehicle's existing BavarianData charging history."""
-        return await self._async_loss_options(LOSS_SOURCE_BAVARIANDATA, user_input)
-
-    async def async_step_loss_sensor(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Configure estimated energy and explicitly opt into automatic matching."""
-        return await self._async_loss_options(LOSS_SOURCE_SENSOR, user_input)
-
-    async def _async_loss_options(
-        self, source: str, user_input: dict[str, Any] | None
-    ) -> ConfigFlowResult:
-        pending = self._pending_options
-        if pending is None or self._pending_step != f"loss_{source}":
-            return await self.async_step_init()
-        errors = _loss_errors(source, user_input) if user_input is not None else {}
         if (
-            user_input is not None and not errors and source == LOSS_SOURCE_BAVARIANDATA
-            and bavarian_vehicle_vin(self.hass, user_input[CONF_LOSS_BAVARIAN_DEVICE]) is None
-        ):
-            errors[CONF_LOSS_BAVARIAN_DEVICE] = "loss_source_invalid"
-        if user_input is not None and not errors:
-            if source == LOSS_SOURCE_BAVARIANDATA:
-                details = {CONF_LOSS_BAVARIAN_DEVICE: user_input[CONF_LOSS_BAVARIAN_DEVICE]}
-            else:
-                details = {
-                    CONF_VEHICLE_LAST_CHARGE_ENERGY: user_input[CONF_VEHICLE_LAST_CHARGE_ENERGY],
-                    CONF_LOSS_AUTO_MATCH: user_input.get(CONF_LOSS_AUTO_MATCH, False),
+            draft := self._section("wallbox")
+        ) is None or CONF_SERVER_URL in self.config_entry.data:
+            return await self.async_step_init()
+        if user_input is not None:
+            draft.values.update(
+                {
+                    key: int(user_input[key])
+                    for key in (
+                        CONF_MEASUREMENT_INTERVAL_SECONDS,
+                        CONF_STATE_CHANGE_INTERVAL_SECONDS,
+                        CONF_PHASE_SWITCH_GRACE_SECONDS,
+                    )
+                    if key in user_input
                 }
-            pending.update(details)
-            return await self._async_start_cost_options(pending)
-        schema = loss_bavariandata_schema if source == LOSS_SOURCE_BAVARIANDATA else loss_sensor_schema
-        return self.async_show_form(
-            step_id=f"loss_{source}",
-            data_schema=schema(dict(self.config_entry.options) if user_input is None else user_input),
-            errors=errors,
-        )
-
-    async def _async_start_cost_options(self, options: dict[str, Any]) -> ConfigFlowResult:
-        """Continue a private draft after the optional loss-source step."""
-        source = options.get(CONF_CHARGING_COST_SOURCE)
-        if source is None:
-            return self._finish_options(options)
-        self._pending_step = f"cost_{source}"
-        return await self._async_cost_options(source, None)
-
-    async def async_step_cost_fixed(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Configure a fixed gross electricity price."""
-        return await self._async_cost_options(COST_SOURCE_FIXED, user_input)
-
-    async def async_step_cost_sensor(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Configure a sensor providing the current gross electricity price."""
-        return await self._async_cost_options(COST_SOURCE_SENSOR, user_input)
-
-    async def _async_cost_options(
-        self, source: str, user_input: dict[str, Any] | None
-    ) -> ConfigFlowResult:
-        pending = self._pending_options
-        if (
-            pending is None
-            or pending.get(CONF_CHARGING_COST_SOURCE) != source
-            or self._pending_step not in (f"cost_{source}", "cost_network")
-        ):
-            return await self.async_step_init()
-        allow_network = getattr(self.hass.config, "country", None) == "DE"
-        errors = (
-            _cost_errors(source, user_input, allow_network=allow_network)
-            if user_input is not None else {}
-        )
-        if user_input is not None and not errors:
-            if source == COST_SOURCE_FIXED:
-                pending[CONF_CHARGING_PRICE] = float(user_input[CONF_CHARGING_PRICE])
-            else:
-                pending[CONF_CHARGING_PRICE_ENTITY] = user_input[CONF_CHARGING_PRICE_ENTITY]
-            module = user_input.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE)
-            pending[CONF_CHARGING_NETWORK_TARIFF] = {"module": module}
-            if module == NETWORK_MODULE_NONE:
-                return self._finish_options(pending)
-            self._pending_step = "cost_network"
-            return await self.async_step_cost_network()
-        current = dict(self.config_entry.options) if user_input is None else user_input
-        if user_input is None:
-            # Back navigation from Module 3 must show the draft that the user
-            # just entered, not the older saved options.
-            current.update(pending)
-            previous = current.get(CONF_CHARGING_NETWORK_TARIFF)
-            current[CONF_CHARGING_NETWORK_MODULE] = (
-                previous.get("module", NETWORK_MODULE_NONE)
-                if isinstance(previous, dict) else NETWORK_MODULE_NONE
             )
+            return self._review()
+        identity = getattr(
+            getattr(self.config_entry, "runtime_data", None), "identity", None
+        )
+        phases = getattr(identity, "phase_options_hw", None)
         return self.async_show_form(
-            step_id=f"cost_{source}",
-            data_schema=cost_source_schema(
-                current, source=source, allow_network=allow_network,
+            step_id="wallbox_advanced",
+            data_schema=advanced_schema(
+                draft.values,
+                phase_switch=phase_switch_is_supported(phases),
             ),
-            errors=errors,
         )
 
-    async def async_step_cost_network(
+    async def async_step_vehicle(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Validate a published network tariff before committing any options."""
-        pending = self._pending_options
-        if pending is None or self._pending_step != "cost_network":
+        self._begin("vehicle", VEHICLE_KEYS)
+        return self.async_show_menu(
+            step_id="vehicle", menu_options=["vehicle_soc", "vehicle_disable", "back"]
+        )
+
+    async def async_step_vehicle_disable(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if (draft := self._section("vehicle")) is None:
             return await self.async_step_init()
-        module = pending[CONF_CHARGING_NETWORK_TARIFF]["module"]
+        draft.clear({CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY})
+        draft.values[CONF_TIMED_GOAL_ENABLED] = False
+        draft.values[CONF_TIMED_GOAL_RESET_PENDING] = True
+        return self._review()
+
+    async def async_step_vehicle_soc(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if (draft := self._section("vehicle")) is None:
+            return await self.async_step_init()
         errors = {}
         if user_input is not None:
-            try:
-                if module == NETWORK_MODULE_3 and type(user_input.get(CONF_AUTO_TARIFF_REFRESH, False)) is not bool:
-                    raise ValueError("auto tariff refresh must be boolean")
-                pending[CONF_CHARGING_NETWORK_TARIFF] = _network_tariff(
-                    user_input, module=module,
-                    # German network windows use the operator's local clock,
-                    # independently of HA's display/configuration time zone.
-                    timezone="Europe/Berlin",
-                )
-            except (KeyError, TypeError, ValueError):
-                errors["base"] = "network_tariff_invalid"
-            else:
-                if module == NETWORK_MODULE_3:
-                    pending[CONF_AUTO_TARIFF_REFRESH] = user_input.get(
-                        CONF_AUTO_TARIFF_REFRESH, False,
-                    )
-                return self._finish_options(pending)
-        previous = dict(self.config_entry.options).get(CONF_CHARGING_NETWORK_TARIFF)
-        current = (
-            _network_form_values(previous if isinstance(previous, dict) else {})
-            if user_input is None else user_input
-        )
-        if user_input is None:
-            current[CONF_AUTO_TARIFF_REFRESH] = self.config_entry.options.get(
-                CONF_AUTO_TARIFF_REFRESH, False,
-            )
-        if user_input is None and module == NETWORK_MODULE_3:
-            if not self._home_tariff_lookup_done:
-                self._home_tariff_values = await async_lookup_home_tariff(self.hass)
-                self._home_tariff_lookup_done = True
-            if self._home_tariff_values is not None:
-                status = self._home_tariff_values.get("_source_status")
-                prefix = "⚠ " if status == "vorlaeufig" else ""
-                self._home_tariff_source = prefix + str(self._home_tariff_values.get("_source_url") or "—")
-                current.update({
-                    key: value for key, value in self._home_tariff_values.items()
-                    if not key.startswith("_source_")
-                })
-                if not (isinstance(previous, dict) and previous.get("module") == NETWORK_MODULE_3):
-                    current[CONF_AUTO_TARIFF_REFRESH] = True
+            errors = _vehicle_errors(user_input)
+            if not user_input.get(CONF_VEHICLE_SOC_ENTITY):
+                errors[CONF_VEHICLE_SOC_ENTITY] = "vehicle_soc_required"
+            if not errors:
+                draft.values[CONF_VEHICLE_SOC_ENTITY] = user_input[
+                    CONF_VEHICLE_SOC_ENTITY
+                ]
+                if user_input.get("use_vehicle_limit") is True:
+                    self._details["limit"] = True
+                    return await self.async_step_vehicle_limit()
+                draft.clear({CONF_VEHICLE_CHARGE_LIMIT_ENTITY})
+                return self._review()
         return self.async_show_form(
-            step_id="cost_network",
-            data_schema=cost_network_schema(current, module=module),
-            description_placeholders={
-                "module": "2" if module != NETWORK_MODULE_3 else "3",
-                "source": self._home_tariff_source,
-            },
+            step_id="vehicle_soc",
+            data_schema=vehicle_soc_schema(
+                draft.values if user_input is None else user_input,
+            ),
             errors=errors,
         )
 
-    def _finish_options(self, options: dict[str, Any]) -> ConfigFlowResult:
-        """Commit the fully configured draft once, without stale source fields."""
-        self._pending_options = None
-        self._pending_step = None
-        return self.async_create_entry(data=options)
+    async def async_step_vehicle_limit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if (draft := self._section("vehicle")) is None or not self._details.get(
+            "limit"
+        ):
+            return await self.async_step_init()
+        errors = {}
+        if user_input is not None:
+            errors = _vehicle_errors(
+                {
+                    **user_input,
+                    CONF_VEHICLE_SOC_ENTITY: draft.values[CONF_VEHICLE_SOC_ENTITY],
+                }
+            )
+            if not user_input.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY):
+                errors[CONF_VEHICLE_CHARGE_LIMIT_ENTITY] = "invalid_vehicle_entity"
+            if not errors:
+                draft.values[CONF_VEHICLE_CHARGE_LIMIT_ENTITY] = user_input[
+                    CONF_VEHICLE_CHARGE_LIMIT_ENTITY
+                ]
+                return self._review()
+        return self.async_show_form(
+            step_id="vehicle_limit",
+            data_schema=vehicle_limit_schema(
+                draft.values if user_input is None else user_input,
+            ),
+            errors=errors,
+        )
+
+    async def async_step_departure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        self._begin("departure", DEPARTURE_KEYS)
+        if not self.config_entry.options.get(CONF_VEHICLE_SOC_ENTITY):
+            return await self.async_step_departure_requires_vehicle()
+        return self.async_show_menu(
+            step_id="departure",
+            menu_options=["departure_configure", "departure_disable", "back"],
+        )
+
+    async def async_step_departure_requires_vehicle(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return self.async_show_menu(
+            step_id="departure_requires_vehicle", menu_options=["vehicle", "back"]
+        )
+
+    async def async_step_departure_disable(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if (draft := self._section("departure")) is None:
+            return await self.async_step_init()
+        draft.values[CONF_TIMED_GOAL_ENABLED] = False
+        draft.values[CONF_TIMED_GOAL_RESET_PENDING] = True
+        return self._review()
+
+    async def async_step_departure_configure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if (draft := self._section("departure")) is None:
+            return await self.async_step_init()
+        errors = {}
+        if user_input is not None:
+            source = user_input.get("capacity_source")
+            if source not in ("fixed", "entity"):
+                errors["capacity_source"] = "capacity_source_invalid"
+            elif not self.config_entry.options.get(CONF_VEHICLE_SOC_ENTITY):
+                return await self.async_step_departure()
+            else:
+                self._details.update(user_input)
+                self._details["remaining"] = [
+                    step
+                    for key, step in (
+                        ("use_calendar", "departure_calendar"),
+                        ("use_departure_entity", "departure_entity"),
+                        ("use_vehicle_timer", "departure_vehicle"),
+                    )
+                    if user_input.get(key) is True
+                ]
+                if user_input.get("use_calendar") is not True:
+                    draft.clear({CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_CALENDAR_TITLE})
+                if user_input.get("use_departure_entity") is not True:
+                    draft.clear({CONF_TIMED_DEPARTURE_ENTITY})
+                if user_input.get("use_vehicle_timer") is not True:
+                    draft.clear(
+                        {
+                            CONF_TIMED_BAVARIAN_DEVICE,
+                            CONF_TIMED_VEHICLE_DEVICE,
+                            CONF_TIMED_VEHICLE_TIME_ZONE,
+                            CONF_TIMED_TIMER1_DAYS,
+                            CONF_TIMED_TIMER2_DAYS,
+                        }
+                    )
+                    draft.values[CONF_TIMED_VEHICLE_PROVIDER] = PROVIDER_NONE
+                draft.values[CONF_TIMED_GOAL_ENABLED] = True
+                if source == "fixed":
+                    draft.clear({CONF_TIMED_CAPACITY_ENTITY})
+                    return await self.async_step_departure_capacity_fixed()
+                draft.clear({CONF_TIMED_CAPACITY_KWH})
+                return await self.async_step_departure_capacity_entity()
+        selection = provider_selection(draft.values, "departure")
+        return self.async_show_form(
+            step_id="departure_configure",
+            data_schema=departure_configure_schema(
+                draft.values if user_input is None else user_input,
+                vehicle_timer=selection.provider_id != PROVIDER_NONE,
+            ),
+            errors=errors,
+        )
+
+    async def async_step_departure_capacity_fixed(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self._capacity(False, user_input)
+
+    async def async_step_departure_capacity_entity(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self._capacity(True, user_input)
+
+    async def _capacity(
+        self, entity: bool, user_input: dict[str, Any] | None
+    ) -> ConfigFlowResult:
+        if (draft := self._section("departure")) is None or self._details.get(
+            "capacity_source"
+        ) != ("entity" if entity else "fixed"):
+            return await self.async_step_init()
+        key = CONF_TIMED_CAPACITY_ENTITY if entity else CONF_TIMED_CAPACITY_KWH
+        errors = {}
+        if user_input is not None:
+            errors = _timed_errors(user_input)
+            if not user_input.get(key):
+                errors[key] = (
+                    "timed_source_invalid" if entity else "timed_capacity_invalid"
+                )
+            if not errors:
+                draft.values[key] = user_input[key]
+                return await self._next_departure()
+        return self.async_show_form(
+            step_id=f"departure_capacity_{'entity' if entity else 'fixed'}",
+            data_schema=departure_capacity_schema(
+                draft.values if user_input is None else user_input,
+                entity=entity,
+            ),
+            errors=errors,
+        )
+
+    async def _next_departure(self) -> ConfigFlowResult:
+        remaining = self._details["remaining"]
+        if remaining:
+            step = remaining.pop(0)
+            self._details["departure_step"] = step
+            if step == "departure_calendar":
+                return await self.async_step_departure_calendar()
+            if step == "departure_entity":
+                return await self.async_step_departure_entity()
+            return await self.async_step_departure_vehicle()
+        return self._review()
+
+    async def async_step_departure_calendar(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self._departure_entity_fields("departure_calendar", user_input)
+
+    async def async_step_departure_entity(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self._departure_entity_fields("departure_entity", user_input)
+
+    async def _departure_entity_fields(
+        self, step: str, user_input: dict[str, Any] | None
+    ) -> ConfigFlowResult:
+        if (draft := self._section("departure")) is None or self._details.get(
+            "departure_step"
+        ) != step:
+            return await self.async_step_init()
+        calendar = step == "departure_calendar"
+        keys = (
+            (CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_CALENDAR_TITLE)
+            if calendar
+            else (CONF_TIMED_DEPARTURE_ENTITY,)
+        )
+        errors = {}
+        if user_input is not None:
+            errors = _timed_errors(user_input)
+            for key in keys:
+                if not user_input.get(key):
+                    errors[key] = "timed_source_invalid"
+            if not errors:
+                draft.values.update({key: user_input[key] for key in keys})
+                return await self._next_departure()
+        schema = departure_calendar_schema if calendar else departure_entity_schema
+        return self.async_show_form(
+            step_id=step,
+            data_schema=schema(draft.values if user_input is None else user_input),
+            errors=errors,
+        )
+
+    async def async_step_departure_vehicle(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if (draft := self._section("departure")) is None or self._details.get(
+            "departure_step"
+        ) != "departure_vehicle":
+            return await self.async_step_init()
+        providers = provider_definitions("departure")
+        selection = self._suggested_vehicle(draft.values, "departure")
+        errors = {}
+        if user_input is not None:
+            provider = user_input.get(CONF_TIMED_VEHICLE_PROVIDER)
+            if provider not in {item.id for item in providers}:
+                errors[CONF_TIMED_VEHICLE_PROVIDER] = "vehicle_provider_invalid"
+            else:
+                self._details["provider"] = provider
+                self._details["suggested_device"] = (
+                    selection.device_id if selection.provider_id == provider else None
+                )
+                return await self.async_step_departure_vehicle_details()
+        return self.async_show_form(
+            step_id="departure_vehicle",
+            data_schema=vehicle_provider_schema(
+                CONF_TIMED_VEHICLE_PROVIDER,
+                selection.provider_id,
+                [item.id for item in providers],
+            ),
+            errors=errors,
+        )
+
+    async def async_step_departure_vehicle_details(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if (
+            draft := self._section("departure")
+        ) is None or "provider" not in self._details:
+            return await self.async_step_init()
+        provider = next(
+            item
+            for item in provider_definitions("departure")
+            if item.id == self._details["provider"]
+        )
+        errors = {}
+        if user_input is not None:
+            device = user_input.get(CONF_TIMED_VEHICLE_DEVICE)
+            if not provider_device_is_valid(self.hass, provider.id, device):
+                errors[CONF_TIMED_VEHICLE_DEVICE] = "vehicle_device_invalid"
+            errors.update(_timer_errors(user_input))
+            if not errors:
+                draft.clear(
+                    {
+                        CONF_TIMED_BAVARIAN_DEVICE,
+                        CONF_TIMED_VEHICLE_TIME_ZONE,
+                        CONF_TIMED_TIMER1_DAYS,
+                        CONF_TIMED_TIMER2_DAYS,
+                    }
+                )
+                draft.values.update(
+                    {
+                        CONF_TIMED_VEHICLE_PROVIDER: provider.id,
+                        CONF_TIMED_VEHICLE_DEVICE: device,
+                    }
+                )
+                for key in (
+                    CONF_TIMED_VEHICLE_TIME_ZONE,
+                    CONF_TIMED_TIMER1_DAYS,
+                    CONF_TIMED_TIMER2_DAYS,
+                ):
+                    if user_input.get(key):
+                        draft.values[key] = user_input[key]
+                return await self._next_departure()
+        current = (
+            {
+                **draft.values,
+                CONF_TIMED_VEHICLE_DEVICE: self._details["suggested_device"],
+            }
+            if user_input is None
+            else user_input
+        )
+        return self.async_show_form(
+            step_id="departure_vehicle_details",
+            data_schema=vehicle_device_schema(
+                current,
+                key=CONF_TIMED_VEHICLE_DEVICE,
+                integration=provider.integration_domain,
+                timer_options=provider.id == PROVIDER_BAVARIANDATA,
+            ),
+            errors=errors,
+        )
+
+    async def async_step_save(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if (
+            (draft := self._section("departure")) is not None
+            and draft.values.get(CONF_TIMED_GOAL_ENABLED) is True
+            and not self.config_entry.options.get(CONF_VEHICLE_SOC_ENTITY)
+        ):
+            return await self.async_step_options_changed()
+        return await super().async_step_save(user_input)
 
 
 def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, Any]:
@@ -332,207 +521,79 @@ def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, 
     }
     if not service_mode:
         options[CONF_CONTROL_MODE] = str(user_input[CONF_CONTROL_MODE])
-        options[CONF_MEASUREMENT_INTERVAL_SECONDS] = int(
-            user_input.get(
-                CONF_MEASUREMENT_INTERVAL_SECONDS, DEFAULT_MEASUREMENT_INTERVAL_SECONDS
-            )
-        )
-        options[CONF_STATE_CHANGE_INTERVAL_SECONDS] = int(
-            user_input.get(
-                CONF_STATE_CHANGE_INTERVAL_SECONDS, DEFAULT_STATE_CHANGE_INTERVAL_SECONDS
-            )
-        )
-        options[CONF_PHASE_SWITCH_GRACE_SECONDS] = int(
-            user_input.get(
-                CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS
-            )
-        )
-    for key in (
-        CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
-        CONF_TIMED_CAPACITY_ENTITY, CONF_TIMED_DEPARTURE_ENTITY,
-        CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_CALENDAR_TITLE,
-        CONF_TIMED_BAVARIAN_DEVICE, CONF_TIMED_VEHICLE_TIME_ZONE,
-        CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS,
-    ):
-        if value := user_input.get(key):
-            options[key] = value
-    if (value := user_input.get(CONF_TIMED_CAPACITY_KWH)) is not None:
-        options[CONF_TIMED_CAPACITY_KWH] = float(value)
     return options
 
 
-def _timed_errors(values: dict[str, Any]) -> dict[str, str]:
-    """Reject ambiguous sources and an unbounded/unknown battery capacity."""
-    errors: dict[str, str] = {}
-    for key, domain in (
-        (CONF_TIMED_CAPACITY_ENTITY, ("sensor",)),
-        (CONF_TIMED_DEPARTURE_ENTITY, ("sensor", "input_datetime")),
-        (CONF_TIMED_CALENDAR_ENTITY, ("calendar",)),
-    ):
-        value = values.get(key)
-        if value and (not isinstance(value, str) or not valid_entity_id(value)
-                      or value.split(".", 1)[0] not in domain):
-            errors[key] = "timed_source_invalid"
-    if values.get(CONF_TIMED_CAPACITY_ENTITY) and values.get(CONF_TIMED_CAPACITY_KWH) is not None:
-        errors[CONF_TIMED_CAPACITY_ENTITY] = "timed_capacity_ambiguous"
-    if values.get(CONF_TIMED_CALENDAR_TITLE) and not values.get(CONF_TIMED_CALENDAR_ENTITY):
-        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_required"
-    if values.get(CONF_TIMED_CALENDAR_ENTITY) and not str(values.get(CONF_TIMED_CALENDAR_TITLE, "")).strip():
-        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_title_required"
-    if any(values.get(key) for key in (
-        CONF_TIMED_DEPARTURE_ENTITY, CONF_TIMED_CALENDAR_ENTITY,
-        CONF_TIMED_CAPACITY_ENTITY, CONF_TIMED_CAPACITY_KWH, CONF_TIMED_BAVARIAN_DEVICE,
-    )) and not values.get(CONF_VEHICLE_SOC_ENTITY):
-        errors[CONF_VEHICLE_SOC_ENTITY] = "vehicle_soc_required"
-    for key in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
-        days = values.get(key, [])
-        if not isinstance(days, list) or any(day not in TIMED_WEEKDAYS for day in days):
-            errors[key] = "timed_weekdays_invalid"
-    zone = values.get(CONF_TIMED_VEHICLE_TIME_ZONE)
-    if zone:
-        try:
-            ZoneInfo(zone)
-        except (ValueError, TypeError, ZoneInfoNotFoundError):
-            errors[CONF_TIMED_VEHICLE_TIME_ZONE] = "timed_timezone_invalid"
-    if any(values.get(key) for key in (
-        CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS, CONF_TIMED_VEHICLE_TIME_ZONE,
-    )) and not values.get(CONF_TIMED_BAVARIAN_DEVICE):
-        errors[CONF_TIMED_BAVARIAN_DEVICE] = "timed_bavarian_required"
-    capacity = values.get(CONF_TIMED_CAPACITY_KWH)
-    if capacity is not None and (isinstance(capacity, bool) or not isinstance(capacity, (int, float))
-                                 or not math.isfinite(capacity) or not 1 <= capacity <= 250):
-        errors[CONF_TIMED_CAPACITY_KWH] = "timed_capacity_invalid"
-    return errors
-
-
 def _vehicle_errors(values: dict[str, Any]) -> dict[str, str]:
-    """Validate source identifiers without requiring a currently online car."""
     errors = {}
     for key, domains in (
         (CONF_VEHICLE_SOC_ENTITY, VEHICLE_SOC_DOMAINS),
         (CONF_VEHICLE_CHARGE_LIMIT_ENTITY, VEHICLE_CHARGE_LIMIT_DOMAINS),
     ):
-        if not (value := values.get(key)):
-            continue
-        if (
-            not isinstance(value, str) or not valid_entity_id(value)
+        value = values.get(key)
+        if value and (
+            not isinstance(value, str)
+            or not valid_entity_id(value)
             or value.split(".", 1)[0] not in domains
         ):
             errors[key] = "invalid_vehicle_entity"
-    if values.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY) and not values.get(CONF_VEHICLE_SOC_ENTITY):
-        errors[CONF_VEHICLE_SOC_ENTITY] = "vehicle_soc_required"
     return errors
 
 
-def _loss_errors(source: str, values: dict[str, Any]) -> dict[str, str]:
-    """Validate identifiers without polling a vehicle or requiring it online."""
-    if source == LOSS_SOURCE_BAVARIANDATA:
-        value = values.get(CONF_LOSS_BAVARIAN_DEVICE)
-        return {} if isinstance(value, str) and value.strip() else {
-            CONF_LOSS_BAVARIAN_DEVICE: "loss_source_invalid"
-        }
+def _timer_errors(values: dict[str, Any]) -> dict[str, str]:
     errors = {}
-    value = values.get(CONF_VEHICLE_LAST_CHARGE_ENERGY)
-    if not isinstance(value, str) or not valid_entity_id(value) or not value.startswith("sensor."):
-        errors[CONF_VEHICLE_LAST_CHARGE_ENERGY] = "loss_source_invalid"
-    if type(values.get(CONF_LOSS_AUTO_MATCH, False)) is not bool:
-        errors[CONF_LOSS_AUTO_MATCH] = "loss_source_invalid"
+    for key in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
+        days = values.get(key, [])
+        if not isinstance(days, list) or any(day not in TIMED_WEEKDAYS for day in days):
+            errors[key] = "timed_weekdays_invalid"
+    if zone := values.get(CONF_TIMED_VEHICLE_TIME_ZONE):
+        try:
+            ZoneInfo(zone)
+        except ValueError, TypeError, ZoneInfoNotFoundError:
+            errors[CONF_TIMED_VEHICLE_TIME_ZONE] = "timed_timezone_invalid"
     return errors
 
 
-def _cost_errors(
-    source: str, values: dict[str, Any], *, allow_network: bool = True,
-) -> dict[str, str]:
+def _timed_errors(values: dict[str, Any]) -> dict[str, str]:
     errors = {}
-    if source == COST_SOURCE_FIXED:
-        value = values.get(CONF_CHARGING_PRICE)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or abs(value) > 1000 or not math.isfinite(value):
-            errors[CONF_CHARGING_PRICE] = "cost_price_invalid"
-    else:
-        value = values.get(CONF_CHARGING_PRICE_ENTITY)
-        if not isinstance(value, str) or not valid_entity_id(value) or not value.startswith("sensor."):
-            errors[CONF_CHARGING_PRICE_ENTITY] = "cost_source_invalid"
-    module = values.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE)
-    if module not in NETWORK_MODULES or (not allow_network and module != NETWORK_MODULE_NONE):
-        errors[CONF_CHARGING_NETWORK_MODULE] = "network_tariff_invalid"
+    for key, domains in (
+        (CONF_TIMED_CAPACITY_ENTITY, ("sensor",)),
+        (CONF_TIMED_DEPARTURE_ENTITY, ("sensor", "input_datetime")),
+        (CONF_TIMED_CALENDAR_ENTITY, ("calendar",)),
+    ):
+        value = values.get(key)
+        if value and (
+            not isinstance(value, str)
+            or not valid_entity_id(value)
+            or value.split(".", 1)[0] not in domains
+        ):
+            errors[key] = "timed_source_invalid"
+    if values.get(CONF_TIMED_CALENDAR_TITLE) and not values.get(
+        CONF_TIMED_CALENDAR_ENTITY
+    ):
+        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_required"
+    if (
+        values.get(CONF_TIMED_CALENDAR_ENTITY)
+        and not str(values.get(CONF_TIMED_CALENDAR_TITLE, "")).strip()
+    ):
+        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_title_required"
+    capacity = values.get(CONF_TIMED_CAPACITY_KWH)
+    if capacity is not None and (
+        isinstance(capacity, bool)
+        or not isinstance(capacity, (int, float))
+        or not 1 <= capacity <= 250
+    ):
+        errors[CONF_TIMED_CAPACITY_KWH] = "timed_capacity_invalid"
     return errors
-
-
-def _network_tariff(values: dict[str, Any], *, module: str, timezone: str) -> dict[str, Any]:
-    """Convert form controls into the model's strict tariff representation."""
-    from .device.charging_cost import TariffConfig
-
-    tariff = {
-        "module": module,
-        CONF_REGULAR_NETWORK: values[CONF_REGULAR_NETWORK],
-        CONF_PRICE_INCLUDES_NETWORK: values[CONF_PRICE_INCLUDES_NETWORK],
-    }
-    if module == NETWORK_MODULE_3:
-        quarters = values[CONF_ACTIVE_QUARTERS]
-        if not isinstance(quarters, list) or any(value not in ("1", "2", "3", "4") for value in quarters):
-            raise ValueError("invalid active_quarters")
-        tariff.update({
-            CONF_HIGH_NETWORK: values[CONF_HIGH_NETWORK],
-            CONF_LOW_NETWORK: values[CONF_LOW_NETWORK],
-            CONF_ACTIVE_QUARTERS: [int(value) for value in quarters],
-            CONF_TARIFF_YEAR: values[CONF_TARIFF_YEAR],
-            "timezone": timezone,
-            "windows": [
-                *_tariff_periods(values[CONF_HIGH_PERIODS], "ht"),
-                *_tariff_periods(values[CONF_LOW_PERIODS], "nt"),
-            ],
-        })
-    parsed = TariffConfig.parse(tariff)
-    if any(window.start % 15 or window.end % 15 for window in parsed.windows):
-        raise ValueError("module 3 windows require quarter-hour boundaries")
-    return parsed.as_dict()
-
-
-def _tariff_periods(value: object, rate: str) -> list[dict[str, str]]:
-    """Parse one HH:MM-HH:MM interval per line, including overnight windows."""
-    if not isinstance(value, str) or not 1 <= len(value) <= 512:
-        raise ValueError("tariff periods must be short text")
-    lines = value.splitlines()
-    if not 1 <= len(lines) <= 8:
-        raise ValueError("tariff periods require one to eight lines")
-    windows: list[dict[str, str]] = []
-    for line in lines:
-        match = re.fullmatch(r"\s*([0-2][0-9]:[0-5][0-9])\s*[-\u2013]\s*([0-2][0-9]:[0-5][0-9])\s*", line)
-        if match is None:
-            raise ValueError("tariff period must be HH:MM-HH:MM")
-        windows.append({"start": match[1], "end": match[2], "rate": rate})
-    return windows
-
-
-def _network_form_values(tariff: dict[str, Any]) -> dict[str, Any]:
-    values = dict(tariff)
-    quarters = tariff.get(CONF_ACTIVE_QUARTERS)
-    values[CONF_ACTIVE_QUARTERS] = [str(value) for value in quarters] if isinstance(quarters, list) else []
-    windows = tariff.get("windows")
-    windows = windows if isinstance(windows, list) else []
-    for rate, key in (("ht", CONF_HIGH_PERIODS), ("nt", CONF_LOW_PERIODS)):
-        values[key] = "\n".join(
-            f"{window['start']}-{window['end']}"
-            for window in windows if isinstance(window, dict)
-            and window.get("rate") == rate
-            and isinstance(window.get("start"), str)
-            and isinstance(window.get("end"), str)
-        )
-    return values
 
 
 def _max_current(entry: Any) -> float:
-    """Return the highest current the device reported, or a safe default."""
-
-    runtime_data = getattr(entry, "runtime_data", None)
-    identity = getattr(runtime_data, "identity", None)
+    identity = getattr(getattr(entry, "runtime_data", None), "identity", None)
     maximum = getattr(identity, "max_evse_current", None)
-    if isinstance(maximum, (int, float)) and maximum >= 6:
-        return float(maximum)
-    return 16.0
+    return (
+        float(maximum) if isinstance(maximum, (int, float)) and maximum >= 6 else 16.0
+    )
 
 
 def control_mode_is_master(options: dict[str, Any]) -> bool:
-    """Return true when the entry is allowed to act as the Modbus master."""
-
     return options.get(CONF_CONTROL_MODE) == CONTROL_MODE_MASTER

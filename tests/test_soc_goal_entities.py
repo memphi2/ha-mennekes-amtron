@@ -22,12 +22,10 @@ from custom_components.mennekes_amtron_rtu.sensor import (
     async_setup_entry as setup_sensors,
 )
 from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
-    CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
     CONF_VEHICLE_SOC_ENTITY,
 )
 from tests.ha_fakes import build_runtime, collect
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
-from tests.test_options_flow import Flow
 
 SOURCE = "sensor.car_soc|number.car_limit"
 
@@ -69,55 +67,6 @@ def test_vehicle_number_uses_reported_cap_and_respects_write_permission(read_onl
             await target.async_set_native_value(75)
             observer.async_set_target.assert_awaited_once_with(75)
         assert transport.writes == []
-        await entry.runtime_data.client.async_close()
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("service_mode", [False, True])
-def test_options_accept_optional_offline_sources_and_can_clear_them(service_mode):
-    async def run():
-        _hass, entry, _transport = await build_runtime()
-        if service_mode:
-            entry.data = {"server_url": "http://service:8765"}
-        values = {
-            "control_mode": "master", "scan_interval_seconds": 10, "current_limit": 16,
-            CONF_VEHICLE_SOC_ENTITY: "sensor.offline_car_soc",
-        }
-        flow = Flow(entry)
-        result = await flow.async_step_init(values)
-        assert result["type"] == "create_entry"
-        assert result["data"][CONF_VEHICLE_SOC_ENTITY] == "sensor.offline_car_soc"
-        assert CONF_VEHICLE_CHARGE_LIMIT_ENTITY not in result["data"]
-        values[CONF_VEHICLE_CHARGE_LIMIT_ENTITY] = "number.offline_car_limit"
-        result = await flow.async_step_init(values)
-        assert result["data"][CONF_VEHICLE_CHARGE_LIMIT_ENTITY] == "number.offline_car_limit"
-        entry.options = result["data"]
-        values[CONF_VEHICLE_SOC_ENTITY] = ""
-        values[CONF_VEHICLE_CHARGE_LIMIT_ENTITY] = ""
-        result = await flow.async_step_init(values)
-        assert CONF_VEHICLE_SOC_ENTITY not in result["data"]
-        assert CONF_VEHICLE_CHARGE_LIMIT_ENTITY not in result["data"]
-        await entry.runtime_data.client.async_close()
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize(("extra", "error_field", "error"), [
-    ({CONF_VEHICLE_CHARGE_LIMIT_ENTITY: "number.car_limit"}, CONF_VEHICLE_SOC_ENTITY, "vehicle_soc_required"),
-    ({CONF_VEHICLE_SOC_ENTITY: "switch.car"}, CONF_VEHICLE_SOC_ENTITY, "invalid_vehicle_entity"),
-    ({CONF_VEHICLE_SOC_ENTITY: True}, CONF_VEHICLE_SOC_ENTITY, "invalid_vehicle_entity"),
-    ({CONF_VEHICLE_SOC_ENTITY: "sensor.car", CONF_VEHICLE_CHARGE_LIMIT_ENTITY: "switch.limit"}, CONF_VEHICLE_CHARGE_LIMIT_ENTITY, "invalid_vehicle_entity"),
-])
-def test_options_reject_invalid_vehicle_selection(extra, error_field, error):
-    async def run():
-        _hass, entry, _transport = await build_runtime()
-        result = await Flow(entry).async_step_init({
-            "control_mode": "master", "scan_interval_seconds": 10, "current_limit": 16,
-            **extra,
-        })
-        assert result["type"] == "form"
-        assert result["errors"][error_field] == error
         await entry.runtime_data.client.async_close()
 
     asyncio.run(run())

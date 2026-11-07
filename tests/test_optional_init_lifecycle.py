@@ -21,7 +21,12 @@ from custom_components.mennekes_amtron_rtu.device.const import (
     CONF_CONTROL_MODE,
     CONTROL_MODE_MASTER,
 )
-from custom_components.mennekes_amtron_rtu.options_flow import _network_tariff
+from custom_components.mennekes_amtron_rtu.network_tariff_config import (
+    parse_tariff_inputs as _network_tariff,
+)
+from custom_components.mennekes_amtron_rtu.timed_goal_const import (
+    CONF_TIMED_GOAL_ENABLED,
+)
 from custom_components.mennekes_amtron_rtu.vehicle_soc_const import (
     CONF_VEHICLE_SOC_ENTITY,
 )
@@ -106,6 +111,7 @@ def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_
         entry = FakeConfigEntry(options={
             CONF_CONTROL_MODE: CONTROL_MODE_MASTER,
             CONF_VEHICLE_SOC_ENTITY: "sensor.car_soc",
+            CONF_TIMED_GOAL_ENABLED: True,
         })
         transport = FakeModbusClient(device_bank())
         _patch_client(monkeypatch, transport)

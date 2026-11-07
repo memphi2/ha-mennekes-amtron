@@ -25,17 +25,12 @@ from homeassistant.helpers.selector import (
 
 from ._flow_serial import PortOption
 from .charge_loss_const import (
-    CONF_CHARGE_LOSS_SOURCE,
     CONF_LOSS_AUTO_MATCH,
-    CONF_LOSS_BAVARIAN_DEVICE,
     CONF_VEHICLE_LAST_CHARGE_ENERGY,
-    LOSS_SOURCE_DISABLED,
-    LOSS_SOURCES,
 )
 from .charging_cost_const import (
     CONF_ACTIVE_QUARTERS,
     CONF_AUTO_TARIFF_REFRESH,
-    CONF_CHARGING_COST_SOURCE,
     CONF_CHARGING_NETWORK_MODULE,
     CONF_CHARGING_PRICE,
     CONF_CHARGING_PRICE_ENTITY,
@@ -46,9 +41,7 @@ from .charging_cost_const import (
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
-    COST_SOURCE_DISABLED,
     COST_SOURCE_FIXED,
-    COST_SOURCES,
     NETWORK_MODULE_3,
     NETWORK_MODULE_NONE,
     NETWORK_MODULES,
@@ -92,7 +85,6 @@ from .device.const import (
     SUPPORTED_FRAMES,
 )
 from .timed_goal_const import (
-    CONF_TIMED_BAVARIAN_DEVICE,
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
     CONF_TIMED_CAPACITY_ENTITY,
@@ -119,7 +111,9 @@ def user_schema(ports: list[PortOption]) -> probatio.Schema:
             probatio.Required(CONF_PORT): _port_selector(ports),
             # A bare integer with a range renders as a slider, which is the
             # wrong control for a bus address somebody reads off a tool.
-            probatio.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): _IntegerSelector(
+            probatio.Required(
+                CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID
+            ): _IntegerSelector(
                 NumberSelectorConfig(
                     min=DEVICE_ID_MIN,
                     max=DEVICE_ID_MAX,
@@ -163,12 +157,16 @@ def network_schema() -> probatio.Schema:
                 )
             ),
             probatio.Required(CONF_HOST): cv.string,
-            probatio.Required(CONF_TCP_PORT, default=DEFAULT_TCP_PORT): _IntegerSelector(
+            probatio.Required(
+                CONF_TCP_PORT, default=DEFAULT_TCP_PORT
+            ): _IntegerSelector(
                 NumberSelectorConfig(
                     min=1, max=65535, step=1, mode=NumberSelectorMode.BOX
                 )
             ),
-            probatio.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): _IntegerSelector(
+            probatio.Required(
+                CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID
+            ): _IntegerSelector(
                 NumberSelectorConfig(
                     min=DEVICE_ID_MIN,
                     max=DEVICE_ID_MAX,
@@ -200,51 +198,17 @@ def options_schema(
     max_current: float,
     service_mode: bool = False,
 ) -> probatio.Schema:
-    """Return the options schema, bounded by what the device allows."""
-
+    """Basic wallbox settings; optional features have their own sections."""
     fields: dict[Any, Any] = {
-        probatio.Required(
-            CONF_CONTROL_MODE,
-            default=current.get(CONF_CONTROL_MODE, DEFAULT_CONTROL_MODE),
-        ): SelectSelector(
-            SelectSelectorConfig(
-                options=list(CONTROL_MODES),
-                translation_key="control_mode",
-                mode=SelectSelectorMode.LIST,
-            )
-        ),
         probatio.Required(
             CONF_SCAN_INTERVAL_SECONDS,
             default=current.get(
-                CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS
+                CONF_SCAN_INTERVAL_SECONDS,
+                DEFAULT_SCAN_INTERVAL_SECONDS,
             ),
-        ): NumberSelector(
-            NumberSelectorConfig(
-                min=MIN_SCAN_INTERVAL_SECONDS,
-                max=MAX_SCAN_INTERVAL_SECONDS,
-                step=1,
-                unit_of_measurement="s",
-                mode=NumberSelectorMode.BOX,
-            )
-        ),
+        ): _seconds_selector(MIN_SCAN_INTERVAL_SECONDS, MAX_SCAN_INTERVAL_SECONDS),
         probatio.Required(
-            CONF_MEASUREMENT_INTERVAL_SECONDS,
-            default=current.get(
-                CONF_MEASUREMENT_INTERVAL_SECONDS,
-                DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
-            ),
-        ): NumberSelector(
-            NumberSelectorConfig(
-                min=MIN_SCAN_INTERVAL_SECONDS,
-                max=MAX_SCAN_INTERVAL_SECONDS,
-                step=1,
-                unit_of_measurement="s",
-                mode=NumberSelectorMode.BOX,
-            )
-        ),
-        probatio.Required(
-            CONF_CURRENT_LIMIT,
-            default=current.get(CONF_CURRENT_LIMIT, max_current),
+            CONF_CURRENT_LIMIT, default=current.get(CONF_CURRENT_LIMIT, max_current)
         ): NumberSelector(
             NumberSelectorConfig(
                 min=6,
@@ -254,161 +218,325 @@ def options_schema(
                 mode=NumberSelectorMode.BOX,
             )
         ),
+    }
+    if not service_mode:
+        fields[
+            probatio.Required(
+                CONF_CONTROL_MODE,
+                default=current.get(
+                    CONF_CONTROL_MODE,
+                    DEFAULT_CONTROL_MODE,
+                ),
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=list(CONTROL_MODES),
+                translation_key="control_mode",
+                mode=SelectSelectorMode.LIST,
+            )
+        )
+    return probatio.Schema(fields)
+
+
+def advanced_schema(current: dict[str, Any], *, phase_switch: bool) -> probatio.Schema:
+    fields: dict[Any, Any] = {
+        probatio.Required(
+            CONF_MEASUREMENT_INTERVAL_SECONDS,
+            default=current.get(
+                CONF_MEASUREMENT_INTERVAL_SECONDS,
+                DEFAULT_MEASUREMENT_INTERVAL_SECONDS,
+            ),
+        ): _seconds_selector(MIN_SCAN_INTERVAL_SECONDS, MAX_SCAN_INTERVAL_SECONDS),
         probatio.Required(
             CONF_STATE_CHANGE_INTERVAL_SECONDS,
             default=current.get(
                 CONF_STATE_CHANGE_INTERVAL_SECONDS,
                 DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
             ),
-        ): _IntegerSelector(
-            NumberSelectorConfig(
-                min=0,
-                max=MAX_STATE_CHANGE_INTERVAL_SECONDS,
-                step=1,
-                unit_of_measurement="s",
-                mode=NumberSelectorMode.BOX,
-            )
-        ),
-        probatio.Required(
-            CONF_PHASE_SWITCH_GRACE_SECONDS,
-            default=current.get(
-                CONF_PHASE_SWITCH_GRACE_SECONDS,
-                DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
-            ),
-        ): _IntegerSelector(
-            NumberSelectorConfig(
-                min=0,
-                max=MAX_PHASE_SWITCH_GRACE_SECONDS,
-                step=1,
-                unit_of_measurement="s",
-                mode=NumberSelectorMode.BOX,
-            )
-        ),
+        ): _seconds_selector(0, MAX_STATE_CHANGE_INTERVAL_SECONDS),
     }
-    if service_mode:
-        fields = {
-            marker: selector
-            for marker, selector in fields.items()
-            if marker.schema not in (
-                CONF_CONTROL_MODE,
-                CONF_MEASUREMENT_INTERVAL_SECONDS,
-                CONF_STATE_CHANGE_INTERVAL_SECONDS,
+    if phase_switch:
+        fields[
+            probatio.Required(
                 CONF_PHASE_SWITCH_GRACE_SECONDS,
+                default=current.get(
+                    CONF_PHASE_SWITCH_GRACE_SECONDS,
+                    DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
+                ),
             )
-        }
-    # Suggested values remain removable. A schema default would silently put
-    # a formerly selected vehicle back when the user clears the optional field.
-    for key, domains in (
-        (CONF_VEHICLE_SOC_ENTITY, VEHICLE_SOC_DOMAINS),
-        (CONF_VEHICLE_CHARGE_LIMIT_ENTITY, VEHICLE_CHARGE_LIMIT_DOMAINS),
-        (CONF_TIMED_CAPACITY_ENTITY, ("sensor",)),
-        (CONF_TIMED_DEPARTURE_ENTITY, ("sensor", "input_datetime")),
-        (CONF_TIMED_CALENDAR_ENTITY, ("calendar",)),
-    ):
-        fields[probatio.Optional(
-            key, description={"suggested_value": current.get(key)},
-        )] = EntitySelector(EntitySelectorConfig(filter={"domain": list(domains)}))
-    fields[probatio.Optional(
-        CONF_TIMED_CAPACITY_KWH,
-        description={"suggested_value": current.get(CONF_TIMED_CAPACITY_KWH)},
-    )] = NumberSelector(NumberSelectorConfig(
-        min=1, max=250, step=0.1, unit_of_measurement="kWh",
-        mode=NumberSelectorMode.BOX,
-    ))
-    fields[probatio.Optional(
-        CONF_TIMED_CALENDAR_TITLE,
-        description={"suggested_value": current.get(CONF_TIMED_CALENDAR_TITLE)},
-    )] = cv.string
-    fields[probatio.Optional(
-        CONF_TIMED_BAVARIAN_DEVICE,
-        description={"suggested_value": current.get(CONF_TIMED_BAVARIAN_DEVICE)},
-    )] = DeviceSelector(DeviceSelectorConfig(integration="bavariandata"))
-    fields[probatio.Optional(
-        CONF_TIMED_VEHICLE_TIME_ZONE,
-        description={"suggested_value": current.get(CONF_TIMED_VEHICLE_TIME_ZONE)},
-    )] = TextSelector()
-    for key in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
-        fields[probatio.Optional(
-            key, description={"suggested_value": current.get(key)},
-        )] = SelectSelector(SelectSelectorConfig(
-            options=list(TIMED_WEEKDAYS), multiple=True,
-            translation_key="timed_weekdays", mode=SelectSelectorMode.DROPDOWN,
-        ))
-    fields[probatio.Required(
-        CONF_CHARGE_LOSS_SOURCE,
-        default=current.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED),
-    )] = SelectSelector(SelectSelectorConfig(
-        options=list(LOSS_SOURCES),
-        translation_key="charge_loss_source",
-        mode=SelectSelectorMode.DROPDOWN,
-    ))
-    fields[probatio.Required(
-        CONF_CHARGING_COST_SOURCE,
-        default=current.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED),
-    )] = SelectSelector(SelectSelectorConfig(
-        options=list(COST_SOURCES),
-        translation_key="charging_cost_source",
-        mode=SelectSelectorMode.DROPDOWN,
-    ))
+        ] = _seconds_selector(0, MAX_PHASE_SWITCH_GRACE_SECONDS)
     return probatio.Schema(fields)
 
 
-def loss_bavariandata_schema(current: dict[str, Any]) -> probatio.Schema:
-    """Select a vehicle whose locally stored charging history can be matched."""
-    return probatio.Schema({
+def _seconds_selector(minimum: int, maximum: int) -> _IntegerSelector:
+    return _IntegerSelector(
+        NumberSelectorConfig(
+            min=minimum,
+            max=maximum,
+            step=1,
+            unit_of_measurement="s",
+            mode=NumberSelectorMode.BOX,
+        )
+    )
+
+
+def _entity_selector(domains: tuple[str, ...]) -> EntitySelector:
+    return EntitySelector(EntitySelectorConfig(filter={"domain": list(domains)}))
+
+
+def vehicle_soc_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema(
+        {
+            probatio.Required(
+                CONF_VEHICLE_SOC_ENTITY,
+                description={
+                    "suggested_value": current.get(CONF_VEHICLE_SOC_ENTITY),
+                },
+            ): _entity_selector(VEHICLE_SOC_DOMAINS),
+            probatio.Required(
+                "use_vehicle_limit",
+                default=current.get(
+                    "use_vehicle_limit",
+                    bool(current.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY)),
+                ),
+            ): BooleanSelector(),
+        }
+    )
+
+
+def vehicle_limit_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema(
+        {
+            probatio.Required(
+                CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
+                description={
+                    "suggested_value": current.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY),
+                },
+            ): _entity_selector(VEHICLE_CHARGE_LIMIT_DOMAINS),
+        }
+    )
+
+
+def departure_configure_schema(
+    current: dict[str, Any], *, vehicle_timer: bool
+) -> probatio.Schema:
+    return probatio.Schema(
+        {
+            probatio.Required(
+                "capacity_source",
+                default=current.get(
+                    "capacity_source",
+                    "entity" if current.get(CONF_TIMED_CAPACITY_ENTITY) else "fixed",
+                ),
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=["fixed", "entity"],
+                    translation_key="capacity_source",
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            probatio.Required(
+                "use_calendar",
+                default=current.get(
+                    "use_calendar", bool(current.get(CONF_TIMED_CALENDAR_ENTITY))
+                ),
+            ): BooleanSelector(),
+            probatio.Required(
+                "use_departure_entity",
+                default=current.get(
+                    "use_departure_entity",
+                    bool(current.get(CONF_TIMED_DEPARTURE_ENTITY)),
+                ),
+            ): BooleanSelector(),
+            probatio.Required(
+                "use_vehicle_timer",
+                default=current.get("use_vehicle_timer", vehicle_timer),
+            ): BooleanSelector(),
+        }
+    )
+
+
+def departure_capacity_schema(
+    current: dict[str, Any], *, entity: bool
+) -> probatio.Schema:
+    key = CONF_TIMED_CAPACITY_ENTITY if entity else CONF_TIMED_CAPACITY_KWH
+    return probatio.Schema(
+        {
+            probatio.Required(
+                key, description={"suggested_value": current.get(key)}
+            ): _entity_selector(("sensor",))
+            if entity
+            else NumberSelector(
+                NumberSelectorConfig(
+                    min=1,
+                    max=250,
+                    step=0.1,
+                    unit_of_measurement="kWh",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
+        }
+    )
+
+
+def departure_calendar_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema(
+        {
+            probatio.Required(
+                CONF_TIMED_CALENDAR_ENTITY,
+                description={
+                    "suggested_value": current.get(CONF_TIMED_CALENDAR_ENTITY),
+                },
+            ): _entity_selector(("calendar",)),
+            probatio.Required(
+                CONF_TIMED_CALENDAR_TITLE,
+                description={
+                    "suggested_value": current.get(CONF_TIMED_CALENDAR_TITLE),
+                },
+            ): TextSelector(),
+        }
+    )
+
+
+def departure_entity_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema(
+        {
+            probatio.Required(
+                CONF_TIMED_DEPARTURE_ENTITY,
+                description={
+                    "suggested_value": current.get(CONF_TIMED_DEPARTURE_ENTITY),
+                },
+            ): _entity_selector(("sensor", "input_datetime")),
+        }
+    )
+
+
+def vehicle_provider_schema(
+    key: str, provider: str, providers: list[str]
+) -> probatio.Schema:
+    return probatio.Schema(
+        {
+            probatio.Required(
+                key,
+                description={
+                    "suggested_value": provider if provider in providers else None
+                },
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=providers,
+                    translation_key="vehicle_provider",
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        }
+    )
+
+
+def vehicle_device_schema(
+    current: dict[str, Any],
+    *,
+    key: str,
+    integration: str,
+    timer_options: bool = False,
+) -> probatio.Schema:
+    fields: dict[Any, Any] = {
         probatio.Required(
-            CONF_LOSS_BAVARIAN_DEVICE,
-            description={"suggested_value": current.get(CONF_LOSS_BAVARIAN_DEVICE)},
-        ): DeviceSelector(DeviceSelectorConfig(integration="bavariandata")),
-    })
+            key, description={"suggested_value": current.get(key)}
+        ): DeviceSelector(DeviceSelectorConfig(integration=integration)),
+    }
+    if timer_options:
+        fields[
+            probatio.Optional(
+                CONF_TIMED_VEHICLE_TIME_ZONE,
+                description={
+                    "suggested_value": current.get(CONF_TIMED_VEHICLE_TIME_ZONE),
+                },
+            )
+        ] = TextSelector()
+        for option in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
+            fields[
+                probatio.Optional(
+                    option, description={"suggested_value": current.get(option)}
+                )
+            ] = SelectSelector(
+                SelectSelectorConfig(
+                    options=list(TIMED_WEEKDAYS),
+                    multiple=True,
+                    translation_key="timed_weekdays",
+                    mode=SelectSelectorMode.DROPDOWN,
+                ),
+            )
+    return probatio.Schema(fields)
 
 
 def loss_sensor_schema(current: dict[str, Any]) -> probatio.Schema:
-    """Select optional estimated-energy matching separately from basic options."""
-    return probatio.Schema({
-        probatio.Required(
-            CONF_VEHICLE_LAST_CHARGE_ENERGY,
-            description={"suggested_value": current.get(CONF_VEHICLE_LAST_CHARGE_ENERGY)},
-        ): EntitySelector(EntitySelectorConfig(filter={"domain": "sensor"})),
-        probatio.Optional(
-            CONF_LOSS_AUTO_MATCH, default=current.get(CONF_LOSS_AUTO_MATCH, False),
-        ): BooleanSelector(),
-    })
+    return probatio.Schema(
+        {
+            probatio.Required(
+                CONF_VEHICLE_LAST_CHARGE_ENERGY,
+                description={
+                    "suggested_value": current.get(CONF_VEHICLE_LAST_CHARGE_ENERGY),
+                },
+            ): _entity_selector(("sensor",)),
+            probatio.Required(
+                CONF_LOSS_AUTO_MATCH, default=current.get(CONF_LOSS_AUTO_MATCH, False)
+            ): BooleanSelector(),
+        }
+    )
 
 
 def cost_source_schema(
-    current: dict[str, Any], *, source: str, allow_network: bool = True,
+    current: dict[str, Any],
+    *,
+    source: str,
+    allow_network: bool = True,
 ) -> probatio.Schema:
-    """Select a gross electricity price and optional network-tariff calculation."""
     fields: dict[Any, Any] = {}
     if source == COST_SOURCE_FIXED:
-        fields[probatio.Required(
-            CONF_CHARGING_PRICE,
-            description={"suggested_value": current.get(CONF_CHARGING_PRICE)},
-        )] = _price_selector(allow_negative=True)
+        fields[
+            probatio.Required(
+                CONF_CHARGING_PRICE,
+                description={
+                    "suggested_value": current.get(CONF_CHARGING_PRICE),
+                },
+            )
+        ] = _price_selector(allow_negative=True)
     else:
-        fields[probatio.Required(
-            CONF_CHARGING_PRICE_ENTITY,
-            description={"suggested_value": current.get(CONF_CHARGING_PRICE_ENTITY)},
-        )] = EntitySelector(EntitySelectorConfig(filter={"domain": "sensor"}))
+        fields[
+            probatio.Required(
+                CONF_CHARGING_PRICE_ENTITY,
+                description={
+                    "suggested_value": current.get(CONF_CHARGING_PRICE_ENTITY),
+                },
+            )
+        ] = _entity_selector(("sensor",))
     if allow_network:
-        fields[probatio.Required(
-            CONF_CHARGING_NETWORK_MODULE,
-            default=current.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE),
-        )] = SelectSelector(SelectSelectorConfig(
-            options=list(NETWORK_MODULES),
-            translation_key="charging_network_module",
-            mode=SelectSelectorMode.DROPDOWN,
-        ))
+        fields[
+            probatio.Required(
+                CONF_CHARGING_NETWORK_MODULE,
+                default=current.get(
+                    CONF_CHARGING_NETWORK_MODULE,
+                    NETWORK_MODULE_NONE,
+                ),
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=list(NETWORK_MODULES),
+                translation_key="charging_network_module",
+                mode=SelectSelectorMode.DROPDOWN,
+            )
+        )
     return probatio.Schema(fields)
 
 
 def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Schema:
-    """Ask only for the published network prices used by the chosen module."""
+    """Published prices only; Module 3 time windows have their own next step."""
     fields: dict[Any, Any] = {
         probatio.Required(
             CONF_REGULAR_NETWORK,
-            description={"suggested_value": current.get(CONF_REGULAR_NETWORK)},
+            description={
+                "suggested_value": current.get(CONF_REGULAR_NETWORK),
+            },
         ): _price_selector(),
         probatio.Required(
             CONF_PRICE_INCLUDES_NETWORK,
@@ -416,41 +544,67 @@ def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Sch
         ): BooleanSelector(),
     }
     if module == NETWORK_MODULE_3:
-        fields[probatio.Required(
-            CONF_AUTO_TARIFF_REFRESH,
-            default=current.get(CONF_AUTO_TARIFF_REFRESH, False),
-        )] = BooleanSelector()
         for key in (CONF_HIGH_NETWORK, CONF_LOW_NETWORK):
-            fields[probatio.Required(
-                key, description={"suggested_value": current.get(key)},
-            )] = _price_selector()
-        for key in (CONF_HIGH_PERIODS, CONF_LOW_PERIODS):
-            fields[probatio.Required(
-                key, description={"suggested_value": current.get(key)},
-            )] = TextSelector(TextSelectorConfig(multiline=True))
-        fields[probatio.Required(
+            fields[
+                probatio.Required(
+                    key, description={"suggested_value": current.get(key)}
+                )
+            ] = _price_selector()
+        fields[
+            probatio.Required(
+                CONF_TARIFF_YEAR,
+                description={
+                    "suggested_value": current.get(CONF_TARIFF_YEAR),
+                },
+            )
+        ] = _IntegerSelector(
+            NumberSelectorConfig(
+                min=2024, max=9998, step=1, mode=NumberSelectorMode.BOX
+            )
+        )
+        fields[
+            probatio.Required(
+                CONF_AUTO_TARIFF_REFRESH,
+                default=current.get(CONF_AUTO_TARIFF_REFRESH, False),
+            )
+        ] = BooleanSelector()
+    return probatio.Schema(fields)
+
+
+def cost_windows_schema(current: dict[str, Any]) -> probatio.Schema:
+    fields: dict[Any, Any] = {}
+    for key in (CONF_HIGH_PERIODS, CONF_LOW_PERIODS):
+        fields[
+            probatio.Required(key, description={"suggested_value": current.get(key)})
+        ] = TextSelector(TextSelectorConfig(multiline=True))
+    fields[
+        probatio.Required(
             CONF_ACTIVE_QUARTERS,
-            description={"suggested_value": current.get(CONF_ACTIVE_QUARTERS)},
-        )] = SelectSelector(SelectSelectorConfig(
+            description={
+                "suggested_value": current.get(CONF_ACTIVE_QUARTERS),
+            },
+        )
+    ] = SelectSelector(
+        SelectSelectorConfig(
             options=["1", "2", "3", "4"],
             translation_key="charging_tariff_quarter",
             multiple=True,
             mode=SelectSelectorMode.LIST,
-        ))
-        fields[probatio.Required(
-            CONF_TARIFF_YEAR,
-            description={"suggested_value": current.get(CONF_TARIFF_YEAR)},
-        )] = _IntegerSelector(NumberSelectorConfig(
-            min=2024, max=9998, step=1, mode=NumberSelectorMode.BOX,
-        ))
+        )
+    )
     return probatio.Schema(fields)
 
 
 def _price_selector(*, allow_negative: bool = False) -> NumberSelector:
-    return NumberSelector(NumberSelectorConfig(
-        min=-1000 if allow_negative else 0,
-        max=1000, step="any", unit_of_measurement="EUR/kWh", mode=NumberSelectorMode.BOX,
-    ))
+    return NumberSelector(
+        NumberSelectorConfig(
+            min=-1000 if allow_negative else 0,
+            max=1000,
+            step="any",
+            unit_of_measurement="EUR/kWh",
+            mode=NumberSelectorMode.BOX,
+        )
+    )
 
 
 def _port_selector(ports: list[PortOption]) -> Any:

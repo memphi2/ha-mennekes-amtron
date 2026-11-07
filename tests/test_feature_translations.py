@@ -41,11 +41,13 @@ def test_new_status_options_and_control_errors_are_translated_in_all_languages()
             "soc_goal_state_invalid", "soc_goal_not_supported", "soc_goal_limit_unavailable",
         ):
             assert payload["exceptions"][key]["message"], (path.name, key)
-        for step in ("init", "service"):
+        for step, key in (
+            ("vehicle_soc", "vehicle_soc_entity"),
+            ("vehicle_limit", "vehicle_charge_limit_entity"),
+        ):
             form = payload["options"]["step"][step]
-            for key in ("vehicle_soc_entity", "vehicle_charge_limit_entity"):
-                assert form["data"][key]
-                assert form["data_description"][key]
+            assert form["data"][key]
+            assert form["data_description"][key]
         reasons = entity["event"]["control_result"]["state_attributes"]["reason"]["state"]
         assert reasons["user_cancelled"]
         assert reasons["energy_goal"]

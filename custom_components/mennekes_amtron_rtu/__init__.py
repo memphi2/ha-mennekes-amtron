@@ -7,6 +7,7 @@ focused modules next to it.
 
 from __future__ import annotations
 
+import logging
 import time
 
 from homeassistant.const import Platform
@@ -110,11 +111,17 @@ from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
 from .session_observer import SessionObserver
+from .timed_goal_const import (
+    CONF_TIMED_GOAL_ENABLED,
+    CONF_TIMED_GOAL_RESET_PENDING,
+    timed_goal_is_enabled,
+)
 from .timed_goal_observer import TimedGoalObserver
 from .vehicle_soc import VehicleSocObserver
 from .vehicle_soc_const import CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_ENTITY
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+_LOGGER = logging.getLogger(__name__)
 
 READ_PLATFORMS = (Platform.SENSOR, Platform.BINARY_SENSOR, Platform.EVENT)
 CONTROL_PLATFORMS = (
@@ -139,6 +146,11 @@ async def async_setup_entry(
 ) -> bool:
     """Set up one wallbox from a config entry."""
 
+    # The preceding runtime is already unloaded. Clear a deliberately disabled
+    # trip before connecting, including when the service is currently offline.
+    # A failed optional cleanup leaves wallbox control available but cannot
+    # restore the old trip, even if the feature has since been re-enabled.
+    timed_reset_complete = await _async_reset_disabled_trip(hass, entry)
     remote = CONF_SERVER_URL in entry.data
     expected_serial = _entry_serial_binding(entry)
     client: MennekesModbusClient
@@ -262,6 +274,26 @@ async def async_setup_entry(
     )
 
     try:
+        if (
+            entry.options.get(CONF_TIMED_GOAL_ENABLED) is False
+            or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
+            or not timed_reset_complete
+        ):
+            try:
+                # Reclaim only this entry's work after an unreachable unload;
+                # manual requests and other owners remain authoritative.
+                await control.async_cancel_timed_current(f"timed:{entry.entry_id}")
+            except (AmtronBusError, HomeAssistantError) as err:
+                raise ConfigEntryNotReady(
+                    translation_domain=DOMAIN, translation_key="timed_goal_unavailable"
+                ) from err
+            if timed_reset_complete and CONF_TIMED_GOAL_RESET_PENDING in entry.options:
+                options = dict(entry.options)
+                options.pop(CONF_TIMED_GOAL_RESET_PENDING)
+                # Complete both halves of the reset before consuming its
+                # authority. A failed reconnect must still cancel the old
+                # service queue on the next attempt, even after re-enabling.
+                hass.config_entries.async_update_entry(entry, options=options)
         loss_enabled = entry.options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
         cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
         if loss_enabled or cost_enabled:
@@ -368,7 +400,10 @@ async def async_setup_entry(
             )
             entry.runtime_data.vehicle_soc = observer
             await observer.async_start()
-        if entry.options.get(CONF_VEHICLE_SOC_ENTITY):
+        if (
+            timed_reset_complete and entry.options.get(CONF_VEHICLE_SOC_ENTITY)
+            and timed_goal_is_enabled(entry.options)
+        ):
             timed = TimedGoalObserver(hass, entry)
             entry.runtime_data.timed_goal = timed
             try:
@@ -430,6 +465,27 @@ async def async_setup_entry(
         await control.async_shutdown()
         await client.async_close()
         raise
+    return True
+
+
+async def _async_reset_disabled_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> bool:
+    """Remove the saved trip; retain reset authority until queues are cancelled."""
+    if (
+        entry.options.get(CONF_TIMED_GOAL_ENABLED) is not False
+        and entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True
+    ):
+        return True
+    try:
+        await TimedGoalStore(hass, entry.entry_id, "").async_remove()
+    except OSError:
+        # Keep this authority in the entry, rather than only in process memory.
+        # Re-enabling after a restart still requires removal of the old trip.
+        if entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True:
+            hass.config_entries.async_update_entry(
+                entry, options={**entry.options, CONF_TIMED_GOAL_RESET_PENDING: True},
+            )
+        _LOGGER.warning("Departure planning remains disabled because its old trip could not be cleared")
+        return False
     return True
 
 
