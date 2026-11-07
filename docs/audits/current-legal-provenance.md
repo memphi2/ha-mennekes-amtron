@@ -12,8 +12,10 @@ The implementation is independently written from protocol facts, manufacturer
 references and verified behavior. Vendor scripts, SDKs, binaries, document
 extractions, private captures and device configuration images remain outside the
 repository. Regression fixtures use synthetic identities and credentials.
-Source links and the new **cryptography** dependency's dual license are recorded
-in [legal notes](../legal.md#optional-waveshare-adapter-support).
+The optional handshake uses **cryptography**, supplied by Home Assistant and
+declared explicitly for the standalone service. Its [dual license](../legal.md#runtime-dependencies)
+and the [protocol sources](../legal.md#optional-waveshare-adapter-support) are
+recorded in the legal notes.
 
 Physical verification covers **RS485 TO POE ETH (B), firmware 1.523**. The ETH B
 and ETH C profiles rely on the manufacturer's same-software statement and

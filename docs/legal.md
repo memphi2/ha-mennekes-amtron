@@ -81,19 +81,21 @@ The legal gate fails if either hash changes without review.
 
 ## Runtime dependencies
 
-`manifest.json` requests `pymodbus[serial]>=3.13.1` and
-`cryptography>=48.0.1`. Both are minimum requirements so Home Assistant keeps
-owning the resolved versions. `scripts/check_pymodbus_pin.py` checks compatibility
-with HA's pymodbus version. pymodbus is published under the BSD-3-Clause license.
-The optional LAN-adapter login uses PyCA cryptography, available under
+`manifest.json` requests `pymodbus[serial]>=3.13.1`; Home Assistant owns the
+resolved version. `scripts/check_pymodbus_pin.py` checks compatibility with
+HA's pymodbus version. pymodbus is published under the BSD-3-Clause license.
+The optional LAN-adapter login uses PyCA cryptography, which Home Assistant
+provides as one of its own dependencies, under
 [Apache-2.0 OR BSD-3-Clause](https://github.com/pyca/cryptography/blob/main/LICENSE).
 Neither dependency is vendored into this repository.
 
-The standalone service additionally depends on `aiohttp`; Home Assistant
-already provides it for the integration client. Python packages and their
-license notices are installed from their upstream distributions. The container
-build uses `requirements-service.txt`; the shared project-owned driver is not
-a third-party vendored payload.
+The HACS release SBOM lists the integration and its manifest-declared runtime
+requirements; it does not enumerate Home Assistant's own dependency tree.
+The standalone service explicitly declares cryptography and `aiohttp`, which
+Home Assistant also provides for the integration client. Python packages and
+their license notices are installed from their upstream distributions. The
+container build uses `requirements-service.txt`; the shared project-owned driver
+is not a third-party vendored payload.
 
 ## Optional Waveshare adapter support
 

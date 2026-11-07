@@ -234,10 +234,11 @@ def _check_required_documents() -> list[str]:
 
 
 def _check_runtime_requirements() -> list[str]:
-    """Keep the audited Modbus and optional authentication dependencies explicit.
+    """Keep the integration's audited Home Assistant requirements explicit.
 
     Every added runtime requirement is a dependency a user installs through
-    Home Assistant, so it has to be a deliberate, reviewed decision.
+    Home Assistant, so it has to be a deliberate, reviewed decision. Home
+    Assistant already supplies cryptography for the optional adapter login.
     """
 
     manifest = json.loads(
@@ -246,12 +247,12 @@ def _check_runtime_requirements() -> list[str]:
         )
     )
     requirements = [str(item) for item in manifest.get("requirements", [])]
-    approved = {"pymodbus[serial]>=3.13.1", "cryptography>=48.0.1"}
+    approved = {"pymodbus[serial]>=3.13.1"}
     if set(requirements) != approved or len(requirements) != len(approved):
         return [
             (
                 "manifest.json runtime requirements must match the audited "
-                f"pymodbus and cryptography declarations, got {requirements!r}"
+                f"pymodbus declaration, got {requirements!r}"
             )
         ]
     return []

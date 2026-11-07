@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,9 +65,14 @@ def test_the_manifest_names_the_public_integration_maintainer() -> None:
 
 def test_the_manifest_requests_only_reviewed_runtime_dependencies_as_minimums() -> None:
     manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["requirements"] == [
-        "pymodbus[serial]>=3.13.1", "cryptography>=48.0.1",
-    ]
+    assert manifest["requirements"] == ["pymodbus[serial]>=3.13.1"]
+
+
+def test_standalone_service_keeps_its_explicit_cryptography_dependency() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert "cryptography>=48.0.1" in project["project"]["dependencies"]
+    requirements = (ROOT / "requirements-service.txt").read_text(encoding="utf-8").splitlines()
+    assert "cryptography==50.0.2" in requirements
 
 
 def test_diagnostics_never_report_the_port_or_the_serial_number() -> None:
