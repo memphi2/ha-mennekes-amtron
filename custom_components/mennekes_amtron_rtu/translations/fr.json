@@ -754,6 +754,9 @@
     "soc_goal_source_changed": {
       "message": "Les sources du véhicule ont changé. Rechargez l’intégration avant de modifier son objectif en pourcentage."
     },
+    "soc_goal_app_update_required": {
+      "message": "Mettez à jour l’application du service Modbus Mennekes avant de modifier l’objectif de charge du véhicule. Les autres fonctions restent disponibles."
+    },
     "soc_goal_not_supported": {
       "message": "Le service Modbus ne prend pas en charge les objectifs en pourcentage du véhicule. Mettez l’application à jour pour utiliser cette fonction facultative."
     },

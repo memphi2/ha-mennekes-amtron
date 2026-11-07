@@ -754,6 +754,9 @@
     "soc_goal_source_changed": {
       "message": "Die Fahrzeugquellen wurden geändert. Lade die Integration neu, bevor du ihr Prozentziel änderst."
     },
+    "soc_goal_app_update_required": {
+      "message": "Aktualisiere die Mennekes Modbus-Service-App, bevor du das Fahrzeug-Ladeziel änderst. Die übrigen Wallbox-Funktionen bleiben verfügbar."
+    },
     "soc_goal_not_supported": {
       "message": "Der Modbus-Dienst unterstützt keine Fahrzeug-Prozentziele. Aktualisiere die App, um diese optionale Funktion zu nutzen."
     },

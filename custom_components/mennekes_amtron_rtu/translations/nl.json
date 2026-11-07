@@ -754,6 +754,9 @@
     "soc_goal_source_changed": {
       "message": "De voertuigbronnen zijn gewijzigd. Herlaad de integratie voordat je het percentagedoel wijzigt."
     },
+    "soc_goal_app_update_required": {
+      "message": "Werk de Mennekes Modbus-serviceapp bij voordat je het laadpercentage van de auto wijzigt. Andere wallboxfuncties blijven beschikbaar."
+    },
     "soc_goal_not_supported": {
       "message": "De Modbus-dienst ondersteunt geen percentagedoelen voor het voertuig. Werk de app bij om deze optionele functie te gebruiken."
     },

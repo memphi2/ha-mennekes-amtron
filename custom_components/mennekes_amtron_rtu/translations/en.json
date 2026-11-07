@@ -754,6 +754,9 @@
     "soc_goal_source_changed": {
       "message": "The vehicle sources have changed. Reload the integration before changing its percentage target."
     },
+    "soc_goal_app_update_required": {
+      "message": "Update the Mennekes Modbus service app before changing the vehicle percentage target. Other wallbox functions remain available."
+    },
     "soc_goal_not_supported": {
       "message": "The Modbus service does not support vehicle percentage targets. Update the app to use this optional feature."
     },

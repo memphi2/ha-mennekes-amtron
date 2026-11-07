@@ -372,9 +372,10 @@ Changing or removing either selected source clears the old percentage target
 and remembered maximum without starting charging. Disable **Vehicle charge
 target** in its section to remove this optional feature. This also disables
 departure planning and clears its trip, because that plan needs the SoC source.
-The kWh goal is independent. Service
-mode needs an app version advertising percentage-goal support; existing service
-functions remain available on older compatible versions.
+The kWh goal is independent. In service mode, changing a percentage target
+requires an app version that supports confirmed target updates. Update the
+Modbus service app if Home Assistant asks you to do so. Other service functions
+remain available with older compatible app versions.
 
 ## Charge for the next departure
 

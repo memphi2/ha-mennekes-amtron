@@ -49,7 +49,10 @@ class SocControl(Protocol):
 
     async def async_observe_soc(
         self, soc: float | None, maximum: float | None = None, *, source: str,
+        expected_soc_revision: str | None = None,
     ) -> None: ...
+
+    async def async_resolve_soc_goal(self) -> str: ...
 
     async def async_set_soc_goal(
         self, value: float, *, source: str,
@@ -81,9 +84,10 @@ class _Observation:
 class _Observations:
     """Fold with the real model, retaining at most two outgoing observations."""
 
-    def __init__(self, model: SocGoal, source: str | None) -> None:
+    def __init__(self, model: SocGoal, source: str | None, revision: str | None = None) -> None:
         self.model = copy(model)
         self.model.configure_source(source)
+        self.revision = revision
         self.minimum: float | None = None
         self.maximum: float | None = None
         self.reached_soc: float | None = None
@@ -139,6 +143,7 @@ class VehicleSocObserver:
         self._pending: _Observations | None = None
         self._inflight: _Observations | None = None
         self._previous_target_model: SocGoal | None = None
+        self._previous_target_revision: str | None = None
         self._target_model: SocGoal | None = None
         self._target_pending: _Observations | None = None
         self._last_sent: _Observation | None = None
@@ -232,14 +237,19 @@ class VehicleSocObserver:
                 self._previous_target_model or
                 (self._inflight.model if self._inflight is not None else self._control.soc_goal)
             )
-            self._pending = _Observations(model, self.source)
+            revision = (
+                self._previous_target_revision if self._previous_target_model is not None else
+                self._inflight.revision if self._inflight is not None else
+                getattr(self._control, "soc_goal_revision", None)
+            )
+            self._pending = _Observations(model, self.source, revision)
         self._pending.add(observation)
         self._ensure_task()
 
     @callback
     def _ensure_task(self) -> None:
         if (
-            not self._stopping and self._pending is not None and self._task is None
+            not self._stopping and (self._pending is not None or self._resolution_pending()) and self._task is None
             and self._control.supports_soc_goal
         ):
             self._task = self._hass.async_create_task(
@@ -248,11 +258,33 @@ class VehicleSocObserver:
 
     async def _run(self) -> None:
         try:
-            while self._pending is not None and not self._stopping:
+            while (self._pending is not None or self._resolution_pending()) and not self._stopping:
                 async with self._command_lock:
+                    if self._resolution_pending():
+                        try:
+                            outcome = await self._control.async_resolve_soc_goal()
+                        except (HomeAssistantError, DeviceError, AmtronBusError, OSError):
+                            return
+                        if outcome == "unknown":
+                            return
+                        if outcome == "applied":
+                            self._pending = self._target_pending
+                            if self._pending is not None:
+                                self._pending.revision = getattr(self._control, "soc_goal_revision", None)
+                        elif outcome == "superseded":
+                            self._pending = None
+                            self._last_sent = None
+                        self._clear_target_models()
+                        if outcome == "superseded":
+                            self._queue_current()
                     observations = self._pending
                     self._pending = None
                     if observations is None:
+                        continue
+                    revision = getattr(self._control, "soc_goal_revision", None)
+                    if observations.revision is not None and revision != observations.revision:
+                        self._last_sent = None
+                        self._queue_current()
                         continue
                     self._inflight = observations
                     try:
@@ -261,8 +293,9 @@ class VehicleSocObserver:
                             self._configured = True
                         if self.source is not None:
                             for observation in observations.outgoing():
+                                kwargs = {"expected_soc_revision": observations.revision} if observations.revision is not None else {}
                                 await self._control.async_observe_soc(
-                                    observation.soc, observation.maximum, source=self.source,
+                                    observation.soc, observation.maximum, source=self.source, **kwargs,
                                 )
                     except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
                         self._pending = (
@@ -286,6 +319,15 @@ class VehicleSocObserver:
         if self._task is not None:
             await asyncio.shield(self._task)
         async with self._command_lock:
+            if self._resolution_pending():
+                if getattr(self._control, "soc_goal_resolution_fenced", False) is not True:
+                    raise service_validation_error("soc_goal_unavailable")
+                # The service has fenced the earlier request. An explicit new
+                # selection supersedes its unknown outcome and both folds.
+                self._control.abandon_fenced_soc_goal()
+                self._pending = None
+                self._last_sent = None
+                self._clear_target_models()
             if (
                 value > 0 and self._limit_entity is not None and self.maximum is None
                 and self._control.soc_goal.maximum_percent is None
@@ -295,6 +337,7 @@ class VehicleSocObserver:
             self._pending = None
             soc, maximum = self.latest_soc, self.maximum
             self._previous_target_model = copy(self._control.soc_goal)
+            self._previous_target_revision = getattr(self._control, "soc_goal_revision", None)
             original = self._previous_target_model.snapshot()
             candidate = copy(self._previous_target_model)
             try:
@@ -310,7 +353,10 @@ class VehicleSocObserver:
                     soc=soc, maximum=maximum,
                 )
             except BaseException:
-                if (
+                if self._resolution_pending():
+                    if previous is not None:
+                        self._pending = previous.combine(self._pending) if self._pending is not None else previous
+                elif (
                     candidate is not None and candidate.snapshot() != original
                     and self._control.soc_goal.snapshot() == candidate.snapshot()
                 ):
@@ -328,11 +374,21 @@ class VehicleSocObserver:
                 # still contain the old goal until the response arrives.
                 if candidate is not None:
                     self._pending = self._target_pending
+                    if self._pending is not None:
+                        self._pending.revision = getattr(self._control, "soc_goal_revision", None)
             finally:
-                self._previous_target_model = None
-                self._target_model = None
-                self._target_pending = None
+                if not self._resolution_pending():
+                    self._clear_target_models()
                 self._ensure_task()
+
+    def _resolution_pending(self) -> bool:
+        return getattr(self._control, "soc_goal_resolution_pending", False) is True
+
+    def _clear_target_models(self) -> None:
+        self._previous_target_model = None
+        self._previous_target_revision = None
+        self._target_model = None
+        self._target_pending = None
 
     async def async_stop(self) -> None:
         """Detach inputs and finish cancellation before this owner is unloaded."""
