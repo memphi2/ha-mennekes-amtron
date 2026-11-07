@@ -1,5 +1,16 @@
 # Changes
 
+## 0.6.1
+
+- Expire queued timed charging commands at their deadline even while Home
+  Assistant is offline. Preserve the last applied charging state and heartbeat;
+  an expired request cannot start charging later.
+- Add the API 2 commands needed for timed-plan current changes and cancellation.
+  Integration 0.6.1 requires this service version or newer; update the app first.
+- Validate quarter-hour boundaries in the shared Module 3 tariff model.
+- Keep existing app settings and data. Stable 0.6.1 is available through **#apps**
+  and also updates existing **#apps-beta** installations.
+
 ## 0.6.0b1
 
 Beta release; stable remains **0.5.1**.
