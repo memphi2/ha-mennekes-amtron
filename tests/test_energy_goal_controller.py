@@ -862,6 +862,40 @@ def test_meter_recovery_resumes_only_the_goal_owned_pause(paused):
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("retry", ["poll", "shutdown"])
+def test_meter_recovery_retries_failed_persistence_without_auto_resume(retry):
+    async def run():
+        harness, control, runner, saved = await _runner(paused=True)
+        await runner.async_set_target(12)
+        runner.observe(None)
+        await _settle(runner)
+        assert saved[-1]["status"] == "meter_unavailable"
+
+        async def fail_once():
+            runner._persist = save
+            raise OSError("disk full")
+
+        async def save():
+            saved.append(control.energy_goal.snapshot())
+
+        runner._persist = fail_once
+        runner.observe(_snapshot(harness, 1235))
+        await _settle(runner)
+        assert control.energy_goal.status == "active"
+        assert saved[-1]["status"] == "meter_unavailable"
+
+        if retry == "poll":
+            runner.observe(_snapshot(harness, 1235, energy_read=False))
+            await _settle(runner)
+        else:
+            await runner.async_stop()
+        assert saved[-1]["status"] == "active"
+        assert current_writes(harness.transport) == []
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("action", ["pause", "release", "lock"])
 def test_explicit_command_revokes_outage_recovery_before_meter_returns(action):
     async def run():
