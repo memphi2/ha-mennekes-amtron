@@ -19,7 +19,6 @@ from .config_schemas import (
     vehicle_device_schema,
     vehicle_limit_schema,
     vehicle_profile_soc_schema,
-    vehicle_provider_schema,
     vehicle_soc_schema,
     vehicle_source_schema,
 )
@@ -493,31 +492,14 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             "departure_step"
         ) != "departure_vehicle":
             return await self.async_step_init()
-        providers = provider_definitions("departure")
         if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none"):
             self._details["provider"] = "profile"
             self._details["suggested_device"] = draft.values.get(CONF_VEHICLE_DEVICE)
             return await self.async_step_departure_vehicle_details()
-        selection = self._suggested_vehicle(draft.values, "departure")
-        errors = {}
-        if user_input is not None:
-            provider = user_input.get(CONF_TIMED_VEHICLE_PROVIDER)
-            if provider not in {item.id for item in providers}:
-                errors[CONF_TIMED_VEHICLE_PROVIDER] = "vehicle_provider_invalid"
-            else:
-                self._details["provider"] = provider
-                self._details["suggested_device"] = (
-                    selection.device_id if selection.provider_id == provider else None
-                )
-                return await self.async_step_departure_vehicle_details()
-        return self.async_show_form(
-            step_id="departure_vehicle",
-            data_schema=vehicle_provider_schema(
-                CONF_TIMED_VEHICLE_PROVIDER,
-                selection.provider_id,
-                [item.id for item in providers],
-            ),
-            errors=errors,
+        return await self._async_vehicle_provider_step(
+            values=draft.values, capability="departure",
+            key=CONF_TIMED_VEHICLE_PROVIDER, step_id="departure_vehicle",
+            user_input=user_input, next_step=self.async_step_departure_vehicle_details,
         )
 
     async def async_step_departure_vehicle_details(

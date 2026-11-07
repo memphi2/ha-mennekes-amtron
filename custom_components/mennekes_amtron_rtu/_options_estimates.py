@@ -44,7 +44,6 @@ from .config_schemas import (
     cost_source_schema,
     loss_sensor_schema,
     vehicle_device_schema,
-    vehicle_provider_schema,
 )
 from .network_tariff_config import parse_tariff_inputs, tariff_form_values
 from .network_tariff_lookup import async_lookup_home_tariff
@@ -374,27 +373,10 @@ class EstimateOptionsFlow(SectionOptionsFlow):
     ) -> ConfigFlowResult:
         if (draft := self._section("losses")) is None:
             return await self.async_step_init()
-        providers = provider_definitions("charge_history")
-        selection = self._suggested_vehicle(draft.values, "charge_history")
-        errors = {}
-        if user_input is not None:
-            provider = user_input.get(CONF_LOSS_VEHICLE_PROVIDER)
-            if provider not in {item.id for item in providers}:
-                errors[CONF_LOSS_VEHICLE_PROVIDER] = "vehicle_provider_invalid"
-            else:
-                self._details["provider"] = provider
-                self._details["suggested_device"] = (
-                    selection.device_id if selection.provider_id == provider else None
-                )
-                return await self.async_step_loss_vehicle_details()
-        return self.async_show_form(
-            step_id="loss_vehicle",
-            data_schema=vehicle_provider_schema(
-                CONF_LOSS_VEHICLE_PROVIDER,
-                selection.provider_id,
-                [item.id for item in providers],
-            ),
-            errors=errors,
+        return await self._async_vehicle_provider_step(
+            values=draft.values, capability="charge_history",
+            key=CONF_LOSS_VEHICLE_PROVIDER, step_id="loss_vehicle",
+            user_input=user_input, next_step=self.async_step_loss_vehicle_details,
         )
 
     async def async_step_loss_vehicle_details(

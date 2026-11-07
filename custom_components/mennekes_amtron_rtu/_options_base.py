@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import probatio
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 
 from ._options_draft import OptionsChangedError, OptionsDraft
+from .config_schemas import vehicle_provider_schema
 from .vehicle_profiles import CONF_VEHICLE_DEVICE, CONF_VEHICLE_PROVIDER
 from .vehicle_sources import (
     Capability,
     ProviderSelection,
     profile_capabilities,
+    provider_definitions,
     provider_device_is_valid,
     provider_identity,
     provider_selection,
@@ -66,6 +69,31 @@ class SectionOptionsFlow(OptionsFlow):
         ):
             return other
         return own
+
+    async def _async_vehicle_provider_step(
+        self, *, values: dict[str, Any], capability: Capability, key: str,
+        step_id: str, user_input: dict[str, Any] | None,
+        next_step: Callable[[], Awaitable[ConfigFlowResult]],
+    ) -> ConfigFlowResult:
+        """Share provider choice without changing each feature's device validation."""
+        providers = [item.id for item in provider_definitions(capability)]
+        selection = self._suggested_vehicle(values, capability)
+        errors = {}
+        if user_input is not None:
+            provider = user_input.get(key)
+            if provider not in set(providers):
+                errors[key] = "vehicle_provider_invalid"
+            else:
+                self._details["provider"] = provider
+                self._details["suggested_device"] = (
+                    selection.device_id if selection.provider_id == provider else None
+                )
+                return await next_step()
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=vehicle_provider_schema(key, selection.provider_id, providers),
+            errors=errors,
+        )
 
     def _finish_section(self) -> ConfigFlowResult:
         """Commit a completed section after checking concurrent edits."""
