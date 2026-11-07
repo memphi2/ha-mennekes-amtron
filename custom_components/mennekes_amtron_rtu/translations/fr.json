@@ -995,34 +995,23 @@
         "description": "Sélectionnez le véhicule une fois. Le bouton de départ copie une programmation active. Pour BavarianData, activez les capteurs d’action, d’heure et de minute ; indiquez ici les jours récurrents car ils ne sont pas publiés."
       },
       "costs": {
-        "title": "Coûts de recharge",
-        "menu_options": {
-          "cost_fixed": "Prix d’électricité fixe",
-          "cost_sensor": "Capteur de prix d’électricité",
-          "cost_disable": "Désactiver l’estimation des coûts",
-          "back": "Retour sans enregistrer"
-        },
-        "description": "Estimations facultatives avec un prix fixe ou un capteur de prix. Elles ne commandent pas la recharge. Les ajustements réseau ne sont proposés qu’en Allemagne."
+        "title": "Source du prix de l’électricité",
+        "description": "Choisissez un prix fixe ou un capteur de prix existant. Désactivé arrête l’estimation des coûts. Les tarifs de réseau se configurent séparément aux étapes suivantes.",
+        "data": {
+          "charging_cost_source": "Source du prix de l’électricité"
+        }
       },
       "cost_fixed": {
         "title": "Prix d’électricité fixe",
         "data": {
-          "charging_price": "Prix d’électricité TTC",
-          "charging_network_module": "Ajustement du prix réseau"
+          "charging_price": "Prix d’électricité TTC"
         },
-        "data_description": {
-          "charging_network_module": "Utilisez uniquement le module convenu avec votre gestionnaire de réseau. Le module 3 propose une saisie manuelle ou un import distinct."
-        },
-        "description": "Saisissez le prix par kWh toutes taxes comprises. Les prix négatifs sont acceptés. Sans ajustement réseau, ce doit être le prix final incluant les frais de réseau. Les abonnements et crédits annuels sont exclus."
+        "description": "Saisissez le prix par kWh toutes taxes comprises. Les prix négatifs sont acceptés. Sans ajustement réseau, ce doit être le prix final incluant les frais de réseau. Les abonnements et crédits annuels sont exclus. La proposition initiale est de 0,40 EUR/kWh ; utilisez le prix de votre contrat."
       },
       "cost_sensor": {
         "title": "Capteur de prix d’électricité",
         "data": {
-          "charging_price_entity": "Capteur de prix d’électricité",
-          "charging_network_module": "Ajustement du prix réseau"
-        },
-        "data_description": {
-          "charging_network_module": "Utilisez uniquement le module convenu avec votre gestionnaire de réseau. Le module 3 propose une saisie manuelle ou un import distinct."
+          "charging_price_entity": "Capteur de prix d’électricité"
         },
         "description": "Sélectionnez un capteur du prix actuel de l’électricité TTC en EUR/kWh, ct/kWh ou EUR/MWh (le symbole € est aussi accepté). Les prix négatifs sont autorisés. Sans ajustement réseau, le prix doit inclure les frais réseau. Une valeur signalée reste valide 90 minutes ; la même valeur signalée à nouveau renouvelle cette durée. Les prix absents ou expirés laissent l’énergie concernée sans prix. Abonnements et crédits annuels sont exclus."
       },
@@ -1047,33 +1036,25 @@
         "description": "La saisie manuelle ne transmet aucune localisation. L’import envoie une fois les coordonnées du domicile HA à VNBdigital et récupère les tarifs publics de Par14a-Database. Vérifiez source, prix et plages horaires avant d’enregistrer."
       },
       "cost_module3_prices": {
-        "title": "Module 3 : prix et année",
+        "title": "Module 3 : prix et plages horaires",
         "data": {
           "regular_network": "Prix réseau normal (tarif standard)",
           "high_network": "Prix réseau haut (HT)",
           "low_network": "Prix réseau bas (NT)",
           "price_includes_network": "Le prix d’électricité inclut déjà le prix réseau normal",
           "tariff_year": "Année du barème",
-          "auto_tariff_refresh": "Actualiser automatiquement le tarif du module 3 au nouvel an"
-        },
-        "data_description": {
-          "price_includes_network": "Activé : retirer le prix réseau normal avant d’ajouter le tarif choisi. Désactivé : la source exclut les frais réseau, donc ajouter le tarif réseau. Choisissez selon votre source pour éviter un double comptage.",
-          "auto_tariff_refresh": "Le 1er janvier, les tarifs publiés pour la nouvelle année sont recherchés et appliqués s’ils sont sans ambiguïté. En l’absence de données valides, une nouvelle tentative est faite chaque jour. Les valeurs provisoires peuvent être appliquées ; vérifiez ensuite la fiche définitive."
-        },
-        "description": "Reprenez les prix TTC et l’année de la fiche du gestionnaire. Source : {source}. ⚠ indique des données provisoires. Vérifiez avant d’enregistrer."
-      },
-      "cost_module3_windows": {
-        "title": "Module 3 : plages horaires",
-        "data": {
+          "auto_tariff_refresh": "Actualiser automatiquement le tarif du module 3 au nouvel an",
           "high_periods": "Périodes tarif haut",
           "low_periods": "Périodes tarif bas",
           "active_quarters": "Trimestres à prix réseau variables"
         },
         "data_description": {
+          "price_includes_network": "Activé : retirer le prix réseau normal avant d’ajouter le tarif choisi. Désactivé : la source exclut les frais réseau, donc ajouter le tarif réseau. Choisissez selon votre source pour éviter un double comptage.",
+          "auto_tariff_refresh": "Le 1er janvier, les tarifs publiés pour la nouvelle année sont recherchés et appliqués s’ils sont sans ambiguïté. En l’absence de données valides, une nouvelle tentative est faite chaque jour. Les valeurs provisoires peuvent être appliquées ; vérifiez ensuite la fiche définitive.",
           "high_periods": "Une période HH:MM-HH:MM par ligne, aux quarts d’heure. Le passage de minuit est possible.",
           "low_periods": "Une période HH:MM-HH:MM par ligne, aux quarts d’heure. Le passage de minuit est possible."
         },
-        "description": "Utilisez l’heure allemande (Europe/Berlin) et des quarts d’heure. Les plages peuvent traverser minuit, sans se chevaucher, et doivent laisser des périodes au tarif standard."
+        "description": "Vérifiez ensemble les trois tarifs de réseau TTC et leurs plages horaires. Le tarif standard s’applique hors des plages haute/basse et des trimestres sélectionnés. Utilisez l’heure locale allemande (Europe/Berlin). Source : {source}. ⚠ indique des données provisoires. Confirmez ce formulaire pour enregistrer."
       },
       "losses": {
         "title": "Pertes de recharge",
@@ -1110,17 +1091,15 @@
         },
         "description": "Sélectionnez le véhicule de cette borne. Seul l’historique local existant est lu ; aucune actualisation du véhicule n’est demandée. Les correspondances absentes ou ambiguës restent inconnues."
       },
-      "review": {
-        "title": "Enregistrer cette section ?",
-        "menu_options": {
-          "save": "Enregistrer",
-          "edit": "Modifier cette section",
-          "back": "Retour sans enregistrer"
-        },
-        "description": "Enregistrez les réglages de cette section, modifiez-les ou revenez sans enregistrer. Les autres sections conservent leurs réglages actuels."
-      },
       "options_changed": {
         "title": "Les paramètres ont changé"
+      },
+      "cost_network": {
+        "title": "Ajustement du tarif de réseau",
+        "description": "Le prix de l’électricité est déjà sélectionné. Ne choisissez aucun ajustement si ce prix est final ; sinon, sélectionnez votre module tarifaire convenu.",
+        "data": {
+          "charging_network_module": "Ajustement du tarif de réseau"
+        }
       }
     },
     "error": {
@@ -1212,6 +1191,13 @@
     "vehicle_provider": {
       "options": {
         "bavariandata": "BavarianData"
+      }
+    },
+    "charging_cost_source": {
+      "options": {
+        "fixed": "Prix d’électricité fixe",
+        "sensor": "Capteur de prix d’électricité",
+        "disabled": "Désactiver l’estimation des coûts"
       }
     }
   },

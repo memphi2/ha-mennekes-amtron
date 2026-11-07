@@ -55,7 +55,7 @@ class SectionOptionsFlow(OptionsFlow):
             return other
         return own
 
-    def _review(self) -> ConfigFlowResult:
+    def _finish_section(self) -> ConfigFlowResult:
         """Commit a completed section after checking concurrent edits."""
         if self._draft is None:
             raise RuntimeError("cannot save an incomplete options section")

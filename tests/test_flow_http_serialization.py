@@ -13,8 +13,11 @@ from homeassistant.helpers.data_entry_flow import FlowManagerResourceView
 
 from custom_components.mennekes_amtron_rtu.config_schemas import (
     advanced_schema,
+    cost_kind_schema,
+    cost_module_schema,
+    cost_module_three_schema,
     cost_network_schema,
-    cost_windows_schema,
+    cost_source_schema,
     departure_calendar_schema,
     departure_capacity_schema,
     departure_configure_schema,
@@ -30,7 +33,7 @@ from custom_components.mennekes_amtron_rtu.config_schemas import (
 )
 from tests.fakes import FakeModbusClient, device_bank
 from tests.options_flow_helpers import assert_options_http
-from tests.test_charging_cost_options import prices, windows
+from tests.test_charging_cost_options import NETWORK
 from tests.test_home_assistant_smoke import _boot
 from tests.test_soc_goal_ha_lifecycle import _entry
 
@@ -101,7 +104,11 @@ def test_serializable_selectors_keep_whole_ui_numbers_and_reject_fractions(name,
     ("loss_vehicle", vehicle_provider_schema("charge_loss_vehicle_provider", "none", ["bavariandata"])),
     ("loss_vehicle_details", vehicle_device_schema({}, key="charge_loss_vehicle_device", integration="bavariandata")),
     ("loss_sensor", loss_sensor_schema({})),
-    ("cost_module3_windows", cost_windows_schema({})),
+    ("costs", cost_kind_schema({})),
+    ("cost_fixed", cost_source_schema({}, source="fixed")),
+    ("cost_sensor", cost_source_schema({}, source="sensor")),
+    ("cost_network", cost_module_schema({})),
+    ("cost_module3_prices", cost_module_three_schema({})),
 ])
 def test_optional_forms_serialize_with_translated_field_labels(step, schema):
     assert_options_http({"type": FlowResultType.FORM, "step_id": step, "data_schema": schema})
@@ -113,7 +120,7 @@ def test_real_http_options_can_save_module_three_then_back_to_two_and_standard(t
         transport = FakeModbusClient(device_bank())
         with (
             patch("custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient", return_value=transport),
-            patch("custom_components.mennekes_amtron_rtu._options_estimates.async_lookup_home_tariff", new=AsyncMock(return_value=None)),
+            patch("custom_components.mennekes_amtron_rtu._options_estimates.async_lookup_home_tariff", new=AsyncMock(return_value={**NETWORK, "_source_url": "https://example.org/network.pdf"})),
         ):
             hass = await _boot(tmp_path / "ha")
             try:
@@ -148,20 +155,23 @@ def test_real_http_options_can_save_module_three_then_back_to_two_and_standard(t
 
                 form = serialized(await manager.async_init(entry.entry_id))
                 form = await submit(form, "costs")
-                form = await submit(form, "cost_fixed")
-                form = await submit(form, {"charging_price": 0.3, "charging_network_module": "module_3"})
+                form = await submit(form, {"charging_cost_source": "fixed"})
+                form = await submit(form, {"charging_price": 0.3})
+                form = await submit(form, {"charging_network_module": "module_3"})
                 assert form["step_id"] == "cost_module3_source"
-                form = await submit(form, "cost_module3_manual")
+                form = await submit(form, "cost_module3_import")
                 assert form["step_id"] == "cost_module3_prices"
+                assert form["last_step"] is True
+                displayed = {field["name"]: field for field in view._prepare_result_json(form)["data_schema"]}
+                for key, value in NETWORK.items():
+                    if key == "price_includes_network":
+                        continue
+                    assert displayed[key]["description"]["suggested_value"] == value
                 for invalid in (2026.5, True, "2026", float("nan"), float("inf"), 10**1000):
                     with pytest.raises(InvalidData):
-                        await manager.async_configure(form["flow_id"], {**prices(), "tariff_year": invalid})
-                form = await submit(form, prices())
-                assert form["step_id"] == "cost_module3_windows"
-                form = await submit(form, windows())
-                assert form["step_id"] == "review"
+                        await manager.async_configure(form["flow_id"], {**NETWORK, "tariff_year": invalid})
                 assert "charging_network_tariff" not in entry.options
-                form = await submit(form, "save")
+                form = await submit(form, NETWORK)
                 assert form["type"] is FlowResultType.CREATE_ENTRY
                 assert entry.options["charging_network_tariff"]["module"] == "module_3"
 
@@ -171,20 +181,20 @@ def test_real_http_options_can_save_module_three_then_back_to_two_and_standard(t
                     before = dict(entry.options)
                     form = serialized(await manager.async_init(entry.entry_id))
                     form = await submit(form, "costs")
-                    form = await submit(form, "cost_fixed")
-                    form = await submit(form, {"charging_price": 0.9, "charging_network_module": "module_3"})
+                    form = await submit(form, {"charging_cost_source": "fixed"})
+                    form = await submit(form, {"charging_price": 0.9})
+                    form = await submit(form, {"charging_network_module": "module_3"})
                     form = await submit(form, "back")
                     assert form["step_id"] == "init"
                     assert entry.options == before
                     form = await submit(form, "costs")
-                    form = await submit(form, "cost_fixed")
-                    form = await submit(form, {"charging_price": 0.3, "charging_network_module": replacement})
+                    form = await submit(form, {"charging_cost_source": "fixed"})
+                    form = await submit(form, {"charging_price": 0.3})
+                    assert entry.options == before
+                    form = await submit(form, {"charging_network_module": replacement})
                     if replacement == "module_2":
                         assert form["step_id"] == "cost_module2"
                         form = await submit(form, {"regular_network": 0.1, "price_includes_network": True})
-                    assert form["step_id"] == "review"
-                    assert entry.options == before
-                    form = await submit(form, "save")
                     assert form["type"] is FlowResultType.CREATE_ENTRY
                     assert entry.options["charging_network_tariff"]["module"] == replacement
                     assert entry.options["charging_price"] == 0.3

@@ -995,34 +995,23 @@
         "description": "Wähle das Fahrzeug einmal aus. Mit der Abfahrt-Schaltfläche übernimmst du einen aktiven Timer. Aktiviere bei BavarianData die Timer-Sensoren für Aktion, Stunde und Minute; wiederkehrende Wochentage trägst du hier ein, da sie nicht veröffentlicht werden."
       },
       "costs": {
-        "title": "Ladekosten",
-        "menu_options": {
-          "cost_fixed": "Fester Strompreis",
-          "cost_sensor": "Strompreissensor",
-          "cost_disable": "Kostenschätzung deaktivieren",
-          "back": "Zurück ohne Speichern"
-        },
-        "description": "Optionale Schätzungen anhand eines festen Preises oder Preissensors. Dies steuert keine Ladevorgänge. Netzentgelt-Anpassungen werden nur für Deutschland angeboten."
+        "title": "Strompreisquelle",
+        "description": "Wähle einen festen Strompreis oder einen vorhandenen Preissensor. Mit Deaktiviert schaltest du die Kostenschätzung aus. Netzentgelte richtest du anschließend getrennt ein.",
+        "data": {
+          "charging_cost_source": "Strompreisquelle"
+        }
       },
       "cost_fixed": {
         "title": "Fester Strompreis",
         "data": {
-          "charging_price": "Bruttostrompreis",
-          "charging_network_module": "Netzentgelt-Anpassung"
+          "charging_price": "Bruttostrompreis"
         },
-        "data_description": {
-          "charging_network_module": "Verwende nur das mit deinem Netzbetreiber vereinbarte Modul. Bei Modul 3 kannst du zwischen manueller Eingabe und Import wählen."
-        },
-        "description": "Gib den Preis je kWh einschließlich Steuern an. Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss dies dein Endpreis einschließlich Netzentgelt sein. Grundpreise und jährliche Gutschriften werden nicht berücksichtigt."
+        "description": "Gib den Preis je kWh einschließlich Steuern an. Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss dies dein Endpreis einschließlich Netzentgelt sein. Grundpreise und jährliche Gutschriften werden nicht berücksichtigt. Vorgeschlagen sind zunächst 0,40 EUR/kWh; verwende deinen eigenen Vertragspreis."
       },
       "cost_sensor": {
         "title": "Strompreissensor",
         "data": {
-          "charging_price_entity": "Strompreissensor",
-          "charging_network_module": "Netzentgelt-Anpassung"
-        },
-        "data_description": {
-          "charging_network_module": "Verwende nur das mit deinem Netzbetreiber vereinbarte Modul. Bei Modul 3 kannst du zwischen manueller Eingabe und Import wählen."
+          "charging_price_entity": "Strompreissensor"
         },
         "description": "Wähle einen Sensor mit dem aktuellen Bruttostrompreis in EUR/kWh, ct/kWh oder EUR/MWh (auch das €-Zeichen wird unterstützt). Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss der Preis das Netzentgelt enthalten. Eine Meldung gilt 90 Minuten; auch die erneute Meldung desselben Werts verlängert dies. Bei fehlendem oder abgelaufenem Preis bleibt diese Energie unbepreist. Grundpreise und jährliche Gutschriften sind ausgeschlossen."
       },
@@ -1047,33 +1036,25 @@
         "description": "Manuelle Eingabe übermittelt keine Standortdaten. Der Import sendet die HA-Zuhause-Koordinaten einmal an VNBdigital und ruft öffentliche Tarife aus Par14a-Database ab. Prüfe Quelle, Preise und Zeitfenster vor dem Speichern."
       },
       "cost_module3_prices": {
-        "title": "Modul 3: Preise und Jahr",
+        "title": "Modul 3: Preise und Zeitfenster",
         "data": {
           "regular_network": "Reguläres Netzentgelt (Standardtarif)",
           "high_network": "Hohes Netzentgelt (HT)",
           "low_network": "Niedriges Netzentgelt (NT)",
           "price_includes_network": "Der Strompreis enthält bereits das reguläre Netzentgelt",
           "tariff_year": "Jahr des Preisblatts",
-          "auto_tariff_refresh": "Modul-3-Tarif zum Jahreswechsel automatisch aktualisieren"
-        },
-        "data_description": {
-          "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden.",
-          "auto_tariff_refresh": "Am 1. Januar werden veröffentlichte Werte für das neue Jahr abgerufen und bei eindeutiger Zuordnung übernommen. Falls noch keine passenden Daten vorliegen, wird täglich erneut versucht. Auch vorläufige Werte können übernommen werden; prüfe später das endgültige Preisblatt."
-        },
-        "description": "Übernimm Bruttopreise und Jahr aus dem Preisblatt des Netzbetreibers. Quelle: {source}. ⚠ kennzeichnet vorläufige Daten. Prüfe die Werte vor dem Speichern."
-      },
-      "cost_module3_windows": {
-        "title": "Modul 3: Zeitfenster",
-        "data": {
+          "auto_tariff_refresh": "Modul-3-Tarif zum Jahreswechsel automatisch aktualisieren",
           "high_periods": "Hochtarif-Zeiträume",
           "low_periods": "Niedrigtarif-Zeiträume",
           "active_quarters": "Quartale mit zeitvariablen Netzentgelten"
         },
         "data_description": {
+          "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden.",
+          "auto_tariff_refresh": "Am 1. Januar werden veröffentlichte Werte für das neue Jahr abgerufen und bei eindeutiger Zuordnung übernommen. Falls noch keine passenden Daten vorliegen, wird täglich erneut versucht. Auch vorläufige Werte können übernommen werden; prüfe später das endgültige Preisblatt.",
           "high_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich.",
           "low_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich."
         },
-        "description": "Verwende deutsche Ortszeit (Europe/Berlin) und Viertelstundengrenzen. Zeitfenster dürfen über Mitternacht gehen, sich aber nicht überschneiden; Standardtarifzeiten müssen übrig bleiben."
+        "description": "Prüfe alle drei Brutto-Netzentgelte und ihre Zeitfenster gemeinsam. Außerhalb der HT/NT-Zeiträume und der gewählten Quartale gilt der Standardtarif. Verwende deutsche Ortszeit (Europe/Berlin). Quelle: {source}. ⚠ kennzeichnet vorläufige Daten. Bestätige diesen Dialog, um zu speichern."
       },
       "losses": {
         "title": "Ladeverluste",
@@ -1110,17 +1091,15 @@
         },
         "description": "Wähle das Fahrzeug an dieser Wallbox. Es wird nur vorhandene lokale Ladehistorie gelesen, keine Fahrzeugaktualisierung angefordert. Fehlende oder mehrdeutige Zuordnungen bleiben unbekannt."
       },
-      "review": {
-        "title": "Diesen Bereich speichern?",
-        "menu_options": {
-          "save": "Speichern",
-          "edit": "Diesen Bereich bearbeiten",
-          "back": "Zurück ohne Speichern"
-        },
-        "description": "Speichere die vollständigen Einstellungen dieses Bereichs, bearbeite sie oder kehre ohne Speichern zurück. Andere Bereiche behalten ihre aktuellen Einstellungen."
-      },
       "options_changed": {
         "title": "Einstellungen wurden geändert"
+      },
+      "cost_network": {
+        "title": "Netzentgelt-Anpassung",
+        "description": "Der Strompreis ist bereits ausgewählt. Wähle keine Anpassung, wenn dies dein Endpreis ist, andernfalls dein vereinbartes Netzentgelt-Modul.",
+        "data": {
+          "charging_network_module": "Netzentgelt-Anpassung"
+        }
       }
     },
     "error": {
@@ -1212,6 +1191,13 @@
     "vehicle_provider": {
       "options": {
         "bavariandata": "BavarianData"
+      }
+    },
+    "charging_cost_source": {
+      "options": {
+        "fixed": "Fester Strompreis",
+        "sensor": "Strompreissensor",
+        "disabled": "Kostenschätzung deaktivieren"
       }
     }
   },

@@ -995,34 +995,23 @@
         "description": "Select the vehicle once. Use the departure button to copy one active timer. For BavarianData, enable its action, hour and minute timer sensors; enter recurring weekdays here because the integration does not publish them."
       },
       "costs": {
-        "title": "Charging costs",
-        "menu_options": {
-          "cost_fixed": "Fixed electricity price",
-          "cost_sensor": "Electricity price sensor",
-          "cost_disable": "Disable cost estimates",
-          "back": "Back without saving"
-        },
-        "description": "Optional estimates from a fixed price or a price sensor. This does not control charging. Network tariff adjustments are offered only for Germany."
+        "title": "Electricity price source",
+        "description": "Choose a fixed electricity price or an existing price sensor. Select Disabled to turn off cost estimates. Network tariffs are configured separately in the next steps.",
+        "data": {
+          "charging_cost_source": "Electricity price source"
+        }
       },
       "cost_fixed": {
         "title": "Fixed electricity price",
         "data": {
-          "charging_price": "Gross electricity price",
-          "charging_network_module": "Network price adjustment"
+          "charging_price": "Gross electricity price"
         },
-        "data_description": {
-          "charging_network_module": "Use only the module agreed with your network operator. Module 3 offers manual entry or a separate import choice."
-        },
-        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded."
+        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded. The initial suggestion is 0.40 EUR/kWh; use your own contract price."
       },
       "cost_sensor": {
         "title": "Electricity price sensor",
         "data": {
-          "charging_price_entity": "Electricity price sensor",
-          "charging_network_module": "Network price adjustment"
-        },
-        "data_description": {
-          "charging_network_module": "Use only the module agreed with your network operator. Module 3 offers manual entry or a separate import choice."
+          "charging_price_entity": "Electricity price sensor"
         },
         "description": "Select a sensor with the current gross electricity price in EUR/kWh, ct/kWh or EUR/MWh (the € symbol is also supported). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded."
       },
@@ -1047,33 +1036,25 @@
         "description": "Manual entry sends no location data. Import sends HA Home coordinates once to VNBdigital, then retrieves public tariffs from Par14a-Database. Review the source, prices and time windows before saving."
       },
       "cost_module3_prices": {
-        "title": "Module 3: prices and year",
+        "title": "Module 3: prices and time windows",
         "data": {
           "regular_network": "Regular network price (standard tariff)",
           "high_network": "High network price (HT)",
           "low_network": "Low network price (NT)",
           "price_includes_network": "Electricity price already includes the regular network price",
           "tariff_year": "Price-sheet year",
-          "auto_tariff_refresh": "Refresh Module 3 tariff automatically at the new year"
-        },
-        "data_description": {
-          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice.",
-          "auto_tariff_refresh": "When enabled, the integration fetches the new year’s published tariff on 1 January and applies a valid unambiguous result. It retries daily if no valid data is available. Provisional published values may be used; review the final price sheet later."
-        },
-        "description": "Copy gross prices and year from the operator’s price sheet. Source: {source}. ⚠ marks provisional data. Check these values before saving."
-      },
-      "cost_module3_windows": {
-        "title": "Module 3: time windows",
-        "data": {
+          "auto_tariff_refresh": "Refresh Module 3 tariff automatically at the new year",
           "high_periods": "High tariff periods",
           "low_periods": "Low tariff periods",
           "active_quarters": "Quarters with time-variable network prices"
         },
         "data_description": {
+          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice.",
+          "auto_tariff_refresh": "When enabled, the integration fetches the new year’s published tariff on 1 January and applies a valid unambiguous result. It retries daily if no valid data is available. Provisional published values may be used; review the final price sheet later.",
           "high_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed.",
           "low_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed."
         },
-        "description": "Use German local time (Europe/Berlin) and quarter-hour boundaries. Overnight windows are allowed; windows must not overlap and must leave time at the standard rate."
+        "description": "Review all three gross network prices and their time windows together. Standard tariff applies outside the high/low windows and outside the selected quarters. Use German local time (Europe/Berlin). Source: {source}. ⚠ marks provisional data. Confirm this form to save."
       },
       "losses": {
         "title": "Charging losses",
@@ -1110,17 +1091,15 @@
         },
         "description": "Select the vehicle connected to this wallbox. Only existing local charging history is read; no vehicle refresh is requested. Missing or ambiguous matches remain unknown."
       },
-      "review": {
-        "title": "Save this section?",
-        "menu_options": {
-          "save": "Save",
-          "edit": "Edit this section",
-          "back": "Back without saving"
-        },
-        "description": "Save the completed settings for this section, edit them, or return without saving. Other sections keep their current settings."
-      },
       "options_changed": {
         "title": "Settings have changed"
+      },
+      "cost_network": {
+        "title": "Network price adjustment",
+        "description": "The electricity price has already been selected. Choose no adjustment if it is your final price; otherwise select your agreed network tariff.",
+        "data": {
+          "charging_network_module": "Network price adjustment"
+        }
       }
     },
     "error": {
@@ -1212,6 +1191,13 @@
     "vehicle_provider": {
       "options": {
         "bavariandata": "BavarianData"
+      }
+    },
+    "charging_cost_source": {
+      "options": {
+        "fixed": "Fixed electricity price",
+        "sensor": "Electricity price sensor",
+        "disabled": "Disable cost estimates"
       }
     }
   },

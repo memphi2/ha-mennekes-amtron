@@ -995,34 +995,23 @@
         "description": "Kies het voertuig eenmalig. Neem met de vertrekknop één actieve timer over. Schakel bij BavarianData de timersensoren voor actie, uur en minuut in; stel terugkerende weekdagen hier in omdat die niet worden gepubliceerd."
       },
       "costs": {
-        "title": "Laadkosten",
-        "menu_options": {
-          "cost_fixed": "Vaste stroomprijs",
-          "cost_sensor": "Stroomprijssensor",
-          "cost_disable": "Kostenraming uitschakelen",
-          "back": "Terug zonder opslaan"
-        },
-        "description": "Optionele ramingen met een vaste prijs of prijssensor. Dit stuurt het laden niet aan. Nettariefaanpassingen worden alleen voor Duitsland aangeboden."
+        "title": "Bron van de stroomprijs",
+        "description": "Kies een vaste stroomprijs of een bestaande prijssensor. Uitgeschakeld stopt de kostenraming. Netwerktarieven stel je in de volgende stappen apart in.",
+        "data": {
+          "charging_cost_source": "Bron van de stroomprijs"
+        }
       },
       "cost_fixed": {
         "title": "Vaste stroomprijs",
         "data": {
-          "charging_price": "Stroomprijs inclusief belastingen",
-          "charging_network_module": "Aanpassing van netkosten"
+          "charging_price": "Stroomprijs inclusief belastingen"
         },
-        "data_description": {
-          "charging_network_module": "Gebruik alleen de module die je met je netbeheerder hebt afgesproken. Module 3 biedt handmatige invoer of een afzonderlijke importkeuze."
-        },
-        "description": "Voer de prijs per kWh inclusief belastingen in. Negatieve prijzen zijn toegestaan. Zonder aanpassing van netkosten moet dit je eindprijs inclusief netkosten zijn. Vaste kosten en jaarlijkse kortingen worden niet meegenomen."
+        "description": "Voer de prijs per kWh inclusief belastingen in. Negatieve prijzen zijn toegestaan. Zonder aanpassing van netkosten moet dit je eindprijs inclusief netkosten zijn. Vaste kosten en jaarlijkse kortingen worden niet meegenomen. Het eerste voorstel is 0,40 EUR/kWh; gebruik je eigen contractprijs."
       },
       "cost_sensor": {
         "title": "Stroomprijssensor",
         "data": {
-          "charging_price_entity": "Stroomprijssensor",
-          "charging_network_module": "Aanpassing van netkosten"
-        },
-        "data_description": {
-          "charging_network_module": "Gebruik alleen de module die je met je netbeheerder hebt afgesproken. Module 3 biedt handmatige invoer of een afzonderlijke importkeuze."
+          "charging_price_entity": "Stroomprijssensor"
         },
         "description": "Selecteer een sensor met de actuele stroomprijs inclusief belastingen in EUR/kWh, ct/kWh of EUR/MWh (het €-teken wordt ook ondersteund). Negatieve prijzen zijn toegestaan. Zonder netaanpassing moet de prijs netkosten bevatten. Een gemelde waarde blijft 90 minuten geldig; dezelfde waarde opnieuw melden verlengt dit. Bij ontbrekende of verlopen prijzen krijgt die energie geen prijs. Vaste kosten en jaarlijkse kortingen worden niet meegenomen."
       },
@@ -1047,33 +1036,25 @@
         "description": "Handmatige invoer verstuurt geen locatiegegevens. Importeren stuurt de HA Thuis-coördinaten eenmalig naar VNBdigital en haalt openbare tarieven uit Par14a-Database. Controleer bron, prijzen en tijdvakken voordat je opslaat."
       },
       "cost_module3_prices": {
-        "title": "Module 3: prijzen en jaar",
+        "title": "Module 3: prijzen en tijdvensters",
         "data": {
           "regular_network": "Normaal nettarief (standaardtarief)",
           "high_network": "Hoog nettarief (HT)",
           "low_network": "Laag nettarief (NT)",
           "price_includes_network": "De stroomprijs bevat al het normale nettarief",
           "tariff_year": "Jaar van de prijslijst",
-          "auto_tariff_refresh": "Module 3-tarief automatisch bij de jaarwisseling bijwerken"
-        },
-        "data_description": {
-          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen.",
-          "auto_tariff_refresh": "Op 1 januari worden gepubliceerde tarieven voor het nieuwe jaar opgehaald en toegepast als de gegevens eenduidig zijn. Als er nog geen geldige gegevens zijn, wordt dagelijks opnieuw geprobeerd. Voorlopige waarden kunnen worden gebruikt; controleer later het definitieve tariefblad."
-        },
-        "description": "Neem brutoprijzen en jaar over uit het tariefblad van de netbeheerder. Bron: {source}. ⚠ duidt voorlopige gegevens aan. Controleer de waarden voor het opslaan."
-      },
-      "cost_module3_windows": {
-        "title": "Module 3: tijdvakken",
-        "data": {
+          "auto_tariff_refresh": "Module 3-tarief automatisch bij de jaarwisseling bijwerken",
           "high_periods": "Hoogtariefperioden",
           "low_periods": "Laagtariefperioden",
           "active_quarters": "Kwartalen met tijdsafhankelijke nettarieven"
         },
         "data_description": {
+          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen.",
+          "auto_tariff_refresh": "Op 1 januari worden gepubliceerde tarieven voor het nieuwe jaar opgehaald en toegepast als de gegevens eenduidig zijn. Als er nog geen geldige gegevens zijn, wordt dagelijks opnieuw geprobeerd. Voorlopige waarden kunnen worden gebruikt; controleer later het definitieve tariefblad.",
           "high_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan.",
           "low_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan."
         },
-        "description": "Gebruik Duitse lokale tijd (Europe/Berlin) en kwartiergrenzen. Tijdvakken mogen over middernacht lopen, maar niet overlappen; er moet tijd tegen standaardtarief overblijven."
+        "description": "Controleer de drie netwerktarieven inclusief btw en hun tijdvensters samen. Het standaardtarief geldt buiten de hoge/lage vensters en de gekozen kwartalen. Gebruik Duitse lokale tijd (Europe/Berlin). Bron: {source}. ⚠ betekent voorlopige gegevens. Bevestig dit formulier om op te slaan."
       },
       "losses": {
         "title": "Laadverliezen",
@@ -1110,17 +1091,15 @@
         },
         "description": "Kies het voertuig aan deze wallbox. Alleen bestaande lokale laadgeschiedenis wordt gelezen; er wordt geen voertuigupdate gevraagd. Ontbrekende of onduidelijke overeenkomsten blijven onbekend."
       },
-      "review": {
-        "title": "Deze sectie opslaan?",
-        "menu_options": {
-          "save": "Opslaan",
-          "edit": "Deze sectie bewerken",
-          "back": "Terug zonder opslaan"
-        },
-        "description": "Sla de volledige instellingen van deze sectie op, bewerk ze of ga terug zonder opslaan. Andere secties behouden hun huidige instellingen."
-      },
       "options_changed": {
         "title": "Instellingen zijn gewijzigd"
+      },
+      "cost_network": {
+        "title": "Aanpassing van netwerktarieven",
+        "description": "De stroomprijs is al gekozen. Kies geen aanpassing als dit de eindprijs is; kies anders de overeengekomen netwerktariefmodule.",
+        "data": {
+          "charging_network_module": "Aanpassing van netwerktarieven"
+        }
       }
     },
     "error": {
@@ -1212,6 +1191,13 @@
     "vehicle_provider": {
       "options": {
         "bavariandata": "BavarianData"
+      }
+    },
+    "charging_cost_source": {
+      "options": {
+        "fixed": "Vaste stroomprijs",
+        "sensor": "Stroomprijssensor",
+        "disabled": "Kostenraming uitschakelen"
       }
     }
   },

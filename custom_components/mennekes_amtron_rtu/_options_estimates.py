@@ -28,6 +28,7 @@ from .charging_cost_const import (
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
+    COST_SOURCE_DISABLED,
     COST_SOURCE_FIXED,
     COST_SOURCE_SENSOR,
     NETWORK_MODULE_3,
@@ -35,9 +36,11 @@ from .charging_cost_const import (
     NETWORK_MODULES,
 )
 from .config_schemas import (
+    cost_kind_schema,
+    cost_module_schema,
+    cost_module_three_schema,
     cost_network_schema,
     cost_source_schema,
-    cost_windows_schema,
     loss_sensor_schema,
     vehicle_device_schema,
     vehicle_provider_schema,
@@ -76,19 +79,20 @@ class EstimateOptionsFlow(SectionOptionsFlow):
     async def async_step_costs(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        self._begin("costs", COST_KEYS)
-        return self.async_show_menu(
-            step_id="costs",
-            menu_options=["cost_fixed", "cost_sensor", "cost_disable", "back"],
+        draft = self._begin("costs", COST_KEYS)
+        errors = {}
+        if user_input is not None:
+            source = user_input.get(CONF_CHARGING_COST_SOURCE)
+            if source == COST_SOURCE_DISABLED:
+                draft.clear(COST_KEYS)
+                return self._finish_section()
+            if source in (COST_SOURCE_FIXED, COST_SOURCE_SENSOR):
+                self._details["cost_source"] = source
+                return await self._cost_source(source, None)
+            errors[CONF_CHARGING_COST_SOURCE] = "cost_source_invalid"
+        return self.async_show_form(
+            step_id="costs", data_schema=cost_kind_schema(draft.values), errors=errors,
         )
-
-    async def async_step_cost_disable(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if (draft := self._section("costs")) is None:
-            return await self.async_step_init()
-        draft.clear(COST_KEYS)
-        return self._review()
 
     async def async_step_cost_fixed(
         self, user_input: dict[str, Any] | None = None
@@ -103,14 +107,10 @@ class EstimateOptionsFlow(SectionOptionsFlow):
     async def _cost_source(
         self, source: str, user_input: dict[str, Any] | None
     ) -> ConfigFlowResult:
-        if (draft := self._section("costs")) is None:
+        if (draft := self._section("costs")) is None or self._details.get("cost_source") != source:
             return await self.async_step_init()
         allow_network = getattr(self.hass.config, "country", None) == "DE"
-        errors = (
-            _cost_errors(source, user_input, allow_network=allow_network)
-            if user_input is not None
-            else {}
-        )
+        errors = _cost_errors(source, user_input) if user_input is not None else {}
         if user_input is not None and not errors:
             draft.values[CONF_CHARGING_COST_SOURCE] = source
             key = (
@@ -125,8 +125,6 @@ class EstimateOptionsFlow(SectionOptionsFlow):
             )
             draft.values[key] = user_input[key]
             draft.clear({other})
-            module = user_input.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE)
-            self._details["module"] = module
             previous = draft.values.get(CONF_CHARGING_NETWORK_TARIFF)
             self._details["tariff"] = tariff_form_values(
                 previous if isinstance(previous, dict) else {}
@@ -135,28 +133,48 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                 CONF_AUTO_TARIFF_REFRESH, False
             )
             self._details["source"] = "—"
-            if module == NETWORK_MODULE_NONE:
+            self._details["cost_ready"] = True
+            if not allow_network:
                 draft.values[CONF_CHARGING_NETWORK_TARIFF] = {
                     "module": NETWORK_MODULE_NONE
                 }
                 draft.clear({CONF_AUTO_TARIFF_REFRESH})
-                return self._review()
-            if module == NETWORK_MODULE_3:
-                return await self.async_step_cost_module3_source()
-            return await self.async_step_cost_module2()
+                return self._finish_section()
+            return await self.async_step_cost_network()
         current = dict(draft.values) if user_input is None else user_input
-        if user_input is None:
-            tariff = current.get(CONF_CHARGING_NETWORK_TARIFF)
-            current[CONF_CHARGING_NETWORK_MODULE] = (
-                tariff.get("module", NETWORK_MODULE_NONE)
-                if isinstance(tariff, dict)
-                else NETWORK_MODULE_NONE
-            )
         return self.async_show_form(
             step_id=f"cost_{source}",
-            data_schema=cost_source_schema(
-                current, source=source, allow_network=allow_network
-            ),
+            data_schema=cost_source_schema(current, source=source),
+            errors=errors,
+            last_step=not allow_network,
+        )
+
+    async def async_step_cost_network(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if (
+            (draft := self._section("costs")) is None
+            or not self._details.get("cost_ready")
+            or getattr(self.hass.config, "country", None) != "DE"
+        ):
+            return await self.async_step_init()
+        errors = {}
+        if user_input is not None:
+            module = user_input.get(CONF_CHARGING_NETWORK_MODULE)
+            if module not in NETWORK_MODULES:
+                errors[CONF_CHARGING_NETWORK_MODULE] = "network_tariff_invalid"
+            else:
+                self._details["module"] = module
+                if module == NETWORK_MODULE_NONE:
+                    draft.values[CONF_CHARGING_NETWORK_TARIFF] = {"module": NETWORK_MODULE_NONE}
+                    draft.clear({CONF_AUTO_TARIFF_REFRESH})
+                    return self._finish_section()
+                if module == NETWORK_MODULE_3:
+                    return await self.async_step_cost_module3_source()
+                return await self.async_step_cost_module2()
+        return self.async_show_form(
+            step_id="cost_network",
+            data_schema=cost_module_schema(draft.values),
             errors=errors,
         )
 
@@ -184,6 +202,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                 module="module_2",
             ),
             errors=errors,
+            last_step=True,
         )
 
     async def async_step_cost_module3_source(
@@ -231,7 +250,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if (
-            self._section("costs") is None
+            (draft := self._section("costs")) is None
             or self._details.get("module") != NETWORK_MODULE_3
         ):
             return await self.async_step_init()
@@ -239,47 +258,25 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         if user_input is not None:
             errors = _network_price_errors(user_input)
             if not errors:
-                self._details["tariff"].update(user_input)
-                self._details["prices_valid"] = True
-                return await self.async_step_cost_module3_windows()
+                try:
+                    tariff = parse_tariff_inputs(
+                        user_input, module=NETWORK_MODULE_3, timezone="Europe/Berlin"
+                    )
+                except KeyError, TypeError, ValueError:
+                    errors["base"] = "network_tariff_invalid"
+                else:
+                    return self._finish_tariff(
+                        draft, tariff,
+                        automatic=user_input.get(CONF_AUTO_TARIFF_REFRESH, False),
+                    )
         elif self._details.get("lookup_failed"):
             errors["base"] = "tariff_lookup_failed"
         return self.async_show_form(
             step_id="cost_module3_prices",
-            data_schema=cost_network_schema(
-                self._details["tariff"] if user_input is None else user_input,
-                module=NETWORK_MODULE_3,
-            ),
+            data_schema=cost_module_three_schema(self._details["tariff"] if user_input is None else user_input),
             errors=errors,
             description_placeholders={"source": self._details["source"]},
-        )
-
-    async def async_step_cost_module3_windows(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if (draft := self._section("costs")) is None or not self._details.get(
-            "prices_valid"
-        ):
-            return await self.async_step_init()
-        errors = {}
-        if user_input is not None:
-            values = {**self._details["tariff"], **user_input}
-            try:
-                tariff = parse_tariff_inputs(
-                    values, module=NETWORK_MODULE_3, timezone="Europe/Berlin"
-                )
-            except KeyError, TypeError, ValueError:
-                errors["base"] = "network_tariff_invalid"
-            else:
-                return self._finish_tariff(
-                    draft, tariff, automatic=values.get(CONF_AUTO_TARIFF_REFRESH, False)
-                )
-        return self.async_show_form(
-            step_id="cost_module3_windows",
-            data_schema=cost_windows_schema(
-                self._details["tariff"] if user_input is None else user_input,
-            ),
-            errors=errors,
+            last_step=True,
         )
 
     def _finish_tariff(
@@ -289,7 +286,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         draft.clear({CONF_AUTO_TARIFF_REFRESH})
         if tariff["module"] == NETWORK_MODULE_3:
             draft.values[CONF_AUTO_TARIFF_REFRESH] = automatic
-        return self._review()
+        return self._finish_section()
 
     async def async_step_losses(
         self, user_input: dict[str, Any] | None = None
@@ -306,7 +303,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         if (draft := self._section("losses")) is None:
             return await self.async_step_init()
         draft.clear(LOSS_KEYS)
-        return self._review()
+        return self._finish_section()
 
     async def async_step_loss_sensor(
         self, user_input: dict[str, Any] | None = None
@@ -335,13 +332,14 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                         ),
                     }
                 )
-                return self._review()
+                return self._finish_section()
         return self.async_show_form(
             step_id="loss_sensor",
             data_schema=loss_sensor_schema(
                 draft.values if user_input is None else user_input,
             ),
             errors=errors,
+            last_step=True,
         )
 
     async def async_step_loss_vehicle(
@@ -398,7 +396,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                         CONF_LOSS_VEHICLE_DEVICE: device,
                     }
                 )
-                return self._review()
+                return self._finish_section()
         current = (
             {CONF_LOSS_VEHICLE_DEVICE: self._details["suggested_device"]}
             if user_input is None
@@ -412,6 +410,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                 integration=provider.integration_domain,
             ),
             errors=errors,
+            last_step=True,
         )
 
 
@@ -447,8 +446,6 @@ def _network_price_errors(values: dict[str, Any]) -> dict[str, str]:
 def _cost_errors(
     source: str,
     values: dict[str, Any],
-    *,
-    allow_network: bool = True,
 ) -> dict[str, str]:
     errors = {}
     if source == COST_SOURCE_FIXED:
@@ -468,9 +465,4 @@ def _cost_errors(
             or not value.startswith("sensor.")
         ):
             errors[CONF_CHARGING_PRICE_ENTITY] = "cost_source_invalid"
-    module = values.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE)
-    if module not in NETWORK_MODULES or (
-        not allow_network and module != NETWORK_MODULE_NONE
-    ):
-        errors[CONF_CHARGING_NETWORK_MODULE] = "network_tariff_invalid"
     return errors

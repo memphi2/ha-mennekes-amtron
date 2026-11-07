@@ -153,9 +153,11 @@ Choose one of five independent sections:
 | **Charging costs** | A fixed price or price entity; German network tariffs when applicable |
 | **Charging losses** | A last-charge energy entity or a supported vehicle history adapter |
 
-Only the fields for your selected choices appear. Finish with **Save** to
-apply that section. **Edit** returns to it; **Back** discards its unsaved
-changes and returns to the menu. Other sections keep their settings.
+Only the fields for your selected choices appear. Confirm the last input
+form to save that section directly; there is no extra confirmation page.
+Cancel or **Back** discards an unfinished section. Other sections keep their
+settings, and a concurrent edit to the same section is reported instead of
+being overwritten.
 
 | Setting | Direct USB or LAN connection | Modbus service connection |
 |---|---|---|

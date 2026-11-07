@@ -7,7 +7,8 @@ The setup steps below follow the separate menus in **beta 0.7.0b4**.
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure**, then **Charging costs** or **Charging losses**.
-Choose a source to see only its relevant inputs; finish with **Save**. They work with a
+Choose a source to see only its relevant inputs; confirming the last form saves
+the section directly. They work with a
 direct USB/LAN connection and with the Modbus app/service. No extra Modbus
 polling, vehicle commands or electricity-provider login is needed.
 
@@ -148,7 +149,7 @@ Choose one model:
 | Module 1 + 3 | Standard, high and low network prices; daily high/low windows; active quarters; tariff year | Replace the regular network component with the price for that local time. |
 
 After choosing Module 3, select **Enter or edit manually** or **Import for HA Home**.
-Manual entry opens the price and time-window forms without an external lookup.
+Manual entry opens the combined price and time-window form without an external lookup.
 Choosing the import makes a **one-time lookup**: it sends the configured HA Home coordinates to
 [VNBdigital](https://www.vnbdigital.de/) to find the responsible low-voltage
 network operator, then reads the current year's public data from
@@ -171,7 +172,7 @@ to Par14a-Database (the78mole), [CC BY 4.0](https://creativecommons.org/licenses
 The network operator's original price sheet governs. Choose **Import for HA
 Home** again whenever you want to retrieve the current published values.
 **Automatic yearly refresh** is a separate optional switch in the Module 3
-time-window form. When enabled, the integration checks the new year's tariff
+tariff form. When enabled, the integration checks the new year's tariff
 on 1 January in **Europe/Berlin** and applies it only if the operator
 and published schedule are unambiguous and valid. If no usable sheet is
 available, it retries once a day; cost estimates remain unknown for that year
@@ -192,8 +193,10 @@ Module 1 and cannot be combined with Module 2 for the same market location.
 Eligibility and the price structure are explained by the
 [Bundesnetzagentur](https://www.bundesnetzagentur.de/DE/Vportal/Energie/SteuerbareVBE/artikel.html).
 
-Module 3 asks for prices first, then daily windows and active quarters. Its
-time-window form supports multiple high-price and low-price daily windows.
+Module 3 shows all three prices, daily windows and active quarters together
+in one final form, including values supplied by the import. Confirming this
+form saves the complete tariff directly. It supports multiple high-price and
+low-price daily windows.
 Enter one period per line as `HH:MM-HH:MM`, for example `06:00-09:00` and
 `17:00-20:00` on separate lines. Windows may cross midnight; all other times
 use the standard rate. Window boundaries must fall on quarter hours, must not

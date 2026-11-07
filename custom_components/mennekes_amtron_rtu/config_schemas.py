@@ -32,7 +32,9 @@ from .charge_loss_const import (
 from .charging_cost_const import (
     CONF_ACTIVE_QUARTERS,
     CONF_AUTO_TARIFF_REFRESH,
+    CONF_CHARGING_COST_SOURCE,
     CONF_CHARGING_NETWORK_MODULE,
+    CONF_CHARGING_NETWORK_TARIFF,
     CONF_CHARGING_PRICE,
     CONF_CHARGING_PRICE_ENTITY,
     CONF_HIGH_NETWORK,
@@ -42,7 +44,9 @@ from .charging_cost_const import (
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
+    COST_SOURCE_DISABLED,
     COST_SOURCE_FIXED,
+    COST_SOURCE_SENSOR,
     NETWORK_MODULE_3,
     NETWORK_MODULE_NONE,
     NETWORK_MODULES,
@@ -510,11 +514,24 @@ def loss_sensor_schema(current: dict[str, Any]) -> probatio.Schema:
     )
 
 
+def cost_kind_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Select the price source before showing its own inputs."""
+    return probatio.Schema({
+        probatio.Required(
+            CONF_CHARGING_COST_SOURCE,
+            default=current.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED),
+        ): SelectSelector(SelectSelectorConfig(
+            options=[COST_SOURCE_FIXED, COST_SOURCE_SENSOR, COST_SOURCE_DISABLED],
+            translation_key="charging_cost_source",
+            mode=SelectSelectorMode.DROPDOWN,
+        )),
+    })
+
+
 def cost_source_schema(
     current: dict[str, Any],
     *,
     source: str,
-    allow_network: bool = True,
 ) -> probatio.Schema:
     fields: dict[Any, Any] = {}
     if source == COST_SOURCE_FIXED:
@@ -535,27 +552,26 @@ def cost_source_schema(
                 },
             )
         ] = _entity_selector(("sensor",))
-    if allow_network:
-        fields[
-            probatio.Required(
-                CONF_CHARGING_NETWORK_MODULE,
-                default=current.get(
-                    CONF_CHARGING_NETWORK_MODULE,
-                    NETWORK_MODULE_NONE,
-                ),
-            )
-        ] = SelectSelector(
+    return probatio.Schema(fields)
+
+
+def cost_module_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Keep the optional German adjustment separate from the energy price."""
+    tariff = current.get(CONF_CHARGING_NETWORK_TARIFF)
+    module = tariff.get("module", NETWORK_MODULE_NONE) if isinstance(tariff, dict) else NETWORK_MODULE_NONE
+    return probatio.Schema({
+        probatio.Required(CONF_CHARGING_NETWORK_MODULE, default=module): SelectSelector(
             SelectSelectorConfig(
                 options=list(NETWORK_MODULES),
                 translation_key="charging_network_module",
                 mode=SelectSelectorMode.DROPDOWN,
-            )
-        )
-    return probatio.Schema(fields)
+            ),
+        ),
+    })
 
 
 def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Schema:
-    """Published prices only; Module 3 time windows have their own next step."""
+    """Published network prices, shared by Module 2 and the full Module 3 form."""
     fields: dict[Any, Any] = {
         probatio.Required(
             CONF_REGULAR_NETWORK,
@@ -618,6 +634,14 @@ def cost_windows_schema(current: dict[str, Any]) -> probatio.Schema:
         )
     )
     return probatio.Schema(fields)
+
+
+def cost_module_three_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Review all imported prices and periods together before saving."""
+    return probatio.Schema({
+        **cost_network_schema(current, module=NETWORK_MODULE_3).schema,
+        **cost_windows_schema(current).schema,
+    })
 
 
 def _price_selector(*, allow_negative: bool = False) -> NumberSelector:

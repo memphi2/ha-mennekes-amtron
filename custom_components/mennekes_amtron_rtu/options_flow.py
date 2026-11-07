@@ -125,7 +125,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
         service = CONF_SERVER_URL in self.config_entry.data
         if user_input is not None:
             draft.values.update(_normalized(user_input, service_mode=service))
-            return self._review()
+            return self._finish_section()
         return self.async_show_form(
             step_id="wallbox_basic",
             data_schema=options_schema(
@@ -155,7 +155,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
                     if key in user_input
                 }
             )
-            return self._review()
+            return self._finish_section()
         identity = getattr(
             getattr(self.config_entry, "runtime_data", None), "identity", None
         )
@@ -185,7 +185,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
         draft.clear({CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY})
         draft.values[CONF_TIMED_GOAL_ENABLED] = False
         draft.values[CONF_TIMED_GOAL_RESET_PENDING] = True
-        return self._review()
+        return self._finish_section()
 
     async def async_step_vehicle_soc(
         self, user_input: dict[str, Any] | None = None
@@ -205,7 +205,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
                     self._details["limit"] = True
                     return await self.async_step_vehicle_limit()
                 draft.clear({CONF_VEHICLE_CHARGE_LIMIT_ENTITY})
-                return self._review()
+                return self._finish_section()
         return self.async_show_form(
             step_id="vehicle_soc",
             data_schema=vehicle_soc_schema(
@@ -235,7 +235,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
                 draft.values[CONF_VEHICLE_CHARGE_LIMIT_ENTITY] = user_input[
                     CONF_VEHICLE_CHARGE_LIMIT_ENTITY
                 ]
-                return self._review()
+                return self._finish_section()
         return self.async_show_form(
             step_id="vehicle_limit",
             data_schema=vehicle_limit_schema(
@@ -270,7 +270,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
             return await self.async_step_init()
         draft.values[CONF_TIMED_GOAL_ENABLED] = False
         draft.values[CONF_TIMED_GOAL_RESET_PENDING] = True
-        return self._review()
+        return self._finish_section()
 
     async def async_step_departure_configure(
         self, user_input: dict[str, Any] | None = None
@@ -374,7 +374,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
             if step == "departure_entity":
                 return await self.async_step_departure_entity()
             return await self.async_step_departure_vehicle()
-        return self._review()
+        return self._finish_section()
 
     async def async_step_departure_calendar(
         self, user_input: dict[str, Any] | None = None
@@ -507,7 +507,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
             last_step=True,
         )
 
-    def _review(self) -> ConfigFlowResult:
+    def _finish_section(self) -> ConfigFlowResult:
         """Recheck the vehicle requirement immediately before committing."""
         if (
             (draft := self._section("departure")) is not None
@@ -515,7 +515,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
             and not self.config_entry.options.get(CONF_VEHICLE_SOC_ENTITY)
         ):
             return self._options_changed()
-        return super()._review()
+        return super()._finish_section()
 
 
 def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, Any]:
