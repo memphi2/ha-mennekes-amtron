@@ -206,6 +206,18 @@
           "unreachable": "mdi:timer-alert-outline",
           "error": "mdi:alert-circle-outline"
         }
+      },
+      "virtual_plug_charge_status": {
+        "default": "mdi:ev-plug-type2",
+        "state": {
+          "waiting_vehicle": "mdi:car-clock",
+          "waiting_detection": "mdi:timer-sand",
+          "vehicle_not_permitted": "mdi:lock-outline",
+          "waiting_release": "mdi:timer-sand",
+          "authorized": "mdi:check-circle-outline",
+          "blocked": "mdi:lock-outline",
+          "disabled": "mdi:power-plug-off"
+        }
       }
     },
     "switch": {

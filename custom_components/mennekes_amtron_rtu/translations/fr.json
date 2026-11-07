@@ -603,6 +603,18 @@
           "write_pending": "Écriture en attente",
           "error": "Erreur"
         }
+      },
+      "virtual_plug_charge_status": {
+        "name": "État de Plug & Charge virtuel",
+        "state": {
+          "waiting_vehicle": "En attente du véhicule",
+          "waiting_detection": "En attente de données actuelles",
+          "vehicle_not_permitted": "Véhicule non autorisé",
+          "waiting_release": "En attente de l’autorisation de charge",
+          "authorized": "Véhicule autorisé",
+          "blocked": "Charge bloquée",
+          "disabled": "Désactivé"
+        }
       }
     },
     "switch": {
@@ -807,6 +819,21 @@
     },
     "vehicle_selection_changed": {
       "message": "La sélection du véhicule a changé pendant la configuration. Celle-ci sera relancée avec la sélection actuelle."
+    },
+    "plug_charge_unavailable": {
+      "message": "Plug & Charge virtuel n’a pas pu être initialisé. La configuration sera réessayée ; vérifiez la connexion à la borne ou à l’application Modbus."
+    },
+    "plug_charge_blocked": {
+      "message": "La charge automatique est bloquée. Vérifiez l’autorisation du véhicule, la pause manuelle et les objectifs."
+    },
+    "plug_charge_session_changed": {
+      "message": "La connexion du véhicule ou les réglages d’autorisation ont changé. L’autorisation n’a pas été appliquée ; attendez la reconnaissance de la session actuelle."
+    },
+    "plug_charge_authorization_expired": {
+      "message": "L’autorisation a expiré ou n’est plus valide. Attendez des données actuelles et concordantes avant de réessayer."
+    },
+    "plug_charge_not_supported": {
+      "message": "L’application ou le service Modbus connecté ne prend pas en charge Plug & Charge virtuel. Mettez-le à jour vers une version compatible."
     }
   },
   "issues": {
@@ -908,7 +935,8 @@
           "back": "Retour sans enregistrer",
           "vehicle_profiles": "Profils de véhicule",
           "vehicle_source": "Configurer le niveau de charge",
-          "vehicle_detection": "Sélection automatique du véhicule"
+          "vehicle_detection": "Sélection automatique du véhicule",
+          "vehicle_plug_charge": "Plug & Charge virtuel"
         },
         "description": "Configurez les profils et l’objectif facultatif en pourcentage. Choisissez chaque voiture une fois, puis activez séparément sa limite, sa capacité, ses départs ou son historique."
       },
@@ -1298,6 +1326,18 @@
           "vehicle_connected_entity": "Utilisez le signal « câble branché » de ce véhicule, pas « charge en cours » : il doit rester identifiable en pause ou avec une batterie pleine.",
           "vehicle_home_entity": "Préférez la localisation du véhicule. La présence d’une personne ne convient que si elle indique de façon fiable que ce véhicule est au domicile. Deux véhicules correspondants ou des signaux incertains empêchent la sélection automatique."
         }
+      },
+      "vehicle_plug_charge": {
+        "title": "Plug & Charge virtuel",
+        "description": "Véhicule actif : **{vehicle}**.\n\nAutorisation facultative fondée sur les signaux du véhicule, sans authentification ISO 15118. La borne doit permettre la charge automatique avec l’autorisation RFID désactivée. La charge attend l’identification unique d’un profil actif autorisé. Les véhicules inconnus ou ambigus restent en attente.\n\nUn nouveau signal de câble correspondant au branchement actuel est nécessaire ; la prochaine mise à jour du véhicule peut prendre du temps. La sélection automatique du profil reste facultative. Les pauses manuelles et objectifs sont respectés. Pour afficher l’autorisation du véhicule, sélectionnez un profil et configurez ses signaux câble/domicile dans Sélection automatique du véhicule ; ce mode automatique peut rester désactivé.",
+        "data": {
+          "virtual_plug_charge": "Activer Plug & Charge virtuel",
+          "vehicle_plug_charge": "Autoriser automatiquement ce véhicule"
+        },
+        "data_description": {
+          "virtual_plug_charge": "S’applique à cette borne. Sans profil actif autorisé reconnu sans ambiguïté, la charge reste bloquée. Désactiver ne démarre pas la charge. Tant que l’application Modbus fonctionne, l’autorisation de la même session branchée survit à un redémarrage de Home Assistant ; débrancher y met fin.",
+          "vehicle_plug_charge": "Autorisation pour le profil actif uniquement. Le choisir manuellement ne prouve pas que son véhicule est branché. Des signaux câble/domicile actuels et concordants restent nécessaires. Changer le véhicule ou ses sources de détection retire cette autorisation."
+        }
       }
     },
     "error": {
@@ -1327,7 +1367,9 @@
       "vehicle_detection_required": "Configurez d’abord les signaux de câble et de présence à domicile d’au moins un profil.",
       "vehicle_detection_source_invalid": "Choisissez une source de détection proposée.",
       "vehicle_detection_entity_invalid": "Choisissez un capteur binaire de câble existant et une entité de présence à domicile compatible.",
-      "vehicle_detection_entities_distinct": "Choisissez des entités différentes pour le câble et la présence à domicile."
+      "vehicle_detection_entities_distinct": "Choisissez des entités différentes pour le câble et la présence à domicile.",
+      "plug_charge_invalid": "Choisissez activé ou désactivé.",
+      "plug_charge_detection_required": "Sélectionnez un profil et configurez ses signaux câble/domicile avant de l’autoriser automatiquement."
     }
   },
   "selector": {

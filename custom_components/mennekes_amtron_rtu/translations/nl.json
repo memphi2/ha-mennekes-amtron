@@ -603,6 +603,18 @@
           "write_pending": "Schrijfopdracht wacht",
           "error": "Fout"
         }
+      },
+      "virtual_plug_charge_status": {
+        "name": "Status virtuele Plug & Charge",
+        "state": {
+          "waiting_vehicle": "Wacht op voertuig",
+          "waiting_detection": "Wacht op actuele voertuiggegevens",
+          "vehicle_not_permitted": "Voertuig niet toegestaan",
+          "waiting_release": "Wacht op laadtoestemming",
+          "authorized": "Voertuig toegestaan",
+          "blocked": "Laden geblokkeerd",
+          "disabled": "Uitgeschakeld"
+        }
       }
     },
     "switch": {
@@ -807,6 +819,21 @@
     },
     "vehicle_selection_changed": {
       "message": "De voertuigselectie is tijdens het instellen gewijzigd. Het instellen wordt opnieuw uitgevoerd met de huidige selectie."
+    },
+    "plug_charge_unavailable": {
+      "message": "Virtuele Plug & Charge kon niet worden gestart. Het instellen wordt opnieuw geprobeerd; controleer de verbinding met de laadpaal of Modbus-app."
+    },
+    "plug_charge_blocked": {
+      "message": "Automatisch laden is momenteel geblokkeerd. Controleer voertuigtoestemming, handmatige pauze en laaddoelen."
+    },
+    "plug_charge_session_changed": {
+      "message": "De voertuigverbinding of toestemmingsinstellingen zijn gewijzigd. De laadtoestemming is niet toegepast; wacht tot de huidige sessie opnieuw is herkend."
+    },
+    "plug_charge_authorization_expired": {
+      "message": "De voertuigtoestemming is verlopen of niet meer geldig. Wacht op actuele passende voertuiggegevens voordat je opnieuw probeert."
+    },
+    "plug_charge_not_supported": {
+      "message": "De verbonden Modbus-app of dienst ondersteunt virtuele Plug & Charge niet. Werk deze eerst bij naar een compatibele versie."
     }
   },
   "issues": {
@@ -908,7 +935,8 @@
           "back": "Terug zonder opslaan",
           "vehicle_profiles": "Voertuigprofielen",
           "vehicle_source": "Laadniveau instellen",
-          "vehicle_detection": "Automatische voertuigkeuze"
+          "vehicle_detection": "Automatische voertuigkeuze",
+          "vehicle_plug_charge": "Virtuele Plug & Charge"
         },
         "description": "Stel voertuigprofielen en het optionele percentagedoel in. Kies elke auto eenmaal en bepaal daarna afzonderlijk of u zijn laadlimiet, capaciteit, vertrektijden of geschiedenis wilt gebruiken."
       },
@@ -1298,6 +1326,18 @@
           "vehicle_connected_entity": "Gebruik het signaal ‘laadkabel aangesloten’ van deze auto, niet ‘bezig met laden’: de auto moet ook tijdens een pauze of met volle accu herkenbaar blijven.",
           "vehicle_home_entity": "Gebruik bij voorkeur de locatie van de auto zelf. De aanwezigheid van een persoon is alleen geschikt als deze betrouwbaar aangeeft dat de auto thuis is. Twee passende auto’s of onzekere signalen verhinderen automatische selectie."
         }
+      },
+      "vehicle_plug_charge": {
+        "title": "Virtuele Plug & Charge",
+        "description": "Actief voertuig: **{vehicle}**.\n\nOptionele laadtoestemming op basis van voertuigsignalen, zonder ISO 15118-authenticatie. De laadpaal moet automatisch kunnen laden met RFID-autorisatie uitgeschakeld. Het laden wacht totdat één toegestaan actief profiel eenduidig is herkend. Onbekende of onduidelijke voertuigen blijven wachten.\n\nEen nieuw kabelbericht dat past bij de huidige aansluiting is vereist; de volgende update van de voertuigintegratie kan even duren. Automatische profielselectie blijft optioneel. Handmatige pauzes en laaddoelen blijven gelden. Selecteer een profiel en stel de kabel-/thuissignalen in onder Automatische voertuigselectie om de voertuigtoestemming te tonen; die automatische modus mag uit blijven.",
+        "data": {
+          "virtual_plug_charge": "Virtuele Plug & Charge inschakelen",
+          "vehicle_plug_charge": "Dit voertuig automatisch toestemming geven"
+        },
+        "data_description": {
+          "virtual_plug_charge": "Geldt voor deze laadpaal. Zonder eenduidig herkend toegestaan actief profiel blijft laden geblokkeerd. Uitschakelen start geen laadsessie. Zolang de Modbus-app blijft draaien, blijft toestemming voor dezelfde aangesloten sessie geldig na een Home Assistant-herstart; loskoppelen beëindigt deze.",
+          "vehicle_plug_charge": "Toestemming alleen voor het actieve profiel. Handmatige profielselectie bewijst niet dat die auto is aangesloten. Actuele passende kabel-/thuissignalen blijven nodig. Een ander voertuig of andere detectiebronnen verwijdert deze toestemming."
+        }
       }
     },
     "error": {
@@ -1327,7 +1367,9 @@
       "vehicle_detection_required": "Stel eerst kabel- en thuissignalen in voor minstens één voertuigprofiel.",
       "vehicle_detection_source_invalid": "Kies een van de beschikbare herkenningsbronnen.",
       "vehicle_detection_entity_invalid": "Kies een bestaande binaire kabelsensor en een ondersteunde entiteit voor aanwezigheid thuis.",
-      "vehicle_detection_entities_distinct": "Kies verschillende entiteiten voor de kabelverbinding en aanwezigheid thuis."
+      "vehicle_detection_entities_distinct": "Kies verschillende entiteiten voor de kabelverbinding en aanwezigheid thuis.",
+      "plug_charge_invalid": "Kies aan of uit voor deze instelling.",
+      "plug_charge_detection_required": "Selecteer een voertuigprofiel en stel de kabel-/thuisdetectie in voordat je automatisch toestemming geeft."
     }
   },
   "selector": {

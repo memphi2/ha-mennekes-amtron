@@ -21,6 +21,7 @@ from .vehicle_profiles import (
     CONF_VEHICLE_DETECTION_SOURCE,
     CONF_VEHICLE_DEVICE,
     CONF_VEHICLE_HOME_ENTITY,
+    CONF_VEHICLE_PLUG_CHARGE,
     CONF_VEHICLE_PROFILE_ID,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
     CONF_VEHICLE_PROFILES,
@@ -204,6 +205,8 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
         if draft is None or profile is None:
             raise RuntimeError("cannot save incomplete vehicle detection")
         raw_profile = draft.values[CONF_VEHICLE_PROFILES][profile.id]
+        if config is None or profile.detection != config:
+            raw_profile["options"].pop(CONF_VEHICLE_PLUG_CHARGE, None)
         if config is None:
             raw_profile.pop("detection", None)
         else:

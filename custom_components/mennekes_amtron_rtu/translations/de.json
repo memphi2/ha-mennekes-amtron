@@ -603,6 +603,18 @@
           "write_pending": "Schreibbefehl ausstehend",
           "error": "Fehler"
         }
+      },
+      "virtual_plug_charge_status": {
+        "name": "Status von virtuellem Plug & Charge",
+        "state": {
+          "waiting_vehicle": "Wartet auf Fahrzeug",
+          "waiting_detection": "Wartet auf aktuelle Fahrzeugdaten",
+          "vehicle_not_permitted": "Fahrzeug nicht erlaubt",
+          "waiting_release": "Wartet auf Ladefreigabe",
+          "authorized": "Fahrzeug freigegeben",
+          "blocked": "Laden gesperrt",
+          "disabled": "Deaktiviert"
+        }
       }
     },
     "switch": {
@@ -807,6 +819,21 @@
     },
     "vehicle_selection_changed": {
       "message": "Die Fahrzeugzuordnung hat sich während der Einrichtung geändert. Die Einrichtung wird mit der aktuellen Auswahl wiederholt."
+    },
+    "plug_charge_unavailable": {
+      "message": "Virtuelles Plug & Charge konnte nicht eingerichtet werden. Die Einrichtung wird wiederholt; prüfe die Verbindung zur Wallbox oder Modbus-App."
+    },
+    "plug_charge_blocked": {
+      "message": "Automatisches Laden ist derzeit gesperrt. Prüfe die Fahrzeugerlaubnis, manuelle Pause und Ladeziele."
+    },
+    "plug_charge_session_changed": {
+      "message": "Die Fahrzeugverbindung oder Freigabeeinstellungen haben sich geändert. Die Ladefreigabe wurde nicht übernommen; warte auf die erneute Erkennung der aktuellen Sitzung."
+    },
+    "plug_charge_authorization_expired": {
+      "message": "Die Fahrzeugfreigabe ist abgelaufen oder nicht mehr gültig. Warte auf aktuelle passende Fahrzeugdaten, bevor du es erneut versuchst."
+    },
+    "plug_charge_not_supported": {
+      "message": "Die verbundene Modbus-App oder der Dienst unterstützt virtuelles Plug & Charge nicht. Aktualisiere zuerst auf eine kompatible Version."
     }
   },
   "issues": {
@@ -908,7 +935,8 @@
           "back": "Zurück ohne Speichern",
           "vehicle_profiles": "Fahrzeugprofile",
           "vehicle_source": "Ladestand einrichten",
-          "vehicle_detection": "Automatische Fahrzeugauswahl"
+          "vehicle_detection": "Automatische Fahrzeugauswahl",
+          "vehicle_plug_charge": "Virtuelles Plug & Charge"
         },
         "description": "Richte Fahrzeugprofile und das optionale Prozentziel ein. Wähle jedes Auto einmal aus und entscheide anschließend unabhängig über Ladegrenze, Kapazität, Abfahrtszeiten und Historie."
       },
@@ -1298,6 +1326,18 @@
           "vehicle_connected_entity": "Verwende das Signal „Ladekabel verbunden“ dieses Autos, nicht „lädt gerade“: Das Auto muss auch bei Ladepause oder vollem Akku zuordenbar bleiben.",
           "vehicle_home_entity": "Bevorzuge den Standort des Autos selbst. Die Anwesenheit einer Person ist nur dann ein sinnvoller Ersatz, wenn sie zuverlässig bedeutet, dass dieses Auto zu Hause ist. Zwei passende Autos oder unsichere Signale verhindern die automatische Auswahl."
         }
+      },
+      "vehicle_plug_charge": {
+        "title": "Virtuelles Plug & Charge",
+        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nOptionale Ladefreigabe anhand von Fahrzeugsignalen, ohne ISO-15118-Authentifizierung. Die Wallbox muss mit deaktivierter RFID-Freigabe automatisch laden können. Ist die Funktion aktiv, wird erst nach eindeutiger Erkennung eines erlaubten aktiven Profils freigegeben. Unbekannte oder mehrdeutige Fahrzeuge warten.\n\nErforderlich ist eine neue Kabelmeldung für den aktuellen Steckvorgang; das nächste Update der Fahrzeugintegration kann dauern. Automatische Profilwahl bleibt optional. Manuelle Pausen und Ladeziele werden beachtet. Für den Fahrzeug-Schalter wähle ein Profil und richte seine Kabel-/Zuhause-Signale unter Automatische Fahrzeugauswahl ein; deren Automatik kann ausgeschaltet bleiben.",
+        "data": {
+          "virtual_plug_charge": "Virtuelles Plug & Charge aktivieren",
+          "vehicle_plug_charge": "Dieses Fahrzeug automatisch freigeben"
+        },
+        "data_description": {
+          "virtual_plug_charge": "Gilt für diese Wallbox. Ohne eindeutig erkanntes, erlaubtes aktives Profil bleibt die Ladung gesperrt. Ausschalten startet keine Ladung. Solange die Modbus-App weiterläuft, bleibt eine Freigabe für dieselbe angeschlossene Sitzung bei einem Home-Assistant-Neustart erhalten; Abstecken beendet sie.",
+          "vehicle_plug_charge": "Erlaubnis nur für das aktive Profil. Eine manuelle Profilwahl beweist nicht, dass dessen Auto angeschlossen ist. Aktuelle passende Kabel-/Zuhause-Signale bleiben erforderlich. Ein Wechsel des Fahrzeugs oder seiner Erkennungsquellen entfernt diese Erlaubnis."
+        }
       }
     },
     "error": {
@@ -1327,7 +1367,9 @@
       "vehicle_detection_required": "Richte zuerst für mindestens ein Fahrzeugprofil Kabel- und Zuhause-Signale ein.",
       "vehicle_detection_source_invalid": "Wähle eine der angebotenen Erkennungsquellen.",
       "vehicle_detection_entity_invalid": "Wähle einen vorhandenen Kabel-Binärsensor und eine unterstützte Entität für die Anwesenheit zu Hause.",
-      "vehicle_detection_entities_distinct": "Wähle unterschiedliche Entitäten für Kabelverbindung und Anwesenheit zu Hause."
+      "vehicle_detection_entities_distinct": "Wähle unterschiedliche Entitäten für Kabelverbindung und Anwesenheit zu Hause.",
+      "plug_charge_invalid": "Wähle für diese Einstellung Ein oder Aus.",
+      "plug_charge_detection_required": "Wähle ein Fahrzeugprofil und richte seine Kabel-/Zuhause-Erkennung ein, bevor du es automatisch freigibst."
     }
   },
   "selector": {

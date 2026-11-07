@@ -13,6 +13,7 @@ from homeassistant.helpers.selector import SelectOptionDict
 from ._options_detection import DetectionOptionsFlow
 from .config_schemas import (
     vehicle_device_schema,
+    vehicle_plug_charge_schema,
     vehicle_profile_choice_schema,
     vehicle_profile_details_schema,
 )
@@ -20,15 +21,18 @@ from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
     CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_DEVICE,
+    CONF_VEHICLE_PLUG_CHARGE,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
+    CONF_VIRTUAL_PLUG_CHARGE,
     LEGACY_PROFILE_ID,
     MAX_VEHICLE_PROFILES,
     PROFILE_OPTION_KEYS,
     RESET_PENDING,
     VehicleProfile,
     activate_profile,
+    active_profile,
     profiles,
 )
 from .vehicle_sources import provider_device_is_valid, provider_identity
@@ -44,6 +48,59 @@ _PROFILE_KEYS = {
 
 class ProfileOptionsFlow(DetectionOptionsFlow):
     """Keep a small explicit catalog and never select another car implicitly."""
+
+    async def async_step_vehicle_plug_charge(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
+        draft = self._begin(
+            "plug_charge",
+            {
+                CONF_VIRTUAL_PLUG_CHARGE,
+                CONF_VEHICLE_PROFILES,
+                CONF_ACTIVE_VEHICLE_PROFILE,
+                CONF_VEHICLE_PROFILE_SELECTED_AT,
+            },
+        )
+        profile = active_profile(draft.values)
+        available = profile is not None and profile.detection is not None
+        current = {
+            CONF_VIRTUAL_PLUG_CHARGE: draft.values.get(CONF_VIRTUAL_PLUG_CHARGE) is True,
+            CONF_VEHICLE_PLUG_CHARGE: available and profile is not None
+            and profile.options.get(CONF_VEHICLE_PLUG_CHARGE) is True,
+        }
+        errors = {}
+        if user_input is not None:
+            enabled = user_input.get(CONF_VIRTUAL_PLUG_CHARGE)
+            allowed = user_input.get(
+                CONF_VEHICLE_PLUG_CHARGE, current[CONF_VEHICLE_PLUG_CHARGE]
+            )
+            for key, value in (
+                (CONF_VIRTUAL_PLUG_CHARGE, enabled),
+                (CONF_VEHICLE_PLUG_CHARGE, allowed),
+            ):
+                if type(value) is not bool:
+                    errors[key] = "plug_charge_invalid"
+            if allowed is True and not available:
+                errors[CONF_VEHICLE_PLUG_CHARGE] = "plug_charge_detection_required"
+            if not errors:
+                draft.values[CONF_VIRTUAL_PLUG_CHARGE] = enabled
+                if profile is not None:
+                    options = draft.values[CONF_VEHICLE_PROFILES][profile.id]["options"]
+                    if allowed is True:
+                        options[CONF_VEHICLE_PLUG_CHARGE] = True
+                    else:
+                        options.pop(CONF_VEHICLE_PLUG_CHARGE, None)
+                return self._finish_section()
+            current.update(user_input)
+        return self.async_show_form(
+            step_id="vehicle_plug_charge",
+            data_schema=vehicle_plug_charge_schema(current, permission=available),
+            description_placeholders={
+                "vehicle": profile.name if profile is not None else "—"
+            },
+            errors=errors,
+            last_step=True,
+        )
 
     async def async_step_vehicle_profiles(
         self, user_input: dict[str, Any] | None = None

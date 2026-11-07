@@ -501,6 +501,22 @@ def vehicle_detection_mode_schema(current: dict[str, Any]) -> probatio.Schema:
     })
 
 
+def vehicle_plug_charge_schema(
+    current: dict[str, Any], *, permission: bool,
+) -> probatio.Schema:
+    """Keep the global gate editable even without a selected, detectable car."""
+    fields: dict[Any, Any] = {
+        probatio.Required(
+            "virtual_plug_charge", default=current.get("virtual_plug_charge") is True
+        ): BooleanSelector(),
+    }
+    if permission:
+        fields[probatio.Required(
+            "vehicle_plug_charge", default=current.get("vehicle_plug_charge") is True,
+        )] = BooleanSelector()
+    return probatio.Schema(fields)
+
+
 def vehicle_detection_source_schema(current: str, *, profile: bool) -> probatio.Schema:
     choices = ["disabled", "entities"]
     if profile:

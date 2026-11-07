@@ -603,6 +603,18 @@
           "write_pending": "Write pending",
           "error": "Error"
         }
+      },
+      "virtual_plug_charge_status": {
+        "name": "Virtual Plug & Charge status",
+        "state": {
+          "waiting_vehicle": "Waiting for a vehicle",
+          "waiting_detection": "Waiting for fresh vehicle data",
+          "vehicle_not_permitted": "Vehicle not permitted",
+          "waiting_release": "Waiting for charging release",
+          "authorized": "Vehicle authorized",
+          "blocked": "Charging blocked",
+          "disabled": "Disabled"
+        }
       }
     },
     "switch": {
@@ -807,6 +819,21 @@
     },
     "vehicle_selection_changed": {
       "message": "The vehicle selection changed during setup. Setup will retry with the current selection."
+    },
+    "plug_charge_unavailable": {
+      "message": "Virtual Plug & Charge could not be initialized. Setup will retry; check the wallbox or Modbus app connection."
+    },
+    "plug_charge_blocked": {
+      "message": "Automatic charging is currently blocked. Check vehicle permission, manual pause and charging targets."
+    },
+    "plug_charge_session_changed": {
+      "message": "The vehicle connection or permission settings changed. Charging permission was not applied; wait for the current session to be recognized again."
+    },
+    "plug_charge_authorization_expired": {
+      "message": "The vehicle authorization has expired or is no longer valid. Wait for fresh matching vehicle data before trying again."
+    },
+    "plug_charge_not_supported": {
+      "message": "The connected Modbus app or service does not support Virtual Plug & Charge. Update it to a compatible version before enabling this feature."
     }
   },
   "issues": {
@@ -908,7 +935,8 @@
           "back": "Back without saving",
           "vehicle_profiles": "Vehicle profiles",
           "vehicle_source": "Configure charge level",
-          "vehicle_detection": "Automatic vehicle selection"
+          "vehicle_detection": "Automatic vehicle selection",
+          "vehicle_plug_charge": "Virtual Plug & Charge"
         },
         "description": "Configure vehicle profiles and the optional percentage target. Select each car once, then choose independently whether to use its charge limit, capacity, departure timers or history."
       },
@@ -1298,6 +1326,18 @@
           "vehicle_connected_entity": "Use this car’s cable-connected signal, not “currently charging”: the car must remain identifiable while paused or fully charged.",
           "vehicle_home_entity": "Prefer the car’s own location signal. A person’s presence is only a useful substitute if it reliably indicates that this car is at home. Two matching cars or uncertain signals prevent automatic selection."
         }
+      },
+      "vehicle_plug_charge": {
+        "title": "Virtual Plug & Charge",
+        "description": "Active vehicle: **{vehicle}**.\n\nOptional charging permission based on vehicle signals, without ISO 15118 authentication. The wallbox must support automatic charging with RFID authorization disabled. When enabled, charging waits until one permitted active profile is identified uniquely. Unknown or ambiguous vehicles wait.\n\nA fresh cable report matching the current connection cycle is required; the next vehicle integration update may take time. Automatic profile selection remains optional. Manual pauses and charging targets are respected. To show the vehicle permission switch, select a profile and configure its cable/home signals under Automatic vehicle selection; its automatic mode can remain off.",
+        "data": {
+          "virtual_plug_charge": "Enable Virtual Plug & Charge",
+          "vehicle_plug_charge": "Allow this vehicle to charge automatically"
+        },
+        "data_description": {
+          "virtual_plug_charge": "Applies to this wallbox. Without a uniquely recognized permitted active profile, charging remains blocked. Disabling this feature does not start charging. While the Modbus app keeps running, a grant for the same connected session survives a Home Assistant restart; unplugging ends it.",
+          "vehicle_plug_charge": "Permission for the active profile only. Selecting a profile manually is not proof that its car is connected. Fresh matching cable/home signals remain required. Changing the vehicle or its detection sources removes this permission."
+        }
       }
     },
     "error": {
@@ -1327,7 +1367,9 @@
       "vehicle_detection_required": "First configure cable and home signals for at least one vehicle profile.",
       "vehicle_detection_source_invalid": "Select one of the available detection sources.",
       "vehicle_detection_entity_invalid": "Select an existing cable binary sensor and a supported home-presence entity.",
-      "vehicle_detection_entities_distinct": "Select separate entities for cable connection and home presence."
+      "vehicle_detection_entities_distinct": "Select separate entities for cable connection and home presence.",
+      "plug_charge_invalid": "Choose on or off for this setting.",
+      "plug_charge_detection_required": "Select a vehicle profile and configure its cable/home detection signals before allowing it to charge automatically."
     }
   },
   "selector": {

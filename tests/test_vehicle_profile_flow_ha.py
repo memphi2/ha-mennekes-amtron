@@ -10,6 +10,7 @@ from custom_components.mennekes_amtron_rtu.config_schemas import (
     vehicle_detection_entities_schema,
     vehicle_detection_mode_schema,
     vehicle_detection_source_schema,
+    vehicle_plug_charge_schema,
     vehicle_profile_choice_schema,
     vehicle_profile_details_schema,
     vehicle_profile_soc_schema,
@@ -25,6 +26,14 @@ from tests.test_soc_goal_ha_lifecycle import _entry
 @pytest.mark.parametrize(
     ("step", "schema"),
     [
+        ("vehicle_plug_charge", vehicle_plug_charge_schema({}, permission=False)),
+        (
+            "vehicle_plug_charge",
+            vehicle_plug_charge_schema(
+                {"virtual_plug_charge": True, "vehicle_plug_charge": True},
+                permission=True,
+            ),
+        ),
         ("vehicle_detection_mode", vehicle_detection_mode_schema({})),
         (
             "vehicle_detection_source",
@@ -179,9 +188,30 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                 form = await submit(await begin(), "vehicle_profile_select")
                 await submit(form, {"vehicle_profile_id": second})
                 assert entry.options["vehicle_auto_selection"] is False
+                form = await submit(await begin(), "vehicle_profile_select")
+                await submit(form, {"vehicle_profile_id": first})
+                form = await manager.async_init(entry.entry_id)
+                form = await submit(form, "vehicle")
+                form = await submit(form, "vehicle_plug_charge")
+                await submit(
+                    form, {"virtual_plug_charge": True, "vehicle_plug_charge": True}
+                )
+                assert entry.options["virtual_plug_charge"] is True
+                assert (
+                    entry.options["vehicle_profiles"][first]["options"][
+                        "vehicle_plug_charge"
+                    ]
+                    is True
+                )
+                assert entry.options["vehicle_auto_selection"] is False
                 await submit(await begin(), "vehicle_profile_clear")
                 assert entry.options["active_vehicle_profile"] is None
                 assert len(profile_list(entry.options)) == 2
+                form = await manager.async_init(entry.entry_id)
+                form = await submit(form, "vehicle")
+                form = await submit(form, "vehicle_plug_charge")
+                await submit(form, {"virtual_plug_charge": False})
+                assert entry.options["virtual_plug_charge"] is False
             finally:
                 await hass.async_stop()
 

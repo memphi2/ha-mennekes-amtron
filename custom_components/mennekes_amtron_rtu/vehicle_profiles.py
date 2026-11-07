@@ -12,6 +12,8 @@ from typing import Any, Final
 CONF_VEHICLE_PROFILES: Final = "vehicle_profiles"
 CONF_ACTIVE_VEHICLE_PROFILE: Final = "active_vehicle_profile"
 CONF_VEHICLE_AUTO_SELECTION: Final = "vehicle_auto_selection"
+CONF_VIRTUAL_PLUG_CHARGE: Final = "virtual_plug_charge"
+CONF_VEHICLE_PLUG_CHARGE: Final = "vehicle_plug_charge"
 CONF_VEHICLE_DETECTION_SOURCE: Final = "vehicle_detection_source"
 CONF_VEHICLE_CONNECTED_ENTITY: Final = "vehicle_connected_entity"
 CONF_VEHICLE_HOME_ENTITY: Final = "vehicle_home_entity"
@@ -32,6 +34,7 @@ PROFILE_OPTION_KEYS: Final = frozenset(
         "vehicle_charge_limit_entity",
         CONF_VEHICLE_SOC_USE_PROFILE,
         CONF_VEHICLE_LIMIT_USE_PROFILE,
+        CONF_VEHICLE_PLUG_CHARGE,
         "timed_goal_enabled",
         "timed_capacity_entity",
         "timed_capacity_kwh",
@@ -170,6 +173,10 @@ def profiles(raw: Mapping[str, Any]) -> dict[str, VehicleProfile]:
             or (provider != "none" and not device)
             or not isinstance(options, dict)
             or not options.keys() <= PROFILE_OPTION_KEYS
+            or (
+                CONF_VEHICLE_PLUG_CHARGE in options
+                and type(options[CONF_VEHICLE_PLUG_CHARGE]) is not bool
+            )
             or not isinstance(identity, str)
             or len(identity) > 256
             or ("detection" in value and detection is None)
