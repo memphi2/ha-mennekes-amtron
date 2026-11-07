@@ -245,3 +245,61 @@ def test_profile_draft_deletes_only_selected_feature_and_keeps_global_reset_glob
     empty = profile_options(active=None)
     with pytest.raises(OptionsChangedError):
         OptionsDraft("vehicle", empty, {"vehicle_soc_entity"}).merge(empty)
+
+
+@pytest.mark.parametrize("profiled", [False, True])
+@pytest.mark.parametrize("initially_present", [False, True])
+def test_draft_distinguishes_missing_from_explicit_none_in_both_storage_modes(
+    profiled, initially_present
+):
+    feature = {"vehicle_soc_entity": None} if initially_present else {}
+    raw = profile_options(feature=feature) if profiled else feature
+    draft = OptionsDraft("vehicle", raw, {"vehicle_soc_entity"})
+    current = deepcopy(raw)
+    live = current["vehicle_profiles"][A]["options"] if profiled else current
+    if initially_present:
+        live.pop("vehicle_soc_entity")
+    else:
+        live["vehicle_soc_entity"] = None
+    with pytest.raises(OptionsChangedError):
+        draft.merge(current)
+
+
+@pytest.mark.parametrize("profiled", [False, True])
+def test_draft_has_the_same_deletion_copy_and_global_reset_semantics_in_both_modes(
+    profiled,
+):
+    feature = {"vehicle_soc_entity": "sensor.old", "timed_timer1_days": ["mon"]}
+    raw = profile_options(feature=feature) if profiled else deepcopy(feature)
+    draft = OptionsDraft(
+        "departure", raw,
+        {"vehicle_soc_entity", "timed_timer1_days", "timed_goal_reset_pending"},
+    )
+    draft.clear({"vehicle_soc_entity"})
+    draft.values["timed_timer1_days"] = ["tue"]
+    draft.values["timed_goal_reset_pending"] = True
+    current = deepcopy(raw)
+    current["charging_price"] = 0.8
+    live = current["vehicle_profiles"][A]["options"] if profiled else current
+    live["timed_capacity_kwh"] = 75
+    saved = draft.merge(current)
+    options = saved["vehicle_profiles"][A]["options"] if profiled else saved
+    assert "vehicle_soc_entity" not in options
+    assert options["timed_capacity_kwh"] == 75
+    assert saved["charging_price"] == 0.8
+    assert saved["timed_goal_reset_pending"] is True
+    if profiled:
+        assert "timed_goal_reset_pending" not in options
+    options["timed_timer1_days"].append("wed")
+    assert draft.values["timed_timer1_days"] == ["tue"]
+    assert live["timed_timer1_days"] == ["mon"]
+
+
+@pytest.mark.parametrize("profiled", [False, True])
+def test_unchanged_explicit_none_can_be_saved_without_becoming_a_deletion(profiled):
+    feature = {"vehicle_soc_entity": None}
+    raw = profile_options(feature=feature) if profiled else feature
+    saved = OptionsDraft("vehicle", raw, {"vehicle_soc_entity"}).merge(raw)
+    options = saved["vehicle_profiles"][A]["options"] if profiled else saved
+    assert "vehicle_soc_entity" in options
+    assert options["vehicle_soc_entity"] is None
