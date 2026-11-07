@@ -11,7 +11,32 @@ from custom_components.mennekes_amtron_rtu.device.charging_session import (
     CompletedSession,
 )
 
-Capability = Literal["soc", "charge_limit", "capacity", "departure", "charge_history"]
+Capability = Literal["soc", "charge_limit", "capacity", "departure", "charge_history", "detection"]
+
+DETECTION_MAX_AGE_SECONDS = 1800
+
+
+@dataclass(frozen=True, slots=True)
+class VehicleDetection:
+    """Positive or negative local evidence; missing evidence stays unknown."""
+
+    connected: bool | None = None
+    home: bool | None = None
+
+
+class VehicleDetectionSource(Protocol):
+    """Observe one vehicle's cable and location without contacting the car."""
+
+    @property
+    def source_key(self) -> str: ...
+
+    @property
+    def available(self) -> bool: ...
+
+    @property
+    def snapshot(self) -> VehicleDetection: ...
+
+    def subscribe(self, on_change: Callable[[VehicleDetection], None]) -> CALLBACK_TYPE: ...
 
 
 @dataclass(frozen=True, slots=True)

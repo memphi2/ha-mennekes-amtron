@@ -24,6 +24,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
 )
 
 from .bavariandata import BavarianChargeHistorySource, BavarianDepartureSource
+from .bavariandata.detection import BavarianDetectionSource, detection_capabilities
 from .bavariandata.history import bavarian_vehicle_vin, vehicle_source_key
 from .bavariandata.telemetry import BavarianTelemetrySource, telemetry_capabilities
 from .const import (
@@ -40,11 +41,12 @@ from .types import (
     DepartureSource,
     ProviderDefinition,
     ProviderSelection,
+    VehicleDetectionSource,
     VehicleTelemetrySource,
 )
 
 _PROVIDERS = (
-    ProviderDefinition(PROVIDER_BAVARIANDATA, "bavariandata", frozenset({"soc", "charge_limit", "capacity", "departure", "charge_history"})),
+    ProviderDefinition(PROVIDER_BAVARIANDATA, "bavariandata", frozenset({"soc", "charge_limit", "capacity", "departure", "charge_history", "detection"})),
 )
 
 
@@ -55,7 +57,7 @@ def provider_definitions(capability: Capability) -> tuple[ProviderDefinition, ..
 
 def provider_selection(options: Mapping[str, Any], capability: Capability) -> ProviderSelection:
     """An explicit generic selection always wins over retained legacy options."""
-    if capability in ("soc", "charge_limit", "capacity"):
+    if capability in ("soc", "charge_limit", "capacity", "detection"):
         provider = options.get(CONF_VEHICLE_PROVIDER)
         device = options.get(CONF_VEHICLE_DEVICE)
         return ProviderSelection(
@@ -103,7 +105,15 @@ def profile_capabilities(hass: HomeAssistant, provider_id: str, device_id: str) 
     """Expose implemented adapters and already enabled telemetry for this car."""
     if not provider_device_is_valid(hass, provider_id, device_id):
         return frozenset()
-    return telemetry_capabilities(hass, device_id) | frozenset({"departure", "charge_history"})
+    return telemetry_capabilities(hass, device_id) | detection_capabilities(hass, device_id) | frozenset({"departure", "charge_history"})
+
+
+def resolve_detection_source(hass: HomeAssistant, options: Mapping[str, Any]) -> VehicleDetectionSource | None:
+    """Bind optional local identification hints to the profile's chosen vehicle."""
+    selection = provider_selection(options, "detection")
+    if selection.provider_id != PROVIDER_BAVARIANDATA or not selection.device_id:
+        return None
+    return BavarianDetectionSource(hass, selection.device_id, expected_source_key=_expected_identity(options))
 
 
 def resolve_telemetry_source(hass: HomeAssistant, options: Mapping[str, Any]) -> VehicleTelemetrySource | None:

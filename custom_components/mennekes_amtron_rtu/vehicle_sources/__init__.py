@@ -8,27 +8,34 @@ from .registry import (
     provider_identity,
     provider_selection,
     resolve_departure_source,
+    resolve_detection_source,
     resolve_history_source,
     resolve_telemetry_source,
 )
 from .types import (
+    DETECTION_MAX_AGE_SECONDS,
     Capability,
     ChargeHistorySource,
     DepartureSource,
     HistoryMatch,
     ProviderDefinition,
     ProviderSelection,
+    VehicleDetection,
+    VehicleDetectionSource,
     VehicleTelemetry,
     VehicleTelemetrySource,
 )
 
 __all__ = [
+    "DETECTION_MAX_AGE_SECONDS",
     "Capability",
     "ChargeHistorySource",
     "DepartureSource",
     "HistoryMatch",
     "ProviderDefinition",
     "ProviderSelection",
+    "VehicleDetection",
+    "VehicleDetectionSource",
     "VehicleTelemetry",
     "VehicleTelemetrySource",
     "loss_source",
@@ -38,6 +45,7 @@ __all__ = [
     "provider_identity",
     "provider_selection",
     "resolve_departure_source",
+    "resolve_detection_source",
     "resolve_history_source",
     "resolve_telemetry_source",
 ]
