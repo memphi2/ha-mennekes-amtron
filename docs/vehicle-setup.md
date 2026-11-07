@@ -154,8 +154,10 @@ This feature controls the energy manager's charging release; it cannot switch
 off or bypass the wallbox's RFID requirement.
 
 Permission requires one unambiguous matching vehicle, an allowed active profile
-and a **cable report newer than the wallbox's observed connection**. A matching
-value left over from before plugging in is insufficient. When BavarianData
+and a **new cable report for the current connection cycle**. The last confirmed
+disconnected wallbox reading marks the earliest acceptable report; if the app
+starts with a car already connected, it needs a report from after startup.
+A matching value left over from a previous connection is insufficient. When BavarianData
 provides the cable measurement's timestamp, that timestamp is used; otherwise
 only the HA report time is available. The next normal vehicle update may be
 needed before permission is granted.
@@ -167,6 +169,10 @@ report does not interrupt that connection. In service mode, its existing grant
 also survives an HA Core restart because the app continues observing the wallbox.
 A disconnect, unknown wallbox connection state or app restart requires a fresh
 grant. Direct mode loses its grant when its HA runtime restarts.
+Choosing another profile alone also leaves an existing grant with that same
+physical connection. Removing a vehicle's permission or changing its identity
+or detection sources invalidates the grant; the next connection always needs a
+fresh match for the then-active permitted profile.
 
 Enabling the feature can stop an ongoing charge while it waits for a valid
 grant. Disabling it **does not resume charging**: use **Charging release**
@@ -239,7 +245,7 @@ remain available with older compatible app versions.
 | A previously valid vehicle maximum | The last valid maximum is retained; a later increase does not raise the target you already chose. |
 | Usable battery capacity | The departure planner cannot calculate a new current; see [departure planning](departure-planning.md). |
 | Detection signals are unclear | Automatic mode selects no vehicle. Choose the correct profile manually if needed. |
-| Virtual Plug & Charge is waiting for detection | Wait for a new cable report after plugging in and check that the selected profile is permitted. Manually selecting it does not replace the detection check. |
+| Virtual Plug & Charge is waiting for detection | Wait for a new cable report for this connection and check that the selected profile is permitted. Manually selecting it does not replace the detection check. |
 | Charging history cannot be matched | Loss estimates stay unknown instead of being assigned to the wrong charge. See [charging estimates](charging-estimates.md). |
 
 For absent BavarianData entities, open the vehicle's HA entity list and enable

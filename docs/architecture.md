@@ -272,8 +272,9 @@ gate for one observed physical connection. Automatic profile selection remains
 optional. Manually choosing a profile never supplies identity evidence.
 
 HA requires a unique candidate matching the active permitted profile and a
-cable report after the current connection was observed. The adapter uses an
-upstream cable timestamp when available, otherwise HA's report time. It does
+cable report since the last confirmed physical absence before this cycle.
+If observation begins with a car already connected, startup is the lower bound.
+The adapter uses an upstream cable timestamp when available, otherwise HA's report time. It does
 not trigger a cloud update. The observation remains heuristic: upstream restore
 behavior cannot always be detected, and Modbus polling cannot prove that no
 unobserved vehicle change occurred between reads.
@@ -284,14 +285,19 @@ one. A disconnect or unknown physical connection invalidates it. The service
 continues enforcing the gate and retains an existing grant while HA restarts;
 the service itself restarting loses that grant. Direct mode has the equivalent
 runtime boundary at its HA entry.
+The policy digest includes vehicle identities, detection sources and profile
+permissions, but not the active-profile label. Changing those permissions or
+sources invalidates grants. A manual selection change or an automatic selection
+cleared by stale cloud data leaves an established physical-session grant intact.
 
 Charging permission composes with existing current, pause, lock and goal
 guards. It does not erase a manual pause or an already reached target, and error
 recovery does not provide another path around it. A cloud-data interruption
 alone does not revoke an already granted physical connection. Enabling the gate
 requests release closure; disabling it does not restore charging release.
-Only configuration changes are persisted, so ordinary evidence reports and cycle
-tokens create neither per-poll storage writes nor Recorder attributes.
+Configuration and the hold until an explicit manual release are durable;
+connection grants are not. Ordinary evidence reports and cycle tokens create
+neither per-poll storage writes nor Recorder attributes.
 
 The gate uses the documented EMS release register, not an RFID write or a
 vehicle authentication protocol. Local RFID authorization remains independent;

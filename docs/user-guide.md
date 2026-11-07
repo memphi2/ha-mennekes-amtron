@@ -348,8 +348,8 @@ identity supplied by the wallbox.
 
 **Unreleased and off by default.** Separately enable this feature and permit the
 profiles that may receive automatic charging release. It needs an unambiguous
-cable/home match for the active car and a fresh cable report after the wallbox
-observes the connection. Manual profile selection alone does not grant permission.
+cable/home match for the active car and a fresh cable report for the current
+connection cycle. Manual profile selection alone does not grant permission.
 Existing pauses, locks, disabled release and reached targets remain effective.
 The status sensor explains what it is waiting for.
 
