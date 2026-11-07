@@ -47,14 +47,15 @@ async def _options(hass, entry, *, limit=False):
     await async_options(
         hass, entry, "wallbox", "wallbox_basic",
         {"control_mode": CONTROL_MODE_MASTER, "scan_interval_seconds": 300, "current_limit": 16},
-        "edit", "wallbox_advanced",
+    )
+    await async_options(
+        hass, entry, "wallbox", "wallbox_advanced",
         {"measurement_interval_seconds": 300, "state_change_interval_seconds": 0, "phase_switch_grace_seconds": 0},
-        "save",
     )
     steps = ["vehicle", "vehicle_soc", {CONF_VEHICLE_SOC_ENTITY: SOC, "use_vehicle_limit": limit}]
     if limit:
         steps.append({CONF_VEHICLE_CHARGE_LIMIT_ENTITY: LIMIT})
-    await async_options(hass, entry, *steps, "save")
+    await async_options(hass, entry, *steps)
 
 
 def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: Path):

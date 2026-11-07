@@ -215,9 +215,10 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
             await async_options(
                 hass, entry, "wallbox", "wallbox_basic",
                 {CONF_CONTROL_MODE: CONTROL_MODE_MASTER, CONF_SCAN_INTERVAL_SECONDS: 5, "current_limit": 16.0},
-                "edit", "wallbox_advanced",
+            )
+            await async_options(
+                hass, entry, "wallbox", "wallbox_advanced",
                 {CONF_MEASUREMENT_INTERVAL_SECONDS: 60, "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5},
-                "save",
             )
             await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]
@@ -397,9 +398,10 @@ def test_the_bundled_blueprints_run_as_automations(
             await async_options(
                 hass, entry, "wallbox", "wallbox_basic",
                 {CONF_CONTROL_MODE: CONTROL_MODE_MASTER, CONF_SCAN_INTERVAL_SECONDS: 5, "current_limit": 16.0},
-                "edit", "wallbox_advanced",
+            )
+            await async_options(
+                hass, entry, "wallbox", "wallbox_advanced",
                 {CONF_MEASUREMENT_INTERVAL_SECONDS: 60, "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5},
-                "save",
             )
             await hass.async_block_till_done()
             entry = hass.config_entries.async_entries(DOMAIN)[0]
