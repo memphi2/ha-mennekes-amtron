@@ -21,6 +21,9 @@ Beta release of the integration and app; **0.6.1 remains stable**.
 - Recheck reached targets before enabling writes, replace stale planner-owned
   commands and safely clear departure plans when disabled. Recover charging-loss
   estimates after temporary storage failures.
+- Plan conservatively while vehicle phases are unknown, recognize equivalent
+  departure timestamps and keep solar display commands independent of timed
+  charging cancellation.
 - Update the app’s shared control and tariff fixes. App beta **0.7.0b1** is
   offered through **#apps-beta**; the stable app catalog remains unchanged.
   Service compatibility remains **API 2, version 0.6.1 or newer**.

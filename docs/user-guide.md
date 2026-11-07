@@ -423,7 +423,8 @@ be selected by enabling the optional **Departure time entity** source. An `input
 and time also works. This optional source can automatically select a new future
 timestamp. A manual, calendar or vehicle selection takes priority over the source's
 current timestamp; it can be replaced when that timestamp changes to a new
-trip. **Clear departure time** cancels the selected plan without changing the
+trip. A different time-zone representation of the same instant is still the
+same trip and does not reactivate a cleared plan. **Clear departure time** cancels the selected plan without changing the
 percentage ceiling or immediately changing the wallbox.
 
 Disabling **Next departure** clears its selected trip and cancels commands queued
@@ -446,6 +447,8 @@ charging targets still apply. Once the target is reached, the charging plan
 cannot resume another charge. **Next departure** remains visible until that
 time so the climate blueprint can still run, then clears automatically.
 The planner assumes 230 V per phase and initially 90% transfer efficiency.
+Until the vehicle's charging phases are detected, it plans conservatively with
+one phase. It adapts when reliable phase information becomes available.
 Car limits, missing or delayed SoC reports, unknown vehicle power, the 6 A
 minimum, the wallbox's configured transition delay and HA outages can make
 the exact target time impossible. Missing SoC or capacity data leaves the
