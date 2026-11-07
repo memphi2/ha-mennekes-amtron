@@ -203,6 +203,26 @@ test('detection preserves requested login, TCP port and mode until explicitly ap
   assert.equal(ui.calls.at(-1).payload.adapter_token, 'opaque-preview');
 });
 
+test('detection retains an entered password only when the TCP endpoint stays the same', async () => {
+  const same = await harness();
+  same.el('tcp_authentication').checked = true;
+  await same.el('tcp_authentication').emit('change');
+  same.el('tcp_auth_password').value = 'Demo123';
+  await detect(same);
+  assert.equal(same.el('tcp_auth_password').value, 'Demo123');
+  same.responses.push(result({ revision: 'revision-2' }));
+  await same.el('connection_form').emit('submit');
+  assert.equal(same.calls.at(-1).payload.tcp_auth_password, 'Demo123');
+
+  const changed = await harness();
+  changed.el('tcp_authentication').checked = true;
+  await changed.el('tcp_authentication').emit('change');
+  changed.el('tcp_auth_password').value = 'Demo123';
+  await detect(changed, { ...detected, tcp_port: 1502 });
+  assert.equal(changed.el('tcp_port').value, '1502');
+  assert.equal(changed.el('tcp_auth_password').value, '');
+});
+
 test('fresh detection preserves edited serial settings but reload restores hardware defaults', async () => {
   const ui = await harness();
   await detect(ui);

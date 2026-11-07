@@ -349,6 +349,7 @@ el("detect_adapter").addEventListener("click", async () => {
   clearAdapter();
   const epoch = adapterEpoch;
   const host = el("host").value.trim();
+  const port = Number(el("tcp_port").value);
   setBusy(true);
   el("error").hidden = true;
   el("status").textContent = text("detecting");
@@ -371,7 +372,9 @@ el("detect_adapter").addEventListener("click", async () => {
       if (!editedSettings.has(id)) el(id).value = data[id];
     }
     if (!editedSettings.has("tcp_authentication")) el("tcp_authentication").checked = data.tcp_authentication;
-    el("tcp_auth_password").value = "";
+    // A detected port may identify a different endpoint. Keep an already
+    // entered password only when detection leaves the destination unchanged.
+    if (Number(el("tcp_port").value) !== port) el("tcp_auth_password").value = "";
     const fromSerial = savedSettings.connection_type === "serial";
     if (!editedSettings.has("adapter_baudrate")) el("adapter_baudrate").value = supportedOption("adapter_baudrate", fromSerial ? savedSettings.baudrate : data.baudrate, 57600);
     if (!editedSettings.has("adapter_frame")) el("adapter_frame").value = supportedOption("adapter_frame", fromSerial ? savedSettings.frame : data.frame, "8n2");
