@@ -1,0 +1,21 @@
+"""Finish a goal save before acting on cancellation."""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable
+
+
+async def finish_goal_save(save: Awaitable[None]) -> None:
+    """Shield lock acquisition and storage, including repeated cancellation."""
+    task = asyncio.ensure_future(save)
+    try:
+        await asyncio.shield(task)
+    except asyncio.CancelledError:
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                continue
+        task.result()
+        raise

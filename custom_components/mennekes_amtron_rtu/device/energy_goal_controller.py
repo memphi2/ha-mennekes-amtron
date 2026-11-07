@@ -14,6 +14,7 @@ from .control import AmtronControl
 from .data import WallboxData
 from .energy_goal import EnergyGoal
 from .errors import DeviceError, validation_error
+from .persistence import finish_goal_save
 from .registers import ENERGY_TOTAL
 
 _LOGGER = logging.getLogger(__name__)
@@ -101,10 +102,11 @@ class EnergyGoalController:
             state.energy_goal_generation += 1
             self._pending = None
             try:
-                await self._persist()
+                await finish_goal_save(self._persist())
             except asyncio.CancelledError:
                 # Owners shield an atomic save and may report cancellation
                 # after it committed. Keep the explicit target in memory too.
+                self._control.cancel_goal_resume()
                 self._notify_changed()
                 raise
             except Exception:
