@@ -41,14 +41,15 @@ Create a private data directory containing `options.json`:
 }
 ```
 
-Replace the token placeholder with a random secret of at least 32 ASCII
-characters without whitespace. Match the serial settings to the wallbox.
+Replace the token placeholder with a random secret of **32–8183 printable ASCII
+characters without spaces**. Control characters are not accepted because the
+token must fit in a valid HTTP authorization header. Match the serial settings to the wallbox.
 The default current cap is **6 A**; leave read-only enabled for the first check.
 The service also accepts `scan_interval` and `measurement_interval`, which default
 to 5 and 30 seconds. Protect this directory and its backups: they contain both
 the credential and saved charging intent.
 
-**Since 0.5.2b2:** the service also accepts
+The service also accepts
 `"state_change_interval_seconds": 300` (whole seconds, 0–3600). It controls
 the wait between charging-state changes; early pause/resume, phase, release and
 lock changes are queued. A stop replaces older pending work and also waits for
