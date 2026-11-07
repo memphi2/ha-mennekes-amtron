@@ -370,23 +370,17 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                     config = _network_config(user_input)
                     return await self._async_test_and_finish(step_id, user_input, config)
             except GatewayError as err:
-                if entry is not None and dict(entry.data) != expected_data:
-                    return self.async_abort(reason="connection_settings_changed")
                 errors["base"] = err.reason
             except ValueError:
-                if entry is not None and dict(entry.data) != expected_data:
-                    return self.async_abort(reason="connection_settings_changed")
                 errors["base"] = "invalid_network_config"
             except AmtronConnectionError as err:
-                if entry is not None and dict(entry.data) != expected_data:
-                    return self.async_abort(reason="connection_settings_changed")
                 _LOGGER.debug("Network connection test failed: %s", err)
                 errors["base"] = "cannot_connect_network"
             except AmtronBusError as err:
-                if entry is not None and dict(entry.data) != expected_data:
-                    return self.async_abort(reason="connection_settings_changed")
                 _LOGGER.debug("Network identity read failed: %s", err)
                 errors["base"] = "invalid_network_response"
+        if entry is not None and dict(entry.data) != expected_data:
+            return self.async_abort(reason="connection_settings_changed")
         return self.async_show_form(
             step_id=step_id,
             data_schema=self.add_suggested_values_to_schema(
@@ -552,14 +546,12 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 finally:
                     await client.async_close()
             except ServiceConnectionError as err:
-                if entry is not None and dict(entry.data) != expected_data:
-                    return self.async_abort(reason="connection_settings_changed")
                 _LOGGER.warning("Modbus service setup: %s", err)
                 errors["base"] = err.reason
             except ValueError, AmtronBusError:
-                if entry is not None and dict(entry.data) != expected_data:
-                    return self.async_abort(reason="connection_settings_changed")
                 errors["base"] = "cannot_connect_service"
+        if entry is not None and dict(entry.data) != expected_data:
+            return self.async_abort(reason="connection_settings_changed")
         defaults = user_input or (dict(entry.data) if entry is not None else {})
         return self.async_show_form(
             step_id="server",
@@ -665,16 +657,14 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                         data=complete,
                     )
         except ServiceConnectionError as err:
-            if reconfigure_entry is not None and dict(reconfigure_entry.data) != expected_data:
-                return self.async_abort(reason="connection_settings_changed")
             _LOGGER.warning("Discovered Modbus app: %s", err)
             errors["base"] = err.reason
         except AmtronBusError:
-            if reconfigure_entry is not None and dict(reconfigure_entry.data) != expected_data:
-                return self.async_abort(reason="connection_settings_changed")
             errors["base"] = "cannot_connect_service"
         finally:
             await client.async_close()
+        if reconfigure_entry is not None and dict(reconfigure_entry.data) != expected_data:
+            return self.async_abort(reason="connection_settings_changed")
         return self.async_show_form(step_id="hassio_confirm", errors=errors)
 
     def _update_discovered_entry(
@@ -778,7 +768,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             else None
         )
         if entry is None:
-            return await self._async_test_and_finish_locked(step_id, user_input, config, gateway=gateway)
+            return await self._async_test_and_finish_locked(
+                step_id, user_input, config, gateway=gateway, entry=None, original_data={},
+            )
         original_data = self._reconfigure_snapshot(entry)
         state = entry.state
         previous_runtime = getattr(entry, "runtime_data", None) if state is ConfigEntryState.LOADED else None
@@ -795,8 +787,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _async_test_and_finish_locked(
         self, step_id: str, user_input: dict[str, Any], config: ConnectionConfig,
-        *, gateway: GatewayChange | None, entry: ConfigEntry | None = None,
-        original_data: dict[str, Any] | None = None,
+        *, gateway: GatewayChange | None, entry: ConfigEntry | None,
+        original_data: dict[str, Any],
     ) -> ConfigFlowResult:
         loaded = entry is not None and entry.state is ConfigEntryState.LOADED
         saved_data: dict[str, Any] | None = None
@@ -812,11 +804,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 if dict(entry.data) != original_data:
                     return self.async_abort(reason="connection_settings_changed")
                 raise
-        if loaded and entry is not None:
-            if original_data is None:
-                raise RuntimeError("missing reconfiguration snapshot")
-            if not await self._async_unload_for_probe(entry, original_data):
-                raise AmtronConnectionError("cannot release the active connection")
+        if loaded and entry is not None and not await self._async_unload_for_probe(entry, original_data):
+            raise AmtronConnectionError("cannot release the active connection")
         async def finish() -> ConfigFlowResult:
             nonlocal saved_data
             identity = await async_test_connection(config)
@@ -824,7 +813,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 step_id, user_input, identity, config=config, defer_reload=gateway is not None,
                 expected_data=original_data,
             )
-            if gateway is not None and original_data is not None and entry is not None and result.get("reason") == "reconfigure_successful":
+            if gateway is not None and entry is not None and result.get("reason") == "reconfigure_successful":
                 saved_data = dict(entry.data)
             return result
 
@@ -834,7 +823,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 self.hass.config_entries.async_schedule_reload(entry.entry_id)
             return result
         except BaseException as err:
-            if gateway is not None and original_data is not None and entry is not None:
+            if gateway is not None and entry is not None:
                 if dict(entry.data) != (saved_data if saved_data is not None else original_data):
                     # Another actor changed the entry while commit was pending;
                     # do not overwrite it or resume a now-ambiguous connection.
@@ -847,7 +836,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
                 raise
             # A failed probe, wrong device or cancelled flow keeps the old entry
             # usable. On success the flow's update/reload helper starts it instead.
-            if loaded and entry is not None and original_data is not None and not isinstance(err, GatewayRollbackError):
+            if loaded and entry is not None and not isinstance(err, GatewayRollbackError):
                 await self._async_restore_after_probe(entry, original_data)
             raise
 

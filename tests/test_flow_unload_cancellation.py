@@ -6,7 +6,8 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntryState, OperationNotAllowed
+from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu import config_flow
@@ -275,6 +276,164 @@ def test_cancel_during_restoration_finishes_ha_setup(
             finally:
                 probe_release.set()
                 restore_release.set()
+                if task is not None:
+                    await asyncio.gather(task, return_exceptions=True)
+                await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))
+
+
+@pytest.mark.parametrize("failure", ["platform_unload", "ha_unload_api"])
+def test_cancelled_unload_failure_never_starts_a_probe_or_restore(
+    tmp_path, monkeypatch, caplog, failure,
+):
+    async def run():
+        bus = FakeModbusClient(device_bank())
+        started = asyncio.Event()
+        release = asyncio.Event()
+        task = None
+        with patch(
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
+            return_value=bus,
+        ):
+            hass = await _boot(tmp_path / "ha")
+            try:
+                entry = await _entry(hass)
+                original = dict(entry.data)
+                previous_runtime = entry.runtime_data
+                setup = AsyncMock(wraps=hass.config_entries.async_setup)
+                monkeypatch.setattr(hass.config_entries, "async_setup", setup)
+                probe = AsyncMock()
+                monkeypatch.setattr(config_flow, "async_test_connection", probe)
+
+                async def failed_unload(*_args, **_kwargs):
+                    started.set()
+                    await release.wait()
+                    if failure == "ha_unload_api":
+                        raise OperationNotAllowed("unload unavailable")
+                    return False
+
+                if failure == "platform_unload":
+                    monkeypatch.setattr(hass.config_entries, "async_unload_platforms", failed_unload)
+                else:
+                    monkeypatch.setattr(hass.config_entries, "async_unload", failed_unload)
+                manager = hass.config_entries.flow
+                flow = await manager.async_init(
+                    DOMAIN, context={"source": "reconfigure", "entry_id": entry.entry_id},
+                )
+                flow = await manager.async_configure(
+                    flow["flow_id"], {"next_step_id": "serial_reconfigure"},
+                )
+                task = asyncio.create_task(manager.async_configure(flow["flow_id"], {
+                    "port": "/dev/changed", "device_id": 50, "baudrate": 57600,
+                    "frame": "8n2", "search": "off",
+                }))
+                await asyncio.wait_for(started.wait(), 5)
+                task.cancel()
+                await asyncio.sleep(0)
+                assert entry.setup_lock.locked()
+                assert not task.done()
+                release.set()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+                setup.assert_not_awaited()
+                probe.assert_not_awaited()
+                assert dict(entry.data) == original
+                assert entry.runtime_data is previous_runtime
+                assert entry.runtime_data.client.connected
+                assert entry.state is (
+                    ConfigEntryState.FAILED_UNLOAD if failure == "platform_unload"
+                    else ConfigEntryState.LOADED
+                )
+                if failure == "ha_unload_api":
+                    assert "Unable to complete cancelled connection probe cleanup" in caplog.text
+                assert not bus.writes
+            finally:
+                release.set()
+                if task is not None:
+                    await asyncio.gather(task, return_exceptions=True)
+                await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))
+
+
+@pytest.mark.parametrize("failure", ["setup_retry", "ha_setup_api"])
+def test_cancelled_restore_preserves_retry_or_reports_ha_api_failure(
+    tmp_path, monkeypatch, caplog, failure,
+):
+    async def run():
+        bus = FakeModbusClient(device_bank())
+        probe_started = asyncio.Event()
+        probe_release = asyncio.Event()
+        setup_started = asyncio.Event()
+        setup_release = asyncio.Event()
+        task = None
+        with patch(
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
+            return_value=bus,
+        ):
+            hass = await _boot(tmp_path / "ha")
+            try:
+                entry = await _entry(hass)
+                original_data = dict(entry.data)
+                original_setup = hass.config_entries.async_setup
+
+                async def delayed_failure(*_args, **_kwargs):
+                    setup_started.set()
+                    await setup_release.wait()
+                    if failure == "setup_retry":
+                        raise ConfigEntryNotReady("temporary setup failure")
+                    raise OperationNotAllowed("setup unavailable")
+
+                async def probe(_config):
+                    probe_started.set()
+                    await probe_release.wait()
+
+                if failure == "setup_retry":
+                    monkeypatch.setattr(integration, "async_setup_entry", delayed_failure)
+                else:
+                    monkeypatch.setattr(hass.config_entries, "async_setup", delayed_failure)
+                monkeypatch.setattr(config_flow, "async_test_connection", probe)
+                manager = hass.config_entries.flow
+                flow = await manager.async_init(
+                    DOMAIN, context={"source": "reconfigure", "entry_id": entry.entry_id},
+                )
+                flow = await manager.async_configure(
+                    flow["flow_id"], {"next_step_id": "serial_reconfigure"},
+                )
+                task = asyncio.create_task(manager.async_configure(flow["flow_id"], {
+                    "port": "/dev/changed", "device_id": 50, "baudrate": 57600,
+                    "frame": "8n2", "search": "off",
+                }))
+                await asyncio.wait_for(probe_started.wait(), 5)
+                task.cancel()
+                await asyncio.wait_for(setup_started.wait(), 5)
+                assert entry.state is (
+                    ConfigEntryState.SETUP_IN_PROGRESS if failure == "setup_retry"
+                    else ConfigEntryState.NOT_LOADED
+                )
+                task.cancel()
+                await asyncio.sleep(0)
+                assert not task.done()
+                assert entry.setup_lock.locked()
+                setup_release.set()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+                assert dict(entry.data) == original_data
+                if failure == "setup_retry":
+                    assert entry.state is ConfigEntryState.SETUP_RETRY
+                    assert entry._async_cancel_retry_setup is not None
+                    entry.async_cancel_retry_setup()
+                else:
+                    assert entry.state is ConfigEntryState.NOT_LOADED
+                    assert "Unable to restore the entry after a cancelled connection probe" in caplog.text
+                    monkeypatch.setattr(hass.config_entries, "async_setup", original_setup)
+                    assert await hass.config_entries.async_setup(entry.entry_id)
+                    assert entry.state is ConfigEntryState.LOADED
+                assert not bus.writes
+            finally:
+                probe_release.set()
+                setup_release.set()
                 if task is not None:
                     await asyncio.gather(task, return_exceptions=True)
                 await hass.async_stop()
