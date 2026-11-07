@@ -1,5 +1,25 @@
 # Changes
 
+## 0.7.0b4
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**.
+
+- Keep target changes durable during cancellation, cancel obsolete queued
+  charging commands and retain a reached target's required stop.
+- Report unconfirmed storage durability without restoring a stale in-memory
+  target or losing a newly saved charging summary.
+- Retain an entered adapter password when detecting the same endpoint and
+  reject invalid adapter settings before stopping the existing connection.
+- Keep selected adapter settings during detection and explain which controls
+  change the app connection or the adapter itself in all five languages.
+- Allow the TCP listener to start after applying adapter settings and report
+  setup, verification and restoration in the app log without credentials.
+- Recheck live status before restart and phase writes, including reconnecting vehicles.
+- Finish interrupted intent saves in order, even after repeated cancellation.
+- Reject service tokens that cannot be used in an HTTP header and detect
+  concurrent Supervisor configuration changes before saving connection options.
+- Report complete polling failures while preserving valid Modbus exception responses.
+
 ## 0.7.0b3
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**. Includes the
