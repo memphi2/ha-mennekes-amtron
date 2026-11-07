@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Keep TCP-login and password fields visible in the app's native configuration,
+  including after updates and connection changes.
+- Separate fixed-price or sensor selection from German network tariffs; suggest
+  0.40 EUR/kWh for a new fixed price and show all Module 3 prices and imported
+  time windows together. The last options form now saves directly.
+- Preserve briefly reached vehicle charge targets during slow target changes,
+  failed saves and lost service responses. Older apps report a specific update
+  requirement for safe percentage-target changes; other controls remain usable.
+- Retry failed energy-target persistence after meter recovery and when stopping.
+- Include app frontend files in the local secret scan and update user guidance.
+
 ## 0.7.0b4 — 2026-11-07
 
 Beta update of the integration and app; **0.6.1 remains stable**.

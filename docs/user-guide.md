@@ -159,6 +159,13 @@ Cancel or **Back** discards an unfinished section. Other sections keep their
 settings, and a concurrent edit to the same section is reported instead of
 being overwritten.
 
+To select a supported vehicle integration, open **Next departure → Configure
+departure planning** and enable **Use the vehicle's departure times**. Its
+integration and vehicle selectors appear after the capacity settings. For
+charging history, use **Charging losses → Vehicle charging history**. The
+special adapter currently supports BavarianData; SoC and other generic sensors
+can come from any integration and are selected by entity instead.
+
 | Setting | Direct USB or LAN connection | Modbus service connection |
 |---|---|---|
 | Write permission | **Configure → Wallbox → Current limit and polling → Control mode** | App configuration: **Read-only** |

@@ -1,5 +1,13 @@
 # Changes
 
+## Unreleased
+
+- Show TCP-login and password fields in native app configuration and retain
+  their visibility when the connection page saves USB or disabled login.
+- Confirm or cancel uncertain percentage-target requests and reject observations
+  belonging to a replaced target. Bound the temporary request state in memory.
+- Retry energy-target storage after a recovered meter or interrupted shutdown.
+
 ## 0.7.0b4
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**.
