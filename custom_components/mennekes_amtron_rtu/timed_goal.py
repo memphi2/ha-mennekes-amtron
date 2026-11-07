@@ -2,7 +2,24 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+
+
+def matches_departure_source(source: str | None, entity_id: str, value: datetime) -> bool:
+    """Recognize the same trip, including saved markers with non-UTC offsets."""
+    prefix = f"entity:{entity_id}:"
+    if source is None or not source.startswith(prefix):
+        return False
+    try:
+        previous = datetime.fromisoformat(source[len(prefix):])
+        if (
+            previous.tzinfo is None or previous.utcoffset() is None
+            or value.tzinfo is None or value.utcoffset() is None
+        ):
+            return False
+        return previous.astimezone(UTC) == value.astimezone(UTC)
+    except (OverflowError, ValueError):
+        return False
 
 
 class TimedGoal:

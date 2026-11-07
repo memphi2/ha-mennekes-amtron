@@ -25,7 +25,7 @@ from .device.registers import CP_STATE, EVSE_STATE
 from .device.vehicle import vehicle_connected
 from .exceptions import service_validation_error
 from .goal_store import TimedGoalStore
-from .timed_goal import TimedGoal
+from .timed_goal import TimedGoal, matches_departure_source
 from .timed_goal_const import (
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
@@ -62,9 +62,11 @@ def departure_time(state: State | None) -> datetime | None:
         return None
     try:
         value = datetime.fromisoformat(state.state)
+        if value.tzinfo is not None and value.utcoffset() is not None:
+            return value.astimezone(UTC)
     except (OverflowError, ValueError):
         return None
-    return value if value.tzinfo is not None and value.utcoffset() is not None else None
+    return None
 
 
 def capacity_from_state(state: State | None) -> float | None:
@@ -319,7 +321,7 @@ class TimedGoalObserver:
             value = departure_time(self._hass.states.get(source_entity))
             if value is not None and value > dt_util.utcnow():
                 source = f"entity:{source_entity}:{value.isoformat()}"
-                if source != self.goal.source:
+                if not matches_departure_source(self.goal.source, source_entity, value):
                     await self._set_deadline(value, source=source, expected=self.goal)
         trip = self.goal
         deadline = trip.deadline
