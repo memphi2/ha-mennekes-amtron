@@ -33,6 +33,17 @@ progress. Named commands retain device guards; the API has no raw
 register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 
+Percentage-target updates reserve a bounded, short-lived service token before
+submission. After a lost reply, resolution either confirms completion or prevents
+an unstarted request from executing later. The HA observer keeps evidence against
+both the old and requested goal until the outcome is known. A service-owned goal
+revision prevents buffered reports from stopping a subsequently replaced target.
+At most 64 reservations are retained in RAM, with a five-minute lifetime; tokens
+do not survive a service restart and are not Recorder attributes. A restarted
+service or an unknown storage outcome is never inferred to be a successful save.
+Older API 2 services remain usable for other controls; setting a percentage goal
+requires this capability and otherwise reports that the app needs an update.
+
 Explicit target saves finish before propagating cancellation, including time
 spent waiting for a storage lock. The corresponding in-memory model and command
 invalidation must finish with that save. This keeps a cancelled request from
