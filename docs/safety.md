@@ -118,9 +118,9 @@ the integration's extra current cap, while hardware limits remain in force.
   longer interval when no vehicle is connected. Failed reads, inconsistent
   status or layouts without CP keep the interval. Register-write guards and
   heartbeat remain active; pending waits check for unplugging every five seconds.
-- From 0.7.0b2, departure-plan commands are cancelled on freshly confirmed
+- From 0.7.0b3, departure-plan commands are cancelled on freshly confirmed
   unplugging before their write. This also applies in service mode while HA is
-  unavailable when the service is updated to 0.7.0b2. Manual commands retain
+  unavailable when the service is updated to 0.7.0b3. Manual commands retain
   the no-vehicle interval bypass.
 - Repeating the same state and recovery that preserves existing intent do not
   restart the long timer. Timing guards survive an entry reload in memory.

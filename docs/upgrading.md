@@ -9,10 +9,10 @@ then the integration. Keep existing app data and your HA entry. The **#apps**
 catalog carries stable updates; **#apps-beta** follows the beta channel below.
 Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Trying 0.7.0b2
+## Trying 0.7.0b3
 
-**0.7.0b2 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
-prereleases in your integration installer and select **v0.7.0b2**. Keep the
+**0.7.0b3 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
+prereleases in your integration installer and select **v0.7.0b3**. Keep the
 existing HA entry. The beta app is offered through
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
 catalog can use **Check for updates** and update their app in place.

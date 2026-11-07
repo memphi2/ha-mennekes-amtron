@@ -77,9 +77,9 @@ integer counters in its JSON report:
 - At least **99% overall** for the integration.
 - Strictly **more than 95% in each production integration module**. Strong
   coverage elsewhere cannot hide an untested module.
-- Exactly **100%** in the configuration-flow modules: `config_flow.py`,
-  `options_flow.py`, `_flow_connect.py`, `_flow_search.py`, `_flow_serial.py`
-  and `config_schemas.py`.
+- Exactly **100%** in configuration and options flows, including their shared
+  schema, connection, search, gateway and tariff helpers. The enforced module
+  list is `FLOW_MODULES` in the [coverage gate](../scripts/check_coverage.py).
 
 The thresholds use unrounded counts; a displayed percentage rounded up to a
 threshold does not pass. Missing or invalid reports and missing production

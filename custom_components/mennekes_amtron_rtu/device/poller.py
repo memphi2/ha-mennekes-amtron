@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections.abc import Callable
 
@@ -17,6 +18,7 @@ from .register_blocks import SLOW_BLOCK_INTERVAL_SECONDS, BlockCadence
 from .runtime_events import EventTimeline, EventType
 
 _LOGGER = logging.getLogger(__name__)
+_BLOCK_RETRY_INITIAL_SECONDS = 5.0
 
 
 class DevicePoller:
@@ -40,6 +42,22 @@ class DevicePoller:
         self._monotonic = monotonic
         self._slow_read_at: float | None = None
         self._active_read_at: float | None = None
+        # Retry only the failed block, with bounded backoff. A single invalid
+        # meter reading must not wait for the next complete slow poll, while an
+        # unsupported register must not occupy the bus on every status poll.
+        self._block_retries: dict[str, tuple[float, float]] = {}
+
+    def _retry_due(self, name: str) -> bool:
+        retry = self._block_retries.get(name)
+        return retry is not None and self._monotonic() >= retry[0]
+
+    def _retry_later(self, name: str) -> None:
+        previous = self._block_retries.get(name)
+        delay = (
+            _BLOCK_RETRY_INITIAL_SECONDS if previous is None
+            else min(previous[1] * 2, SLOW_BLOCK_INTERVAL_SECONDS)
+        )
+        self._block_retries[name] = (self._monotonic() + delay, delay)
 
     def _slow_blocks_are_due(self) -> bool:
         """Return whether the configuration blocks should be read again."""
@@ -75,6 +93,8 @@ class DevicePoller:
             state_changed = read.get("evse_state") != values.get("evse_state")
             if block.cadence is BlockCadence.SLOW and not (
                 slow_due or (block.name == "statistics" and state_changed)
+                or (block.name == "statistics" and not last_success)
+                or self._retry_due(block.name)
             ):
                 continue
             if block.cadence is BlockCadence.ACTIVE:
@@ -90,11 +110,11 @@ class DevicePoller:
                         or not last_success
                         or self._monotonic() - self._active_read_at >= interval
                     )
-                if not active_due:
+                if not active_due and not self._retry_due(block.name):
                     continue
             failed.discard(block.name)
             try:
-                read.update(await self._client.async_read_block(block))
+                result = await self._client.async_read_block(block)
             except AmtronConnectionError as err:
                 self._log_unavailable(err)
                 raise
@@ -105,7 +125,20 @@ class DevicePoller:
                 # frozen measurement an automation still believes is worse than
                 # an entity that admits it knows nothing.
                 stale.extend(block.keys)
+                if block.cadence is not BlockCadence.FAST:
+                    self._retry_later(block.name)
                 _LOGGER.debug("Block %s failed: %s", block.name, err)
+            else:
+                read.update(result)
+                total = result.get("energy_total") if block.name == "statistics" else None
+                invalid_meter = block.name == "statistics" and (
+                    isinstance(total, bool) or not isinstance(total, (int, float))
+                    or not math.isfinite(total) or total < 0
+                )
+                if invalid_meter:
+                    self._retry_later(block.name)
+                else:
+                    self._block_retries.pop(block.name, None)
         if not read:
             raise AmtronConnectionError("no register block could be read")
         if slow_due:

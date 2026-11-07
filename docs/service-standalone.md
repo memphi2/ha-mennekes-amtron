@@ -86,11 +86,11 @@ port. No local serial path or container device mapping is needed for LAN.
 The service's HTTP `port` remains **8765**; it is independent of `tcp_port`.
 See [LAN setup and network access](network-gateway.md).
 
-#### Optional TCP login (since 0.7.0b2)
+#### Optional TCP login (since 0.7.0b3)
 
 TCP login is not available in stable **0.6.1** or beta **0.7.0b1**. Their service
 does not perform the handshake even if the following fields are added. This
-section requires **app/service 0.7.0b2 or newer** from the beta channel.
+section requires **app/service 0.7.0b3 or newer** from the beta channel.
 
 If a supported Waveshare adapter already has TCP login enabled, additionally
 set `tcp_authentication` to `true` and `tcp_auth_password` to its existing web
@@ -112,7 +112,7 @@ Copy the **standalone container reference** from the
 [published app catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps)
 for stable **0.6.1**, or from the
 [beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta)
-for **0.7.0b2**. Use the beta service for optional Waveshare TCP login and the
+for **0.7.0b3**. Use the beta service for optional Waveshare TCP login and the
 shared control fixes. The
 integration's minimum compatible service remains **0.6.1 with API 2**.
 Use the complete `ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference

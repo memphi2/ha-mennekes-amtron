@@ -1,7 +1,7 @@
 # Set up a compatible LAN adapter
 
-**Available in beta 0.7.0b2.** Direct connections need integration 0.7.0b2;
-service connections need app/service 0.7.0b2 for these adapter features.
+**Available in beta 0.7.0b3.** Direct connections need integration 0.7.0b3;
+service connections need app/service 0.7.0b3 for these adapter features.
 Stable 0.6.1 and beta 0.7.0b1 do not include them.
 
 You can optionally configure a supported Waveshare adapter from the integration
@@ -147,6 +147,13 @@ before trying again. This also applies when a sent change was never confirmed:
 a delayed adapter update cannot safely be ruled out by one old readback.
 An adapter changed by another administrator must be
 detected again; do not reuse the old preview.
+
+If a Supervisor save cannot be confirmed, the running app blocks further
+connection saves while still allowing you to read its settings and detect the
+adapter. A previous save may still complete later; a reload does not cancel it.
+Check both the saved connection and the adapter before deciding how to recover.
+The block applies only to this app process and does not prevent changes through
+Supervisor or guarantee that an earlier request has finished after a restart.
 
 For detection, allow the HA/service host to reach the adapter's **UDP port 1092**
 and configured HTTP web port, as well as the selected TCP data port. There is no

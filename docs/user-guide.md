@@ -5,7 +5,7 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
-The setup instructions below follow **beta 0.7.0b2** and its separate feature
+The setup instructions below follow **beta 0.7.0b3** and its separate feature
 menus. **0.6.1 remains the stable release.** Optional charging targets,
 departure planning, loss/cost estimates and command-result events are described here. For service
 connections, [update the app first](installation.md#updating-to-061).
@@ -72,7 +72,7 @@ layouts without CP status also keep it.
 
 Timed departure commands are cancelled when unplugging is confirmed before
 their write, including commands already waiting for the bus or an interval.
-This requires integration 0.7.0b2 in direct mode or service 0.7.0b2 in service mode.
+This requires integration 0.7.0b3 in direct mode or service 0.7.0b3 in service mode.
 
 **Pending change** shows what is waiting, and **Pending change due** shows
 the planned execution time when known. While a phase change waits for the
@@ -472,9 +472,9 @@ charge. The service continues its heartbeat and last applied state, subject
 to its charging limits. Service mode requires **app/service 0.6.1 or newer**
 for this behavior; update it before the integration.
 
-From **0.7.0b2**, the bus owner also checks for a disconnected vehicle before
+From **0.7.0b3**, the bus owner also checks for a disconnected vehicle before
 applying a planned command. Confirmed unplugging cancels that command, including
-while HA is offline when using service 0.7.0b2. Manual controls remain available.
+while HA is offline when using service 0.7.0b3. Manual controls remain available.
 
 Current adjustments require at least 1 A difference and are spaced by at least
 five minutes; the status sensor has

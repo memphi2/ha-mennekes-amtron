@@ -199,7 +199,7 @@ def test_reconfiguration_replaces_backend_fields_and_preserves_options(monkeypat
         entry.runtime_data = SimpleNamespace(client=SimpleNamespace(config=object()))
         events = []
 
-        async def unload(entry_id):
+        async def unload(entry_id, *, _lock=True):
             assert entry_id == entry.entry_id
             events.append("unload")
             entry.state = ConfigEntryState.NOT_LOADED
@@ -246,14 +246,14 @@ def test_failed_network_handover_restores_the_loaded_entry(monkeypatch, failure)
         entry.runtime_data = SimpleNamespace(client=SimpleNamespace(config=object()))
         events = []
 
-        async def unload(entry_id):
+        async def unload(entry_id, *, _lock=True):
             events.append("unload")
             if failure == "unload":
                 return False
             entry.state = ConfigEntryState.NOT_LOADED
             return True
 
-        async def setup(entry_id):
+        async def setup(entry_id, *, _lock=True):
             events.append("restore")
             entry.state = ConfigEntryState.LOADED
             return True

@@ -348,12 +348,46 @@ class MennekesModbusClient:
                 raise AmtronIdentityError("wallbox identity changed or is unavailable")
             return result
 
-    async def _async_read_words_locked(self, address: int, count: int) -> list[int]:
-        """Release the bus between fallback reads so a heartbeat can pass."""
+    async def _async_read_words_locked(
+        self, address: int, count: int, *, verify_identity: bool = False,
+    ) -> list[int]:
+        """Give a heartbeat the bus between identity and a following read.
+
+        The caller retains the ordinary-operation queue. A read after a new
+        connection must not consume identity evidence from a different link.
+        """
 
         async with self._lock:
+            previous = self._require_client()
+            old_generation = self._connection_generation
+            checking_identity = verify_identity or self._identity_check_needed or not previous.connected
+            client = await self._async_transaction_client(verify_identity=verify_identity)
+            generation = self._connection_generation
+            bound_serial = self._bound_serial
+            if bound_serial is None or not (checking_identity or generation != old_generation):
+                return await _client_read.read_words(
+                    client,
+                    address=address,
+                    count=count,
+                    device_id=self._config.device_id,
+                    retries=self._config.retries,
+                    observe=self.link_quality.observe,
+                )
+
+        # Identity and the target are separate Modbus transactions. Keep the
+        # queue, but let an already waiting heartbeat acquire the bus first.
+        await asyncio.sleep(0)
+        async with self._lock:
+            if (
+                self._require_client() is not client
+                or self._connection_generation != generation
+                or self._bound_serial != bound_serial
+                or not client.connected
+                or not self.identity_verified
+            ):
+                raise AmtronConnectionError("connection changed during read")
             return await _client_read.read_words(
-                await self._async_transaction_client(),
+                client,
                 address=address,
                 count=count,
                 device_id=self._config.device_id,
@@ -366,31 +400,17 @@ class MennekesModbusClient:
     ) -> RegisterValue:
         """Read one register range."""
 
-        async with self._queue, self._lock:
-            client = await self._async_transaction_client(verify_identity=verify_identity)
-            words = await _client_read.read_words(
-                client,
-                address=spec.address,
-                count=spec.count,
-                device_id=self._config.device_id,
-                retries=self._config.retries,
-                observe=self.link_quality.observe,
+        async with self._queue:
+            words = await self._async_read_words_locked(
+                spec.address, spec.count, verify_identity=verify_identity,
             )
         return decode_register(spec, words)
 
     async def async_read_words(self, *, address: int, count: int) -> list[int]:
         """Read raw register words, used by diagnostics."""
 
-        async with self._queue, self._lock:
-            client = await self._async_transaction_client()
-            return await _client_read.read_words(
-                client,
-                address=address,
-                count=count,
-                device_id=self._config.device_id,
-                retries=self._config.retries,
-                observe=self.link_quality.observe,
-            )
+        async with self._queue:
+            return await self._async_read_words_locked(address, count)
 
     async def async_write_register(
         self,

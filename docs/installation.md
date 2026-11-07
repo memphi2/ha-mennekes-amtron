@@ -31,7 +31,6 @@ passthrough. Leave the vehicle disconnected during the first control setup.
 | USB adapter or LAN gateway is used by | Service | Home Assistant |
 | Enable writing in | App configuration → **Read-only** off | Integration options → **Control mode: Modbus master** |
 | During a Core restart | Last charging state and heartbeat continue | Heartbeat is interrupted; wallbox fallback applies |
-| Availability | Since **0.5.0**, optional | Since **0.5.0**; existing USB entries remain supported |
 
 Both connection owners support USB and LAN; see
 [LAN connection setup](network-gateway.md). Compatible Waveshare adapters can
@@ -99,8 +98,7 @@ your existing device or entity IDs.
 
 App **0.6.1** includes an **Open Web UI** page for USB/LAN
 setup. That page requires an administrator and stable **Supervisor 2026.11.0+**;
-it does not raise the integration's Home Assistant minimum version. Older app
-**0.5.2b2** uses the native **Configuration** tab. See
+it does not raise the integration's Home Assistant minimum version. See
 [the connection page](upgrading.md#app-connection-page) for setup and updates.
 
 ## Updates
@@ -117,14 +115,12 @@ it does not raise the integration's Home Assistant minimum version. Older app
 
 **The integration and app may have different version numbers.** Integration
 **0.6.1** requires **service 0.6.1 or newer with API 2**. Update an older service
-first, including 0.6.0b1. This supplies expiry for queued timed-plan commands
+first. This supplies expiry for queued timed-plan commands
 even while HA is offline. Future integration-only updates can reuse a compatible
 app without restarting it; its heartbeat continues through HA Core restarts.
 
-**Still using a 0.5.0 beta?** Update the app/service to **0.6.1** first,
-then update the integration. The old beta integration may show unavailable controls between
-these updates because its API differs. Keep the existing app and follow
-[service updates](modbus-service.md#updates), including the connection choice.
+For older app versions and saved connection choices, follow
+[Updating an existing installation](upgrading.md). Keep the existing entry and app data.
 
 Updates can take time to appear; use **Check for updates** in the app store for
 app updates. See
@@ -149,7 +145,7 @@ newer**; update it before the integration, even if you do not use timed planning
 - **App:** `https://github.com/memphi2/ha-mennekes-amtron#apps` offers stable
   **0.6.1**. Use **Check for updates** and keep the existing app data.
   The `#apps-beta` catalog may offer a newer prerelease; see
-  [trying 0.7.0b2](upgrading.md#trying-070b2). A catalog switch creates a separate
+  [trying 0.7.0b3](upgrading.md#trying-070b3). A catalog switch creates a separate
   app; follow the [channel handover](modbus-service.md#updates).
 
 Before updating the app from 0.5.1, save one of the three readable connection

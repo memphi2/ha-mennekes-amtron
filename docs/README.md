@@ -10,15 +10,16 @@ A LAN connection requires no local USB device.
 
 1. Check your model in the [compatibility matrix](compatibility.md) and prepare
    the connection using the [hardware guide](hardware.md).
-2. [Install the integration](installation.md), then follow the
-   [Quick start](quickstart.md).
+2. [Install the integration](installation.md), then connect through the
+   recommended [service app](modbus-service.md) or a
+   [direct USB](quickstart.md) / [LAN connection](network-gateway.md).
 3. Open the [User guide](user-guide.md) for the current slider, pause switch,
    readings and options.
 
-You can connect the serial adapter directly to the integration or use the
+You can connect the USB or LAN adapter directly to the integration or use the
 **optional, recommended [Modbus service](modbus-service.md)**. The service keeps
 the heartbeat and last charging state through Home Assistant Core restarts.
-An app shutdown, host restart or serial failure still requires the wallbox's
+An app shutdown, host restart or USB/LAN failure still requires the wallbox's
 configured fallback.
 
 ## Use your wallbox
@@ -44,7 +45,7 @@ configured fallback.
   app configuration, save and restart the app. HA follows its next status update
   without a Core restart.
 - **One connection owns the bus.** Read-only mode still sends requests. Do not
-  run direct serial and the service against the same adapter at the same time.
+  run a direct connection and the service against the same adapter at the same time.
 
 ## Advanced setup and reference
 

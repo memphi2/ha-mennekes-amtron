@@ -39,7 +39,7 @@ def test_unconfigured_model_is_inert_and_has_no_fabricated_zero():
     assert model.status == "disabled"
     assert model.last_loss_percent is None
     assert model.average_loss_percent is None
-    assert model.last_session_id is None
+    assert model.snapshot()["current_session"] is None
     assert model.sample_count == 0
     assert model.association is None
     assert model.wallbox_kwh is None
@@ -73,7 +73,7 @@ def test_weighted_average_and_correction_of_latest_session_without_recounting():
     assert model.sample_count == 2
     for _ in range(10):
         assert not accept(model, second, 27)
-    assert model.last_session_id == second.session_id
+    assert model.snapshot()["current_session"] == second.as_dict()
     restored = LossStatistics.restore(model.snapshot())
     assert restored.snapshot() == model.snapshot()
     assert restored.average_loss_percent == pytest.approx(10)
@@ -134,7 +134,7 @@ def test_missing_complete_session_hides_last_result_but_keeps_valid_average():
     assert model.observe_session(None)
     assert model.status == "waiting_for_session"
     assert model.last_loss_percent is None
-    assert model.last_session_id is None
+    assert model.snapshot()["current_session"] is None
     assert model.average_loss_percent == pytest.approx(10)
     assert not model.observe_session(None)
     restored = LossStatistics.restore(model.snapshot())
@@ -207,7 +207,7 @@ def test_changing_or_removing_source_resets_the_vehicle_specific_average():
     assert model.configure_source("sensor.other_vehicle|start|end")
     assert model.sample_count == 0
     assert model.average_loss_percent is None
-    assert model.last_session_id is None
+    assert model.snapshot()["current_session"] is None
     assert model.status == "waiting_for_session"
     assert model.configure_source(None)
     assert model.status == "disabled"

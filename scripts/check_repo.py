@@ -6,6 +6,7 @@ from __future__ import annotations
 import compileall
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -153,14 +154,21 @@ def check_required_paths() -> list[str]:
 def check_tracked_runtime_artifacts() -> list[str]:
     """Build and cache directories must not live inside the package."""
 
-    failures: list[str] = []
-    for name in FORBIDDEN_TRACKED_DIRS:
-        for path in ROOT.rglob(name):
-            if ".git" in path.parts:
-                continue
-            if path.is_dir() and _is_tracked(path):
-                failures.append(f"runtime artifact directory is tracked: {path}")
-    return failures
+    result = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=False
+    )
+    if result.returncode:
+        return ["cannot inspect the Git index for tracked runtime artifacts"]
+    directories: set[Path] = set()
+    for raw_path in result.stdout.split(b"\0"):
+        path = Path(raw_path.decode("utf-8", errors="surrogateescape"))
+        for index, part in enumerate(path.parts):
+            if part in FORBIDDEN_TRACKED_DIRS:
+                directories.add(Path(*path.parts[: index + 1]))
+    return [
+        f"runtime artifact directory is tracked: {path}"
+        for path in sorted(directories)
+    ]
 
 
 def check_json_files() -> list[str]:
@@ -546,10 +554,6 @@ def check_python_compile() -> list[str]:
         str(ROOT / "scripts"), quiet=2, force=True, legacy=False
     )
     return [] if ok else ["python sources failed to compile"]
-
-
-def _is_tracked(path: Path) -> bool:
-    return not _is_ignored(path)
 
 
 def _is_ignored(path: Path) -> bool:

@@ -12,8 +12,8 @@ two supported protocols. Compatible Waveshare adapters also have optional
 
 **Stable service: 0.6.1.** Integration 0.6.1 requires **service 0.6.1 or newer
 with API 2**. Update the app first. Later integration and service versions can
-differ when this requirement is met. Existing beta-app installations receive
-this stable update too; no catalog switch is needed.
+differ when this requirement is met. For newer betas or a change of app channel,
+follow [Updates](#updates).
 Check the [handover](#check-the-handover) on your hardware before relying on it.
 See [Updating to 0.6.1](installation.md#updating-to-061).
 
@@ -69,9 +69,9 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 The repository above provides stable **0.6.1**. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog provides beta
-**0.7.0b2**. Existing beta-catalog installations update in place. To switch
+**0.7.0b3**. Existing beta-catalog installations update in place. To switch
 catalogs, follow the [channel handover](#updates) and
-[beta update guide](upgrading.md#trying-070b2).
+[beta update guide](upgrading.md#trying-070b3).
 
 ### 3. Configure and start read-only
 
@@ -86,10 +86,9 @@ old serial path. Save and restart the app from the Info tab to apply changes.
 Without a configured connection, the app remains running for setup and does not
 start Modbus or discovery. Leave **Read-only** on in the native Configuration tab.
 
-Older apps use the native Configuration tab for all settings. From app **0.5.1**,
-**Adapter host / IP** is always visible. Enter it for LAN and leave it empty for
-USB. If **Serial adapter** is hidden, enable **Show unused optional configuration
-options**. Those older forms do not rearrange fields when the connection changes.
+On older Supervisor versions, use the native **Configuration** tab; enable
+**Show unused optional configuration options** if a required field is hidden.
+For an older app, follow [the update guide](upgrading.md#app-connection-choice).
 
 | App option | What to enter |
 |---|---|
@@ -106,8 +105,6 @@ App 0.6.1 shows exactly these three connection choices. When updating an
 older app with a saved technical connection name, select the matching readable
 choice once; see [Updating the connection choice](upgrading.md#app-connection-choice).
 The transport is never changed automatically to USB.
-Still on app 0.5.0 and missing the host field? See the
-[0.5.0 configuration workaround](network-gateway.md#app-050-configuration).
 
 Leave the app's **API** listen address and port at their defaults. Its HTTP port
 **8765** is separate from the gateway's Modbus TCP port. No service URL, token or
@@ -165,7 +162,7 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 | Enable or disable all writes | Change **Read-only**, save and restart the app. HA needs no restart. Read-only stops the heartbeat as well as writes. |
 | Change Modbus polling intervals or the service current cap | Change the app configuration, save and restart the app. |
 | Set the time between charging changes | Set **Minimum time between state changes** in the app, in seconds; default **300**, range **0–3600**. Save and restart the app. |
-| Change USB/LAN connection settings | Open the app configuration, save and restart the app. For LAN, use the adapter interface or optional [adapter setup](lan-adapters.md#service-app). |
+| Change USB/LAN connection settings | Choose **Open Web UI**, save and restart the app. For LAN, use the adapter interface or optional [adapter setup](lan-adapters.md#service-app). |
 | Change how often HA reads app status, or lower HA's current cap | Open the integration options. |
 | Hand the USB or LAN connection to another master | Stop the app. Disabling its HA entry or enabling read-only does not release the bus. |
 
@@ -180,7 +177,7 @@ a saved limited setpoint. A deliberately selected **0 A** remains unlimited;
 the wallbox's hardware limits still apply. See the [user guide](user-guide.md)
 for charging controls and automations.
 
-**Since 0.5.2b2:** early pause/resume, phase, release and lock changes
+Early pause/resume, phase, release and lock changes
 wait in one pending slot. **Pending change** and **Pending change due** show
 the action and when it can run. A newer charging request replaces it. A stop
 replaces a pending start and also waits for its due time. Heartbeat and recovery
@@ -202,12 +199,12 @@ register-write guards and heartbeat remain active.
 
 | Event | What happens |
 |---|---|
-| HA Core restarts or stays offline | The running app keeps heartbeat and accepted charging intent. Since 0.5.2b2, an already queued command can execute while HA is offline. |
+| HA Core restarts or stays offline | The running app keeps heartbeat and accepted charging intent. An already queued command can execute while HA is offline, up to its expiry if it belongs to a timed departure plan. |
 | HA automation is unavailable | No new schedule or surplus calculation runs; the app holds the last chosen state. |
 | App, host, power, USB or LAN/gateway connection fails | The heartbeat can stop. The wallbox's configured fallback applies. |
 | HA reconnects | HA reads the current app state; it does not restore old commands. |
 
-Since 0.5.2b2, an app/service restart cancels pending commands; it does not
+An app/service restart cancels pending commands; it does not
 cancel an already applied pause. HA Core restarts leave the independent
 service's queue running.
 
@@ -221,7 +218,7 @@ health changes rather than every beat. For smaller HA history, use a
 
 ## AppArmor protection
 
-App **0.6.1** includes the custom AppArmor profile first introduced in 0.5.2b1.
+The app includes a custom AppArmor profile.
 Supervisor loads it automatically when the app is installed;
 keep **Protection mode on**. It limits the service to its runtime files, USB/LAN
 communication and its own token and charging-state files. App options remain
@@ -259,15 +256,8 @@ app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
 **Updating the app itself briefly interrupts its heartbeat.**
 
-**From an older release or beta:** update the app/service to **0.6.1** first,
-then update the integration. The old beta integration may show unavailable controls between
-updates because its API differs. Keep the existing HA entry, app and data.
-The token, saved charging state and USB settings are retained;
-check the [connection choice](upgrading.md#app-connection-choice) before starting.
-LAN remains an optional connection change.
-
-Stable **0.6.1** is published to `#apps`; beta **0.7.0b2** is published to
-`#apps-beta`. For the shared control fixes in 0.7.0b2, update that beta app too;
+Stable **0.6.1** is published to `#apps`; beta **0.7.0b3** is published to
+`#apps-beta`. For the shared control fixes in 0.7.0b3, update that beta app too;
 the minimum compatible service remains **0.6.1 with API 2**. An existing beta
 app updates in place with its data intact. When updating from 0.5.1, check the
 [connection-choice change](upgrading.md#app-connection-choice).

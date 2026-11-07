@@ -228,9 +228,28 @@ class AmtronControl:
                 return
             self._require_write_access()
             self._clear_pending(outcome="cancelled", reason="energy_goal")
-            if self.is_paused is True:
-                self.pause_requested = True
-                return
+            if self.is_paused is not False:
+                try:
+                    # A former acknowledgement or cached poll is not proof of
+                    # the present register value. In particular, a poll can
+                    # detect a reached goal while its current block has failed
+                    # and the coordinator still exposes the previous snapshot.
+                    # A reconnect still triggers the client's identity check.
+                    # With an established connection, avoid holding the bus
+                    # for two retrying reads before a priority heartbeat.
+                    current = await self._client.async_read_register(CHARGING_CURRENT_EMS)
+                except AmtronBusError:
+                    current = None
+                if (
+                    not isinstance(current, bool) and isinstance(current, (int, float))
+                    and math.isfinite(current) and current >= 0
+                ):
+                    self._write_state.confirmed_current = float(current)
+                    if 0 < current < CHARGING_CURRENT_MINIMUM:
+                        self.pause_requested = True
+                        return
+                else:
+                    self._write_state.confirmed_current = None
             await self._async_observe_command(_PendingCommand(
                 "pause", CHARGING_PAUSE_CURRENT, energy_goal_stop=True,
             ))
@@ -726,10 +745,10 @@ class AmtronControl:
         self, value: float, *, preserve_setpoint: bool = False, recovery: bool = False,
         phase_preparation: bool = False, energy_goal_stop: bool = False,
     ) -> None:
-        transition = not recovery and (
-            self._current_transition(value)
-            or (energy_goal_stop and self.is_paused is not True)
-        )
+        # A goal stop reaches this method only when a current pause was not
+        # freshly confirmed. Treat its write as a possible transition even if
+        # the old cached snapshot still says "paused".
+        transition = not recovery and (energy_goal_stop or self._current_transition(value))
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._write_state.confirmed_current
         if transition and not phase_preparation and not energy_goal_stop:

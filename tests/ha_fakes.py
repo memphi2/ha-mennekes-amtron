@@ -160,6 +160,7 @@ class FakeConfigEntry:
             else data
         )
         self.options = {} if options is None else options
+        self.setup_lock = asyncio.Lock()
         self.runtime_data: Any = None
         self.unloads: list[Callable[[], Any]] = []
         self.update_listeners: list[Any] = []

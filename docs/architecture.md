@@ -75,13 +75,20 @@ endpoint, with no Modbus owner, heartbeat or discovery. A configured but missing
 adapter still follows the normal reconnect path. Standalone configuration remains
 strict and has no Ingress setup mode. See [connection setup](upgrading.md#app-connection-page).
 
-The 0.5.2b2 driver binds a readable serial number to the client. Reconnection
+The driver binds a readable serial number to the client. Reconnection
 invalidates that verification; the next transaction checks it again under the
 bus lock. Control writes also read the serial to catch a downstream gateway
 change without a TCP disconnect. A mismatch blocks writes and preserves saved
 intent. Ordinary heartbeat delivery adds no serial-number read or Recorder
 update. Devices without a readable serial retain their documented endpoint
 binding limitation.
+
+The ordinary request queue stays owned while a priority heartbeat can pass
+between identity verification and the following data read. Reacquiring the bus
+also rechecks the client and connection generation; changed or closed transports
+cannot supply the result. Failed measurement blocks have individual bounded
+retries, without accelerating the remaining measurement groups or adding
+per-retry Recorder attributes.
 
 `tests/test_service_process.py` runs the server in a separate process over a
 virtual serial Modbus bus while a real HA instance stops and starts. It checks

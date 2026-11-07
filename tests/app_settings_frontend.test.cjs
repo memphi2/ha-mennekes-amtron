@@ -28,7 +28,7 @@ const detected = {
   tcp_port: 502, baudrate: 9600, frame: '8e1', connection_type: 'rtu_over_tcp', tcp_authentication: false, can_configure: true,
 };
 const result = (data, ok = true) => ({ ok, json: async () => data });
-const settingsResponse = (settings = baseSettings) => result({ settings, adapters: [], revision: 'revision-1', csrf: 'csrf-proof' });
+const settingsResponse = (settings = baseSettings, write_blocked = false) => result({ settings, adapters: [], revision: 'revision-1', csrf: 'csrf-proof', write_blocked });
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
 async function harness(settings = baseSettings, language = 'en') {
@@ -223,14 +223,29 @@ for (const failure of ['adapter_save_uncertain', 'gateway_rollback_failed', 'los
     const before = ui.calls.length;
     await ui.el('connection_form').emit('submit');
     assert.equal(ui.calls.length, before);
-    ui.responses.push(settingsResponse());
+    const blocked = failure === 'adapter_save_uncertain';
+    ui.responses.push(settingsResponse(baseSettings, blocked));
     await ui.el('reload').emit('click');
     assert.equal(ui.el('save').disabled, true);
-    assert.match(ui.el('error').textContent, /could not be confirmed together/);
+    assert.match(ui.el('error').textContent, blocked ? /previous save may still complete/ : /could not be confirmed together/);
     await detect(ui);
-    assert.equal(ui.el('save').disabled, false);
+    assert.equal(ui.el('save').disabled, blocked);
+    if (blocked) assert.match(ui.el('error').textContent, /previous save may still complete/);
   });
 }
+
+test('an unconfirmed ordinary save stays blocked after reopening or detecting the adapter', async () => {
+  const ui = await harness();
+  ui.responses.push(result({ error: 'options_save_uncertain' }, false));
+  await ui.el('connection_form').emit('submit');
+  assert.equal(ui.el('save').disabled, true);
+  assert.match(ui.el('error').textContent, /previous save may still complete/);
+  ui.responses.push(settingsResponse(baseSettings, true));
+  await ui.el('reload').emit('click');
+  await detect(ui);
+  assert.equal(ui.el('save').disabled, true);
+  assert.match(ui.el('error').textContent, /previous save may still complete/);
+});
 
 test('rejected password clears proof and input without pretending the connection was saved', async () => {
   const ui = await harness();

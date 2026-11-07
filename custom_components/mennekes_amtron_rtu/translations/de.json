@@ -9,6 +9,7 @@
       "service_identity_changed": "Die erkannte Wallbox hat sich geändert. Starte die Einrichtung erneut.",
       "service_discovery_updated": "Die vorhandene Integration verwendet jetzt die erkannte App-Verbindung.",
       "multiple_service_apps": "Mehrere Modbus-Apps wurden gefunden. Wähle die passende erkannte App unter Geräte & Dienste.",
+      "connection_settings_changed": "Die Verbindungseinstellungen haben sich während der Anmeldung geändert. Die geprüften Zugangsdaten wurden nicht gespeichert. Prüfe die aktuelle Verbindung, bevor du es erneut versuchst.",
       "reauth_not_supported": "Diese Verbindung nutzt keine TCP-Anmeldung am Adapter. Aktualisiere ihre Einstellungen über „Verbindung ändern“."
     },
     "error": {
