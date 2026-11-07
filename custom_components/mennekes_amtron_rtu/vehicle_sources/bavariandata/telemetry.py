@@ -31,11 +31,10 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources.types import (
     VehicleTelemetry,
 )
 
-from .history import (
-    HISTORY_DOMAIN,
+from .identity import (
+    DOMAIN,
+    BavarianVehicleBinding,
     bavarian_vehicle_vin,
-    bound_vehicle_vin,
-    vehicle_source_key,
 )
 
 SOC_DESCRIPTORS = (
@@ -51,7 +50,7 @@ _CAPABILITIES: tuple[Capability, ...] = ("soc", "charge_limit", "capacity")
 def _entity(hass: HomeAssistant, device_id: str, vin: str, descriptors: tuple[str, ...]) -> tuple[str, str] | None:
     registry = er.async_get(hass)
     for descriptor in descriptors:
-        entity_id = registry.async_get_entity_id("sensor", HISTORY_DOMAIN, f"{vin}_{descriptor}")
+        entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{vin}_{descriptor}")
         if entity_id is None:
             continue
         entry = registry.async_get(entity_id)
@@ -90,25 +89,8 @@ def _value(state: State | None, descriptor: str) -> float | None:
     return value
 
 
-class BavarianTelemetrySource:
+class BavarianTelemetrySource(BavarianVehicleBinding):
     """Keep one vehicle binding and event snapshots across entity renames."""
-
-    def __init__(self, hass: HomeAssistant, device_id: str, *, expected_source_key: str | None = None) -> None:
-        self._hass = hass
-        self._device_id = device_id
-        self._expected_source_key = expected_source_key
-        self._vin = bound_vehicle_vin(hass, device_id, expected_source_key)
-
-    @property
-    def source_key(self) -> str:
-        return self._expected_source_key or vehicle_source_key(self._device_id, self._vin)
-
-    @property
-    def available(self) -> bool:
-        current = bound_vehicle_vin(self._hass, self._device_id, self._expected_source_key)
-        if self._vin is None:
-            self._vin = current
-        return self._vin is not None and current == self._vin
 
     def _bindings(self) -> tuple[tuple[str, str] | None, ...]:
         if not self.available or self._vin is None:

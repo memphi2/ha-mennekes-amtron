@@ -23,6 +23,9 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.history 
     HistoryMatch,
     async_read_history,
 )
+from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.identity import (
+    bavarian_vehicle_vin,
+)
 
 BASE = 1700000000.0
 VIN = "WBA12345678901234"
@@ -327,12 +330,12 @@ def test_account_debug_foreign_or_ambiguous_device_never_queries_history(identif
 def test_missing_registry_removed_device_and_entry_identifier_are_not_vehicles():
     hass = fake_hass({})
     hass.data = {}
-    assert history.bavarian_vehicle_vin(hass, "car") is None
+    assert bavarian_vehicle_vin(hass, "car") is None
     registry = vehicle_registry(entries={VIN})
     hass.data[dr.DATA_REGISTRY] = registry
-    assert history.bavarian_vehicle_vin(hass, "car") is None
+    assert bavarian_vehicle_vin(hass, "car") is None
     registry.async_get.return_value = None
-    assert history.bavarian_vehicle_vin(hass, "car") is None
+    assert bavarian_vehicle_vin(hass, "car") is None
 
 
 def test_expected_vehicle_must_match_selected_registry_device():

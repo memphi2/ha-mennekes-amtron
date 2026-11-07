@@ -35,11 +35,10 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources.types import (
     VehicleDetection,
 )
 
-from .history import (
-    HISTORY_DOMAIN,
+from .identity import (
+    DOMAIN,
+    BavarianVehicleBinding,
     bavarian_vehicle_vin,
-    bound_vehicle_vin,
-    vehicle_source_key,
 )
 
 PLUG_DESCRIPTOR = "vehicle.powertrain.tractionBattery.charging.port.anyPosition.isPlugged"
@@ -49,7 +48,7 @@ _ENTITY_KEYS = (("binary_sensor", PLUG_DESCRIPTOR), ("device_tracker", "tracker"
 
 def _entity(hass: HomeAssistant, device_id: str, vin: str, domain: str, suffix: str) -> str | None:
     registry = er.async_get(hass)
-    entity_id = registry.async_get_entity_id(domain, HISTORY_DOMAIN, f"{vin}_{suffix}")
+    entity_id = registry.async_get_entity_id(domain, DOMAIN, f"{vin}_{suffix}")
     entry = registry.async_get(entity_id) if entity_id is not None else None
     if entry is None or entry.device_id != device_id or entry.disabled_by is not None:
         return None
@@ -135,25 +134,8 @@ def _home(observation: _Observation, zone: State | None, now: datetime) -> bool 
     return None if in_zone(zone, latitude, longitude, accuracy) else False
 
 
-class BavarianDetectionSource:
+class BavarianDetectionSource(BavarianVehicleBinding):
     """Keep one vehicle's cable and GPS hints separate from charging status."""
-
-    def __init__(self, hass: HomeAssistant, device_id: str, *, expected_source_key: str | None = None) -> None:
-        self._hass = hass
-        self._device_id = device_id
-        self._expected_source_key = expected_source_key
-        self._vin = bound_vehicle_vin(hass, device_id, expected_source_key)
-
-    @property
-    def source_key(self) -> str:
-        return self._expected_source_key or vehicle_source_key(self._device_id, self._vin)
-
-    @property
-    def available(self) -> bool:
-        current = bound_vehicle_vin(self._hass, self._device_id, self._expected_source_key)
-        if self._vin is None:
-            self._vin = current
-        return self._vin is not None and current == self._vin
 
     def _bindings(self) -> tuple[str | None, ...]:
         if not self.available or self._vin is None:

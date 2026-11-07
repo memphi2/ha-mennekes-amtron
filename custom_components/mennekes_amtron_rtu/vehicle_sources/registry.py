@@ -25,7 +25,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
 
 from .bavariandata import BavarianChargeHistorySource, BavarianDepartureSource
 from .bavariandata.detection import BavarianDetectionSource, detection_capabilities
-from .bavariandata.history import bavarian_vehicle_vin, vehicle_source_key
+from .bavariandata.identity import bavarian_vehicle_vin, vehicle_source_key
 from .bavariandata.telemetry import BavarianTelemetrySource, telemetry_capabilities
 from .const import (
     CONF_LOSS_VEHICLE_DEVICE,
