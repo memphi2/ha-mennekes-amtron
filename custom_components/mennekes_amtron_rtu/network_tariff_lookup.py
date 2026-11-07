@@ -167,7 +167,7 @@ def _parse_tariff_values(
             start, end = part.split("-")
             parsed_windows.append({"start": start, "end": end, "rate": rate})
     try:
-        TariffConfig.parse({
+        tariff = TariffConfig.parse({
             "module": "module_3",
             "regular_network": values[CONF_REGULAR_NETWORK],
             "high_network": values[CONF_HIGH_NETWORK],
@@ -178,6 +178,8 @@ def _parse_tariff_values(
             "timezone": "Europe/Berlin",
             "windows": parsed_windows,
         })
+        if any(window.start % 15 or window.end % 15 for window in tariff.windows):
+            return None
     except (ValueError, TypeError):
         return None
     return values

@@ -127,7 +127,6 @@ def test_quarter_switch_and_year_expiry_split_a_meter_interval():
     config(windows=[]), config(windows=[window()]),
     config(windows=[window(), window("10:00", "11:00")]),
     config(windows=[window(), window("23:00", "01:00", "ht")]),
-    config(windows=[window("22:10", "06:00"), window("17:00", "20:00", "ht")]),
     config(windows=[window("00:00", "12:00"), window("12:00", "00:00", "ht")]),
     config(timezone="missing/timezone"), config(timezone="/absolute"),
     config(timezone="a" * 256), config(timezone=False),
@@ -377,3 +376,15 @@ def test_unknown_interval_stays_incomplete_even_if_its_energy_underflows_to_zero
     accumulator.observe_energy(100, 1e-323)
     assert accumulator.result.unpriced_kwh == 0
     assert accumulator.result.cost is None
+
+
+@pytest.mark.parametrize(("start", "end"), [("22:00", "06:01"), ("22:10", "06:00")])
+def test_saved_whole_minute_tariff_still_loads_and_prices_exact_boundaries(start, end):
+    """0.6.0b1 accepted these schedules; an upgrade must preserve their meaning."""
+    raw = config(windows=[window(start, end), window("17:00", "20:00", "ht")])
+    tariff = TariffConfig.parse(raw)
+    assert tariff.as_dict() == raw
+    boundary = at(f"2026-01-02T{end}:00+01:00")
+    assert tariff.price_at(boundary - 1, 0.2) == pytest.approx(0.22)
+    assert tariff.price_at(boundary, 0.2) == pytest.approx(0.3)
+    assert tariff.average_price(boundary - 60, boundary + 60, 0.2) == pytest.approx(0.26)

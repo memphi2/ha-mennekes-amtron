@@ -482,7 +482,10 @@ def _network_tariff(values: dict[str, Any], *, module: str, timezone: str) -> di
                 *_tariff_periods(values[CONF_LOW_PERIODS], "nt"),
             ],
         })
-    return TariffConfig.parse(tariff).as_dict()
+    parsed = TariffConfig.parse(tariff)
+    if any(window.start % 15 or window.end % 15 for window in parsed.windows):
+        raise ValueError("module 3 windows require quarter-hour boundaries")
+    return parsed.as_dict()
 
 
 def _tariff_periods(value: object, rate: str) -> list[dict[str, str]]:
