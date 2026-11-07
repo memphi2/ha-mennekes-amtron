@@ -116,7 +116,7 @@ This event entity is available in **stable 0.6.1** and was introduced in beta 0.
 
 Enable **Control result** under **Settings → Devices & services → Entities**
 first; it starts disabled to avoid history growth from frequent current commands.
-You can [exclude it from Recorder](recorder.md#recorder-defaults-in-060b1)
+You can [exclude it from Recorder](recorder.md#recorder-defaults)
 while keeping live automation triggers. Use it to notify you about a rejected command, an uncertain
 write, a phase-pause timeout or a recovery that did not clear the error. In the
 UI, add a state trigger for the event entity, then filter its `event_type`
