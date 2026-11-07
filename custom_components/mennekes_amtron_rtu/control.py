@@ -40,6 +40,14 @@ class AmtronControl(DeviceControl):
     """The direct serial backend, with translated Home Assistant errors."""
 
     @ha_command
+    async def async_configure_plug_charge(self, enabled: bool, *, policy: str = "") -> None:
+        await super().async_configure_plug_charge(enabled, policy=policy)
+
+    @ha_command
+    async def async_authorize_plug_charge(self, session: str, *, deadline: datetime) -> None:
+        await super().async_authorize_plug_charge(session, deadline=deadline)
+
+    @ha_command
     async def async_set_charging_current(
         self, value: float, *, allow_unlimited: bool = False
     ) -> None:

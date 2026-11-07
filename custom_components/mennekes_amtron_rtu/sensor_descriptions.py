@@ -48,6 +48,15 @@ from .device.soc_goal import SOC_GOAL_STATES
 
 CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
+        key="virtual_plug_charge_status",
+        translation_key="virtual_plug_charge_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=[
+            "disabled", "waiting_vehicle", "waiting_detection", "vehicle_not_permitted",
+            "waiting_release", "authorized", "blocked",
+        ],
+    ),
+    SensorEntityDescription(
         key="timed_goal_status",
         translation_key="timed_goal_status",
         device_class=SensorDeviceClass.ENUM,

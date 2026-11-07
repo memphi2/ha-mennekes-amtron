@@ -283,12 +283,19 @@ The gate's enabled setting is durable; connection tokens and grants stay in RAM.
 A token belongs to the current observation cycle and cannot authorize a later
 one. A disconnect or unknown physical connection invalidates it. The service
 continues enforcing the gate and retains an existing grant while HA restarts;
-the service itself restarting loses that grant. Direct mode has the equivalent
-runtime boundary at its HA entry.
+the service itself restarting loses that grant. Direct mode loses the grant
+when its physical client closes. A controlled options/profile reload hands over
+the same open client when connection settings match; normal unload, failed
+setup and a changed connection close it. Transport disconnect callbacks still
+invalidate the token immediately.
 The policy digest includes vehicle identities, detection sources and profile
 permissions, but not the active-profile label. Changing those permissions or
 sources invalidates grants. A manual selection change or an automatic selection
 cleared by stale cloud data leaves an established physical-session grant intact.
+The vehicle decision is taken when HA sends the request. A submitted request
+expires after ten seconds and is checked again against the physical token at
+the bus write. Cancelling its HA HTTP task is not a remote revocation of a
+request already accepted by the service.
 
 Charging permission composes with existing current, pause, lock and goal
 guards. It does not erase a manual pause or an already reached target, and error

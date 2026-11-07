@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .device.energy_goal_controller import EnergyGoalController
     from .device.heartbeat import HeartbeatTask
     from .device.soc_goal_controller import SocGoalController
+    from .plug_charge import PlugChargeObserver
     from .recovery import HeartbeatRecovery
     from .session_observer import SessionObserver
     from .timed_goal_observer import TimedGoalObserver
@@ -39,6 +40,7 @@ class MennekesAmtronRuntimeData:
     identity: DeviceIdentity
     diagnostics: WriteDiagnostics
     connection_state: ConnectionState
+    retain_client_on_unload: bool = False
     # Config data/options are already replaced when an update starts unloading.
     # Retain this runtime's platform set instead of recomputing from the new mode.
     loaded_platforms: tuple[Platform, ...] = ()
@@ -49,6 +51,7 @@ class MennekesAmtronRuntimeData:
     vehicle_soc: VehicleSocObserver | None = None
     vehicle_telemetry: VehicleTelemetrySource | None = None
     vehicle_detection: VehicleDetectionObserver | None = None
+    plug_charge: PlugChargeObserver | None = None
     timed_goal: TimedGoalObserver | None = None
     sessions: SessionObserver | None = None
     charge_loss: ChargeLossObserver | None = None

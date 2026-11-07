@@ -148,7 +148,8 @@ manually, but that choice alone never proves which car is connected.
 4. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 
-For automatic charging without presenting an RFID card, local RFID
+The wallbox must expose CP state and its local authorization setting (Modbus
+register layout 01.02 or newer). For automatic charging without presenting an RFID card, local RFID
 authorization must already be disabled in the wallbox's installation settings.
 This feature controls the energy manager's charging release; it cannot switch
 off or bypass the wallbox's RFID requirement.
@@ -168,7 +169,8 @@ does not remove those choices. Once granted, a later missing or stale vehicle
 report does not interrupt that connection. In service mode, its existing grant
 also survives an HA Core restart because the app continues observing the wallbox.
 A disconnect, unknown wallbox connection state or app restart requires a fresh
-grant. Direct mode loses its grant when its HA runtime restarts.
+grant. Direct mode loses its grant on a full HA restart or when its physical
+connection closes. Automatic profile changes preserve the open connection.
 Choosing another profile alone also leaves an existing grant with that same
 physical connection. Removing a vehicle's permission or changing its identity
 or detection sources invalidates the grant; the next connection always needs a
@@ -179,6 +181,10 @@ grant. Disabling it **does not resume charging**: use **Charging release**
 explicitly afterwards, and leave a wanted pause or lock in place. Changing a
 profile's vehicle or detection sources clears its saved automatic permission;
 check the new sources before allowing it again.
+
+If you previously switched **Charging release** off, switch it on when you want
+to allow charging again. With virtual Plug & Charge enabled this records your
+request; it still waits for the permitted vehicle and cannot bypass recognition.
 
 Cable and home signals provide a convenience check, not cryptographic vehicle
 identification or ISO 15118 Plug & Charge. Restored upstream values and a vehicle

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import timedelta
 from typing import Any
 
@@ -51,19 +51,14 @@ def entity_signal(state: State | None, *, home: bool) -> bool | None:
     return None
 
 
-class VehicleDetectionObserver:
-    """Bounded subscriptions to configured cars, with explicit manual override."""
+class VehicleEvidence:
+    """Shared local evidence without profile selection or charging side effects."""
 
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass = hass
         self._entry = entry
         self._profiles = profiles(entry.options)
         self._sources: dict[str, VehicleDetectionSource | None] = {}
-        self._unsubs: list[CALLBACK_TYPE] = []
-        self._pending: CALLBACK_TYPE | None = None
-        self._candidate: str | None = None
-        self._generation = 0
-        self._stopped = False
         for key, profile in self._profiles.items():
             if profile.detection is not None and profile.detection.source == "profile":
                 effective = vehicle_options({**entry.options, CONF_ACTIVE_VEHICLE_PROFILE: key})
@@ -76,10 +71,21 @@ class VehicleDetectionObserver:
         if detection.source == "profile":
             source = self._sources.get(profile.id)
             return source.snapshot if source is not None else VehicleDetection()
+        connected = self._hass.states.get(detection.connected_entity)
         return VehicleDetection(
-            connected=entity_signal(self._hass.states.get(detection.connected_entity), home=False),
+            connected=entity_signal(connected, home=False),
             home=entity_signal(self._hass.states.get(detection.home_entity), home=True),
+            connected_at=connected.last_reported if connected is not None else None,
         )
+
+    def snapshot(self, profile_id: str) -> VehicleDetection:
+        """Return evidence for an explicitly configured vehicle."""
+        profile = self._profiles.get(profile_id)
+        return self._snapshot(profile) if profile is not None else VehicleDetection()
+
+    def current(self) -> bool:
+        """An old observer cannot authorize a modified vehicle catalog."""
+        return profiles(self._entry.options) == self._profiles
 
     def selected(self) -> str | None:
         """One positive car is insufficient if another configured car is unknown."""
@@ -95,16 +101,9 @@ class VehicleDetectionObserver:
             candidates.append(key)
         return candidates[0] if len(candidates) == 1 else None
 
-    def _current(self) -> bool:
-        return (
-            not self._stopped
-            and self._entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
-            and profiles(self._entry.options) == self._profiles
-        )
-
-    @callback
-    def start(self) -> None:
-        """Subscribe after setup; ordinary unchanged reports cause no writes."""
+    def subscribe(self, on_change: Callable[..., None]) -> CALLBACK_TYPE:
+        """Watch configured sources; callers decide what a match may do."""
+        unsubs: list[CALLBACK_TYPE] = []
         entities = {
             entity
             for profile in self._profiles.values()
@@ -112,14 +111,46 @@ class VehicleDetectionObserver:
             for entity in (profile.detection.connected_entity, profile.detection.home_entity)
         }
         if entities:
-            self._unsubs.extend((
-                async_track_state_change_event(self._hass, entities, self._changed),
-                async_track_state_report_event(self._hass, entities, self._changed),
+            unsubs.extend((
+                async_track_state_change_event(self._hass, entities, on_change),
+                async_track_state_report_event(self._hass, entities, on_change),
             ))
-        for source in self._sources.values():
-            if source is not None:
-                self._unsubs.append(source.subscribe(self._changed))
-        self._unsubs.append(async_track_time_interval(self._hass, self._changed, timedelta(minutes=1)))
+        unsubs.extend(
+            source.subscribe(on_change) for source in self._sources.values() if source is not None
+        )
+        unsubs.append(async_track_time_interval(self._hass, on_change, timedelta(minutes=1)))
+
+        @callback
+        def unsubscribe() -> None:
+            for unsub in unsubs:
+                unsub()
+            unsubs.clear()
+
+        return unsubscribe
+
+
+class VehicleDetectionObserver(VehicleEvidence):
+    """Optional automatic profile selection, without charging commands."""
+
+    def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
+        super().__init__(hass, entry)
+        self._unsubs: list[CALLBACK_TYPE] = []
+        self._pending: CALLBACK_TYPE | None = None
+        self._candidate: str | None = None
+        self._generation = 0
+        self._stopped = False
+
+    def _current(self) -> bool:
+        return (
+            not self._stopped
+            and self._entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
+            and self.current()
+        )
+
+    @callback
+    def start(self) -> None:
+        """Subscribe after setup; unchanged reports cause no writes."""
+        self._unsubs.append(self.subscribe(self._changed))
         self._changed()
 
     @callback

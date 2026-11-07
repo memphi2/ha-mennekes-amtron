@@ -507,7 +507,9 @@ class ModbusService:
             # it against the same current state that the API reports as usable.
             command = payload.get("command")
             cancelling = command in ("cancel_pending", "cancel_timed_current")
-            metadata = command in ("soc_source", "soc_observation")
+            metadata = command in ("soc_source", "soc_observation") or (
+                command == "plug_charge_config" and payload.get("value") is False
+            )
             if control is None or self._stopping or (not cancelling and not metadata and not self._is_available()):
                 raise DeviceError("service_unavailable")
             # The service can restart against another wallbox between HA polls,

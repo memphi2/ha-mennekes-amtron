@@ -402,6 +402,40 @@ class RemoteClient(MennekesModbusClient):
             ):
                 raise ValueError("invalid write errors")
             section = "control.intent"
+            supports_plug_charge = control.get("supports_plug_charge", False)
+            if type(supports_plug_charge) is not bool:
+                raise ValueError("invalid plug charge capability")
+            if supports_plug_charge:
+                section = "control.plug_charge"
+                gate = control.get("plug_charge")
+                if (
+                    not isinstance(gate, dict)
+                    or gate.keys() != {"enabled", "policy", "session", "since", "authorized"}
+                    or type(gate["enabled"]) is not bool
+                    or type(gate["authorized"]) is not bool
+                    or not isinstance(gate["policy"], str)
+                    or (gate["policy"] != "" and (
+                        len(gate["policy"]) != 64
+                        or any(character not in "0123456789abcdef" for character in gate["policy"])
+                    ))
+                    or (gate["session"] is not None and (
+                        not isinstance(gate["session"], str) or len(gate["session"]) != 32
+                        or any(character not in "0123456789abcdef" for character in gate["session"])
+                    ))
+                    or (gate["authorized"] and (not gate["enabled"] or gate["session"] is None))
+                ):
+                    raise ValueError("invalid plug charge state")
+                since = gate["since"]
+                if gate["session"] is None:
+                    if since is not None:
+                        raise ValueError("unexpected plug charge start")
+                elif (
+                    not isinstance(since, str) or len(since) > 64
+                    or (started := datetime.fromisoformat(since)).tzinfo is None
+                    or started.utcoffset() is None
+                ):
+                    raise ValueError("invalid plug charge start")
+            section = "control.intent"
             for key in ("pause_requested", "charging_release_requested"):
                 value = control.get(key)
                 if value is not None and not isinstance(value, bool):
@@ -496,7 +530,10 @@ class RemoteClient(MennekesModbusClient):
                 # poll. In particular, a mismatched identity must block an
                 # already queued command before it reaches the service.
                 cancelling = command in {"cancel_pending", "cancel_timed_current"}
-                metadata = command in {"soc_source", "soc_observation"}
+                soc_metadata = command in {"soc_source", "soc_observation"}
+                metadata = soc_metadata or (
+                    command == "plug_charge_config" and values.get("value") is False
+                )
                 if not self._connected or (
                     not cancelling and not metadata and self.snapshot.get("available") is not True
                 ):
@@ -505,7 +542,7 @@ class RemoteClient(MennekesModbusClient):
                     raise DeviceValidationError("cancel_pending_not_supported")
                 if command == "cancel_pending" and self.snapshot.get("control", {}).get("read_only") is not False:
                     raise DeviceValidationError("read_only_mode")
-                if metadata and self.snapshot.get("control", {}).get("supports_soc_goal") is not True:
+                if soc_metadata and self.snapshot.get("control", {}).get("supports_soc_goal") is not True:
                     raise DeviceValidationError("soc_goal_not_supported")
                 self.apply_snapshot(
                     await self.request(
@@ -735,6 +772,37 @@ class RemoteControl(AmtronControl):
     @property
     def supports_energy_goal(self) -> bool:
         return self._remote.snapshot.get("control", {}).get("supports_energy_goal") is True
+
+    @property
+    def supports_plug_charge(self) -> bool:
+        return self._remote.snapshot.get("control", {}).get("supports_plug_charge") is True
+
+    @property
+    def plug_charge(self) -> dict[str, Any]:
+        if not self.supports_plug_charge:
+            return {"enabled": False, "policy": "", "session": None, "since": None, "authorized": False}
+        return dict(self._remote.snapshot["control"]["plug_charge"])
+
+    @ha_command
+    async def async_configure_plug_charge(self, enabled: bool, *, policy: str = "") -> None:
+        if not self.supports_plug_charge:
+            raise DeviceValidationError("plug_charge_not_supported")
+        if enabled is not False:
+            await self._command("plug_charge_config", value=enabled, policy=policy)
+            return
+        # Disabling only removes this optional policy. The bus owner keeps its
+        # release hold, so this is allowed even after switching to read-only.
+        await self._remote.execute("plug_charge_config", value=False, policy=policy)
+        if self._notify_pending is not None:
+            self._notify_pending()
+
+    @ha_command
+    async def async_authorize_plug_charge(self, session: str, *, deadline: datetime) -> None:
+        if not self.supports_plug_charge:
+            raise DeviceValidationError("plug_charge_not_supported")
+        await self._command(
+            "plug_charge_authorize", session=session, deadline=deadline.isoformat(),
+        )
 
     @ha_command
     async def async_set_energy_goal(self, value: float) -> None:

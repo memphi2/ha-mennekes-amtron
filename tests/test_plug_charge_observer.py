@@ -294,10 +294,11 @@ def test_inflight_authorization_cancels_on_unload_or_source_change_but_not_own_a
     asyncio.run(run())
 
 
-def test_failed_release_waits_for_retry_window_without_forcing_polls(tmp_path, monkeypatch):
+@pytest.mark.parametrize("failure", [DeviceValidationError("plug_charge_blocked"), OSError("transport unavailable")])
+def test_failed_release_waits_for_retry_window_without_forcing_polls(tmp_path, monkeypatch, failure):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:
-            h.control.async_authorize_plug_charge.side_effect = DeviceValidationError("plug_charge_blocked")
+            h.control.async_authorize_plug_charge.side_effect = failure
             await report(h)
             h.timers[-1].callback(None)
             await h.hass.async_block_till_done()

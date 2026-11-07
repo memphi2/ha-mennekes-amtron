@@ -68,6 +68,7 @@ async def async_setup_entry(
         if (description.key != "energy_goal_status" or identity.layout_version >= ENERGY_TOTAL.min_layout)
         and (description.key != "soc_goal_status" or vehicle_soc_is_configured(vehicle_options(entry.options)))
         and (description.key != "timed_goal_status" or runtime_data.timed_goal is not None)
+        and (description.key != "virtual_plug_charge_status" or runtime_data.plug_charge is not None)
     )
     entities.extend(
         AmtronEstimateSensor(entry, runtime_data.coordinator, description)
@@ -117,6 +118,9 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
         if key == "timed_goal_status":
             observer = self.runtime_data.timed_goal
             return observer.status if observer is not None else None
+        if key == "virtual_plug_charge_status":
+            plug_charge = self.runtime_data.plug_charge
+            return plug_charge.status if plug_charge is not None else None
         if key == "pending_change":
             return control.pending_action or "none"
         return control.pending_until

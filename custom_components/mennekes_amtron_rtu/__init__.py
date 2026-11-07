@@ -7,6 +7,7 @@ focused modules next to it.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import NoReturn
@@ -102,6 +103,7 @@ from .network_tariff_year import (
     needs_year_refresh,
 )
 from .options_flow import control_mode_is_master
+from .plug_charge import PlugChargeObserver, plug_charge_policy
 from .recovery import HeartbeatRecovery
 from .remote import (
     CONF_SERVER_TOKEN,
@@ -132,6 +134,7 @@ from .vehicle_profiles import (
     CONF_VEHICLE_PROFILE_ID,
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_SOC_USE_PROFILE,
+    CONF_VIRTUAL_PLUG_CHARGE,
     profiles,
     vehicle_options,
     vehicle_soc_is_configured,
@@ -208,7 +211,11 @@ async def async_setup_entry(
         )
         if entry.entry_id not in states:
             states[entry.entry_id] = WriteState.cold_start(time.monotonic())
-        client = MennekesModbusClient(
+        handoff = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
+        if handoff is not None and handoff.config != _connection_config(entry):
+            await handoff.async_close()
+            handoff = None
+        client = handoff or MennekesModbusClient(
             _connection_config(entry), write_state=states[entry.entry_id]
         )
     try:
@@ -307,6 +314,9 @@ async def async_setup_entry(
         )
         coordinator.control_status = lambda: (control.pending_action, control.pending_until)
         coordinator.observe_recovery = control.observe_recovery
+        coordinator.observe_plug_charge = lambda data, observed_at: control.observe_plug_charge(
+            data, observed_at=observed_at,
+        )
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -318,6 +328,21 @@ async def async_setup_entry(
 
     try:
         validate_vehicle_selection()
+        # Configure the gate before starting heartbeat/recovery. The app owns
+        # the previous grant; an unchanged policy survives this HA reload.
+        plug_enabled = entry.options.get(CONF_VIRTUAL_PLUG_CHARGE) is True
+        if plug_enabled or (
+            CONF_VIRTUAL_PLUG_CHARGE in entry.options and control.supports_plug_charge
+            and control.plug_charge.get("enabled") is True
+        ):
+            try:
+                await control.async_configure_plug_charge(
+                    plug_enabled, policy=plug_charge_policy(entry.options),
+                )
+            except (AmtronBusError, HomeAssistantError) as err:
+                _raise_optional_setup_error(client, err, "plug_charge_unavailable")
+        if plug_enabled:
+            entry.runtime_data.plug_charge = PlugChargeObserver(hass, entry)
         if (
             vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is False
             or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
@@ -482,6 +507,8 @@ async def async_setup_entry(
         )
         entry.runtime_data.loaded_platforms = platforms
         entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+        if entry.runtime_data.plug_charge is not None:
+            entry.runtime_data.plug_charge.start()
         if entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True:
             detector = VehicleDetectionObserver(hass, entry)
             entry.runtime_data.vehicle_detection = detector
@@ -572,11 +599,16 @@ async def async_unload_entry(
     )
     if not unloaded:
         return False
-    await _async_stop_runtime(runtime_data)
+    retain_client = runtime_data.retain_client_on_unload
+    await _async_stop_runtime(runtime_data, close_client=not retain_client)
+    if retain_client:
+        hass.data.setdefault(f"{DOMAIN}_reload_clients", {})[entry.entry_id] = runtime_data.client
     return unloaded
 
 
-async def _async_stop_runtime(runtime: MennekesAmtronRuntimeData) -> None:
+async def _async_stop_runtime(
+    runtime: MennekesAmtronRuntimeData, *, close_client: bool = True,
+) -> None:
     """Release the same owners after partial setup and ordinary unloading.
 
     Detach source and polling listeners before their consumers, and keep the
@@ -585,6 +617,9 @@ async def _async_stop_runtime(runtime: MennekesAmtronRuntimeData) -> None:
     """
     if runtime.vehicle_detection is not None:
         runtime.vehicle_detection.stop()
+    if runtime.plug_charge is not None:
+        await runtime.plug_charge.async_stop()
+    runtime.coordinator.observe_plug_charge = None
     runtime.coordinator.observe_session = None
     if runtime.charge_loss is not None:
         await runtime.charge_loss.async_stop()
@@ -599,7 +634,8 @@ async def _async_stop_runtime(runtime: MennekesAmtronRuntimeData) -> None:
         if owner is not None:
             await owner.async_stop()
     await runtime.control.async_shutdown()
-    await runtime.client.async_close()
+    if close_client:
+        await runtime.client.async_close()
 
 
 async def async_reload_entry(
@@ -607,11 +643,40 @@ async def async_reload_entry(
 ) -> None:
     """Reload the entry after its options changed."""
 
+    locks: dict[str, asyncio.Lock] = hass.data.setdefault(f"{DOMAIN}_reload_locks", {})
+    async with locks.setdefault(entry.entry_id, asyncio.Lock()):
+        await _async_reload_entry_locked(hass, entry)
+
+
+async def _async_reload_entry_locked(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry,
+) -> None:
+    """Inspect the current owner only after earlier option reloads finish."""
+
     runtime = getattr(entry, "runtime_data", None)
     cost = runtime.charging_cost if runtime is not None else None
     if cost is not None and cost.apply_tariff_only_update():
         return
-    await hass.config_entries.async_reload(entry.entry_id)
+    # Automatic profile changes reload optional observers. Preserve the open
+    # physical connection so this logical reload does not discard the current
+    # cable observation or an already granted session. Real disconnects still
+    # invalidate the gate in the driver. Other reloads retain their lifecycle.
+    retain = (
+        runtime is not None and CONF_SERVER_URL not in entry.data
+        and not isinstance(runtime.client, RemoteClient)
+        and runtime.control.plug_charge.get("enabled") is True
+        and runtime.client.config == _connection_config(entry)
+    )
+    if runtime is not None and retain:
+        runtime.retain_client_on_unload = True
+    try:
+        await hass.config_entries.async_reload(entry.entry_id)
+    finally:
+        if runtime is not None and retain:
+            runtime.retain_client_on_unload = False
+            unused = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
+            if unused is not None:
+                await unused.async_close()
 
 
 async def async_remove_entry(
@@ -620,6 +685,7 @@ async def async_remove_entry(
     """Remove repairs owned by a deleted entry, also on HA before 2026.11."""
 
     hass.data.get(f"{DOMAIN}_write_states", {}).pop(entry.entry_id, None)
+    hass.data.get(f"{DOMAIN}_reload_locks", {}).pop(entry.entry_id, None)
     await GoalStore(hass, entry.entry_id, "").async_remove()
     await SocGoalStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()

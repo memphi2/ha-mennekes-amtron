@@ -146,7 +146,14 @@ class BavarianDetectionSource(BavarianVehicleBinding):
         if not self.available:
             return VehicleDetection()
         now = dt_util.utcnow()
-        return VehicleDetection(_connected(states[0], now), _home(states[1], zone, now))
+        connected_at = states[0].reported
+        state = states[0].state
+        if state is not None and "timestamp" in state.attributes:
+            timestamp = state.attributes["timestamp"]
+            connected_at = dt_util.parse_datetime(timestamp) if isinstance(timestamp, str) else None
+        return VehicleDetection(
+            _connected(states[0], now), _home(states[1], zone, now), connected_at,
+        )
 
     @property
     def snapshot(self) -> VehicleDetection:

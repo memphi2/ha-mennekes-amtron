@@ -130,6 +130,7 @@ remembered resume target while paused, which may be the pending target. See
 |---|---|---|---|---|---|
 | `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. |
 | `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure. |
+| `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | Virtual Plug & Charge enabled | Shows recognition, permission and release status. No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
 | `sensor.*_pending_change` | Pending change |  | enum | since 0.5.2b2; supporting service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |

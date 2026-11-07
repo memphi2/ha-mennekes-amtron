@@ -1,7 +1,7 @@
 """Small local-data contracts used by charging features and configuration."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, Protocol
 
@@ -22,6 +22,8 @@ class VehicleDetection:
 
     connected: bool | None = None
     home: bool | None = None
+    # Evidence age matters for grants, but does not change automatic selection.
+    connected_at: datetime | None = field(default=None, compare=False)
 
 
 class VehicleDetectionSource(Protocol):
