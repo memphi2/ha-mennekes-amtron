@@ -27,6 +27,22 @@ class _GoalModel(Protocol):
     def restore(cls, raw: object) -> Self: ...
 
 
+async def _finish_atomic(task: asyncio.Task[None]) -> None:
+    """Keep the storage lock until the executor has really finished."""
+    try:
+        await asyncio.shield(task)
+    except asyncio.CancelledError:
+        # Repeated cancellation must not cancel the executor's owning task:
+        # the thread would continue while a newer file operation starts.
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                continue
+        task.result()
+        raise
+
+
 class ModelStore[Goal: _GoalModel]:
     """Atomically persist one model, isolated by store key and wallbox identity."""
 
@@ -92,12 +108,7 @@ class ModelStore[Goal: _GoalModel]:
         async with self._lock:
             if payload == self._last:
                 return
-            saving = asyncio.create_task(self._async_write(payload))
-            try:
-                await asyncio.shield(saving)
-            except asyncio.CancelledError:
-                await saving
-                raise
+            await _finish_atomic(asyncio.create_task(self._async_write(payload)))
 
     async def _async_write(self, payload: dict[str, Any]) -> None:
         await self._hass.async_add_executor_job(self._write, payload)
@@ -119,8 +130,11 @@ class ModelStore[Goal: _GoalModel]:
     async def async_remove(self) -> None:
         """Remove obsolete local intent after removal or service takeover."""
         async with self._lock:
-            await self._hass.async_add_executor_job(lambda: self.path.unlink(missing_ok=True))
-            self._last = None
+            await _finish_atomic(asyncio.create_task(self._async_remove()))
+
+    async def _async_remove(self) -> None:
+        await self._hass.async_add_executor_job(lambda: self.path.unlink(missing_ok=True))
+        self._last = None
 
 
 class GoalStore(ModelStore[EnergyGoal]):

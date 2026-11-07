@@ -124,6 +124,86 @@ def test_cancel_during_save_finishes_the_atomic_write(tmp_path, monkeypatch):
     asyncio.run(run())
 
 
+def test_repeated_cancel_cannot_reorder_atomic_goal_writes(tmp_path, monkeypatch):
+    async def run():
+        store = store_at(tmp_path)
+        first, second = EnergyGoal(), EnergyGoal()
+        first.set_target(1, 100)
+        second.set_target(2, 100)
+        started, next_started, release = threading.Event(), threading.Event(), threading.Event()
+        real_write = goal_store.write_utf8_file_atomic
+
+        def delayed(path, contents, **kwargs):
+            target = json.loads(contents)["data"]["goal"]["target_kwh"]
+            if target == 1:
+                started.set()
+                assert release.wait(5)
+            else:
+                next_started.set()
+            real_write(path, contents, **kwargs)
+
+        monkeypatch.setattr(goal_store, "write_utf8_file_atomic", delayed)
+        saving = asyncio.create_task(store.async_save(first))
+        following = None
+        try:
+            assert await asyncio.to_thread(started.wait, 5)
+            saving.cancel()
+            await asyncio.sleep(0)
+            saving.cancel()
+            await asyncio.sleep(0)
+            following = asyncio.create_task(store.async_save(second))
+            started_early = await asyncio.to_thread(next_started.wait, 0.2)
+        finally:
+            release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await saving
+        assert following is not None
+        await following
+        assert not started_early
+        assert (await store_at(tmp_path).async_load()).target_kwh == 2
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("cancel_count", [1, 2])
+def test_cancelled_removal_cannot_delete_a_later_save(tmp_path, monkeypatch, cancel_count):
+    async def run():
+        store = store_at(tmp_path)
+        goal = EnergyGoal()
+        goal.set_target(1, 100)
+        await store.async_save(goal)
+        started, release = threading.Event(), threading.Event()
+        real_unlink = Path.unlink
+
+        def delayed(path, *args, **kwargs):
+            if path == store.path:
+                started.set()
+                assert release.wait(5)
+            return real_unlink(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", delayed)
+        removing = asyncio.create_task(store.async_remove())
+        following = None
+        try:
+            assert await asyncio.to_thread(started.wait, 5)
+            for _ in range(cancel_count):
+                removing.cancel()
+                await asyncio.sleep(0)
+            following = asyncio.create_task(store.async_save(goal))
+            await asyncio.sleep(0)
+            started_early = following.done()
+        finally:
+            release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await removing
+        assert following is not None
+        await following
+        assert not started_early
+        assert (await store_at(tmp_path).async_load()).target_kwh == 1
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("error", [WriteError("disk full"), OSError("read-only filesystem")])
 def test_failed_atomic_save_keeps_previous_goal_and_propagates(tmp_path, monkeypatch, error):
     async def run():
