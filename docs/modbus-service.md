@@ -69,9 +69,9 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 The repository above provides stable **0.6.1**. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog provides beta
-**0.7.0b2**. Existing beta-catalog installations update in place. To switch
+**0.7.0b3**. Existing beta-catalog installations update in place. To switch
 catalogs, follow the [channel handover](#updates) and
-[beta update guide](upgrading.md#trying-070b2).
+[beta update guide](upgrading.md#trying-070b3).
 
 ### 3. Configure and start read-only
 
@@ -256,8 +256,8 @@ app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
 **Updating the app itself briefly interrupts its heartbeat.**
 
-Stable **0.6.1** is published to `#apps`; beta **0.7.0b2** is published to
-`#apps-beta`. For the shared control fixes in 0.7.0b2, update that beta app too;
+Stable **0.6.1** is published to `#apps`; beta **0.7.0b3** is published to
+`#apps-beta`. For the shared control fixes in 0.7.0b3, update that beta app too;
 the minimum compatible service remains **0.6.1 with API 2**. An existing beta
 app updates in place with its data intact. When updating from 0.5.1, check the
 [connection-choice change](upgrading.md#app-connection-choice).

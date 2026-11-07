@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.7.0b3 — 2026-11-07
+
+Beta update of the integration and app; **0.6.1 remains stable**. This includes
+the changes from the incomplete 0.7.0b2 publication.
+
+- Retry temporary vehicle-source setup failures automatically and preserve
+  authentication prompts. Keep concurrent connection changes from being
+  overwritten by an older reauthentication or reconfiguration attempt.
+- Retry failed measurement blocks individually with bounded backoff, so a
+  recovered energy meter can unblock its charging target promptly.
+- Confirm the actual current before treating a reached energy or percentage
+  target as already paused; stale readbacks cannot suppress the required stop.
+- Keep heartbeat priority between identity and data reads after reconnects,
+  and finish connection cleanup when setup or a bus search is cancelled.
+- Block further app connection saves after an unconfirmed Supervisor write,
+  skip unchanged options and preserve credentials for equivalent hostnames.
+- Remove unused charging helpers and duplicated limits, simplify installation
+  guidance and strengthen tracked-file and licensing checks.
+
 ## 0.7.0b2 — 2026-11-07
 
 - Add optional TCP login and guided setup for recognized Waveshare single-channel

@@ -145,7 +145,7 @@ newer**; update it before the integration, even if you do not use timed planning
 - **App:** `https://github.com/memphi2/ha-mennekes-amtron#apps` offers stable
   **0.6.1**. Use **Check for updates** and keep the existing app data.
   The `#apps-beta` catalog may offer a newer prerelease; see
-  [trying 0.7.0b2](upgrading.md#trying-070b2). A catalog switch creates a separate
+  [trying 0.7.0b3](upgrading.md#trying-070b3). A catalog switch creates a separate
   app; follow the [channel handover](modbus-service.md#updates).
 
 Before updating the app from 0.5.1, save one of the three readable connection

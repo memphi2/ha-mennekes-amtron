@@ -1,5 +1,20 @@
 # Changes
 
+## 0.7.0b3
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**. Includes the
+changes from the incomplete 0.7.0b2 publication.
+
+- Recover failed measurements with individual, bounded retries.
+- Confirm the current pause before skipping a stop at an energy or SoC target.
+- Let the heartbeat pass between identity verification and data reads after
+  reconnecting, without accepting data from a changed connection.
+- Prevent further connection saves after an unconfirmed Supervisor write;
+  unchanged options no longer send a redundant save request.
+- Retain saved login credentials for equivalent hostnames and clarify the
+  recovery guidance in all five app languages.
+- Remove unused charging helpers; keep API 2 and existing app data.
+
 ## 0.7.0b2
 
 - Keep the old connection stopped when a delayed adapter update cannot be ruled

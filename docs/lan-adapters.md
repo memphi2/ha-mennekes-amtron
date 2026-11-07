@@ -1,7 +1,7 @@
 # Set up a compatible LAN adapter
 
-**Available in beta 0.7.0b2.** Direct connections need integration 0.7.0b2;
-service connections need app/service 0.7.0b2 for these adapter features.
+**Available in beta 0.7.0b3.** Direct connections need integration 0.7.0b3;
+service connections need app/service 0.7.0b3 for these adapter features.
 Stable 0.6.1 and beta 0.7.0b1 do not include them.
 
 You can optionally configure a supported Waveshare adapter from the integration
