@@ -30,7 +30,7 @@ and hardware-test status.
 | **Independent Modbus service — recommended, optional** | The app keeps the heartbeat and last charging state through Home Assistant Core restarts. HA discovers the app automatically on HA OS. |
 | **Direct Home Assistant connection** | No extra app; Home Assistant owns the connection and its heartbeat stops while HA restarts. |
 
-Both support **USB and LAN** from **0.5.0**. LAN adapters can use transparent
+Both support **USB and LAN**. LAN adapters can use transparent
 RTU-over-TCP or a translating Modbus TCP-to-RTU gateway; see [LAN setup](docs/network-gateway.md).
 
 The service is our preferred setup for everyday use. Direct mode remains
