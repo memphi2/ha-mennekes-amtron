@@ -1329,13 +1329,13 @@
       },
       "vehicle_plug_charge": {
         "title": "Virtual Plug & Charge",
-        "description": "Active vehicle: **{vehicle}**.\n\nOptional charging permission based on vehicle signals, without ISO 15118 authentication. The wallbox must support automatic charging with RFID authorization disabled. When enabled, charging waits until one permitted active profile is identified uniquely. Unknown or ambiguous vehicles wait.\n\nA fresh cable report matching the current connection cycle is required; the next vehicle integration update may take time. Automatic profile selection remains optional. Manual pauses and charging targets are respected. To show the vehicle permission switch, select a profile and configure its cable/home signals under Automatic vehicle selection; its automatic mode can remain off.",
+        "description": "Active vehicle: **{vehicle}**.\n\nOptional charging permission based on vehicle signals, without ISO 15118 authentication. The wallbox must support automatic charging with RFID authorization disabled. A new charging grant requires one uniquely identified, permitted active profile. Unknown or ambiguous vehicles receive no new grant.\n\nA fresh cable report matching the current connection cycle is required; the next vehicle integration update may take time. Automatic profile selection remains optional. Manual pauses and charging targets are respected. To show the vehicle permission switch, select a profile and configure its cable/home signals under Automatic vehicle selection; its automatic mode can remain off.",
         "data": {
           "virtual_plug_charge": "Enable Virtual Plug & Charge",
           "vehicle_plug_charge": "Allow this vehicle to charge automatically"
         },
         "data_description": {
-          "virtual_plug_charge": "Applies to this wallbox. Without a uniquely recognized permitted active profile, charging remains blocked. Disabling this feature does not start charging. While the Modbus app keeps running, a grant for the same connected session survives a Home Assistant restart; unplugging ends it.",
+          "virtual_plug_charge": "New permission needs one uniquely recognized, permitted active profile. Once granted, changing the selection or missing vehicle data does not revoke it. Disconnection, lost wallbox observation or changed vehicle identity, permission or detection sources revoke it. Disabling does not start charging. An existing app grant survives an HA restart while the app keeps running.",
           "vehicle_plug_charge": "Permission for the active profile only. Selecting a profile manually is not proof that its car is connected. Fresh matching cable/home signals remain required. Changing the vehicle or its detection sources removes this permission."
         }
       }

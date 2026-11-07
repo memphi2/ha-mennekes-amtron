@@ -192,7 +192,9 @@ level and optional limit, then repeat for Second car. Before charging, choose
 the connected car in **Active vehicle** and set its intended target. Selecting
 another car clears the previous percentage target and trip; it never starts
 charging. If you do not want vehicle-based features for this charge, select
-**No vehicle selected** and use the normal wallbox controls.
+**No vehicle selected** and use the normal wallbox controls. With Virtual Plug & Charge
+enabled, a new grant still needs a permitted active profile and matching
+detection; choosing no vehicle does not bypass that requirement.
 
 ## Optional vehicle percentage target
 

@@ -1329,13 +1329,13 @@
       },
       "vehicle_plug_charge": {
         "title": "Virtuelles Plug & Charge",
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nOptionale Ladefreigabe anhand von Fahrzeugsignalen, ohne ISO-15118-Authentifizierung. Die Wallbox muss mit deaktivierter RFID-Freigabe automatisch laden können. Ist die Funktion aktiv, wird erst nach eindeutiger Erkennung eines erlaubten aktiven Profils freigegeben. Unbekannte oder mehrdeutige Fahrzeuge warten.\n\nErforderlich ist eine neue Kabelmeldung für den aktuellen Steckvorgang; das nächste Update der Fahrzeugintegration kann dauern. Automatische Profilwahl bleibt optional. Manuelle Pausen und Ladeziele werden beachtet. Für den Fahrzeug-Schalter wähle ein Profil und richte seine Kabel-/Zuhause-Signale unter Automatische Fahrzeugauswahl ein; deren Automatik kann ausgeschaltet bleiben.",
+        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nOptionale Ladefreigabe anhand von Fahrzeugsignalen, ohne ISO-15118-Authentifizierung. Die Wallbox muss mit deaktivierter RFID-Freigabe automatisch laden können. Eine neue Ladefreigabe erfordert ein eindeutig erkanntes, erlaubtes aktives Profil. Unbekannte oder mehrdeutige Fahrzeuge erhalten keine neue Freigabe.\n\nErforderlich ist eine neue Kabelmeldung für den aktuellen Steckvorgang; das nächste Update der Fahrzeugintegration kann dauern. Automatische Profilwahl bleibt optional. Manuelle Pausen und Ladeziele werden beachtet. Für den Fahrzeug-Schalter wähle ein Profil und richte seine Kabel-/Zuhause-Signale unter Automatische Fahrzeugauswahl ein; deren Automatik kann ausgeschaltet bleiben.",
         "data": {
           "virtual_plug_charge": "Virtuelles Plug & Charge aktivieren",
           "vehicle_plug_charge": "Dieses Fahrzeug automatisch freigeben"
         },
         "data_description": {
-          "virtual_plug_charge": "Gilt für diese Wallbox. Ohne eindeutig erkanntes, erlaubtes aktives Profil bleibt die Ladung gesperrt. Ausschalten startet keine Ladung. Solange die Modbus-App weiterläuft, bleibt eine Freigabe für dieselbe angeschlossene Sitzung bei einem Home-Assistant-Neustart erhalten; Abstecken beendet sie.",
+          "virtual_plug_charge": "Neue Freigaben benötigen ein eindeutig erkanntes, erlaubtes aktives Profil. Eine bestehende Freigabe bleibt bei anderer Profilauswahl oder fehlenden Fahrzeugdaten erhalten. Abstecken, fehlende Wallboxdaten oder geänderte Fahrzeugidentität, Erlaubnis oder Erkennungsquellen heben sie auf. Ausschalten startet keine Ladung. Bei laufender App bleibt die Freigabe über HA-Neustarts erhalten.",
           "vehicle_plug_charge": "Erlaubnis nur für das aktive Profil. Eine manuelle Profilwahl beweist nicht, dass dessen Auto angeschlossen ist. Aktuelle passende Kabel-/Zuhause-Signale bleiben erforderlich. Ein Wechsel des Fahrzeugs oder seiner Erkennungsquellen entfernt diese Erlaubnis."
         }
       }

@@ -1329,13 +1329,13 @@
       },
       "vehicle_plug_charge": {
         "title": "Plug & Charge virtuel",
-        "description": "Véhicule actif : **{vehicle}**.\n\nAutorisation facultative fondée sur les signaux du véhicule, sans authentification ISO 15118. La borne doit permettre la charge automatique avec l’autorisation RFID désactivée. La charge attend l’identification unique d’un profil actif autorisé. Les véhicules inconnus ou ambigus restent en attente.\n\nUn nouveau signal de câble correspondant au branchement actuel est nécessaire ; la prochaine mise à jour du véhicule peut prendre du temps. La sélection automatique du profil reste facultative. Les pauses manuelles et objectifs sont respectés. Pour afficher l’autorisation du véhicule, sélectionnez un profil et configurez ses signaux câble/domicile dans Sélection automatique du véhicule ; ce mode automatique peut rester désactivé.",
+        "description": "Véhicule actif : **{vehicle}**.\n\nAutorisation facultative fondée sur les signaux du véhicule, sans authentification ISO 15118. La borne doit permettre la charge automatique avec l’autorisation RFID désactivée. Une nouvelle autorisation de charge nécessite un profil actif autorisé identifié sans ambiguïté. Aucun nouvel accord n’est donné aux véhicules inconnus ou ambigus.\n\nUn nouveau signal de câble correspondant au branchement actuel est nécessaire ; la prochaine mise à jour du véhicule peut prendre du temps. La sélection automatique du profil reste facultative. Les pauses manuelles et objectifs sont respectés. Pour afficher l’autorisation du véhicule, sélectionnez un profil et configurez ses signaux câble/domicile dans Sélection automatique du véhicule ; ce mode automatique peut rester désactivé.",
         "data": {
           "virtual_plug_charge": "Activer Plug & Charge virtuel",
           "vehicle_plug_charge": "Autoriser automatiquement ce véhicule"
         },
         "data_description": {
-          "virtual_plug_charge": "S’applique à cette borne. Sans profil actif autorisé reconnu sans ambiguïté, la charge reste bloquée. Désactiver ne démarre pas la charge. Tant que l’application Modbus fonctionne, l’autorisation de la même session branchée survit à un redémarrage de Home Assistant ; débrancher y met fin.",
+          "virtual_plug_charge": "Une nouvelle autorisation exige un profil actif autorisé reconnu sans ambiguïté. Changer la sélection ou perdre les données du véhicule n’annule pas un accord existant. Le débranchement, la perte des données de la borne ou un changement d’identité, de permission ou de sources de détection l’annulent. Désactiver ne démarre pas la charge. L’accord survit à un redémarrage de HA tant que l’application continue de fonctionner.",
           "vehicle_plug_charge": "Autorisation pour le profil actif uniquement. Le choisir manuellement ne prouve pas que son véhicule est branché. Des signaux câble/domicile actuels et concordants restent nécessaires. Changer le véhicule ou ses sources de détection retire cette autorisation."
         }
       }

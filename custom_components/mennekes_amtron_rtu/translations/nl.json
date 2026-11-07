@@ -1329,13 +1329,13 @@
       },
       "vehicle_plug_charge": {
         "title": "Virtuele Plug & Charge",
-        "description": "Actief voertuig: **{vehicle}**.\n\nOptionele laadtoestemming op basis van voertuigsignalen, zonder ISO 15118-authenticatie. De laadpaal moet automatisch kunnen laden met RFID-autorisatie uitgeschakeld. Het laden wacht totdat één toegestaan actief profiel eenduidig is herkend. Onbekende of onduidelijke voertuigen blijven wachten.\n\nEen nieuw kabelbericht dat past bij de huidige aansluiting is vereist; de volgende update van de voertuigintegratie kan even duren. Automatische profielselectie blijft optioneel. Handmatige pauzes en laaddoelen blijven gelden. Selecteer een profiel en stel de kabel-/thuissignalen in onder Automatische voertuigselectie om de voertuigtoestemming te tonen; die automatische modus mag uit blijven.",
+        "description": "Actief voertuig: **{vehicle}**.\n\nOptionele laadtoestemming op basis van voertuigsignalen, zonder ISO 15118-authenticatie. De laadpaal moet automatisch kunnen laden met RFID-autorisatie uitgeschakeld. Nieuwe laadtoestemming vereist één eenduidig herkend, toegestaan actief profiel. Onbekende of onduidelijke voertuigen krijgen geen nieuwe toestemming.\n\nEen nieuw kabelbericht dat past bij de huidige aansluiting is vereist; de volgende update van de voertuigintegratie kan even duren. Automatische profielselectie blijft optioneel. Handmatige pauzes en laaddoelen blijven gelden. Selecteer een profiel en stel de kabel-/thuissignalen in onder Automatische voertuigselectie om de voertuigtoestemming te tonen; die automatische modus mag uit blijven.",
         "data": {
           "virtual_plug_charge": "Virtuele Plug & Charge inschakelen",
           "vehicle_plug_charge": "Dit voertuig automatisch toestemming geven"
         },
         "data_description": {
-          "virtual_plug_charge": "Geldt voor deze laadpaal. Zonder eenduidig herkend toegestaan actief profiel blijft laden geblokkeerd. Uitschakelen start geen laadsessie. Zolang de Modbus-app blijft draaien, blijft toestemming voor dezelfde aangesloten sessie geldig na een Home Assistant-herstart; loskoppelen beëindigt deze.",
+          "virtual_plug_charge": "Nieuwe toestemming vereist één eenduidig herkend, toegestaan actief profiel. Een andere selectie of ontbrekende voertuiggegevens trekken bestaande toestemming niet in. Loskoppelen, ontbrekende laadpaalgegevens of een gewijzigde voertuigidentiteit, toestemming of detectiebron doen dat wel. Uitschakelen start geen laadsessie. De toestemming blijft geldig na een HA-herstart zolang de app blijft draaien.",
           "vehicle_plug_charge": "Toestemming alleen voor het actieve profiel. Handmatige profielselectie bewijst niet dat die auto is aangesloten. Actuele passende kabel-/thuissignalen blijven nodig. Een ander voertuig of andere detectiebronnen verwijdert deze toestemming."
         }
       }

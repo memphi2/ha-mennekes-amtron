@@ -1329,13 +1329,13 @@
       },
       "vehicle_plug_charge": {
         "title": "Plug & Charge virtuale",
-        "description": "Veicolo attivo: **{vehicle}**.\n\nAutorizzazione facoltativa basata sui segnali del veicolo, senza autenticazione ISO 15118. La wallbox deve consentire la ricarica automatica con autorizzazione RFID disattivata. La ricarica attende l’identificazione univoca di un profilo attivo autorizzato. Veicoli sconosciuti o ambigui restano in attesa.\n\nServe un nuovo segnale del cavo corrispondente al collegamento attuale; il prossimo aggiornamento dell’integrazione può richiedere tempo. La selezione automatica del profilo resta facoltativa. Pause manuali e obiettivi vengono rispettati. Per mostrare il consenso del veicolo, seleziona un profilo e configura i segnali cavo/casa in Selezione automatica del veicolo; la modalità automatica può restare disattivata.",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nAutorizzazione facoltativa basata sui segnali del veicolo, senza autenticazione ISO 15118. La wallbox deve consentire la ricarica automatica con autorizzazione RFID disattivata. Una nuova autorizzazione alla ricarica richiede un profilo attivo consentito e identificato univocamente. Veicoli sconosciuti o ambigui non ricevono una nuova autorizzazione.\n\nServe un nuovo segnale del cavo corrispondente al collegamento attuale; il prossimo aggiornamento dell’integrazione può richiedere tempo. La selezione automatica del profilo resta facoltativa. Pause manuali e obiettivi vengono rispettati. Per mostrare il consenso del veicolo, seleziona un profilo e configura i segnali cavo/casa in Selezione automatica del veicolo; la modalità automatica può restare disattivata.",
         "data": {
           "virtual_plug_charge": "Attiva Plug & Charge virtuale",
           "vehicle_plug_charge": "Autorizza automaticamente questo veicolo"
         },
         "data_description": {
-          "virtual_plug_charge": "Vale per questa wallbox. Senza un profilo attivo autorizzato riconosciuto univocamente, la ricarica resta bloccata. Disattivare non avvia la ricarica. Finché l’app Modbus rimane attiva, il consenso per la stessa sessione collegata sopravvive al riavvio di Home Assistant; scollegare lo termina.",
+          "virtual_plug_charge": "Una nuova autorizzazione richiede un profilo attivo consentito e riconosciuto univocamente. Cambiare selezione o perdere i dati del veicolo non revoca un consenso esistente. Lo scollegamento, la perdita dei dati della wallbox o modifiche a identità, permesso o fonti di rilevamento lo revocano. Disattivare non avvia la ricarica. Il consenso sopravvive a un riavvio di HA finché l’app rimane attiva.",
           "vehicle_plug_charge": "Consenso solo per il profilo attivo. Selezionarlo manualmente non prova che la sua auto sia collegata. Servono comunque segnali cavo/casa recenti e coerenti. Cambiare veicolo o fonti di rilevamento rimuove questo consenso."
         }
       }
