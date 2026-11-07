@@ -619,7 +619,13 @@ class AmtronControl:
             self._diagnostics.timeline.record(EventType.RECOVERY_STARTED)
             try:
                 await self._async_write(HEARTBEAT, HEARTBEAT_VALUE)
-                await self._async_write(CHARGING_RELEASE, int(self.charging_release_requested is not False))
+                # Error 200 requires release before the current register. The
+                # current step below reasserts a goal stop as the pause value;
+                # rejecting this recovery-only release would leave it faulted.
+                await self._async_write(
+                    CHARGING_RELEASE, int(self.charging_release_requested is not False),
+                    recovery_release=True,
+                )
                 await self._async_apply_current(
                     min(target, self.max_charging_current),
                     preserve_setpoint=paused,
@@ -1120,14 +1126,20 @@ class AmtronControl:
         *,
         min_interval: float = 0.0,
         refresh: bool = True,
+        recovery_release: bool = False,
     ) -> None:
         self._check_timed_command()
         if self._active_command is not None:
             self._command_write_started = True
         try:
-            if self._active_command is not None and self._active_command.deadline is not None:
+            if self._write_enables_charging(spec, value) or (
+                self._active_command is not None and self._active_command.deadline is not None
+            ):
                 await self._client.async_write_register(
-                    spec, value, min_interval=min_interval, before_write=self._check_timed_command,
+                    spec, value, min_interval=min_interval,
+                    before_write=lambda: self._check_write_allowed(
+                        spec, value, recovery_release=recovery_release,
+                    ),
                 )
             else:
                 await self._client.async_write_register(
@@ -1166,6 +1178,27 @@ class AmtronControl:
                 self._notify_write_error()
         if refresh and self._request_refresh is not None:
             await self._request_refresh()
+
+    @staticmethod
+    def _write_enables_charging(spec: RegisterSpec, value: float) -> bool:
+        return (
+            (spec == CHARGING_CURRENT_EMS and (value == 0 or value >= CHARGING_CURRENT_MINIMUM))
+            or (spec == CHARGING_RELEASE and value == 1)
+            or (spec == LOCK_EVSE and value == 0)
+        )
+
+    def _check_write_allowed(
+        self, spec: RegisterSpec, value: float, *, recovery_release: bool,
+    ) -> None:
+        # Observations can latch a stop while this command awaits the bus or
+        # physical identity. Recheck under the bus lock, immediately before
+        # sending, so a refused start neither writes nor consumes the 5s floor.
+        self._check_timed_command()
+        if (
+            self._write_enables_charging(spec, value) and self.energy_goal_stop_requested
+            and not (recovery_release and spec == CHARGING_RELEASE)
+        ):
+            raise validation_error("energy_goal_stop_active")
 
     def _timed_cancellation_reason(self, command: _PendingCommand) -> str | None:
         if command.owner is None:
