@@ -5,7 +5,7 @@ Use **Charging current limit** and **Charging paused** for everyday charging.
 energy and connection health. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
 
-This reference follows **beta 0.7.0b3**, including optional targets,
+This reference follows **beta 0.7.0b4**, including optional targets,
 estimates, departure planning and command-result events. **0.6.1 remains the
 stable release.** Service connections
 require **app/service 0.6.1 or newer**.

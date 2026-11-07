@@ -61,16 +61,16 @@
       },
       "serial": {
         "data": {
-          "baudrate": "Baud rate",
+          "baudrate": "Serial speed (baud rate)",
           "device_id": "Modbus device address",
-          "frame": "Frame",
+          "frame": "Serial data format",
           "port": "Serial port",
           "search": "If these values do not work"
         },
         "data_description": {
-          "baudrate": "Factory default is 57600.",
+          "baudrate": "Must match the wallbox setting. The factory default is 57600 baud.",
           "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
-          "frame": "The wallbox documents exactly these three. Factory default is 8 data bits, no parity, 2 stop bits.",
+          "frame": "Data bits, parity and stop bits must match the wallbox. The factory default is 8N2.",
           "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
           "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching sends read requests. Only use it on a bus without another Modbus master."
         },
@@ -79,16 +79,16 @@
       },
       "serial_reconfigure": {
         "data": {
-          "baudrate": "Baud rate",
+          "baudrate": "Serial speed (baud rate)",
           "device_id": "Modbus device address",
-          "frame": "Frame",
+          "frame": "Serial data format",
           "port": "Serial port",
           "search": "If these values do not work"
         },
         "data_description": {
-          "baudrate": "Factory default is 57600.",
+          "baudrate": "Must match the wallbox setting. The factory default is 57600 baud.",
           "device_id": "Factory default is 50. Addresses from 10 to 50 can be set with the MENNEKES configuration tool.",
-          "frame": "The wallbox documents exactly these three. Factory default is 8 data bits, no parity, 2 stop bits.",
+          "frame": "Data bits, parity and stop bits must match the wallbox. The factory default is 8N2.",
           "port": "Path of the USB RS-485 adapter. Prefer a /dev/serial/by-id path: /dev/ttyUSB0 can change between reboots.",
           "search": "The device address and the bus parameters can be changed with the MENNEKES configuration tool, so an inherited installation often uses something else. Searching sends read requests. Only use it on a bus without another Modbus master."
         },
@@ -115,10 +115,10 @@
         "description": "Connect a supported RTU wallbox through an Ethernet-to-RS-485 adapter. Select transparent RTU over TCP or a gateway that translates Modbus TCP to RTU. Configure baud rate and frame on the adapter. Use a trusted private network and exclusive access to the bus. Validated register layout: {validated_layout}.",
         "data": {
           "connection_type": "Connection protocol",
-          "host": "Adapter host",
+          "host": "Adapter IP address or host name",
           "tcp_port": "Adapter TCP port",
           "device_id": "Modbus device address",
-          "tcp_authentication": "TCP login",
+          "tcp_authentication": "Connect using TCP login",
           "configure_gateway": "Set up LAN adapter"
         },
         "data_description": {
@@ -126,8 +126,8 @@
           "host": "Host name or IP address of the LAN adapter, without http:// or any URL path.",
           "tcp_port": "TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.",
           "device_id": "Wallbox address behind the adapter; factory default 50, supported range 10–50.",
-          "tcp_authentication": "Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
-          "configure_gateway": "Read this adapter’s settings and review changes before applying them. Only supported adapter models and firmware can be configured here."
+          "tcp_authentication": "Use the login already enabled on the adapter. This switch alone does not enable it on the adapter; select “Set up LAN adapter” to change that setting. Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
+          "configure_gateway": "Detect a compatible adapter, then choose and apply its TCP login, serial speed, data format, connection protocol and TCP port. The next page lets you review the settings before saving."
         }
       },
       "network_reconfigure": {
@@ -135,10 +135,10 @@
         "description": "Connect a supported RTU wallbox through an Ethernet-to-RS-485 adapter. Select transparent RTU over TCP or a gateway that translates Modbus TCP to RTU. Configure baud rate and frame on the adapter. Use a trusted private network and exclusive access to the bus. Validated register layout: {validated_layout}.",
         "data": {
           "connection_type": "Connection protocol",
-          "host": "Adapter host",
+          "host": "Adapter IP address or host name",
           "tcp_port": "Adapter TCP port",
           "device_id": "Modbus device address",
-          "tcp_authentication": "TCP login",
+          "tcp_authentication": "Connect using TCP login",
           "configure_gateway": "Set up LAN adapter"
         },
         "data_description": {
@@ -146,8 +146,8 @@
           "host": "Host name or IP address of the LAN adapter, without http:// or any URL path.",
           "tcp_port": "TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.",
           "device_id": "Wallbox address behind the adapter; factory default 50, supported range 10–50.",
-          "tcp_authentication": "Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
-          "configure_gateway": "Read this adapter’s settings and review changes before applying them. Only supported adapter models and firmware can be configured here."
+          "tcp_authentication": "Use the login already enabled on the adapter. This switch alone does not enable it on the adapter; select “Set up LAN adapter” to change that setting. Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
+          "configure_gateway": "Detect a compatible adapter, then choose and apply its TCP login, serial speed, data format, connection protocol and TCP port. The next page lets you review the settings before saving."
         }
       },
       "reauth_confirm": {
@@ -166,20 +166,25 @@
         "description": "Enter the existing web password of your compatible adapter. This checks the connection without changing the adapter’s settings or password. Use 1–9 printable ASCII characters without spaces. Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
         "data": {
           "tcp_auth_password": "Existing adapter web password"
+        },
+        "data_description": {
+          "tcp_auth_password": "The password you use to open the adapter’s own web interface, not a Home Assistant or app access token. TCP login accepts 1–9 printable ASCII characters without spaces."
         }
       },
       "network_adapter": {
         "title": "Set up LAN adapter",
         "description": "Recognized: **{model}**, firmware **{firmware}**. Current serial settings: **{baudrate} baud, {frame}**, TCP port **{tcp_port}**.\n\nSubmitting applies the connection protocol and TCP port chosen on the previous page together with the settings below. It then checks the wallbox identity. If validation fails, the previous adapter settings are restored where reachable. Your existing web password is not changed. This also selects passive TCP-server operation and disables the adapter’s own Modbus polling/cache, flow control, connection preambles, replay of buffered serial data, automatic parameter uploads and data-triggered restarts.",
         "data": {
-          "baudrate": "Baud rate",
-          "frame": "Frame",
-          "tcp_authentication": "TCP login",
+          "baudrate": "Serial speed (baud rate)",
+          "frame": "Serial data format",
+          "tcp_authentication": "Enable TCP login on the adapter",
           "tcp_auth_password": "Existing adapter web password"
         },
         "data_description": {
-          "tcp_authentication": "Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
-          "tcp_auth_password": "Enter the current adapter web password, if set. TCP login requires a password with 1–9 printable ASCII characters without spaces. The password is saved only when TCP login is enabled."
+          "tcp_authentication": "Saving enables or disables login on the adapter and configures this integration to match. Login uses the existing adapter web password; it does not create or change that password. Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
+          "tcp_auth_password": "Enter the current adapter web password, if set. TCP login requires a password with 1–9 printable ASCII characters without spaces. The password is saved only when TCP login is enabled.",
+          "baudrate": "Must match the wallbox setting. The factory default is 57600 baud.",
+          "frame": "Data bits, parity and stop bits must match the wallbox. The factory default is 8N2."
         }
       },
       "network_reauth": {
@@ -187,6 +192,9 @@
         "description": "Enter the existing web password of your compatible adapter. This checks the connection without changing the adapter’s settings or password. Use 1–9 printable ASCII characters without spaces. Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
         "data": {
           "tcp_auth_password": "Existing adapter web password"
+        },
+        "data_description": {
+          "tcp_auth_password": "The password you use to open the adapter’s own web interface, not a Home Assistant or app access token. TCP login accepts 1–9 printable ASCII characters without spaces."
         }
       }
     }

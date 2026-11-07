@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import base64
+import hashlib
 import json
 import os
 import re
@@ -32,6 +33,17 @@ INFO = {
 }
 DIGEST = "sha256:" + "b" * 64
 OTHER_DIGEST = "sha256:" + "c" * 64
+
+
+def catalog_tree(files):
+    return {
+        "truncated": False,
+        "tree": [
+            {"path": path, "mode": "100644", "type": "blob",
+             "sha": hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data, usedforsecurity=False).hexdigest()}
+            for path, data in files.items()
+        ],
+    }
 
 
 def candidates(directory):
@@ -416,6 +428,64 @@ def test_catalog_same_version_is_idempotent_and_newer_version_can_advance():
     )
 
 
+@pytest.mark.parametrize("change", ["dockerfile", "missing_profile", "extra", "symlink", "executable", "duplicate", "submodule", "truncated"])
+def test_catalog_tree_rejects_installation_drift_even_with_unchanged_metadata(monkeypatch, change):
+    files = catalog.catalog_files(INFO, DIGEST)
+    tree = catalog_tree(files)
+    prefix = "mennekes_amtron_modbus/"
+    item = next(item for item in tree["tree"] if item["path"] == prefix + "Dockerfile")
+    if change == "dockerfile":
+        item["sha"] = "0" * 40
+    elif change == "missing_profile":
+        tree["tree"] = [item for item in tree["tree"] if item["path"] != prefix + "apparmor.txt"]
+    elif change == "extra":
+        tree["tree"].append({**item, "path": prefix + "run.sh"})
+    elif change in ("symlink", "executable"):
+        item["mode"] = "120000" if change == "symlink" else "100755"
+    elif change == "duplicate":
+        tree["tree"].append(dict(item))
+    elif change == "submodule":
+        item.update(type="commit", mode="160000")
+    else:
+        tree["truncated"] = True
+    monkeypatch.setattr(catalog, "api", lambda *_args: tree)
+    with pytest.raises(ValueError, match="catalog"):
+        catalog.verify_catalog_tree(INFO["repository"], "e" * 40, files)
+
+
+def test_reused_catalog_is_checked_against_original_git_source_not_current_docs(tmp_path, monkeypatch):
+    executable = shutil.which("git")
+    assert executable is not None
+    commit = subprocess.run(
+        [executable, "rev-parse", "HEAD"], cwd=catalog.ROOT,
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    info = {**INFO, "commit": commit}
+    expected = catalog.catalog_files(info, DIGEST, source_ref=commit)
+    assert expected["mennekes_amtron_modbus/CHANGELOG.md"] == subprocess.run(
+        [executable, "show", f"{commit}:modbus_service/CHANGELOG.md"],
+        cwd=catalog.ROOT, check=True, capture_output=True,
+    ).stdout
+    # An integration-only release can have different app documentation. The
+    # already installed app must retain its original published instructions.
+    monkeypatch.setattr(catalog, "ROOT", tmp_path)
+    requests = []
+
+    def api(repository, endpoint):
+        assert repository == INFO["repository"]
+        requests.append(endpoint)
+        if endpoint == "git/ref/heads/apps-beta":
+            return {"object": {"sha": "e" * 40}}
+        assert endpoint == f"git/trees/{'e' * 40}?recursive=1"
+        tree = catalog_tree(expected)
+        tree["tree"].append({"path": "mennekes_amtron_modbus", "type": "tree", "mode": "040000"})
+        return tree
+
+    monkeypatch.setattr(catalog, "api", api)
+    catalog.verify_existing_catalog(info, DIGEST, "apps-beta")
+    assert len(requests) == 2
+
+
 def test_stable_promotion_keeps_provenance_and_catalog_identity_separate():
     info = {**INFO, "version": "0.5.0", "channel": "apps"}
     stable = catalog.catalog_files(info, DIGEST, branch="apps")
@@ -440,6 +510,7 @@ def test_prereleases_cannot_be_rendered_into_the_stable_catalog(version):
 def catalog_repository(monkeypatch, initial):
     """Simulate the Git API, including immutable commits and failed ref updates."""
     references, commits, trees = {}, {}, {}
+    committed_files, tree_files = {}, {}
     events, published, fail_once = [], [], set()
     serial = 0
 
@@ -452,6 +523,9 @@ def catalog_repository(monkeypatch, initial):
         sha = new_sha()
         references[branch] = sha
         commits[sha] = deepcopy(metadata)
+        source = {key: metadata[key] for key in INFO}
+        source["channel"] = catalog.catalog_branch(source["version"])
+        committed_files[sha] = catalog_tree(catalog.catalog_files(source, metadata["digest"], branch=branch))
 
     def api(_repository, endpoint, payload=None, **_kwargs):
         events.append((endpoint, payload))
@@ -461,15 +535,25 @@ def catalog_repository(monkeypatch, initial):
         if endpoint.startswith("contents/release.json?ref="):
             metadata = commits[endpoint.split("=", 1)[1]]
             return {"content": base64.b64encode(json.dumps(metadata).encode()).decode()}
+        if endpoint.startswith("git/trees/"):
+            return committed_files[endpoint.split("/", 2)[2].split("?", 1)[0]]
         if endpoint == "git/trees":
             sha = new_sha()
             trees[sha] = json.loads(next(
                 item["content"] for item in payload["tree"] if item["path"] == "release.json"
             ))
+            entries = []
+            for item in payload["tree"]:
+                if "content" in item:
+                    entries.extend(catalog_tree({item["path"]: item["content"].encode()})["tree"])
+                else:
+                    entries.append(dict(item))
+            tree_files[sha] = {"truncated": False, "tree": entries}
             return {"sha": sha}
         if endpoint == "git/commits":
             sha = new_sha()
             commits[sha] = trees[payload["tree"]]
+            committed_files[sha] = tree_files[payload["tree"]]
             return {"sha": sha}
         if endpoint == "git/refs":
             branch = payload["ref"].removeprefix("refs/heads/")
@@ -478,7 +562,8 @@ def catalog_repository(monkeypatch, initial):
             published.append(branch)
             return {"object": {"sha": payload["sha"]}}
         assert endpoint == "git/blobs"
-        return {"sha": new_sha()}
+        data = base64.b64decode(payload["content"])
+        return {"sha": catalog_tree({"image": data})["tree"][0]["sha"]}
 
     def patch(command, **kwargs):
         assert command[3] == "PATCH"
@@ -546,6 +631,26 @@ def test_partial_promotion_can_retry_without_republishing_the_completed_catalog(
     assert commits[refs["apps-beta"]] == {**info, "digest": DIGEST, "catalog_channel": "apps-beta"}
     catalog.publish(info, DIGEST)
     assert published == ["apps", "apps-beta"]
+
+
+def test_same_version_catalog_retry_refuses_changed_installation_files(monkeypatch):
+    metadata = {**INFO, "digest": DIGEST, "catalog_channel": "apps-beta"}
+    refs, _commits, _events, published, _fail = catalog_repository(monkeypatch, {"apps-beta": metadata})
+    before = dict(refs)
+    original_api = catalog.api
+
+    def corrupted_api(repository, endpoint, *args, **kwargs):
+        result = original_api(repository, endpoint, *args, **kwargs)
+        if endpoint.startswith("git/trees/"):
+            result = deepcopy(result)
+            next(item for item in result["tree"] if item["path"].endswith("/Dockerfile"))["sha"] = "0" * 40
+        return result
+
+    monkeypatch.setattr(catalog, "api", corrupted_api)
+    with pytest.raises(ValueError, match="files differ"):
+        catalog.publish(INFO, DIGEST)
+    assert refs == before
+    assert not published
 
 
 def test_stable_maintenance_update_keeps_a_newer_preview_catalog(monkeypatch):

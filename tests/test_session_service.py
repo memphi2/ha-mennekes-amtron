@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import stat
 import threading
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -187,6 +189,40 @@ def test_session_storage_failure_does_not_make_wallbox_unavailable_and_retries_b
                 assert service.snapshot()["available"]
             finally:
                 service._store.save = real_save
+                await service.stop()
+
+    asyncio.run(run())
+
+
+def test_uncertain_session_save_survives_later_control_save(tmp_path, monkeypatch):
+    async def run():
+        clock = [1000.0]
+        with patch("custom_components.mennekes_amtron_rtu.device.service_runtime.wall_clock", side_effect=lambda: clock[0]):
+            service, transport = await owner(tmp_path)
+            sync = os.fsync
+            try:
+                await observe(service, transport, clock, 1005, EvseState.EV_CONNECTED, 100)
+                await observe(service, transport, clock, 1010, EvseState.CHARGING, 100)
+                await observe(service, transport, clock, 1100, EvseState.EV_CONNECTED, 112)
+
+                def fail_directory(descriptor):
+                    if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+                        raise OSError("directory sync failed")
+                    return sync(descriptor)
+
+                with monkeypatch.context() as patcher:
+                    patcher.setattr(os, "fsync", fail_directory)
+                    await observe(service, transport, clock, 1120, EvseState.IDLE, 112)
+                summary = service.snapshot()["charging_session"]["latest"]
+                assert service._saved_session_history["latest"] == summary
+                assert service._session_history_dirty
+                await service._persist()
+                stored = json.loads(await asyncio.to_thread(service.state_path.read_text))
+                assert stored["charging_session_history"]["latest"] == summary
+                service._session_history_retry_at = 0
+                await service._persist_session_history()
+                assert not service._session_history_dirty
+            finally:
                 await service.stop()
 
     asyncio.run(run())

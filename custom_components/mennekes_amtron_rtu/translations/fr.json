@@ -61,16 +61,16 @@
       },
       "serial": {
         "data": {
-          "baudrate": "Vitesse de transmission",
+          "baudrate": "Vitesse série (débit en bauds)",
           "device_id": "Adresse Modbus de l’appareil",
-          "frame": "Format de trame",
+          "frame": "Format des données série",
           "port": "Port série",
           "search": "Si ces paramètres ne fonctionnent pas"
         },
         "data_description": {
-          "baudrate": "La valeur d’usine est 57600.",
+          "baudrate": "Doit correspondre au réglage de la borne. La valeur d’usine est de 57600 bauds.",
           "device_id": "L’adresse d’usine est 50. L’outil de configuration MENNEKES permet de définir une adresse de 10 à 50.",
-          "frame": "La documentation de la borne prévoit uniquement ces trois formats. Le réglage d’usine est 8 bits de données, sans parité et 2 bits d’arrêt.",
+          "frame": "Les bits de données, la parité et les bits d’arrêt doivent correspondre à la borne. Le réglage d’usine est 8N2.",
           "port": "Chemin de l’adaptateur USB RS-485. Préférez un chemin /dev/serial/by-id : /dev/ttyUSB0 peut changer après un redémarrage.",
           "search": "L’adresse de l’appareil et les paramètres du bus peuvent être modifiés avec l’outil de configuration MENNEKES. Une installation existante peut donc utiliser d’autres valeurs. La recherche envoie des requêtes de lecture. Utilisez-la uniquement sur un bus sans autre maître Modbus."
         },
@@ -79,16 +79,16 @@
       },
       "serial_reconfigure": {
         "data": {
-          "baudrate": "Vitesse de transmission",
+          "baudrate": "Vitesse série (débit en bauds)",
           "device_id": "Adresse Modbus de l’appareil",
-          "frame": "Format de trame",
+          "frame": "Format des données série",
           "port": "Port série",
           "search": "Si ces paramètres ne fonctionnent pas"
         },
         "data_description": {
-          "baudrate": "La valeur d’usine est 57600.",
+          "baudrate": "Doit correspondre au réglage de la borne. La valeur d’usine est de 57600 bauds.",
           "device_id": "L’adresse d’usine est 50. L’outil de configuration MENNEKES permet de définir une adresse de 10 à 50.",
-          "frame": "La documentation de la borne prévoit uniquement ces trois formats. Le réglage d’usine est 8 bits de données, sans parité et 2 bits d’arrêt.",
+          "frame": "Les bits de données, la parité et les bits d’arrêt doivent correspondre à la borne. Le réglage d’usine est 8N2.",
           "port": "Chemin de l’adaptateur USB RS-485. Préférez un chemin /dev/serial/by-id : /dev/ttyUSB0 peut changer après un redémarrage.",
           "search": "L’adresse de l’appareil et les paramètres du bus peuvent être modifiés avec l’outil de configuration MENNEKES. Une installation existante peut donc utiliser d’autres valeurs. La recherche envoie des requêtes de lecture. Utilisez-la uniquement sur un bus sans autre maître Modbus."
         },
@@ -115,10 +115,10 @@
         "description": "Connectez une borne RTU compatible via un adaptateur Ethernet-RS-485. Choisissez RTU over TCP transparent ou une passerelle qui traduit Modbus TCP en RTU. Réglez le débit et la trame sur l’adaptateur. Utilisez un réseau privé de confiance et un accès exclusif au bus. Table de registres validée : {validated_layout}.",
         "data": {
           "connection_type": "Protocole de connexion",
-          "host": "Hôte de l’adaptateur",
+          "host": "Adresse IP ou nom d’hôte de l’adaptateur",
           "tcp_port": "Port TCP de l’adaptateur",
           "device_id": "Adresse Modbus de la borne",
-          "tcp_authentication": "Authentification TCP",
+          "tcp_authentication": "Se connecter avec l’authentification TCP",
           "configure_gateway": "Configurer l’adaptateur LAN"
         },
         "data_description": {
@@ -126,8 +126,8 @@
           "host": "Nom d’hôte ou adresse IP de l’adaptateur réseau, sans http:// ni chemin d’URL.",
           "tcp_port": "Port TCP configuré sur l’adaptateur ; 502 par défaut. Il ne s’agit pas du port HTTP 8765 du service indépendant.",
           "device_id": "Adresse de la borne derrière l’adaptateur ; 50 par défaut, plage prise en charge de 10 à 50.",
-          "tcp_authentication": "L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
-          "configure_gateway": "Lire les réglages de cet adaptateur et vérifier les modifications avant de les appliquer. Seuls les modèles et firmwares pris en charge peuvent être configurés ici."
+          "tcp_authentication": "Utilise l’authentification déjà activée sur l’adaptateur. Ce bouton seul ne l’active pas sur l’adaptateur ; choisissez « Configurer l’adaptateur LAN » pour modifier ce réglage. L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
+          "configure_gateway": "Détecte un adaptateur compatible, puis permet de régler son authentification TCP, sa vitesse série, son format de données, son protocole et son port TCP. Vérifiez les valeurs à la page suivante avant de les enregistrer."
         }
       },
       "network_reconfigure": {
@@ -135,10 +135,10 @@
         "description": "Connectez une borne RTU compatible via un adaptateur Ethernet-RS-485. Choisissez RTU over TCP transparent ou une passerelle qui traduit Modbus TCP en RTU. Réglez le débit et la trame sur l’adaptateur. Utilisez un réseau privé de confiance et un accès exclusif au bus. Table de registres validée : {validated_layout}.",
         "data": {
           "connection_type": "Protocole de connexion",
-          "host": "Hôte de l’adaptateur",
+          "host": "Adresse IP ou nom d’hôte de l’adaptateur",
           "tcp_port": "Port TCP de l’adaptateur",
           "device_id": "Adresse Modbus de la borne",
-          "tcp_authentication": "Authentification TCP",
+          "tcp_authentication": "Se connecter avec l’authentification TCP",
           "configure_gateway": "Configurer l’adaptateur LAN"
         },
         "data_description": {
@@ -146,8 +146,8 @@
           "host": "Nom d’hôte ou adresse IP de l’adaptateur réseau, sans http:// ni chemin d’URL.",
           "tcp_port": "Port TCP configuré sur l’adaptateur ; 502 par défaut. Il ne s’agit pas du port HTTP 8765 du service indépendant.",
           "device_id": "Adresse de la borne derrière l’adaptateur ; 50 par défaut, plage prise en charge de 10 à 50.",
-          "tcp_authentication": "L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
-          "configure_gateway": "Lire les réglages de cet adaptateur et vérifier les modifications avant de les appliquer. Seuls les modèles et firmwares pris en charge peuvent être configurés ici."
+          "tcp_authentication": "Utilise l’authentification déjà activée sur l’adaptateur. Ce bouton seul ne l’active pas sur l’adaptateur ; choisissez « Configurer l’adaptateur LAN » pour modifier ce réglage. L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
+          "configure_gateway": "Détecte un adaptateur compatible, puis permet de régler son authentification TCP, sa vitesse série, son format de données, son protocole et son port TCP. Vérifiez les valeurs à la page suivante avant de les enregistrer."
         }
       },
       "reauth_confirm": {
@@ -166,20 +166,25 @@
         "description": "Saisissez le mot de passe web actuel de votre adaptateur compatible. La connexion est vérifiée sans modifier les réglages ni le mot de passe. Utilisez 1 à 9 caractères ASCII imprimables, sans espaces. L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
         "data": {
           "tcp_auth_password": "Mot de passe web actuel de l’adaptateur"
+        },
+        "data_description": {
+          "tcp_auth_password": "Le mot de passe de l’interface web de l’adaptateur, et non un mot de passe Home Assistant ou un jeton d’accès à l’application. L’authentification TCP accepte 1 à 9 caractères ASCII imprimables sans espaces."
         }
       },
       "network_adapter": {
         "title": "Configurer l’adaptateur LAN",
         "description": "Détecté : **{model}**, firmware **{firmware}**. Réglages actuels : **{baudrate} bauds, {frame}**, port TCP **{tcp_port}**.\n\nValider applique le protocole et le port TCP choisis à la page précédente ainsi que les réglages ci-dessous, puis vérifie l’identité de la borne. En cas d’échec, les anciens réglages sont restaurés si l’adaptateur reste accessible. Le mot de passe web actuel n’est pas modifié. Le mode serveur TCP passif est également activé : interrogation/cache Modbus interne, contrôle de flux, préambules de connexion, répétition des données série mémorisées, envoi automatique des paramètres et redémarrages déclenchés par les données sont désactivés.",
         "data": {
-          "baudrate": "Vitesse de transmission",
-          "frame": "Format de trame",
-          "tcp_authentication": "Authentification TCP",
+          "baudrate": "Vitesse série (débit en bauds)",
+          "frame": "Format des données série",
+          "tcp_authentication": "Activer l’authentification TCP sur l’adaptateur",
           "tcp_auth_password": "Mot de passe web actuel de l’adaptateur"
         },
         "data_description": {
-          "tcp_authentication": "L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
-          "tcp_auth_password": "Saisissez le mot de passe web actuel, s’il est défini. L’authentification TCP exige 1 à 9 caractères ASCII imprimables, sans espaces. Le mot de passe n’est enregistré que si cette authentification est activée."
+          "tcp_authentication": "L’enregistrement active ou désactive l’authentification sur l’adaptateur et adapte la connexion de cette intégration. Le mot de passe web actuel de l’adaptateur est utilisé ; aucun mot de passe n’est créé ni modifié. L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
+          "tcp_auth_password": "Saisissez le mot de passe web actuel, s’il est défini. L’authentification TCP exige 1 à 9 caractères ASCII imprimables, sans espaces. Le mot de passe n’est enregistré que si cette authentification est activée.",
+          "baudrate": "Doit correspondre au réglage de la borne. La valeur d’usine est de 57600 bauds.",
+          "frame": "Les bits de données, la parité et les bits d’arrêt doivent correspondre à la borne. Le réglage d’usine est 8N2."
         }
       },
       "network_reauth": {
@@ -187,6 +192,9 @@
         "description": "Saisissez le mot de passe web actuel de votre adaptateur compatible. La connexion est vérifiée sans modifier les réglages ni le mot de passe. Utilisez 1 à 9 caractères ASCII imprimables, sans espaces. L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
         "data": {
           "tcp_auth_password": "Mot de passe web actuel de l’adaptateur"
+        },
+        "data_description": {
+          "tcp_auth_password": "Le mot de passe de l’interface web de l’adaptateur, et non un mot de passe Home Assistant ou un jeton d’accès à l’application. L’authentification TCP accepte 1 à 9 caractères ASCII imprimables sans espaces."
         }
       }
     }

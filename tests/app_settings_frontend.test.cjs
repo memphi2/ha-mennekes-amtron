@@ -176,6 +176,74 @@ test('factory serial values display accurately while valid wallbox settings are 
   assert.equal(ui.calls.length, 2); // Only GET config and read-only detection.
 });
 
+test('detection preserves requested login, TCP port and mode until explicitly applied', async () => {
+  const ui = await harness();
+  ui.el('tcp_authentication').checked = true;
+  await ui.el('tcp_authentication').emit('change');
+  ui.el('tcp_port').value = '1502';
+  await ui.el('tcp_port').emit('input');
+  ui.el('connection_type').value = 'modbus_tcp';
+  await ui.el('connection_type').emit('change');
+  await detect(ui);
+  assert.equal(ui.el('tcp_authentication').checked, true);
+  assert.equal(ui.el('tcp_port').value, '1502');
+  assert.equal(ui.el('connection_type').value, 'modbus_tcp');
+  assert.equal(ui.el('apply_adapter').checked, false);
+  assert.match(ui.el('auth_hint').textContent, /app connection only/);
+  ui.el('apply_adapter').checked = true;
+  await ui.el('apply_adapter').emit('change');
+  assert.match(ui.el('auth_label').textContent, /on the adapter/);
+  assert.match(ui.el('auth_hint').textContent, /both the adapter and this app/);
+  ui.el('tcp_auth_password').value = 'Demo123';
+  ui.responses.push(result({ revision: 'revision-2' }));
+  await ui.el('connection_form').emit('submit');
+  assert.equal(ui.calls.at(-1).payload.tcp_authentication, true);
+  assert.equal(ui.calls.at(-1).payload.tcp_port, 1502);
+  assert.equal(ui.calls.at(-1).payload.connection_type, 'modbus_tcp');
+  assert.equal(ui.calls.at(-1).payload.adapter_token, 'opaque-preview');
+});
+
+test('detection retains an entered password only when the TCP endpoint stays the same', async () => {
+  const same = await harness();
+  same.el('tcp_authentication').checked = true;
+  await same.el('tcp_authentication').emit('change');
+  same.el('tcp_auth_password').value = 'Demo123';
+  await detect(same);
+  assert.equal(same.el('tcp_auth_password').value, 'Demo123');
+  same.responses.push(result({ revision: 'revision-2' }));
+  await same.el('connection_form').emit('submit');
+  assert.equal(same.calls.at(-1).payload.tcp_auth_password, 'Demo123');
+
+  const changed = await harness();
+  changed.el('tcp_authentication').checked = true;
+  await changed.el('tcp_authentication').emit('change');
+  changed.el('tcp_auth_password').value = 'Demo123';
+  await detect(changed, { ...detected, tcp_port: 1502 });
+  assert.equal(changed.el('tcp_port').value, '1502');
+  assert.equal(changed.el('tcp_auth_password').value, '');
+});
+
+test('fresh detection preserves edited serial settings but reload restores hardware defaults', async () => {
+  const ui = await harness();
+  await detect(ui);
+  ui.el('adapter_baudrate').value = '19200';
+  await ui.el('adapter_baudrate').emit('change');
+  ui.el('adapter_frame').value = '8o1';
+  await ui.el('adapter_frame').emit('change');
+  await detect(ui);
+  assert.equal(ui.el('adapter_baudrate').value, '19200');
+  assert.equal(ui.el('adapter_frame').value, '8o1');
+  assert.equal(ui.el('apply_adapter').checked, false);
+  ui.responses.push(settingsResponse());
+  await ui.el('reload').emit('click');
+  await detect(ui, { ...detected, tcp_port: 1502, connection_type: 'modbus_tcp', tcp_authentication: true });
+  assert.equal(ui.el('adapter_baudrate').value, '9600');
+  assert.equal(ui.el('adapter_frame').value, '8e1');
+  assert.equal(ui.el('tcp_port').value, '1502');
+  assert.equal(ui.el('connection_type').value, 'modbus_tcp');
+  assert.equal(ui.el('tcp_authentication').checked, true);
+});
+
 test('host changes invalidate both in-flight detection and previously issued proof', async () => {
   const ui = await harness();
   let resolve;

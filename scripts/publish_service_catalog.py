@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import subprocess
 import sys
@@ -11,7 +12,7 @@ from typing import Any
 
 import yaml
 from packaging.version import Version
-from release_check import remote_commit
+from release_check import remote_commit, run
 from release_version import catalog_branch, catalog_branches
 from service_image import ROOT, app_dockerfile, existing_verified_image, release_info
 
@@ -54,29 +55,40 @@ def _release_metadata(
 
 
 def catalog_files(
-    info: dict[str, str], digest: str, *, branch: str | None = None
+    info: dict[str, str], digest: str, *, branch: str | None = None,
+    source_ref: str | None = None,
 ) -> dict[str, bytes]:
     """Publish an allowlist of metadata and documentation, never development files."""
     branch = branch or info["channel"]
     metadata = _release_metadata(info, digest, branch)
     prefix = "mennekes_amtron_modbus/"
     app = ROOT / "modbus_service"
+
+    def read(path: str) -> bytes:
+        if source_ref is not None:
+            return run("git", "show", f"{source_ref}:{path}")
+        return (ROOT / path).read_bytes()
+
     files = {
-        prefix + name: (app / name).read_bytes()
+        prefix + name: read(f"modbus_service/{name}")
         for name in ("config.yaml", "README.md", "DOCS.md", "CHANGELOG.md", "apparmor.txt")
     }
     config = yaml.safe_load(files[prefix + "config.yaml"])
     if "image" in config:
         raise ValueError("app config must use the digest-pinned Dockerfile")
     files[prefix + "Dockerfile"] = app_dockerfile(info, digest)
-    for translation in sorted((app / "translations").glob("*.yaml")):
-        files[f"{prefix}translations/{translation.name}"] = translation.read_bytes()
+    translations = (
+        run("git", "ls-tree", "-rz", "--name-only", source_ref, "--", "modbus_service/translations").decode().split("\0")
+        if source_ref is not None
+        else [path.relative_to(ROOT).as_posix() for path in sorted((app / "translations").glob("*.yaml"))]
+    )
+    for translation in translations:
+        if translation.endswith(".yaml"):
+            files[prefix + translation.removeprefix("modbus_service/")] = read(translation)
     for name in ("LICENSE", "NOTICE"):
-        files[name] = (ROOT / name).read_bytes()
+        files[name] = read(name)
     for name in ("icon.png", "logo.png"):
-        files[prefix + name] = (
-            ROOT / "custom_components/mennekes_amtron_rtu/brand/icon.png"
-        ).read_bytes()
+        files[prefix + name] = read("custom_components/mennekes_amtron_rtu/brand/icon.png")
     title = "Mennekes Amtron" + (" beta" if branch == "apps-beta" else "")
     url = f"https://github.com/{info['repository']}#{branch}"
     files["repository.yaml"] = yaml.safe_dump({"name": title, "url": url}).encode()
@@ -90,6 +102,41 @@ def catalog_files(
         json.dumps(metadata, sort_keys=True, indent=2) + "\n"
     ).encode()
     return files
+
+
+def verify_catalog_tree(repository: str, commit: str, files: dict[str, bytes]) -> None:
+    """Bind every installed catalog file to its reviewed content, not just metadata."""
+    tree = api(repository, f"git/trees/{commit}?recursive=1")
+    if tree is None or tree.get("truncated") is not False or not isinstance(tree.get("tree"), list):
+        raise ValueError("app catalog tree is incomplete")
+    expected = {
+        path: hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content, usedforsecurity=False).hexdigest()
+        for path, content in files.items()
+    }
+    observed = {}
+    for item in tree["tree"]:
+        if not isinstance(item, dict):
+            raise ValueError("invalid app catalog tree entry")
+        if item.get("type") == "tree" and item.get("mode") == "040000":
+            continue
+        path = item.get("path")
+        if (
+            not isinstance(path, str) or path in observed
+            or item.get("type") != "blob" or item.get("mode") != "100644"
+        ):
+            raise ValueError("app catalog file types or paths differ")
+        observed[path] = item.get("sha")
+    if observed != expected:
+        raise ValueError("app catalog files differ from the original release")
+
+
+def verify_existing_catalog(info: dict[str, str], digest: str, branch: str) -> None:
+    """Verify an unchanged app using its original source, including its old docs."""
+    reference = api(info["repository"], f"git/ref/heads/{branch}")
+    if reference is None:
+        raise ValueError("app catalog reference is missing")
+    files = catalog_files(info, digest, branch=branch, source_ref=info["commit"])
+    verify_catalog_tree(info["repository"], reference["object"]["sha"], files)
 
 
 def check_forward(
@@ -148,6 +195,8 @@ def publish(info: dict[str, str], digest: str) -> None:
             if not isinstance(previous, dict):
                 raise ValueError("existing catalog has an invalid release identity")
             if not check_forward(previous, info, digest, branch=branch):
+                if Version(previous["version"]) == Version(info["version"]):
+                    verify_catalog_tree(repository, parent, files)
                 continue
         updates.append((branch, files, parent))
     for branch, files, parent in updates:
@@ -216,6 +265,7 @@ def _publish_catalog(
     updated = api(repository, f"git/ref/heads/{branch}")
     if updated is None or updated["object"]["sha"] != commit["sha"]:
         raise ValueError("catalog publication was not confirmed")
+    verify_catalog_tree(repository, commit["sha"], files)
 
 
 def main() -> int:

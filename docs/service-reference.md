@@ -58,6 +58,12 @@ process-local block does not cancel the earlier Supervisor request or prevent
 changes made elsewhere; an app restart alone does not prove that the request has
 finished. Check the saved options and adapter before reconnecting.
 
+Before saving, the connection page checks that the Supervisor options still
+match those it read. A detected concurrent edit is rejected; reload the page
+before trying again. Supervisor has no atomic compare-and-save API, so an edit
+made elsewhere between the final check and the save can still race. Use one
+configuration page at a time, including the native app Configuration tab.
+
 In older apps **0.5.1–0.5.2b2**, the native Configuration tab has an optional
 serial-device selector with no default device path. It keeps the host field
 visible, accepts an empty host for USB and does not hide fields when changing

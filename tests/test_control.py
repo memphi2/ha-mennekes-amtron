@@ -1132,7 +1132,9 @@ def test_restart_uses_fresh_device_status(cached, actual):
                 await control.async_restart()
             assert error.value.translation_key == "restart_requires_idle"
         assert bool(harness.written(R.SYSTEM_RESTART)) == (actual == EvseState.IDLE)
-        assert harness.transport.reads == [(R.EVSE_STATE.address, 1)]
+        assert harness.transport.reads == [(R.EVSE_STATE.address, 1)] * (
+            2 if actual == EvseState.IDLE else 1
+        )
 
     asyncio.run(run())
 

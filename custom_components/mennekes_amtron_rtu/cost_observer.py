@@ -234,6 +234,13 @@ class ChargingCostObserver:
             self.last = candidate
             self._dirty = True
         if present is False:
+            if self._active:
+                # End the previous plug cycle even when the final meter read
+                # failed or the service has not published a fresh sample yet.
+                # A later plug must not inherit its energy as a complete cost.
+                self._accumulator.reset()
+                self._accumulator.set_price(min(at, now), self._price())
+                self._anchored = False
             self._active = False
             if fresh and energy is not None and math.isfinite(energy) and energy >= 0:
                 self._accumulator.reset()

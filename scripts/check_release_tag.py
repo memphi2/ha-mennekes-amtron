@@ -15,7 +15,6 @@ def main() -> int:
 
     parser = argparse.ArgumentParser()
     parser.add_argument("tag")
-    parser.add_argument("--attestation-context", action="store_true")
     args = parser.parse_args()
 
     failures = check_tag(args.tag)

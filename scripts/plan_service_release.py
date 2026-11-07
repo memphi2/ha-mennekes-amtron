@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from packaging.version import Version
-from publish_service_catalog import api
+from publish_service_catalog import api, verify_existing_catalog
 from release_check import remote_commit
 from release_version import (
     catalog_branch,
@@ -132,6 +132,7 @@ def _catalog_resume_needed(info: dict[str, str], digest: str) -> bool:
             raise ValueError("refusing to downgrade an app catalog during resume")
         if _source_info(previous) != info or previous["digest"] != digest:
             raise ValueError("same-version app catalog differs during resume")
+        verify_existing_catalog(info, digest, branch)
     return pending
 
 
@@ -164,6 +165,8 @@ def plan(repository: str, tag: str) -> ServicePlan:
         if digest is None or digest != previous["digest"]:
             raise ValueError("published app image is missing or differs from its catalog")
         resume = original == info and _catalog_resume_needed(original, digest)
+        if original != info:
+            verify_existing_catalog(original, digest, previous["catalog_channel"])
         return ServicePlan(original, inputs, False, resume, digest)
     digest = existing_verified_image(info)
     return ServicePlan(info, inputs, digest is None, True, digest or "")

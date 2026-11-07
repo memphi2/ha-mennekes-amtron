@@ -45,8 +45,8 @@ configuration:
     name: Porta TCP adattatore
     description: Porta TCP configurata sull’adattatore; valore predefinito 502. Non è la porta HTTP 8765 del servizio indipendente.
   tcp_authentication:
-    name: "Accesso TCP"
-    description: "L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta."
+    name: "Usa accesso TCP in questa app"
+    description: "Questo cambia solo la connessione dell’app. Per attivare o disattivare l’accesso anche su un adattatore compatibile, leggi le sue impostazioni e seleziona l’applicazione al salvataggio. Apri l’interfaccia Web per configurare l’adattatore. L’accesso non cifra i dati ed è aggirabile con il firmware 1.523. Usa una rete locale protetta."
   tcp_auth_password:
     name: "Password web attuale dell’adattatore"
     description: "Password web attuale per l’accesso TCP: da 1 a 9 caratteri ASCII stampabili senza spazi. La password dell’adattatore non viene modificata."

@@ -213,6 +213,50 @@ def test_persist_finishes_atomically_even_when_the_caller_is_cancelled(
     asyncio.run(run())
 
 
+def test_repeated_cancellation_keeps_older_store_write_serialized(tmp_path, monkeypatch):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path, read_only=True)
+        entered = threading.Event()
+        release = threading.Event()
+        original_save = service._store.save
+        first = second = None
+
+        def blocked(state):
+            if state.pause_requested is True:
+                entered.set()
+                assert release.wait(5)
+            original_save(state)
+
+        monkeypatch.setattr(service._store, "save", blocked)
+        try:
+            service.control.pause_requested = True
+            first = asyncio.create_task(service._persist())
+            assert await asyncio.to_thread(entered.wait, 5)
+            first.cancel()
+            await asyncio.sleep(0)
+            first.cancel()
+            await asyncio.sleep(0)
+
+            service.control.pause_requested = False
+            second = asyncio.create_task(service._persist())
+            await asyncio.sleep(0)
+            # The first thread still owns the store despite both cancellations.
+            assert not first.done()
+            assert not second.done()
+            release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await first
+            await second
+            assert json.loads((tmp_path / "intent.json").read_text())["pause_requested"] is False
+        finally:
+            release.set()
+            await asyncio.gather(*(task for task in (first, second) if task), return_exceptions=True)
+            monkeypatch.setattr(service._store, "save", original_save)
+            await service.stop()
+
+    asyncio.run(run())
+
+
 def test_io_failure_is_reported_without_leaking_exception_details(tmp_path):
     async def run():
         service, transport, _clock = await service_fixture(tmp_path)

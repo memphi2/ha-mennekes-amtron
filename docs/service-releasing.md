@@ -54,6 +54,13 @@ an image or committing catalog changes. The HACS integration release proceeds
 normally. The existing image retains its original source and attestation;
 reuse never relabels it as built from the newer integration commit.
 
+Catalog verification compares the complete file inventory, file modes and Git
+blob identities with the original app release. An unchanged `release.json`
+alone cannot hide a changed Dockerfile, AppArmor profile or configuration.
+Missing, modified or extra files stop reuse and same-version publication
+retries; they are not silently replaced. Original app documentation is checked
+against its own source commit, not newer integration-only documentation.
+
 Documentation changes appear in the source repository immediately. App-store
 README, documentation and changelog files are refreshed with the next real app
 publication. A documentation correction alone does not offer an app update or

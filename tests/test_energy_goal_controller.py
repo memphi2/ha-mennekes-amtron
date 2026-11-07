@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -20,11 +21,16 @@ from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import 
 )
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceValidationError
+from custom_components.mennekes_amtron_rtu.device.persistence import (
+    StorageCommitUncertainError,
+    StorageStateUnknownError,
+)
 from custom_components.mennekes_amtron_rtu.device.poller import DevicePoller
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
 from tests.fakes import put, raise_connection_error
 from tests.test_control import Harness
+from tests.test_goal_store import store_at
 from tests.test_modbus_service import current_writes, service_fixture
 
 
@@ -422,6 +428,226 @@ def test_cancelled_save_keeps_the_target_that_may_already_be_committed():
         assert harness.transport.writes == []
         await runner.async_stop()
     asyncio.run(run())
+
+
+def test_cancelled_committed_target_invalidates_queued_timed_command():
+    async def run():
+        harness, control, runner, _saved = await _runner()
+        control.soc_goal.configure_source("sensor.car_soc")
+        control.soc_goal.set_target(80, soc=20)
+        release = asyncio.Event()
+        control._sleep = lambda _delay: release.wait()
+        try:
+            await control.async_pause_charging()
+            await control.async_set_timed_current(
+                6, deadline=datetime.now(UTC) + timedelta(hours=1), owner="timed:entry"
+            )
+            assert control.pending_action == "set_current"
+
+            async def committed_then_cancelled():
+                raise asyncio.CancelledError
+
+            runner._persist = committed_then_cancelled
+            with pytest.raises(asyncio.CancelledError):
+                await runner.async_set_target(12)
+            assert control.energy_goal.target_kwh == 12
+            assert control.pending_action is None
+            assert control.events.snapshot()["events"][-1]["reason"] == "energy_goal"
+            assert current_writes(harness.transport) == [1]
+        finally:
+            release.set()
+            await runner.async_stop()
+            await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_uncertain_target_preserves_storage_error_if_queue_notification_fails():
+    async def run():
+        _harness, control, runner, _saved = await _runner()
+        runner._persist = AsyncMock(side_effect=StorageCommitUncertainError("directory sync"))
+        control.cancel_goal_resume = lambda: (_ for _ in ()).throw(RuntimeError("listener failed"))
+        with pytest.raises(StorageCommitUncertainError, match="directory sync"):
+            await runner.async_set_target(12)
+        assert control.energy_goal.target_kwh == 12
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("target", [0, 8])
+def test_unknown_goal_store_fences_and_retries_pause_until_saved(tmp_path, target):
+    async def run():
+        harness, control, runner, _saved = await _runner()
+        store = store_at(tmp_path)
+        runner._persist = lambda: store.async_save(control.energy_goal)
+        await runner.async_set_target(12)
+        write, read = store._write, store._validate_file
+
+        def replace_then_fail(payload):
+            write(payload)
+            raise OSError("directory sync failed")
+
+        def unreadable():
+            raise OSError("readback failed")
+
+        store._write = replace_then_fail
+        store._validate_file = unreadable
+        harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = 2
+        with pytest.raises(StorageStateUnknownError):
+            await runner.async_set_target(target)
+        assert control.energy_goal.target_kwh == target
+        assert runner.stop_requested
+        await _settle(runner)
+        assert runner.stop_requested
+        assert current_writes(harness.transport) == []
+        del harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address]
+        # A normal poll must retry even when the requested goal is disabled.
+        runner.observe(_snapshot(harness, 1234.5, energy_read=False))
+        await _settle(runner)
+        assert current_writes(harness.transport) == [1]
+        assert runner.stop_requested
+        store._write, store._validate_file = write, read
+        await runner.async_set_target(target)
+        assert not runner.stop_requested
+        assert (await store.async_load()).snapshot() == control.energy_goal.snapshot()
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+def test_unknown_worker_save_fences_until_a_later_poll_saves():
+    async def run():
+        harness, control, runner, _saved = await _runner()
+        await runner.async_set_target(12)
+        runner._persist = AsyncMock(side_effect=[StorageStateUnknownError("readback failed"), None, None])
+        runner.observe(None)
+        await _settle(runner)
+        assert runner._storage_unknown
+        assert current_writes(harness.transport) == [1]
+        runner.observe(_snapshot(harness, 1235))
+        await _settle(runner)
+        assert not runner._storage_unknown
+        assert not control.energy_goal.resume_on_recovery
+        assert current_writes(harness.transport) == [1]
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+def test_unknown_recovery_save_never_resumes_before_storage_recovers():
+    async def run():
+        harness, control, runner, _saved = await _runner()
+        await runner.async_set_target(12)
+        runner.observe(None)
+        await _settle(runner)
+        assert control.energy_goal.resume_on_recovery
+        saving_allowed = False
+
+        async def save():
+            if not saving_allowed and control.energy_goal.status == "active" and not control.energy_goal.resume_on_recovery:
+                raise StorageStateUnknownError("readback failed")
+
+        runner._persist = save
+        runner.observe(_snapshot(harness, 1235))
+        await _settle(runner)
+        assert runner.stop_requested
+        assert current_writes(harness.transport) == [1]
+        runner.observe(_snapshot(harness, 1235, energy_read=False))
+        await _settle(runner)
+        assert runner.stop_requested
+        assert current_writes(harness.transport) == [1]
+        saving_allowed = True
+        runner.observe(_snapshot(harness, 1235, energy_read=False))
+        await _settle(runner)
+        assert not runner.stop_requested
+        assert current_writes(harness.transport) == [1]
+        await runner.async_stop()
+        await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_cancelled_target_waiting_for_store_lock_finishes_or_rolls_back(tmp_path, fails):
+    async def run():
+        _harness, control, runner, _saved = await _runner()
+        store = store_at(tmp_path)
+        await store.async_save(control.energy_goal)
+        old = control.energy_goal.snapshot()
+        started = asyncio.Event()
+
+        async def save():
+            started.set()
+            await store.async_save(control.energy_goal)
+
+        def failed_write(_payload):
+            raise OSError("disk failed")
+
+        if fails:
+            store._write = failed_write
+        runner._persist = save
+        async with store._lock:
+            task = asyncio.create_task(runner.async_set_target(12))
+            await started.wait()
+            task.cancel()
+            await asyncio.sleep(0)
+            task.cancel()
+            await asyncio.sleep(0)
+            assert not task.done()
+        with pytest.raises(OSError if fails else asyncio.CancelledError):
+            await task
+        assert control.energy_goal.snapshot() == (old if fails else (await store.async_load()).snapshot())
+        if fails:
+            assert (await store.async_load()).snapshot() == old
+        else:
+            assert control.energy_goal.target_kwh == 12
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+async def _assert_service_cancelled_store_wait(tmp_path, *, kind):
+    service, _transport, _clock = await service_fixture(tmp_path)
+    try:
+        if kind == "soc":
+            await service.control.async_configure_soc("sensor.soc")
+            controller = service.control.soc_goal_controller
+        else:
+            controller = service.control.goal_controller
+        started = asyncio.Event()
+
+        async def save():
+            started.set()
+            await service._persist()
+
+        controller._persist = save
+        async with service._store_lock:
+            if kind == "soc":
+                action = service.control.async_set_soc_goal(80, source="sensor.soc", soc=20)
+            else:
+                action = service.control.async_set_energy_goal(12)
+            task = asyncio.create_task(action)
+            await started.wait()
+            task.cancel()
+            await asyncio.sleep(0)
+            assert not task.done()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        restored = WriteState()
+        IntentStore(service._store.path, service._store.identity).load(restored)
+        if kind == "soc":
+            assert restored.soc_goal.snapshot() == service.control.soc_goal.snapshot()
+            assert restored.soc_goal.target_percent == 80
+        else:
+            assert restored.energy_goal.snapshot() == service.control.energy_goal.snapshot()
+            assert restored.energy_goal.target_kwh == 12
+    finally:
+        await service.stop()
+
+
+def test_cancelled_energy_target_waiting_for_service_store_lock_is_saved(tmp_path):
+    asyncio.run(_assert_service_cancelled_store_wait(tmp_path, kind="energy"))
 
 
 def test_failed_stop_save_still_pauses_and_does_not_spam_logs(caplog):

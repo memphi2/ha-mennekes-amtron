@@ -31,12 +31,13 @@ def validate_token(value: Any) -> str:
     """Validate credentials without including them in error messages."""
     if (
         not isinstance(value, str)
-        or len(value) < 32
-        or not value.isascii()
-        or any(char.isspace() for char in value)
+        # aiohttp permits at most 8190 bytes in a header value; the Bearer
+        # prefix consumes seven. Reject values the API could never receive.
+        or not 32 <= len(value) <= 8183
+        or any(not 0x21 <= ord(char) <= 0x7E for char in value)
     ):
         raise ValueError(
-            "token must contain at least 32 ASCII characters without whitespace"
+            "token must contain 32 to 8183 printable ASCII characters without spaces"
         )
     return value
 

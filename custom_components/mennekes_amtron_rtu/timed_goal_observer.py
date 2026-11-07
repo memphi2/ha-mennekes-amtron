@@ -21,6 +21,7 @@ from homeassistant.util import dt as dt_util
 from .charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
 from .device.enums import DetectedEvPhases, GridPhasesConnected, SwitchedPhases
+from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.registers import CP_STATE, EVSE_STATE
 from .device.vehicle import vehicle_connected
 from .exceptions import service_validation_error
@@ -97,6 +98,8 @@ class TimedGoalObserver:
         self._last_write_at: float | None = None
         self._last_error: str | None = None
         self._goal_lock = asyncio.Lock()
+        self._save_dirty = False
+        self._save_unknown = False
         self._command_owner = f"timed:{entry.entry_id}"
         self._command_submitted = False
         self._command_current: float | None = None
@@ -208,11 +211,10 @@ class TimedGoalObserver:
                 changed = candidate.set(value, source)
             except ValueError as err:
                 raise HomeAssistantError(str(err)) from err
-            if not changed:
+            if not changed and not self._save_dirty:
                 return
             await self._cancel_command()
-            await self._store.async_save(candidate)
-            self.goal = candidate
+            await self._save_goal(candidate)
         self._notify()
         self.request_evaluate()
 
@@ -225,10 +227,52 @@ class TimedGoalObserver:
             candidate = TimedGoal.restore(expected.snapshot())
             candidate.finish(reason, clear_deadline=clear_deadline)
             await self._cancel_command()
-            await self._store.async_save(candidate)
-            self.goal = candidate
+            await self._save_goal(candidate)
         self._set_status(reason)
         self._notify()
+
+    async def _save_goal(self, candidate: TimedGoal) -> None:
+        """Keep the live trip aligned with a save that survives cancellation."""
+        task = asyncio.create_task(self._store.async_save(candidate))
+        try:
+            await asyncio.shield(task)
+        except (StorageCommitUncertainError, StorageStateUnknownError) as err:
+            # The file contains this trip, although directory durability was
+            # not confirmed, or its state could not be read. Keep the pending
+            # trip and report failure; unknown storage blocks plan commands.
+            self._publish_uncertain_goal(candidate, unknown=isinstance(err, StorageStateUnknownError))
+            raise
+        except asyncio.CancelledError:
+            # The store finishes atomic writes even when its caller is
+            # cancelled. Shield the whole save, including lock acquisition,
+            # so we know whether the candidate was actually committed.
+            while not task.done():
+                try:
+                    await asyncio.shield(task)
+                except asyncio.CancelledError:
+                    continue
+            try:
+                task.result()
+            except (StorageCommitUncertainError, StorageStateUnknownError) as err:
+                self._publish_uncertain_goal(candidate, unknown=isinstance(err, StorageStateUnknownError))
+                raise
+            self.goal = candidate
+            self._save_dirty = self._save_unknown = False
+            self._notify()
+            self.request_evaluate()
+            raise
+        self.goal = candidate
+        self._save_dirty = self._save_unknown = False
+
+    def _publish_uncertain_goal(self, candidate: TimedGoal, *, unknown: bool) -> None:
+        self.goal = candidate
+        self._save_dirty = True
+        self._save_unknown = unknown
+        for publish in (self._notify, self.request_evaluate):
+            try:
+                publish()
+            except Exception:  # noqa: BLE001 - preserve the storage failure
+                _LOGGER.error("Unable to publish an uncertain departure update")
 
     async def async_use_next_calendar_event(self) -> None:
         """Select a single matching future event; later events never roll in."""
@@ -315,6 +359,9 @@ class TimedGoalObserver:
         return 1
 
     async def _evaluate(self) -> None:
+        if self._save_unknown:
+            await self._wait_for_input("error")
+            return
         options = self._entry.options
         source_entity = options.get(CONF_TIMED_DEPARTURE_ENTITY)
         if source_entity:

@@ -68,6 +68,7 @@ class Adapter:
         monkeypatch.setattr(gw, "_send_parameters", self.send)
         monkeypatch.setattr(gw, "_verify_model", self.identify)
         monkeypatch.setattr(gw, "async_open_authenticated_socket", self.authenticate)
+        monkeypatch.setattr(gw, "_verify_tcp_ready", AsyncMock())
         monkeypatch.setattr(gw.asyncio, "sleep", self.yield_once)
         monkeypatch.setattr(gw, "_APPLY_TIMEOUT", 0.03)
         monkeypatch.setattr(gw, "_ROLLBACK_TIMEOUT", 0.3)
@@ -306,6 +307,112 @@ def test_bad_enable_key_restores_auth_off(adapter):
     asyncio.run(asyncio.wait_for(run(), 3))
 
 
+def test_enabling_auth_waits_for_tcp_listener_after_parameter_readback(adapter, monkeypatch):
+    async def run():
+        authenticated = MagicMock()
+        login = AsyncMock(side_effect=[
+            WaveshareAuthenticationError("Cannot connect to TCP authentication gateway"),
+            authenticated,
+        ])
+        monkeypatch.setattr(gw, "async_open_authenticated_socket", login)
+        async with await gw.configure_gateway(
+            ADDRESS, gw.GatewaySettings(tcp_authentication=True), PASSWORD,
+        ) as receipt:
+            await receipt.commit()
+        assert login.await_count == 2
+        assert len(adapter.writes) == 1
+        assert adapter.native[0x72] & 2
+        authenticated.close.assert_called_once_with()
+
+    asyncio.run(asyncio.wait_for(run(), 3))
+
+
+def test_unauthenticated_setup_waits_for_tcp_listener_after_readback(adapter, monkeypatch):
+    async def run():
+        ready = AsyncMock(side_effect=[gw.GatewayError(), None])
+        monkeypatch.setattr(gw, "_verify_tcp_ready", ready)
+        async with await gw.configure_gateway(ADDRESS, gw.GatewaySettings(baudrate=9600)) as receipt:
+            await receipt.commit()
+        assert ready.await_count == 2
+        assert len(adapter.writes) == 1
+        assert adapter.native[0x25] == 4
+
+    asyncio.run(asyncio.wait_for(run(), 3))
+
+
+def test_restoration_waits_for_restarted_authenticated_listener(adapter, monkeypatch):
+    async def run():
+        adapter.change(0x72, adapter.native[0x72] | 2)
+        restored = MagicMock()
+        login = AsyncMock(side_effect=[
+            MagicMock(),
+            WaveshareAuthenticationError("TCP gateway authentication connection failed"),
+            restored,
+        ])
+        monkeypatch.setattr(gw, "async_open_authenticated_socket", login)
+        async with await gw.configure_gateway(
+            ADDRESS, gw.GatewaySettings(tcp_authentication=False), PASSWORD,
+        ) as receipt:
+            assert not receipt.after.tcp_authentication
+        assert receipt.rollback_verified
+        assert adapter.native[0x72] & 2
+        assert login.await_count == 3
+        restored.close.assert_called_once_with()
+
+    asyncio.run(asyncio.wait_for(run(), 3))
+
+
+def test_cancelling_tcp_readiness_restores_applied_settings(adapter, monkeypatch):
+    async def run():
+        before = adapter.native
+        connecting = asyncio.Event()
+
+        async def ready(_snapshot):
+            if len(adapter.writes) == 1:
+                connecting.set()
+                await asyncio.Event().wait()
+
+        monkeypatch.setattr(gw, "_verify_tcp_ready", ready)
+        task = asyncio.create_task(gw.configure_gateway(ADDRESS, gw.GatewaySettings(baudrate=9600)))
+        await connecting.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert adapter.native == before
+        assert len(adapter.writes) == 2
+
+    asyncio.run(asyncio.wait_for(run(), 3))
+
+
+@pytest.mark.parametrize("outcome", ["success", "refused", "timeout", "cancel"])
+def test_tcp_readiness_closes_socket_without_sending_application_bytes(monkeypatch, outcome):
+    async def run():
+        sock = MagicMock()
+        sock.__enter__.return_value = sock
+        factory = MagicMock(return_value=sock)
+        monkeypatch.setattr(gw.socket, "socket", factory)
+        errors = {"success": None, "refused": OSError("private details"), "timeout": TimeoutError(), "cancel": asyncio.CancelledError()}
+        connect = AsyncMock(side_effect=errors[outcome])
+        loop = asyncio.get_running_loop()
+        monkeypatch.setattr(loop, "sock_connect", connect)
+        send = AsyncMock()
+        monkeypatch.setattr(loop, "sock_sendall", send)
+        if outcome == "success":
+            await gw._verify_tcp_ready(gw._snapshot(ADDRESS, parameters()))
+        else:
+            with pytest.raises(asyncio.CancelledError if outcome == "cancel" else gw.GatewayError):
+                await gw._verify_tcp_ready(gw._snapshot(ADDRESS, parameters()))
+        factory.assert_called_once_with(socket.AF_INET, socket.SOCK_STREAM)
+        connect.assert_awaited_once_with(sock, (ADDRESS, 502))
+        sock.setblocking.assert_called_once_with(False)
+        sock.__exit__.assert_called_once()
+        send.assert_not_awaited()
+        sock.send.assert_not_called()
+        sock.sendall.assert_not_called()
+
+    asyncio.run(asyncio.wait_for(run(), 3))
+
+
 @pytest.mark.parametrize("existing_auth", [False, True])
 @pytest.mark.parametrize(("error", "reason"), [
     (WaveshareAuthenticationRejectedError("TCP gateway rejected authentication"), "gateway_authentication_failed"),
@@ -329,7 +436,10 @@ def test_setup_distinguishes_password_rejection_from_unconfirmed_login(adapter, 
         # An enabled login is verified before any mutation; a failed new login
         # is restored to its original disabled setting before returning.
         assert len(adapter.writes) == (0 if existing_auth else 2)
-        assert login.await_count == 1
+        if existing_auth or isinstance(error, WaveshareAuthenticationRejectedError):
+            assert login.await_count == 1
+        else:
+            assert login.await_count > 1
 
     asyncio.run(asyncio.wait_for(run(), 3))
 

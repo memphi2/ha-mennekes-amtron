@@ -2,7 +2,10 @@
 
 ## Supported Release Line
 
-- `0.5.x`: active
+Security and compatibility fixes target the latest stable minor release line.
+The current release is listed on the [releases page](https://github.com/memphi2/ha-mennekes-amtron/releases/latest).
+Newer betas are available for testing; they do not replace the stable support
+line. Use the newest patch of the supported line before reporting a problem.
 
 The integration is maintained by [@memphi2](https://github.com/memphi2),
 also listed in its manifest and repository CODEOWNERS. Use
@@ -28,12 +31,11 @@ and bug reports; follow [the security policy](SECURITY.md) for vulnerabilities.
   with capability gating and untested
 - pymodbus: minimum `3.13.1`, declared as `pymodbus[serial]>=3.13.1`
 
-Home Assistant Core pins pymodbus exactly for the whole instance, and that pin
-moves between releases: every release in the supported range resolves
-`3.13.1`. An exact pin here would fight Core the moment that changes, so
+Home Assistant Core can pin pymodbus for the whole instance, and that pin
+can change between releases. An exact pin here would conflict with a newer Core pin, so
 `manifest.json` declares a minimum and lets Home Assistant own the resolved
-version. The floor is the oldest version any supported Home Assistant
-resolves to. `scripts/check_pymodbus_pin.py` enforces that the declared
+version. The floor is the oldest version in the validated minimum/latest
+environments. `scripts/check_pymodbus_pin.py` enforces that the declared
 minimum stays a minimum and stays at or below what the installed Home
 Assistant resolves to.
 
@@ -44,10 +46,8 @@ version too, so a future Core update cannot pass while tests still use the
 older development pin. The development requirements retain their baseline pin
 for local bootstrapping and dependency alerts.
 
-Core also ships `tmodbus` and `modbus-connection` next to pymodbus for its own
-`modbus` integration, so Core may be migrating away from pymodbus. That does
-not change anything here: if Core drops pymodbus, Home Assistant installs it
-for this integration alone.
+If Core no longer declares pymodbus, Home Assistant installs it for this
+integration using its declared minimum and Core's package constraints.
 
 
 ## Schema Validation
@@ -112,5 +112,5 @@ first.
 
 ## Maintenance Scope
 
-Security and compatibility fixes target the current minor release line only,
+Security and compatibility fixes target the current stable minor release line only,
 unless a release note states otherwise.

@@ -264,6 +264,10 @@ def test_service_restart_restores_pause_and_resume_current(tmp_path):
         {"token": "short"},
         {"token": "x" * 31 + " "},
         {"token": "ü" * 32},
+        {"token": "x" * 31 + "\x00"},
+        {"token": "x" * 31 + "\x1b"},
+        {"token": "x" * 31 + "\x7f"},
+        {"token": "x" * 8184},
         {"read_only": "false"},
         {"baudrate": 12345},
         {"device_id": 51},
@@ -283,6 +287,13 @@ def test_service_config_rejects_unsafe_or_malformed_options(values):
         base = {}
     with pytest.raises(ValueError, match=r"."):
         ServerConfig.from_dict(base)
+
+
+@pytest.mark.parametrize("size", [32, 8183])
+def test_service_token_accepts_valid_header_boundaries(size):
+    token = "!" + "x" * (size - 2) + "~"
+    config = ServerConfig.from_dict({"serial_port": "/dev/fake", "token": token})
+    assert config.token == token
 
 
 def test_service_config_defaults_and_credential_redaction():

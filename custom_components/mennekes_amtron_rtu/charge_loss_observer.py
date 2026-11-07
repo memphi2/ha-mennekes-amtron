@@ -29,9 +29,11 @@ from .charge_loss_const import (
 )
 from .device.charge_loss import LossStatistics
 from .device.charging_session import CompletedSession
+from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.registers import CP_STATE, EVSE_STATE
 from .device.vehicle import vehicle_connected
 from .exceptions import service_validation_error
+from .goal_store import _finish_atomic
 from .loss_store import LossStore
 from .vehicle_sources import loss_source, resolve_history_source
 
@@ -68,6 +70,12 @@ class ChargeLossObserver:
         self._auto = entry.options.get(CONF_LOSS_AUTO_MATCH, False)
         self._history_source = resolve_history_source(hass, entry.options) if self.mode == LOSS_SOURCE_VEHICLE_HISTORY else None
         self._source = self._history_source.source_key if self._history_source is not None else f"{self.mode}:{self._entity}"
+        self._source_ready = self.mode != LOSS_SOURCE_VEHICLE_HISTORY or (
+            self._history_source is not None and self._history_source.available
+        )
+        self._history_available = (
+            self._history_source is not None and self._history_source.available
+        )
         identity = entry.runtime_data.identity.serial_number or entry.entry_id
         self._store = LossStore(hass, entry.entry_id, identity)
         self.statistics = LossStatistics()
@@ -90,7 +98,8 @@ class ChargeLossObserver:
     @property
     def available(self) -> bool:
         return (
-            self._storage_ok and self._coordinator.current_data().session_summary_supported
+            self._storage_ok and self._source_ready
+            and self._coordinator.current_data().session_summary_supported
             and (self.mode != LOSS_SOURCE_VEHICLE_HISTORY or (
                 self._history_source is not None and self._history_source.available
             ))
@@ -117,7 +126,10 @@ class ChargeLossObserver:
             self._storage_ok = False
             self._storage_corrupt = True
             _LOGGER.warning("Charging-loss storage cannot be read; optional loss estimates are unavailable")
-        self.statistics.configure_source(self._source)
+        self._source_ready = self._configure_source()
+        self._history_available = (
+            self._history_source is not None and self._history_source.available
+        )
         self._unsubscribers.append(self._coordinator.async_add_listener(self._updated))
         if self.mode == LOSS_SOURCE_SENSOR and self._entity:
             self._unsubscribers.append(async_track_state_change_event(
@@ -129,6 +141,15 @@ class ChargeLossObserver:
         if self._task is not None:
             await asyncio.shield(self._task)
 
+    def _configure_source(self) -> bool:
+        """Wait for a real vehicle identity before replacing a saved aggregate."""
+        if self.mode == LOSS_SOURCE_VEHICLE_HISTORY:
+            if self._history_source is None or not self._history_source.available:
+                return False
+            self._source = self._history_source.source_key
+        self.statistics.configure_source(self._source)
+        return True
+
     @callback
     def _vehicle_changed(self, event: Event[EventStateChangedData]) -> None:
         old, new = vehicle_energy(event.data["old_state"]), vehicle_energy(event.data["new_state"])
@@ -138,12 +159,30 @@ class ChargeLossObserver:
 
     @callback
     def _history_changed(self) -> None:
+        available = self._history_source is not None and self._history_source.available
+        changed = available != self._history_available
+        self._history_available = available
+        if not self._source_ready:
+            self._updated(initial=True)
+        if changed:
+            # Device-registry changes do not necessarily alter the wallbox
+            # snapshot, so notify entities even when polling stays identical.
+            self._coordinator.async_update_listeners()
+        if not available:
+            return
+        if changed:
+            self._last_query = float("-inf")
         if time.monotonic() - self._last_query >= 30:
             self._query_history = True
             self._queue()
 
     @callback
     def _updated(self, *, initial: bool = False) -> None:
+        if not self._source_ready:
+            self._source_ready = self._configure_source()
+            if not self._source_ready:
+                return
+            initial = True
         data = self._coordinator.current_data()
         session = CompletedSession.parse(data.charging_session) if data.charging_session else None
         if session != self._session or initial:
@@ -163,7 +202,7 @@ class ChargeLossObserver:
 
     @callback
     def _queue(self) -> None:
-        if self._stopping or self._storage_corrupt:
+        if self._stopping or self._storage_corrupt or not self._source_ready:
             return
         self._pending = True
         if self._task is None or self._task.done():
@@ -182,6 +221,13 @@ class ChargeLossObserver:
                 try:
                     match = await self._history_source.async_match(session) if self._history_source is not None else None
                 except (HomeAssistantError, TimeoutError):
+                    match = None
+                except Exception as err:  # noqa: BLE001 - isolate third-party services
+                    # A third-party history service can fail with its own
+                    # exception types. Keep the wallbox and its setup usable;
+                    # the same bounded retry policy applies to this provider.
+                    # Do not log exception messages that may contain VINs.
+                    _LOGGER.warning("Vehicle charging history failed (%s)", type(err).__name__)
                     match = None
                 energy = match.vehicle_kwh if match is not None else None
                 association = "history"
@@ -220,8 +266,28 @@ class ChargeLossObserver:
 
     async def _save(self, candidate: LossStatistics) -> bool:
         self._last_storage_attempt = time.monotonic()
+
+        # The atomic store completes its write even when its caller is
+        # cancelled. Commit the corresponding in-memory snapshot as part of
+        # the same protected operation before cancellation reaches the caller.
+        await _finish_atomic(asyncio.create_task(self._save_and_publish(candidate)))
+        return self._storage_ok
+
+    async def _save_and_publish(self, candidate: LossStatistics) -> None:
         try:
             await self._store.async_save(candidate)
+        except (StorageCommitUncertainError, StorageStateUnknownError):
+            # The replacement is visible or its state could not be read.
+            # Retain the candidate for a retry and make estimates unavailable.
+            self.statistics = candidate
+            if self._storage_ok:
+                _LOGGER.warning("Charging-loss estimate could not be saved; retrying without affecting charging")
+            self._storage_ok = False
+            try:
+                self._coordinator.async_update_listeners()
+            except Exception:  # noqa: BLE001 - preserve the storage failure
+                _LOGGER.error("Unable to publish an uncertain charging-loss update")
+            return
         except (OSError, ValueError):
             if self._storage_ok:
                 _LOGGER.warning("Charging-loss estimate could not be saved; retrying without affecting charging")
@@ -233,7 +299,6 @@ class ChargeLossObserver:
             self._storage_ok = True
         if changed:
             self._coordinator.async_update_listeners()
-        return self._storage_ok
 
     async def async_assign(self) -> None:
         """Explicitly associate a last-energy value; never change charging state."""

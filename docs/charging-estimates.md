@@ -3,7 +3,7 @@
 These optional features are available in **stable 0.6.1**, including automatic
 tariff import and yearly refresh. For service connections,
 [update the app first](installation.md#updating-to-061).
-The setup steps below follow the separate menus in **beta 0.7.0b3**.
+The setup steps below follow the separate menus in **beta 0.7.0b4**.
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure**, then **Charging costs** or **Charging losses**.
@@ -37,6 +37,10 @@ estimated charging loss**. The average weights each accepted charge by energy:
 For example, 10 kWh at the wallbox and 9 kWh reaching the battery gives 10%.
 Correcting the latest assignment replaces that sample instead of adding it twice.
 Changing the selected vehicle or source starts a new average.
+
+If a selected vehicle is temporarily missing from Home Assistant, its loss
+estimates become unavailable while the saved history is retained. They resume
+when the same vehicle identity becomes available again.
 
 The vehicle value must describe **energy entering the battery**. A vehicle's
 AC-input or grid-energy value is a different measurement boundary and does not
@@ -155,7 +159,7 @@ these values and the **price-includes-network** switch before saving.
 
 If a price sheet is marked **provisional**, the form marks its source link
 accordingly. Provisional figures may change. They are never saved without
-your review and confirmation of the options flow.
+your review and confirmation during this manual import.
 
 The source is incomplete and some sheets use different windows in different
 quarters. In those cases the form stays editable for manual entry; it does
@@ -173,8 +177,8 @@ available, it retries once a day; cost estimates remain unknown for that year
 until a valid tariff is found. A provisional sheet may be applied and is logged
 as provisional. The next final sheet is not silently substituted during the
 same year; import again to review changes. The annual update changes only
-the cost model and does not restart the Modbus connection or add Recorder
-history.
+the cost model and does not restart the Modbus connection or create a tariff
+history. Updated cost estimates still follow your normal Recorder settings.
 
 If **Electricity price already includes the regular network price** is enabled,
 the regular component is subtracted before the selected module's component is added.

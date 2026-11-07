@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 from .capabilities import supported_blocks
 from .client import MennekesModbusClient
-from .client_errors import AmtronBusError, AmtronConnectionError
+from .client_errors import AmtronBusError, AmtronConnectionError, AmtronProtocolError
 from .const import DEFAULT_MEASUREMENT_INTERVAL_SECONDS
 from .data import ConnectionState, DeviceIdentity, WallboxData
 from .decode import RegisterValue
@@ -82,6 +82,7 @@ class DevicePoller:
         read: dict[str, RegisterValue] = {}
         failed = set(previous.failed_blocks)
         stale: list[str] = []
+        answered = False
         # Read status first: a plug/start/stop transition must refresh the
         # measurements and final energy counters in this same poll.
         order = {BlockCadence.FAST: 0, BlockCadence.ACTIVE: 1, BlockCadence.SLOW: 2}
@@ -120,6 +121,9 @@ class DevicePoller:
                 raise
             except AmtronBusError as err:
                 failed.add(block.name)
+                # A valid Modbus exception proves the device answered even
+                # though it did not supply this block's data.
+                answered |= isinstance(err, AmtronProtocolError) and err.exception_code is not None
                 # Carrying a block forward is only right while it was not due.
                 # A block that was read and failed has no current value, and a
                 # frozen measurement an automation still believes is worse than
@@ -140,7 +144,10 @@ class DevicePoller:
                 else:
                     self._block_retries.pop(block.name, None)
         if not read:
-            raise AmtronConnectionError("no register block could be read")
+            error = AmtronConnectionError("no register block could be read")
+            if not answered:
+                self._log_unavailable(error)
+            raise error
         if slow_due:
             self._slow_read_at = self._monotonic()
         if active_due:

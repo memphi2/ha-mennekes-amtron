@@ -5,7 +5,7 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
-The setup instructions below follow **beta 0.7.0b3** and its separate feature
+The setup instructions below follow **beta 0.7.0b4** and its separate feature
 menus. **0.6.1 remains the stable release.** Optional charging targets,
 departure planning, loss/cost estimates and command-result events are described here. For service
 connections, [update the app first](installation.md#updating-to-061).

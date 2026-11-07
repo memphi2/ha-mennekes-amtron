@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from pymodbus.exceptions import ModbusIOException
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
@@ -20,10 +21,43 @@ from custom_components.mennekes_amtron_rtu.device.register_blocks import (
     REGISTER_BLOCKS,
     BlockCadence,
 )
+from custom_components.mennekes_amtron_rtu.device.runtime_events import EventTimeline
 from tests.fakes import put, raise_connection_error
 from tests.test_control import Harness
 from tests.test_energy_goal_controller import _runner, _settle
 from tests.test_modbus_service import current_writes
+
+
+@pytest.mark.parametrize("failure", ["timeout", "device_exception", "mixed"])
+def test_all_failed_reads_distinguish_missing_replies_from_device_exceptions(failure):
+    async def run():
+        h = Harness()
+        await h.connect()
+        state = ConnectionState()
+        timeline = EventTimeline()
+        poller = DevicePoller(h.client, h.identity, connection_state=state, timeline=timeline)
+        data = await poller.async_poll(WallboxData(), last_success=True)
+        failure_response = 4 if failure == "device_exception" else ModbusIOException("No response received")
+        h.transport.read_exceptions.update({block.address: failure_response for block in REGISTER_BLOCKS})
+        if failure == "mixed":
+            h.transport.read_exceptions[R.EVSE_STATE.address] = 4
+
+        for _ in range(2):
+            with pytest.raises(AmtronConnectionError, match="no register block"):
+                await poller.async_poll(data, last_success=False)
+        assert state.available is (failure != "timeout")
+        assert [row["event"] for row in timeline.snapshot()] == (
+            ["connection_lost"] if failure == "timeout" else []
+        )
+
+        h.transport.read_exceptions.clear()
+        await poller.async_poll(data, last_success=False)
+        assert state.available
+        assert [row["event"] for row in timeline.snapshot()] == (
+            ["connection_lost", "connection_recovered"] if failure == "timeout" else []
+        )
+
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize("state", [EvseState.IDLE, EvseState.CHARGING])

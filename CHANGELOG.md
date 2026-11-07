@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.7.0b4 — 2026-11-07
+
+Beta update of the integration and app; **0.6.1 remains stable**.
+
+- Keep energy, vehicle-percentage and departure targets consistent through
+  cancelled saves, including time spent waiting for another storage operation.
+- Distinguish failed storage from an already replaced file with unconfirmed
+  durability; stop target-controlled starts when the saved state is unknown.
+- Isolate optional vehicle-history failures from wallbox setup and keep charging
+  loss assignments consistent when their save is interrupted.
+- Preserve an entered adapter password while re-reading the same endpoint;
+  reject invalid adapter settings before stopping the existing connection.
+- Preserve selected adapter settings when the app reads the device again;
+  clarify connection-only login versus changing the adapter in all five languages.
+- Wait for the adapter's TCP listener after applying settings, with bounded
+  retries and immediate password rejection; log setup and restoration stages.
+- Recheck live wallbox state immediately before restart and phase writes,
+  including a vehicle disconnecting and reconnecting during the operation.
+- Keep saved targets and charging intent ordered when shutdown or a cancelled
+  request interrupts the same storage operation more than once.
+- Preserve charging-loss history while a vehicle identity is temporarily
+  unavailable; prevent costs from carrying over into a different plug cycle.
+- Reject unusable service tokens and detect concurrent Supervisor edits before
+  saving the app's connection settings.
+- Report complete polling failures without treating valid Modbus exceptions
+  as a lost connection.
+- Verify installed app catalog files as well as release metadata; remove an
+  unused release flag and correct support and configuration documentation.
+
 ## 0.7.0b3 — 2026-11-07
 
 Beta update of the integration and app; **0.6.1 remains stable**. This includes

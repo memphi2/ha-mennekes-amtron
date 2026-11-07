@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import atomicwrites
 import pytest
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 
+from custom_components.mennekes_amtron_rtu import goal_store
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
     CONF_LOSS_AUTO_MATCH,
@@ -225,6 +228,40 @@ def test_history_uses_public_adapter_retries_and_does_not_call_on_each_poll(tmp_
     asyncio.run(run())
 
 
+def test_provider_exception_during_setup_does_not_block_wallbox_and_retries(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        coordinator.complete()
+        callbacks = []
+
+        def schedule(_hass, delay, callback):
+            callbacks.append((delay, callback))
+            return lambda: None
+
+        with (
+            patch(
+                "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history",
+                new=AsyncMock(side_effect=[ValueError("private vehicle data"), HistoryMatch(8, 1)]),
+            ),
+            patch("custom_components.mennekes_amtron_rtu.charge_loss_observer.async_call_later", side_effect=schedule),
+        ):
+            try:
+                await observer.async_start()
+                assert observer.statistics.last_loss_percent is None
+                assert callbacks[0][0] == 60
+                assert "ValueError" in caplog.text
+                assert "private vehicle data" not in caplog.text
+                callbacks[0][1](None)
+                await hass.async_block_till_done()
+                assert observer.statistics.last_loss_percent == pytest.approx(20)
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+
+    asyncio.run(run())
+
+
 def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
@@ -261,6 +298,108 @@ def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path)
         finally:
             await observer.async_stop()
             await hass.async_stop()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", ["file_sync", "directory_sync"])
+def test_assignment_sync_failure_keeps_visible_aggregate_and_reports_failure(tmp_path, monkeypatch, failure):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        try:
+            await observer.async_start()
+            coordinator.complete()
+            await hass.async_block_till_done()
+            hass.states.async_set("sensor.car_energy", "8", {"unit_of_measurement": "kWh"})
+
+            def fail(*_args):
+                raise OSError("injected fsync failure")
+
+            with monkeypatch.context() as scope:
+                scope.setattr(atomicwrites, "_proper_fsync" if failure == "file_sync" else "_sync_directory", fail)
+                with pytest.raises(ServiceValidationError) as error:
+                    await observer.async_assign()
+                assert error.value.translation_key == "loss_storage_unavailable"
+            visible = await observer._store.async_load()
+            assert observer.statistics.snapshot() == visible.snapshot()
+            assert observer.statistics.sample_count == (1 if failure == "directory_sync" else 0)
+            assert not observer.available
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_unknown_assignment_is_unavailable_until_pending_candidate_is_saved(tmp_path, monkeypatch):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        try:
+            await observer.async_start()
+            coordinator.complete()
+            await hass.async_block_till_done()
+            hass.states.async_set("sensor.car_energy", "8", {"unit_of_measurement": "kWh"})
+
+            def fail(*_args):
+                raise OSError("injected failure")
+
+            with monkeypatch.context() as scope:
+                scope.setattr(atomicwrites, "_sync_directory", fail)
+                scope.setattr(observer._store, "_validate_file", fail)
+                with pytest.raises(ServiceValidationError) as error:
+                    await observer.async_assign()
+                assert error.value.translation_key == "loss_storage_unavailable"
+            assert not observer.available
+            assert observer.statistics.last_loss_percent == pytest.approx(20)
+            observer._last_storage_attempt -= 61
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert observer.available
+            assert (await observer._store.async_load()).snapshot() == observer.statistics.snapshot()
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("cancel_count", [1, 2])
+def test_cancelled_assignment_keeps_memory_and_durable_loss_in_sync(tmp_path, monkeypatch, cancel_count):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        started, release = threading.Event(), threading.Event()
+        writer = goal_store.write_utf8_file_atomic
+
+        def delayed(*args, **kwargs):
+            started.set()
+            assert release.wait(5)
+            writer(*args, **kwargs)
+
+        try:
+            await observer.async_start()
+            coordinator.complete()
+            await hass.async_block_till_done()
+            hass.states.async_set("sensor.car_energy", "8", {"unit_of_measurement": "kWh"})
+            monkeypatch.setattr(goal_store, "write_utf8_file_atomic", delayed)
+            task = asyncio.create_task(observer.async_assign())
+            try:
+                assert await asyncio.to_thread(started.wait, 5)
+                for _ in range(cancel_count):
+                    task.cancel()
+                    await asyncio.sleep(0)
+            finally:
+                release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert observer.statistics.last_loss_percent == pytest.approx(20)
+            assert (await observer._store.async_load()).snapshot() == observer.statistics.snapshot()
+        finally:
+            release.set()
+            await observer.async_stop()
+            await hass.async_stop()
+
     asyncio.run(run())
 
 
@@ -399,6 +538,65 @@ def test_generic_history_selection_keeps_the_existing_average_after_reload(tmp_p
             if replacement is not None:
                 await replacement.async_stop()
             await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_temporarily_missing_history_vehicle_preserves_statistics_and_recovers(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        original, coordinator = build(hass, "bavariandata")
+        replacement = None
+        with patch(
+            "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history",
+            return_value=HistoryMatch(8, 1),
+        ) as read:
+            try:
+                await original.async_start()
+                coordinator.complete(energy=10)
+                await hass.async_block_till_done()
+                expected = original.statistics.snapshot()
+                assert original.statistics.sample_count == 1
+                await original.async_stop()
+                saved = original._store.path.read_bytes()
+
+                # The selected HA device is temporarily absent/invalid on restart.
+                hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "account-entry")})
+                replacement, replacement_coordinator = build(hass, "bavariandata")
+                replacement_coordinator.data = coordinator.data
+                await replacement.async_start()
+                assert not replacement.available
+                assert replacement.statistics.snapshot() == expected
+                assert original._store.path.read_bytes() == saved
+                assert read.await_count == 1
+
+                # A registry event recovers even when identical wallbox polls
+                # do not notify coordinator listeners.
+                hass.data[dr.DATA_REGISTRY] = vehicle_registry()
+                hass.bus.async_fire(dr.EVENT_DEVICE_REGISTRY_UPDATED, {"device_id": "car-device", "action": "create"})
+                await hass.async_block_till_done()
+                assert replacement.available
+                assert replacement.statistics.sample_count == 1
+                assert replacement.statistics.average_loss_percent == pytest.approx(20)
+                assert replacement.statistics.source == expected["source"]
+
+                # The same registry ID acquiring another VIN cannot rebind the
+                # live observer or replace the established statistics.
+                before_rebind = replacement.statistics.snapshot()
+                hass.data[dr.DATA_REGISTRY] = vehicle_registry(identifiers={("bavariandata", "WBA98765432109876")})
+                hass.bus.async_fire(dr.EVENT_DEVICE_REGISTRY_UPDATED, {"device_id": "car-device", "action": "update"})
+                await hass.async_block_till_done()
+                assert not replacement.available
+                assert replacement.statistics.snapshot() == before_rebind
+                hass.data[dr.DATA_REGISTRY] = vehicle_registry()
+                hass.bus.async_fire(dr.EVENT_DEVICE_REGISTRY_UPDATED, {"device_id": "car-device", "action": "update"})
+                await hass.async_block_till_done()
+                assert replacement.available
+                assert replacement.statistics.source == expected["source"]
+            finally:
+                await original.async_stop()
+                if replacement is not None:
+                    await replacement.async_stop()
+                await hass.async_stop()
     asyncio.run(run())
 
 

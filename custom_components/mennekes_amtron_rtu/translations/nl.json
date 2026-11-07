@@ -61,16 +61,16 @@
       },
       "serial": {
         "data": {
-          "baudrate": "Baudrate",
+          "baudrate": "Seriële snelheid (baudrate)",
           "device_id": "Modbus-apparaatadres",
-          "frame": "Frame",
+          "frame": "Serieel gegevensformaat",
           "port": "Seriële poort",
           "search": "Als deze waarden niet werken"
         },
         "data_description": {
-          "baudrate": "De fabrieksinstelling is 57600.",
+          "baudrate": "Moet overeenkomen met de instelling van de laadpaal. De fabrieksinstelling is 57600 baud.",
           "device_id": "De fabrieksinstelling is 50. Adressen van 10 tot 50 kunnen worden ingesteld met de MENNEKES-configuratietool.",
-          "frame": "De documentatie van de wallbox vermeldt precies deze drie combinaties. De fabrieksinstelling is 8 databits, geen pariteit en 2 stopbits.",
+          "frame": "Databits, pariteit en stopbits moeten overeenkomen met de laadpaal. De fabrieksinstelling is 8N2.",
           "port": "Pad van de USB-RS-485-adapter. Gebruik bij voorkeur een /dev/serial/by-id-pad: /dev/ttyUSB0 kan na een herstart veranderen.",
           "search": "Het apparaatadres en de businstellingen kunnen worden gewijzigd met de MENNEKES-configuratietool. Bij een bestaande installatie kunnen ze daarom afwijken. Zoeken verstuurt leesverzoeken. Gebruik dit alleen op een bus zonder een andere Modbus-master."
         },
@@ -79,16 +79,16 @@
       },
       "serial_reconfigure": {
         "data": {
-          "baudrate": "Baudrate",
+          "baudrate": "Seriële snelheid (baudrate)",
           "device_id": "Modbus-apparaatadres",
-          "frame": "Frame",
+          "frame": "Serieel gegevensformaat",
           "port": "Seriële poort",
           "search": "Als deze waarden niet werken"
         },
         "data_description": {
-          "baudrate": "De fabrieksinstelling is 57600.",
+          "baudrate": "Moet overeenkomen met de instelling van de laadpaal. De fabrieksinstelling is 57600 baud.",
           "device_id": "De fabrieksinstelling is 50. Adressen van 10 tot 50 kunnen worden ingesteld met de MENNEKES-configuratietool.",
-          "frame": "De documentatie van de wallbox vermeldt precies deze drie combinaties. De fabrieksinstelling is 8 databits, geen pariteit en 2 stopbits.",
+          "frame": "Databits, pariteit en stopbits moeten overeenkomen met de laadpaal. De fabrieksinstelling is 8N2.",
           "port": "Pad van de USB-RS-485-adapter. Gebruik bij voorkeur een /dev/serial/by-id-pad: /dev/ttyUSB0 kan na een herstart veranderen.",
           "search": "Het apparaatadres en de businstellingen kunnen worden gewijzigd met de MENNEKES-configuratietool. Bij een bestaande installatie kunnen ze daarom afwijken. Zoeken verstuurt leesverzoeken. Gebruik dit alleen op een bus zonder een andere Modbus-master."
         },
@@ -115,10 +115,10 @@
         "description": "Verbind een ondersteunde RTU-wallbox via een Ethernet-RS-485-adapter. Kies transparant RTU over TCP of een gateway die Modbus TCP naar RTU vertaalt. Stel baudrate en frame in op de adapter. Gebruik een vertrouwd privénetwerk en exclusieve toegang tot de bus. Geteste registerindeling: {validated_layout}.",
         "data": {
           "connection_type": "Verbindingsprotocol",
-          "host": "Adapterhost",
+          "host": "IP-adres of hostnaam van de adapter",
           "tcp_port": "TCP-poort van adapter",
           "device_id": "Modbus-apparaatadres",
-          "tcp_authentication": "TCP-aanmelding",
+          "tcp_authentication": "Verbinden met TCP-aanmelding",
           "configure_gateway": "LAN-adapter instellen"
         },
         "data_description": {
@@ -126,8 +126,8 @@
           "host": "Hostnaam of IP-adres van de LAN-adapter, zonder http:// of URL-pad.",
           "tcp_port": "TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.",
           "device_id": "Adres van de wallbox achter de adapter; standaard 50, ondersteund bereik 10–50.",
-          "tcp_authentication": "Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
-          "configure_gateway": "Lees de instellingen van deze adapter en controleer wijzigingen voordat ze worden toegepast. Alleen ondersteunde modellen en firmware kunnen hier worden ingesteld."
+          "tcp_authentication": "Gebruikt de aanmelding die al op de adapter is ingeschakeld. Deze schakelaar alleen schakelt deze niet in op de adapter; kies “LAN-adapter instellen” om die instelling te wijzigen. Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
+          "configure_gateway": "Herkent een compatibele adapter. Daarna kun je de TCP-aanmelding, seriële snelheid, het gegevensformaat, verbindingsprotocol en de TCP-poort instellen. Controleer de waarden op de volgende pagina voordat je ze opslaat."
         }
       },
       "network_reconfigure": {
@@ -135,10 +135,10 @@
         "description": "Verbind een ondersteunde RTU-wallbox via een Ethernet-RS-485-adapter. Kies transparant RTU over TCP of een gateway die Modbus TCP naar RTU vertaalt. Stel baudrate en frame in op de adapter. Gebruik een vertrouwd privénetwerk en exclusieve toegang tot de bus. Geteste registerindeling: {validated_layout}.",
         "data": {
           "connection_type": "Verbindingsprotocol",
-          "host": "Adapterhost",
+          "host": "IP-adres of hostnaam van de adapter",
           "tcp_port": "TCP-poort van adapter",
           "device_id": "Modbus-apparaatadres",
-          "tcp_authentication": "TCP-aanmelding",
+          "tcp_authentication": "Verbinden met TCP-aanmelding",
           "configure_gateway": "LAN-adapter instellen"
         },
         "data_description": {
@@ -146,8 +146,8 @@
           "host": "Hostnaam of IP-adres van de LAN-adapter, zonder http:// of URL-pad.",
           "tcp_port": "TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.",
           "device_id": "Adres van de wallbox achter de adapter; standaard 50, ondersteund bereik 10–50.",
-          "tcp_authentication": "Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
-          "configure_gateway": "Lees de instellingen van deze adapter en controleer wijzigingen voordat ze worden toegepast. Alleen ondersteunde modellen en firmware kunnen hier worden ingesteld."
+          "tcp_authentication": "Gebruikt de aanmelding die al op de adapter is ingeschakeld. Deze schakelaar alleen schakelt deze niet in op de adapter; kies “LAN-adapter instellen” om die instelling te wijzigen. Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
+          "configure_gateway": "Herkent een compatibele adapter. Daarna kun je de TCP-aanmelding, seriële snelheid, het gegevensformaat, verbindingsprotocol en de TCP-poort instellen. Controleer de waarden op de volgende pagina voordat je ze opslaat."
         }
       },
       "reauth_confirm": {
@@ -166,20 +166,25 @@
         "description": "Voer het huidige webwachtwoord van je compatibele adapter in. De verbinding wordt gecontroleerd zonder instellingen of wachtwoord te wijzigen. Gebruik 1–9 afdrukbare ASCII-tekens zonder spaties. Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
         "data": {
           "tcp_auth_password": "Huidig webwachtwoord van de adapter"
+        },
+        "data_description": {
+          "tcp_auth_password": "Het wachtwoord van de eigen webinterface van de adapter, geen Home Assistant-wachtwoord of app-toegangstoken. TCP-aanmelding accepteert 1–9 afdrukbare ASCII-tekens zonder spaties."
         }
       },
       "network_adapter": {
         "title": "LAN-adapter instellen",
         "description": "Herkend: **{model}**, firmware **{firmware}**. Huidige instellingen: **{baudrate} baud, {frame}**, TCP-poort **{tcp_port}**.\n\nBevestigen past het protocol en de TCP-poort van de vorige pagina toe, samen met onderstaande instellingen. Daarna wordt de identiteit van de laadpaal gecontroleerd. Bij een fout worden de oude instellingen hersteld als de adapter bereikbaar is. Het huidige webwachtwoord wordt niet gewijzigd. Ook wordt de passieve TCP-servermodus ingesteld. Eigen Modbus-uitlezing/cache, flowcontrole, verbindingsvoorvoegsels, herhalen van gebufferde seriële gegevens, automatische parameteruploads en door gegevens geactiveerde herstarts worden uitgeschakeld.",
         "data": {
-          "baudrate": "Baudrate",
-          "frame": "Frame",
-          "tcp_authentication": "TCP-aanmelding",
+          "baudrate": "Seriële snelheid (baudrate)",
+          "frame": "Serieel gegevensformaat",
+          "tcp_authentication": "TCP-aanmelding op de adapter inschakelen",
           "tcp_auth_password": "Huidig webwachtwoord van de adapter"
         },
         "data_description": {
-          "tcp_authentication": "Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
-          "tcp_auth_password": "Voer het huidige webwachtwoord in als er een is ingesteld. TCP-aanmelding vereist 1–9 afdrukbare ASCII-tekens zonder spaties. Het wachtwoord wordt alleen opgeslagen als TCP-aanmelding is ingeschakeld."
+          "tcp_authentication": "Opslaan schakelt de aanmelding op de adapter in of uit en past de verbinding van deze integratie aan. Het huidige webwachtwoord van de adapter wordt gebruikt; er wordt geen wachtwoord aangemaakt of gewijzigd. Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
+          "tcp_auth_password": "Voer het huidige webwachtwoord in als er een is ingesteld. TCP-aanmelding vereist 1–9 afdrukbare ASCII-tekens zonder spaties. Het wachtwoord wordt alleen opgeslagen als TCP-aanmelding is ingeschakeld.",
+          "baudrate": "Moet overeenkomen met de instelling van de laadpaal. De fabrieksinstelling is 57600 baud.",
+          "frame": "Databits, pariteit en stopbits moeten overeenkomen met de laadpaal. De fabrieksinstelling is 8N2."
         }
       },
       "network_reauth": {
@@ -187,6 +192,9 @@
         "description": "Voer het huidige webwachtwoord van je compatibele adapter in. De verbinding wordt gecontroleerd zonder instellingen of wachtwoord te wijzigen. Gebruik 1–9 afdrukbare ASCII-tekens zonder spaties. Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
         "data": {
           "tcp_auth_password": "Huidig webwachtwoord van de adapter"
+        },
+        "data_description": {
+          "tcp_auth_password": "Het wachtwoord van de eigen webinterface van de adapter, geen Home Assistant-wachtwoord of app-toegangstoken. TCP-aanmelding accepteert 1–9 afdrukbare ASCII-tekens zonder spaties."
         }
       }
     }

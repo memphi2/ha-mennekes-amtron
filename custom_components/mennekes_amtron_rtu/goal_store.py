@@ -14,6 +14,7 @@ from homeassistant.util.file import WriteError, write_utf8_file_atomic
 from .device.charging_session import SessionHistory
 from .device.const import DOMAIN
 from .device.energy_goal import EnergyGoal
+from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.soc_goal import SocGoal
 from .timed_goal import TimedGoal
 
@@ -25,6 +26,22 @@ class _GoalModel(Protocol):
 
     @classmethod
     def restore(cls, raw: object) -> Self: ...
+
+
+async def _finish_atomic(task: asyncio.Task[None]) -> None:
+    """Keep the storage lock until the executor has really finished."""
+    try:
+        await asyncio.shield(task)
+    except asyncio.CancelledError:
+        # Repeated cancellation must not cancel the executor's owning task:
+        # the thread would continue while a newer file operation starts.
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                continue
+        task.result()
+        raise
 
 
 class ModelStore[Goal: _GoalModel]:
@@ -42,13 +59,14 @@ class ModelStore[Goal: _GoalModel]:
         self.path = Path(hass.config.path(STORAGE_DIR, self._key))
         self._lock = asyncio.Lock()
         self._last: dict[str, Any] | None = None
+        self._write_unconfirmed = False
 
     async def async_load(self) -> Goal:
         """Read durable state without moving corrupt files aside or caching them."""
         async with self._lock:
             payload = await self._hass.async_add_executor_job(self._validate_file)
             goal = self._validate_payload(payload) if payload is not None else self._model()
-            self._last = payload
+            self._last = None if self._write_unconfirmed else payload
             return goal
 
     def _validate_file(self) -> dict[str, Any] | None:
@@ -92,16 +110,31 @@ class ModelStore[Goal: _GoalModel]:
         async with self._lock:
             if payload == self._last:
                 return
-            saving = asyncio.create_task(self._async_write(payload))
-            try:
-                await asyncio.shield(saving)
-            except asyncio.CancelledError:
-                await saving
-                raise
+            await _finish_atomic(asyncio.create_task(self._async_write(payload)))
 
     async def _async_write(self, payload: dict[str, Any]) -> None:
-        await self._hass.async_add_executor_job(self._write, payload)
+        try:
+            await self._hass.async_add_executor_job(self._write, payload)
+        except OSError as err:
+            # A rename can succeed before the directory sync fails. Invalidate
+            # even the previous cache: the file may have changed, including
+            # when it cannot be read back. This task stays shielded throughout
+            # classification, with the store lock held.
+            self._last = None
+            self._write_unconfirmed = True
+            try:
+                visible = await self._hass.async_add_executor_job(self._validate_file)
+            except (OSError, ValueError) as read_error:
+                raise StorageStateUnknownError(
+                    f"{self._label} could not be verified after a failed save"
+                ) from read_error
+            if visible == payload:
+                raise StorageCommitUncertainError(
+                    f"{self._label} replaced but its durability is uncertain"
+                ) from err
+            raise
         self._last = payload
+        self._write_unconfirmed = False
 
     def _write(self, payload: dict[str, Any]) -> None:
         # Store.async_save can defer until FINAL_WRITE during shutdown and
@@ -119,8 +152,12 @@ class ModelStore[Goal: _GoalModel]:
     async def async_remove(self) -> None:
         """Remove obsolete local intent after removal or service takeover."""
         async with self._lock:
-            await self._hass.async_add_executor_job(lambda: self.path.unlink(missing_ok=True))
-            self._last = None
+            await _finish_atomic(asyncio.create_task(self._async_remove()))
+
+    async def _async_remove(self) -> None:
+        await self._hass.async_add_executor_job(lambda: self.path.unlink(missing_ok=True))
+        self._last = None
+        self._write_unconfirmed = False
 
 
 class GoalStore(ModelStore[EnergyGoal]):

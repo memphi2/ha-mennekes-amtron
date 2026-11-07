@@ -11,6 +11,11 @@ from copy import copy
 from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .control import AmtronControl
 from .errors import DeviceError, validation_error
+from .persistence import (
+    StorageCommitUncertainError,
+    StorageStateUnknownError,
+    finish_goal_save,
+)
 from .soc_goal import SocGoal, percentage
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,6 +41,7 @@ class SocGoalController:
         self._dirty = False
         self._stopping = False
         self._failure_logged = False
+        self._storage_unknown = False
         control.soc_goal_controller = self
 
     @property
@@ -44,11 +50,20 @@ class SocGoalController:
 
     @property
     def stop_requested(self) -> bool:
-        return self.model.stop_requested or (
+        return self._storage_unknown or self.model.stop_requested or (
             self._pending is not None
             and self._pending_generation == self._control.write_state.soc_goal_generation
             and self._pending.stop_requested
         )
+
+    async def _save_state(self) -> None:
+        """Fence an unknown disk state until any later save succeeds."""
+        try:
+            await self._persist()
+        except StorageStateUnknownError:
+            self._storage_unknown = True
+            raise
+        self._storage_unknown = False
 
     async def async_configure_source(self, source: str | None) -> None:
         async with self._control.energy_goal_guard:
@@ -92,14 +107,41 @@ class SocGoalController:
         self._pending = None
         self._pending_soc = self._pending_maximum = None
         try:
-            await self._persist()
+            await finish_goal_save(self._save_state())
             self._dirty = False
+            self._storage_unknown = False
         except asyncio.CancelledError:
-            if self._control.goal_controller is not None:
-                await self._control.goal_controller.async_cancel_recovery_locked()
-            self.retry_stop()
-            self._changed()
+            self._storage_unknown = False
+            try:
+                if self._control.goal_controller is not None:
+                    await self._control.goal_controller.async_cancel_recovery_locked()
+            finally:
+                # Recovery persistence can itself be cancelled. A committed
+                # reached target must still arrange its stop before we exit.
+                self.retry_stop()
+                self._changed()
             raise
+        except (StorageCommitUncertainError, StorageStateUnknownError) as err:
+            # The visible candidate has not completed a durable directory
+            # sync. Retry it even when the goal is active or disabled.
+            self._dirty = True
+            if isinstance(err, StorageStateUnknownError):
+                self._storage_unknown = True
+            try:
+                if self._control.goal_controller is not None:
+                    await finish_goal_save(
+                        self._control.goal_controller.async_cancel_recovery_locked()
+                    )
+            except asyncio.CancelledError:
+                # The completed recovery cancellation does not supersede the
+                # already reported uncertainty of the target save.
+                pass
+            except Exception as recovery_error:  # noqa: BLE001 - retain the original storage error
+                _LOGGER.error("Cannot cancel goal recovery (%s)", type(recovery_error).__name__)
+            finally:
+                self.retry_stop()
+                self._changed()
+            raise err
         except Exception:
             restored = copy(pending or original)
             if candidate.source == original.source:
@@ -152,8 +194,12 @@ class SocGoalController:
             self._dirty |= changed
             try:
                 if self._dirty:
-                    await self._persist()
+                    await self._save_state()
                     self._dirty = False
+                    self._storage_unknown = False
+            except StorageStateUnknownError:
+                self._storage_unknown = True
+                raise
             finally:
                 if changed:
                     self._changed()
@@ -176,9 +222,12 @@ class SocGoalController:
                         state.soc_goal = self._pending
                         self._pending = None
                     try:
-                        await self._persist()
+                        await self._save_state()
                         self._dirty = False
+                        self._storage_unknown = False
                     except (OSError, RuntimeError, ValueError) as err:
+                        if isinstance(err, StorageStateUnknownError):
+                            self._storage_unknown = True
                         if not self._failure_logged:
                             _LOGGER.error("Cannot save percentage goal stop (%s)", type(err).__name__)
                             self._failure_logged = True
@@ -223,7 +272,7 @@ class SocGoalController:
                 self._control.write_state.soc_goal = pending
             if self._dirty:
                 try:
-                    await self._persist()
+                    await self._save_state()
                     self._dirty = False
                 except (OSError, RuntimeError, ValueError) as err:
                     _LOGGER.error("Cannot save percentage goal on shutdown (%s)", type(err).__name__)
