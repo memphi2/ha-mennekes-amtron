@@ -327,6 +327,29 @@ them. The histories omit packet contents, write values and arbitrary exception
 messages. Diagnostics omit identifying register fields, the serial number and
 full serial-port path.
 
+### Watch app Modbus communication live
+
+In the app, select **Open Web UI → Live Modbus communication**, then enable
+**Capture communication for 10 minutes**. This is optional and off after every
+app restart. It shows existing reads, writes and heartbeats, register addresses,
+decoded values, transaction durations and confirmed or failed responses. Each
+retry is a separate row. A failed write shows the requested value; it does not
+confirm that the wallbox applied it. Register names and enum identifiers follow
+the Modbus register map.
+
+The app keeps only the latest **200 transactions in RAM** and automatically
+stops and erases the capture after **10 minutes**, even when the browser closes.
+Switching capture off also erases it; **Clear entries** clears the view without
+extending the deadline. Closing the panel or hiding the browser tab stops UI
+updates while capture continues until its deadline. Capture produces no extra
+Modbus requests, Recorder history or log files. Serial numbers and all text
+registers are masked, including inside block reads; network login traffic and
+exception-message contents are never captured.
+
+This view requires the app's administrator-only ingress page and a configured
+connection. It remains available when that connection is failing. Direct-mode
+integration users can use the diagnostics described above.
+
 ## Getting help
 
 Include the integration, app (if used) and Home Assistant versions; wallbox

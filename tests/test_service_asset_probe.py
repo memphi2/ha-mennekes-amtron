@@ -58,6 +58,8 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
 @pytest.mark.parametrize(("remote", "path", "method"), [
     ("192.0.2.1", "/", "GET"), ("127.0.0.1", "/api/config", "GET"),
     ("127.0.0.1", "/", "POST"),
+    ("127.0.0.1", "/api/modbus-debug", "GET"),
+    ("127.0.0.1", "/api/modbus-debug", "POST"),
 ])
 def test_probe_guard_never_allows_remote_clients_or_configuration(remote, path, method):
     async def run():

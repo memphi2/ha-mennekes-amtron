@@ -210,6 +210,153 @@ const messages = {
   }
 };
 
+// Live diagnostics use the same supported interface languages.
+Object.assign(messages.en, {
+  "debug_title": "Live Modbus communication",
+  "debug_hint": "Optional troubleshooting: observe existing reads, writes and heartbeats for up to 10 minutes. Only the latest 200 entries stay in memory; nothing is stored in the Home Assistant database or log files.",
+  "debug_enable": "Capture communication for 10 minutes",
+  "debug_off": "Capture is off. Switching it off erases all entries.",
+  "debug_on": "Capture active — seconds remaining:",
+  "debug_privacy": "Serial numbers and text registers are hidden. Network login traffic is never captured. Closing this panel stops updates; capture continues until switched off or automatically expired.",
+  "debug_clear": "Clear entries",
+  "debug_records": "Latest transactions, newest first",
+  "debug_time": "Time (UTC)",
+  "debug_operation": "Operation",
+  "debug_registers": "Registers and decoded values",
+  "debug_duration": "Duration",
+  "debug_result": "Result",
+  "debug_unavailable": "Configure the wallbox connection and restart the app to use live communication capture.",
+  "debug_failed": "Communication capture could not be read or changed. Close and reopen this panel to check its current state; an active capture still expires automatically.",
+  "debug_read": "Read",
+  "debug_write": "Write",
+  "debug_heartbeat": "Heartbeat",
+  "debug_ok": "Confirmed",
+  "debug_connection": "Connection failed",
+  "debug_timeout": "No response",
+  "debug_protocol": "Invalid response",
+  "debug_device_exception": "Rejected by wallbox",
+  "debug_cancelled": "Cancelled",
+  "debug_unexpected": "Transaction failed",
+  "debug_redacted": "hidden",
+  "debug_unknown": "Not decoded"
+});
+Object.assign(messages.de, {
+  "debug_title": "Modbus-Kommunikation live",
+  "debug_hint": "Optional zur Fehlersuche: vorhandene Lesezugriffe, Schreibzugriffe und Heartbeats bis zu 10 Minuten mitverfolgen. Nur die letzten 200 Einträge bleiben im Arbeitsspeicher; nichts landet in der Home-Assistant-Datenbank oder in Protokolldateien.",
+  "debug_enable": "Kommunikation für 10 Minuten aufzeichnen",
+  "debug_off": "Aufzeichnung ausgeschaltet. Ausschalten löscht alle Einträge.",
+  "debug_on": "Aufzeichnung aktiv — verbleibende Sekunden:",
+  "debug_privacy": "Seriennummern und Textregister werden ausgeblendet. Die Netzwerkanmeldung wird nie aufgezeichnet. Beim Schließen dieses Bereichs enden die Bildschirmaktualisierungen; die Aufzeichnung läuft bis zum Ausschalten oder automatischen Ablauf weiter.",
+  "debug_clear": "Einträge löschen",
+  "debug_records": "Letzte Zugriffe, neueste zuerst",
+  "debug_time": "Zeit (UTC)",
+  "debug_operation": "Zugriff",
+  "debug_registers": "Register und dekodierte Werte",
+  "debug_duration": "Dauer",
+  "debug_result": "Ergebnis",
+  "debug_unavailable": "Wallbox-Verbindung einrichten und die App neu starten, um die Kommunikation mitzuverfolgen.",
+  "debug_failed": "Die Aufzeichnung konnte nicht gelesen oder geändert werden. Diesen Bereich schließen und erneut öffnen, um den aktuellen Zustand zu prüfen; eine aktive Aufzeichnung endet weiterhin automatisch.",
+  "debug_read": "Lesen",
+  "debug_write": "Schreiben",
+  "debug_heartbeat": "Heartbeat",
+  "debug_ok": "Bestätigt",
+  "debug_connection": "Verbindung fehlgeschlagen",
+  "debug_timeout": "Keine Antwort",
+  "debug_protocol": "Ungültige Antwort",
+  "debug_device_exception": "Von der Wallbox abgelehnt",
+  "debug_cancelled": "Abgebrochen",
+  "debug_unexpected": "Zugriff fehlgeschlagen",
+  "debug_redacted": "ausgeblendet",
+  "debug_unknown": "Nicht dekodiert"
+});
+Object.assign(messages.fr, {
+  "debug_title": "Communication Modbus en direct",
+  "debug_hint": "Diagnostic facultatif : observer les lectures, écritures et signaux de présence existants pendant 10 minutes au maximum. Seules les 200 dernières entrées restent en mémoire ; aucune écriture dans la base Home Assistant ni dans des fichiers journaux.",
+  "debug_enable": "Capturer les échanges pendant 10 minutes",
+  "debug_off": "Capture désactivée. La désactivation efface toutes les entrées.",
+  "debug_on": "Capture active — secondes restantes :",
+  "debug_privacy": "Les numéros de série et registres texte sont masqués. Les échanges de connexion réseau ne sont jamais capturés. Fermer ce panneau arrête son actualisation ; la capture continue jusqu’à sa désactivation ou son expiration automatique.",
+  "debug_clear": "Effacer les entrées",
+  "debug_records": "Derniers échanges, les plus récents en premier",
+  "debug_time": "Heure (UTC)",
+  "debug_operation": "Opération",
+  "debug_registers": "Registres et valeurs décodées",
+  "debug_duration": "Durée",
+  "debug_result": "Résultat",
+  "debug_unavailable": "Configurez la connexion à la borne et redémarrez l’application pour observer les échanges.",
+  "debug_failed": "Impossible de lire ou modifier la capture. Fermez puis rouvrez ce panneau pour vérifier son état ; une capture active expire toujours automatiquement.",
+  "debug_read": "Lecture",
+  "debug_write": "Écriture",
+  "debug_heartbeat": "Signal de présence",
+  "debug_ok": "Confirmé",
+  "debug_connection": "Échec de connexion",
+  "debug_timeout": "Aucune réponse",
+  "debug_protocol": "Réponse invalide",
+  "debug_device_exception": "Refus de la borne",
+  "debug_cancelled": "Annulé",
+  "debug_unexpected": "Échec de l’échange",
+  "debug_redacted": "masqué",
+  "debug_unknown": "Non décodé"
+});
+Object.assign(messages.it, {
+  "debug_title": "Comunicazione Modbus in diretta",
+  "debug_hint": "Diagnostica facoltativa: osserva letture, scritture e heartbeat esistenti per un massimo di 10 minuti. Solo le ultime 200 voci rimangono in memoria; nulla viene salvato nel database di Home Assistant o nei file di registro.",
+  "debug_enable": "Acquisisci la comunicazione per 10 minuti",
+  "debug_off": "Acquisizione disattivata. Disattivandola si eliminano tutte le voci.",
+  "debug_on": "Acquisizione attiva — secondi rimanenti:",
+  "debug_privacy": "Numeri di serie e registri di testo sono nascosti. Il traffico di autenticazione di rete non viene mai acquisito. Chiudere questo pannello interrompe gli aggiornamenti; l’acquisizione continua fino alla disattivazione o alla scadenza automatica.",
+  "debug_clear": "Elimina le voci",
+  "debug_records": "Ultimi scambi, dal più recente",
+  "debug_time": "Ora (UTC)",
+  "debug_operation": "Operazione",
+  "debug_registers": "Registri e valori decodificati",
+  "debug_duration": "Durata",
+  "debug_result": "Risultato",
+  "debug_unavailable": "Configura la connessione alla wallbox e riavvia l’app per osservare la comunicazione.",
+  "debug_failed": "Impossibile leggere o modificare l’acquisizione. Chiudi e riapri questo pannello per verificarne lo stato; un’acquisizione attiva termina comunque automaticamente.",
+  "debug_read": "Lettura",
+  "debug_write": "Scrittura",
+  "debug_heartbeat": "Heartbeat",
+  "debug_ok": "Confermato",
+  "debug_connection": "Connessione non riuscita",
+  "debug_timeout": "Nessuna risposta",
+  "debug_protocol": "Risposta non valida",
+  "debug_device_exception": "Rifiutato dalla wallbox",
+  "debug_cancelled": "Annullato",
+  "debug_unexpected": "Scambio non riuscito",
+  "debug_redacted": "nascosto",
+  "debug_unknown": "Non decodificato"
+});
+Object.assign(messages.nl, {
+  "debug_title": "Live Modbus-communicatie",
+  "debug_hint": "Optioneel voor foutonderzoek: bekijk bestaande leesacties, schrijfacties en heartbeats maximaal 10 minuten. Alleen de laatste 200 regels blijven in het geheugen; er wordt niets opgeslagen in de Home Assistant-database of logbestanden.",
+  "debug_enable": "Communicatie 10 minuten vastleggen",
+  "debug_off": "Registratie uitgeschakeld. Uitschakelen wist alle regels.",
+  "debug_on": "Registratie actief — resterende seconden:",
+  "debug_privacy": "Serienummers en tekstregisters zijn verborgen. Netwerkaanmeldingen worden nooit vastgelegd. Dit paneel sluiten stopt de weergave-updates; de registratie loopt door tot uitschakeling of automatisch verlopen.",
+  "debug_clear": "Regels wissen",
+  "debug_records": "Laatste transacties, nieuwste eerst",
+  "debug_time": "Tijd (UTC)",
+  "debug_operation": "Bewerking",
+  "debug_registers": "Registers en gedecodeerde waarden",
+  "debug_duration": "Duur",
+  "debug_result": "Resultaat",
+  "debug_unavailable": "Stel de wallboxverbinding in en herstart de app om de communicatie te bekijken.",
+  "debug_failed": "De registratie kon niet worden gelezen of gewijzigd. Sluit en heropen dit paneel om de huidige status te controleren; een actieve registratie verloopt nog steeds automatisch.",
+  "debug_read": "Lezen",
+  "debug_write": "Schrijven",
+  "debug_heartbeat": "Heartbeat",
+  "debug_ok": "Bevestigd",
+  "debug_connection": "Verbinding mislukt",
+  "debug_timeout": "Geen antwoord",
+  "debug_protocol": "Ongeldig antwoord",
+  "debug_device_exception": "Geweigerd door wallbox",
+  "debug_cancelled": "Geannuleerd",
+  "debug_unexpected": "Transactie mislukt",
+  "debug_redacted": "verborgen",
+  "debug_unknown": "Niet gedecodeerd"
+});
+
 const language = messages[document.documentElement.lang] ? document.documentElement.lang : "en";
 const text = (key) => messages[language][key] || messages.en[key] || messages.en.supervisor_unavailable;
 document.querySelectorAll("[data-i18n]").forEach((element) => { element.textContent = text(element.dataset.i18n); });
@@ -245,6 +392,7 @@ function setBusy(value) {
   el("connection_type").disabled = value || restartPending;
   el("device_id").disabled = value || restartPending;
   showTransport();
+  updateDebugControls();
 }
 
 function showError(key) {
@@ -432,5 +580,94 @@ el("connection_form").addEventListener("submit", async (event) => {
     setBusy(false);
   }
 });
+
+// These observations are separate from saved connection settings. No debug
+// option is persisted, and UI polling never asks the wallbox for extra reads.
+let debugState = { available: false, enabled: false, expires_in: 0 };
+let debugRows = [];
+let debugSequence = 0;
+let debugTimer = null;
+let debugBusy = false;
+let debugStopped = false;
+const debugVisible = () => el("modbus_debug").open && !document.hidden && !debugStopped;
+
+function stopDebugPolling() {
+  if (debugTimer !== null) clearTimeout(debugTimer);
+  debugTimer = null;
+}
+function updateDebugControls() {
+  el("debug_enabled").disabled = debugBusy || !csrf || !debugState.available;
+  el("debug_clear").disabled = debugBusy || !csrf || !debugState.available || !debugRows.length;
+}
+function renderDebug(data, reset) {
+  reset = reset || data.generation !== debugState.generation || data.latest_sequence < debugSequence;
+  debugState = data;
+  if (reset || !data.enabled) debugRows = [];
+  for (const record of data.records) {
+    if (reset || record.sequence > debugSequence) debugRows.push(record);
+  }
+  debugRows = debugRows.slice(-200);
+  debugSequence = data.latest_sequence;
+  el("debug_enabled").checked = data.enabled;
+  el("debug_status").textContent = !data.available ? text("debug_unavailable")
+    : data.enabled ? `${text("debug_on")} ${data.expires_in}` : text("debug_off");
+  const rows = [];
+  for (const record of [...debugRows].reverse()) {
+    const row = document.createElement("tr");
+    const values = record.values.map(value => `${value.address} ${value.register.replaceAll("_", " ")}: ${value.redacted
+      ? text("debug_redacted") : `${value.value ?? text("debug_unknown")}${value.unit ? ` ${value.unit}` : ""}${value.enum ? ` (${value.enum})` : ""}`}`).join("\n");
+    const result = record.error ? text(`debug_${record.error}`) : text("debug_ok");
+    for (const value of [record.time, `${text(`debug_${record.operation}`)}\nFC ${record.function} · ID ${record.device_id}`,
+      `${record.address} (${record.count})\n${values || text("debug_unknown")}`, `${record.duration_ms} ms`,
+      `${result}${record.exception_code !== null ? ` (${record.exception_code})` : ""}`]) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    }
+    rows.push(row);
+  }
+  el("debug_records").replaceChildren(...rows);
+  updateDebugControls();
+}
+async function refreshDebug(payload = null, reset = false) {
+  stopDebugPolling();
+  if (debugBusy || !debugVisible()) return;
+  if (payload && !csrf) return;
+  debugBusy = true;
+  updateDebugControls();
+  let success = false;
+  try {
+    const response = await fetch(`./api/modbus-debug${payload || reset ? "" : `?after=${debugSequence}`}`, payload ? {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Amtron-CSRF": csrf }, body: JSON.stringify(payload)
+    } : { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) {
+      el("debug_enabled").checked = debugState.enabled;
+      el("debug_status").textContent = data.error === "debug_unavailable" ? text("debug_unavailable") : text("debug_failed");
+      return;
+    }
+    renderDebug(data, reset || Boolean(payload));
+    success = true;
+  } catch (_) {
+    el("debug_enabled").checked = debugState.enabled;
+    el("debug_status").textContent = text("debug_failed");
+  } finally {
+    debugBusy = false;
+    updateDebugControls();
+    if (success && debugVisible() && debugState.enabled) debugTimer = setTimeout(refreshDebug, 2000);
+  }
+}
+el("modbus_debug").addEventListener("toggle", () => {
+  stopDebugPolling();
+  if (debugVisible()) return refreshDebug(null, true);
+});
+el("debug_enabled").addEventListener("change", () => refreshDebug({ enabled: el("debug_enabled").checked }));
+el("debug_clear").addEventListener("click", () => refreshDebug({ clear: true }));
+document.addEventListener("visibilitychange", () => {
+  stopDebugPolling();
+  if (debugVisible()) return refreshDebug(null, true);
+});
+addEventListener("pagehide", () => { debugStopped = true; stopDebugPolling(); });
+addEventListener("pageshow", () => { debugStopped = false; if (debugVisible()) return refreshDebug(null, true); });
 
 readSettings();

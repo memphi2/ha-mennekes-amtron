@@ -41,6 +41,7 @@ from .const import (
 )
 from .decode import RegisterValue, decode_register
 from .link_quality import LinkQuality
+from .modbus_trace import ModbusTrace
 from .register_blocks import RegisterBlock
 from .registers import HEARTBEAT, SERIAL_NUMBER, RegisterSpec
 from .transport import ModbusTransport
@@ -148,6 +149,7 @@ class MennekesModbusClient:
         self._config = config
         self._monotonic = monotonic
         self.link_quality = LinkQuality(monotonic=monotonic)
+        self.modbus_trace = ModbusTrace(clock=monotonic)
         self.write_trace = WriteTrace(
             clock=monotonic, packet_trace=client_factory is create_modbus_client
         )
@@ -231,7 +233,7 @@ class MennekesModbusClient:
                 words = await _client_read.read_words(
                     client, address=SERIAL_NUMBER.address, count=SERIAL_NUMBER.count,
                     device_id=self._config.device_id, retries=self._config.retries,
-                    observe=self.link_quality.observe,
+                    observe=self.link_quality.observe, trace=self.modbus_trace,
                 )
             except asyncio.CancelledError as err:
                 # No write was attempted. Preserve cancellation, but distinguish
@@ -371,7 +373,7 @@ class MennekesModbusClient:
                     count=count,
                     device_id=self._config.device_id,
                     retries=self._config.retries,
-                    observe=self.link_quality.observe,
+                    observe=self.link_quality.observe, trace=self.modbus_trace,
                 )
 
         # Identity and the target are separate Modbus transactions. Keep the
@@ -392,7 +394,7 @@ class MennekesModbusClient:
                 count=count,
                 device_id=self._config.device_id,
                 retries=self._config.retries,
-                observe=self.link_quality.observe,
+                observe=self.link_quality.observe, trace=self.modbus_trace,
             )
 
     async def async_read_register(
@@ -509,7 +511,7 @@ class MennekesModbusClient:
                             count=register.count,
                             device_id=self._config.device_id,
                             retries=self._config.retries,
-                            observe=self.link_quality.observe,
+                            observe=self.link_quality.observe, trace=self.modbus_trace,
                         )
                         return decode_register(register, words)
 
@@ -546,6 +548,7 @@ class MennekesModbusClient:
                     spec=spec,
                     value=value,
                     device_id=self._config.device_id,
+                    trace=self.modbus_trace,
                 )
             except (Exception, asyncio.CancelledError) as err:
                 error = err

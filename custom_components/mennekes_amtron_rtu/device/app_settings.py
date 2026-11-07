@@ -24,6 +24,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout, web
 
 from .app_adapter_setup import AdapterSetup
 from .connection import validate_network_host
+from .modbus_trace import ModbusTrace
 from .service_config import ServerConfig
 from .waveshare_gateway import (
     GatewayError,
@@ -169,11 +170,13 @@ class AppSettings:
 
     def __init__(
         self, supervisor_token: str, service_token: str,
-        *, configuration_guard: Callable[[], AbstractAsyncContextManager[ConnectionConfigurationGuard]] | None = None,
+        *, modbus_trace: ModbusTrace | None = None,
+        configuration_guard: Callable[[], AbstractAsyncContextManager[ConnectionConfigurationGuard]] | None = None,
     ) -> None:
         self._supervisor_token = supervisor_token
         self._service_token = service_token
         self._secret = secrets.token_bytes(32)
+        self._modbus_trace = modbus_trace
         self._session: ClientSession | None = None
         self._lock = asyncio.Lock()
         self._slots = asyncio.Semaphore(2)
@@ -188,6 +191,8 @@ class AppSettings:
                 yield
             finally:
                 self._session = None
+                if self._modbus_trace is not None:
+                    self._modbus_trace.close()
 
     async def _request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         if self._session is None:
@@ -277,6 +282,30 @@ class AppSettings:
         if not isinstance(payload, dict):
             raise SettingsError("invalid_request")
         return user, payload
+
+    async def read_modbus_debug(self, request: web.Request) -> web.Response:
+        """Read passive, redacted observations only through authorized ingress."""
+        await self._authorize(request)
+        after = request.query.get("after", "0")
+        if not re.fullmatch(r"[0-9]{1,18}", after) or set(request.query) - {"after"}:
+            raise SettingsError("invalid_request")
+        if self._modbus_trace is None:
+            return web.json_response({"available": False, "enabled": False,
+                                      "expires_in": 0, "latest_sequence": 0, "generation": 0, "records": []})
+        return web.json_response(self._modbus_trace.snapshot(after=int(after)))
+
+    async def set_modbus_debug(self, request: web.Request) -> web.Response:
+        """Change RAM-only capture settings, using the same admin and CSRF gate."""
+        _, payload = await self._edit_request(request)
+        if self._modbus_trace is None:
+            raise SettingsError("debug_unavailable", 409)
+        if set(payload) == {"enabled"} and type(payload["enabled"]) is bool:
+            self._modbus_trace.set_enabled(payload["enabled"])
+        elif payload == {"clear": True} and type(payload["clear"]) is bool:
+            self._modbus_trace.clear()
+        else:
+            raise SettingsError("invalid_request")
+        return web.json_response(self._modbus_trace.snapshot())
 
     def _check_revision(self, revision: Any, options: dict[str, Any]) -> str:
         if not isinstance(revision, str) or not _DIGEST.fullmatch(revision) or not hmac.compare_digest(revision, self._revision(options)):
@@ -520,6 +549,8 @@ def create_settings_app(settings: AppSettings) -> web.Application:
     app.router.add_get("/api/config", settings.read)
     app.router.add_post("/api/config", settings.save)
     app.router.add_post("/api/adapter", settings.inspect_adapter)
+    app.router.add_get("/api/modbus-debug", settings.read_modbus_debug)
+    app.router.add_post("/api/modbus-debug", settings.set_modbus_debug)
     return app
 
 

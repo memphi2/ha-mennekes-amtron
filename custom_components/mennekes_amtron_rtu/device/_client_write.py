@@ -21,6 +21,7 @@ from .client_errors import (
     protocol_error_for,
 )
 from .decode import encode_register
+from .modbus_trace import ModbusTrace
 from .registers import RegisterSpec
 from .transport import ModbusTransport
 
@@ -74,6 +75,7 @@ async def write_register(
     spec: RegisterSpec,
     value: float,
     device_id: int,
+    trace: ModbusTrace | None = None,
 ) -> None:
     """Write one register range.
 
@@ -83,6 +85,24 @@ async def write_register(
 
     validate_write(spec, value)
     words = encode_register(spec, value)
+    started = trace.start() if trace is not None else None
+    error = None
+    try:
+        await _write_words(client, spec=spec, words=words, device_id=device_id)
+    except (Exception, asyncio.CancelledError) as err:
+        error = err
+        raise
+    finally:
+        if trace is not None:
+            trace.finish(started, operation="write", address=spec.address, count=len(words),
+                         device_id=device_id, words=words, error=error)
+    _LOGGER.debug("Wrote %s = %s to 0x%04X", spec.key, value, spec.address)
+
+
+async def _write_words(
+    client: ModbusTransport, *, spec: RegisterSpec, words: list[int], device_id: int,
+) -> None:
+    """Execute and validate precisely one physical write attempt."""
     try:
         if len(words) == 1:
             response = await client.write_register(
@@ -118,4 +138,3 @@ async def write_register(
         raise AmtronProtocolError(
             f"write to 0x{spec.address:04X} received a mismatched acknowledgement"
         )
-    _LOGGER.debug("Wrote %s = %s to 0x%04X", spec.key, value, spec.address)

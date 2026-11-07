@@ -282,6 +282,18 @@ Diagnostics include the last 20 failed write/recovery records in RAM, with timin
 information and no packet contents or credentials. They add no Recorder rows and
 are lost when the app restarts.
 
+For optional live troubleshooting, open **Web UI → Live Modbus communication**
+and enable capture. Existing reads, writes, retries and heartbeats appear with
+register addresses, decoded values, duration and outcome. A failed write shows
+the requested value, not proof that it was applied. Capture is off by default,
+keeps at most **200 transactions in RAM** and automatically stops and erases
+itself after **10 minutes**, including when the browser is closed. Turning it off
+also erases entries; clearing entries does not extend the deadline. Closing the
+panel or hiding the tab stops UI polling. There are no extra Modbus requests,
+Recorder entries or log files. Serial numbers and text registers are hidden;
+network login traffic and exception messages are never captured. In setup-only
+mode, first save a connection and restart the app.
+
 Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Error-200 recovery while paused and particular LAN gateways still need
 confirmation on the actual hardware; automated tests do not establish that.

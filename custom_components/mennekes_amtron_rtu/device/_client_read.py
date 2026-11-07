@@ -22,6 +22,7 @@ from .client_errors import (
     protocol_error_for,
 )
 from .decode import RegisterValue, decode_block, decode_register
+from .modbus_trace import ModbusTrace
 from .register_blocks import RegisterBlock
 from .transport import ModbusTransport
 
@@ -36,13 +37,14 @@ async def read_words(
     device_id: int,
     retries: int = 0,
     observe: Callable[[BaseException | None], None] | None = None,
+    trace: ModbusTrace | None = None,
 ) -> list[int]:
     """Read words, retrying unanswered reads without retrying any writes."""
 
     try:
         words = await _read_words(
             client, address=address, count=count, device_id=device_id,
-            retries=retries, observe=observe,
+            retries=retries, observe=observe, trace=trace,
         )
     except AmtronBusError as err:
         if observe is not None:
@@ -61,30 +63,46 @@ async def _read_words(
     device_id: int,
     retries: int,
     observe: Callable[[BaseException | None], None] | None,
+    trace: ModbusTrace | None,
 ) -> list[int]:
     """Validate each response, retaining failures hidden by successful retries."""
 
     remaining = retries
     while True:
+        started = trace.start() if trace is not None else None
+        words = None
+        error: BaseException | None = None
         try:
-            response = await client.read_holding_registers(
-                address, count=count, device_id=device_id
-            )
-            break
-        except ConnectionException as err:
-            raise AmtronConnectionError(str(err) or "Modbus connection failed") from err
-        except ModbusIOException as err:
-            # pymodbus 3.13 wraps cancellation in ModbusIOException. Preserve
-            # task cancellation instead of treating it as another read timeout.
-            if isinstance(err.__cause__, asyncio.CancelledError):
-                raise err.__cause__ from None
-            if remaining <= 0:
-                raise AmtronProtocolError(str(err) or "modbus read failed") from err
+            words = await _read_once(client, address=address, count=count, device_id=device_id)
+            return words
+        except AmtronProtocolError as err:
+            error = err
+            if not isinstance(err.__cause__, ModbusIOException) or remaining <= 0:
+                raise
             if observe is not None:
                 observe(AmtronProtocolError("modbus read retry"))
             remaining -= 1
-        except ModbusException as err:
-            raise AmtronProtocolError(str(err) or "modbus transaction failed") from err
+        except (Exception, asyncio.CancelledError) as err:
+            error = err
+            raise
+        finally:
+            if trace is not None:
+                trace.finish(started, operation="read", address=address, count=count,
+                             device_id=device_id, words=words, error=error)
+
+
+async def _read_once(
+    client: ModbusTransport, *, address: int, count: int, device_id: int,
+) -> list[int]:
+    """Execute and validate precisely one physical read attempt."""
+    try:
+        response = await client.read_holding_registers(address, count=count, device_id=device_id)
+    except ConnectionException as err:
+        raise AmtronConnectionError(str(err) or "Modbus connection failed") from err
+    except ModbusException as err:
+        if isinstance(err.__cause__, asyncio.CancelledError):
+            raise err.__cause__ from None
+        raise AmtronProtocolError(str(err) or "modbus read failed") from err
 
     if isinstance(response, ExceptionResponse):
         if response.function_code != 0x83:

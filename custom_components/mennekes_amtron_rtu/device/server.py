@@ -62,6 +62,7 @@ async def run(config: ServerConfig | SetupConfig, state: Path, supervisor_token:
             settings_runner = web.AppRunner(
                 create_settings_app(AppSettings(
                     supervisor_token, config.token,
+                    modbus_trace=service.client.modbus_trace if service is not None else None,
                     configuration_guard=(service.client.async_connection_configuration if service is not None else None),
                 )), access_log=None,
             )

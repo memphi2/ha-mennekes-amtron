@@ -43,6 +43,8 @@ class ProbeSettings:
 
     save = read
     inspect_adapter = read
+    read_modbus_debug = read
+    set_modbus_debug = read
 
 
 async def check_assets(expected: dict[str, str]) -> None:

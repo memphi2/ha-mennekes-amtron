@@ -101,6 +101,30 @@
         <button id="save" type="submit" data-i18n="save">Save connection</button>
       </div>
     </form>
+    <details id="modbus_debug" class="modbus-debug">
+      <summary data-i18n="debug_title">Live Modbus communication</summary>
+      <p class="hint" data-i18n="debug_hint">Optional troubleshooting: observe existing reads, writes and heartbeats for up to 10 minutes. Only the latest 200 entries stay in memory; nothing is stored in the Home Assistant database or log files.</p>
+      <label class="check" for="debug_enabled">
+        <input id="debug_enabled" type="checkbox" disabled>
+        <span data-i18n="debug_enable">Capture communication for 10 minutes</span>
+      </label>
+      <p id="debug_status" role="status" aria-live="polite" data-i18n="debug_off">Capture is off.</p>
+      <p class="hint" data-i18n="debug_privacy">Serial numbers and text registers are hidden. Network login traffic is never captured. Closing this panel stops updates; capture continues until switched off or automatically expired.</p>
+      <button id="debug_clear" type="button" class="secondary" data-i18n="debug_clear" disabled>Clear entries</button>
+      <div class="debug-scroll" tabindex="0" role="region" aria-labelledby="debug_table_title">
+        <table>
+          <caption id="debug_table_title" data-i18n="debug_records">Latest transactions, newest first</caption>
+          <thead><tr>
+            <th scope="col" data-i18n="debug_time">Time (UTC)</th>
+            <th scope="col" data-i18n="debug_operation">Operation</th>
+            <th scope="col" data-i18n="debug_registers">Registers and decoded values</th>
+            <th scope="col" data-i18n="debug_duration">Duration</th>
+            <th scope="col" data-i18n="debug_result">Result</th>
+          </tr></thead>
+          <tbody id="debug_records"></tbody>
+        </table>
+      </div>
+    </details>
     <footer data-i18n="security">Available to Home Assistant administrators with Supervisor 2026.10.4 or newer. No service token is needed here.</footer>
   </main>
 </body>
