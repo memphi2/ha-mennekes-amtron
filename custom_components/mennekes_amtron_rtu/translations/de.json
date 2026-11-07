@@ -45,7 +45,8 @@
           "server": "Zum Modbus-Dienst wechseln",
           "serial_reconfigure": "Serielle Verbindung ändern",
           "network_reconfigure": "LAN-Adapter-Verbindung ändern"
-        }
+        },
+        "description": "Wähle die neue Verbindung für diese Wallbox. Verwaltet die Modbus-App die Verbindung, ändere USB- oder LAN-Einstellungen dort. Zur Wallbox darf nur eine Modbus-Verbindung aktiv sein."
       },
       "search_result": {
         "description": "Nach {attempts} Versuchen hat eine Wallbox geantwortet:\n\n- Geräteadresse: **{device_id}**\n- Bus: **{baudrate} Baud, {frame}**\n- Modbus-Layout: **{layout}**\n- Seriennummer: **{serial_number}**\n\nMit Absenden wird die Wallbox mit diesen Werten eingerichtet.",
@@ -57,7 +58,8 @@
           "server": "Modbus-Dienst (übersteht HA-Neustarts)",
           "serial": "Direkt über seriellen Port",
           "network": "Direkte Verbindung über LAN-Adapter"
-        }
+        },
+        "description": "Wähle, wie Home Assistant die Wallbox erreicht. Empfohlen ist die optionale Modbus-App: Sie hält den Heartbeat bei einem Home-Assistant-Neustart aufrecht. Eine laufende Supervisor-App wird automatisch gefunden. Direktverbindungen über USB oder LAN benötigen keine App."
       },
       "serial": {
         "data": {
@@ -103,7 +105,8 @@
           "server_token": "Zugriffstoken"
         },
         "data_description": {
-          "server_url": "HTTP-Adresse des eigenständigen Modbus-Dienstes, normalerweise auf Port 8765. Hier nicht die Adresse des Modbus-LAN-Adapters eintragen."
+          "server_url": "HTTP-Adresse des eigenständigen Modbus-Dienstes, normalerweise auf Port 8765. Hier nicht die Adresse des Modbus-LAN-Adapters eintragen.",
+          "server_token": "Verwende den im separat betriebenen Dienst eingerichteten Zugriffstoken. Die Supervisor-App übermittelt ihren Token automatisch; für sie ist dieses Formular nicht nötig."
         }
       },
       "hassio_confirm": {
@@ -796,6 +799,9 @@
     },
     "vehicle_profile_invalid": {
       "message": "Wähle ein vorhandenes, eindeutig benanntes Fahrzeugprofil."
+    },
+    "vehicle_selection_changed": {
+      "message": "Die Fahrzeugzuordnung hat sich während der Einrichtung geändert. Die Einrichtung wird mit der aktuellen Auswahl wiederholt."
     }
   },
   "issues": {
@@ -850,7 +856,7 @@
           "costs": "Ladekosten",
           "losses": "Ladeverluste"
         },
-        "description": "Wähle einen Bereich. Änderungen werden erst beim Speichern dieses Bereichs übernommen."
+        "description": "Beginne mit Wallbox. Fahrzeugdaten, Abfahrtsplanung, Kostenschätzung und Ladeverluste sind optional. Jeder Bereich wird auf seinem letzten Formular separat gespeichert; es erscheinen nur die Einstellungen der gewählten Funktionen."
       },
       "wallbox": {
         "title": "Wallbox",
@@ -859,7 +865,7 @@
           "wallbox_advanced": "Messwerte und Wartezeiten",
           "back": "Zurück ohne Speichern"
         },
-        "description": "Bei einer App-Verbindung werden Schreibrechte und Modbus-Zeitabstände in der App eingestellt. USB/LAN-Verbindungsdaten änderst du über Neu konfigurieren."
+        "description": "Lege fest, welchen Strom Home Assistant höchstens anfordern darf und wie oft der Status gelesen wird. Bei Nutzung der Modbus-App gehören Schreibfreigabe und Bus-Zeitabstände in deren Reiter Konfiguration. USB/LAN änderst du bei Direktverbindungen über Neu konfigurieren, bei App-Verbindungen in der App."
       },
       "wallbox_basic": {
         "title": "Stromgrenze und Abfrage",
@@ -870,7 +876,7 @@
         },
         "data_description": {
           "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
-          "current_limit": "Obergrenze der Ladestrom-Entität, zusätzlich zur Begrenzung, die die Wallbox selbst erzwingt.",
+          "current_limit": "Obergrenze für den Ladestrom-Regler, in Ampere pro Phase. Dies ist weder ein Prozent-Ladeziel noch ein Pausenbefehl. Die Grenze der Wallbox und gegebenenfalls die der App gelten zusätzlich.",
           "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon."
         },
         "description": "Die Stromgrenze begrenzt Anforderungen aus HA; die Grenzen von Wallbox und Dienst gelten zusätzlich. Bei App-Verbindungen betrifft das Abfrageintervall nur die Dienstabfragen von HA."
@@ -886,7 +892,8 @@
           "measurement_interval_seconds": "Leistung, Spannung, Strom und Sitzungswerte: 30 Sekunden reduzieren die Datenbanklast. Statuswechsel aktualisieren sofort. Ohne Fahrzeug mindestens 60 Sekunden. Das Statusintervall bestimmt die kürzeste mögliche Abfragezeit.",
           "state_change_interval_seconds": "Mindestabstand in Sekunden zwischen Start, Pause, Freigabe-, Sperr- und Phasenwechseln (Standard 300). Zu frühe Befehle werden vorgemerkt; der neueste ersetzt den vorherigen. Der Schreibabstand von fünf Sekunden für den Ladestrom bleibt bestehen. Mit 0 entfällt die längere Wartezeit.",
           "phase_switch_grace_seconds": "Zusätzliche Sekunden zwischen der bestätigten Ladepause des Fahrzeugs und dem Phasenwechsel (Standard 5, Bereich 0–30). Mit 0 entfällt nur diese zusätzliche Wartezeit; die Ladepause muss weiterhin bestätigt werden."
-        }
+        },
+        "description": "Die Standardwerte verbinden schnelle Statusmeldungen mit weniger gespeicherten Messwerten und schonenden Zustandswechseln. Bei vorgemerkten Befehlen zeigt Home Assistant die verbleibende Wartezeit. Der unabhängige Heartbeat wird dadurch nicht langsamer."
       },
       "vehicle": {
         "title": "Fahrzeug",
@@ -909,7 +916,8 @@
         "data_description": {
           "vehicle_soc_entity": "Wähle den Sensor für den tatsächlichen Fahrzeug-Ladestand in %. Fehlende Daten lassen die Ladung unverändert, bis gültige Werte zurückkehren. Ein Quellenwechsel löscht das Prozentziel, ohne das Laden zu starten. Zum Deaktivieren dient das vorherige Menü.",
           "use_vehicle_limit": "Aktiviere dies, um die Ladegrenze des Fahrzeugs als zusätzliches Maximum auszuwählen. Es wird keine Einstellung ins Fahrzeug geschrieben."
-        }
+        },
+        "description": "Damit richtest du das optionale Prozent-Ladeziel über einen vorhandenen Ladestandssensor ein. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein. Ein Ladeziel begrenzt nur die Ladung; es hebt eine manuelle Pause nicht auf."
       },
       "vehicle_limit": {
         "title": "Ladegrenze des Fahrzeugs",
@@ -918,7 +926,8 @@
         },
         "data_description": {
           "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt."
-        }
+        },
+        "description": "Nutze die im Fahrzeug eingestellte Ladegrenze als zusätzliche Obergrenze für das Prozent-Ladeziel in Home Assistant. Wähle die vom Auto gemeldete Zielgrenze, nicht seinen aktuellen Ladestand."
       },
       "departure": {
         "title": "Nächste Abfahrt",
@@ -927,7 +936,7 @@
           "departure_disable": "Abfahrtsplanung deaktivieren",
           "back": "Zurück ohne Speichern"
         },
-        "description": "Plane eine nächste Fahrt anhand von Prozentziel und nutzbarer Akkukapazität. Deaktivieren löscht die ausgewählte Fahrt und ihre vorgemerkten Befehle; das Prozentziel bleibt bestehen."
+        "description": "Plane die nächste einzelne Fahrt mit Prozent-Ladeziel, nutzbarer Akkukapazität und Abfahrtszeit. Den konkreten Zeitpunkt wählst du anschließend auf der Geräteseite oder übernimmst ihn aus einer optionalen Quelle. Dies ist kein täglicher Zeitplan. Deaktivieren löscht die Fahrt und vorgemerkte Planbefehle; das Prozent-Ladeziel bleibt bestehen."
       },
       "departure_requires_vehicle": {
         "title": "Ladestand erforderlich",
@@ -945,7 +954,13 @@
           "use_departure_entity": "Entität für Abfahrtszeit verwenden",
           "use_vehicle_timer": "Abfahrtszeiten des Fahrzeugs verwenden"
         },
-        "description": "Datum und Uhrzeit lassen sich immer manuell eingeben. Aktiviere nur gewünschte Zusatzquellen; deren Einstellungen folgen anschließend. Ein aktiver Plan kann eine manuelle Pause aufheben, um das Abfahrtsziel zu erreichen."
+        "description": "Datum und Uhrzeit lassen sich immer manuell eingeben. Aktiviere nur gewünschte Zusatzquellen; deren Einstellungen folgen anschließend. Ein aktiver Plan kann eine manuelle Pause aufheben, um das Abfahrtsziel zu erreichen.",
+        "data_description": {
+          "capacity_source": "Verwende die nutzbare Akkukapazität: als festen Wert, kWh-/Wh-Sensor oder unterstützten Profilwert. Fehlt die gewählte Kapazität oder der Ladestand, wartet die Planung.",
+          "use_calendar": "Ergänzt einen Button zum Übernehmen des nächsten passenden Kalendereintrags. Jeder Druck wählt eine Fahrt; für zeitgesteuerte Kalenderübernahmen kannst du die mitgelieferte Blaupause nutzen.",
+          "use_departure_entity": "Übernimmt ein neues Datum mit Uhrzeit in der Zukunft automatisch aus der gewählten Entität. Manuelle Auswahl bleibt möglich; ein neuer zukünftiger Zeitstempel dieser Quelle kann sie ersetzen.",
+          "use_vehicle_timer": "Ergänzt einen Button zum Übernehmen eines aktiven Abfahrts-/Klimatimers aus der Fahrzeugintegration. Er liest den gemeldeten Timer; die Klimaanlage des Autos schaltet er nicht ein."
+        }
       },
       "departure_capacity_fixed": {
         "title": "Nutzbare Akkukapazität",
@@ -954,7 +969,8 @@
         },
         "data_description": {
           "timed_capacity_kwh": "Gib die nutzbare Akkukapazität ein, nicht die Nennkapazität."
-        }
+        },
+        "description": "Trage die Energie ein, die der Akku tatsächlich zum Fahren speichern kann. Daraus wird die nötige Ladezeit geschätzt; die Akkueinstellungen des Autos werden nicht verändert."
       },
       "departure_capacity_entity": {
         "title": "Entität für Akkukapazität",
@@ -963,7 +979,8 @@
         },
         "data_description": {
           "timed_capacity_entity": "Sensor für die nutzbare Akkukapazität in kWh oder Wh auswählen."
-        }
+        },
+        "description": "Wähle einen Sensor für die nutzbare Gesamtkapazität, nicht für Restenergie oder Ladeprozent. Die Einheit muss kWh oder Wh sein. Ohne gültigen Wert wartet die Planung auf Kapazitätsdaten, statt zu schätzen."
       },
       "departure_calendar": {
         "title": "Abfahrtskalender",
@@ -974,7 +991,8 @@
         "data_description": {
           "timed_calendar_entity": "Kalender auswählen und mit „Nächsten Kalendertermin übernehmen“ einen passenden Termin als Abfahrtszeit setzen.",
           "timed_calendar_title": "Nur Termine mit exakt diesem Titel werden berücksichtigt. Ganztägige Termine werden ignoriert."
-        }
+        },
+        "description": "Wähle einen Kalender und einen exakten Termin-Titel, zum Beispiel „Fahrt zur Arbeit“. Der Terminbeginn wird zur Abfahrtszeit. Der Button durchsucht die nächsten 14 Tage; ganztägige Termine werden ignoriert."
       },
       "departure_entity": {
         "title": "Entität für Abfahrtszeit",
@@ -983,7 +1001,8 @@
         },
         "data_description": {
           "timed_departure_entity": "Sensor mit vollständigem Datum und Uhrzeit oder input_datetime mit Datum und Uhrzeit auswählen. Eine bloße Uhrzeit reicht für die nächste Fahrt nicht."
-        }
+        },
+        "description": "Wähle eine Quelle mit Datum und Uhrzeit. Ein neuer gültiger Zeitpunkt in der Zukunft wird automatisch übernommen. Richte dafür nur eine Quelle ein; manuelle Eingabe und Kalender-/Fahrzeugbuttons bleiben verfügbar."
       },
       "departure_vehicle": {
         "title": "Fahrzeug-Integration",
@@ -1009,9 +1028,12 @@
       },
       "costs": {
         "title": "Strompreisquelle",
-        "description": "Wähle einen festen Strompreis oder einen vorhandenen Preissensor. Mit Deaktiviert schaltest du die Kostenschätzung aus. Netzentgelte richtest du anschließend getrennt ein.",
+        "description": "Wähle einen festen Strompreis oder einen vorhandenen Preissensor. Deaktiviert schaltet die Kostenschätzung aus. Weitere Schritte zu Netzentgelten erscheinen, wenn in Home Assistant Deutschland als Land eingestellt ist.",
         "data": {
           "charging_cost_source": "Strompreisquelle"
+        },
+        "data_description": {
+          "charging_cost_source": "Festpreis passt zu einem konstanten Vertragspreis; ein Sensor kann einen dynamischen Tarif wie Tibber abbilden. Dies schätzt nur die Ladekosten und wählt keine günstigen Ladezeiten aus."
         }
       },
       "cost_fixed": {
@@ -1019,14 +1041,20 @@
         "data": {
           "charging_price": "Bruttostrompreis"
         },
-        "description": "Gib den Preis je kWh einschließlich Steuern an. Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss dies dein Endpreis einschließlich Netzentgelt sein. Grundpreise und jährliche Gutschriften werden nicht berücksichtigt. Vorgeschlagen sind zunächst 0,40 EUR/kWh; verwende deinen eigenen Vertragspreis."
+        "description": "Gib den Preis je kWh einschließlich Steuern an. Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss dies dein Endpreis einschließlich Netzentgelt sein. Grundpreise und jährliche Gutschriften werden nicht berücksichtigt. Vorgeschlagen sind zunächst 0,40 EUR/kWh; verwende deinen eigenen Vertragspreis.",
+        "data_description": {
+          "charging_price": "Gib Euro pro kWh inklusive Steuern ein: 0,40 bedeutet 40 Cent/kWh. Verwende den Arbeitspreis deines Vertrags; eine mögliche Netzentgelt-Anpassung wird separat eingerichtet."
+        }
       },
       "cost_sensor": {
         "title": "Strompreissensor",
         "data": {
           "charging_price_entity": "Strompreissensor"
         },
-        "description": "Wähle einen Sensor mit dem aktuellen Bruttostrompreis in EUR/kWh, ct/kWh oder EUR/MWh (auch das €-Zeichen wird unterstützt). Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss der Preis das Netzentgelt enthalten. Eine Meldung gilt 90 Minuten; auch die erneute Meldung desselben Werts verlängert dies. Bei fehlendem oder abgelaufenem Preis bleibt diese Energie unbepreist. Grundpreise und jährliche Gutschriften sind ausgeschlossen."
+        "description": "Wähle einen Sensor mit dem aktuellen Bruttostrompreis in EUR/kWh, ct/kWh oder EUR/MWh (auch das €-Zeichen wird unterstützt). Negative Preise sind erlaubt. Ohne Netzentgelt-Anpassung muss der Preis das Netzentgelt enthalten. Eine Meldung gilt 90 Minuten; auch die erneute Meldung desselben Werts verlängert dies. Bei fehlendem oder abgelaufenem Preis bleibt diese Energie unbepreist. Grundpreise und jährliche Gutschriften sind ausgeschlossen.",
+        "data_description": {
+          "charging_price_entity": "Wähle den Preis für den aktuellen Strombezug, keinen Tagesmittelwert, keine Prognoseliste und keine Einspeisevergütung. Die Einheit muss EUR/kWh, ct/kWh oder EUR/MWh ausweisen."
+        }
       },
       "cost_module2": {
         "title": "Modul 2: reduziertes Netzentgelt",
@@ -1035,7 +1063,8 @@
           "price_includes_network": "Der Strompreis enthält bereits das reguläre Netzentgelt"
         },
         "data_description": {
-          "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden."
+          "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden.",
+          "regular_network": "Regulärer Brutto-Arbeitspreis des Netzentgelts laut Preisblatt des Netzbetreibers, in EUR/kWh. Trage den ungekürzten Betrag ein; die Reduzierung für Modul 2 berechnet die Integration."
         },
         "description": "Gib das reguläre Netzentgelt brutto ein. Modul 2 berücksichtigt 40 % dieses Bestandteils, nicht 40 % des gesamten Strompreises."
       },
@@ -1046,7 +1075,7 @@
           "cost_module3_import": "Für HA-Zuhause importieren",
           "back": "Zurück ohne Speichern"
         },
-        "description": "Manuelle Eingabe übermittelt keine Standortdaten. Der Import sendet die HA-Zuhause-Koordinaten einmal an VNBdigital und ruft öffentliche Tarife aus Par14a-Database ab. Prüfe Quelle, Preise und Zeitfenster vor dem Speichern."
+        "description": "Manuelle Eingabe sendet deinen Standort nicht, solange du später keine Jahresaktualisierung aktivierst. Der Import sendet die HA-Home-Koordinaten an VNBdigital und liest öffentliche Tarife aus Par14a-Database. Prüfe Netzbetreiber, Preise und Zeitfenster vor dem Speichern. Wird kein eindeutiger Tarif gefunden, kannst du die Werte manuell eingeben."
       },
       "cost_module3_prices": {
         "title": "Modul 3: Preise und Zeitfenster",
@@ -1063,9 +1092,14 @@
         },
         "data_description": {
           "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden.",
-          "auto_tariff_refresh": "Am 1. Januar werden veröffentlichte Werte für das neue Jahr abgerufen und bei eindeutiger Zuordnung übernommen. Falls noch keine passenden Daten vorliegen, wird täglich erneut versucht. Auch vorläufige Werte können übernommen werden; prüfe später das endgültige Preisblatt.",
+          "auto_tariff_refresh": "Ruft ab 1. Januar den Tarif des neuen Jahres anhand der HA-Home-Koordinaten ab und übernimmt ein gültiges eindeutiges Ergebnis. Sendet die Koordinaten erneut an VNBdigital; bei Bedarf täglicher Wiederholungsversuch. Vorläufige Preise sind möglich. Das kann manuell eingegebene Preise und Zeitfenster ersetzen; prüfe später das endgültige Preisblatt.",
           "high_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich.",
-          "low_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich."
+          "low_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich.",
+          "regular_network": "Brutto-Standardnetzentgelt in EUR/kWh. Es gilt außerhalb der eingetragenen Hoch-/Niedrigtarifzeiten und außerhalb der gewählten Quartale.",
+          "high_network": "Brutto-Netzentgelt im Hochtarif (HT), in EUR/kWh. Trage nur den Netzanteil ein, nicht den gesamten Haushaltsstrompreis.",
+          "low_network": "Brutto-Netzentgelt im Niedrigtarif (NT), in EUR/kWh. Verwende dasselbe Preisblattjahr wie beim Standard- und Hochtarif.",
+          "tariff_year": "Jahr, für das dieses Preisblatt gilt. Nach dessen Ablauf warten Kostenschätzungen auf einen gültigen Tarif des neuen Jahres. Aktualisiere manuell oder aktiviere die optionale Jahresaktualisierung.",
+          "active_quarters": "Wähle die Quartale, in denen der Netzbetreiber diese zeitabhängigen Preise anbietet. In den übrigen Quartalen gilt der Standardtarif. Q1 = Jan–Mär, Q2 = Apr–Jun, Q3 = Jul–Sep, Q4 = Okt–Dez."
         },
         "description": "Prüfe alle drei Brutto-Netzentgelte und ihre Zeitfenster gemeinsam. Außerhalb der HT/NT-Zeiträume und der gewählten Quartale gilt der Standardtarif. Verwende deutsche Ortszeit (Europe/Berlin). Quelle: {source}. ⚠ kennzeichnet vorläufige Daten. Bestätige diesen Dialog, um zu speichern."
       },
@@ -1078,7 +1112,7 @@
           "back": "Zurück ohne Speichern",
           "loss_profile": "Ladehistorie des ausgewählten Fahrzeugs verwenden"
         },
-        "description": "Optionaler Vergleich von Wallbox-Energie und Energie im Fahrzeugakku. Wähle eine vorhandene Ladehistorie oder einen Sensor für die Energie der letzten Ladung."
+        "description": "Vergleiche die an der Wallbox gemessene Energie mit der im Akku angekommenen Energie derselben abgeschlossenen Ladung. Letzter Verlust und Durchschnitt sind Schätzwerte. Wähle das Fahrzeug vor Ladebeginn; fehlende oder mehrdeutige Zuordnungen bleiben unbekannt, statt eine andere Ladung zu verwenden."
       },
       "loss_sensor": {
         "title": "Ladeverluste aus einem Sensor",
@@ -1088,7 +1122,8 @@
           "charge_loss_auto_match": "Geänderten Energiewert automatisch zuordnen"
         },
         "data_description": {
-          "charge_loss_auto_match": "Optional: Einen geänderten Sensorwert innerhalb von 30 Minuten nach dem Abstecken zuordnen, wenn die Integration die gesamte Ladung beobachtet hat. Ein geänderter Wert beweist nicht, dass beide Messungen zur selben Ladung gehören. Deaktiviert lassen, um jede Zuordnung selbst zu bestätigen."
+          "charge_loss_auto_match": "Optional: Einen geänderten Sensorwert innerhalb von 30 Minuten nach dem Abstecken zuordnen, wenn die Integration die gesamte Ladung beobachtet hat. Ein geänderter Wert beweist nicht, dass beide Messungen zur selben Ladung gehören. Deaktiviert lassen, um jede Zuordnung selbst zu bestätigen.",
+          "vehicle_last_charge_energy_entity": "Wähle die Akkuenergie der letzten abgeschlossenen Ladung in kWh oder Wh. Ladestand in %, Wallbox-Zähler und Lebenszeit-Gesamtwerte eignen sich dafür nicht."
         }
       },
       "loss_vehicle": {
@@ -1106,13 +1141,17 @@
         "description": "Wähle das Fahrzeug an dieser Wallbox. Es wird nur vorhandene lokale Ladehistorie gelesen, keine Fahrzeugaktualisierung angefordert. Fehlende oder mehrdeutige Zuordnungen bleiben unbekannt."
       },
       "options_changed": {
-        "title": "Einstellungen wurden geändert"
+        "title": "Einstellungen wurden geändert",
+        "description": "Diese Einstellungen oder das aktive Fahrzeug wurden geändert, während das Formular geöffnet war. Aus diesem Formular wurde nichts gespeichert. Fahre fort, um den Bereich mit den aktuellen Einstellungen erneut zu öffnen."
       },
       "cost_network": {
         "title": "Netzentgelt-Anpassung",
         "description": "Der Strompreis ist bereits ausgewählt. Wähle keine Anpassung, wenn dies dein Endpreis ist, andernfalls dein vereinbartes Netzentgelt-Modul.",
         "data": {
           "charging_network_module": "Netzentgelt-Anpassung"
+        },
+        "data_description": {
+          "charging_network_module": "Diese Optionen erscheinen, wenn in Home Assistant Deutschland als Land eingestellt ist. Wähle das für deinen Anschluss vereinbarte Modul. Die Integration berechnet eine Schätzung; sie beantragt keinen Tarif und ändert deinen Stromvertrag nicht."
         }
       },
       "vehicle_profiles": {
@@ -1135,7 +1174,8 @@
           "vehicle_provider": "Fahrzeugintegration"
         },
         "data_description": {
-          "vehicle_profile_name": "Gib einen eindeutigen Profilnamen mit 1 bis 80 Zeichen ein."
+          "vehicle_profile_name": "Gib einen eindeutigen Profilnamen mit 1 bis 80 Zeichen ein.",
+          "vehicle_provider": "Wähle BavarianData, wenn die Integration bereits installiert ist und dieses Auto in Home Assistant bereitstellt. Manuelle Quellen funktionieren mit anderen Fahrzeugintegrationen oder Helfern; deren Entitäten wählst du bei der jeweiligen optionalen Funktion aus."
         }
       },
       "vehicle_profile_edit": {
@@ -1146,7 +1186,8 @@
           "vehicle_provider": "Fahrzeugintegration"
         },
         "data_description": {
-          "vehicle_profile_name": "Gib einen eindeutigen Profilnamen mit 1 bis 80 Zeichen ein."
+          "vehicle_profile_name": "Gib einen eindeutigen Profilnamen mit 1 bis 80 Zeichen ein.",
+          "vehicle_provider": "Wähle BavarianData, wenn die Integration bereits installiert ist und dieses Auto in Home Assistant bereitstellt. Manuelle Quellen funktionieren mit anderen Fahrzeugintegrationen oder Helfern; deren Entitäten wählst du bei der jeweiligen optionalen Funktion aus."
         }
       },
       "vehicle_profile_select": {
@@ -1154,13 +1195,17 @@
         "data": {
           "vehicle_profile_id": "Fahrzeugprofil"
         },
-        "description": "Wähle das an dieser Wallbox angeschlossene Fahrzeug. Beim Wechsel werden das bisherige Prozentziel und der Abfahrtsplan gelöscht, ohne das Laden zu starten. Einstellungen und mittlere Ladeverluste bleiben je Profil erhalten."
+        "description": "Wähle das an dieser Wallbox angeschlossene Fahrzeug. Beim Wechsel werden das bisherige Prozentziel und der Abfahrtsplan gelöscht, ohne das Laden zu starten. Einstellungen und mittlere Ladeverluste bleiben je Profil erhalten.",
+        "data_description": {
+          "vehicle_profile_id": "Wähle das tatsächlich angeschlossene Auto vor Ladebeginn, besonders für den Vergleich der Ladeverluste. Diese manuelle Wahl schaltet die automatische Fahrzeugauswahl aus."
+        }
       },
       "vehicle_profile_edit_select": {
         "title": "Profil bearbeiten",
         "data": {
           "vehicle_profile_id": "Fahrzeugprofil"
-        }
+        },
+        "description": "Wähle das zu bearbeitende Profil. Das Bearbeiten eines anderen Profils wählt dieses Fahrzeug nicht zum Laden aus."
       },
       "vehicle_profile_remove": {
         "title": "Profil entfernen",
@@ -1175,6 +1220,9 @@
         "description": "Wähle das tatsächliche Fahrzeuggerät aus BavarianData. Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten und Historie können anschließend dasselbe Auto verwenden. Jede Funktion bleibt einzeln zuschaltbar.",
         "data": {
           "vehicle_device": "Fahrzeug"
+        },
+        "data_description": {
+          "vehicle_device": "Wähle das Auto selbst, nicht die Wallbox. Unterstützte Daten stammen ausschließlich von diesem Gerät. Fehlende Werte werden nicht durch Daten eines anderen Autos ersetzt."
         }
       },
       "vehicle_source": {
@@ -1182,6 +1230,9 @@
         "description": "Verwende den gemeldeten Ladestand des aktiven Profils oder wähle eine Entität manuell. Anschließend erscheinen nur die Einstellungen der gewählten Quelle.",
         "data": {
           "vehicle_soc_source": "Quelle des Ladestands"
+        },
+        "data_description": {
+          "vehicle_soc_source": "Die Profilquelle nutzt die bereits gewählte Fahrzeugintegration. Mit manueller Auswahl kannst du für dieses Profil einen anderen Prozentsensor verwenden, ohne seine übrigen optionalen Datenquellen zu ändern."
         }
       },
       "vehicle_profile_soc": {
@@ -1189,6 +1240,9 @@
         "description": "Verwende den gemeldeten Ladestand des aktiven Profils für das optionale Prozentziel. Die Ladegrenze dieses Autos lässt sich zusätzlich als Maximum verwenden. Im Fahrzeug wird keine Einstellung geändert.",
         "data": {
           "use_vehicle_limit": "Ladegrenze des Fahrzeugs zusätzlich verwenden"
+        },
+        "data_description": {
+          "use_vehicle_limit": "Optional und unabhängig von der Ladestandsquelle. Eine niedrigere Fahrzeuggrenze senkt das Ladeziel; eine höhere erhöht es nicht. Wird diese Grenze nicht mehr gemeldet, gilt der letzte gültige Wert weiter."
         }
       },
       "loss_profile": {
@@ -1209,6 +1263,9 @@
         "description": "Ausgewählt wird nur genau ein Auto mit gültigen, kürzlich an Home Assistant gemeldeten Signalen für „Kabel angeschlossen“ und „zu Hause“. Ein sicher getrenntes Kabel oder ein sicher abwesendes Auto schließt dieses Fahrzeug aus. Andernfalls verhindern unbekannte, nicht verfügbare oder seit über 30 Minuten nicht gemeldete Signale die Auswahl. Bei keinem oder mehreren Treffern wird kein Fahrzeug ausgewählt. Eine manuelle Fahrzeugauswahl schaltet die Automatik aus. Die Erkennung startet keine Ladung und hebt keine Pause auf.",
         "data": {
           "vehicle_auto_selection": "Fahrzeug automatisch auswählen"
+        },
+        "data_description": {
+          "vehicle_auto_selection": "Erst einschalten, nachdem die teilnehmenden Profile eingerichtet sind. Die Automatik erkennt das Fahrzeug nicht am Wallbox-Kabel selbst, sondern anhand der gewählten Fahrzeugsignale. Du kannst jederzeit ein Auto manuell wählen."
         }
       },
       "vehicle_detection_profile": {
@@ -1231,6 +1288,10 @@
         "data": {
           "vehicle_connected_entity": "Ladekabel angeschlossen",
           "vehicle_home_entity": "Fahrzeug zu Hause"
+        },
+        "data_description": {
+          "vehicle_connected_entity": "Verwende das Signal „Ladekabel verbunden“ dieses Autos, nicht „lädt gerade“: Das Auto muss auch bei Ladepause oder vollem Akku zuordenbar bleiben.",
+          "vehicle_home_entity": "Bevorzuge den Standort des Autos selbst. Die Anwesenheit einer Person ist nur dann ein sinnvoller Ersatz, wenn sie zuverlässig bedeutet, dass dieses Auto zu Hause ist. Zwei passende Autos oder unsichere Signale verhindern die automatische Auswahl."
         }
       }
     },

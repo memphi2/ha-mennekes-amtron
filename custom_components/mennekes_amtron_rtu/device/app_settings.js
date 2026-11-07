@@ -42,6 +42,10 @@ const messages = {
     gateway_rollback_failed: "The previous adapter settings could not be confirmed after a failed change. The service connection remains stopped. Check the adapter settings manually before reconnecting.",
     adapter_authentication: "Enable TCP login on the adapter",
     adapter_auth_hint: "Saving changes login on both the adapter and this app. To enable it, a web password must already be set on the adapter. Enter that existing password below; this page does not create or change it.",
+    transport_hint: "USB uses an adapter connected to the host running this app. For LAN, match the adapter mode: transparent RTU over TCP or translating Modbus TCP.",
+    serial_hint: "Speed and data format must match the wallbox; factory defaults are 57600 baud and 8N2. Changing these app settings does not reconfigure the wallbox.",
+    endpoint_hint: "Enter the LAN adapter address without http:// or a path. Use its configured TCP port, commonly 502. The Modbus service’s HTTP port 8765 does not belong here.",
+    address_hint: "This number identifies the wallbox on the RS-485 bus, including behind a LAN adapter. Factory default: 50; supported range: 10–50. It is not an IP address.",
   },
   de: {
     title: "Verbindung zur Wallbox", intro: "Wähle den Adapter für diese App. Schreibfreigabe und weitere Einstellungen bleiben im Reiter Konfiguration der App.",
@@ -84,6 +88,10 @@ const messages = {
     gateway_rollback_failed: "Nach der fehlgeschlagenen Änderung konnten die bisherigen Adaptereinstellungen nicht bestätigt werden. Die Dienstverbindung bleibt angehalten. Prüfe die Adaptereinstellungen manuell, bevor du die Verbindung wiederherstellst.",
     adapter_authentication: "TCP-Anmeldung am Adapter aktivieren",
     adapter_auth_hint: "Beim Speichern wird die Anmeldung am Adapter und in dieser App geändert. Zum Aktivieren muss bereits ein Webpasswort am Adapter gesetzt sein. Gib dieses vorhandene Passwort unten ein; diese Seite legt es nicht an und ändert es nicht.",
+    transport_hint: "USB nutzt einen Adapter am Rechner, auf dem diese App läuft. Bei LAN muss die Auswahl zum Adaptermodus passen: transparentes RTU über TCP oder übersetzendes Modbus TCP.",
+    serial_hint: "Geschwindigkeit und Datenformat müssen zur Wallbox passen; ab Werk sind es 57600 Baud und 8N2. Diese App-Einstellungen ändern die Konfiguration der Wallbox nicht.",
+    endpoint_hint: "Trage die Adresse des LAN-Adapters ohne http:// oder Pfad ein. Verwende dessen eingestellten TCP-Port, häufig 502. Der HTTP-Port 8765 des Modbus-Dienstes gehört nicht hierher.",
+    address_hint: "Diese Nummer kennzeichnet die Wallbox am RS-485-Bus, auch hinter einem LAN-Adapter. Werkseinstellung: 50; unterstützter Bereich: 10–50. Es ist keine IP-Adresse.",
   },
   fr: {
     title: "Connexion à la borne", intro: "Choisissez l’adaptateur de cette application. Les autorisations d’écriture et les autres réglages restent dans l’onglet Configuration.",
@@ -125,6 +133,10 @@ const messages = {
     gateway_rollback_failed: "Impossible de confirmer les anciens réglages après l’échec. La connexion du service reste arrêtée. Vérifiez manuellement l’adaptateur avant de vous reconnecter.",
     adapter_authentication: "Activer l’authentification TCP sur l’adaptateur",
     adapter_auth_hint: "L’enregistrement modifie l’authentification sur l’adaptateur et dans cette application. Pour l’activer, un mot de passe web doit déjà être défini sur l’adaptateur. Saisissez-le ci-dessous ; cette page ne le crée ni ne le modifie.",
+    transport_hint: "USB utilise un adaptateur branché à l’hôte de cette application. Pour LAN, choisissez le mode de l’adaptateur : RTU transparent sur TCP ou conversion Modbus TCP.",
+    serial_hint: "La vitesse et le format doivent correspondre à la borne ; valeurs d’usine : 57600 bauds et 8N2. Ces réglages ne reconfigurent pas la borne.",
+    endpoint_hint: "Saisissez l’adresse de l’adaptateur LAN sans http:// ni chemin. Utilisez son port TCP configuré, souvent 502. Le port HTTP 8765 du service Modbus ne convient pas ici.",
+    address_hint: "Ce numéro identifie la borne sur le bus RS-485, y compris derrière un adaptateur LAN. Valeur d’usine : 50 ; plage prise en charge : 10–50. Ce n’est pas une adresse IP.",
   },
   nl: {
     title: "Verbinding met de laadpaal", intro: "Kies de adapter voor deze app. Schrijfrechten en overige instellingen blijven op het tabblad Configuratie.",
@@ -166,6 +178,10 @@ const messages = {
     gateway_rollback_failed: "De vorige instellingen konden na de mislukte wijziging niet worden bevestigd. De verbinding van de dienst blijft gestopt. Controleer de adapter handmatig voordat je opnieuw verbinding maakt.",
     adapter_authentication: "TCP-aanmelding inschakelen op de adapter",
     adapter_auth_hint: "Opslaan wijzigt de aanmelding op de adapter en in deze app. Voor inschakelen moet al een webwachtwoord op de adapter zijn ingesteld. Vul dat hieronder in; deze pagina maakt of wijzigt het niet.",
+    transport_hint: "USB gebruikt een adapter op de host waarop deze app draait. Kies bij LAN de adaptermodus: transparant RTU over TCP of vertalend Modbus TCP.",
+    serial_hint: "Snelheid en gegevensformaat moeten overeenkomen met de laadpaal; fabriekswaarden zijn 57600 baud en 8N2. Deze appinstellingen wijzigen de laadpaalconfiguratie niet.",
+    endpoint_hint: "Vul het LAN-adapteradres in zonder http:// of pad. Gebruik de ingestelde TCP-poort, vaak 502. HTTP-poort 8765 van de Modbus-dienst hoort hier niet.",
+    address_hint: "Dit nummer identificeert de laadpaal op de RS-485-bus, ook achter een LAN-adapter. Fabriekswaarde: 50; ondersteund bereik: 10–50. Het is geen IP-adres.",
   },
   it: {
     title: "Collegamento alla wallbox", intro: "Scegli l’adattatore per questa app. I permessi di scrittura e le altre impostazioni rimangono nella scheda Configurazione.",
@@ -207,6 +223,10 @@ const messages = {
     gateway_rollback_failed: "Impossibile confermare le impostazioni precedenti dopo l’errore. La connessione del servizio resta arrestata. Controlla manualmente l’adattatore prima di riconnetterti.",
     adapter_authentication: "Attiva accesso TCP sull’adattatore",
     adapter_auth_hint: "Il salvataggio modifica l’accesso sull’adattatore e in questa app. Per attivarlo deve essere già impostata una password web sull’adattatore. Inseriscila qui sotto; questa pagina non la crea né la modifica.",
+    transport_hint: "USB usa un adattatore collegato all’host di questa app. Per LAN scegli la modalità dell’adattatore: RTU trasparente su TCP oppure conversione Modbus TCP.",
+    serial_hint: "Velocità e formato devono corrispondere alla wallbox; valori di fabbrica: 57600 baud e 8N2. Queste impostazioni dell’app non riconfigurano la wallbox.",
+    endpoint_hint: "Inserisci l’indirizzo dell’adattatore LAN senza http:// o percorso. Usa la sua porta TCP configurata, spesso 502. La porta HTTP 8765 del servizio Modbus non va inserita qui.",
+    address_hint: "Questo numero identifica la wallbox sul bus RS-485, anche dietro un adattatore LAN. Valore di fabbrica: 50; intervallo supportato: 10–50. Non è un indirizzo IP.",
   }
 };
 

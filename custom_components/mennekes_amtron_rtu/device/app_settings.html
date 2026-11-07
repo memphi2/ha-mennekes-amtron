@@ -23,6 +23,7 @@
         <option value="rtu_over_tcp" data-i18n="rtu">LAN: Modbus RTU over TCP</option>
         <option value="modbus_tcp" data-i18n="tcp">LAN: Modbus TCP</option>
       </select>
+      <p class="hint" data-i18n="transport_hint">USB uses an adapter connected to the host running this app. For LAN, match the adapter mode: transparent RTU over TCP or translating Modbus TCP.</p>
       <fieldset id="serial_fields">
         <legend data-i18n="usb_settings">USB adapter</legend>
         <label for="serial_port" data-i18n="adapter">Serial adapter</label>
@@ -43,6 +44,7 @@
             </select>
           </div>
         </div>
+        <p class="hint" data-i18n="serial_hint">Speed and data format must match the wallbox; factory defaults are 57600 baud and 8N2. Changing these app settings does not reconfigure the wallbox.</p>
       </fieldset>
       <fieldset id="network_fields" hidden disabled>
         <legend data-i18n="lan_settings">LAN adapter</legend>
@@ -50,6 +52,7 @@
         <input id="host" name="host" type="text" maxlength="253" autocomplete="off" spellcheck="false" required>
         <label for="tcp_port" data-i18n="port">Adapter TCP port</label>
         <input id="tcp_port" name="tcp_port" type="number" min="1" max="65535" step="1" value="502" required>
+        <p class="hint" data-i18n="endpoint_hint">Enter the LAN adapter address without http:// or a path. Use its configured TCP port, commonly 502. The Modbus service’s HTTP port 8765 does not belong here.</p>
         <p class="hint" data-i18n="lan_hint">Set the serial baud rate and format on the LAN adapter. Saving LAN settings removes any old USB adapter selection.</p>
         <button id="detect_adapter" type="button" class="secondary" data-i18n="detect_adapter">Set up LAN adapter</button>
         <section id="adapter_preview" class="adapter-preview" hidden aria-live="polite">
@@ -95,6 +98,7 @@
       </fieldset>
       <label for="device_id" data-i18n="address">Wallbox Modbus address</label>
       <input id="device_id" name="device_id" type="number" min="10" max="50" step="1" value="50" required>
+      <p class="hint" data-i18n="address_hint">This number identifies the wallbox on the RS-485 bus, including behind a LAN adapter. Factory default: 50; supported range: 10–50. It is not an IP address.</p>
       <p id="restart_hint" class="hint" data-i18n="restart_hint">Saving keeps the current connection running. Restart the app afterwards to apply the change; this briefly interrupts its heartbeat.</p>
       <div class="actions">
         <button id="reload" type="button" class="secondary" data-i18n="reload">Reload settings and adapters</button>

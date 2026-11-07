@@ -4,7 +4,7 @@ configuration:
     description: "Choisissez l’adaptateur USB dans la liste de l’interface Web. Son chemin est enregistré ici. Ignoré pour le réseau et supprimé lors de l’enregistrement réseau dans l’interface Web."
   device_id:
     name: Adresse de la borne
-    description: Adresse Modbus configurée sur la borne.
+    description: "Adresse de la borne sur le bus RS-485, même avec LAN. Valeur d’usine : 50 ; plage prise en charge : 10–50. Utilisez l’adresse configurée dans la borne."
   baudrate:
     name: Vitesse de transmission
     description: "Pour USB / RS-485 uniquement : doit correspondre à la borne. En mode réseau, réglez le débit sur l’adaptateur."
@@ -13,7 +13,7 @@ configuration:
     description: "Pour USB / RS-485 uniquement : bits de données, parité et bits d’arrêt de la borne. En mode réseau, réglez-les sur l’adaptateur."
   read_only:
     name: Lecture seule
-    description: Désactive les commandes de charge, y compris celles de Home Assistant, et le signal de présence du service ; les lectures Modbus restent actives.
+    description: "Activé : surveillance seule ; commandes de charge et heartbeat désactivés, y compris depuis Home Assistant. Désactivez cette option pour autoriser le heartbeat et les commandes. Les lectures Modbus continuent dans les deux modes."
   current_cap:
     name: Plafond du courant
     description: Courant de charge maximal demandé par le gestionnaire d’énergie, en ampères. Une commande explicite à 0 A supprime la limite du gestionnaire d’énergie.
@@ -28,13 +28,13 @@ configuration:
     description: Secondes entre les lectures de l’état. Le signal de présence fonctionne indépendamment.
   measurement_interval:
     name: Intervalle des mesures
-    description: Secondes entre les lectures des mesures ; un intervalle de 30 secondes limite le volume de données dans Recorder.
+    description: "Secondes entre les mesures de puissance, tension, courant et énergie. Les 30 secondes par défaut réduisent les mises à jour fréquentes de l’historique Home Assistant. L’état et le heartbeat ont leurs propres intervalles."
   listen:
     name: Adresse d’écoute de l’API
     description: Conservez 0.0.0.0 pour l’accès via le réseau privé de l’application.
   port:
     name: Port interne de l’API
-    description: Fixé à 8765 ; la publication du port sur l’hôte est facultative et généralement inutile.
+    description: "L’API HTTP de l’application utilise 8765. Home Assistant y accède normalement via le réseau privé des applications sans port publié sur l’hôte. Le port TCP de l’adaptateur LAN se règle séparément."
   connection_type:
     name: Connexion à la borne
     description: "Pour un adaptateur LAN compatible, ouvrez l’interface Web depuis l’onglet Infos de l’application. Choisissez LAN, saisissez l’hôte et sélectionnez « Lire les réglages de l’adaptateur LAN ». Pour le configurer, choisissez « Appliquer les réglages de l’adaptateur lors de l’enregistrement », puis enregistrez et redémarrez l’application. Les adaptateurs USB peuvent aussi y être choisis."

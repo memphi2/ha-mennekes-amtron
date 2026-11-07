@@ -45,7 +45,8 @@
           "server": "Connetti al servizio Modbus",
           "serial_reconfigure": "Modifica connessione seriale",
           "network_reconfigure": "Modifica connessione adattatore LAN"
-        }
+        },
+        "description": "Scegli la nuova connessione della wallbox. Se la connessione è gestita dall’app Modbus, modifica lì le impostazioni USB o LAN. Mantieni attiva una sola connessione Modbus alla wallbox."
       },
       "search_result": {
         "description": "Una wallbox ha risposto dopo {attempts} tentativi:\n\n- Indirizzo del dispositivo: **{device_id}**\n- Bus: **{baudrate} baud, {frame}**\n- Mappa Modbus: **{layout}**\n- Numero di serie: **{serial_number}**\n\nConferma per configurare la wallbox con questi valori.",
@@ -57,7 +58,8 @@
           "server": "Servizio Modbus (continua durante i riavvii di HA)",
           "serial": "Connessione seriale diretta",
           "network": "Connessione diretta tramite adattatore LAN"
-        }
+        },
+        "description": "Scegli come Home Assistant raggiunge la wallbox. Si consiglia l’app Modbus facoltativa: mantiene l’heartbeat durante un riavvio di Home Assistant. Un’app Supervisor in esecuzione viene rilevata automaticamente. Le connessioni dirette USB o LAN non richiedono l’app."
       },
       "serial": {
         "data": {
@@ -103,7 +105,8 @@
           "server_token": "Token di accesso"
         },
         "data_description": {
-          "server_url": "Indirizzo HTTP del servizio Modbus indipendente, normalmente sulla porta 8765. Non inserire qui l’indirizzo dell’adattatore Modbus LAN."
+          "server_url": "Indirizzo HTTP del servizio Modbus indipendente, normalmente sulla porta 8765. Non inserire qui l’indirizzo dell’adattatore Modbus LAN.",
+          "server_token": "Usa il token di accesso configurato nel servizio ospitato separatamente. L’app Supervisor fornisce il token automaticamente; questo modulo non serve per quell’app."
         }
       },
       "hassio_confirm": {
@@ -796,6 +799,9 @@
     },
     "vehicle_profile_invalid": {
       "message": "Seleziona un profilo veicolo esistente e identificabile senza ambiguità."
+    },
+    "vehicle_selection_changed": {
+      "message": "La selezione del veicolo è cambiata durante la configurazione. La configurazione verrà ripetuta con la selezione attuale."
     }
   },
   "issues": {
@@ -850,7 +856,7 @@
           "costs": "Costi di ricarica",
           "losses": "Perdite di ricarica"
         },
-        "description": "Scegli una sezione. Le modifiche vengono applicate solo quando la salvi."
+        "description": "Inizia da Wallbox. Dati del veicolo, pianificazione della partenza, costi e perdite di ricarica sono facoltativi. Ogni sezione viene salvata nell’ultimo modulo; compaiono solo le impostazioni delle funzioni scelte."
       },
       "wallbox": {
         "title": "Wallbox",
@@ -859,7 +865,7 @@
           "wallbox_advanced": "Misure e tempi di attesa",
           "back": "Indietro senza salvare"
         },
-        "description": "Con l’app, i permessi di scrittura e gli intervalli Modbus si impostano nell’app. Usa Riconfigura per modificare la connessione USB/LAN."
+        "description": "Imposta la corrente massima richiedibile da Home Assistant e la frequenza di lettura dello stato. Con l’app Modbus, autorizzazione alla scrittura e intervalli del bus si impostano nella sua scheda Configurazione. Modifica USB/LAN tramite Riconfigura per le connessioni dirette, oppure nell’app se gestisce la connessione."
       },
       "wallbox_basic": {
         "title": "Limite di corrente e lettura",
@@ -870,7 +876,7 @@
         },
         "data_description": {
           "control_mode": "Entrambe le modalità inviano richieste di lettura e richiedono l'accesso esclusivo al bus. Sola lettura non scrive registri. Master Modbus invia anche l'heartbeat e abilita le entità di controllo. Non condividere questo bus con un altro master.",
-          "current_limit": "Limite superiore dell'entità della corrente di ricarica, oltre al limite applicato dalla wallbox stessa.",
+          "current_limit": "Limite superiore del controllo della corrente, in ampere per fase. Non è un obiettivo percentuale né un comando di pausa. Si applicano anche i limiti della wallbox e, se usata, dell’app.",
           "scan_interval_seconds": "Frequenza di lettura dello stato di ricarica, degli errori e dei controlli. L'heartbeat funziona indipendentemente."
         },
         "description": "Il limite di corrente si applica alle richieste HA; restano validi i limiti della wallbox e del servizio. Con l’app, l’intervallo riguarda solo le richieste HA al servizio."
@@ -886,7 +892,8 @@
           "measurement_interval_seconds": "Potenza, tensione, corrente e valori di sessione: 30 secondi riducono il carico sul database. I cambiamenti di stato aggiornano subito le letture. Senza veicolo, almeno 60 secondi. L'intervallo di stato determina il tempo minimo tra le letture.",
           "state_change_interval_seconds": "Intervallo minimo in secondi tra avvii, pause e cambiamenti del consenso alla ricarica, del blocco o delle fasi (predefinito 300). I comandi anticipati vengono accodati; l’ultimo sostituisce il precedente. Rimane l’intervallo di cinque secondi tra le scritture della corrente. Impostare 0 per disabilitare l’intervallo più lungo.",
           "phase_switch_grace_seconds": "Secondi di attesa aggiuntivi tra la conferma della pausa di ricarica da parte del veicolo e il cambio delle fasi (predefinito 5, da 0 a 30). Impostare 0 per eliminare solo questa attesa aggiuntiva; la conferma della pausa rimane obbligatoria."
-        }
+        },
+        "description": "I valori predefiniti bilanciano aggiornamenti rapidi, meno misure memorizzate e cambi di stato graduali. Home Assistant mostra l’attesa residua dei comandi accodati. Questi intervalli non rallentano l’heartbeat indipendente."
       },
       "vehicle": {
         "title": "Veicolo",
@@ -909,7 +916,8 @@
         "data_description": {
           "vehicle_soc_entity": "Scegli il sensore del livello reale di carica in %. In assenza di dati, la ricarica prosegue invariata finché tornano valori validi. Cambiare fonte cancella l’obiettivo senza avviare la carica. Per disattivarlo usa il menu precedente.",
           "use_vehicle_limit": "Attiva questa opzione per usare il limite del veicolo come massimo aggiuntivo. Non vengono modificate le impostazioni del veicolo."
-        }
+        },
+        "description": "Abilita l’obiettivo percentuale facoltativo tramite un sensore di carica esistente. Imposta poi la percentuale desiderata nella pagina del dispositivo wallbox. Un obiettivo limita la carica; non annulla una pausa manuale."
       },
       "vehicle_limit": {
         "title": "Limite di carica del veicolo",
@@ -918,7 +926,8 @@
         },
         "data_description": {
           "vehicle_charge_limit_entity": "Facoltativo: limita ulteriormente l’obiettivo con l’entità del limite di carica del veicolo. Senza questa entità sono possibili obiettivi fino al 100%. Un limite inferiore riduce l’obiettivo esistente; un aumento non lo alza. Se l’entità non è disponibile rimane valido l’ultimo limite noto. Nessuna impostazione del veicolo viene modificata."
-        }
+        },
+        "description": "Usa il limite di ricarica impostato nel veicolo come massimo aggiuntivo per l’obiettivo di Home Assistant. Seleziona il limite desiderato riportato dall’auto, non il suo livello di carica attuale."
       },
       "departure": {
         "title": "Prossima partenza",
@@ -927,7 +936,7 @@
           "departure_disable": "Disattiva la pianificazione della partenza",
           "back": "Indietro senza salvare"
         },
-        "description": "Pianifica un solo prossimo viaggio con l’obiettivo percentuale e la capacità utile. La disattivazione cancella il viaggio e i suoi comandi in attesa; l’obiettivo percentuale resta attivo."
+        "description": "Pianifica il prossimo singolo viaggio con obiettivo percentuale, capacità utile e ora di partenza. Scegli poi l’orario nella pagina del dispositivo o copialo da una fonte facoltativa. Non è un programma giornaliero. La disattivazione cancella il viaggio e i comandi in attesa; l’obiettivo percentuale rimane."
       },
       "departure_requires_vehicle": {
         "title": "Livello di carica necessario",
@@ -945,7 +954,13 @@
           "use_departure_entity": "Usa un’entità per l’orario di partenza",
           "use_vehicle_timer": "Usa gli orari di partenza del veicolo"
         },
-        "description": "Data e ora restano sempre inseribili manualmente. Attiva solo le fonti aggiuntive desiderate; seguiranno le relative impostazioni. Un piano attivo può annullare una pausa manuale per raggiungere l’obiettivo di partenza."
+        "description": "Data e ora restano sempre inseribili manualmente. Attiva solo le fonti aggiuntive desiderate; seguiranno le relative impostazioni. Un piano attivo può annullare una pausa manuale per raggiungere l’obiettivo di partenza.",
+        "data_description": {
+          "capacity_source": "Usa la capacità utile: valore fisso, sensore in kWh/Wh o valore del profilo se supportato. Il piano attende se la capacità scelta o il livello di carica non sono disponibili.",
+          "use_calendar": "Aggiunge un pulsante per copiare il prossimo evento corrispondente. Ogni pressione sceglie un viaggio; usa il blueprint fornito per importazioni pianificate.",
+          "use_departure_entity": "Adotta automaticamente una nuova data e ora future dall’entità scelta. La selezione manuale resta possibile; un nuovo orario futuro di questa fonte può sostituirla.",
+          "use_vehicle_timer": "Aggiunge un pulsante per copiare un timer attivo di partenza/climatizzazione dall’integrazione del veicolo. Legge il timer riportato; non accende il climatizzatore."
+        }
       },
       "departure_capacity_fixed": {
         "title": "Capacità utile della batteria",
@@ -954,7 +969,8 @@
         },
         "data_description": {
           "timed_capacity_kwh": "Inserisci la capacità utile della batteria, non quella nominale."
-        }
+        },
+        "description": "Inserisci l’energia effettivamente utilizzabile per guidare. Serve a stimare il tempo di ricarica necessario; non cambia le impostazioni della batteria dell’auto."
       },
       "departure_capacity_entity": {
         "title": "Entità della capacità della batteria",
@@ -963,7 +979,8 @@
         },
         "data_description": {
           "timed_capacity_entity": "Seleziona un sensore di capacità utile in kWh o Wh."
-        }
+        },
+        "description": "Scegli un sensore della capacità utile, non dell’energia residua o della percentuale. L’unità deve essere kWh o Wh. Senza un valore valido, il piano attende la capacità senza stimarla."
       },
       "departure_calendar": {
         "title": "Calendario delle partenze",
@@ -974,7 +991,8 @@
         "data_description": {
           "timed_calendar_entity": "Seleziona un calendario, poi copia un evento con il pulsante dedicato.",
           "timed_calendar_title": "Sono validi solo gli eventi con questo titolo esatto. Gli eventi di tutto il giorno sono ignorati."
-        }
+        },
+        "description": "Scegli un calendario e un titolo esatto, ad esempio «Viaggio al lavoro». L’inizio dell’evento diventa l’ora di partenza. Il pulsante cerca nei prossimi 14 giorni; ignora gli eventi di giornata intera."
       },
       "departure_entity": {
         "title": "Entità dell’orario di partenza",
@@ -983,7 +1001,8 @@
         },
         "data_description": {
           "timed_departure_entity": "Seleziona un timestamp con data e ora o un input_datetime completo. La sola ora non basta."
-        }
+        },
+        "description": "Scegli una fonte con data e ora. Un nuovo orario futuro valido viene adottato automaticamente. Configura una sola fonte per questo scopo; inserimento manuale e pulsanti calendario/veicolo restano disponibili."
       },
       "departure_vehicle": {
         "title": "Integrazione del veicolo",
@@ -1009,9 +1028,12 @@
       },
       "costs": {
         "title": "Fonte del prezzo dell’energia",
-        "description": "Scegli un prezzo fisso o un sensore di prezzo esistente. Disattivato interrompe la stima dei costi. Le tariffe di rete si configurano separatamente nei passaggi successivi.",
+        "description": "Scegli un prezzo fisso o un sensore di prezzo esistente. Disabilitato spegne la stima dei costi. I passaggi relativi alla tariffa di rete appaiono se il Paese di Home Assistant è Germania.",
         "data": {
           "charging_cost_source": "Fonte del prezzo dell’energia"
+        },
+        "data_description": {
+          "charging_cost_source": "Il prezzo fisso è adatto a un contratto costante; un sensore può seguire una tariffa dinamica come Tibber. Questa funzione stima i costi e non sceglie gli orari più economici."
         }
       },
       "cost_fixed": {
@@ -1019,14 +1041,20 @@
         "data": {
           "charging_price": "Prezzo dell’elettricità lordo"
         },
-        "description": "Inserisci il prezzo per kWh comprensivo di imposte. Sono ammessi prezzi negativi. Senza adeguamento della rete, deve essere il prezzo finale comprensivo degli oneri di rete. Canoni fissi e accrediti annuali sono esclusi. Il valore iniziale suggerito è 0,40 EUR/kWh; usa il prezzo del tuo contratto."
+        "description": "Inserisci il prezzo per kWh comprensivo di imposte. Sono ammessi prezzi negativi. Senza adeguamento della rete, deve essere il prezzo finale comprensivo degli oneri di rete. Canoni fissi e accrediti annuali sono esclusi. Il valore iniziale suggerito è 0,40 EUR/kWh; usa il prezzo del tuo contratto.",
+        "data_description": {
+          "charging_price": "Inserisci euro per kWh, tasse incluse: 0,40 significa 40 centesimi/kWh. Usa il prezzo del contratto; l’eventuale modifica degli oneri di rete si configura separatamente."
+        }
       },
       "cost_sensor": {
         "title": "Sensore del prezzo dell’elettricità",
         "data": {
           "charging_price_entity": "Sensore del prezzo dell’elettricità"
         },
-        "description": "Seleziona un sensore con il prezzo attuale dell’elettricità comprensivo di imposte in EUR/kWh, ct/kWh o EUR/MWh (è accettato anche il simbolo €). Sono ammessi prezzi negativi. Senza adeguamento della rete, il prezzo deve includere gli oneri di rete. Un valore ricevuto è valido per 90 minuti; ricevere nuovamente lo stesso valore rinnova la durata. Prezzi assenti o scaduti lasciano l’energia interessata senza prezzo. Canoni fissi e accrediti annuali sono esclusi."
+        "description": "Seleziona un sensore con il prezzo attuale dell’elettricità comprensivo di imposte in EUR/kWh, ct/kWh o EUR/MWh (è accettato anche il simbolo €). Sono ammessi prezzi negativi. Senza adeguamento della rete, il prezzo deve includere gli oneri di rete. Un valore ricevuto è valido per 90 minuti; ricevere nuovamente lo stesso valore rinnova la durata. Prezzi assenti o scaduti lasciano l’energia interessata senza prezzo. Canoni fissi e accrediti annuali sono esclusi.",
+        "data_description": {
+          "charging_price_entity": "Scegli il prezzo dell’elettricità consumata ora, non una media giornaliera, un elenco di previsioni o il prezzo di immissione. L’unità deve essere EUR/kWh, ct/kWh o EUR/MWh."
+        }
       },
       "cost_module2": {
         "title": "Modulo 2: tariffa di rete ridotta",
@@ -1035,7 +1063,8 @@
           "price_includes_network": "Il prezzo dell’elettricità include già il prezzo di rete ordinario"
         },
         "data_description": {
-          "price_includes_network": "Attivato: sottrai il prezzo di rete ordinario prima di aggiungere la tariffa scelta. Disattivato: la fonte esclude gli oneri di rete, quindi aggiungi la tariffa di rete. Scegli in base alla fonte per evitare un doppio conteggio."
+          "price_includes_network": "Attivato: sottrai il prezzo di rete ordinario prima di aggiungere la tariffa scelta. Disattivato: la fonte esclude gli oneri di rete, quindi aggiungi la tariffa di rete. Scegli in base alla fonte per evitare un doppio conteggio.",
+          "regular_network": "Prezzo lordo ordinario dell’energia di rete dal listino del gestore, in EUR/kWh. Inserisci l’importo non ridotto; l’integrazione calcola la riduzione del modulo 2."
         },
         "description": "Inserisci la tariffa di rete ordinaria lorda. Il modulo 2 applica il 40% a questa componente, non all’intero prezzo dell’elettricità."
       },
@@ -1046,7 +1075,7 @@
           "cost_module3_import": "Importa per la casa HA",
           "back": "Indietro senza salvare"
         },
-        "description": "L’inserimento manuale non trasmette la posizione. L’import invia una volta le coordinate della casa HA a VNBdigital e recupera le tariffe pubbliche da Par14a-Database. Verifica fonte, prezzi e fasce prima di salvare."
+        "description": "L’inserimento manuale non invia la posizione, a meno che tu attivi poi l’aggiornamento annuale. L’importazione invia le coordinate Home a VNBdigital e legge le tariffe pubbliche di Par14a-Database. Verifica gestore, prezzi e fasce prima di salvare. Se non trova una tariffa univoca, inserisci i valori manualmente."
       },
       "cost_module3_prices": {
         "title": "Modulo 3: prezzi e fasce orarie",
@@ -1063,9 +1092,14 @@
         },
         "data_description": {
           "price_includes_network": "Attivato: sottrai il prezzo di rete ordinario prima di aggiungere la tariffa scelta. Disattivato: la fonte esclude gli oneri di rete, quindi aggiungi la tariffa di rete. Scegli in base alla fonte per evitare un doppio conteggio.",
-          "auto_tariff_refresh": "Il 1° gennaio vengono cercati e applicati i dati pubblicati per il nuovo anno se univoci. Se non disponibili, il tentativo viene ripetuto ogni giorno. Possono essere usati anche valori provvisori; verifica in seguito il listino definitivo.",
+          "auto_tariff_refresh": "Dal 1° gennaio cerca la nuova tariffa usando le coordinate Home e applica un risultato valido e univoco. Reinvia le coordinate a VNBdigital; riprova ogni giorno se necessario. Prezzi provvisori possono sostituire prezzi e fasce manuali. Verifica poi il listino definitivo.",
           "high_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte.",
-          "low_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte."
+          "low_periods": "Un periodo HH:MM-HH:MM per riga, con confini di 15 minuti. È possibile attraversare la mezzanotte.",
+          "regular_network": "Prezzo lordo standard di rete in EUR/kWh. Si applica fuori dalle fasce alte/basse e dai trimestri scelti.",
+          "high_network": "Prezzo lordo di rete nella fascia alta (HT), in EUR/kWh. Inserisci solo la componente di rete, non il prezzo totale dell’elettricità.",
+          "low_network": "Prezzo lordo di rete nella fascia bassa (NT), in EUR/kWh. Usa lo stesso anno del listino delle tariffe standard e alta.",
+          "tariff_year": "Anno di validità del listino. Alla scadenza, le stime attendono una tariffa valida per il nuovo anno. Aggiorna manualmente o attiva l’aggiornamento annuale facoltativo.",
+          "active_quarters": "Seleziona i trimestri in cui valgono questi prezzi variabili. Negli altri si applica il prezzo standard. Q1 = gen–mar, Q2 = apr–giu, Q3 = lug–set, Q4 = ott–dic."
         },
         "description": "Controlla insieme i tre prezzi di rete IVA inclusa e le relative fasce orarie. La tariffa standard vale fuori dalle fasce alta/bassa e dai trimestri selezionati. Usa l’ora locale tedesca (Europe/Berlin). Fonte: {source}. ⚠ indica dati provvisori. Conferma questo modulo per salvare."
       },
@@ -1078,7 +1112,7 @@
           "back": "Indietro senza salvare",
           "loss_profile": "Usa la cronologia di ricarica del veicolo selezionato"
         },
-        "description": "Confronto facoltativo tra energia della wallbox ed energia immessa nella batteria. Scegli una cronologia esistente o un sensore di energia dell’ultima ricarica."
+        "description": "Confronta l’energia misurata dalla wallbox con quella aggiunta alla batteria nella stessa ricarica completata. Ultima perdita e media sono stime. Seleziona il veicolo prima della ricarica; corrispondenze mancanti o ambigue restano sconosciute."
       },
       "loss_sensor": {
         "title": "Perdite di ricarica da un sensore",
@@ -1088,7 +1122,8 @@
           "charge_loss_auto_match": "Abbinare automaticamente il valore di energia modificato"
         },
         "data_description": {
-          "charge_loss_auto_match": "Facoltativo: abbina un valore modificato ricevuto entro 30 minuti dallo scollegamento, se l’integrazione ha osservato l’intera ricarica. Una variazione del valore non dimostra che entrambe le misure appartengano alla stessa ricarica. Lascia disattivato per confermare ogni abbinamento."
+          "charge_loss_auto_match": "Facoltativo: abbina un valore modificato ricevuto entro 30 minuti dallo scollegamento, se l’integrazione ha osservato l’intera ricarica. Una variazione del valore non dimostra che entrambe le misure appartengano alla stessa ricarica. Lascia disattivato per confermare ogni abbinamento.",
+          "vehicle_last_charge_energy_entity": "Scegli l’energia ricevuta dalla batteria nell’ultima ricarica completata, in kWh o Wh. Percentuale di carica, contatore della wallbox e totale cumulativo non sono adatti."
         }
       },
       "loss_vehicle": {
@@ -1106,13 +1141,17 @@
         "description": "Seleziona il veicolo collegato a questa wallbox. Viene letta solo la cronologia locale esistente, senza aggiornare il veicolo. Le corrispondenze mancanti o ambigue restano sconosciute."
       },
       "options_changed": {
-        "title": "Le impostazioni sono cambiate"
+        "title": "Le impostazioni sono cambiate",
+        "description": "Le impostazioni o il veicolo attivo sono cambiati mentre il modulo era aperto. Nulla di questo modulo è stato salvato. Prosegui per riaprire la sezione con le impostazioni attuali."
       },
       "cost_network": {
         "title": "Adeguamento della tariffa di rete",
         "description": "Il prezzo dell’energia è già selezionato. Non applicare adeguamenti se è il prezzo finale; altrimenti seleziona il modulo di rete concordato.",
         "data": {
           "charging_network_module": "Adeguamento della tariffa di rete"
+        },
+        "data_description": {
+          "charging_network_module": "Queste opzioni appaiono se il Paese di Home Assistant è Germania. Scegli il modulo concordato per questa utenza. L’integrazione calcola una stima; non richiede tariffe né modifica il contratto elettrico."
         }
       },
       "vehicle_profiles": {
@@ -1135,7 +1174,8 @@
           "vehicle_provider": "Integrazione del veicolo"
         },
         "data_description": {
-          "vehicle_profile_name": "Inserisci un nome di profilo univoco da 1 a 80 caratteri."
+          "vehicle_profile_name": "Inserisci un nome di profilo univoco da 1 a 80 caratteri.",
+          "vehicle_provider": "Scegli BavarianData se è già installata e fornisce questa auto in Home Assistant. Le fonti manuali funzionano con altre integrazioni o helper; seleziona le loro entità nelle singole funzioni facoltative."
         }
       },
       "vehicle_profile_edit": {
@@ -1146,7 +1186,8 @@
           "vehicle_provider": "Integrazione del veicolo"
         },
         "data_description": {
-          "vehicle_profile_name": "Inserisci un nome di profilo univoco da 1 a 80 caratteri."
+          "vehicle_profile_name": "Inserisci un nome di profilo univoco da 1 a 80 caratteri.",
+          "vehicle_provider": "Scegli BavarianData se è già installata e fornisce questa auto in Home Assistant. Le fonti manuali funzionano con altre integrazioni o helper; seleziona le loro entità nelle singole funzioni facoltative."
         }
       },
       "vehicle_profile_select": {
@@ -1154,13 +1195,17 @@
         "data": {
           "vehicle_profile_id": "Profilo veicolo"
         },
-        "description": "Seleziona il veicolo collegato a questa wallbox. Il cambio cancella l’obiettivo percentuale e il piano di partenza precedenti senza avviare la ricarica. Ogni profilo conserva impostazioni e perdite medie."
+        "description": "Seleziona il veicolo collegato a questa wallbox. Il cambio cancella l’obiettivo percentuale e il piano di partenza precedenti senza avviare la ricarica. Ogni profilo conserva impostazioni e perdite medie.",
+        "data_description": {
+          "vehicle_profile_id": "Seleziona l’auto effettivamente collegata prima della ricarica, soprattutto per confrontare le perdite. Questa scelta manuale disattiva la selezione automatica."
+        }
       },
       "vehicle_profile_edit_select": {
         "title": "Modifica profilo",
         "data": {
           "vehicle_profile_id": "Profilo veicolo"
-        }
+        },
+        "description": "Scegli il profilo da modificare. Modificare un altro profilo non seleziona quel veicolo per la ricarica."
       },
       "vehicle_profile_remove": {
         "title": "Rimuovi profilo",
@@ -1175,6 +1220,9 @@
         "description": "Seleziona il dispositivo del veicolo in BavarianData. Livello di carica, limite, capacità, partenze e cronologia potranno usare la stessa auto. Attiva ogni funzione separatamente.",
         "data": {
           "vehicle_device": "Veicolo"
+        },
+        "data_description": {
+          "vehicle_device": "Scegli l’auto, non la wallbox. I dati supportati provengono solo da questo dispositivo. I valori mancanti non vengono sostituiti con quelli di un’altra auto."
         }
       },
       "vehicle_source": {
@@ -1182,6 +1230,9 @@
         "description": "Usa il livello di carica riportato dal profilo attivo oppure scegli manualmente un’entità. Seguono solo le impostazioni della fonte scelta.",
         "data": {
           "vehicle_soc_source": "Fonte del livello di carica"
+        },
+        "data_description": {
+          "vehicle_soc_source": "La fonte del profilo riutilizza l’integrazione del veicolo selezionata. La selezione manuale permette un altro sensore percentuale per il profilo senza modificarne le altre fonti facoltative."
         }
       },
       "vehicle_profile_soc": {
@@ -1189,6 +1240,9 @@
         "description": "Usa il livello di carica riportato dal profilo attivo per l’obiettivo percentuale facoltativo. Il limite di carica della stessa auto può anche fungere da massimo. Nessuna impostazione viene scritta nel veicolo.",
         "data": {
           "use_vehicle_limit": "Usa anche il limite di carica del veicolo"
+        },
+        "data_description": {
+          "use_vehicle_limit": "Facoltativo e indipendente dalla fonte del livello di carica. Un limite inferiore riduce l’obiettivo; uno superiore non lo aumenta. Se diventa indisponibile, rimane valido l’ultimo valore attendibile."
         }
       },
       "loss_profile": {
@@ -1209,6 +1263,9 @@
         "description": "Viene selezionata solo un’auto con segnali validi di cavo collegato e presenza a casa segnalati recentemente a Home Assistant. Un cavo sicuramente scollegato o un’auto certamente fuori casa esclude quel veicolo. Altrimenti, segnali sconosciuti, non disponibili o non segnalati da oltre 30 minuti impediscono la selezione. Se non corrisponde nessun’auto o ne corrispondono più di una, non viene selezionato alcun veicolo. Una scelta manuale disattiva la selezione automatica. Il rilevamento non avvia né riprende la ricarica.",
         "data": {
           "vehicle_auto_selection": "Seleziona il veicolo automaticamente"
+        },
+        "data_description": {
+          "vehicle_auto_selection": "Attiva dopo aver configurato i profili partecipanti. La selezione automatica non identifica l’auto dal cavo della wallbox; dipende dai segnali scelti. Puoi sempre selezionare manualmente un’auto."
         }
       },
       "vehicle_detection_profile": {
@@ -1231,6 +1288,10 @@
         "data": {
           "vehicle_connected_entity": "Cavo di ricarica collegato",
           "vehicle_home_entity": "Veicolo a casa"
+        },
+        "data_description": {
+          "vehicle_connected_entity": "Usa il segnale «cavo collegato» di questa auto, non «ricarica in corso»: deve restare identificabile anche in pausa o a batteria piena.",
+          "vehicle_home_entity": "Preferisci la posizione dell’auto. La presenza di una persona va bene solo se indica in modo affidabile che questa auto è a casa. Due auto compatibili o segnali incerti impediscono la selezione automatica."
         }
       }
     },

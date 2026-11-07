@@ -4,7 +4,7 @@ configuration:
     description: "Scegli l’adattatore USB dal menu Apri interfaccia Web. Il percorso viene salvato qui. Ignorato per LAN e rimosso salvando LAN nell’interfaccia Web."
   device_id:
     name: Indirizzo della wallbox
-    description: Indirizzo Modbus configurato nella wallbox.
+    description: "Indirizzo della wallbox sul bus RS-485, anche con LAN. Valore di fabbrica: 50; intervallo supportato: 10–50. Usa l’indirizzo configurato nella wallbox."
   baudrate:
     name: Velocità in baud
     description: "Solo per USB / RS-485: deve corrispondere alla wallbox. Per LAN, imposta la velocità sull’adattatore."
@@ -13,7 +13,7 @@ configuration:
     description: "Solo per USB / RS-485: bit dati, parità e bit di stop della wallbox. Per LAN, impostali sull’adattatore."
   read_only:
     name: Sola lettura
-    description: Disabilita i comandi di ricarica, compresi i controlli di Home Assistant, e l'heartbeat del servizio; le letture Modbus rimangono attive.
+    description: "Attivato: solo monitoraggio; comandi di ricarica e heartbeat disabilitati, anche da Home Assistant. Disattiva l’opzione per consentire heartbeat e controlli di ricarica. Le letture Modbus proseguono in entrambe le modalità."
   current_cap:
     name: Corrente massima
     description: Corrente EMS massima richiesta in ampere. I comandi espliciti con 0 A rimuovono il limite EMS.
@@ -28,13 +28,13 @@ configuration:
     description: Secondi tra le letture dello stato. L'heartbeat funziona indipendentemente.
   measurement_interval:
     name: Intervallo delle misurazioni
-    description: Secondi tra le letture delle misurazioni; 30 secondi limitano il carico su Recorder.
+    description: "Secondi tra misure di potenza, tensione, corrente ed energia. I 30 secondi predefiniti riducono gli aggiornamenti frequenti della cronologia di Home Assistant. Stato e heartbeat hanno intervalli separati."
   listen:
     name: Indirizzo di ascolto API
     description: Mantieni 0.0.0.0 per l'accesso tramite la rete privata dell'app.
   port:
     name: Porta API interna
-    description: Fissa a 8765; esporre la porta sull'host è facoltativo e normalmente non necessario.
+    description: "L’API HTTP dell’app usa 8765. Home Assistant la raggiunge normalmente tramite la rete privata delle app senza pubblicare una porta host. La porta TCP dell’adattatore LAN si configura separatamente."
   connection_type:
     name: Connessione wallbox
     description: "Per un adattatore LAN compatibile, apri l’interfaccia Web dalla scheda Informazioni dell’app. Scegli LAN, inserisci l’host e seleziona «Leggi impostazioni adattatore LAN». Per configurarlo, scegli «Applica le impostazioni dell’adattatore al salvataggio», salva e riavvia l’app. Qui puoi scegliere anche gli adattatori USB."
