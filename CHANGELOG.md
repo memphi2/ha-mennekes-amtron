@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.7.0b1 — 2026-11-07
+
+Beta release of the integration and app; **0.6.1 remains stable**.
+
+- Split settings into Wallbox, Vehicle charge target, Next departure, Charging
+  costs and Charging losses. Show details only for selected features, save each
+  section independently and preserve other settings.
+- Separate optional vehicle adapters from charging logic. Keep generic HA
+  sensors, manual dates and calendars independent of BavarianData. Preserve
+  existing vehicle selections and departure-button identities.
+- Fix Module 3 and integer-input dialogs, preserve saved minute-level tariffs,
+  and make Home-based tariff import an explicit choice. Run annual refresh at
+  German midnight regardless of Home Assistant’s time zone.
+- Recheck reached targets before enabling writes, replace stale planner-owned
+  commands and safely clear departure plans when disabled. Recover charging-loss
+  estimates after temporary storage failures.
+- Update the app’s shared control and tariff fixes. App beta **0.7.0b1** is
+  offered through **#apps-beta**; the stable app catalog remains unchanged.
+  Service compatibility remains **API 2, version 0.6.1 or newer**.
+
 ## 0.6.1 — 2026-11-07
 
 - Add next-trip charging deadlines with fixed or dynamic battery capacity,
