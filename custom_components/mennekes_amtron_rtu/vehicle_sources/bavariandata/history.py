@@ -9,6 +9,7 @@ Protocol verified against JustChr/BavarianData commit
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import math
 import re
 from dataclasses import dataclass
@@ -52,6 +53,20 @@ def bavarian_vehicle_vin(hass: HomeAssistant, device_id: object) -> str | None:
         and re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", value.strip().upper())
     }
     return next(iter(candidates)) if len(candidates) == 1 else None
+
+
+def vehicle_source_key(device_id: str, vin: str | None) -> str:
+    """Expose stable source identity without publishing the vehicle VIN."""
+    identity = f"{HISTORY_DOMAIN}:{device_id}"
+    return identity if vin is None else identity + ":" + hashlib.sha256(vin.encode()).hexdigest()
+
+
+def bound_vehicle_vin(hass: HomeAssistant, device_id: str, expected_source_key: str | None) -> str | None:
+    """A persisted profile pin survives missing registries, not vehicle replacement."""
+    vin = bavarian_vehicle_vin(hass, device_id)
+    if expected_source_key is not None and vehicle_source_key(device_id, vin) != expected_source_key:
+        return None
+    return vin
 
 
 @dataclass(frozen=True, slots=True)

@@ -11,7 +11,31 @@ from custom_components.mennekes_amtron_rtu.device.charging_session import (
     CompletedSession,
 )
 
-Capability = Literal["departure", "charge_history"]
+Capability = Literal["soc", "charge_limit", "capacity", "departure", "charge_history"]
+
+
+@dataclass(frozen=True, slots=True)
+class VehicleTelemetry:
+    """Validated optional values from one locally selected vehicle."""
+
+    soc_percent: float | None = None
+    maximum_percent: float | None = None
+    capacity_kwh: float | None = None
+
+
+class VehicleTelemetrySource(Protocol):
+    """Observe already published vehicle data without polling its integration."""
+
+    @property
+    def source_key(self) -> str: ...
+
+    @property
+    def available(self) -> bool: ...
+
+    @property
+    def snapshot(self) -> VehicleTelemetry: ...
+
+    def subscribe(self, on_change: Callable[[VehicleTelemetry], None]) -> CALLBACK_TYPE: ...
 
 
 @dataclass(frozen=True, slots=True)

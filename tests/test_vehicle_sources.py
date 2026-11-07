@@ -38,7 +38,7 @@ def test_only_implemented_capabilities_are_advertised_and_vehicle_bound():
         definitions = provider_definitions(capability)
         assert len(definitions) == 1
         assert definitions[0].id == definitions[0].integration_domain == "bavariandata"
-        assert definitions[0].capabilities == frozenset({"departure", "charge_history"})
+        assert definitions[0].capabilities == frozenset({"soc", "charge_limit", "capacity", "departure", "charge_history"})
         assert provider_selection({}, capability) == ProviderSelection("none", "")
     hass = local_hass()
     assert provider_device_is_valid(hass, "bavariandata", "car")
