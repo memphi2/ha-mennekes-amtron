@@ -280,7 +280,7 @@ def planned_release(monkeypatch):
     current = info()
     previous = {**info(tag="v0.5.0", source=PREVIOUS_SOURCE), "digest": DIGEST, "catalog_channel": "apps"}
     state = {"current": current, "previous": previous, "changed": False,
-             "minimum": "0.5.0", "digest": DIGEST, "dirty": False}
+             "minimum": "0.5.0", "digest": DIGEST, "dirty": False, "catalog_checks": []}
     commands = []
     verified = []
     reads = []
@@ -311,6 +311,7 @@ def planned_release(monkeypatch):
     monkeypatch.setattr(planner, "fingerprint", lambda ref: "new" if state["changed"] and ref == SOURCE else "same")
     monkeypatch.setattr(planner, "minimum_service_version", lambda: state["minimum"])
     monkeypatch.setattr(planner, "existing_verified_image", verify)
+    monkeypatch.setattr(planner, "verify_existing_catalog", lambda *args: state["catalog_checks"].append(args))
     return state, commands, verified, reads
 
 
@@ -325,7 +326,19 @@ def test_unchanged_service_reuses_original_tag_commit_and_digest_without_publica
     assert not result.build_required
     assert not result.catalog_required
     assert verified == [expected]
+    assert state["catalog_checks"] == [(expected, DIGEST, "apps")]
     assert commands == [("status", "--porcelain"), ("merge-base", "--is-ancestor", PREVIOUS_SOURCE, SOURCE)]
+
+
+def test_unchanged_service_cannot_hide_a_drifted_catalog(planned_release, monkeypatch):
+    state, _commands, _verified, _reads = planned_release
+
+    def drifted(*_args):
+        raise ValueError("app catalog files differ from the original release")
+
+    monkeypatch.setattr(planner, "verify_existing_catalog", drifted)
+    with pytest.raises(ValueError, match="files differ"):
+        planner.plan(REPOSITORY, state["current"]["source_tag"])
 
 
 @pytest.mark.parametrize("existing_digest", [None, DIGEST])
