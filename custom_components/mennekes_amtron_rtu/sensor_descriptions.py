@@ -48,6 +48,17 @@ from .device.soc_goal import SOC_GOAL_STATES
 
 CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
+        key="timed_goal_status",
+        translation_key="timed_goal_status",
+        device_class=SensorDeviceClass.ENUM,
+        options=[
+            "disabled", "waiting_for_target", "waiting_for_capacity",
+            "waiting_for_soc", "waiting_for_device", "read_only", "queued",
+            "paused_until_start", "paced", "early_at_minimum", "unreachable",
+            "late", "reached", "write_pending", "error",
+        ],
+    ),
+    SensorEntityDescription(
         key="soc_goal_status",
         translation_key="soc_goal_status",
         device_class=SensorDeviceClass.ENUM,

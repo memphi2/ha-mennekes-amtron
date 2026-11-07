@@ -119,8 +119,9 @@ service, checks the entry's existing identity binding and reloads the entry.
 Serial-bound entries require the same serial number; standalone entries added
 without a readable serial number retain their URL binding.
 Integration and service releases are independent. The current integration
-accepts **service 0.5.0 or newer with API 2**, including the already published
-0.5.0 app. A routine integration update leaves that service running. If both
+requires **service 0.6.1 or newer with API 2**, including service-owned expiry
+of queued timed charging commands. A future integration-only update can leave
+that compatible service running. If both
 need updating, update the app/service first, then the integration and restart
 Core. Keep existing app data and the HA entry; see [Updates](modbus-service.md#updates).
 
@@ -209,10 +210,10 @@ authenticated endpoints use `/v2/`. The beta API 1 and `/v1/` routes are
 intentionally unsupported; there are no compatibility aliases.
 
 The integration checks the supported API and its separate minimum service
-version, currently **0.5.0**. Release numbers do not have to match: compatible
-newer service versions are accepted. New snapshots report `service_version`.
-The published 0.5.0 app predates that field and is accepted as the known API 2
-baseline; an omitted version will no longer satisfy a future higher minimum.
+version, currently **0.6.1**. Release numbers do not have to match: compatible
+newer service versions are accepted. Snapshots must report `service_version`
+meeting that minimum. Old API 2 snapshots without this field correspond to the
+0.5.0 baseline and do not satisfy the current requirement.
 An unsupported API or a service below the minimum produces the compatibility
 error. A malformed version or snapshot produces the data-validation error.
 Neither condition asks for new credentials. See [Updates](modbus-service.md#updates).
@@ -253,6 +254,21 @@ identity:
   "expected_serial_number": "EXAMPLE_CONFIGURED_SERIAL"
 }
 ```
+
+Timed plans use two additional API 2 commands from service **0.6.1**:
+
+| Command | Additional fields | Behavior |
+|---|---|---|
+| `timed_current` | `value`: requested amperes ≥6 (limited to the configured maximum), or `null` for pause; `owner`: nonempty string up to 128 characters; `deadline`: timezone-aware ISO timestamp up to 64 characters | Applies or queues this plan's requested current/pause only before its deadline. |
+| `cancel_timed_current` | `owner`: the same owner string | Removes only an unsent queued command belonging to that plan; manual queued work is preserved. |
+
+Both require `expected_serial_number` as above. The deadline is checked inside
+the service, so an obsolete queued request expires even while HA is offline.
+Expiry and cancellation do not reverse a command already applied or alter the
+last charging state. The integration cancels its owned pending work when a plan
+is cleared, replaced, completed or unloaded. Pending work remains volatile and
+is not restored after a service restart. The service still maintains heartbeat;
+HA must be running to recalculate the departure plan and start climate actions.
 
 The service compares this precondition with its initialized wallbox identity
 while holding the command lock, before writing. A missing field or mismatched

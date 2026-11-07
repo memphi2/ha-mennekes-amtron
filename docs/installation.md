@@ -62,8 +62,7 @@ The service continues running when the Home Assistant part restarts.
 1. Open the repository with the button, or search **Settings → Marketplace**
    for **Mennekes Amtron RTU** by **memphi2**.
 2. Accept the community-content notice when prompted.
-3. Select stable **0.5.1**, or enable prereleases and choose **0.6.0b1** to test
-   the new features; see [Beta testing](#beta-testing-060b1).
+3. Select stable **0.6.1**.
 4. Install the integration and follow any restart request.
 
 The first Marketplace installation can be used without a Core restart.
@@ -73,8 +72,7 @@ Replacing code already loaded by HA needs a restart; see
 ### Home Assistant 2026.9 and 2026.10
 
 1. Open **HACS** and search for **Mennekes Amtron RTU** by **memphi2**.
-2. Select stable **0.5.1**, or enable beta releases and choose **v0.6.0b1** to test
-   the new features; see [Beta testing](#beta-testing-060b1).
+2. Select stable **v0.6.1**.
 3. Download the integration and restart Home Assistant.
 
 If the repository is missing from the catalog, add
@@ -98,7 +96,7 @@ The service is a separate app: installing the integration from the Marketplace
 or HACS does not install it. It remains optional, and choosing it never deletes
 your existing device or entity IDs.
 
-App **0.6.0b1** adds an **Open Web UI** page for USB/LAN
+App **0.6.1** includes an **Open Web UI** page for USB/LAN
 setup. That page requires an administrator and stable **Supervisor 2026.11.0+**;
 it does not raise the integration's Home Assistant minimum version. Older app
 **0.5.2b2** uses the native **Configuration** tab. See
@@ -116,15 +114,14 @@ it does not raise the integration's Home Assistant minimum version. Older app
 4. Confirm current readings, the intended pause/release settings and heartbeat
    health. Keep the existing integration entry.
 
-**The integration and app may have different version numbers.** The current
-integration requires **service 0.5.0 or newer with API 2**. The released 0.5.0 app
-already meets that requirement. A normal integration update does not update or
-restart the compatible app; its heartbeat and charging intent continue through
-Core's restart when writes are enabled.
+**The integration and app may have different version numbers.** Integration
+**0.6.1** requires **service 0.6.1 or newer with API 2**. Update an older service
+first, including 0.6.0b1. This supplies expiry for queued timed-plan commands
+even while HA is offline. Future integration-only updates can reuse a compatible
+app without restarting it; its heartbeat continues through HA Core restarts.
 
-**Still using a 0.5.0 beta?** Update the app/service to an API 2 release first:
-stable **0.5.1**, or **0.6.0b1** when testing this beta. Then update the
-integration. The old beta integration may show unavailable controls between
+**Still using a 0.5.0 beta?** Update the app/service to **0.6.1** first,
+then update the integration. The old beta integration may show unavailable controls between
 these updates because its API differs. Keep the existing app and follow
 [service updates](modbus-service.md#updates), including the connection choice.
 
@@ -137,21 +134,22 @@ adding the wallbox again; [HA carries over the existing repositories](https://co
 For blueprint changes, follow
 [Updating existing automations](blueprints.md#updating-existing-blueprint-automations).
 
-## Beta testing 0.6.0b1
+## Updating to 0.6.1
 
-**0.6.0b1 is a prerelease of the integration and app**, including the previous
-**0.5.2b1/b2** improvements. Stable remains **0.5.1**. Keep the existing HA entry
-and back up the app's data before updating.
+**0.6.1 is a stable release of the integration and app**, including the features
+previously offered in 0.5.2 and 0.6.0 betas. Keep your existing HA entry and back
+up the app's data before updating. Service mode requires **app/service 0.6.1 or
+newer**; update it before the integration, even if you do not use timed planning.
 
-- **Marketplace:** enable the repository's **Pre-release** switch and select
-  **0.6.0b1**.
-- **HACS:** choose **⋮ → Redownload → Need a different version?**, enable beta
-  releases when needed and select **v0.6.0b1**.
-- **App:** only `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` offers
-  **0.6.0b1**. Existing beta-app users can use **Check for updates** and update
-  normally without switching catalogs or reinstalling. The stable `#apps` catalog
-  stays on **0.5.1**. Switching catalogs creates a separate app; follow the
-  [channel handover](modbus-service.md#updates) and never run both on the same bus.
+- **Marketplace:** install the stable **0.6.1** update. No prerelease switch is
+  needed for this version.
+- **HACS:** select **v0.6.1**. Existing beta installations can move to this stable
+  version without adding the integration again.
+- **App:** `https://github.com/memphi2/ha-mennekes-amtron#apps` offers stable
+  **0.6.1**. Existing `#apps-beta` users also receive this stable app; use
+  **Check for updates** and update normally, keeping the existing app data.
+  No catalog switch is needed. An optional catalog switch creates a separate
+  app; follow the [channel handover](modbus-service.md#updates).
 
 Before updating the app from 0.5.1, save one of the three readable connection
 choices if a technical value such as `serial` is still selected; see

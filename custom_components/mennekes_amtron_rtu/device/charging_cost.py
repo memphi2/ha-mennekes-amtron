@@ -150,6 +150,8 @@ class TariffConfig:
             raise ValueError("windows requires two to sixteen tariff windows")
         if {window.rate for window in self.windows} != {"ht", "nt"}:
             raise ValueError("windows requires both ht and nt")
+        if any(window.start % 15 or window.end % 15 for window in self.windows):
+            raise ValueError("module 3 windows require quarter-hour boundaries")
         occupied: set[int] = set()
         for window in self.windows:
             minutes = {minute for minute in range(1440) if window.contains(minute)}

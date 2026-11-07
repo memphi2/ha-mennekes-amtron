@@ -191,6 +191,15 @@
       },
       "assign_vehicle_charge": {
         "name": "Fahrzeug-Ladeenergie zuordnen"
+      },
+      "timed_next_calendar_event": {
+        "name": "Nächsten Kalendertermin übernehmen"
+      },
+      "timed_clear_departure": {
+        "name": "Abfahrtszeit löschen"
+      },
+      "timed_bmw_departure": {
+        "name": "BMW-Abfahrt übernehmen"
       }
     },
     "number": {
@@ -506,6 +515,26 @@
             "name": "Energie ohne Preis"
           }
         }
+      },
+      "timed_goal_status": {
+        "name": "Status des zeitgesteuerten Ladens",
+        "state": {
+          "disabled": "Deaktiviert",
+          "waiting_for_target": "Wartet auf Prozentziel",
+          "waiting_for_capacity": "Wartet auf Akkukapazität",
+          "waiting_for_soc": "Wartet auf Fahrzeugladestand",
+          "waiting_for_device": "Wartet auf Wallbox",
+          "read_only": "Nur lesen",
+          "queued": "Änderung vorgemerkt",
+          "paused_until_start": "Pausiert bis zum Start",
+          "paced": "Ladestrom wird angepasst",
+          "early_at_minimum": "Bei Mindeststrom eventuell zu früh fertig",
+          "unreachable": "Ziel eventuell nicht erreichbar",
+          "late": "Zielzeit überschritten",
+          "reached": "Ziel erreicht",
+          "write_pending": "Schreibbefehl ausstehend",
+          "error": "Fehler"
+        }
       }
     },
     "switch": {
@@ -565,10 +594,16 @@
               "error_still_active": "Fehler weiterhin aktiv",
               "unknown": "Unbekannter Grund",
               "user_cancelled": "Vom Benutzer abgebrochen",
-              "energy_goal": "Ladestopp durch ein Ladeziel"
+              "energy_goal": "Ladestopp durch ein Ladeziel",
+              "deadline_expired": "Abfahrtszeit abgelaufen"
             }
           }
         }
+      }
+    },
+    "datetime": {
+      "timed_departure": {
+        "name": "Nächste Abfahrt"
       }
     }
   },
@@ -683,6 +718,15 @@
     },
     "loss_storage_unavailable": {
       "message": "Der Ladeverlust konnte nicht gespeichert werden. Prüfe den verfügbaren Speicher und versuche es erneut."
+    },
+    "timed_goal_state_invalid": {
+      "message": "Die gespeicherte Abfahrtszeit konnte nicht wiederhergestellt werden. Prüfe den gespeicherten Plan vor dem nächsten Laden."
+    },
+    "timed_bavarian_unavailable": {
+      "message": "Kein aktiver, vollständiger BMW-Abfahrtstimer verfügbar. Aktiviere in BavarianData die Sensoren für Aktivierung, Stunde und Minute. Für wiederkehrende Timer müssen die Wochentage in den Integrationsoptionen angegeben sein."
+    },
+    "timed_goal_unavailable": {
+      "message": "Vorgemerkte Abfahrtsbefehle konnten nicht geprüft werden. Die Integration versucht es erneut, sobald die Verbindung verfügbar ist."
     }
   },
   "issues": {
@@ -731,7 +775,16 @@
           "vehicle_soc_entity": "Entität für den Fahrzeug-Ladestand (optional)",
           "vehicle_charge_limit_entity": "Entität für das Fahrzeug-Ladelimit (optional)",
           "charge_loss_source": "Datenquelle für Ladeverluste",
-          "charging_cost_source": "Ladekosten berechnen"
+          "charging_cost_source": "Ladekosten berechnen",
+          "timed_capacity_kwh": "Nutzbare Akkukapazität (kWh, optional)",
+          "timed_capacity_entity": "Entität für nutzbare Akkukapazität (optional)",
+          "timed_departure_entity": "Entität für Abfahrtszeit (optional)",
+          "timed_calendar_entity": "Abfahrtskalender (optional)",
+          "timed_calendar_title": "Genauer Titel des Kalendertermins (optional)",
+          "timed_bavarian_device": "BavarianData-Fahrzeug für Abfahrt (optional)",
+          "timed_vehicle_time_zone": "Zeitzone des Fahrzeugs (optional)",
+          "timed_timer1_days": "Wochentage BMW-Timer 1 (optional)",
+          "timed_timer2_days": "Wochentage BMW-Timer 2 (optional)"
         },
         "data_description": {
           "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
@@ -743,7 +796,16 @@
           "vehicle_soc_entity": "Optional: Wähle den Sensor, der den tatsächlichen Ladestand des Fahrzeugs in % meldet. Damit wird ein separates Prozent-Ladeziel verfügbar; ohne Auswahl bleibt es deaktiviert. Bei fehlenden Fahrzeugdaten läuft das Laden unverändert weiter, bis gültige Daten zurückkehren. Ändern oder Entfernen einer Quelle löscht das Prozentziel, ohne das Laden fortzusetzen.",
           "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt.",
           "charge_loss_source": "Optionaler Vergleich der Wallbox-Energie mit der Energie, die im Fahrzeugakku ankommt. Wähle eine Quelle und richte sie im nächsten Schritt ein. Die Ladesteuerung bleibt davon unabhängig.",
-          "charging_cost_source": "Optionale Kostenschätzung mit einem festen Bruttostrompreis oder einem Preissensor. Richte den Preis im nächsten Schritt ein. Standardmäßig deaktiviert; die Ladesteuerung bleibt unabhängig."
+          "charging_cost_source": "Optionale Kostenschätzung mit einem festen Bruttostrompreis oder einem Preissensor. Richte den Preis im nächsten Schritt ein. Standardmäßig deaktiviert; die Ladesteuerung bleibt unabhängig.",
+          "timed_capacity_kwh": "Nutzbare statt nomineller Akkukapazität eintragen. Leer lassen, wenn eine Kapazitätsentität genutzt wird.",
+          "timed_capacity_entity": "Sensor für die nutzbare Akkukapazität in kWh oder Wh auswählen.",
+          "timed_departure_entity": "Sensor mit vollständigem Datum und Uhrzeit oder input_datetime mit Datum und Uhrzeit auswählen. Eine bloße Uhrzeit reicht für die nächste Fahrt nicht.",
+          "timed_calendar_entity": "Kalender auswählen und mit „Nächsten Kalendertermin übernehmen“ einen passenden Termin als Abfahrtszeit setzen.",
+          "timed_calendar_title": "Nur Termine mit exakt diesem Titel werden berücksichtigt. Ganztägige Termine werden ignoriert.",
+          "timed_bavarian_device": "Wähle dein Fahrzeug einmal aus, um BMW-Abfahrt übernehmen zu nutzen. Manuelle Eingabe und Kalender bleiben verfügbar. Aktiviere in BavarianData die Sensoren für Aktivierung, Stunde und Minute des gewünschten Timers.",
+          "timed_vehicle_time_zone": "Zeitzone des Fahrzeugs, zum Beispiel Europe/Berlin. Leer lassen, um die Home-Assistant-Zeitzone zu verwenden. BMW-Timer enthalten keine Zeitzone.",
+          "timed_timer1_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 1. BavarianData liefert diese Tage nicht. Leer lassen, um diesen Timer zu ignorieren.",
+          "timed_timer2_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 2. Leer lassen, um diesen Timer zu ignorieren."
         },
         "title": "Optionen"
       },
@@ -755,7 +817,16 @@
           "vehicle_soc_entity": "Entität für den Fahrzeug-Ladestand (optional)",
           "vehicle_charge_limit_entity": "Entität für das Fahrzeug-Ladelimit (optional)",
           "charge_loss_source": "Datenquelle für Ladeverluste",
-          "charging_cost_source": "Ladekosten berechnen"
+          "charging_cost_source": "Ladekosten berechnen",
+          "timed_capacity_kwh": "Nutzbare Akkukapazität (kWh, optional)",
+          "timed_capacity_entity": "Entität für nutzbare Akkukapazität (optional)",
+          "timed_departure_entity": "Entität für Abfahrtszeit (optional)",
+          "timed_calendar_entity": "Abfahrtskalender (optional)",
+          "timed_calendar_title": "Genauer Titel des Kalendertermins (optional)",
+          "timed_bavarian_device": "BavarianData-Fahrzeug für Abfahrt (optional)",
+          "timed_vehicle_time_zone": "Zeitzone des Fahrzeugs (optional)",
+          "timed_timer1_days": "Wochentage BMW-Timer 1 (optional)",
+          "timed_timer2_days": "Wochentage BMW-Timer 2 (optional)"
         },
         "data_description": {
           "current_limit": "Zusätzliche Obergrenze für von Home Assistant angeforderte Ladestromwerte. Die Obergrenze des Dienstes bleibt wirksam. Bewusst gewählte 0 A schalten die EMS-Begrenzung aus.",
@@ -763,7 +834,16 @@
           "vehicle_soc_entity": "Optional: Wähle den Sensor, der den tatsächlichen Ladestand des Fahrzeugs in % meldet. Damit wird ein separates Prozent-Ladeziel verfügbar; ohne Auswahl bleibt es deaktiviert. Bei fehlenden Fahrzeugdaten läuft das Laden unverändert weiter, bis gültige Daten zurückkehren. Ändern oder Entfernen einer Quelle löscht das Prozentziel, ohne das Laden fortzusetzen.",
           "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt.",
           "charge_loss_source": "Optionaler Vergleich der Wallbox-Energie mit der Energie, die im Fahrzeugakku ankommt. Wähle eine Quelle und richte sie im nächsten Schritt ein. Die Ladesteuerung bleibt davon unabhängig.",
-          "charging_cost_source": "Optionale Kostenschätzung mit einem festen Bruttostrompreis oder einem Preissensor. Richte den Preis im nächsten Schritt ein. Standardmäßig deaktiviert; die Ladesteuerung bleibt unabhängig."
+          "charging_cost_source": "Optionale Kostenschätzung mit einem festen Bruttostrompreis oder einem Preissensor. Richte den Preis im nächsten Schritt ein. Standardmäßig deaktiviert; die Ladesteuerung bleibt unabhängig.",
+          "timed_capacity_kwh": "Nutzbare statt nomineller Akkukapazität eintragen. Leer lassen, wenn eine Kapazitätsentität genutzt wird.",
+          "timed_capacity_entity": "Sensor für die nutzbare Akkukapazität in kWh oder Wh auswählen.",
+          "timed_departure_entity": "Sensor mit vollständigem Datum und Uhrzeit oder input_datetime mit Datum und Uhrzeit auswählen. Eine bloße Uhrzeit reicht für die nächste Fahrt nicht.",
+          "timed_calendar_entity": "Kalender auswählen und mit „Nächsten Kalendertermin übernehmen“ einen passenden Termin als Abfahrtszeit setzen.",
+          "timed_calendar_title": "Nur Termine mit exakt diesem Titel werden berücksichtigt. Ganztägige Termine werden ignoriert.",
+          "timed_bavarian_device": "Wähle dein Fahrzeug einmal aus, um BMW-Abfahrt übernehmen zu nutzen. Manuelle Eingabe und Kalender bleiben verfügbar. Aktiviere in BavarianData die Sensoren für Aktivierung, Stunde und Minute des gewünschten Timers.",
+          "timed_vehicle_time_zone": "Zeitzone des Fahrzeugs, zum Beispiel Europe/Berlin. Leer lassen, um die Home-Assistant-Zeitzone zu verwenden. BMW-Timer enthalten keine Zeitzone.",
+          "timed_timer1_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 1. BavarianData liefert diese Tage nicht. Leer lassen, um diesen Timer zu ignorieren.",
+          "timed_timer2_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 2. Leer lassen, um diesen Timer zu ignorieren."
         },
         "description": "Die Einstellung „Nur lesen“ der App steuert auch die Schreibfreigabe in Home Assistant. Deaktiviere sie in der App, speichere und starte die App neu, um die Steuerung zu aktivieren. Die Steuer-Entitäten bleiben bei aktivem Nur-Lesen-Modus oder nicht bereitem Dienst nicht verfügbar. Den Mindestabstand zwischen Zustandswechseln und die zusätzliche Wartezeit vor Phasenwechseln stellst du in der App-Konfiguration ein; der Dienst hält beide auch während eines Home-Assistant-Neustarts ein."
       },
@@ -793,7 +873,7 @@
           "charging_network_module": "Netzentgelt-Anpassung"
         },
         "data_description": {
-          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen."
+          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen. Bei Auswahl von Modul 3 werden die HA-Home-Koordinaten einmalig an VNBdigital gesendet und Tarifdaten aus der Par14a-Database abgerufen. Prüfe vorausgefüllte Werte anhand des verlinkten Preisblatts."
         }
       },
       "cost_sensor": {
@@ -804,26 +884,28 @@
           "charging_network_module": "Netzentgelt-Anpassung"
         },
         "data_description": {
-          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen."
+          "charging_network_module": "Optionale Berechnung für deutsche Netzentgelte nach §14a. Verwende nur das mit deinem Netzbetreiber vereinbarte Modul und dessen Preise. Ansonsten „Keine“ wählen. Bei Auswahl von Modul 3 werden die HA-Home-Koordinaten einmalig an VNBdigital gesendet und Tarifdaten aus der Par14a-Database abgerufen. Prüfe vorausgefüllte Werte anhand des verlinkten Preisblatts."
         }
       },
       "cost_network": {
         "title": "Netzentgelt: Modul {module}",
-        "description": "Übernimm die Bruttopreise aus dem Preisblatt deines Netzbetreibers. Modul 2 verwendet 40 % des regulären Netzentgelts. Modul 3 verwendet in den gewählten Quartalen und im angegebenen Tarifjahr die veröffentlichten Hoch- und Niedrigtarife; sonst gilt der Standardtarif. Es gelten die Zeitzone von Home Assistant und volle Minuten. Zeitfenster dürfen über Mitternacht reichen, sich aber nicht überschneiden. Diese Angaben schätzen variable Ladekosten; sie bestätigen keine Berechtigung und ändern keinen Vertrag.",
+        "description": "Übernimm die Bruttopreise aus dem Preisblatt deines Netzbetreibers. Modul 2 verwendet 40 % des regulären Netzentgelts. Modul 3 verwendet in den gewählten Quartalen und im angegebenen Tarifjahr die veröffentlichten Hoch- und Niedrigtarife; sonst gilt der Standardtarif. Es gelten die deutsche Tarifzeit (Europe/Berlin, einschließlich Sommerzeit) und Viertelstundengrenzen. Zeitfenster dürfen über Mitternacht reichen, sich aber nicht überschneiden. Diese Angaben schätzen variable Ladekosten; sie bestätigen keine Berechtigung und ändern keinen Vertrag. Quelle der vorausgefüllten Werte: {source} Das Zeichen ⚠ kennzeichnet ein vorläufiges Preisblatt, dessen Werte sich ändern können.",
         "data": {
           "regular_network": "Reguläres Netzentgelt (Standardtarif)",
           "price_includes_network": "Der Strompreis enthält bereits das reguläre Netzentgelt",
           "high_network": "Hohes Netzentgelt (HT)",
           "low_network": "Niedriges Netzentgelt (NT)",
-          "high_start": "Hochtarif beginnt",
-          "high_end": "Hochtarif endet",
-          "low_start": "Niedrigtarif beginnt",
-          "low_end": "Niedrigtarif endet",
           "active_quarters": "Quartale mit zeitvariablen Netzentgelten",
-          "tariff_year": "Jahr des Preisblatts"
+          "tariff_year": "Jahr des Preisblatts",
+          "high_periods": "Hochtarif-Zeiträume",
+          "low_periods": "Niedrigtarif-Zeiträume",
+          "auto_tariff_refresh": "Modul-3-Tarif zum Jahreswechsel automatisch aktualisieren"
         },
         "data_description": {
-          "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden."
+          "price_includes_network": "Aktiviert: Das reguläre Netzentgelt abziehen und den gewählten Netztarif hinzufügen. Deaktiviert: Die Strompreisquelle enthält kein Netzentgelt, daher wird der Netztarif hinzugefügt. Wähle passend zu deiner Quelle, damit Netzentgelte nicht doppelt gezählt werden.",
+          "high_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich.",
+          "low_periods": "Je Zeile einen Zeitraum HH:MM-HH:MM eingeben. Grenzen müssen auf Viertelstunden liegen; Zeiträume über Mitternacht sind möglich.",
+          "auto_tariff_refresh": "Am 1. Januar werden veröffentlichte Werte für das neue Jahr abgerufen und bei eindeutiger Zuordnung übernommen. Falls noch keine passenden Daten vorliegen, wird täglich erneut versucht. Auch vorläufige Werte können übernommen werden; prüfe später das endgültige Preisblatt."
         }
       }
     },
@@ -833,7 +915,16 @@
       "loss_source_invalid": "Wähle eine unterstützte Quelle für Ladeverluste und richte das passende Fahrzeug oder den Sensor ein.",
       "cost_source_invalid": "Wähle eine unterstützte Kostenquelle und für einen sensorbasierten Preis eine Sensor-Entität.",
       "cost_price_invalid": "Gib einen endlichen Bruttopreis zwischen −1000 und 1000 EUR/kWh an. Negative Preise sind erlaubt.",
-      "network_tariff_invalid": "Prüfe Bruttonetzentgelte, Tarifjahr, zwei bis vier aktive Quartale und Zeitfenster. HT muss über dem Standardtarif liegen, NT darunter und mindestens 0 betragen. Zeitfenster müssen volle Minuten verwenden, dürfen sich nicht überschneiden und müssen Zeit für den Standardtarif übrig lassen."
+      "network_tariff_invalid": "Prüfe Brutto-Netzentgelte, Tarifjahr, zwei bis vier aktive Quartale und HT/NT-Zeiträume. Je Zeile HH:MM-HH:MM mit Viertelstundengrenzen; keine Überschneidung und eine Standardtarifzeit muss bleiben.",
+      "timed_source_invalid": "Ungültige Quelle für das Zeitziel",
+      "timed_capacity_ambiguous": "Feste oder dynamische Akkukapazität wählen",
+      "timed_calendar_required": "Für diesen Titel einen Kalender wählen",
+      "timed_calendar_title_required": "Genauen Termintitel eingeben",
+      "timed_capacity_invalid": "Nutzbare Kapazität zwischen 1 und 250 kWh eingeben",
+      "timed_bavarian_invalid": "Wähle ein BavarianData-Fahrzeug",
+      "timed_bavarian_required": "Wähle zuerst ein BavarianData-Fahrzeug für die Timer",
+      "timed_weekdays_invalid": "Wähle gültige Wochentage",
+      "timed_timezone_invalid": "Gib eine gültige Zeitzone ein, zum Beispiel Europe/Berlin"
     }
   },
   "selector": {
@@ -897,6 +988,17 @@
         "2": "Q2: April–Juni",
         "3": "Q3: Juli–September",
         "4": "Q4: Oktober–Dezember"
+      }
+    },
+    "timed_weekdays": {
+      "options": {
+        "mon": "Montag",
+        "tue": "Dienstag",
+        "wed": "Mittwoch",
+        "thu": "Donnerstag",
+        "fri": "Freitag",
+        "sat": "Samstag",
+        "sun": "Sonntag"
       }
     }
   },

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import math
+import re
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 from homeassistant.core import valid_entity_id
@@ -21,17 +23,16 @@ from .charge_loss_const import (
 )
 from .charging_cost_const import (
     CONF_ACTIVE_QUARTERS,
+    CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_COST_SOURCE,
     CONF_CHARGING_NETWORK_MODULE,
     CONF_CHARGING_NETWORK_TARIFF,
     CONF_CHARGING_PRICE,
     CONF_CHARGING_PRICE_ENTITY,
-    CONF_HIGH_END,
     CONF_HIGH_NETWORK,
-    CONF_HIGH_START,
-    CONF_LOW_END,
+    CONF_HIGH_PERIODS,
     CONF_LOW_NETWORK,
-    CONF_LOW_START,
+    CONF_LOW_PERIODS,
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
@@ -62,7 +63,20 @@ from .device.const import (
     DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
     DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
 )
+from .network_tariff_lookup import async_lookup_home_tariff
 from .remote import CONF_SERVER_URL
+from .timed_goal_const import (
+    CONF_TIMED_BAVARIAN_DEVICE,
+    CONF_TIMED_CALENDAR_ENTITY,
+    CONF_TIMED_CALENDAR_TITLE,
+    CONF_TIMED_CAPACITY_ENTITY,
+    CONF_TIMED_CAPACITY_KWH,
+    CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_TIMER1_DAYS,
+    CONF_TIMED_TIMER2_DAYS,
+    CONF_TIMED_VEHICLE_TIME_ZONE,
+    TIMED_WEEKDAYS,
+)
 from .vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
     CONF_VEHICLE_SOC_ENTITY,
@@ -79,6 +93,9 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         super().__init__()
         self._pending_options: dict[str, Any] | None = None
         self._pending_step: str | None = None
+        self._home_tariff_lookup_done = False
+        self._home_tariff_values: dict[str, Any] | None = None
+        self._home_tariff_source = "—"
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -99,7 +116,16 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
 
         self._pending_options = None
         self._pending_step = None
+        self._home_tariff_lookup_done = False
+        self._home_tariff_values = None
+        self._home_tariff_source = "—"
         errors = _vehicle_errors(user_input) if user_input is not None else {}
+        if user_input is not None:
+            errors.update(_timed_errors(user_input))
+            if user_input.get(CONF_TIMED_BAVARIAN_DEVICE) and bavarian_vehicle_vin(
+                self.hass, user_input[CONF_TIMED_BAVARIAN_DEVICE]
+            ) is None:
+                errors[CONF_TIMED_BAVARIAN_DEVICE] = "timed_bavarian_invalid"
         source = (user_input or {}).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED)
         if source not in LOSS_SOURCES:
             errors[CONF_CHARGE_LOSS_SOURCE] = "loss_source_invalid"
@@ -192,9 +218,17 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         self, source: str, user_input: dict[str, Any] | None
     ) -> ConfigFlowResult:
         pending = self._pending_options
-        if pending is None or self._pending_step != f"cost_{source}":
+        if (
+            pending is None
+            or pending.get(CONF_CHARGING_COST_SOURCE) != source
+            or self._pending_step not in (f"cost_{source}", "cost_network")
+        ):
             return await self.async_step_init()
-        errors = _cost_errors(source, user_input) if user_input is not None else {}
+        allow_network = getattr(self.hass.config, "country", None) == "DE"
+        errors = (
+            _cost_errors(source, user_input, allow_network=allow_network)
+            if user_input is not None else {}
+        )
         if user_input is not None and not errors:
             if source == COST_SOURCE_FIXED:
                 pending[CONF_CHARGING_PRICE] = float(user_input[CONF_CHARGING_PRICE])
@@ -208,12 +242,19 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
             return await self.async_step_cost_network()
         current = dict(self.config_entry.options) if user_input is None else user_input
         if user_input is None:
-            current[CONF_CHARGING_NETWORK_MODULE] = current.get(
-                CONF_CHARGING_NETWORK_TARIFF, {}
-            ).get("module", NETWORK_MODULE_NONE)
+            # Back navigation from Module 3 must show the draft that the user
+            # just entered, not the older saved options.
+            current.update(pending)
+            previous = current.get(CONF_CHARGING_NETWORK_TARIFF)
+            current[CONF_CHARGING_NETWORK_MODULE] = (
+                previous.get("module", NETWORK_MODULE_NONE)
+                if isinstance(previous, dict) else NETWORK_MODULE_NONE
+            )
         return self.async_show_form(
             step_id=f"cost_{source}",
-            data_schema=cost_source_schema(current, source=source),
+            data_schema=cost_source_schema(
+                current, source=source, allow_network=allow_network,
+            ),
             errors=errors,
         )
 
@@ -228,21 +269,52 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
         errors = {}
         if user_input is not None:
             try:
+                if module == NETWORK_MODULE_3 and type(user_input.get(CONF_AUTO_TARIFF_REFRESH, False)) is not bool:
+                    raise ValueError("auto tariff refresh must be boolean")
                 pending[CONF_CHARGING_NETWORK_TARIFF] = _network_tariff(
                     user_input, module=module,
-                    timezone=self.hass.config.time_zone,
+                    # German network windows use the operator's local clock,
+                    # independently of HA's display/configuration time zone.
+                    timezone="Europe/Berlin",
                 )
             except (KeyError, TypeError, ValueError):
                 errors["base"] = "network_tariff_invalid"
             else:
+                if module == NETWORK_MODULE_3:
+                    pending[CONF_AUTO_TARIFF_REFRESH] = user_input.get(
+                        CONF_AUTO_TARIFF_REFRESH, False,
+                    )
                 return self._finish_options(pending)
-        current = _network_form_values(dict(self.config_entry.options).get(
-            CONF_CHARGING_NETWORK_TARIFF, {}
-        )) if user_input is None else user_input
+        previous = dict(self.config_entry.options).get(CONF_CHARGING_NETWORK_TARIFF)
+        current = (
+            _network_form_values(previous if isinstance(previous, dict) else {})
+            if user_input is None else user_input
+        )
+        if user_input is None:
+            current[CONF_AUTO_TARIFF_REFRESH] = self.config_entry.options.get(
+                CONF_AUTO_TARIFF_REFRESH, False,
+            )
+        if user_input is None and module == NETWORK_MODULE_3:
+            if not self._home_tariff_lookup_done:
+                self._home_tariff_values = await async_lookup_home_tariff(self.hass)
+                self._home_tariff_lookup_done = True
+            if self._home_tariff_values is not None:
+                status = self._home_tariff_values.get("_source_status")
+                prefix = "⚠ " if status == "vorlaeufig" else ""
+                self._home_tariff_source = prefix + str(self._home_tariff_values.get("_source_url") or "—")
+                current.update({
+                    key: value for key, value in self._home_tariff_values.items()
+                    if not key.startswith("_source_")
+                })
+                if not (isinstance(previous, dict) and previous.get("module") == NETWORK_MODULE_3):
+                    current[CONF_AUTO_TARIFF_REFRESH] = True
         return self.async_show_form(
             step_id="cost_network",
             data_schema=cost_network_schema(current, module=module),
-            description_placeholders={"module": "2" if module != NETWORK_MODULE_3 else "3"},
+            description_placeholders={
+                "module": "2" if module != NETWORK_MODULE_3 else "3",
+                "source": self._home_tariff_source,
+            },
             errors=errors,
         )
 
@@ -275,10 +347,62 @@ def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, 
                 CONF_PHASE_SWITCH_GRACE_SECONDS, DEFAULT_PHASE_SWITCH_GRACE_SECONDS
             )
         )
-    for key in (CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY):
+    for key in (
+        CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
+        CONF_TIMED_CAPACITY_ENTITY, CONF_TIMED_DEPARTURE_ENTITY,
+        CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_CALENDAR_TITLE,
+        CONF_TIMED_BAVARIAN_DEVICE, CONF_TIMED_VEHICLE_TIME_ZONE,
+        CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS,
+    ):
         if value := user_input.get(key):
             options[key] = value
+    if (value := user_input.get(CONF_TIMED_CAPACITY_KWH)) is not None:
+        options[CONF_TIMED_CAPACITY_KWH] = float(value)
     return options
+
+
+def _timed_errors(values: dict[str, Any]) -> dict[str, str]:
+    """Reject ambiguous sources and an unbounded/unknown battery capacity."""
+    errors: dict[str, str] = {}
+    for key, domain in (
+        (CONF_TIMED_CAPACITY_ENTITY, ("sensor",)),
+        (CONF_TIMED_DEPARTURE_ENTITY, ("sensor", "input_datetime")),
+        (CONF_TIMED_CALENDAR_ENTITY, ("calendar",)),
+    ):
+        value = values.get(key)
+        if value and (not isinstance(value, str) or not valid_entity_id(value)
+                      or value.split(".", 1)[0] not in domain):
+            errors[key] = "timed_source_invalid"
+    if values.get(CONF_TIMED_CAPACITY_ENTITY) and values.get(CONF_TIMED_CAPACITY_KWH) is not None:
+        errors[CONF_TIMED_CAPACITY_ENTITY] = "timed_capacity_ambiguous"
+    if values.get(CONF_TIMED_CALENDAR_TITLE) and not values.get(CONF_TIMED_CALENDAR_ENTITY):
+        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_required"
+    if values.get(CONF_TIMED_CALENDAR_ENTITY) and not str(values.get(CONF_TIMED_CALENDAR_TITLE, "")).strip():
+        errors[CONF_TIMED_CALENDAR_TITLE] = "timed_calendar_title_required"
+    if any(values.get(key) for key in (
+        CONF_TIMED_DEPARTURE_ENTITY, CONF_TIMED_CALENDAR_ENTITY,
+        CONF_TIMED_CAPACITY_ENTITY, CONF_TIMED_CAPACITY_KWH, CONF_TIMED_BAVARIAN_DEVICE,
+    )) and not values.get(CONF_VEHICLE_SOC_ENTITY):
+        errors[CONF_VEHICLE_SOC_ENTITY] = "vehicle_soc_required"
+    for key in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
+        days = values.get(key, [])
+        if not isinstance(days, list) or any(day not in TIMED_WEEKDAYS for day in days):
+            errors[key] = "timed_weekdays_invalid"
+    zone = values.get(CONF_TIMED_VEHICLE_TIME_ZONE)
+    if zone:
+        try:
+            ZoneInfo(zone)
+        except (ValueError, TypeError, ZoneInfoNotFoundError):
+            errors[CONF_TIMED_VEHICLE_TIME_ZONE] = "timed_timezone_invalid"
+    if any(values.get(key) for key in (
+        CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS, CONF_TIMED_VEHICLE_TIME_ZONE,
+    )) and not values.get(CONF_TIMED_BAVARIAN_DEVICE):
+        errors[CONF_TIMED_BAVARIAN_DEVICE] = "timed_bavarian_required"
+    capacity = values.get(CONF_TIMED_CAPACITY_KWH)
+    if capacity is not None and (isinstance(capacity, bool) or not isinstance(capacity, (int, float))
+                                 or not math.isfinite(capacity) or not 1 <= capacity <= 250):
+        errors[CONF_TIMED_CAPACITY_KWH] = "timed_capacity_invalid"
+    return errors
 
 
 def _vehicle_errors(values: dict[str, Any]) -> dict[str, str]:
@@ -316,7 +440,9 @@ def _loss_errors(source: str, values: dict[str, Any]) -> dict[str, str]:
     return errors
 
 
-def _cost_errors(source: str, values: dict[str, Any]) -> dict[str, str]:
+def _cost_errors(
+    source: str, values: dict[str, Any], *, allow_network: bool = True,
+) -> dict[str, str]:
     errors = {}
     if source == COST_SOURCE_FIXED:
         value = values.get(CONF_CHARGING_PRICE)
@@ -326,7 +452,8 @@ def _cost_errors(source: str, values: dict[str, Any]) -> dict[str, str]:
         value = values.get(CONF_CHARGING_PRICE_ENTITY)
         if not isinstance(value, str) or not valid_entity_id(value) or not value.startswith("sensor."):
             errors[CONF_CHARGING_PRICE_ENTITY] = "cost_source_invalid"
-    if values.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE) not in NETWORK_MODULES:
+    module = values.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE)
+    if module not in NETWORK_MODULES or (not allow_network and module != NETWORK_MODULE_NONE):
         errors[CONF_CHARGING_NETWORK_MODULE] = "network_tariff_invalid"
     return errors
 
@@ -351,29 +478,43 @@ def _network_tariff(values: dict[str, Any], *, module: str, timezone: str) -> di
             CONF_TARIFF_YEAR: values[CONF_TARIFF_YEAR],
             "timezone": timezone,
             "windows": [
-                {"start": _tariff_time(values[CONF_HIGH_START]), "end": _tariff_time(values[CONF_HIGH_END]), "rate": "ht"},
-                {"start": _tariff_time(values[CONF_LOW_START]), "end": _tariff_time(values[CONF_LOW_END]), "rate": "nt"},
+                *_tariff_periods(values[CONF_HIGH_PERIODS], "ht"),
+                *_tariff_periods(values[CONF_LOW_PERIODS], "nt"),
             ],
         })
     return TariffConfig.parse(tariff).as_dict()
 
 
-def _tariff_time(value: Any) -> str:
-    """The HA time selector includes seconds; network windows use whole minutes."""
-    if isinstance(value, str) and len(value) == 8 and value.endswith(":00"):
-        return value[:5]
-    if isinstance(value, str) and len(value) == 5:
-        return value
-    raise ValueError("network time must use whole minutes")
+def _tariff_periods(value: object, rate: str) -> list[dict[str, str]]:
+    """Parse one HH:MM-HH:MM interval per line, including overnight windows."""
+    if not isinstance(value, str) or not 1 <= len(value) <= 512:
+        raise ValueError("tariff periods must be short text")
+    lines = value.splitlines()
+    if not 1 <= len(lines) <= 8:
+        raise ValueError("tariff periods require one to eight lines")
+    windows: list[dict[str, str]] = []
+    for line in lines:
+        match = re.fullmatch(r"\s*([0-2][0-9]:[0-5][0-9])\s*[-\u2013]\s*([0-2][0-9]:[0-5][0-9])\s*", line)
+        if match is None:
+            raise ValueError("tariff period must be HH:MM-HH:MM")
+        windows.append({"start": match[1], "end": match[2], "rate": rate})
+    return windows
 
 
 def _network_form_values(tariff: dict[str, Any]) -> dict[str, Any]:
     values = dict(tariff)
-    values[CONF_ACTIVE_QUARTERS] = [str(value) for value in tariff.get(CONF_ACTIVE_QUARTERS, [])]
-    for window in tariff.get("windows", []):
-        prefix = "high" if window["rate"] == "ht" else "low"
-        values[f"{prefix}_start"] = window["start"]
-        values[f"{prefix}_end"] = window["end"]
+    quarters = tariff.get(CONF_ACTIVE_QUARTERS)
+    values[CONF_ACTIVE_QUARTERS] = [str(value) for value in quarters] if isinstance(quarters, list) else []
+    windows = tariff.get("windows")
+    windows = windows if isinstance(windows, list) else []
+    for rate, key in (("ht", CONF_HIGH_PERIODS), ("nt", CONF_LOW_PERIODS)):
+        values[key] = "\n".join(
+            f"{window['start']}-{window['end']}"
+            for window in windows if isinstance(window, dict)
+            and window.get("rate") == rate
+            and isinstance(window.get("start"), str)
+            and isinstance(window.get("end"), str)
+        )
     return values
 
 

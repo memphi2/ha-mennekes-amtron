@@ -191,7 +191,7 @@ an existing archive. Concurrent builds, including those sharing an output path,
 are covered by regression tests.
 
 ```bash
-.venv/bin/python scripts/release_check.py --ref v0.6.0b1 --published
+.venv/bin/python scripts/release_check.py --ref v0.6.1 --published
 ```
 
 Use the intended release tag or approved commit. This read-only check requires

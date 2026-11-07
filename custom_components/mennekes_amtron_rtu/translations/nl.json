@@ -191,6 +191,15 @@
       },
       "assign_vehicle_charge": {
         "name": "Laadenergie van voertuig koppelen"
+      },
+      "timed_next_calendar_event": {
+        "name": "Volgende agenda-afspraak gebruiken"
+      },
+      "timed_clear_departure": {
+        "name": "Vertrektijd wissen"
+      },
+      "timed_bmw_departure": {
+        "name": "BMW-vertrek overnemen"
       }
     },
     "number": {
@@ -506,6 +515,26 @@
             "name": "Energie zonder prijs"
           }
         }
+      },
+      "timed_goal_status": {
+        "name": "Status geplande lading",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "waiting_for_target": "Wacht op procentdoel",
+          "waiting_for_capacity": "Wacht op accucapaciteit",
+          "waiting_for_soc": "Wacht op laadniveau",
+          "waiting_for_device": "Wacht op laadpaal",
+          "read_only": "Alleen lezen",
+          "queued": "Wijziging in wachtrij",
+          "paused_until_start": "Gepauzeerd tot start",
+          "paced": "Laadstroom aangepast",
+          "early_at_minimum": "Mogelijk te vroeg klaar",
+          "unreachable": "Doel mogelijk onhaalbaar",
+          "late": "Streeftijd verstreken",
+          "reached": "Doel bereikt",
+          "write_pending": "Schrijfopdracht wacht",
+          "error": "Fout"
+        }
       }
     },
     "switch": {
@@ -565,10 +594,16 @@
               "error_still_active": "De fout is nog actief",
               "unknown": "Onbekende reden",
               "user_cancelled": "Geannuleerd door de gebruiker",
-              "energy_goal": "Stop door een laaddoel"
+              "energy_goal": "Stop door een laaddoel",
+              "deadline_expired": "Vertrektijd verstreken"
             }
           }
         }
+      }
+    },
+    "datetime": {
+      "timed_departure": {
+        "name": "Volgend vertrek"
       }
     }
   },
@@ -683,6 +718,15 @@
     },
     "loss_storage_unavailable": {
       "message": "Het laadverlies kon niet worden opgeslagen. Controleer of opslag beschikbaar is en probeer het opnieuw."
+    },
+    "timed_goal_state_invalid": {
+      "message": "De opgeslagen vertrektijd kon niet worden hersteld. Controleer het plan voordat je opnieuw laadt."
+    },
+    "timed_bavarian_unavailable": {
+      "message": "Geen actieve, volledige BMW-vertrektimer beschikbaar. Schakel de sensoren voor actie, uur en minuut in BavarianData in. Stel voor herhalende timers ook de weekdagen in de opties in."
+    },
+    "timed_goal_unavailable": {
+      "message": "Wachtende vertrekopdrachten konden niet worden gecontroleerd. De integratie probeert het opnieuw zodra de verbinding beschikbaar is."
     }
   },
   "issues": {
@@ -731,7 +775,16 @@
           "vehicle_soc_entity": "Entiteit voor laadniveau van voertuig (optioneel)",
           "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig (optioneel)",
           "charge_loss_source": "Gegevensbron voor laadverliezen",
-          "charging_cost_source": "Laadkosten berekenen"
+          "charging_cost_source": "Laadkosten berekenen",
+          "timed_capacity_kwh": "Bruikbare accucapaciteit (kWh, optioneel)",
+          "timed_capacity_entity": "Entiteit voor bruikbare capaciteit (optioneel)",
+          "timed_departure_entity": "Entiteit voor vertrektijd (optioneel)",
+          "timed_calendar_entity": "Vertrekkalender (optioneel)",
+          "timed_calendar_title": "Exacte titel van agenda-afspraak (optioneel)",
+          "timed_bavarian_device": "BavarianData-voertuig voor vertrek (optioneel)",
+          "timed_vehicle_time_zone": "Tijdzone van het voertuig (optioneel)",
+          "timed_timer1_days": "Weekdagen BMW-timer 1 (optioneel)",
+          "timed_timer2_days": "Weekdagen BMW-timer 2 (optioneel)"
         },
         "data_description": {
           "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
@@ -743,7 +796,16 @@
           "vehicle_soc_entity": "Optioneel: selecteer de sensor die het werkelijke laadniveau van het voertuig in % meldt. Dit schakelt een apart percentagedoel in; zonder selectie blijft het uitgeschakeld. Bij ontbrekende gegevens gaat het laden ongewijzigd door tot geldige gegevens terugkeren. Een bron wijzigen of verwijderen wist dit doel zonder het laden te hervatten.",
           "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd.",
           "charge_loss_source": "Optionele vergelijking van de energie van de laadpaal met de energie die aan de voertuigaccu is toegevoegd. Selecteer een bron om deze in de volgende stap in te stellen. De laadregeling blijft onafhankelijk.",
-          "charging_cost_source": "Optionele kostenraming met een vaste stroomprijs inclusief belastingen of een prijssensor. Stel de prijs in de volgende stap in. Standaard uitgeschakeld; dit beïnvloedt de laadregeling niet."
+          "charging_cost_source": "Optionele kostenraming met een vaste stroomprijs inclusief belastingen of een prijssensor. Stel de prijs in de volgende stap in. Standaard uitgeschakeld; dit beïnvloedt de laadregeling niet.",
+          "timed_capacity_kwh": "Voer de bruikbare, niet de nominale, capaciteit in. Laat leeg bij gebruik van een entiteit.",
+          "timed_capacity_entity": "Kies een sensor voor bruikbare capaciteit in kWh of Wh.",
+          "timed_departure_entity": "Kies een tijdstempel met datum en tijd of een volledige input_datetime. Alleen een tijdstip is onvoldoende.",
+          "timed_calendar_entity": "Kies een kalender en kopieer één afspraak met de bijbehorende knop.",
+          "timed_calendar_title": "Alleen afspraken met precies deze titel tellen mee. Afspraken voor de hele dag worden genegeerd.",
+          "timed_bavarian_device": "Kies eenmalig het voertuig om het BMW-vertrek over te nemen. Handmatige invoer en de kalender blijven beschikbaar. Schakel in BavarianData de sensoren voor actie, uur en minuut van de timer in.",
+          "timed_vehicle_time_zone": "Tijdzone van het voertuig, bijvoorbeeld Europe/Amsterdam. Leeg gebruikt de Home Assistant-tijdzone. BMW-tijden bevatten geen tijdzone.",
+          "timed_timer1_days": "Kies de in de BMW ingestelde dagen voor klimaattimer 1. BavarianData levert deze dagen niet. Laat leeg om deze timer te negeren.",
+          "timed_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren."
         },
         "title": "Opties"
       },
@@ -755,7 +817,16 @@
           "vehicle_soc_entity": "Entiteit voor laadniveau van voertuig (optioneel)",
           "vehicle_charge_limit_entity": "Entiteit voor laadlimiet van voertuig (optioneel)",
           "charge_loss_source": "Gegevensbron voor laadverliezen",
-          "charging_cost_source": "Laadkosten berekenen"
+          "charging_cost_source": "Laadkosten berekenen",
+          "timed_capacity_kwh": "Bruikbare accucapaciteit (kWh, optioneel)",
+          "timed_capacity_entity": "Entiteit voor bruikbare capaciteit (optioneel)",
+          "timed_departure_entity": "Entiteit voor vertrektijd (optioneel)",
+          "timed_calendar_entity": "Vertrekkalender (optioneel)",
+          "timed_calendar_title": "Exacte titel van agenda-afspraak (optioneel)",
+          "timed_bavarian_device": "BavarianData-voertuig voor vertrek (optioneel)",
+          "timed_vehicle_time_zone": "Tijdzone van het voertuig (optioneel)",
+          "timed_timer1_days": "Weekdagen BMW-timer 1 (optioneel)",
+          "timed_timer2_days": "Weekdagen BMW-timer 2 (optioneel)"
         },
         "data_description": {
           "current_limit": "Extra bovengrens voor stroomwaarden die Home Assistant aanvraagt. De servicegrens blijft van toepassing. Door bewust 0 A te selecteren, schakel je de EMS-limiet uit.",
@@ -763,7 +834,16 @@
           "vehicle_soc_entity": "Optioneel: selecteer de sensor die het werkelijke laadniveau van het voertuig in % meldt. Dit schakelt een apart percentagedoel in; zonder selectie blijft het uitgeschakeld. Bij ontbrekende gegevens gaat het laden ongewijzigd door tot geldige gegevens terugkeren. Een bron wijzigen of verwijderen wist dit doel zonder het laden te hervatten.",
           "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd.",
           "charge_loss_source": "Optionele vergelijking van de energie van de laadpaal met de energie die aan de voertuigaccu is toegevoegd. Selecteer een bron om deze in de volgende stap in te stellen. De laadregeling blijft onafhankelijk.",
-          "charging_cost_source": "Optionele kostenraming met een vaste stroomprijs inclusief belastingen of een prijssensor. Stel de prijs in de volgende stap in. Standaard uitgeschakeld; dit beïnvloedt de laadregeling niet."
+          "charging_cost_source": "Optionele kostenraming met een vaste stroomprijs inclusief belastingen of een prijssensor. Stel de prijs in de volgende stap in. Standaard uitgeschakeld; dit beïnvloedt de laadregeling niet.",
+          "timed_capacity_kwh": "Voer de bruikbare, niet de nominale, capaciteit in. Laat leeg bij gebruik van een entiteit.",
+          "timed_capacity_entity": "Kies een sensor voor bruikbare capaciteit in kWh of Wh.",
+          "timed_departure_entity": "Kies een tijdstempel met datum en tijd of een volledige input_datetime. Alleen een tijdstip is onvoldoende.",
+          "timed_calendar_entity": "Kies een kalender en kopieer één afspraak met de bijbehorende knop.",
+          "timed_calendar_title": "Alleen afspraken met precies deze titel tellen mee. Afspraken voor de hele dag worden genegeerd.",
+          "timed_bavarian_device": "Kies eenmalig het voertuig om het BMW-vertrek over te nemen. Handmatige invoer en de kalender blijven beschikbaar. Schakel in BavarianData de sensoren voor actie, uur en minuut van de timer in.",
+          "timed_vehicle_time_zone": "Tijdzone van het voertuig, bijvoorbeeld Europe/Amsterdam. Leeg gebruikt de Home Assistant-tijdzone. BMW-tijden bevatten geen tijdzone.",
+          "timed_timer1_days": "Kies de in de BMW ingestelde dagen voor klimaattimer 1. BavarianData levert deze dagen niet. Laat leeg om deze timer te negeren.",
+          "timed_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren."
         },
         "description": "De instelling Alleen lezen van de app bepaalt ook of Home Assistant mag schrijven. Schakel deze in de app uit, sla de wijziging op en herstart de app om de bedieningselementen in te schakelen. Deze blijven niet beschikbaar zolang Alleen lezen is ingeschakeld of de service nog niet gereed is. Stel de minimale tijd tussen statuswijzigingen en de extra wachttijd vóór fasewisselingen in bij de appconfiguratie; de service handhaaft beide ook tijdens een herstart van Home Assistant."
       },
@@ -793,7 +873,7 @@
           "charging_network_module": "Aanpassing van netkosten"
         },
         "data_description": {
-          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen."
+          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen. Bij selectie van module 3 worden de Home Assistant Home-coördinaten eenmaal naar VNBdigital verzonden en tariefgegevens uit Par14a-Database opgehaald. Controleer de ingevulde waarden met het gekoppelde tariefblad."
         }
       },
       "cost_sensor": {
@@ -804,26 +884,28 @@
           "charging_network_module": "Aanpassing van netkosten"
         },
         "data_description": {
-          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen."
+          "charging_network_module": "Optionele berekening voor Duitse nettarieven volgens §14a. Gebruik alleen de module en prijzen die met je netbeheerder zijn overeengekomen. Kies anders Geen. Bij selectie van module 3 worden de Home Assistant Home-coördinaten eenmaal naar VNBdigital verzonden en tariefgegevens uit Par14a-Database opgehaald. Controleer de ingevulde waarden met het gekoppelde tariefblad."
         }
       },
       "cost_network": {
         "title": "Nettarief: module {module}",
-        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de tijdzone van Home Assistant en hele minuten. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet.",
+        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de Duitse lokale tarieftijd (Europe/Berlin, inclusief zomertijd) en kwartiergrenzen. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet. Bron van vooraf ingevulde waarden: {source} Het symbool ⚠ markeert een voorlopig tariefblad dat nog kan veranderen.",
         "data": {
           "regular_network": "Normaal nettarief (standaardtarief)",
           "price_includes_network": "De stroomprijs bevat al het normale nettarief",
           "high_network": "Hoog nettarief (HT)",
           "low_network": "Laag nettarief (NT)",
-          "high_start": "Hoog tarief begint",
-          "high_end": "Hoog tarief eindigt",
-          "low_start": "Laag tarief begint",
-          "low_end": "Laag tarief eindigt",
           "active_quarters": "Kwartalen met tijdsafhankelijke nettarieven",
-          "tariff_year": "Jaar van de prijslijst"
+          "tariff_year": "Jaar van de prijslijst",
+          "high_periods": "Hoogtariefperioden",
+          "low_periods": "Laagtariefperioden",
+          "auto_tariff_refresh": "Module 3-tarief automatisch bij de jaarwisseling bijwerken"
         },
         "data_description": {
-          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen."
+          "price_includes_network": "Ingeschakeld: trek het normale nettarief af voordat het gekozen nettarief wordt toegevoegd. Uitgeschakeld: de stroomprijsbron bevat geen netkosten, dus voeg het nettarief toe. Kies volgens je bron om dubbele netkosten te voorkomen.",
+          "high_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan.",
+          "low_periods": "Eén periode HH:MM-HH:MM per regel, op kwartiergrenzen. Over middernacht heen is toegestaan.",
+          "auto_tariff_refresh": "Op 1 januari worden gepubliceerde tarieven voor het nieuwe jaar opgehaald en toegepast als de gegevens eenduidig zijn. Als er nog geen geldige gegevens zijn, wordt dagelijks opnieuw geprobeerd. Voorlopige waarden kunnen worden gebruikt; controleer later het definitieve tariefblad."
         }
       }
     },
@@ -833,7 +915,16 @@
       "loss_source_invalid": "Selecteer een ondersteunde bron voor laadverliezen en stel het bijbehorende voertuig of de sensor in.",
       "cost_source_invalid": "Selecteer een ondersteunde kostenbron en een sensorentiteit voor een prijs uit een sensor.",
       "cost_price_invalid": "Voer een eindige prijs inclusief belastingen tussen −1000 en 1000 EUR/kWh in. Negatieve prijzen zijn toegestaan.",
-      "network_tariff_invalid": "Controleer nettarieven inclusief belastingen, het tariefjaar, twee tot vier actieve kwartalen en tijdvakken. HT moet hoger zijn dan het standaardtarief; NT moet lager en niet negatief zijn. Tijdvakken moeten hele minuten gebruiken, niet overlappen en tijd voor het standaardtarief overlaten."
+      "network_tariff_invalid": "Controleer brutoprijzen, tariefjaar, twee tot vier actieve kwartalen en hoog/laagperioden. Eén HH:MM-HH:MM per regel op kwartiergrenzen, zonder overlap en met ruimte voor het standaardtarief.",
+      "timed_source_invalid": "Ongeldige tijdbron",
+      "timed_capacity_ambiguous": "Kies vaste of dynamische capaciteit",
+      "timed_calendar_required": "Kies een kalender",
+      "timed_calendar_title_required": "Voer de exacte titel in",
+      "timed_capacity_invalid": "Voer een bruikbare capaciteit in van 1 tot 250 kWh",
+      "timed_bavarian_invalid": "Kies een BavarianData-voertuig",
+      "timed_bavarian_required": "Kies eerst een BavarianData-voertuig voor de timers",
+      "timed_weekdays_invalid": "Kies geldige weekdagen",
+      "timed_timezone_invalid": "Vul een geldige tijdzone in, bijvoorbeeld Europe/Amsterdam"
     }
   },
   "selector": {
@@ -897,6 +988,17 @@
         "2": "K2: april–juni",
         "3": "K3: juli–september",
         "4": "K4: oktober–december"
+      }
+    },
+    "timed_weekdays": {
+      "options": {
+        "mon": "Maandag",
+        "tue": "Dinsdag",
+        "wed": "Woensdag",
+        "thu": "Donderdag",
+        "fri": "Vrijdag",
+        "sat": "Zaterdag",
+        "sun": "Zondag"
       }
     }
   },

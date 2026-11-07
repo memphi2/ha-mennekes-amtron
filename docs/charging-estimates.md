@@ -1,7 +1,8 @@
-# Charging losses and costs — beta 0.6.0b1
+# Charging losses and costs
 
-These features are available in **beta 0.6.0b1**, not stable 0.5.1.
-See [Beta testing](installation.md#beta-testing-060b1) before enabling them.
+These optional features are available in **stable 0.6.1**, including automatic
+tariff import and yearly refresh. For service connections,
+[update the app first](installation.md#updating-to-061).
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure** and choose the sources you want. They work with a
@@ -120,6 +121,10 @@ change later.
 
 ### Optional §14a EnWG network tariffs
 
+The §14a network-tariff choices appear only when Home Assistant's country is
+**Germany**. Fixed and dynamic electricity-price estimates remain available
+in other countries.
+
 These settings estimate the **variable network charge for charging energy**.
 They do not enroll a tariff, implement grid-operator control or establish that
 your installation meets the tariff's eligibility requirements.
@@ -133,6 +138,38 @@ Choose one model:
 | Module 2 | Regular network work price and whether the selected energy price already includes it | Replace the regular network component with 40% of that component. |
 | Module 1 + 3 | Standard, high and low network prices; daily high/low windows; active quarters; tariff year | Replace the regular network component with the price for that local time. |
 
+Whenever you open the Module 3 form, the integration makes a
+**one-time lookup for that options flow**: it sends the configured HA Home coordinates to
+[VNBdigital](https://www.vnbdigital.de/) to find the responsible low-voltage
+network operator, then reads the current year's public data from
+[Par14a-Database](https://github.com/the78mole/Par14a-Database). It sends no
+vehicle or wallbox data. If there is exactly one operator and one published price
+sheet with a daily schedule the form can represent, the gross prices and time
+windows are filled in. The form shows the original price-sheet URL. Review
+these values and the **price-includes-network** switch before saving.
+
+If a price sheet is marked **provisional**, the form marks its source link
+accordingly. Provisional figures may change. They are never saved without
+your review and confirmation of the options flow.
+
+The source is incomplete and some sheets use different windows in different
+quarters. In those cases the form stays editable for manual entry; it does
+not guess an operator or tariff. If the Module 3 standard rate differs from
+the ordinary network rate, this model cannot represent the sheet correctly;
+use a sensor supplying the complete price instead. The data is attributed
+to Par14a-Database (the78mole), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The network operator's original price sheet governs. Reopen the settings at
+any time to retrieve the current published values. **Automatic yearly refresh**
+is an optional switch in the Module 3 form. When enabled, the integration
+checks the new year's tariff on 1 January and applies it only if the operator
+and published schedule are unambiguous and valid. If no usable sheet is
+available, it retries once a day; cost estimates remain unknown for that year
+until a valid tariff is found. A provisional sheet may be applied and is logged
+as provisional. The next final sheet is not silently substituted during the
+same year; reopen settings to review changes. The annual update changes only
+the cost model and does not restart the Modbus connection or add Recorder
+history.
+
 If **Electricity price already includes the regular network price** is enabled,
 the regular component is subtracted before the selected module's component is added.
 Otherwise the input price must exclude that component, and the module's network
@@ -144,18 +181,22 @@ Module 1 and cannot be combined with Module 2 for the same market location.
 Eligibility and the price structure are explained by the
 [Bundesnetzagentur](https://www.bundesnetzagentur.de/DE/Vportal/Energie/SteuerbareVBE/artikel.html).
 
-The Module 3 form supports one high-price and one low-price daily window,
-including windows crossing midnight; all other times use the standard rate.
-The windows must use whole minutes, must not overlap and must leave some time
+The Module 3 form supports multiple high-price and low-price daily windows.
+Enter one period per line as `HH:MM-HH:MM`, for example `06:00-09:00` and
+`17:00-20:00` on separate lines. Windows may cross midnight; all other times
+use the standard rate. Window boundaries must fall on quarter hours, must not
+overlap and must leave some time
 at the standard rate. Select **two to four quarters** from the operator's
 schedule. Outside those quarters, the standard rate applies. There are no
 invented default prices, time windows or tariff year: copy these from the
-published price sheet. The form uses Home Assistant's configured timezone,
-including daylight saving changes. Check that this agrees with your operator's
-price sheet.
+published price sheet. German network-tariff windows always use
+**Europe/Berlin**, including daylight saving changes. Enter the clock times
+shown on the operator's sheet without converting them to Home Assistant's
+display time zone. Manual entry, imported values and annual refresh all use
+this same tariff clock.
 A different tariff year makes the price unknown until you update the settings.
-Published schedules with more daily windows are not supported by this form;
-use a sensor supplying the complete correct price instead.
+The form accepts up to eight high and eight low periods. For more complex
+published schedules, use a sensor supplying the complete correct price instead.
 
 The selected tariff must match the operator's published schedule and your
 contract. The integration validates the input structure, not legal eligibility.

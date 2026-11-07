@@ -22,6 +22,8 @@ EXPECTED = {
     "pause_and_resume_on_surplus.yaml",
     "recover_from_lost_heartbeat.yaml",
     "downgrade_notification.yaml",
+    "calendar_departure.yaml",
+    "precondition_before_departure.yaml",
 }
 
 

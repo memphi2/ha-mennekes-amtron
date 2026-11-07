@@ -67,27 +67,26 @@ def async_setup_recorder_service(hass: HomeAssistant) -> None:
             device = devices.async_get(device_id)
             if device is None:
                 raise service_validation_error("unknown_device", {"device": device_id})
-            for entry_id in device.config_entries:
-                entry = hass.config_entries.async_get_entry(entry_id)
-                if entry is None or entry.domain != DOMAIN:
+            entry = hass.config_entries.async_get_entry(device.config_entry_id)
+            if entry is None or entry.domain != DOMAIN:
+                continue
+            matched = True
+            for key in PROFILES[profile]:
+                entity_id = registry.async_get_entity_id(
+                    "sensor", DOMAIN, entry_entity_unique_id(entry, key)
+                )
+                if entity_id is None:
                     continue
-                matched = True
-                for key in PROFILES[profile]:
-                    entity_id = registry.async_get_entity_id(
-                        "sensor", DOMAIN, entry_entity_unique_id(entry, key)
+                registered = registry.async_get(entity_id)
+                if registered is None or registered.device_id != device_id:
+                    continue
+                if user is not None and not user.permissions.check_entity(
+                    entity_id, POLICY_READ
+                ):
+                    raise Unauthorized(
+                        user_id=user.id, entity_id=entity_id, permission=POLICY_READ
                     )
-                    if entity_id is None:
-                        continue
-                    registered = registry.async_get(entity_id)
-                    if registered is None or registered.device_id != device_id:
-                        continue
-                    if user is not None and not user.permissions.check_entity(
-                        entity_id, POLICY_READ
-                    ):
-                        raise Unauthorized(
-                            user_id=user.id, entity_id=entity_id, permission=POLICY_READ
-                        )
-                    entities.add(entity_id)
+                entities.add(entity_id)
         if not matched:
             raise service_validation_error("no_wallbox_target")
         selected = sorted(entities)

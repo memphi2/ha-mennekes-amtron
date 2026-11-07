@@ -5,9 +5,9 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
-Charging targets, loss/cost estimates, revised status and command-result events
-in this guide are features of **beta 0.6.0b1**. Stable remains **0.5.1**;
-see [Beta testing](installation.md#beta-testing-060b1) to try them.
+This guide describes **stable 0.6.1**, including optional charging targets,
+departure planning, loss/cost estimates and command-result events. For service
+connections, [update the app first](installation.md#updating-to-061).
 
 ## Optional charging losses and costs
 
@@ -346,6 +346,90 @@ turn off the whole percentage feature; also clear the maximum selection if one
 was configured. The kWh goal is independent. Service
 mode needs an app version advertising percentage-goal support; existing service
 functions remain available on older compatible versions.
+
+## Charge for the next departure
+
+Available from **0.6.1**. Set up a vehicle charge-level entity and a positive **Vehicle charge target** first.
+In the integration options, enter the **usable battery capacity** in kWh, or
+select an entity that reports that capacity in kWh or Wh. Select only one
+capacity source. The integration never guesses it from the nominal model
+capacity.
+
+Set **Next departure** to a full date and time. This is a one-trip target, not
+a repeating daily plan. Manual entry, calendar selection and optional BMW timer
+selection can coexist; choose the source you want for each trip.
+
+For a calendar, select a **Departure calendar** and enter the **exact event
+title** in the options. Press **Use next calendar event** to copy the first
+matching timed event within the next 14 days into **Next departure**. All-day
+events are ignored. Calendar changes after selection do not alter the copied
+time; press the button again to import the updated event. The
+[calendar blueprint](blueprints.md#plan-the-next-trip-from-a-calendar) can
+perform this selection ahead of the next trip using a Toggle helper.
+
+For **BavarianData**, select **BavarianData vehicle for departure** once in the
+integration options, then use **Use BMW departure** when you want to copy the
+next active climate timer. The integration reads the vehicle's last locally
+published Home Assistant states; it does not fetch BMW cloud data or change the
+vehicle's timers. Those states may be cached, so check **Next departure** after
+importing, especially after changing the timer in your car or the BMW app.
+
+- Enable the **action**, **hour** and **minute** sensor for each timer you want
+  to use in the BavarianData device's entity list. These diagnostic entities
+  start disabled. The timer's action must report `activate`; missing or
+  unavailable values are ignored.
+- The one-off timer (`overwriteTimer`) supplies a clock time, without a date.
+  The import uses its next occurrence within the coming 24 hours.
+- For recurring timer 1 or 2, select **BMW timer 1 weekdays** or **BMW timer 2
+  weekdays** to match the days configured in your vehicle. BavarianData does
+  not expose those days. Leave a timer's day selection empty to ignore it.
+- **Vehicle time zone** defaults to Home Assistant's time zone. Override it
+  when the vehicle's timer uses another zone, for example `Europe/Berlin`.
+  Nonexistent clock times during a daylight-saving change are skipped.
+
+The BMW button selects the earliest usable upcoming occurrence once. It does
+not turn a recurring vehicle timer into a recurring HA charging plan. A copied
+BMW or calendar time stays selected until you replace or clear it.
+
+A vehicle integration that already supplies a full dated timestamp can instead
+be selected as **Departure time entity**. An `input_datetime` with both date
+and time also works. This optional source can automatically select a new future
+timestamp. A manual, calendar or BMW selection takes priority over the source's
+current timestamp; it can be replaced when that timestamp changes to a new
+trip. **Clear departure time** cancels the selected plan without changing the
+percentage ceiling or immediately changing the wallbox.
+
+The planner uses the current vehicle SoC, remaining time, usable capacity,
+known wallbox limits and phase information to choose a charging current.
+It recalculates from later SoC reports. If 6 A would finish too early, it can
+pause and resume closer to departure. **An active timed goal can lift even a
+manually set charging pause** to meet the selected time. To prevent that,
+clear **Next departure**. The ordinary percentage target without a departure
+time still only limits charging and never resumes a pause.
+
+The optional [calendar and preconditioning blueprints](blueprints.md) select
+one trip and run your chosen vehicle action before departure. The vehicle
+determines whether preconditioning draws grid or battery power; completed
+charging targets still apply. Once the target is reached, the charging plan
+cannot resume another charge. **Next departure** remains visible until that
+time so the climate blueprint can still run, then clears automatically.
+The planner assumes 230 V per phase and initially 90% transfer efficiency.
+Car limits, missing or delayed SoC reports, unknown vehicle power, the 6 A
+minimum, the wallbox's configured transition delay and HA outages can make
+the exact target time impossible. Missing SoC or capacity data leaves the
+current charging state unchanged.
+
+The plan needs HA running to recalculate current and start climate actions.
+With the independent service, a queued timed-plan command expires at its
+deadline even if HA is offline; it cannot resume charging later as an obsolete
+request. Expiry does not undo a command already applied or stop an ongoing
+charge. The service continues its heartbeat and last applied state, subject
+to its charging limits. Service mode requires **app/service 0.6.1 or newer**
+for this behavior; update it before the integration.
+
+Current adjustments require at least 1 A difference and are spaced by at least
+five minutes; the status sensor has
+stable states and adds no per-minute history entries.
 
 ## Cancel a queued change
 

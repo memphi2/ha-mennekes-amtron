@@ -10,7 +10,8 @@ even with short history retention.
 
 ## Recorder defaults in 0.6.0b1
 
-These defaults apply to **beta 0.6.0b1**; stable 0.5.1 retains its existing defaults.
+Introduced in beta 0.6.0b1, these defaults are included in **stable 0.6.1**.
+Existing user choices remain unchanged when updating from 0.5.1.
 
 On new installations, the three phase-voltage and three phase-power entities
 start disabled. Enable individual readings under **Settings → Devices & services

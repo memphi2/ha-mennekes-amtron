@@ -296,6 +296,9 @@ def test_unexpected_worker_exit_stops_heartbeat_serial_and_discovery(
         monkeypatch.setattr(service, "_run", failed_worker)
         monkeypatch.setattr(server, "ModbusService", lambda *_: service)
         monkeypatch.setattr(server, "publish_discovery", pending_discovery)
+        # Parallel HA-version test runs must not compete for the app's fixed
+        # production ingress port; both HTTP listeners use ephemeral ports.
+        monkeypatch.setattr(server, "INGRESS_PORT", 0)
         with pytest.raises(RuntimeError, match="unexpected worker failure"):
             await asyncio.wait_for(
                 server.run(

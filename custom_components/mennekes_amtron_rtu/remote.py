@@ -480,15 +480,15 @@ class RemoteClient(MennekesModbusClient):
                 # Permission may have changed while this command waited for a
                 # poll. In particular, a mismatched identity must block an
                 # already queued command before it reaches the service.
-                cancelling = command == "cancel_pending"
+                cancelling = command in {"cancel_pending", "cancel_timed_current"}
                 metadata = command in {"soc_source", "soc_observation"}
                 if not self._connected or (
                     not cancelling and not metadata and self.snapshot.get("available") is not True
                 ):
                     raise ServiceConnectionError("service_not_ready", "wallbox is unavailable at the service")
-                if cancelling and self.snapshot.get("control", {}).get("supports_cancel_pending") is not True:
+                if command == "cancel_pending" and self.snapshot.get("control", {}).get("supports_cancel_pending") is not True:
                     raise DeviceValidationError("cancel_pending_not_supported")
-                if cancelling and self.snapshot.get("control", {}).get("read_only") is not False:
+                if command == "cancel_pending" and self.snapshot.get("control", {}).get("read_only") is not False:
                     raise DeviceValidationError("read_only_mode")
                 if metadata and self.snapshot.get("control", {}).get("supports_soc_goal") is not True:
                     raise DeviceValidationError("soc_goal_not_supported")
@@ -551,6 +551,7 @@ class RemoteClient(MennekesModbusClient):
         *,
         min_interval: float = 0.0,
         priority: bool = False,
+        before_write: Callable[[], None] | None = None,
     ) -> None:
         raise AmtronWriteRejectedError(
             "direct register writes are not available through the service"
@@ -785,6 +786,23 @@ class RemoteControl(AmtronControl):
     @ha_command
     async def async_pause_charging(self) -> None:
         await self._command("pause")
+
+    @ha_command
+    async def async_set_timed_current(
+        self, value: float | None, *, deadline: datetime, owner: str,
+    ) -> None:
+        if value is not None:
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 6:
+                raise DeviceValidationError("charging_current_invalid", {"value": str(value), "minimum": "6"})
+            value = min(value, self.max_charging_current)
+        await self._command("timed_current", value=value, deadline=deadline.isoformat(), owner=owner)
+
+    @ha_command
+    async def async_cancel_timed_current(self, owner: str) -> None:
+        # Queue cancellation is local service bookkeeping, not a bus write.
+        await self._remote.execute("cancel_timed_current", owner=owner)
+        if self._request_refresh is not None:
+            await self._request_refresh()
 
     @ha_command
     async def async_resume_charging(self, *, current_cap: float | None = None) -> None:

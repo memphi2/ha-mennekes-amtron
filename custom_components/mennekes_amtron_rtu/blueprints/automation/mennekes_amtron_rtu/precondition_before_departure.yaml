@@ -1,0 +1,87 @@
+blueprint:
+  name: MENNEKES AMTRON - precondition before the next trip
+  description: >-
+    Run your vehicle integration's climate action or an HA script once before
+    the wallbox's selected departure time. Works with manually selected,
+    calendar and vehicle-sensor departure times. A Text helper records
+    the attempted departure before calling the actions, so a Home Assistant
+    restart does not repeat them. Choose actions that start climate explicitly,
+    not a toggle. Charging remains controlled by the timed charging plan.
+  domain: automation
+  homeassistant:
+    min_version: "2026.9.0"
+  input:
+    departure_time:
+      name: Next departure
+      description: The same Mennekes Amtron RTU Next departure used for the next trip.
+      selector:
+        entity:
+          filter:
+            - integration: mennekes_amtron_rtu
+              domain: datetime
+    climate_lead_minutes:
+      name: Start climate before departure
+      description: >-
+        Start this many minutes before departure. If HA restarts inside this
+        window, run on restart while the departure is still in the future.
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 120
+          step: 1
+          unit_of_measurement: min
+          mode: box
+    last_attempted_departure:
+      name: Last climate departure helper
+      description: >-
+        Create a Text helper with its default length (100 characters).
+        Use a separate helper for each automation and leave its initial value
+        unset in YAML so Home Assistant restores the last value after restart.
+      selector:
+        entity:
+          filter:
+            - domain: input_text
+    climate_actions:
+      name: Start vehicle climate
+      description: >-
+        Choose the climate-start action supplied by your vehicle integration
+        or a script. Actions run once per departure; failures are not retried
+        automatically. The automation does not infer a vehicle API.
+      selector:
+        action:
+
+mode: single
+max_exceeded: silent
+
+variables:
+  departure_entity: !input departure_time
+  marker_entity: !input last_attempted_departure
+  lead_minutes: !input climate_lead_minutes
+
+triggers:
+  - trigger: state
+    entity_id: !input departure_time
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    minutes: "/1"
+
+conditions:
+  - condition: template
+    value_template: >-
+      {% set departure = as_timestamp(states(departure_entity), 0) %}
+      {% set current = as_timestamp(now()) %}
+      {{ current < departure <= current + (lead_minutes | float * 60)
+         and states(marker_entity) != 'unavailable'
+         and states[marker_entity] is not none
+         and states(marker_entity) | int(0) != departure | int }}
+
+actions:
+  - action: input_text.set_value
+    target:
+      entity_id: !input last_attempted_departure
+    data:
+      value: "{{ as_timestamp(states(departure_entity)) | int | string }}"
+  - choose: []
+    default: !input climate_actions

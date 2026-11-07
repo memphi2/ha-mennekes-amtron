@@ -28,6 +28,7 @@ REASONS = (
     "completed", "replaced", "shutdown", "phase_timeout", "phase_unconfirmed",
     "connection_error", "write_rejected", "permission_denied",
     "status_refresh_failed", "unknown", "error_still_active", "user_cancelled", "energy_goal",
+    "deadline_expired",
 )
 
 

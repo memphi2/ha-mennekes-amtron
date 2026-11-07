@@ -1,6 +1,6 @@
 # Ready-made automations
 
-The integration includes four blueprints. Adding the wallbox installs them
+The integration includes six blueprints. Adding the wallbox installs them
 under **Settings → Automations & scenes → Blueprints**. Choose a blueprint,
 select **Create automation**, then choose the entities for the same wallbox.
 The PV sensor comes from your inverter or energy-management setup.
@@ -11,6 +11,82 @@ The PV sensor comes from your inverter or energy-management setup.
 | **Pause and resume on PV surplus** | Pause below one power threshold and resume above a higher one, after a hold time |
 | **Recover from a lost heartbeat** | Legacy manual-button automation; recovery is now built in. Disable existing instances to avoid duplicate attempts. |
 | **Notify on a grid-operator downgrade** | Notify when a downgrade starts and ends |
+| **Plan the next trip from a calendar** | Copy one matching departure into the timed charging plan |
+| **Precondition before the next trip** | Run your vehicle climate action once before the selected departure |
+
+## Plan the next trip from a calendar
+
+Configure the vehicle SoC source, SoC target and battery capacity first; see
+[Charge for the next departure](user-guide.md#charge-for-the-next-departure). The
+calendar supplies the departure time. It does not create a charge target.
+
+1. Add your calendar to Home Assistant and create a **timed** event, for example
+   **Departure**, at the time you want to leave. All-day events are ignored.
+2. Under **Settings → Devices & services → Helpers**, create a **Toggle** helper,
+   for example **Plan next trip**.
+3. Create an automation from **Plan the next trip from a calendar**. Select the
+   calendar, the exact event title, the helper and the wallbox's **Next
+   departure** entity. Titles are case-sensitive.
+4. Choose how far ahead to plan: the default is **12 hours**, adjustable up to
+   **14 days**. Allow enough time for the energy your vehicle needs.
+5. Turn on **Plan next trip**. The automation selects the earliest matching
+   future event inside that window and turns the helper off after copying it.
+
+If no matching event is available yet, the helper stays on and the automation
+checks every 15 minutes and after a Home Assistant restart. An unavailable
+calendar produces no commands. Only this next trip is selected: recurring
+calendar events do not enable another plan automatically. An existing future
+**Next departure** is preserved; cancel it before selecting a different trip.
+Calendar edits or deletions after selection do not change the copied time.
+Use **Clear departure time**, then turn the helper on again to select an
+updated event. Turning the helper off only stops the search; it does not cancel
+an already selected plan.
+
+The built-in **Use next calendar event** button is an alternative for an
+immediate, single lookup using the calendar configured in integration options.
+Manual entry, the configured calendar and an optional BavarianData vehicle
+can coexist. **Use BMW departure** copies one upcoming timer from the selected
+vehicle's locally published states; see [BMW timer setup](user-guide.md#charge-for-the-next-departure).
+It does not fetch cloud data or start a repeating HA plan. A separately
+configured dated departure source keeps its current timestamp from overriding
+an explicit selection; when that source changes to another future timestamp,
+it can select the new trip.
+
+## Start vehicle climate before departure
+
+This optional companion works with any selected **Next departure**, including
+one copied from a calendar or a BMW timer. Reaching the charging target early
+keeps the departure time available until departure, so climate can still start.
+The vehicle integration must provide a working climate-start action or script.
+Reading a BMW timer does not provide a remote climate-start command; select an
+action only if your vehicle integration supplies one.
+
+1. Create a **Text** helper with the default length, for example **Last climate
+   departure**. Reserve it for this automation. For a helper configured in YAML, omit `initial` so Home Assistant restores its
+   previous value after restarting.
+2. Create an automation from **Precondition before the next trip**. Select the
+   same wallbox departure entity, the helper and your vehicle's **start climate**
+   action or script. Use an explicit start action rather than a toggle.
+3. Select the lead time; the default is **15 minutes**. Leave the automation
+   enabled for climate on future trips, or disable it whenever climate is not
+   wanted.
+
+The automation checks every minute. After a Home Assistant restart it catches
+up if the departure is still ahead and already inside the lead window. It
+records the selected departure in the helper **before** attempting your actions,
+using an unambiguous timestamp even when clocks change. Normal restarts do not
+repeat them. An action failure is not retried indefinitely: check the automation trace and start climate manually if needed.
+A restart during the action can leave that attempt incomplete. To retry through
+this automation, clear the Text helper while departure is still ahead;
+the next check can then run it again. Changing the departure to a different time
+counts as a new trip and can start climate again.
+
+The climate action does not bypass SoC or energy limits or directly change the
+wallbox pause switch. An active timed charging plan may resume charging while
+below its target. Once a charge limit is reached, it remains authoritative.
+Whether the vehicle draws climate energy from the grid depends on the vehicle
+and its current charging state; this automation cannot guarantee grid power.
+Avoid a second vehicle schedule that also starts climate for the same trip.
 
 ## Set up PV charging
 

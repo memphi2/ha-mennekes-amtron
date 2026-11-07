@@ -19,7 +19,8 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
-    TimeSelector,
+    TextSelector,
+    TextSelectorConfig,
 )
 
 from ._flow_serial import PortOption
@@ -33,16 +34,15 @@ from .charge_loss_const import (
 )
 from .charging_cost_const import (
     CONF_ACTIVE_QUARTERS,
+    CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_COST_SOURCE,
     CONF_CHARGING_NETWORK_MODULE,
     CONF_CHARGING_PRICE,
     CONF_CHARGING_PRICE_ENTITY,
-    CONF_HIGH_END,
     CONF_HIGH_NETWORK,
-    CONF_HIGH_START,
-    CONF_LOW_END,
+    CONF_HIGH_PERIODS,
     CONF_LOW_NETWORK,
-    CONF_LOW_START,
+    CONF_LOW_PERIODS,
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
@@ -90,6 +90,18 @@ from .device.const import (
     SEARCH_MODES,
     SUPPORTED_BAUDRATES,
     SUPPORTED_FRAMES,
+)
+from .timed_goal_const import (
+    CONF_TIMED_BAVARIAN_DEVICE,
+    CONF_TIMED_CALENDAR_ENTITY,
+    CONF_TIMED_CALENDAR_TITLE,
+    CONF_TIMED_CAPACITY_ENTITY,
+    CONF_TIMED_CAPACITY_KWH,
+    CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_TIMER1_DAYS,
+    CONF_TIMED_TIMER2_DAYS,
+    CONF_TIMED_VEHICLE_TIME_ZONE,
+    TIMED_WEEKDAYS,
 )
 from .vehicle_soc_const import (
     CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
@@ -304,10 +316,39 @@ def options_schema(
     for key, domains in (
         (CONF_VEHICLE_SOC_ENTITY, VEHICLE_SOC_DOMAINS),
         (CONF_VEHICLE_CHARGE_LIMIT_ENTITY, VEHICLE_CHARGE_LIMIT_DOMAINS),
+        (CONF_TIMED_CAPACITY_ENTITY, ("sensor",)),
+        (CONF_TIMED_DEPARTURE_ENTITY, ("sensor", "input_datetime")),
+        (CONF_TIMED_CALENDAR_ENTITY, ("calendar",)),
     ):
         fields[probatio.Optional(
             key, description={"suggested_value": current.get(key)},
         )] = EntitySelector(EntitySelectorConfig(filter={"domain": list(domains)}))
+    fields[probatio.Optional(
+        CONF_TIMED_CAPACITY_KWH,
+        description={"suggested_value": current.get(CONF_TIMED_CAPACITY_KWH)},
+    )] = NumberSelector(NumberSelectorConfig(
+        min=1, max=250, step=0.1, unit_of_measurement="kWh",
+        mode=NumberSelectorMode.BOX,
+    ))
+    fields[probatio.Optional(
+        CONF_TIMED_CALENDAR_TITLE,
+        description={"suggested_value": current.get(CONF_TIMED_CALENDAR_TITLE)},
+    )] = cv.string
+    fields[probatio.Optional(
+        CONF_TIMED_BAVARIAN_DEVICE,
+        description={"suggested_value": current.get(CONF_TIMED_BAVARIAN_DEVICE)},
+    )] = DeviceSelector(DeviceSelectorConfig(integration="bavariandata"))
+    fields[probatio.Optional(
+        CONF_TIMED_VEHICLE_TIME_ZONE,
+        description={"suggested_value": current.get(CONF_TIMED_VEHICLE_TIME_ZONE)},
+    )] = TextSelector()
+    for key in (CONF_TIMED_TIMER1_DAYS, CONF_TIMED_TIMER2_DAYS):
+        fields[probatio.Optional(
+            key, description={"suggested_value": current.get(key)},
+        )] = SelectSelector(SelectSelectorConfig(
+            options=list(TIMED_WEEKDAYS), multiple=True,
+            translation_key="timed_weekdays", mode=SelectSelectorMode.DROPDOWN,
+        ))
     fields[probatio.Required(
         CONF_CHARGE_LOSS_SOURCE,
         default=current.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED),
@@ -350,7 +391,9 @@ def loss_sensor_schema(current: dict[str, Any]) -> probatio.Schema:
     })
 
 
-def cost_source_schema(current: dict[str, Any], *, source: str) -> probatio.Schema:
+def cost_source_schema(
+    current: dict[str, Any], *, source: str, allow_network: bool = True,
+) -> probatio.Schema:
     """Select a gross electricity price and optional network-tariff calculation."""
     fields: dict[Any, Any] = {}
     if source == COST_SOURCE_FIXED:
@@ -363,14 +406,15 @@ def cost_source_schema(current: dict[str, Any], *, source: str) -> probatio.Sche
             CONF_CHARGING_PRICE_ENTITY,
             description={"suggested_value": current.get(CONF_CHARGING_PRICE_ENTITY)},
         )] = EntitySelector(EntitySelectorConfig(filter={"domain": "sensor"}))
-    fields[probatio.Required(
-        CONF_CHARGING_NETWORK_MODULE,
-        default=current.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE),
-    )] = SelectSelector(SelectSelectorConfig(
-        options=list(NETWORK_MODULES),
-        translation_key="charging_network_module",
-        mode=SelectSelectorMode.DROPDOWN,
-    ))
+    if allow_network:
+        fields[probatio.Required(
+            CONF_CHARGING_NETWORK_MODULE,
+            default=current.get(CONF_CHARGING_NETWORK_MODULE, NETWORK_MODULE_NONE),
+        )] = SelectSelector(SelectSelectorConfig(
+            options=list(NETWORK_MODULES),
+            translation_key="charging_network_module",
+            mode=SelectSelectorMode.DROPDOWN,
+        ))
     return probatio.Schema(fields)
 
 
@@ -387,14 +431,18 @@ def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Sch
         ): BooleanSelector(),
     }
     if module == NETWORK_MODULE_3:
+        fields[probatio.Required(
+            CONF_AUTO_TARIFF_REFRESH,
+            default=current.get(CONF_AUTO_TARIFF_REFRESH, False),
+        )] = BooleanSelector()
         for key in (CONF_HIGH_NETWORK, CONF_LOW_NETWORK):
             fields[probatio.Required(
                 key, description={"suggested_value": current.get(key)},
             )] = _price_selector()
-        for key in (CONF_HIGH_START, CONF_HIGH_END, CONF_LOW_START, CONF_LOW_END):
+        for key in (CONF_HIGH_PERIODS, CONF_LOW_PERIODS):
             fields[probatio.Required(
                 key, description={"suggested_value": current.get(key)},
-            )] = TimeSelector()
+            )] = TextSelector(TextSelectorConfig(multiline=True))
         fields[probatio.Required(
             CONF_ACTIVE_QUARTERS,
             description={"suggested_value": current.get(CONF_ACTIVE_QUARTERS)},

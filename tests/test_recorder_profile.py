@@ -94,9 +94,9 @@ def test_profile_ignores_other_integrations_and_missing_registry_entries(monkeyp
         originals = hass.config_entries.async_get_entry
         monkeypatch.setattr(hass.config_entries, "async_get_entry", lambda key: foreign if key == "foreign" else originals(key))
         devices = {
-            "foreign": SimpleNamespace(config_entries={"foreign"}),
-            "gone": SimpleNamespace(config_entries={"deleted"}),
-            "wallbox": SimpleNamespace(config_entries={entry.entry_id}),
+            "foreign": SimpleNamespace(config_entry_id="foreign"),
+            "gone": SimpleNamespace(config_entry_id="deleted"),
+            "wallbox": SimpleNamespace(config_entry_id=entry.entry_id),
         }
         registry = SimpleNamespace(
             async_get_entity_id=lambda _kind, _domain, key: (

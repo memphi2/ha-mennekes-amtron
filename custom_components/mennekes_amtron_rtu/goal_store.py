@@ -15,6 +15,7 @@ from .device.charging_session import SessionHistory
 from .device.const import DOMAIN
 from .device.energy_goal import EnergyGoal
 from .device.soc_goal import SocGoal
+from .timed_goal import TimedGoal
 
 
 class _GoalModel(Protocol):
@@ -141,3 +142,10 @@ class SessionHistoryStore(ModelStore[SessionHistory]):
 
     def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
         super().__init__(hass, entry_id, identity, kind="charging_session", model=SessionHistory)
+
+
+class TimedGoalStore(ModelStore[TimedGoal]):
+    """Keep a single trip time durable without Recorder history."""
+
+    def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
+        super().__init__(hass, entry_id, identity, kind="timed_goal", model=TimedGoal)

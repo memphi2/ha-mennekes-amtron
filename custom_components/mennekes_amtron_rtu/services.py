@@ -82,26 +82,25 @@ def async_resolve_controls(
         device = registry.async_get(device_id)
         if device is None:
             raise service_validation_error("unknown_device", {"device": device_id})
-        for entry_id in device.config_entries:
-            entry = hass.config_entries.async_get_entry(entry_id)
-            if entry is None or entry.domain != DOMAIN:
-                continue
-            runtime_data = getattr(entry, "runtime_data", None)
-            if runtime_data is None:
-                raise service_validation_error(
-                    "entry_not_loaded", {"device": device_id}
+        entry = hass.config_entries.async_get_entry(device.config_entry_id)
+        if entry is None or entry.domain != DOMAIN:
+            continue
+        runtime_data = getattr(entry, "runtime_data", None)
+        if runtime_data is None:
+            raise service_validation_error(
+                "entry_not_loaded", {"device": device_id}
+            )
+        if user is not None and not user.is_admin:
+            entity_id = er.async_get(hass).async_get_entity_id(
+                "number", DOMAIN, entry_entity_unique_id(entry, "charging_current_limit")
+            )
+            if entity_id is None or not user.permissions.check_entity(
+                entity_id, POLICY_CONTROL
+            ):
+                raise Unauthorized(
+                    user_id=user.id, entity_id=entity_id, permission=POLICY_CONTROL
                 )
-            if user is not None and not user.is_admin:
-                entity_id = er.async_get(hass).async_get_entity_id(
-                    "number", DOMAIN, entry_entity_unique_id(entry, "charging_current_limit")
-                )
-                if entity_id is None or not user.permissions.check_entity(
-                    entity_id, POLICY_CONTROL
-                ):
-                    raise Unauthorized(
-                        user_id=user.id, entity_id=entity_id, permission=POLICY_CONTROL
-                    )
-            controls.append(runtime_data.control)
+        controls.append(runtime_data.control)
     if not controls:
         raise service_validation_error("no_wallbox_target")
     return controls

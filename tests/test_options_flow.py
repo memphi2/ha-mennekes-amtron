@@ -117,7 +117,7 @@ def test_submitting_normalises_the_values() -> None:
 
 
 @pytest.mark.parametrize("stale_mode", [None, CONTROL_MODE_READ_ONLY, CONTROL_MODE_MASTER])
-def test_service_options_configure_only_current_cap_and_cache_refresh(stale_mode) -> None:
+def test_service_options_keep_device_settings_in_service_and_ha_sources_in_ha(stale_mode) -> None:
     async def run() -> None:
         entry = FakeConfigEntry(
             data={"server_url": "http://service:8765"},
@@ -138,6 +138,15 @@ def test_service_options_configure_only_current_cap_and_cache_refresh(stale_mode
             CONF_SCAN_INTERVAL_SECONDS,
             CONF_VEHICLE_SOC_ENTITY,
             CONF_VEHICLE_CHARGE_LIMIT_ENTITY,
+            "timed_capacity_kwh",
+            "timed_capacity_entity",
+            "timed_departure_entity",
+            "timed_calendar_entity",
+            "timed_calendar_title",
+            "timed_bavarian_device",
+            "timed_vehicle_time_zone",
+            "timed_timer1_days",
+            "timed_timer2_days",
         }
         submitted = {
             CONF_CURRENT_LIMIT: 8,

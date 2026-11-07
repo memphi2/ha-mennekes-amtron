@@ -49,7 +49,7 @@ def test_the_schema_rejects_the_invalid_band_through_control(
     async def run() -> None:
         hass, entry, transport = await build_runtime()
         _patch_registry(
-            monkeypatch, {"dev": SimpleNamespace(config_entries={entry.entry_id})}
+            monkeypatch, {"dev": SimpleNamespace(config_entry_id=entry.entry_id)}
         )
         services.async_setup_services(hass)
         handler, _schema = hass.services.registered[
@@ -110,7 +110,7 @@ def test_an_unloaded_entry_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
         hass, entry, _transport = await build_runtime()
         entry.runtime_data = None
         _patch_registry(
-            monkeypatch, {"dev": SimpleNamespace(config_entries={entry.entry_id})}
+            monkeypatch, {"dev": SimpleNamespace(config_entry_id=entry.entry_id)}
         )
         with pytest.raises(ServiceValidationError) as excinfo:
             services.async_resolve_controls(hass, ["dev"])
@@ -127,7 +127,7 @@ def test_a_device_of_another_integration_is_refused(
         hass, entry, _transport = await build_runtime()
         entry.domain = domain
         _patch_registry(
-            monkeypatch, {"dev": SimpleNamespace(config_entries={entry.entry_id})}
+            monkeypatch, {"dev": SimpleNamespace(config_entry_id=entry.entry_id)}
         )
         with pytest.raises(ServiceValidationError) as excinfo:
             services.async_resolve_controls(hass, ["dev"])
@@ -140,7 +140,7 @@ def test_an_unknown_entry_id_is_skipped(monkeypatch: pytest.MonkeyPatch) -> None
     async def run() -> None:
         hass, _entry, _transport = await build_runtime()
         _patch_registry(
-            monkeypatch, {"dev": SimpleNamespace(config_entries={"nope"})}
+            monkeypatch, {"dev": SimpleNamespace(config_entry_id="nope")}
         )
         with pytest.raises(ServiceValidationError):
             services.async_resolve_controls(hass, ["dev"])
