@@ -187,9 +187,10 @@ resetting the stored hashed source identity or loss average. History adapters
 bind that identity for their lifetime and reject a device rebound to another
 vehicle before and after an asynchronous read.
 
-Options edits are held in a section-local draft until **Save**. Saving merges
-only that section's keys into the latest options and rejects an edit to the
-same section made concurrently. Returning to the main menu discards the draft.
+Options edits are held in a section-local draft until the final form is
+submitted. Completing it merges only that section's keys into the latest
+options and rejects a concurrent edit to the same section. Returning to the
+main menu discards an unfinished draft.
 Departure activation is independent of merely configuring an SoC sensor;
 disabling it clears the trip and cancels only its owned queued commands.
 

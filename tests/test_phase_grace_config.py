@@ -39,8 +39,7 @@ def test_direct_options_store_whole_seconds_and_pass_them_to_control(seconds):
         await flow.async_step_wallbox()
         form = await flow.async_step_wallbox_advanced()
         submitted = form["data_schema"]({CONF_PHASE_SWITCH_GRACE_SECONDS: float(seconds)})
-        await flow.async_step_wallbox_advanced(submitted)
-        result = await flow.async_step_save()
+        result = await flow.async_step_wallbox_advanced(submitted)
         stored = result["data"]
         assert type(stored[CONF_PHASE_SWITCH_GRACE_SECONDS]) is int
         entry = FakeConfigEntry(options=stored)
@@ -91,8 +90,7 @@ def test_service_integration_options_do_not_edit_service_owned_grace_setting():
             marker.schema for marker in schema.schema
         }
         submitted = {**schema({}), CONF_PHASE_SWITCH_GRACE_SECONDS: 20}
-        await flow.async_step_wallbox_basic(submitted)
-        result = await flow.async_step_save()
+        result = await flow.async_step_wallbox_basic(submitted)
         assert result["data"][CONF_PHASE_SWITCH_GRACE_SECONDS] == 20
 
     asyncio.run(run())

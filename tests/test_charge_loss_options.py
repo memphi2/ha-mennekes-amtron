@@ -68,9 +68,9 @@ def test_loss_source_is_independent_and_atomic(source):
             result = await flow.async_step_loss_vehicle_details(
                 {"charge_loss_vehicle_device": "car"}
             )
-        assert result["step_id"] == "review"
+        assert result["type"] == "create_entry"
         assert "charge_loss_source" not in entry.options
-        saved = (await flow.async_step_save())["data"]
+        saved = result["data"]
         assert saved["charging_price"] == 0.3
         assert saved["scan_interval_seconds"] == 40
         assert saved["charge_loss_source"] == (
@@ -81,8 +81,7 @@ def test_loss_source_is_independent_and_atomic(source):
             assert saved["charge_loss_auto_match"] is False
         entry.options = saved
         await flow.async_step_losses()
-        await flow.async_step_loss_disable()
-        cleared = (await flow.async_step_save())["data"]
+        cleared = (await flow.async_step_loss_disable())["data"]
         assert cleared == {"charging_price": 0.3, "scan_interval_seconds": 40}
 
     asyncio.run(run())
@@ -113,7 +112,7 @@ def test_loss_sensor_validation_and_correction(invalid):
                     "charge_loss_auto_match": True,
                 }
             )
-        )["step_id"] == "review"
+        )["type"] == "create_entry"
 
     asyncio.run(run())
 
@@ -140,7 +139,7 @@ def test_loss_provider_and_device_validation(invalid):
             await flow.async_step_loss_vehicle_details(
                 {"charge_loss_vehicle_device": "car"}
             )
-        )["step_id"] == "review"
+        )["type"] == "create_entry"
 
     asyncio.run(run())
 

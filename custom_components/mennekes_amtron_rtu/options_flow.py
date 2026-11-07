@@ -102,7 +102,6 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         self._draft = None
-        self._ready = False
         self._details = {}
         return self.async_show_menu(
             step_id="init",
@@ -134,6 +133,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
                 max_current=_max_current(self.config_entry),
                 service_mode=service,
             ),
+            last_step=True,
         )
 
     async def async_step_wallbox_advanced(
@@ -166,6 +166,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
                 draft.values,
                 phase_switch=phase_switch_is_supported(phases),
             ),
+            last_step=True,
         )
 
     async def async_step_vehicle(
@@ -241,6 +242,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
                 draft.values if user_input is None else user_input,
             ),
             errors=errors,
+            last_step=True,
         )
 
     async def async_step_departure(
@@ -359,6 +361,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
                 entity=entity,
             ),
             errors=errors,
+            last_step=not self._details["remaining"],
         )
 
     async def _next_departure(self) -> ConfigFlowResult:
@@ -410,6 +413,7 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
             step_id=step,
             data_schema=schema(draft.values if user_input is None else user_input),
             errors=errors,
+            last_step=not self._details["remaining"],
         )
 
     async def async_step_departure_vehicle(
@@ -500,18 +504,18 @@ class MennekesAmtronOptionsFlow(EstimateOptionsFlow):
                 timer_options=provider.id == PROVIDER_BAVARIANDATA,
             ),
             errors=errors,
+            last_step=True,
         )
 
-    async def async_step_save(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    def _review(self) -> ConfigFlowResult:
+        """Recheck the vehicle requirement immediately before committing."""
         if (
             (draft := self._section("departure")) is not None
             and draft.values.get(CONF_TIMED_GOAL_ENABLED) is True
             and not self.config_entry.options.get(CONF_VEHICLE_SOC_ENTITY)
         ):
-            return await self.async_step_options_changed()
-        return await super().async_step_save(user_input)
+            return self._options_changed()
+        return super()._review()
 
 
 def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, Any]:

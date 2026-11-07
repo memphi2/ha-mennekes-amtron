@@ -1,9 +1,8 @@
-"""Common draft and explicit navigation for independent options sections."""
+"""Common draft and concurrent-edit protection for options sections."""
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import Any, cast
+from typing import Any
 
 import probatio
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
@@ -19,12 +18,11 @@ from .vehicle_sources.const import PROVIDER_NONE
 
 
 class SectionOptionsFlow(OptionsFlow):
-    """Save only a complete section, with real menu routes for edit and back."""
+    """Save only a complete section, preserving changes in other sections."""
 
     def __init__(self) -> None:
         super().__init__()
         self._draft: OptionsDraft | None = None
-        self._ready = False
         self._details: dict[str, Any] = {}
 
     async def async_step_init(
@@ -35,7 +33,6 @@ class SectionOptionsFlow(OptionsFlow):
     def _begin(self, section: str, keys: set[str]) -> OptionsDraft:
         if self._draft is None or self._draft.section != section:
             self._draft = OptionsDraft(section, self.config_entry.options, keys)
-        self._ready = False
         self._details = {}
         return self._draft
 
@@ -59,58 +56,34 @@ class SectionOptionsFlow(OptionsFlow):
         return own
 
     def _review(self) -> ConfigFlowResult:
-        self._ready = True
-        return self.async_show_menu(
-            step_id="review", menu_options=["save", "edit", "back"]
-        )
-
-    async def async_step_review(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if self._draft is None or not self._ready:
-            return await self.async_step_init()
-        return self._review()
+        """Commit a completed section after checking concurrent edits."""
+        if self._draft is None:
+            raise RuntimeError("cannot save an incomplete options section")
+        try:
+            merged = self._draft.merge(self.config_entry.options)
+        except OptionsChangedError:
+            return self._options_changed()
+        self._draft = None
+        self._details = {}
+        return self.async_create_entry(data=merged)
 
     async def async_step_back(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         self._draft = None
-        self._ready = False
         self._details = {}
         return await self.async_step_init()
 
-    async def async_step_edit(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if self._draft is None:
-            return await self.async_step_init()
-        # Sections are named by our fixed root menu, never by user text.
-        step = cast(
-            Callable[[], Awaitable[ConfigFlowResult]],
-            getattr(self, f"async_step_{self._draft.section}"),
+    def _options_changed(self) -> ConfigFlowResult:
+        return self.async_show_form(
+            step_id="options_changed",
+            data_schema=probatio.Schema({}),
+            errors={"base": "options_changed"},
         )
-        return await step()
-
-    async def async_step_save(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if self._draft is None or not self._ready:
-            return await self.async_step_init()
-        try:
-            merged = self._draft.merge(self.config_entry.options)
-        except OptionsChangedError:
-            return await self.async_step_options_changed()
-        self._draft = None
-        self._ready = False
-        return self.async_create_entry(data=merged)
 
     async def async_step_options_changed(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
             return await self.async_step_back()
-        return self.async_show_form(
-            step_id="options_changed",
-            data_schema=probatio.Schema({}),
-            errors={"base": "options_changed"},
-        )
+        return self._options_changed()
