@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 
 from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu.charging_cost_const import (
@@ -100,7 +100,7 @@ def test_annual_import_starts_after_wallbox_setup_and_is_cancelled_on_unload(tmp
     asyncio.run(asyncio.wait_for(run(), 60))
 
 
-@pytest.mark.parametrize("failure", ["timed", "recovery"])
+@pytest.mark.parametrize("failure", ["timed", "timed_connection", "recovery"])
 def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_path, monkeypatch, failure):
     async def run():
         hass = FakeHass(str(tmp_path))
@@ -112,15 +112,16 @@ def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_
         _patch_client(monkeypatch, transport)
         _patch_issues(monkeypatch)
         vehicle = Mock(async_start=AsyncMock(), async_stop=AsyncMock())
-        timed = Mock(async_start=AsyncMock(side_effect=ValueError("invalid saved trip") if failure == "timed" else None), async_stop=AsyncMock())
+        timed_error = {"timed": ValueError("invalid saved trip"), "timed_connection": HomeAssistantError("service offline")}.get(failure)
+        timed = Mock(async_start=AsyncMock(side_effect=timed_error), async_stop=AsyncMock())
         recovery = Mock(start=Mock(side_effect=RuntimeError("recovery startup failed")), async_stop=AsyncMock())
         monkeypatch.setattr(integration, "VehicleSocObserver", lambda *_args: vehicle)
         monkeypatch.setattr(integration, "TimedGoalObserver", lambda *_args: timed)
         monkeypatch.setattr(integration, "HeartbeatRecovery", lambda *_args: recovery)
-        with pytest.raises(ConfigEntryNotReady if failure == "timed" else RuntimeError) as caught:
+        with pytest.raises(RuntimeError if failure == "recovery" else ConfigEntryNotReady) as caught:
             await integration.async_setup_entry(hass, entry)
-        if failure == "timed":
-            assert caught.value.translation_key == "timed_goal_state_invalid"
+        if failure != "recovery":
+            assert caught.value.translation_key == ("timed_goal_state_invalid" if failure == "timed" else "timed_goal_unavailable")
             recovery.async_stop.assert_not_awaited()
         else:
             recovery.async_stop.assert_awaited_once()

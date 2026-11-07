@@ -183,7 +183,7 @@ def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, 
     observer = TimedGoalObserver(hass, entry)
     monkeypatch.setattr(observer, "request_evaluate", lambda: None)
     monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: NOW)
-    monkeypatch.setattr(observer_module.time, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(observer_module, "time", SimpleNamespace(monotonic=lambda: 0.0))
     return observer, control, hass
 
 

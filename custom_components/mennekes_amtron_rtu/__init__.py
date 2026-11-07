@@ -11,7 +11,11 @@ import time
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -369,6 +373,10 @@ async def async_setup_entry(
             except (OSError, ValueError) as err:
                 raise ConfigEntryNotReady(
                     translation_domain=DOMAIN, translation_key="timed_goal_state_invalid"
+                ) from err
+            except (AmtronBusError, HomeAssistantError) as err:
+                raise ConfigEntryNotReady(
+                    translation_domain=DOMAIN, translation_key="timed_goal_unavailable"
                 ) from err
         if remote:
             # The service owns its own durable goal. Old direct-mode intent must

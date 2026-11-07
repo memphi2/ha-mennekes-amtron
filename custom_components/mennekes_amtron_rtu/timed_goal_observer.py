@@ -9,7 +9,6 @@ import time
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -100,10 +99,14 @@ class TimedGoalObserver:
         self._last_write_at: float | None = None
         self._last_error: str | None = None
         self._goal_lock = asyncio.Lock()
-        self._command_owner = f"timed:{entry.entry_id}:{uuid4().hex}"
+        self._command_owner = f"timed:{entry.entry_id}"
         self._command_submitted = False
 
     async def async_start(self) -> None:
+        # The service may retain a queued command after an unreachable unload
+        # or HA crash. Reclaim this entry's stable owner before arming a trip.
+        self._command_submitted = True
+        await self._cancel_command()
         self.goal = await self._store.async_load()
         options = self._entry.options
         sources = [
@@ -136,7 +139,10 @@ class TimedGoalObserver:
         except (AmtronBusError, HomeAssistantError, OSError) as err:
             # The independent service still expires the queued command at its
             # deadline. A disconnected service must not abort HA teardown.
-            _LOGGER.warning("Could not cancel timed charging during unload: %s", err)
+            _LOGGER.warning(
+                "Could not cancel timed charging during unload: %s",
+                getattr(err, "translation_key", None) or type(err).__name__,
+            )
 
     @callback
     def _source_changed(self, _event: object) -> None:
@@ -325,31 +331,31 @@ class TimedGoalObserver:
             await self._finish("reached", trip)
             return
         if goal.status != "active" or goal.target_percent <= 0:
-            self._set_status("waiting_for_target")
+            await self._wait_for_input("waiting_for_target")
             return
         capacity = self._capacity()
         if capacity is None:
-            self._set_status("waiting_for_capacity")
+            await self._wait_for_input("waiting_for_capacity")
             return
         soc_entity = options.get(CONF_VEHICLE_SOC_ENTITY)
         soc = vehicle_percentage(
             self._hass.states.get(soc_entity) if isinstance(soc_entity, str) else None
         )
         if soc is None:
-            self._set_status("waiting_for_soc")
+            await self._wait_for_input("waiting_for_soc")
             return
         if not self._runtime.coordinator.last_update_success:
-            self._set_status("waiting_for_device")
+            await self._wait_for_input("waiting_for_device")
             return
         if control.read_only:
-            self._set_status("read_only")
+            await self._wait_for_input("read_only")
             return
         data = self._runtime.coordinator.current_data()
         if vehicle_connected(
             data.get(EVSE_STATE.key), data.get(CP_STATE.key),
             cp_supported=self._runtime.identity.layout_version >= CP_STATE.min_layout,
         ) is not True:
-            self._set_status("waiting_for_device")
+            await self._wait_for_input("waiting_for_device")
             return
         plan: ChargePlan = plan_current(
             now=dt_util.utcnow(), deadline=deadline,
@@ -363,7 +369,7 @@ class TimedGoalObserver:
         if control.energy_goal_stop_requested:
             # Missing/reset meter data and stop evidence awaiting persistence
             # block commands without proving that either target was reached.
-            self._set_status("waiting_for_device")
+            await self._wait_for_input("waiting_for_device")
             return
         if control.pending_action is not None:
             self._set_status("queued")
@@ -406,6 +412,12 @@ class TimedGoalObserver:
         if self._command_submitted:
             await self._runtime.control.async_cancel_timed_current(self._command_owner)
             self._command_submitted = False
+
+    async def _wait_for_input(self, status: str) -> None:
+        # Keep an already applied charge unchanged, but do not let an older
+        # queued start run after the plan's target or input became unavailable.
+        await self._cancel_command()
+        self._set_status(status)
 
     def _set_status(self, status: str) -> None:
         if status != self.status:

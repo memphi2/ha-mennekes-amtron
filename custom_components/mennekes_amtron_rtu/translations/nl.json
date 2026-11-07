@@ -724,6 +724,9 @@
     },
     "timed_bavarian_unavailable": {
       "message": "Geen actieve, volledige BMW-vertrektimer beschikbaar. Schakel de sensoren voor actie, uur en minuut in BavarianData in. Stel voor herhalende timers ook de weekdagen in de opties in."
+    },
+    "timed_goal_unavailable": {
+      "message": "Wachtende vertrekopdrachten konden niet worden gecontroleerd. De integratie probeert het opnieuw zodra de verbinding beschikbaar is."
     }
   },
   "issues": {

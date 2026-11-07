@@ -16,10 +16,29 @@ from custom_components.mennekes_amtron_rtu.device import control as device_contr
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
-from tests.test_control import Harness
-from tests.test_modbus_service import TOKEN, current_writes, service_fixture
+from tests.test_control import Harness as ControlHarness
+from tests.test_modbus_service import TOKEN, current_writes
+from tests.test_modbus_service import service_fixture as base_service_fixture
 
 OWNER = "timed:entry:one-trip"
+SOC_SOURCE = "sensor.car_soc"
+
+
+class Harness(ControlHarness):
+    """A timed plan requires an explicitly active percentage target."""
+
+    async def connect(self):
+        control = await super().connect()
+        control.soc_goal.configure_source(SOC_SOURCE)
+        control.soc_goal.set_target(80, soc=20)
+        return control
+
+
+async def service_fixture(tmp_path):
+    service, transport, clock = await base_service_fixture(tmp_path)
+    await service.control.async_configure_soc(SOC_SOURCE)
+    await service.control.async_set_soc_goal(80, source=SOC_SOURCE, soc=20)
+    return service, transport, clock
 
 
 def future() -> datetime:
@@ -258,6 +277,120 @@ def test_remote_timed_current_keeps_local_cap_and_rejects_invalid_values(tmp_pat
                 assert current_writes(transport) == [8]
                 await remote.async_close()
         finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("target_state", ["disabled", "reached"])
+def test_inactive_target_refuses_timed_current_without_changing_wallbox(target_state):
+    async def run():
+        harness = Harness(values={"charging_current_ems": 1})
+        control = await harness.connect()
+        if target_state == "disabled":
+            control.soc_goal.set_target(0)
+        else:
+            control.soc_goal.observe(80)
+        previous_intent = control.write_state.command_intent_generation
+        await control.async_set_timed_current(6, deadline=future(), owner=OWNER)
+        assert control.is_paused is True
+        assert control.pending_action is None
+        assert harness.written(R.CHARGING_CURRENT_EMS) == []
+        assert control.write_state.command_intent_generation == previous_intent
+        event = control.events.snapshot()["events"][-1]
+        assert event["outcome"] == "cancelled"
+        assert event["reason"] == "energy_goal"
+
+    asyncio.run(run())
+
+
+def test_disabled_target_invalidates_deferred_command_without_observer():
+    async def run():
+        harness = Harness()
+        control = await harness.connect()
+        release = asyncio.Event()
+        control._sleep = lambda _delay: release.wait()
+        try:
+            await control.async_pause_charging()
+            await control.async_set_timed_current(6, deadline=future(), owner=OWNER)
+            task = control._flush_task
+            assert control.pending_action == "set_current"
+            control.soc_goal.set_target(0)
+            release.set()
+            await asyncio.wait_for(task, 2)
+            assert control.pending_action is None
+            assert control.is_paused is True
+            assert len(harness.written(R.CHARGING_CURRENT_EMS)) == 1
+            assert control.events.snapshot()["events"][-1]["reason"] == "energy_goal"
+        finally:
+            release.set()
+            await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("target_state", ["disabled", "reached"])
+def test_target_is_rechecked_after_waiting_for_physical_identity(target_state):
+    async def run():
+        harness = Harness(values={"charging_current_ems": 1})
+        control = await harness.connect()
+        started, release = asyncio.Event(), asyncio.Event()
+        original = harness.client._async_transaction_client
+
+        async def delayed_identity(**kwargs):
+            client = await original(**kwargs)
+            started.set()
+            await release.wait()
+            return client
+
+        harness.client._async_transaction_client = delayed_identity
+        writing = asyncio.create_task(control.async_set_timed_current(6, deadline=future(), owner=OWNER))
+        try:
+            await asyncio.wait_for(started.wait(), 2)
+            if target_state == "disabled":
+                control.soc_goal.set_target(0)
+            else:
+                control.soc_goal.observe(80)
+            release.set()
+            await asyncio.wait_for(writing, 2)
+            assert harness.written(R.CHARGING_CURRENT_EMS) == []
+            assert control.is_paused is True
+            assert harness.client.write_state.current_write_generation == 0
+            assert control.events.snapshot()["events"][-1]["reason"] == "energy_goal"
+        finally:
+            release.set()
+            await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("pending_owner", ["timed", "manual"])
+def test_service_target_disable_cancels_only_timed_resume_without_ha(tmp_path, pending_owner):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        release = asyncio.Event()
+        try:
+            await service.heartbeat.async_stop()
+            service.control._sleep = lambda _delay: release.wait()
+            binding = {"expected_serial_number": service.identity.serial_number}
+            await service.command({"command": "pause", **binding})
+            pending = {"command": "set_current", "value": 6}
+            if pending_owner == "timed":
+                pending = {"command": "timed_current", "value": 6, "owner": OWNER, "deadline": future().isoformat()}
+            await service.command({**pending, **binding})
+            task = service.control._flush_task
+            assert service.control.pending_action == "set_current"
+            await service.command({"command": "soc_goal", "value": 0, "source": SOC_SOURCE, **binding})
+            assert service.control.soc_goal.status == "disabled"
+            assert service.control.pending_action == (None if pending_owner == "timed" else "set_current")
+            # No HA observer or client is running to cancel the old plan.
+            clock[0] += 300
+            release.set()
+            await asyncio.wait_for(task, 2)
+            assert current_writes(transport) == ([1] if pending_owner == "timed" else [1, 6])
+            assert service.control.pending_action is None
+        finally:
+            release.set()
             await service.stop()
 
     asyncio.run(run())

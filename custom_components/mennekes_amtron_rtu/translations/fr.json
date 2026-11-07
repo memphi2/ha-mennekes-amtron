@@ -724,6 +724,9 @@
     },
     "timed_bavarian_unavailable": {
       "message": "Aucun départ BMW actif et complet n’est disponible. Activez les capteurs d’action, d’heure et de minute dans BavarianData. Indiquez aussi les jours des programmateurs récurrents dans les options."
+    },
+    "timed_goal_unavailable": {
+      "message": "Les commandes de départ en attente n’ont pas pu être vérifiées. L’intégration réessaiera lorsque la connexion sera disponible."
     }
   },
   "issues": {

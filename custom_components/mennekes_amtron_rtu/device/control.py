@@ -93,8 +93,11 @@ class _PhaseWaitError(Exception):
         self.preserve_deadline = preserve_deadline
 
 
-class _TimedCommandExpiredError(Exception):
-    """A trip deadline passed before its current command could execute."""
+class _TimedCommandCancelledError(Exception):
+    """The trip or its charge target no longer authorizes a pending command."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
 
 
 @dataclass(frozen=True, slots=True)
@@ -262,8 +265,10 @@ class AmtronControl:
         await self.soc_goal_controller.async_observe(soc, maximum, source=source)
 
     def cancel_goal_resume(self) -> None:
-        """Invalidate only the automatic start associated with an old goal."""
-        if self._pending is not None and self._pending.recovery_generation is not None:
+        """Invalidate automatic requests calculated for a previous goal."""
+        if self._pending is not None and (
+            self._pending.recovery_generation is not None or self._pending.owner is not None
+        ):
             self._clear_pending(outcome="cancelled", reason="energy_goal")
             if self._notify_pending is not None:
                 self._notify_pending()
@@ -475,6 +480,12 @@ class AmtronControl:
         async with self._current_lock:
             # A manual request can arrive while the caller waits for this lock.
             if self._pending is not None and self._pending.owner != owner:
+                return
+            if reason := self._timed_cancellation_reason(command):
+                # Refused plans must not change remembered current or command
+                # intent, or cancel another goal's automatic recovery.
+                self.events.record("cancelled", command.action, reason)
+                await self._async_cancel_pending()
                 return
             await self._async_submit_locked(command)
 
@@ -925,12 +936,12 @@ class AmtronControl:
         self._command_acknowledged = False
         self._command_write_started = False
         try:
-            self._check_timed_deadline()
+            self._check_timed_command()
             if deferred and self._validate_deferred is not None:
                 self._validate_deferred()
             await self._async_apply_command(command)
-        except _TimedCommandExpiredError:
-            self.events.record("cancelled", command.action, "deadline_expired")
+        except _TimedCommandCancelledError as err:
+            self.events.record("cancelled", command.action, err.reason)
         except (_PhaseWaitError, AmtronRateLimitedError):
             raise
         except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError, asyncio.CancelledError) as err:
@@ -1054,8 +1065,8 @@ class AmtronControl:
                     command = self._pending
                     if command is None:
                         return
-                    if command.deadline is not None and datetime.now(UTC) >= command.deadline:
-                        self._clear_pending(outcome="cancelled", reason="deadline_expired")
+                    if reason := self._timed_cancellation_reason(command):
+                        self._clear_pending(outcome="cancelled", reason=reason)
                         await self._async_publish_pending()
                         return
                     delay = self._pending_due - self._monotonic()
@@ -1110,13 +1121,13 @@ class AmtronControl:
         min_interval: float = 0.0,
         refresh: bool = True,
     ) -> None:
-        self._check_timed_deadline()
+        self._check_timed_command()
         if self._active_command is not None:
             self._command_write_started = True
         try:
             if self._active_command is not None and self._active_command.deadline is not None:
                 await self._client.async_write_register(
-                    spec, value, min_interval=min_interval, before_write=self._check_timed_deadline,
+                    spec, value, min_interval=min_interval, before_write=self._check_timed_command,
                 )
             else:
                 await self._client.async_write_register(
@@ -1156,10 +1167,19 @@ class AmtronControl:
         if refresh and self._request_refresh is not None:
             await self._request_refresh()
 
-    def _check_timed_deadline(self) -> None:
+    def _timed_cancellation_reason(self, command: _PendingCommand) -> str | None:
+        if command.owner is None:
+            return None
+        if command.deadline is not None and datetime.now(UTC) >= command.deadline:
+            return "deadline_expired"
+        if self.soc_goal.status != "active" or self.soc_goal.target_percent <= 0 or self.energy_goal_stop_requested:
+            return "energy_goal"
+        return None
+
+    def _check_timed_command(self) -> None:
         command = self._active_command
-        if command is not None and command.deadline is not None and datetime.now(UTC) >= command.deadline:
-            raise _TimedCommandExpiredError
+        if command is not None and (reason := self._timed_cancellation_reason(command)):
+            raise _TimedCommandCancelledError(reason)
 
     def _require_write_access(self) -> None:
         if self._options.read_only:

@@ -724,6 +724,9 @@
     },
     "timed_bavarian_unavailable": {
       "message": "Nessun timer di partenza BMW attivo e completo disponibile. Attiva i sensori di azione, ora e minuto in BavarianData. Per i timer ricorrenti, specifica anche i giorni nelle opzioni."
+    },
+    "timed_goal_unavailable": {
+      "message": "Non è stato possibile verificare i comandi di partenza in attesa. L’integrazione riproverà quando la connessione sarà disponibile."
     }
   },
   "issues": {

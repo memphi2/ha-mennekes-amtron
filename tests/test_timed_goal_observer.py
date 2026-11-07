@@ -1,16 +1,24 @@
 """Exercise trip completion, concurrent edits and vehicle safety at runtime."""
 
 import asyncio
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
+from aiohttp import ClientSession
+from aiohttp.test_utils import TestServer
 
 import custom_components.mennekes_amtron_rtu.timed_goal_observer as observer_module
+from custom_components.mennekes_amtron_rtu.control import ControlOptions
+from custom_components.mennekes_amtron_rtu.data import WallboxData, WriteDiagnostics
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
+from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.timed_goal_observer import departure_time
+from tests.test_control import Harness
+from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 from tests.test_timed_goal import NOW, setup_observer, state
 
 
@@ -322,5 +330,207 @@ def test_observer_coalesces_events_and_cancels_inflight_work(monkeypatch: pytest
         # Stopping an observer that never started is harmless.
         unused, _control, _hass = setup_observer(monkeypatch)
         await unused.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("manual", [False, True])
+def test_disabling_soc_target_cancels_only_owned_real_queue(monkeypatch: pytest.MonkeyPatch, manual: bool) -> None:
+    async def run() -> None:
+        observer, _fake_control, _hass = setup_observer(monkeypatch)
+        now = datetime.now(UTC)
+        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: now)
+        harness = Harness()
+        control = await harness.connect()
+        release = asyncio.Event()
+        control._sleep = lambda _delay: release.wait()
+        control.soc_goal.configure_source("sensor.soc|")
+        control.soc_goal.set_target(80, soc=20)
+        observer._runtime.control = control
+        observer.goal.set(now + timedelta(hours=8))
+        try:
+            await control.async_pause_charging()
+            await observer._evaluate()
+            assert control.pending_action == "set_current"
+            assert control._pending.owner == observer._command_owner
+            task = control._flush_task
+            if manual:
+                await control.async_set_charging_current(12)
+            control.soc_goal.set_target(0)
+            await observer._evaluate()
+            assert observer.status == "waiting_for_target"
+            assert observer.goal.finished is None
+            assert (control.pending_action is not None) is manual
+            harness.clock[0] += 301
+            release.set()
+            await asyncio.wait_for(task, 2)
+            assert current_writes(harness.transport) == ([1, 12] if manual else [1])
+        finally:
+            release.set()
+            await observer.async_stop()
+            await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("manual", [False, True])
+def test_disabling_target_cancels_service_queue_without_removing_manual_work(tmp_path, monkeypatch: pytest.MonkeyPatch, manual: bool) -> None:
+    async def run() -> None:
+        observer, _fake_control, _hass = setup_observer(monkeypatch)
+        now = datetime.now(UTC)
+        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: now)
+        service, transport, clock = await service_fixture(tmp_path)
+        release = asyncio.Event()
+        try:
+            await service.heartbeat.async_stop()
+            service.control._sleep = lambda _delay: release.wait()
+            await service.control.async_configure_soc("sensor.soc|")
+            await service.control.async_set_soc_goal(80, source="sensor.soc|", soc=20)
+            async with TestServer(create_app(service)) as server, ClientSession() as session:
+                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                await remote.async_connect()
+                control = RemoteControl(
+                    remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
+                    state=lambda: WallboxData(), request_refresh=None,
+                )
+                observer._runtime.control = control
+                observer.goal.set(now + timedelta(hours=8))
+                await control.async_pause_charging()
+                await observer._evaluate()
+                assert service.control.pending_action == "set_current"
+                task = service.control._flush_task
+                if manual:
+                    await control.async_set_charging_current(12)
+                await control.async_set_soc_goal(0, source="sensor.soc|")
+                await observer._evaluate()
+                assert observer.status == "waiting_for_target"
+                assert observer.goal.finished is None
+                assert (service.control.pending_action is not None) is manual
+                clock[0] += 301
+                release.set()
+                await asyncio.wait_for(task, 2)
+                assert current_writes(transport) == ([1, 12] if manual else [1])
+                await observer.async_stop()
+                await remote.async_close()
+        finally:
+            release.set()
+            await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("missing", "status"), [
+    ("capacity", "waiting_for_capacity"), ("soc", "waiting_for_soc"),
+    ("device", "waiting_for_device"), ("read_only", "read_only"),
+    ("vehicle", "waiting_for_device"), ("safety_stop", "waiting_for_device"),
+])
+def test_missing_planning_input_cancels_future_work_without_stopping_charge(monkeypatch: pytest.MonkeyPatch, missing: str, status: str) -> None:
+    async def run() -> None:
+        observer, control, hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=8))
+        await observer._evaluate()
+        control.async_cancel_timed_current = AsyncMock()
+        original = observer.goal
+        if missing == "capacity":
+            observer._entry.options.pop("timed_capacity_kwh")
+        elif missing == "soc":
+            hass.states.pop("sensor.soc")
+        elif missing == "device":
+            observer._runtime.coordinator.last_update_success = False
+        elif missing == "read_only":
+            control.read_only = True
+        elif missing == "vehicle":
+            control.data.values.update({"evse_state": EvseState.IDLE, "cp_state": CpState.A1})
+        else:
+            control.energy_goal_stop_requested = True
+        await observer._evaluate()
+        assert observer.status == status
+        control.async_cancel_timed_current.assert_awaited_once_with(observer._command_owner)
+        assert observer.goal is original
+        assert control.commands == [("current", 9.7)]
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("pending_owner", ["same_entry", "manual", "other_entry"])
+def test_reloaded_observer_reclaims_service_queue_after_offline_unload(tmp_path, monkeypatch: pytest.MonkeyPatch, pending_owner: str) -> None:
+    async def run() -> None:
+        observer, _fake_control, hass = setup_observer(monkeypatch)
+        now = datetime.now(UTC)
+        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: now)
+        monkeypatch.setattr(observer_module, "async_track_state_change_event", lambda *_args: lambda: None)
+        monkeypatch.setattr(observer_module, "async_track_time_interval", lambda *_args: lambda: None)
+        service, transport, clock = await service_fixture(tmp_path)
+        release = asyncio.Event()
+        try:
+            await service.heartbeat.async_stop()
+            service.control._sleep = lambda _delay: release.wait()
+            await service.control.async_configure_soc("sensor.soc|")
+            await service.control.async_set_soc_goal(80, source="sensor.soc|", soc=20)
+            async with TestServer(create_app(service)) as server, ClientSession() as session:
+                endpoint = str(server.make_url("/"))
+                remote = RemoteClient(session, endpoint, TOKEN)
+                await remote.async_connect()
+                control = RemoteControl(
+                    remote, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
+                    state=lambda: WallboxData(), request_refresh=None,
+                )
+                observer._runtime.control = control
+                observer.goal.set(now + timedelta(hours=8))
+                saved = observer.goal.snapshot()
+                await control.async_pause_charging()
+                await observer._evaluate()
+                assert service.control._pending.owner == observer._command_owner
+                if pending_owner == "manual":
+                    await control.async_set_charging_current(12)
+                elif pending_owner == "other_entry":
+                    await control.async_cancel_timed_current(observer._command_owner)
+                    await control.async_set_timed_current(
+                        12, deadline=observer.goal.deadline, owner="timed:other_entry",
+                    )
+                task = service.control._flush_task
+                await remote.async_close()
+                await observer.async_stop()
+                assert service.control.pending_action == "set_current"
+
+                fresh = RemoteClient(session, endpoint, TOKEN)
+                await fresh.async_connect()
+                observer._runtime.control = RemoteControl(
+                    fresh, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
+                    state=lambda: WallboxData(), request_refresh=None,
+                )
+                reloaded = observer_module.TimedGoalObserver(hass, observer._entry)
+                reloaded.request_evaluate = lambda: None
+                reloaded._store.async_load = AsyncMock(return_value=TimedGoal.restore(saved))
+                await reloaded.async_start()
+                assert reloaded._command_owner == observer._command_owner
+                await reloaded.async_set_deadline(None)
+                assert reloaded.goal.deadline is None
+                assert (service.control.pending_action is not None) is (pending_owner != "same_entry")
+                clock[0] += 301
+                release.set()
+                await asyncio.wait_for(task, 2)
+                assert current_writes(transport) == ([1] if pending_owner == "same_entry" else [1, 12])
+                await reloaded.async_stop()
+                await fresh.async_close()
+        finally:
+            release.set()
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_failed_queue_reclaim_cannot_start_new_observer(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, _hass = setup_observer(monkeypatch)
+        control.async_cancel_timed_current = AsyncMock(side_effect=observer_module.HomeAssistantError("service offline"))
+        observer._store.async_load = AsyncMock()
+        with pytest.raises(observer_module.HomeAssistantError, match="service offline"):
+            await observer.async_start()
+        observer._store.async_load.assert_not_awaited()
+        assert observer._task is None
+        assert observer._unsubs == []
+        assert observer._command_submitted
+        await observer.async_stop()
 
     asyncio.run(run())

@@ -724,6 +724,9 @@
     },
     "timed_bavarian_unavailable": {
       "message": "No active, complete BMW departure timer is available. Enable the timer action, hour and minute sensors in BavarianData; recurring timers also need their weekdays in the integration options."
+    },
+    "timed_goal_unavailable": {
+      "message": "Queued departure commands could not be checked. The integration will retry when the connection is available."
     }
   },
   "issues": {

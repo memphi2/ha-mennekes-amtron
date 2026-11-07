@@ -724,6 +724,9 @@
     },
     "timed_bavarian_unavailable": {
       "message": "Kein aktiver, vollständiger BMW-Abfahrtstimer verfügbar. Aktiviere in BavarianData die Sensoren für Aktivierung, Stunde und Minute. Für wiederkehrende Timer müssen die Wochentage in den Integrationsoptionen angegeben sein."
+    },
+    "timed_goal_unavailable": {
+      "message": "Vorgemerkte Abfahrtsbefehle konnten nicht geprüft werden. Die Integration versucht es erneut, sobald die Verbindung verfügbar ist."
     }
   },
   "issues": {
