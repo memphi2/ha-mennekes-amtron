@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Allow the connection page on stable Supervisor 2026.10.4 and newer,
+  while retaining its administrator and trusted-ingress checks.
 - Show TCP-login and password fields in native app configuration and retain
   their visibility when the connection page saves USB or disabled login.
 - Confirm or cancel uncertain percentage-target requests and reject observations

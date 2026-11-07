@@ -79,7 +79,7 @@ paths to supported serial devices; the schema change grants no additional device
 access. See [connection setup](upgrading.md#app-connection-page).
 
 The new page uses a separate internal Ingress listener on port 8099 and requires
-an administrator with stable Supervisor **2026.11.0+**. It accepts requests only
+an administrator with stable Supervisor **2026.10.4+**. It accepts requests only
 from Supervisor, validates administrator identity and protects writes against
 cross-site requests and concurrent option changes. It reads only locally mapped
 serial devices, saves through Supervisor's own-app API and never sends the

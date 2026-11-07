@@ -1,8 +1,8 @@
 """Connection setup through authenticated Supervisor ingress, without extra roles.
 
-Only the Supervisor's real network peer is trusted. Supervisor 2026.11.0 is the
-first verified release that enforces panel_admin and replaces every user/group
-header; older releases cannot authorize this configuration page safely.
+Only the Supervisor's real network peer is trusted. Supervisor 2026.10.4 is the
+first stable release verified to enforce panel_admin and replace every
+user/group header; older releases cannot authorize this page safely.
 """
 
 from __future__ import annotations
@@ -219,7 +219,7 @@ class AppSettings:
         info = await self._request("GET", "/info")
         version = info.get("supervisor")
         match = _VERSION.fullmatch(version) if isinstance(version, str) and len(version) <= 32 else None
-        if match is None or not 1 <= int(match[2]) <= 12 or tuple(int(part) for part in match.groups()) < (2026, 11, 0):
+        if match is None or not 1 <= int(match[2]) <= 12 or tuple(int(part) for part in match.groups()) < (2026, 10, 4):
             raise SettingsError("supervisor_update_required", 503)
         user = request.headers.get("X-Remote-User-Id", "")
         groups = request.headers.get("X-Remote-User-Groups", "").split(",")

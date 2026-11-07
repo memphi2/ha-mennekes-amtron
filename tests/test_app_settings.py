@@ -35,7 +35,7 @@ class FixtureSettings(ui.AppSettings):
     def __init__(self):
         super().__init__("isolated-supervisor-token", TOKEN)
         self.options = deepcopy(BASE)
-        self.version = "2026.11.0"
+        self.version = "2026.10.5"
         self.calls = []
 
     async def _request(self, method, path, payload=None):
@@ -109,7 +109,7 @@ def test_admin_and_same_site_are_required(settings, headers):
     asyncio.run(check())
 
 
-@pytest.mark.parametrize("version", [None, 202611, "2026.10.1", "2026.11.0b1", "2026.11.0.dev0", "2026.13.0", "2027.0.0", "x" * 33])
+@pytest.mark.parametrize("version", [None, 202611, "2026.10.1", "2026.10.2", "2026.10.3", "2026.10.4b1", "2026.10.4.dev0", "2026.11.0b1", "2026.11.0.dev0", "2026.13.0", "2027.0.0", "x" * 33])
 def test_old_or_unverified_supervisor_versions_fail_closed(settings, version):
     async def check():
         assert (await invoke(settings, request())).status == 200
@@ -117,6 +117,20 @@ def test_old_or_unverified_supervisor_versions_fail_closed(settings, version):
         response = await invoke(settings, request())
         assert response.status == 503
         assert body(response) == {"error": "supervisor_update_required"}
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("version", ["2026.10.4", "2026.10.5", "2026.11.0"])
+def test_verified_supervisor_releases_accept_only_authenticated_admin(settings, version):
+    async def check():
+        settings.version = version
+        assert (await invoke(settings, request())).status == 200
+        # Missing group, non-admin group, and forged identities from non-
+        # Supervisor peers cannot access the page on any supported version.
+        for groups in ("", "system-users", "not-system-admin"):
+            headers = {**HEADERS, "X-Remote-User-Groups": groups}
+            assert (await invoke(settings, request(headers=headers))).status == 403
+        assert (await invoke(settings, request(peer="127.0.0.1"))).status == 403
     asyncio.run(check())
 
 

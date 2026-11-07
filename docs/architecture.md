@@ -89,14 +89,20 @@ Cancellation runs a bounded, shielded restoration. A failed restoration leaves
 the old owner stopped. See [adapter setup and limitations](lan-adapters.md).
 
 Since **0.6.0b1**, an administrator connection page runs on a separate
-internal Ingress listener. It requires stable Supervisor 2026.11.0+, enumerates
-only locally mapped serial adapters and saves connection fields through the
+internal Ingress listener. The updated page requires stable Supervisor
+2026.10.4+; earlier app releases required 2026.11.0+. It enumerates only locally
+mapped serial adapters and saves connection fields through the
 Supervisor API for this app. It does not expose the service token to the browser.
 Ordinary connection saves take effect after an app restart. Explicit LAN-adapter
 setup stops the old connection before changing the adapter; local validation
 errors leave the existing connection running. The user restarts the app after
 a successful adapter change to resume Modbus with the saved settings.
 Other app settings remain in the native Configuration tab.
+
+The [Supervisor 2026.10.4 ingress implementation](https://github.com/home-assistant/supervisor/blob/2026.10.4/supervisor/api/ingress.py)
+enforces `panel_admin`, removes incoming user and group headers regardless of
+case, and sets the groups from the authenticated user. Earlier Supervisor
+releases do not provide all of these checks and headers together.
 
 An app with missing connection fields starts only its setup interface and health
 endpoint, with no Modbus owner, heartbeat or discovery. A configured but missing

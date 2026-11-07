@@ -96,8 +96,8 @@ The service is a separate app: installing the integration from the Marketplace
 or HACS does not install it. It remains optional, and choosing it never deletes
 your existing device or entity IDs.
 
-App **0.6.1** includes an **Open Web UI** page for USB/LAN
-setup. That page requires an administrator and stable **Supervisor 2026.11.0+**;
+The updated app includes an **Open Web UI** page for USB/LAN
+setup. That page requires an administrator and stable **Supervisor 2026.10.4+**;
 it does not raise the integration's Home Assistant minimum version. See
 [the connection page](upgrading.md#app-connection-page) for setup and updates.
 

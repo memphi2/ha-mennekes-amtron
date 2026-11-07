@@ -15,7 +15,7 @@ See [Updates](DOCS.md#updates).
 App settings are available in English, German, French, Dutch and Italian.
 Use **Open Web UI** for the connection: choose a USB adapter from a dropdown,
 or enter the LAN host/IP and port. Save, then restart the app from its Info tab.
-This page needs an administrator and stable Supervisor **2026.11.0 or newer**;
+In the updated app, this page needs an administrator and stable Supervisor **2026.10.4 or newer**;
 read-only, limits and polling settings remain in the Configuration tab.
 
 Beta 0.7.0b4 includes optional Waveshare adapter setup and TCP login in the connection

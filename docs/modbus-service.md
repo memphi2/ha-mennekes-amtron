@@ -78,8 +78,8 @@ catalogs, follow the [channel handover](#updates) and
 If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
-In app **0.6.1**, start the app and choose **Open Web UI** as an
-administrator. It requires stable **Supervisor 2026.11.0 or newer**. Choose USB
+In the updated app, start the app and choose **Open Web UI** as an
+administrator. It requires stable **Supervisor 2026.10.4 or newer**. Choose USB
 or LAN; USB provides an adapter dropdown, while LAN shows the host/IP and port.
 A missing USB adapter is never replaced automatically. Saving LAN removes its
 old serial path. Save and restart the app from the Info tab to apply changes.

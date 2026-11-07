@@ -134,8 +134,10 @@ LAN shows the gateway host/IP and TCP port. Saving LAN also clears any old USB
 path, so an unplugged adapter cannot block the change. A missing USB adapter is
 never replaced automatically.
 
-The page requires stable **Supervisor 2026.11.0 or newer** for its administrator
-access check. This is a requirement of the page, not a new minimum Home Assistant
+The updated page requires stable **Supervisor 2026.10.4 or newer** for its
+administrator access check. App releases through 0.7.0b4 require 2026.11.0 or
+newer; update the app to use the lower requirement. This is a requirement of
+the page, not a new minimum Home Assistant
 version for the integration. On older Supervisor versions, the native app
 **Configuration** tab remains available; its serial path is a text field in
 0.6.0b1. Update Supervisor to use the guided USB dropdown.

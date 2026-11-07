@@ -81,7 +81,7 @@ itself, or configure those fields in the app when the service owns it.
 | App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
 | Older app **0.5.2b2** rejects LAN settings because an old USB device no longer exists | Update to **0.6.1**, which includes the fix for this validation conflict. Before updating, clear the saved **Serial adapter** selection in the native Configuration tab, then save LAN settings and restart. LAN needs no local USB device. |
 | **Connection setup required** | Open the app's **Web UI**, choose USB or LAN, save and restart. Until then, the app runs only setup and health checks, without Modbus, heartbeat or discovery. |
-| Web UI requests a Supervisor update | The guided connection page requires an administrator and stable **Supervisor 2026.11.0+**. The native Configuration tab remains available; see [connection setup](upgrading.md#app-connection-page). This does not change the integration's HA minimum version. |
+| Web UI requests a Supervisor update | The guided connection page requires an administrator and stable **Supervisor 2026.10.4+**. The native Configuration tab remains available; see [connection setup](upgrading.md#app-connection-page). This does not change the integration's HA minimum version. |
 
 An app that starts successfully can still be waiting for the wallbox. The log
 separates API startup, USB/LAN connection, heartbeat start/stop and shutdown.

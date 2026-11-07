@@ -112,7 +112,7 @@ only the entered host. Applying changes the adapter immediately; restart the
 app afterwards to resume the connection. The native TCP-login switch changes
 the app connection only; it does not enable login on the adapter.
 
-This page requires a Home Assistant administrator and **Supervisor 2026.11.0 or
+This page requires a Home Assistant administrator and **Supervisor 2026.10.4 or
 newer** (stable). Older Supervisor versions can still save LAN settings in the
 native **Configuration** tab, including when an old USB adapter is absent. For
 the USB dropdown, update Supervisor. Read-only, current limits and polling
@@ -123,7 +123,7 @@ The native Configuration form cannot show fields conditionally or require a
 dropdown for its device selector; see the [Supervisor option schema](https://contributors.home-assistant.io/apps/guides/options/).
 The separate [Ingress page](https://contributors.home-assistant.io/apps/guides/ingress/)
 does not require a host port, an API token in your browser or extra Supervisor
-roles. Supervisor 2026.11.0 supplies the required server-side administrator check.
+roles. Supervisor 2026.10.4 supplies the required server-side administrator check.
 
 App **0.6.0b1** shows exactly three connection choices. If an older app still has
 a technical name saved, select its matching readable choice once:
@@ -273,7 +273,7 @@ uses HA's own security policy and does not automatically use this service profil
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
 | Connection setup required | Open **Web UI**, configure USB or LAN, save and restart the app. Setup mode is running but does not advertise ready wallbox data. |
-| Web UI asks for a Supervisor update | Update Supervisor to stable **2026.11.0 or newer**. This requirement concerns the connection page, not the integration's HA minimum version. |
+| Web UI asks for a Supervisor update | Update Supervisor to stable **2026.10.4 or newer**. This requirement concerns the connection page, not the integration's HA minimum version. |
 | Serial adapter marked missing | Reconnect the saved adapter or choose its replacement from the dropdown. For LAN, change the connection type and save; the old serial path is removed. |
 | Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. A managed heartbeat or HA-to-app link failing continuously for 60 seconds raises a repair that clears on recovery; a connection fault has no Fix button. |
 

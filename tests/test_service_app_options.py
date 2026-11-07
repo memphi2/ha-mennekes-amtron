@@ -62,7 +62,7 @@ def test_native_app_form_exposes_tcp_login_and_password_by_default(app_config):
 
 
 def test_added_tcp_defaults_preserve_existing_login_on_supervisor_upgrade(app_config):
-    # Supervisor 2026.11.0 merges user options over new app defaults.
+    # Supervisor merges user options over new app defaults.
     existing = {
         "connection_type": "LAN: Modbus TCP", "host": "gateway.local",
         "tcp_authentication": True, "tcp_auth_password": "Demo123",
