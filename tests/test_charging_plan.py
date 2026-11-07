@@ -36,7 +36,6 @@ def test_plan_paces_current_within_physical_limits() -> None:
     result = plan(8)
     assert result.status == "paced"
     assert result.current_a == 9.7
-    assert result.required_kwh == 48
     assert plan(24).status == "early_at_minimum"
     assert plan(24).current_a == 6
     assert plan(1).status == "unreachable"

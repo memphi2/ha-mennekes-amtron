@@ -10,7 +10,6 @@ CONF_AUTO_TARIFF_REFRESH: Final = "auto_tariff_refresh"
 COST_SOURCE_DISABLED: Final = "disabled"
 COST_SOURCE_FIXED: Final = "fixed"
 COST_SOURCE_SENSOR: Final = "sensor"
-COST_SOURCES: Final = (COST_SOURCE_DISABLED, COST_SOURCE_FIXED, COST_SOURCE_SENSOR)
 NETWORK_MODULE_NONE: Final = "none"
 NETWORK_MODULE_2: Final = "module_2"
 NETWORK_MODULE_3: Final = "module_3"

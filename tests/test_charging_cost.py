@@ -12,6 +12,7 @@ from custom_components.mennekes_amtron_rtu.device.charging_cost import (
     MAX_TARIFF_INTERVAL,
     CostAccumulator,
     CostResult,
+    PriceInterval,
     TariffConfig,
     TariffWindow,
 )
@@ -37,11 +38,19 @@ def config(**overrides):
     return raw
 
 
+def one_kwh_cost(tariff, start, end, base_price):
+    """Exercise actual metered billing across tariff boundaries."""
+    accumulator = CostAccumulator(tariff, max_gap=MAX_TARIFF_INTERVAL)
+    accumulator.sample(start, 0, base_price)
+    accumulator.observe_energy(end, 1)
+    return accumulator.result.cost
+
+
 @pytest.mark.parametrize("price", [-0.2, 0, 0.35, 2])
 def test_plain_tariff_preserves_complete_end_price_without_any_adjustment(price):
     tariff = TariffConfig.parse({})
     assert tariff.price_at(10, price) == price
-    assert tariff.average_price(10, 1000, price) == price
+    assert one_kwh_cost(tariff, 10, 1000, price) == price
     assert TariffConfig.parse(tariff.as_dict()) == tariff
 
 
@@ -49,7 +58,7 @@ def test_plain_tariff_preserves_complete_end_price_without_any_adjustment(price)
 def test_unknown_price_never_turns_into_zero_or_a_network_only_price(price):
     for tariff in (TariffConfig(), TariffConfig.parse(config())):
         assert tariff.price_at(10, price) is None
-        assert tariff.average_price(10, 1000, price) is None
+        assert one_kwh_cost(tariff, 10, 1000, price) is None
 
 
 @pytest.mark.parametrize(("includes", "base", "expected"), [
@@ -98,15 +107,15 @@ def test_module_three_replaces_existing_regular_fee_and_allows_rounded_published
 ])
 def test_schedule_uses_elapsed_utc_time_across_both_dst_transitions(start, end, nt_start, nt_end, expected):
     tariff = TariffConfig.parse(config(windows=[window(nt_start, nt_end), window("17:00", "20:00", "ht")]))
-    assert tariff.average_price(at(start), at(end), 0) == pytest.approx(expected)
+    assert one_kwh_cost(tariff, at(start), at(end), 0) == pytest.approx(expected)
 
 
 def test_quarter_switch_and_year_expiry_split_a_meter_interval():
     tariff = TariffConfig.parse(config(active_quarters=[1, 4]))
     start, end = at("2026-03-31T21:00:00+00:00"), at("2026-03-31T23:00:00+00:00")
-    assert tariff.average_price(start, end, 0) == pytest.approx(0.06)
+    assert one_kwh_cost(tariff, start, end, 0) == pytest.approx(0.06)
     start, end = at("2026-12-31T22:30:00+00:00"), at("2026-12-31T23:30:00+00:00")
-    assert tariff.average_price(start, end, 0) is None
+    assert one_kwh_cost(tariff, start, end, 0) is None
     accumulator = CostAccumulator(tariff, max_gap=7200)
     accumulator.sample(start, 100, 0)
     accumulator.observe_energy(end, 110)
@@ -179,15 +188,17 @@ def test_bad_price_timestamp_is_unknown(timestamp):
 @pytest.mark.parametrize(("start", "end"), [(1, 1), (2, 1), (-1, 1), (1, float("inf"))])
 def test_invalid_price_interval_raises(start, end):
     with pytest.raises(ValueError, match=r"positive duration|out of range|finite number"):
-        TariffConfig().average_price(start, end, 0.3)
+        TariffConfig().price_intervals(start, end, 0.3)
 
 
 def test_too_large_tariff_interval_and_transition_overflow_are_unknown(monkeypatch):
     tariff = TariffConfig.parse(config())
     start = at("2026-01-01T00:00:00+00:00")
-    assert tariff.average_price(start, start + MAX_TARIFF_INTERVAL + 1, 0) is None
+    end = start + MAX_TARIFF_INTERVAL + 1
+    assert tariff.price_intervals(start, end, 0) == (PriceInterval(start, end, None),)
     monkeypatch.setattr(charging_cost, "MAX_PRICE_CHANGES", 2)
-    assert tariff.average_price(start, start + 86400, 0) is None
+    end = start + 86400
+    assert tariff.price_intervals(start, end, 0) == (PriceInterval(start, end, None),)
 
 
 def test_network_price_arithmetic_overflow_is_unknown():
@@ -387,4 +398,4 @@ def test_saved_whole_minute_tariff_still_loads_and_prices_exact_boundaries(start
     boundary = at(f"2026-01-02T{end}:00+01:00")
     assert tariff.price_at(boundary - 1, 0.2) == pytest.approx(0.22)
     assert tariff.price_at(boundary, 0.2) == pytest.approx(0.3)
-    assert tariff.average_price(boundary - 60, boundary + 60, 0.2) == pytest.approx(0.26)
+    assert one_kwh_cost(tariff, boundary - 60, boundary + 60, 0.2) == pytest.approx(0.26)
