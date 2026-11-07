@@ -354,6 +354,17 @@ def test_remote_diagnostics_and_raw_write_refusal(tmp_path):
                     await remote.async_read_words(address=123, count=1)
                 with pytest.raises(AmtronWriteRejectedError):
                     await remote.async_write_register(R.CHARGING_CURRENT_EMS, 16)
+                precondition_called = False
+
+                async def precondition(_read):
+                    nonlocal precondition_called
+                    precondition_called = True
+
+                with pytest.raises(AmtronWriteRejectedError):
+                    await remote.async_write_register(
+                        R.CHARGING_CURRENT_EMS, 16, precondition=precondition,
+                    )
+                assert not precondition_called
                 await server.close()
                 control = RemoteControl(
                     remote,

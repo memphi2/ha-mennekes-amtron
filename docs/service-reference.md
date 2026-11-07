@@ -30,6 +30,27 @@ USB uses `serial_port`, `baudrate` and `frame`. LAN uses `host` and `tcp_port`
 wallbox address from 10 to 50. The HTTP API's `port` is independent and defaults
 to 8765. Neither LAN mode expands the supported RTU register/model scope.
 
+For compatible Waveshare adapters, `tcp_authentication: true` enables a fresh
+password handshake on every TCP connection, using `tcp_auth_password`. This is
+the existing adapter web password, separate from the service API token. Login
+failure closes the socket; Modbus traffic is not sent through an unverified
+connection. Passwords are not included in diagnostics or configuration reprs.
+The app and HA setup clear the saved adapter password when disabling login or
+switching to USB. For standalone JSON, remove `tcp_auth_password` yourself when
+turning login off.
+See [TCP login limits](lan-adapters.md#tcp-login-and-its-limits): this protocol
+provides no encryption and firmware 1.523 has a confirmed handshake weakness.
+
+Compatible adapter setup is a separate explicit operation in the HA flow or
+app connection page. It pins the inspected address and native identifier,
+checks the supported firmware/layout and sets a passive TCP-server profile
+without storage queries, flow control, preambles or serial replay. It preserves
+unrelated parameters and reads back the whole change. Unknown payload/flag
+formats are refused before writing. No parameter writes occur during ordinary startup or reconnect.
+The app closes and suspends its old Modbus connection before an explicit apply;
+a successful save requires an app restart, while an uncertain restore keeps the
+old connection blocked. See [LAN adapter setup](lan-adapters.md).
+
 In older apps **0.5.1–0.5.2b2**, the native Configuration tab has an optional
 serial-device selector with no default device path. It keeps the host field
 visible, accepts an empty host for USB and does not hide fields when changing

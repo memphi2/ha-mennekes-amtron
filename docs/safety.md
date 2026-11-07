@@ -27,9 +27,15 @@ existing master. Disabling a service-connected HA entry does not stop the app.
 
 A LAN-to-RS-485 gateway does not make the bus multi-master. Give only the selected
 HA instance or independent service access to it. Both supported LAN protocols
-are unencrypted and unauthenticated: restrict the gateway to a trusted private
-network and never expose its Modbus port to the Internet. The service API's token
-does not protect that separate port. See [LAN setup](network-gateway.md).
+are unencrypted and have no authentication by default. Optional Waveshare login
+has a confirmed weakness in firmware 1.523 and is not a security boundary:
+restrict the gateway to a trusted private network and never expose its Modbus
+port to the Internet. The service API's token does not protect that separate
+port. See [LAN setup](network-gateway.md) and [Security](../SECURITY.md#threat-model).
+
+Explicitly applying adapter settings restarts that adapter and interrupts the
+heartbeat. Do this during setup or a planned interruption. Successful changes
+through the app's connection page require an app restart before Modbus resumes.
 
 ## §14a EnWG is enforced in hardware
 
@@ -112,6 +118,10 @@ the integration's extra current cap, while hardware limits remain in force.
   longer interval when no vehicle is connected. Failed reads, inconsistent
   status or layouts without CP keep the interval. Register-write guards and
   heartbeat remain active; pending waits check for unplugging every five seconds.
+- From 0.7.0b2, departure-plan commands are cancelled on freshly confirmed
+  unplugging before their write. This also applies in service mode while HA is
+  unavailable when the service is updated to 0.7.0b2. Manual commands retain
+  the no-vehicle interval bypass.
 - Repeating the same state and recovery that preserves existing intent do not
   restart the long timer. Timing guards survive an entry reload in memory.
   A cold process start uses a fresh guard period because prior timing is

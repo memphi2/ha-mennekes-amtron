@@ -9,7 +9,7 @@
       "service_identity_changed": "De gevonden wallbox is gewijzigd. Begin de configuratie opnieuw.",
       "service_discovery_updated": "De bestaande integratie gebruikt nu de verbinding met de gevonden app.",
       "multiple_service_apps": "Er zijn meerdere Modbus-apps gevonden. Selecteer de juiste gevonden app onder Apparaten & diensten.",
-      "reauth_not_supported": "Een directe Modbus-verbinding heeft geen toegangsgegevens om te vernieuwen."
+      "reauth_not_supported": "Deze verbinding gebruikt geen TCP-aanmelding bij de adapter. Werk de instellingen bij via Verbinding wijzigen."
     },
     "error": {
       "cannot_connect": "De seriële poort kon niet worden geopend of de wallbox antwoordde niet. Controleer de bekabeling (Modbus A is +, B is -), de poort en de businstellingen.",
@@ -24,7 +24,15 @@
       "cannot_connect_network": "De LAN-adapter is niet bereikbaar of de wallbox antwoordt niet. Controleer host, poort, protocol en de seriële instellingen op de adapter.",
       "invalid_network_response": "De adapter antwoordde, maar meldde geen geldige Modbus-registerindeling. Controleer het wallboxadres, het adapterprotocol en de satellietinstelling.",
       "service_discovery_unavailable": "De huidige toegangsgegevens van deze app konden niet worden opgehaald. Controleer de app en Supervisor, start of herstart de app indien nodig en bevestig opnieuw.",
-      "service_version_mismatch": "De Modbus-dienst voldoet niet aan de API-eisen of de minimale versie van deze integratie. Gebruik een compatibele dienstversie zoals beschreven in de releaseopmerkingen van de integratie. Als beide componenten een update nodig hebben, werk dan eerst de app of de afzonderlijk gehoste dienst bij."
+      "service_version_mismatch": "De Modbus-dienst voldoet niet aan de API-eisen of de minimale versie van deze integratie. Gebruik een compatibele dienstversie zoals beschreven in de releaseopmerkingen van de integratie. Als beide componenten een update nodig hebben, werk dan eerst de app of de afzonderlijk gehoste dienst bij.",
+      "invalid_tcp_auth_password": "Voer het huidige webwachtwoord in: 1–9 afdrukbare ASCII-tekens zonder spaties.",
+      "invalid_gateway_config": "Controleer de ondersteunde baudrate, het frame en het huidige webwachtwoord. TCP-aanmelding vereist een geldig wachtwoord.",
+      "gateway_unsupported": "Dit model, deze firmware of bedrijfsmodus kan niet automatisch worden ingesteld. Stel de adapter handmatig in en schakel “LAN-adapter instellen” uit.",
+      "gateway_unreachable": "De adapterinstellingen konden niet worden gelezen. Controleer het adres en de lokale netwerktoegang of stel de adapter handmatig in.",
+      "gateway_changed": "De instellingen zijn gewijzigd sinds dit voorbeeld. Start de verbindingsinstellingen opnieuw om de huidige waarden te lezen.",
+      "gateway_apply_failed": "De instellingen konden niet worden toegepast en gecontroleerd. Controleer het huidige webwachtwoord en de adapterverbinding.",
+      "gateway_rollback_failed": "De vorige instellingen konden na de mislukte wijziging niet worden bevestigd. De oude integratieverbinding blijft gestopt. Controleer de adapter handmatig voordat je opnieuw verbinding maakt.",
+      "gateway_authentication_failed": "De adapter heeft zijn huidige webwachtwoord geweigerd. Controleer het wachtwoord voor de webinterface."
     },
     "progress": {
       "searching": "De bus wordt doorzocht naar een wallbox: maximaal {candidates} combinaties, ongeveer {minutes} minuten plus verbindingscontroles. Er wordt niet naar registers geschreven. Tijdens het opnieuw configureren worden de bestaande verbinding en heartbeat onderbroken; het ingestelde gedrag van de wallbox bij uitval is dan van toepassing."
@@ -108,13 +116,17 @@
           "connection_type": "Verbindingsprotocol",
           "host": "Adapterhost",
           "tcp_port": "TCP-poort van adapter",
-          "device_id": "Modbus-apparaatadres"
+          "device_id": "Modbus-apparaatadres",
+          "tcp_authentication": "TCP-aanmelding",
+          "configure_gateway": "LAN-adapter instellen"
         },
         "data_description": {
           "connection_type": "Moet overeenkomen met de adaptermodus: transparant RTU over TCP of vertaling van Modbus TCP naar RTU.",
           "host": "Hostnaam of IP-adres van de LAN-adapter, zonder http:// of URL-pad.",
           "tcp_port": "TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.",
-          "device_id": "Adres van de wallbox achter de adapter; standaard 50, ondersteund bereik 10–50."
+          "device_id": "Adres van de wallbox achter de adapter; standaard 50, ondersteund bereik 10–50.",
+          "tcp_authentication": "Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
+          "configure_gateway": "Lees de instellingen van deze adapter en controleer wijzigingen voordat ze worden toegepast. Alleen ondersteunde modellen en firmware kunnen hier worden ingesteld."
         }
       },
       "network_reconfigure": {
@@ -124,13 +136,17 @@
           "connection_type": "Verbindingsprotocol",
           "host": "Adapterhost",
           "tcp_port": "TCP-poort van adapter",
-          "device_id": "Modbus-apparaatadres"
+          "device_id": "Modbus-apparaatadres",
+          "tcp_authentication": "TCP-aanmelding",
+          "configure_gateway": "LAN-adapter instellen"
         },
         "data_description": {
           "connection_type": "Moet overeenkomen met de adaptermodus: transparant RTU over TCP of vertaling van Modbus TCP naar RTU.",
           "host": "Hostnaam of IP-adres van de LAN-adapter, zonder http:// of URL-pad.",
           "tcp_port": "TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.",
-          "device_id": "Adres van de wallbox achter de adapter; standaard 50, ondersteund bereik 10–50."
+          "device_id": "Adres van de wallbox achter de adapter; standaard 50, ondersteund bereik 10–50.",
+          "tcp_authentication": "Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
+          "configure_gateway": "Lees de instellingen van deze adapter en controleer wijzigingen voordat ze worden toegepast. Alleen ondersteunde modellen en firmware kunnen hier worden ingesteld."
         }
       },
       "reauth_confirm": {
@@ -143,6 +159,34 @@
       "reauth_app": {
         "title": "Toegang tot de app vernieuwen",
         "description": "Bevestig om de huidige toegangsgegevens van deze Modbus-app bij Supervisor op te halen. De app moet actief zijn. Je hoeft geen token in te voeren."
+      },
+      "network_auth": {
+        "title": "Aanmelden bij de LAN-adapter",
+        "description": "Voer het huidige webwachtwoord van je compatibele adapter in. De verbinding wordt gecontroleerd zonder instellingen of wachtwoord te wijzigen. Gebruik 1–9 afdrukbare ASCII-tekens zonder spaties. Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
+        "data": {
+          "tcp_auth_password": "Huidig webwachtwoord van de adapter"
+        }
+      },
+      "network_adapter": {
+        "title": "LAN-adapter instellen",
+        "description": "Herkend: **{model}**, firmware **{firmware}**. Huidige instellingen: **{baudrate} baud, {frame}**, TCP-poort **{tcp_port}**.\n\nBevestigen past het protocol en de TCP-poort van de vorige pagina toe, samen met onderstaande instellingen. Daarna wordt de identiteit van de laadpaal gecontroleerd. Bij een fout worden de oude instellingen hersteld als de adapter bereikbaar is. Het huidige webwachtwoord wordt niet gewijzigd. Ook wordt de passieve TCP-servermodus ingesteld. Eigen Modbus-uitlezing/cache, flowcontrole, verbindingsvoorvoegsels, herhalen van gebufferde seriële gegevens, automatische parameteruploads en door gegevens geactiveerde herstarts worden uitgeschakeld.",
+        "data": {
+          "baudrate": "Baudrate",
+          "frame": "Frame",
+          "tcp_authentication": "TCP-aanmelding",
+          "tcp_auth_password": "Huidig webwachtwoord van de adapter"
+        },
+        "data_description": {
+          "tcp_authentication": "Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
+          "tcp_auth_password": "Voer het huidige webwachtwoord in als er een is ingesteld. TCP-aanmelding vereist 1–9 afdrukbare ASCII-tekens zonder spaties. Het wachtwoord wordt alleen opgeslagen als TCP-aanmelding is ingeschakeld."
+        }
+      },
+      "network_reauth": {
+        "title": "Aanmelden bij de LAN-adapter",
+        "description": "Voer het huidige webwachtwoord van je compatibele adapter in. De verbinding wordt gecontroleerd zonder instellingen of wachtwoord te wijzigen. Gebruik 1–9 afdrukbare ASCII-tekens zonder spaties. Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk.",
+        "data": {
+          "tcp_auth_password": "Huidig webwachtwoord van de adapter"
+        }
       }
     }
   },
@@ -727,9 +771,20 @@
     },
     "timed_vehicle_unavailable": {
       "message": "Er is geen bruikbare komende vertrektijd gevonden voor het gekozen voertuig. Controleer de integratie, timersensoren en instellingen."
+    },
+    "gateway_authentication_failed": {
+      "message": "De adapter heeft zijn huidige webwachtwoord geweigerd. Controleer het wachtwoord voor de webinterface."
     }
   },
   "issues": {
+    "heartbeat_unavailable": {
+      "title": "Heartbeat van de wallbox wordt niet bevestigd",
+      "description": "De controller ontvangt al minstens één minuut geen bevestiging van de heartbeat van de wallbox. Controleer de voeding van de wallbox en adapter, de USB- of LAN-verbinding en de RS485-bekabeling. Controleer in de app-modus ook het app-logboek. Deze melding verdwijnt automatisch zodra de heartbeat weer wordt bevestigd."
+    },
+    "service_unavailable": {
+      "title": "Verbinding met de Modbus-app is niet beschikbaar",
+      "description": "Home Assistant kan de verbinding met de Modbus-app al minstens één minuut niet bevestigen. De app kan onafhankelijk daarvan de heartbeat blijven verzenden. Controleer of de app actief is en de netwerkverbinding werkt. Deze melding verdwijnt automatisch zodra de verbinding is hersteld."
+    },
     "ems_fallback_not_configured": {
       "description": "Register 0x030E is 0. Daardoor blijft de wallbox laden met de laatst ontvangen waarden als de actieve Modbus-master geen heartbeat meer verstuurt. Stel met de MENNEKES-configuratietool het gedrag of de stroom bij uitval in, zodat de wallbox bij uitval een vooraf bepaalde toestand aanneemt.",
       "title": "Geen gedrag bij uitval van de energiemanager ingesteld"

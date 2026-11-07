@@ -104,6 +104,8 @@ def test_the_repair_issues_are_translated() -> None:
         repair_issues.ISSUE_EMS_FALLBACK_NOT_CONFIGURED,
         repair_issues.ISSUE_UNSUPPORTED_LAYOUT,
         repair_issues.ISSUE_WRITE_REJECTED,
+        repair_issues.ISSUE_HEARTBEAT_UNAVAILABLE,
+        repair_issues.ISSUE_SERVICE_UNAVAILABLE,
     }
     assert declared == expected
 

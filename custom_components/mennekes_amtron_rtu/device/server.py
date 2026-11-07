@@ -60,7 +60,10 @@ async def run(config: ServerConfig | SetupConfig, state: Path, supervisor_token:
         _LOGGER.info("Service API ready on port %s", config.port)
         if supervisor_token:
             settings_runner = web.AppRunner(
-                create_settings_app(AppSettings(supervisor_token, config.token)), access_log=None,
+                create_settings_app(AppSettings(
+                    supervisor_token, config.token,
+                    configuration_guard=(service.client.async_connection_configuration if service is not None else None),
+                )), access_log=None,
             )
             await settings_runner.setup()
             await web.TCPSite(settings_runner, config.listen, INGRESS_PORT).start()

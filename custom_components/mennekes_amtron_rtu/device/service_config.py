@@ -60,6 +60,8 @@ class ServerConfig:
             "connection_type",
             "host",
             "tcp_port",
+            "tcp_authentication",
+            "tcp_auth_password",
             "serial_port",
             "baudrate",
             "device_id",
@@ -119,6 +121,8 @@ def _connection_options(values: dict[str, Any]) -> ConnectionConfig:
             tcp_port=values.get("tcp_port", 502),
             connection_type=cast(Literal["rtu_over_tcp", "modbus_tcp"], connection_type),
             device_id=device_id,
+            tcp_authentication=values.get("tcp_authentication", False),
+            tcp_auth_password=values.get("tcp_auth_password", ""),
         )
     serial_port = values.get("serial_port")
     if (

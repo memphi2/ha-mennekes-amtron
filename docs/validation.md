@@ -182,6 +182,15 @@ the HTTP content types and SHA-256 hashes with the reviewed source; missing,
 changed or unservable resources fail the check. This probe needs no Supervisor
 or hardware, cannot read or save configuration, and leaves the running service's
 Ingress access guard unchanged.
+PR validation builds the repository-root Docker context, including its
+`.dockerignore`, exactly as release publication does. Checking the exported
+app directory alone would miss files excluded from the release image.
+
+A second installed-package probe completes the five-message Waveshare login
+against an isolated loopback peer, including a fragmented response and the
+actual AES calculation. It runs under the same AppArmor profile in the native
+image gates and sends no Modbus application data. This checks packaged crypto
+dependencies and permitted socket operations without contacting an adapter.
 
 The native AMD64 and ARM64 CI jobs run this check on every `beta`/`main` push and
 pull request. Release builds require it before pushing an app image. Missing

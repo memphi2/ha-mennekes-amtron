@@ -3,7 +3,7 @@
 These optional features are available in **stable 0.6.1**, including automatic
 tariff import and yearly refresh. For service connections,
 [update the app first](installation.md#updating-to-061).
-The setup steps below follow the separate menus in **beta 0.7.0b1**.
+The setup steps below follow the separate menus in **beta 0.7.0b2**.
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure**, then **Charging costs** or **Charging losses**.

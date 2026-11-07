@@ -164,6 +164,25 @@ connection endpoint. They cannot independently verify the physical wallbox's
 identity. A successful network connection alone does not prove the right device
 is behind it.
 
+## Heartbeat or service connection repair
+
+After **60 seconds of continuous failure**, a managed heartbeat can raise a
+repair even when the wallbox error register cannot be read. Brief interruptions
+do not immediately create a repair. No such heartbeat repair is raised for
+read-only operation or an unmanaged heartbeat.
+
+- **Heartbeat unavailable:** check the USB/LAN connection, adapter power, bus
+  ownership and app/integration logs. Delivery is unhealthy; the wallbox's
+  fallback may apply.
+- **Service connection unavailable:** HA cannot reach the app. The independent
+  app may still be sending its heartbeat and keeping the last charging state.
+  Check its status and local network before assuming charging has stopped.
+
+These connection repairs clear automatically after recovery. They have no
+**Fix** button because a wallbox recovery command cannot repair a lost
+connection. A confirmed wallbox error 200 uses the separate repair below, so
+both messages are not shown for the same confirmed firmware fault.
+
 ## Error 200, "Energy manager unavailable"
 
 The wallbox did not receive a usable heartbeat in time. With writes enabled,

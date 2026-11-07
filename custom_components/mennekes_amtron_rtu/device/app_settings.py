@@ -14,14 +14,26 @@ import json
 import re
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import AbstractAsyncContextManager, nullcontext, suppress
 from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout, web
 
+from .app_adapter_setup import AdapterSetup
+from .connection import validate_network_host
 from .service_config import ServerConfig
+from .waveshare_gateway import (
+    GatewayError,
+    GatewayRollbackError,
+    GatewaySettings,
+    configure_gateway,
+)
+
+if TYPE_CHECKING:
+    from .client import ConnectionConfigurationGuard
 
 INGRESS_PORT = 8099
 SUPERVISOR_URL = "http://supervisor"
@@ -36,7 +48,8 @@ _SERIAL_PATH = re.compile(r"/dev/(?:tty(?:USB|ACM|AMA|S|SC|THS|XRUSB)[0-9]+|seri
 _USER_ID = re.compile(r"[0-9a-f]{32}")
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"([0-9]{4})\.([0-9]{1,2})\.([0-9]+)")
-_FIELDS = {"connection_type", "serial_port", "host", "tcp_port", "device_id", "baudrate", "frame"}
+_FIELDS = {"connection_type", "serial_port", "host", "tcp_port", "device_id", "baudrate", "frame", "tcp_authentication"}
+_NETWORK_EXTRAS = {"tcp_authentication", "tcp_auth_password", "adapter_token", "adapter_baudrate", "adapter_frame"}
 _ASSETS = {
     "/": ("app_settings.html", "text/html"),
     "/app_settings.js": ("app_settings.js", "text/javascript"),
@@ -153,13 +166,18 @@ class SettingsError(Exception):
 class AppSettings:
     """Read and replace only this app's connection settings via the self API."""
 
-    def __init__(self, supervisor_token: str, service_token: str) -> None:
+    def __init__(
+        self, supervisor_token: str, service_token: str,
+        *, configuration_guard: Callable[[], AbstractAsyncContextManager[ConnectionConfigurationGuard]] | None = None,
+    ) -> None:
         self._supervisor_token = supervisor_token
         self._service_token = service_token
         self._secret = secrets.token_bytes(32)
         self._session: ClientSession | None = None
         self._lock = asyncio.Lock()
         self._slots = asyncio.Semaphore(2)
+        self._adapter_setup = AdapterSetup()
+        self._configuration_guard = configuration_guard
 
     async def lifecycle(self, _app: web.Application) -> AsyncIterator[None]:
         async with ClientSession(timeout=ClientTimeout(total=10), trust_env=False) as session:
@@ -225,6 +243,7 @@ class AppSettings:
         options = await self._options()
         adapters = await asyncio.to_thread(serial_adapters)
         settings = {key: options[key] for key in _FIELDS if key in options}
+        settings["tcp_auth_password_set"] = bool(options.get("tcp_auth_password"))
         settings["connection_type"] = _TRANSPORTS.get(settings.get("connection_type", "serial"), "serial")
         selected = settings.get("serial_port")
         if isinstance(selected, str) and _SERIAL_PATH.fullmatch(selected):
@@ -240,7 +259,8 @@ class AppSettings:
             "csrf": self._digest("csrf", user),
         })
 
-    async def save(self, request: web.Request) -> web.Response:
+    async def _edit_request(self, request: web.Request) -> tuple[str, dict[str, Any]]:
+        """Authorize every request which probes or changes an adapter."""
         user = await self._authorize(request)
         csrf = request.headers.get("X-Amtron-CSRF", "")
         if not _DIGEST.fullmatch(csrf) or not hmac.compare_digest(csrf, self._digest("csrf", user)):
@@ -253,35 +273,176 @@ class AppSettings:
             raise SettingsError("invalid_request") from err
         if not isinstance(payload, dict):
             raise SettingsError("invalid_request")
+        return user, payload
+
+    def _check_revision(self, revision: Any, options: dict[str, Any]) -> str:
+        if not isinstance(revision, str) or not _DIGEST.fullmatch(revision) or not hmac.compare_digest(revision, self._revision(options)):
+            raise SettingsError("settings_changed", 409)
+        return revision
+
+    async def inspect_adapter(self, request: web.Request) -> web.Response:
+        """Identify one explicitly entered endpoint; never scan a subnet."""
+        user, payload = await self._edit_request(request)
+        if payload.keys() != {"host", "revision"}:
+            raise SettingsError("invalid_request")
+        async with self._lock:
+            options = await self._options()
+            revision = self._check_revision(payload["revision"], options)
+            try:
+                result = await self._adapter_setup.inspect(payload["host"], user, revision)
+            except GatewayError as err:
+                raise SettingsError(err.reason) from err
+            except ValueError as err:
+                raise SettingsError("connection_invalid") from err
+        return web.json_response(result)
+
+    async def save(self, request: web.Request) -> web.Response:
+        user, payload = await self._edit_request(request)
         transport = payload.get("connection_type")
         if not isinstance(transport, str) or transport not in _TRANSPORT_LABELS:
             raise SettingsError("invalid_request")
         keys = {"revision", "connection_type", "device_id"} | (
             {"serial_port", "baudrate", "frame"} if transport == "serial" else {"host", "tcp_port"}
         )
-        if payload.keys() != keys:
+        extras = _NETWORK_EXTRAS if transport != "serial" else set()
+        if not keys <= payload.keys() or payload.keys() - keys - extras:
+            raise SettingsError("invalid_request")
+        adapter_keys = {"adapter_token", "adapter_baudrate", "adapter_frame"}
+        if payload.keys() & adapter_keys and not adapter_keys <= payload.keys():
             raise SettingsError("invalid_request")
         async with self._lock:
             options = await self._options()
-            revision = payload["revision"]
-            if not isinstance(revision, str) or not _DIGEST.fullmatch(revision) or not hmac.compare_digest(revision, self._revision(options)):
-                raise SettingsError("settings_changed", 409)
-            updated = {**options, **{key: value for key, value in payload.items() if key != "revision"}}
+            revision = self._check_revision(payload["revision"], options)
+            updated = {**options, **{key: value for key, value in payload.items() if key in _FIELDS}}
             updated["connection_type"] = _TRANSPORT_LABELS[transport]
+            password = ""
             if transport == "serial":
+                updated.pop("tcp_authentication", None)
+                updated.pop("tcp_auth_password", None)
                 adapters = await asyncio.to_thread(serial_adapters)
                 if not isinstance(payload["serial_port"], str) or payload["serial_port"] not in {adapter.value for adapter in adapters}:
                     raise SettingsError("adapter_missing")
             else:
                 updated.pop("serial_port", None)
+                try:
+                    host = validate_network_host(payload["host"])
+                except ValueError as err:
+                    raise SettingsError("connection_invalid") from err
+                same_endpoint = host == options.get("host") and payload["tcp_port"] == options.get("tcp_port", 502)
+                password = payload.get("tcp_auth_password", "")
+                if not isinstance(password, str):
+                    raise SettingsError("connection_invalid")
+                if not password and same_endpoint:
+                    password = options.get("tcp_auth_password", "")
+                auth = payload.get("tcp_authentication", options.get("tcp_authentication", False) if same_endpoint else False)
+                if type(auth) is not bool:
+                    raise SettingsError("connection_invalid")
+                updated["host"] = host
+                updated["tcp_authentication"] = auth
+                updated.pop("tcp_auth_password", None)
+                if auth:
+                    updated["tcp_auth_password"] = password
+                if "adapter_token" in payload:
+                    updated["baudrate"] = str(payload["adapter_baudrate"])
+                    updated["frame"] = payload["adapter_frame"]
             try:
                 config = await asyncio.to_thread(app_configuration, {**updated, "token": self._service_token})
             except (OSError, ValueError) as err:
                 raise SettingsError("connection_invalid") from err
             if isinstance(config, SetupConfig):
                 raise SettingsError("connection_invalid")
-            await self._request("POST", "/addons/self/options", {"options": updated})
+            if "adapter_token" in payload:
+                await self._save_with_adapter(payload, user, revision, options, updated, password)
+            else:
+                await self._request("POST", "/addons/self/options", {"options": updated})
         return web.json_response({"saved": True, "restart_required": True, "revision": self._revision(updated)})
+
+    async def _save_with_adapter(
+        self, payload: dict[str, Any], user: str, revision: str,
+        original: dict[str, Any], updated: dict[str, Any], password: str,
+    ) -> None:
+        """Apply only the detected adapter and undo it if options cannot be saved."""
+        host = updated["host"]
+        try:
+            snapshot = self._adapter_setup.expected(payload["adapter_token"], user, host, revision)
+            settings = GatewaySettings(
+                baudrate=payload["adapter_baudrate"], frame=payload["adapter_frame"],
+                connection_type=payload["connection_type"],
+                tcp_authentication=updated["tcp_authentication"], tcp_port=updated["tcp_port"],
+            )
+        except ValueError as err:
+            raise SettingsError("adapter_detection_required") from err
+        context = self._configuration_guard() if self._configuration_guard else nullcontext(None)
+        async with context as guard:
+            receipt = None
+            save_attempted = False
+            try:
+                async with await configure_gateway(host, settings, password, expected=snapshot) as receipt:
+                    # Adapter configuration can take several seconds. An
+                    # administrator may have changed other app options in the
+                    # native Supervisor panel while that operation was running.
+                    if await self._options() != original:
+                        raise SettingsError("settings_changed", 409)
+                    save_attempted = True
+                    await self._persist_adapter_options(updated)
+                    await receipt.commit()
+            except BaseException as err:
+                options_restored = not save_attempted or await self._restore_adapter_options(original, updated)
+                if isinstance(err, GatewayRollbackError):
+                    raise SettingsError(err.reason, 503) from err
+                save_uncertain = isinstance(err, SettingsError) and err.key == "adapter_save_uncertain"
+                if not options_restored or save_uncertain:
+                    # An earlier POST may still finish after a readback returned
+                    # the old options. Do not resume the previous connection.
+                    raise SettingsError("adapter_save_uncertain", 503) from err
+                adapter_restored = isinstance(err, GatewayError) or bool(receipt is not None and receipt.rollback_verified)
+                if adapter_restored and isinstance(err, Exception) and guard is not None:
+                    guard.allow_reconnect()
+                if isinstance(err, GatewayError):
+                    raise SettingsError(err.reason) from err
+                raise
+        self._adapter_setup.forget(payload["adapter_token"])
+
+    async def _persist_adapter_options(self, updated: dict[str, Any]) -> None:
+        """A lost reply can follow a successful Supervisor write: read it back."""
+        try:
+            await self._request("POST", "/addons/self/options", {"options": updated})
+        except (SettingsError, ClientError, TimeoutError, OSError, ValueError, TypeError) as err:
+            try:
+                current = await self._options()
+            except (SettingsError, ClientError, TimeoutError, OSError, ValueError, TypeError):
+                raise SettingsError("adapter_save_uncertain", 503) from err
+            if current == updated:
+                return
+            # Even if the original options are still visible, the server may
+            # commit the interrupted POST after this read has completed.
+            raise SettingsError("adapter_save_uncertain", 503) from err
+
+    async def _restore_adapter_options(self, original: dict[str, Any], updated: dict[str, Any]) -> bool:
+        """Undo only our own save, retaining unrelated concurrent administrator edits."""
+        async def restore() -> bool:
+            try:
+                async with asyncio.timeout(25):
+                    current = await self._options()
+                    if current == original:
+                        return True
+                    if current != updated:
+                        return False
+                    # A lost restoration reply is resolved by the following readback.
+                    with suppress(SettingsError, ClientError, TimeoutError, OSError, ValueError, TypeError):
+                        await self._request("POST", "/addons/self/options", {"options": original})
+                    return await self._options() == original
+            except (SettingsError, ClientError, TimeoutError, OSError, ValueError, TypeError):
+                return False
+
+        task = asyncio.create_task(restore(), name="amtron_adapter_options_restore")
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                # The original cancellation is re-raised by the transaction.
+                continue
+        return task.result()
 
     @web.middleware
     async def guard(
@@ -311,7 +472,7 @@ class AppSettings:
 
 
 def create_settings_app(settings: AppSettings) -> web.Application:
-    """Expose only fixed assets and the two connection-configuration routes."""
+    """Expose fixed assets and bounded, administrator-only setup routes."""
     app = web.Application(middlewares=[settings.guard], client_max_size=4096)
     app.cleanup_ctx.append(settings.lifecycle)
 
@@ -328,6 +489,7 @@ def create_settings_app(settings: AppSettings) -> web.Application:
         app.router.add_get(path, asset)
     app.router.add_get("/api/config", settings.read)
     app.router.add_post("/api/config", settings.save)
+    app.router.add_post("/api/adapter", settings.inspect_adapter)
     return app
 
 

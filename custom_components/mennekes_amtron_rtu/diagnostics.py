@@ -74,7 +74,8 @@ async def async_get_config_entry_diagnostics(
         }
         if isinstance(config, NetworkConfig):
             bus["transport"] = config.connection_type
-            identifiers += (config.host,)
+            bus["tcp_authentication"] = config.tcp_authentication
+            identifiers += (config.host, config.tcp_auth_password or None)
         else:
             bus.update({
                 "port_category": port_category(config.port),

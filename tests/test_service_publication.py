@@ -7,6 +7,7 @@ import base64
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from copy import deepcopy
@@ -691,6 +692,18 @@ def test_beta_pushes_require_native_profile_validation_and_codeql():
     assert not job.get("continue-on-error")
     assert {item["architecture"] for item in job["strategy"]["matrix"]["include"]} == {"amd64", "aarch64"}
     steps = job["steps"]
+    builds = [
+        (step, shlex.split(line))
+        for step in steps for line in step.get("run", "").splitlines()
+        if line.strip().startswith("docker build ")
+    ]
+    assert len(builds) == 1
+    build_step, build_command = builds[0]
+    # Asset filtering must be exercised before merge, with the very same
+    # repository-root .dockerignore that the release build uses.
+    assert build_command[-1] == "."
+    assert "working-directory" not in build_step
+    assert "service_image.py smoke --image amtron-service:test" in build_step["run"]
     checks = [step for step in steps if "check_service_apparmor.py" in step.get("run", "")]
     assert len(checks) == 1
     check = checks[0]

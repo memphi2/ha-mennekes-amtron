@@ -258,7 +258,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
         if request.path == "/addons/self/options":
             require(set(payload) == {"options"} and isinstance(payload["options"], dict), "self API received an unexpected payload")
             updated = payload["options"]
-            connection_fields = {"connection_type", "serial_port", "host", "tcp_port", "device_id", "baudrate", "frame"}
+            connection_fields = {"connection_type", "serial_port", "host", "tcp_port", "device_id", "baudrate", "frame", "tcp_authentication", "tcp_auth_password"}
             require({key: value for key, value in updated.items() if key not in connection_fields} == {key: value for key, value in original_options.items() if key not in connection_fields}, "connection page changed unrelated app options")
             supervisor_options = updated
             return web.json_response({"result": "ok", "data": {}})

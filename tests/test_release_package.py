@@ -182,11 +182,18 @@ def test_the_release_assets_describe_the_build(tmp_path: Path) -> None:
     document = json.loads(sbom.read_text(encoding="utf-8"))
     assert document["spdxVersion"] == "SPDX-2.3"
     packages = {package["name"] for package in document["packages"]}
-    assert "ha-mennekes-amtron" in packages
-    assert "pymodbus[serial]" in packages
+    assert packages == {"ha-mennekes-amtron", "pymodbus[serial]"}
     versions = {package["name"]: package["versionInfo"] for package in document["packages"]}
     assert versions["pymodbus[serial]"] == ">=3.13.1"
+    package_ids = {package["name"]: package["SPDXID"] for package in document["packages"]}
     assert len(document["relationships"]) == 2
+    assert {
+        (relation["spdxElementId"], relation["relationshipType"], relation["relatedSpdxElement"])
+        for relation in document["relationships"]
+    } == {
+        (document["SPDXID"], "DESCRIBES", package_ids["ha-mennekes-amtron"]),
+        (package_ids["ha-mennekes-amtron"], "DEPENDS_ON", package_ids["pymodbus[serial]"]),
+    }
 
     lines = sums.read_text(encoding="utf-8").strip().splitlines()
     entries = dict(line.split("  ")[::-1] for line in lines)

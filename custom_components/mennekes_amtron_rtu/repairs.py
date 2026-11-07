@@ -15,6 +15,7 @@ from .device.client_errors import AmtronBusError
 from .device.const import DOMAIN, ERROR_CODE_EMS_UNAVAILABLE
 from .device.registers import ERROR_CODE
 from .entry_types import MennekesAmtronConfigEntry
+from .repair_health import HeartbeatRepairMonitor
 from .repair_issues import (
     ISSUE_EMS_FALLBACK_NOT_CONFIGURED,
     ISSUE_EMS_HEARTBEAT_LOST,
@@ -68,6 +69,12 @@ def async_setup_repairs(
     entry.async_on_unload(
         coordinator.async_add_listener(lambda: async_check_repairs(hass, entry))
     )
+    HeartbeatRepairMonitor(
+        hass, entry,
+        lambda issue, active: _set_issue(
+            hass, entry, issue, active, severity=ir.IssueSeverity.WARNING,
+        ),
+    ).start()
 
 
 @callback

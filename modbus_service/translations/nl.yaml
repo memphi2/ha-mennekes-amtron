@@ -44,5 +44,11 @@ configuration:
   tcp_port:
     name: TCP-poort van adapter
     description: TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.
+  tcp_authentication:
+    name: "TCP-aanmelding"
+    description: "Aanmelding versleutelt het verkeer niet. Bij firmware 1.523 is deze te omzeilen; gebruik een beschermd lokaal netwerk."
+  tcp_auth_password:
+    name: "Huidig webwachtwoord van de adapter"
+    description: "Huidig webwachtwoord voor TCP-aanmelding: 1–9 afdrukbare ASCII-tekens zonder spaties. Het adapterwachtwoord wordt hierdoor niet gewijzigd."
 network:
   8765/tcp: Service-API met authenticatie; interne toegang vereist geen hostpoort.

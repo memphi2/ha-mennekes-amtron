@@ -5,7 +5,7 @@ from __future__ import annotations
 import ipaddress
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from .const import (
@@ -79,6 +79,17 @@ def validate_tcp_port(value: Any) -> int:
     return value
 
 
+def validate_tcp_auth_password(value: Any) -> str:
+    """Match the verified wired gateway's nine-character web-password field."""
+    if (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 9
+        or any(not 0x21 <= ord(char) <= 0x7E for char in value)
+    ):
+        raise ValueError("adapter password must contain 1 to 9 printable ASCII characters without spaces")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class NetworkConfig:
     """A TCP connection to a transparent adapter or a Modbus TCP gateway."""
@@ -89,6 +100,8 @@ class NetworkConfig:
     device_id: int = DEFAULT_DEVICE_ID
     timeout: float = DEFAULT_TIMEOUT
     retries: int = DEFAULT_RETRIES
+    tcp_authentication: bool = False
+    tcp_auth_password: str = field(default="", repr=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "host", validate_network_host(self.host))
@@ -106,6 +119,14 @@ class NetworkConfig:
             raise ValueError("timeout must be a positive finite number")
         if type(self.retries) is not int or self.retries < 0:
             raise ValueError("retries must be a non-negative integer")
+        if type(self.tcp_authentication) is not bool:
+            raise ValueError("tcp_authentication must be boolean")
+        if not isinstance(self.tcp_auth_password, str):
+            raise ValueError("adapter password must be a string")
+        if self.tcp_authentication:
+            validate_tcp_auth_password(self.tcp_auth_password)
+        elif self.tcp_auth_password:
+            raise ValueError("adapter password requires TCP authentication")
 
     @property
     def port(self) -> str:

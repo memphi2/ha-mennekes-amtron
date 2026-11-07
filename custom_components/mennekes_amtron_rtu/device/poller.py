@@ -97,7 +97,7 @@ class DevicePoller:
                 read.update(await self._client.async_read_block(block))
             except AmtronConnectionError as err:
                 self._log_unavailable(err)
-                raise AmtronConnectionError(str(err)) from err
+                raise
             except AmtronBusError as err:
                 failed.add(block.name)
                 # Carrying a block forward is only right while it was not due.

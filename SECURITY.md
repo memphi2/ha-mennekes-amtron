@@ -29,13 +29,33 @@ What matters for security here is different from a cloud integration:
   transmits read requests in both control modes. Read-only disables register
   writes and heartbeat, but does not make sharing with another master safe.
   Setup, discovery and the smoke test also require exclusive bus access.
-- **LAN adapter access.** Transparent RTU over TCP and translating Modbus TCP
-  gateways add an unauthenticated, unencrypted Modbus network connection. Anyone
-  who can reach that port may be able to send charging commands independently of
-  HA permissions. Use a trusted private network, restrict gateway access to the
-  selected HA/service host, and never expose it to the Internet. A service token
-  protects the separate HTTP API, not the gateway's Modbus port. Multiple TCP
-  clients do not remove the single-master requirement on the RS-485 bus.
+- **LAN adapter access.** Modbus through a LAN gateway is unencrypted and has no
+  authentication by default. The optional Waveshare login supports the vendor's
+  existing connection protocol; it is not a secure transport. On firmware 1.523,
+  a test obtained the successful-login indicator by reflecting challenge
+  responses without knowing the password. Serial forwarding after that result
+  was not tested. Do not rely on this login to keep an untrusted peer out. Use a
+  trusted private network, restrict gateway access to the selected HA/service
+  host, and never expose it to the Internet. A service token protects the
+  separate HTTP API, not the gateway's Modbus port. Multiple TCP clients do not
+  remove the single-master requirement on the RS-485 bus.
+- **Optional gateway login.** The existing adapter password is stored locally
+  only when TCP authentication is enabled. Every new TCP connection completes
+  the full handshake before Modbus starts; failed authentication closes the
+  socket without an unauthenticated fallback. Authentication frames do not
+  enter the Modbus packet logger. The vendor protocol uses a password-derived
+  AES key without a password-hardening function; recorded challenge/response
+  pairs permit offline password checks. This feature neither adds TLS nor
+  changes the adapter password.
+- **Explicit adapter setup.** Reading and applying supported adapter settings
+  happens only after the user chooses that setup path and confirms the
+  detected adapter. Management requests target one configured endpoint; normal
+  polling and reconnects do not change its configuration. The app's Ingress
+  page requires a trusted Supervisor peer, an administrator and CSRF checks.
+  A short-lived detection token binds an apply request to that administrator,
+  endpoint and current app options. Gateway changes temporarily stop Modbus
+  traffic. Failed changes require verified restoration before the old client
+  can reconnect; successful app changes require an app restart.
 - **Write authority.** In master mode the integration can release charging,
   lock the wallbox and restart it. Home Assistant user permissions are the
   boundary for HA accounts. A holder of the independent service token can
@@ -64,14 +84,15 @@ What matters for security here is different from a cloud integration:
   configured fallback. A direct HA connection, whether USB or LAN, stops its
   heartbeat during a Core restart.
 - **Private state.** The service saves bounded intent with atomic owner-only
-  files. Protect HA configuration, service options and backups, which hold the
-  credential. Diagnostics do not include service URLs, credentials or gateway
-  hostnames/IP addresses.
+  files. Protect HA configuration, service options and backups, which can hold
+  the service token and optional adapter password. Diagnostics do not include
+  service URLs, credentials or gateway hostnames/IP addresses. The app's
+  connection page reports only whether an adapter password is saved; it never
+  returns that password to the browser.
 
 ## Service AppArmor profile
 
-The 0.5.2b1 prerelease adds a custom Supervisor-app profile; stable 0.5.1 does
-not include it. Supervisor loads the packaged `apparmor.txt` for the
+The service app includes a custom Supervisor profile. Supervisor loads the packaged `apparmor.txt` for the
 installed app without disabling protection mode. The allowlist permits the
 Python runtime, USB/LAN communication and the service's private token and intent
 files. Options are read-only; there is no general filesystem-write or shell

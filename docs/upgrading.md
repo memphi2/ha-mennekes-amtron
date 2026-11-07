@@ -9,10 +9,10 @@ then the integration. Keep existing app data and your HA entry. The **#apps**
 catalog carries stable updates; **#apps-beta** follows the beta channel below.
 Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Trying 0.7.0b1
+## Trying 0.7.0b2
 
-**0.7.0b1 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
-prereleases in your integration installer and select **v0.7.0b1**. Keep the
+**0.7.0b2 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
+prereleases in your integration installer and select **v0.7.0b2**. Keep the
 existing HA entry. The beta app is offered through
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
 catalog can use **Check for updates** and update their app in place.
@@ -20,9 +20,15 @@ catalog can use **Check for updates** and update their app in place.
 Moving from **#apps** to **#apps-beta** creates a separate app installation.
 Follow the [channel handover](modbus-service.md#updates), preserving its data
 and ensuring only one service owns the wallbox connection. The beta includes
-shared control fixes, so update the app as well when testing those fixes.
+shared control fixes and optional Waveshare adapter setup/TCP login, so update
+the app as well when using those features.
 The integration's minimum compatible service remains **0.6.1**; matching
 version numbers are not generally required.
+
+Adapter configuration and TCP login remain optional. An update does not change
+the LAN adapter or enable its authentication. Use [LAN adapter setup](lan-adapters.md)
+only when you want to configure a compatible adapter. Sustained heartbeat or
+service-connection failures now show Repairs notices that clear after recovery.
 
 ## Feature settings after an update
 

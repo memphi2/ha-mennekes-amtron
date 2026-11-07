@@ -44,5 +44,11 @@ configuration:
   tcp_port:
     name: Porta TCP adattatore
     description: Porta TCP configurata sull’adattatore; valore predefinito 502. Non è la porta HTTP 8765 del servizio indipendente.
+  tcp_authentication:
+    name: "Accesso TCP"
+    description: "L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta."
+  tcp_auth_password:
+    name: "Password web attuale dell’adattatore"
+    description: "Password web attuale per l’accesso TCP: da 1 a 9 caratteri ASCII stampabili senza spazi. La password dell’adattatore non viene modificata."
 network:
   8765/tcp: API del servizio con autenticazione; l'accesso interno non richiede una porta esposta sull'host.

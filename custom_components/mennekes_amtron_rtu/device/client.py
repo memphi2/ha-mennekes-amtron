@@ -17,7 +17,9 @@ import asyncio
 import logging
 import time
 import weakref
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from functools import partial
 
 from pymodbus import FramerType
@@ -42,12 +44,40 @@ from .link_quality import LinkQuality
 from .register_blocks import RegisterBlock
 from .registers import HEARTBEAT, SERIAL_NUMBER, RegisterSpec
 from .transport import ModbusTransport
+from .waveshare_auth import WaveshareAuthenticationRejectedError
+from .waveshare_transport import WaveshareModbusTcpClient
 from .write_state import WriteState
 from .write_trace import WriteTrace
 
 _LOGGER = logging.getLogger(__name__)
 
 type ClientFactory = Callable[[ConnectionConfig], ModbusTransport]
+type LockedRegisterReader = Callable[[RegisterSpec], Awaitable[RegisterValue]]
+type WritePrecondition = Callable[[LockedRegisterReader], Awaitable[None]]
+
+
+@dataclass(slots=True)
+class ConnectionConfigurationGuard:
+    """Explicit proof that a failed gateway change restored the old settings."""
+
+    _reconnect_allowed: bool = False
+
+    def allow_reconnect(self) -> None:
+        """Call only after verified rollback or a failure before any mutation."""
+        self._reconnect_allowed = True
+
+    @property
+    def reconnect_allowed(self) -> bool:
+        """Whether an exceptional exit can safely resume the old connection."""
+        return self._reconnect_allowed
+
+
+async def _async_close_transport(client: ModbusTransport | None) -> None:
+    if client is None or (close := getattr(client, "close", None)) is None:
+        return
+    result = close()
+    if asyncio.iscoroutine(result):
+        await result
 
 
 def create_serial_client(
@@ -85,6 +115,10 @@ def create_modbus_client(
     if isinstance(config, SerialConfig):
         return create_serial_client(
             config, trace_packet=trace_packet, trace_connect=trace_connect
+        )
+    if config.tcp_authentication:
+        return WaveshareModbusTcpClient(
+            config, trace_packet=trace_packet, trace_connect=trace_connect,
         )
     return AsyncModbusTcpClient(
         config.host,
@@ -136,6 +170,7 @@ class MennekesModbusClient:
             if client_factory is create_modbus_client else client_factory
         )
         self._client: ModbusTransport | None = None
+        self._configuration_pending_restart = False
         self._lock = asyncio.Lock()
         # Bulk users queue behind this gate before they reach the bus, so at
         # most one of them is ever waiting on the bus itself. The heartbeat
@@ -155,7 +190,7 @@ class MennekesModbusClient:
     def connected(self) -> bool:
         """Return true while the configured transport is open."""
 
-        if self._client is None:
+        if self._client is None or self._configuration_pending_restart:
             return False
         return self._client.connected
 
@@ -219,6 +254,7 @@ class MennekesModbusClient:
         """Open the configured connection or raise when it cannot be used."""
 
         async with self._lock:
+            self._require_connection_usable()
             client = self._client or self._client_factory(self._config)
             self._client = client
             await self._async_connect_locked(client)
@@ -226,11 +262,16 @@ class MennekesModbusClient:
     async def _async_connect_locked(self, client: ModbusTransport) -> None:
         """Open the transport while the caller holds the transaction lock."""
 
+        self._require_connection_usable()
         if client.connected:
             return
         self._identity_check_needed = True
         try:
             connected = await client.connect()
+        except WaveshareAuthenticationRejectedError as err:
+            # Preserve actionable credential failures for HA's reauth flow.
+            self.link_quality.observe(err)
+            raise
         # Drivers raise unrelated exception types; callers handle one bus error.
         except Exception as err:
             self.link_quality.observe(AmtronConnectionError("cannot open transport"))
@@ -264,14 +305,28 @@ class MennekesModbusClient:
         async with self._lock:
             client = self._client
             self._client = None
-            if client is None:
-                return
-            close = getattr(client, "close", None)
-            if close is None:
-                return
-            result = close()
-            if asyncio.iscoroutine(result):
-                await result
+            await _async_close_transport(client)
+
+    @asynccontextmanager
+    async def async_connection_configuration(self) -> AsyncIterator[ConnectionConfigurationGuard]:
+        """Exclude bus traffic while explicitly applying gateway settings.
+
+        Successful changes require a new client with the saved settings after
+        service restart. Failed or cancelled changes remain blocked unless the
+        caller explicitly confirms that rollback restored the old connection.
+        """
+        async with self._lock:
+            was_pending = self._configuration_pending_restart
+            self._configuration_pending_restart = True
+            self._identity_check_needed = True
+            guard = ConnectionConfigurationGuard()
+            try:
+                await _async_close_transport(self._client)
+                yield guard
+            except BaseException:
+                if guard.reconnect_allowed:
+                    self._configuration_pending_restart = was_pending
+                raise
 
     async def async_read_block(self, block: RegisterBlock) -> dict[str, RegisterValue]:
         """Read one register block."""
@@ -345,6 +400,7 @@ class MennekesModbusClient:
         min_interval: float = 0.0,
         priority: bool = False,
         before_write: Callable[[], None] | None = None,
+        precondition: WritePrecondition | None = None,
     ) -> None:
         """Write one register range, honouring its minimum write interval.
 
@@ -358,12 +414,14 @@ class MennekesModbusClient:
             await self._async_write_locked(
                 spec, value, min_interval=min_interval, queued=queued,
                 verify_identity=spec != HEARTBEAT, before_write=before_write,
+                precondition=precondition,
             )
             return
         async with self._queue:
             await self._async_write_locked(
                 spec, value, min_interval=min_interval, queued=queued,
                 verify_identity=True, before_write=before_write,
+                precondition=precondition,
             )
 
     def check_write_interval(
@@ -392,16 +450,64 @@ class MennekesModbusClient:
         queued: float,
         verify_identity: bool,
         before_write: Callable[[], None] | None = None,
+        precondition: WritePrecondition | None = None,
     ) -> None:
-        async with self._lock:
+        await self._lock.acquire()
+        locked = True
+        try:
             self.check_write_interval(spec, min_interval=min_interval)
             client = self._require_client()
-            if before_write is not None:
+            if before_write is not None or precondition is not None:
                 # A scheduled command can expire while waiting for this bus or
                 # for identity verification. A rejected guard sends no write,
                 # consumes no write interval and is not a transport failure.
                 client = await self._async_transaction_client(verify_identity=verify_identity)
-                before_write()
+                if before_write is not None:
+                    before_write()
+                if precondition is not None:
+                    generation = self._connection_generation
+
+                    async def read_locked(register: RegisterSpec) -> RegisterValue:
+                        nonlocal locked
+                        # Keep the ordinary-operation queue, but let a pending
+                        # priority heartbeat pass between Modbus transactions.
+                        # The final read remains locked through the write.
+                        self._lock.release()
+                        locked = False
+                        await asyncio.sleep(0)
+                        await self._lock.acquire()
+                        locked = True
+                        if (
+                            self._require_client() is not client
+                            or generation != self._connection_generation
+                            or not client.connected
+                        ):
+                            raise AmtronConnectionError("connection changed during write precondition")
+                        words = await _client_read.read_words(
+                            client,
+                            address=register.address,
+                            count=register.count,
+                            device_id=self._config.device_id,
+                            retries=self._config.retries,
+                            observe=self.link_quality.observe,
+                        )
+                        return decode_register(register, words)
+
+                    await precondition(read_locked)
+                    if (
+                        self._require_client() is not client
+                        or generation != self._connection_generation
+                        or not client.connected
+                    ):
+                        # Never apply an observation made on a previous link to
+                        # a write after a transparent disconnect or reconnect.
+                        raise AmtronConnectionError("connection changed during write precondition")
+                    # A priority operation may have run while the bus was free.
+                    self.check_write_interval(spec, min_interval=min_interval)
+                    # The precondition may await one or more live reads while
+                    # deadline or goal evidence changes in another task.
+                    if before_write is not None:
+                        before_write()
             rejected = False
             error: BaseException | None = None
             self.write_trace.begin(
@@ -411,7 +517,7 @@ class MennekesModbusClient:
                 # A transparent gateway may retain its TCP connection while
                 # its downstream wallbox changes. Check every control write;
                 # ordinary heartbeats reuse the connection's confirmed identity.
-                if before_write is None:
+                if before_write is None and precondition is None:
                     client = await self._async_transaction_client(
                         verify_identity=verify_identity
                     )
@@ -443,8 +549,18 @@ class MennekesModbusClient:
                     # Even cancellation can follow an applied write. Measuring
                     # from completion conservatively protects the wire interval.
                     self._rate_limiter.record(spec.key, now=self._monotonic())
+        finally:
+            # Cancellation while reacquiring must not release a heartbeat's
+            # lock. Once reacquired this owner alone releases it here.
+            if locked:
+                self._lock.release()
 
     def _require_client(self) -> ModbusTransport:
+        self._require_connection_usable()
         if self._client is None:
             raise AmtronConnectionError(f"{self._config.port} is not connected")
         return self._client
+
+    def _require_connection_usable(self) -> None:
+        if self._configuration_pending_restart:
+            raise AmtronConnectionError("gateway configuration requires a service restart")

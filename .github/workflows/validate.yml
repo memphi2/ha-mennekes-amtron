@@ -97,10 +97,11 @@ jobs:
           /tmp/amtron-service/bin/python -m pip check
           /tmp/amtron-service/bin/python -c 'import importlib.util; import amtron_device.server; assert importlib.util.find_spec("homeassistant") is None'
           /tmp/amtron-service/bin/amtron-modbus-service --help
-      - name: Build the local Supervisor app context and verify its entrypoint
+      - name: Verify the app export and build the actual release Docker context
         run: |
           python scripts/build_service_app.py --output /tmp/amtron-app
-          docker build -t amtron-service:test /tmp/amtron-app
+          # Use the same root context and .dockerignore as release publication.
+          docker build -t amtron-service:test .
           docker run --rm amtron-service:test amtron-modbus-service --help
           docker run --rm amtron-service:test python -m pip check
           python -m pip install -r requirements-dev.txt
