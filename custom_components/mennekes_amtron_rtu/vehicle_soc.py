@@ -138,6 +138,8 @@ class VehicleSocObserver:
         self._unsubscribers: list[CALLBACK_TYPE] = []
         self._pending: _Observations | None = None
         self._inflight: _Observations | None = None
+        self._target_model: SocGoal | None = None
+        self._target_pending: _Observations | None = None
         self._last_sent: _Observation | None = None
         self._task: asyncio.Task[None] | None = None
         self._command_lock = asyncio.Lock()
@@ -218,6 +220,10 @@ class VehicleSocObserver:
     def _queue_observation(self, observation: _Observation) -> None:
         if self._stopping:
             return
+        if self._target_model is not None:
+            if self._target_pending is None:
+                self._target_pending = _Observations(self._target_model, self.source)
+            self._target_pending.add(observation)
         if self._pending is None and observation == self._last_sent:
             return
         if self._pending is None:
@@ -283,18 +289,43 @@ class VehicleSocObserver:
                 raise service_validation_error("soc_goal_limit_unavailable")
             previous = self._pending
             self._pending = None
+            soc, maximum = self.latest_soc, self.maximum
+            original = self._control.soc_goal.snapshot()
+            candidate = copy(self._control.soc_goal)
+            try:
+                candidate.set_target(value, soc, maximum)
+            except ValueError:
+                # The control remains responsible for validating the request.
+                candidate = None
+            self._target_model = candidate
+            self._target_pending = None
             try:
                 await self._control.async_set_soc_goal(
                     value, source=self.source,
-                    soc=self.latest_soc, maximum=self.maximum,
+                    soc=soc, maximum=maximum,
                 )
             except BaseException:
-                if previous is not None:
+                if (
+                    candidate is not None and candidate.snapshot() != original
+                    and self._control.soc_goal.snapshot() == candidate.snapshot()
+                ):
+                    # A cancelled or uncertain write can still publish its
+                    # candidate; preserve evidence against that live target.
+                    self._pending = self._target_pending
+                elif previous is not None:
                     self._pending = (
                         previous.combine(self._pending) if self._pending is not None else previous
                     )
                 raise
+            else:
+                # Events received while the command was in flight were also
+                # folded against the requested target. A remote snapshot can
+                # still contain the old goal until the response arrives.
+                if candidate is not None:
+                    self._pending = self._target_pending
             finally:
+                self._target_model = None
+                self._target_pending = None
                 self._ensure_task()
 
     async def async_stop(self) -> None:

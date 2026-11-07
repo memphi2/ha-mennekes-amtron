@@ -13,6 +13,9 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.event import async_track_state_change_event
 
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+from custom_components.mennekes_amtron_rtu.device.persistence import (
+    StorageCommitUncertainError,
+)
 from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
 from custom_components.mennekes_amtron_rtu.vehicle_soc import (
     VehicleSocObserver,
@@ -133,6 +136,115 @@ def test_observer_uses_real_ha_events_and_removes_its_listeners(tmp_path):
             with pytest.raises(ServiceValidationError):
                 await observer.async_set_target(80)
         finally:
+            await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_new_target_preserves_transient_threshold_while_command_is_in_flight(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        control, coordinator = Control(), Coordinator()
+        hass.states.async_set("sensor.car", "50")
+        observer = VehicleSocObserver(hass, control, coordinator, "sensor.car")
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def slow_set(value, *, source, soc, maximum):
+            started.set()
+            await release.wait()
+            await control.set_goal(value, source=source, soc=soc, maximum=maximum)
+
+        try:
+            await observer.async_start()
+            control.async_set_soc_goal.side_effect = slow_set
+            setting = asyncio.create_task(observer.async_set_target(80))
+            await started.wait()
+            hass.states.async_set("sensor.car", "85")
+            hass.states.async_set("sensor.car", "50")
+            # Dispatch callbacks, leaving the observation worker waiting on
+            # the command lock until the target request finishes.
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            release.set()
+            await setting
+            await hass.async_block_till_done()
+            assert control.soc_goal.status == "reached"
+        finally:
+            release.set()
+            await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_failed_target_keeps_threshold_evidence_for_previous_goal(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        control, coordinator = Control(), Coordinator()
+        hass.states.async_set("sensor.car", "50")
+        observer = VehicleSocObserver(hass, control, coordinator, "sensor.car")
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def failing_set(value, *, source, soc, maximum):
+            started.set()
+            await release.wait()
+            raise DeviceError("service_unavailable")
+
+        try:
+            await observer.async_start()
+            await observer.async_set_target(70)
+            control.async_set_soc_goal.side_effect = failing_set
+            setting = asyncio.create_task(observer.async_set_target(90))
+            await started.wait()
+            hass.states.async_set("sensor.car", "75")
+            hass.states.async_set("sensor.car", "50")
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            release.set()
+            with pytest.raises(DeviceError):
+                await setting
+            await hass.async_block_till_done()
+            assert control.soc_goal.target_percent == 70
+            assert control.soc_goal.status == "reached"
+        finally:
+            release.set()
+            await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_uncertain_committed_target_keeps_its_transient_threshold(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        control, coordinator = Control(), Coordinator()
+        hass.states.async_set("sensor.car", "50")
+        observer = VehicleSocObserver(hass, control, coordinator, "sensor.car")
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def uncertain_set(value, *, source, soc, maximum):
+            await control.set_goal(value, source=source, soc=soc, maximum=maximum)
+            started.set()
+            await release.wait()
+            raise StorageCommitUncertainError("uncertain")
+
+        try:
+            await observer.async_start()
+            control.async_set_soc_goal.side_effect = uncertain_set
+            setting = asyncio.create_task(observer.async_set_target(80))
+            await started.wait()
+            hass.states.async_set("sensor.car", "85")
+            hass.states.async_set("sensor.car", "50")
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            release.set()
+            with pytest.raises(StorageCommitUncertainError):
+                await setting
+            await hass.async_block_till_done()
+            assert control.soc_goal.status == "reached"
+        finally:
+            release.set()
             await observer.async_stop()
             await hass.async_stop()
 
