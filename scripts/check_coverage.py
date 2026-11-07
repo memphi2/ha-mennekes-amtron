@@ -22,6 +22,7 @@ FLOW_MODULES = frozenset({
     "_flow_gateway.py",
     "_options_base.py", "_options_draft.py", "_options_estimates.py",
     "_options_profiles.py",
+    "_options_detection.py",
     "network_tariff_config.py",
 })
 COUNTERS = ("num_statements", "covered_lines", "num_branches", "covered_branches")

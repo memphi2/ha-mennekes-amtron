@@ -120,7 +120,7 @@ def test_partial_timed_setup_stops_already_started_soc_and_heartbeat_owners(tmp_
         timed_error = {"timed": ValueError("invalid saved trip"), "timed_connection": HomeAssistantError("service offline")}.get(failure)
         timed = Mock(async_start=AsyncMock(side_effect=timed_error), async_stop=AsyncMock())
         recovery = Mock(start=Mock(side_effect=RuntimeError("recovery startup failed")), async_stop=AsyncMock())
-        monkeypatch.setattr(integration, "VehicleSocObserver", lambda *_args: vehicle)
+        monkeypatch.setattr(integration, "VehicleSocObserver", lambda *_args, **_kwargs: vehicle)
         monkeypatch.setattr(integration, "TimedGoalObserver", lambda *_args: timed)
         monkeypatch.setattr(integration, "HeartbeatRecovery", lambda *_args: recovery)
         with pytest.raises(RuntimeError if failure == "recovery" else ConfigEntryNotReady) as caught:

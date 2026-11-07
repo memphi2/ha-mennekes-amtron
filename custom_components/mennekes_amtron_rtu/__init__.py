@@ -121,7 +121,9 @@ from .timed_goal_const import (
     timed_goal_is_enabled,
 )
 from .timed_goal_observer import TimedGoalObserver
+from .vehicle_detection import VehicleDetectionObserver, prepare_vehicle_selection
 from .vehicle_profiles import (
+    CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_LIMIT_USE_PROFILE,
     CONF_VEHICLE_PROFILE_ID,
     CONF_VEHICLE_PROFILES,
@@ -164,6 +166,7 @@ async def async_setup_entry(
     # trip before connecting, including when the service is currently offline.
     # A failed optional cleanup leaves wallbox control available but cannot
     # restore the old trip, even if the feature has since been re-enabled.
+    prepare_vehicle_selection(hass, entry)
     timed_reset_complete = await _async_reset_disabled_trip(hass, entry)
     options = vehicle_options(entry.options)
     if CONF_VEHICLE_PROFILES in entry.options:
@@ -459,6 +462,10 @@ async def async_setup_entry(
         )
         entry.runtime_data.loaded_platforms = platforms
         entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+        if entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True:
+            detector = VehicleDetectionObserver(hass, entry)
+            entry.runtime_data.vehicle_detection = detector
+            detector.start()
         if cost_enabled and needs_year_refresh(dict(entry.options)):
             # A stale tariff is refreshed after setup, so the wallbox and its
             # heartbeat are already running before any external HTTP request.
@@ -480,6 +487,8 @@ async def async_setup_entry(
             entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)
             entry.runtime_data.recovery.start()
     except BaseException:
+        if entry.runtime_data.vehicle_detection is not None:
+            entry.runtime_data.vehicle_detection.stop()
         await _async_stop_estimates(entry.runtime_data)
         if entry.runtime_data.timed_goal is not None:
             await entry.runtime_data.timed_goal.async_stop()
@@ -559,6 +568,8 @@ async def async_unload_entry(
     )
     if not unloaded:
         return False
+    if runtime_data.vehicle_detection is not None:
+        runtime_data.vehicle_detection.stop()
     await _async_stop_estimates(runtime_data)
     if runtime_data.timed_goal is not None:
         await runtime_data.timed_goal.async_stop()
