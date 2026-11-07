@@ -130,9 +130,10 @@ class PlugChargeController:
 
     async def async_sync(self) -> None:
         async with self._control.energy_goal_guard:
-            await self._sync_locked()
+            await self.async_sync_locked()
 
-    async def _sync_locked(self) -> None:
+    async def async_sync_locked(self) -> None:
+        """Enforce the hold while the caller already owns the control lock."""
         if self._stopping or not self.state.blocked or self._control.read_only:
             return
         current = await self._control._async_read_switch(CHARGING_RELEASE, stopping=True)
@@ -150,7 +151,7 @@ class PlugChargeController:
             self._control._require_write_access()
         async with self._control.energy_goal_guard:
             self.state.configure(enabled, policy)
-            await self._sync_locked()
+            await self.async_sync_locked()
 
     def check_release(self, *, recovery: bool = False) -> None:
         if self._authorizing is not None:

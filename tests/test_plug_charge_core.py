@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.exceptions import ServiceValidationError
@@ -12,6 +13,9 @@ from homeassistant.exceptions import ServiceValidationError
 from custom_components.mennekes_amtron_rtu.control import AmtronControl, ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import (
+    EnergyGoalController,
+)
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.plug_charge import PlugChargeState
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
@@ -98,15 +102,16 @@ def test_gate_closes_without_changing_manual_intent_and_grants_only_release():
         assert h.written(R.CHARGING_RELEASE) == [[0]]
         assert control.charging_release_requested is None
         assert control.pause_requested is None
-        with pytest.raises(ServiceValidationError) as exc:
-            await control.async_set_charging_release(True)
-        assert exc.value.translation_key == "plug_charge_blocked"
+        await control.async_set_charging_release(True)
+        assert control.charging_release_requested is True
+        assert h.written(R.CHARGING_RELEASE) == [[0]]
+        assert control.events.snapshot()["events"] == []
         await authorize(control)
         assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
         assert control.plug_charge["authorized"]
         assert h.written(R.CHARGING_CURRENT_EMS) == []
         assert h.written(R.LOCK_EVSE) == []
-        assert control.charging_release_requested is None
+        assert control.charging_release_requested is True
         await control.async_configure_plug_charge(True, policy=POLICY)
         assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
         present(h)
@@ -548,4 +553,71 @@ def test_control_handoff_preserves_session_only_while_transport_continues(link_l
         await fresh.async_shutdown()
         await h.client.async_close()
         assert fresh.plug_charge["session"] is None
+    asyncio.run(run())
+
+
+def test_manual_release_request_clears_previous_refusal_without_bypassing_vehicle_gate():
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        await c.async_set_charging_release(False)
+        present(h, False)
+        present(h)
+        with pytest.raises(ServiceValidationError) as exc:
+            await authorize(c)
+        assert exc.value.translation_key == "plug_charge_blocked"
+        before_writes = list(h.transport.writes)
+        before_events = c.events.snapshot()
+        before_generation = c.write_state.command_intent_generation
+        before_refreshes = h.refreshes
+        await c.async_set_charging_release(True)
+        assert c.charging_release_requested is True
+        assert c.write_state.command_intent_generation == before_generation + 1
+        assert h.transport.writes == before_writes
+        assert c.events.snapshot() == before_events
+        assert h.refreshes == before_refreshes + 1
+        assert not c.plug_charge["authorized"]
+        assert h.transport.bank[R.CHARGING_RELEASE.address] == 0
+        await authorize(c)
+        assert h.transport.bank[R.CHARGING_RELEASE.address] == 1
+        assert c.plug_charge["authorized"]
+        await c.async_shutdown()
+    asyncio.run(run())
+
+
+def test_manual_release_request_does_not_clear_independent_goal_stop():
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        c.charging_release_requested = False
+        c.energy_goal._status = "reached"
+        before_generation = c.write_state.command_intent_generation
+        with pytest.raises(ServiceValidationError) as exc:
+            await c.async_set_charging_release(True)
+        assert exc.value.translation_key == "energy_goal_stop_active"
+        assert c.charging_release_requested is False
+        assert c.write_state.command_intent_generation == before_generation
+        assert h.written(R.CHARGING_RELEASE) == [[0]]
+        await c.async_shutdown()
+    asyncio.run(run())
+
+
+def test_manual_gate_intent_replaces_old_pending_command_and_goal_recovery():
+    async def run():
+        h = Harness(state_change_interval_seconds=300)
+        c = await armed(h)
+        await c.async_set_lock_evse(True)
+        assert c.pending_action == "lock"
+        persist = AsyncMock()
+        goal = EnergyGoalController(c, h.client, persist)
+        goal.model.resume_on_recovery = True
+        await c.async_set_charging_release(True)
+        assert c.pending_action is None
+        assert not goal.model.resume_on_recovery
+        persist.assert_awaited_once()
+        assert h.written(R.LOCK_EVSE) == []
+        assert h.written(R.CHARGING_RELEASE) == [[0]]
+        assert c.events.snapshot()["events"][-1]["outcome"] == "replaced"
+        await goal.async_stop()
+        await c.async_shutdown()
     asyncio.run(run())
