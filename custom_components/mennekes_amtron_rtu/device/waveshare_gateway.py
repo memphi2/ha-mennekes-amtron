@@ -334,6 +334,14 @@ def _desired(before: GatewaySnapshot, settings: GatewaySettings) -> tuple[bytes,
     return bytes(value), masks
 
 
+def validate_gateway_settings(snapshot: GatewaySnapshot, settings: GatewaySettings, password: str) -> None:
+    """Reject locally invalid setup before stopping an existing connection."""
+    if settings.tcp_port is not None and settings.tcp_port == int.from_bytes(snapshot._native[0x62:0x64], "big"):
+        raise ValueError("Adapter TCP and web ports must differ")
+    if snapshot.tcp_authentication or settings.tcp_authentication is True:
+        validate_tcp_auth_password(password)
+
+
 async def _verify_auth(snapshot: GatewaySnapshot, password: str) -> None:
     if snapshot.tcp_authentication:
         validate_tcp_auth_password(password)
@@ -536,10 +544,8 @@ async def configure_gateway(
                 raise GatewayConflictError
         if not before.can_configure:
             raise GatewayUnsupportedError
+        validate_gateway_settings(before, settings, password)
         native, masks = _desired(before, settings)
-        after = _snapshot(address, native)
-        if before.tcp_authentication or after.tcp_authentication:
-            validate_tcp_auth_password(password)
         phase = "initial authentication"
         _LOGGER.info("LAN adapter setup: checking existing authentication")
         await _verify_auth(before, password)

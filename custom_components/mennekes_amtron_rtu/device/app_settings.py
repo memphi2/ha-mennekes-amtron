@@ -30,6 +30,7 @@ from .waveshare_gateway import (
     GatewayRollbackError,
     GatewaySettings,
     configure_gateway,
+    validate_gateway_settings,
 )
 
 if TYPE_CHECKING:
@@ -385,6 +386,10 @@ class AppSettings:
             )
         except ValueError as err:
             raise SettingsError("adapter_detection_required") from err
+        try:
+            validate_gateway_settings(snapshot, settings, password)
+        except ValueError as err:
+            raise SettingsError("connection_invalid") from err
         context = self._configuration_guard() if self._configuration_guard else nullcontext(None)
         async with context as guard:
             receipt = None

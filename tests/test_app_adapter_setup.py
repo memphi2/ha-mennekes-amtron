@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -467,6 +468,36 @@ def test_prewrite_authentication_failure_preserves_options_and_can_restore_exist
         if client is not None:
             await client.async_connect()
             assert client.connected
+            await client.async_close()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("invalid", ["web_port", "password"])
+def test_invalid_adapter_settings_do_not_interrupt_the_running_connection(settings, monkeypatch, invalid):
+    async def run():
+        detected = snapshot()
+        if invalid == "password":
+            detected = replace(detected, tcp_authentication=True)
+        monkeypatch.setattr(detection, "inspect_gateway", AsyncMock(return_value=detected))
+        headers, payload = await managed_request(settings)
+        if invalid == "web_port":
+            payload["tcp_port"] = int.from_bytes(detected._native[0x62:0x64], "big")
+        else:
+            payload.update(tcp_authentication=False, tcp_auth_password=f"{KEY} invalid")
+        transport = FakeModbusClient(device_bank())
+        client = MennekesModbusClient(NetworkConfig("192.0.2.50"), client_factory=lambda _: transport)
+        settings._configuration_guard = client.async_connection_configuration
+        await client.async_connect()
+        configure = AsyncMock()
+        monkeypatch.setattr(ui, "configure_gateway", configure)
+        try:
+            response = await invoke(settings, request("POST", headers=headers, payload=payload))
+            assert response.status == 400
+            assert body(response) == {"error": "connection_invalid"}
+            assert client.connected
+            assert not settings.posts
+            configure.assert_not_awaited()
+        finally:
             await client.async_close()
     asyncio.run(run())
 
