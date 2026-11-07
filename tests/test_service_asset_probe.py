@@ -28,6 +28,13 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
         images.ROOT / "custom_components/mennekes_amtron_rtu/device", package,
         ignore=shutil.ignore_patterns("__pycache__"),
     )
+    # The static probe must not construct the operational API. Its handlers
+    # may evolve or require runtime-only dependencies independently of assets.
+    settings_file = package / "app_settings.py"
+    settings_file.write_text(settings_file.read_text() + (
+        '\ndef create_settings_app(settings):\n'
+        '    raise AssertionError("asset validation must not construct the settings API")\n'
+    ))
     if broken == "modified":
         (package / "app_settings.js").write_text("/* incomplete or wrong build */")
     elif broken is not None:
@@ -63,16 +70,11 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
 ])
 def test_probe_guard_never_allows_remote_clients_or_configuration(remote, path, method):
     async def run():
-        settings = probe.ProbeSettings()
         handler = AsyncMock()
         request = SimpleNamespace(remote=remote, path=path, method=method)
         with pytest.raises(web.HTTPForbidden):
-            await settings.guard(request, handler)
+            await probe.local_assets_only(request, handler)
         handler.assert_not_awaited()
-        with pytest.raises(web.HTTPForbidden):
-            await settings.read(request)
-        with pytest.raises(web.HTTPForbidden):
-            await settings.save(request)
     asyncio.run(run())
 
 

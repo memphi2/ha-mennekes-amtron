@@ -530,11 +530,8 @@ class AppSettings:
         return response
 
 
-def create_settings_app(settings: AppSettings) -> web.Application:
-    """Expose fixed assets and bounded, administrator-only setup routes."""
-    app = web.Application(middlewares=[settings.guard], client_max_size=4096)
-    app.cleanup_ctx.append(settings.lifecycle)
-
+def add_settings_asset_routes(app: web.Application) -> None:
+    """Register packaged assets within the caller's existing access boundary."""
     async def asset(request: web.Request) -> web.Response:
         filename, content_type = _ASSETS[request.path]
         resource = files(__package__).joinpath(filename)
@@ -546,6 +543,13 @@ def create_settings_app(settings: AppSettings) -> web.Application:
 
     for path in _ASSETS:
         app.router.add_get(path, asset)
+
+
+def create_settings_app(settings: AppSettings) -> web.Application:
+    """Expose fixed assets and bounded, administrator-only setup routes."""
+    app = web.Application(middlewares=[settings.guard], client_max_size=4096)
+    app.cleanup_ctx.append(settings.lifecycle)
+    add_settings_asset_routes(app)
     app.router.add_get("/api/config", settings.read)
     app.router.add_post("/api/config", settings.save)
     app.router.add_post("/api/adapter", settings.inspect_adapter)
