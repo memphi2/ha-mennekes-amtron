@@ -147,8 +147,25 @@ def test_live_unrelated_changes_merge_but_section_changes_conflict():
         entry.options["current_limit"] = 12
         conflict = await flow.async_step_wallbox_basic(form["data_schema"]({"current_limit": 8}))
         assert conflict["step_id"] == "options_changed"
+        repeated = await flow.async_step_options_changed()
+        assert repeated["step_id"] == "options_changed"
+        assert repeated["errors"] == {"base": "options_changed"}
         assert (await flow.async_step_options_changed({}))["step_id"] == "init"
         assert entry.options["current_limit"] == 12
+
+    asyncio.run(run())
+
+
+def test_cannot_commit_after_abandoning_the_section():
+    async def run():
+        entry = FakeConfigEntry(options={"current_limit": 16, "charging_price": 0.3})
+        flow = Flow(entry)
+        await flow.async_step_wallbox()
+        await flow.async_step_wallbox_basic()
+        await flow.async_step_back()
+        with pytest.raises(RuntimeError, match="incomplete options section"):
+            flow._finish_section()
+        assert entry.options == {"current_limit": 16, "charging_price": 0.3}
 
     asyncio.run(run())
 
