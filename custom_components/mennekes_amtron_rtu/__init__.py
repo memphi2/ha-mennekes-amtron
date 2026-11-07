@@ -507,23 +507,7 @@ async def async_setup_entry(
             entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)
             entry.runtime_data.recovery.start()
     except BaseException:
-        if entry.runtime_data.vehicle_detection is not None:
-            entry.runtime_data.vehicle_detection.stop()
-        await _async_stop_estimates(entry.runtime_data)
-        if entry.runtime_data.timed_goal is not None:
-            await entry.runtime_data.timed_goal.async_stop()
-        if entry.runtime_data.vehicle_soc is not None:
-            await entry.runtime_data.vehicle_soc.async_stop()
-        if entry.runtime_data.soc_goal is not None:
-            await entry.runtime_data.soc_goal.async_stop()
-        if entry.runtime_data.goal is not None:
-            await entry.runtime_data.goal.async_stop()
-        if entry.runtime_data.recovery is not None:
-            await entry.runtime_data.recovery.async_stop()
-        if entry.runtime_data.heartbeat is not None:
-            await entry.runtime_data.heartbeat.async_stop()
-        await control.async_shutdown()
-        await client.async_close()
+        await _async_stop_runtime(entry.runtime_data)
         raise
     return True
 
@@ -588,28 +572,19 @@ async def async_unload_entry(
     )
     if not unloaded:
         return False
-    if runtime_data.vehicle_detection is not None:
-        runtime_data.vehicle_detection.stop()
-    await _async_stop_estimates(runtime_data)
-    if runtime_data.timed_goal is not None:
-        await runtime_data.timed_goal.async_stop()
-    if runtime_data.vehicle_soc is not None:
-        await runtime_data.vehicle_soc.async_stop()
-    if runtime_data.soc_goal is not None:
-        await runtime_data.soc_goal.async_stop()
-    if runtime_data.goal is not None:
-        await runtime_data.goal.async_stop()
-    if runtime_data.recovery is not None:
-        await runtime_data.recovery.async_stop()
-    if runtime_data.heartbeat is not None:
-        await runtime_data.heartbeat.async_stop()
-    await runtime_data.control.async_shutdown()
-    await runtime_data.client.async_close()
+    await _async_stop_runtime(runtime_data)
     return unloaded
 
 
-async def _async_stop_estimates(runtime: MennekesAmtronRuntimeData) -> None:
-    """Detach the poll hook before closing optional estimate owners."""
+async def _async_stop_runtime(runtime: MennekesAmtronRuntimeData) -> None:
+    """Release the same owners after partial setup and ordinary unloading.
+
+    Detach source and polling listeners before their consumers, and keep the
+    heartbeat until the charging controllers have finished their persistence.
+    The command owner and physical connection are always closed last.
+    """
+    if runtime.vehicle_detection is not None:
+        runtime.vehicle_detection.stop()
     runtime.coordinator.observe_session = None
     if runtime.charge_loss is not None:
         await runtime.charge_loss.async_stop()
@@ -617,6 +592,14 @@ async def _async_stop_estimates(runtime: MennekesAmtronRuntimeData) -> None:
         await runtime.charging_cost.async_stop()
     if runtime.sessions is not None:
         await runtime.sessions.async_close()
+    for owner in (
+        runtime.timed_goal, runtime.vehicle_soc, runtime.soc_goal,
+        runtime.goal, runtime.recovery, runtime.heartbeat,
+    ):
+        if owner is not None:
+            await owner.async_stop()
+    await runtime.control.async_shutdown()
+    await runtime.client.async_close()
 
 
 async def async_reload_entry(
