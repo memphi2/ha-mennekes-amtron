@@ -22,6 +22,34 @@ from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 from tests.test_timed_goal import NOW, setup_observer, state
 
 
+@pytest.mark.parametrize("detected", ["missing", None, 0])
+def test_unknown_vehicle_phases_do_not_postpone_a_reachable_one_phase_trip(monkeypatch, detected):
+    async def run():
+        observer, control, _hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        if detected == "missing":
+            control.data.values.pop("detected_ev_phases")
+        else:
+            control.data.values["detected_ev_phases"] = detected
+        observer.goal.set(NOW + timedelta(hours=16))
+
+        # 48 kWh is reachable on one phase at 14.5 A. Assuming three phases
+        # while detection is uninitialised previously inserted a three-hour
+        # pause, leaving under 43 kWh available even at the eventual 16 A max.
+        await observer._evaluate()
+        assert observer.status == "paced"
+        assert control.commands == [("current", 14.5)]
+        assert control.commands[0][1] * 230 * 0.9 * 16 / 1000 >= 48
+
+        # Confirming one phase does not suddenly turn the plan unreachable.
+        control.data.values["detected_ev_phases"] = 1
+        await observer._evaluate()
+        assert observer.status == "paced"
+        assert control.commands == [("current", 14.5)]
+
+    asyncio.run(run())
+
+
 def test_completed_trip_roundtrip_and_invalid_completion() -> None:
     goal = TimedGoal()
     goal.set(NOW + timedelta(hours=1), "external:next-trip")

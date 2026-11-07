@@ -301,10 +301,15 @@ class TimedGoalObserver:
             return 1
         if switched == SwitchedPhases.ALL_AVAILABLE and connected == GridPhasesConnected.L1_L2_L3:
             detected = data.get("detected_ev_phases")
-            if detected in (DetectedEvPhases.ONE_PHASE, DetectedEvPhases.TWO_PHASES):
+            if detected in (
+                DetectedEvPhases.ONE_PHASE, DetectedEvPhases.TWO_PHASES,
+                DetectedEvPhases.THREE_PHASES,
+            ):
                 return int(detected)
-            return 3
-        # Unknown phase switching cannot justify a three-phase estimate.
+        # Grid/switch capability does not establish the vehicle's capability.
+        # Before its first charge, detection can be zero or unavailable. An
+        # optimistic three-phase estimate can postpone a one-phase car until
+        # even its maximum current cannot meet a formerly reachable deadline.
         return 1
 
     async def _evaluate(self) -> None:

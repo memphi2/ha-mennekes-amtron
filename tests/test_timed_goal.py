@@ -154,6 +154,7 @@ def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, 
         "charging_current_ems": 16.0,
         "switched_phases": 0,
         "grid_phases_connected": 2,
+        "detected_ev_phases": 3,
         "evse_state": EvseState.CHARGING,
         "cp_state": CpState.C2,
     })
