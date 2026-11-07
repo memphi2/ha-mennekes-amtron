@@ -7,9 +7,11 @@ import re
 import tomllib
 from pathlib import Path
 
+import check_repo
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "mennekes_amtron_rtu"
-TEXT_SUFFIXES = {".json", ".md", ".py", ".toml", ".txt", ".yaml", ".yml", ".in"}
 IGNORED = {
     ".git",
     ".venv",
@@ -39,7 +41,7 @@ def _tracked_text_files() -> list[Path]:
         path
         for path in ROOT.rglob("*")
         if path.is_file()
-        and path.suffix in TEXT_SUFFIXES
+        and path.suffix in check_repo.TEXT_SUFFIXES
         and not IGNORED.intersection(path.relative_to(ROOT).parts)
     ]
 
@@ -55,6 +57,21 @@ def test_no_tracked_file_carries_a_secret_or_identifying_path() -> None:
         )
     ]
     assert offenders == []
+
+
+@pytest.mark.parametrize("suffix", [".js", ".cjs", ".html", ".css"])
+def test_frontend_assets_are_scanned_without_reporting_secret_contents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, suffix: str
+) -> None:
+    asset = tmp_path / f"app{suffix}"
+    asset.write_text("-----BEGIN PRIVATE KEY-----\nsynthetic regression marker\n")
+    monkeypatch.setattr(check_repo, "ROOT", tmp_path)
+    monkeypatch.setitem(globals(), "ROOT", tmp_path)
+
+    assert check_repo.check_secrets() == [
+        f"app{suffix} contains a secret or identifying value"
+    ]
+    assert _tracked_text_files() == [asset]
 
 
 def test_the_manifest_names_the_public_integration_maintainer() -> None:
