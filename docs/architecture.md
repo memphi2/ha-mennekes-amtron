@@ -131,12 +131,20 @@ The other service tests cover migration identity, API validation, bounded queues
 recovery and atomic state persistence. These simulations do not validate the
 physical wallbox's firmware or the Supervisor/container runtime. CI separately
 builds the standalone wheel and app container and checks their entrypoints.
+The installed-asset probe reuses the app's static route registration with its
+own loopback-only guard. It does not construct the settings API or its Supervisor
+lifecycle, so API additions do not require placeholder handlers in the probe.
 
 ## Shape
 
 Small, single-purpose modules; a leading `_` marks a module that only its
 sibling may import. `__init__.py` is a facade that assembles runtime data and
 tears it down again — no device rule lives there.
+
+Failed setup and normal entry unloading share one ordered cleanup path. Source
+listeners and estimates stop first, followed by goal owners, recovery and the
+heartbeat; control shutdown and connection close come last. Failed platform
+unloading leaves the active runtime intact.
 
 ```text
 device/registers.py          the register map, single source of truth
@@ -168,6 +176,7 @@ _options_*.py         independent draft, vehicle, departure and estimate steps
 vehicle_profiles.py  bounded profiles and effective vehicle options
 vehicle_sources/     optional provider capabilities and selection compatibility
 vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapters
+vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure plan from generic HA sources or a provider
 charge_loss_observer.py  bounded matching and durable loss aggregate
 sensor.py             + sensor_descriptions.py
@@ -198,6 +207,11 @@ entity descriptors, provider event names and the local public history service
 remain inside the adapter. Neither observer calls a vehicle cloud API or
 interprets manufacturer identities, and the Modbus control layer has no
 vehicle-provider dependency.
+
+All BavarianData sources use the same vehicle-identity binding. Registry lookup,
+the persisted identity hash and late initial binding live outside the history
+adapter. Each source retains its own value validation and event cache because
+telemetry, location and timer freshness have different contracts.
 
 BavarianData telemetry is resolved by the selected device and its registered
 `VIN_descriptor` identities, with matching descriptor attributes. Charge level
