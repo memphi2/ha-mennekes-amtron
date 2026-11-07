@@ -5,7 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import secrets
+import sys
 import time
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import asdict
 from datetime import datetime
@@ -24,7 +27,7 @@ from .enums import RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
-from .persistence import StorageCommitUncertainError
+from .persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .poller import DevicePoller
 from .register_blocks import REGISTER_BLOCKS
 from .registers import ENERGY_TOTAL, ERROR_CODE, REGISTERS_BY_KEY
@@ -33,6 +36,7 @@ from .service_store import IntentStore
 from .service_version import SERVICE_VERSION
 from .soc_goal import SocGoal
 from .soc_goal_controller import SocGoalController
+from .soc_transactions import SocTransactions
 from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,6 +81,10 @@ class ModbusService:
         self._session_history_error_logged = False
         self._logged_unavailable = False
         self._command_lock = asyncio.Lock()
+        # A fresh boot changes the revision, so a client cannot mistake an old
+        # cached command outcome for a goal restored after a service restart.
+        self._soc_goal_revision = secrets.token_hex(16)
+        self.soc_transactions = SocTransactions(self)
         self._task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._heartbeat_started = asyncio.Event()
@@ -415,6 +423,8 @@ class ModbusService:
             "control": {
                 "supports_energy_goal": control.supports_energy_goal if control else False,
                 "supports_soc_goal": control.supports_soc_goal if control else False,
+                "soc_transactions_supported": True,
+                "soc_goal_revision": self._soc_goal_revision,
                 "soc_goal": control.soc_goal.snapshot() if control else None,
                 "energy_goal": control.energy_goal.snapshot() if control else None,
                 "read_only": self.config.read_only,
@@ -453,10 +463,18 @@ class ModbusService:
             "write_errors": sorted(self.diagnostics.write_errors),
         }
 
-    async def command(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def stable_snapshot(self) -> dict[str, Any]:
+        """Publish a goal only after its enclosing command has completed."""
+        async with self._command_lock:
+            return self.snapshot()
+
+    async def command(
+        self, payload: dict[str, Any], *,
+        _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None,
+    ) -> dict[str, Any]:
         if payload.keys() - {
             "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
-            "source", "soc", "maximum", "deadline", "owner"
+            "source", "soc", "maximum", "deadline", "owner", "expected_soc_revision"
         }:
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
@@ -480,6 +498,12 @@ class ModbusService:
             # Explicit null matches only a device without a readable serial.
             if expected_serial != self.identity.serial_number:
                 raise DeviceError("device_identity_changed")
+            if "expected_soc_revision" in payload and (
+                command != "soc_observation"
+                or payload["expected_soc_revision"] != self._soc_goal_revision
+            ):
+                raise DeviceError("soc_goal_source_changed")
+            initial_revision = self._soc_goal_revision
             value = payload.get("value")
             try:
                 owner = payload.get("owner")
@@ -514,7 +538,14 @@ class ModbusService:
                     source = payload.get("source")
                     if source is not None and not isinstance(source, str):
                         raise ValueError("source must be a string or null")
-                    await control.async_configure_soc(source)
+                    before = control.soc_goal.snapshot()
+                    success = False
+                    try:
+                        await control.async_configure_soc(source)
+                        success = True
+                    finally:
+                        if success or control.soc_goal.snapshot() != before:
+                            self._soc_goal_revision = secrets.token_hex(16)
                 elif command in ("soc_goal", "soc_observation"):
                     source = payload.get("source")
                     if not isinstance(source, str):
@@ -522,11 +553,18 @@ class ModbusService:
                     soc = payload.get("soc")
                     maximum = payload.get("maximum")
                     if command == "soc_goal":
-                        await control.async_set_soc_goal(
-                            number(value, 0, 100), source=source,
-                            soc=None if soc is None else number(soc, 0, 100),
-                            maximum=None if maximum is None else number(maximum, 0, 100),
-                        )
+                        before = control.soc_goal.snapshot()
+                        success = False
+                        try:
+                            await control.async_set_soc_goal(
+                                number(value, 0, 100), source=source,
+                                soc=None if soc is None else number(soc, 0, 100),
+                                maximum=None if maximum is None else number(maximum, 0, 100),
+                            )
+                            success = True
+                        finally:
+                            if success or control.soc_goal.snapshot() != before:
+                                self._soc_goal_revision = secrets.token_hex(16)
                     else:
                         await control.async_observe_soc(
                             None if soc is None else number(soc, 0, 100),
@@ -560,7 +598,16 @@ class ModbusService:
                 else:
                     raise ValueError("unknown command")
             finally:
-                await self._persist()
+                failure = sys.exception()
+                try:
+                    await self._persist()
+                except BaseException as err:
+                    if not isinstance(failure, (StorageCommitUncertainError, StorageStateUnknownError)):
+                        failure = err
+                    raise
+                finally:
+                    if _soc_outcome is not None:
+                        _soc_outcome(initial_revision, self._soc_goal_revision, failure)
             if not cancelling and not metadata:
                 await self.refresh()
             return self.snapshot()
@@ -596,6 +643,7 @@ class ModbusService:
     async def stop(self) -> None:
         self._stopping = True
         try:
+            await self.soc_transactions.close()
             try:
                 if self._task is not None:
                     self._task.cancel()
