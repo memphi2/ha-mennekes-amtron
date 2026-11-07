@@ -52,6 +52,7 @@ from .data import DeviceIdentity, WallboxData, WriteDiagnostics
 from .energy_goal import EnergyGoal
 from .enums import CpState, EvseState, RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError, device_error, validation_error
+from .plug_charge import PlugChargeController
 from .registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
@@ -184,6 +185,27 @@ class AmtronControl:
         self._recovery_generation = 0
         self.goal_controller: EnergyGoalController | None = None
         self.soc_goal_controller: SocGoalController | None = None
+        self._plug_charge = PlugChargeController(self)
+
+    @property
+    def supports_plug_charge(self) -> bool:
+        return True
+
+    @property
+    def plug_charge(self) -> dict[str, object]:
+        return self._plug_charge.state.snapshot()
+
+    def observe_plug_charge(self, data: WallboxData | None, *, observed_at: datetime | None = None) -> None:
+        self._plug_charge.observe(data, observed_at=observed_at)
+
+    async def async_sync_plug_charge(self) -> None:
+        await self._plug_charge.async_sync()
+
+    async def async_configure_plug_charge(self, enabled: bool, *, policy: str = "") -> None:
+        await self._plug_charge.async_configure(enabled, policy)
+
+    async def async_authorize_plug_charge(self, session: str, *, deadline: datetime) -> None:
+        await self._plug_charge.async_authorize(session, deadline)
 
     @property
     def write_state(self) -> WriteState:
@@ -647,7 +669,7 @@ class AmtronControl:
                 # current step below reasserts a goal stop as the pause value;
                 # rejecting this recovery-only release would leave it faulted.
                 await self._async_write(
-                    CHARGING_RELEASE, int(self.charging_release_requested is not False),
+                    CHARGING_RELEASE, int(self.charging_release_requested is not False and not self._plug_charge.state.blocked),
                     recovery_release=True,
                 )
                 await self._async_apply_current(
@@ -699,6 +721,7 @@ class AmtronControl:
     async def async_shutdown(self) -> None:
         """Cancel deferred work; a new owner never inherits a delayed start."""
 
+        await self._plug_charge.async_stop()
         self._clear_pending(outcome="cancelled", reason="shutdown")
         task = self._flush_task
         self._flush_task = None
@@ -847,6 +870,8 @@ class AmtronControl:
             await self._request_refresh()
 
     async def _async_apply_release(self, released: bool) -> None:
+        if released:
+            self._plug_charge.check_release()
         current = await self._async_read_switch(CHARGING_RELEASE, stopping=not released)
         changed = current != int(released)
         if changed:
@@ -855,6 +880,8 @@ class AmtronControl:
         self.charging_release_requested = released
         try:
             await self._async_transition_write(CHARGING_RELEASE, int(released), changed=changed)
+            if released:
+                self._plug_charge.release_written()
         except (DeviceError, asyncio.CancelledError) as err:
             # A failed block retains its intent unless identity verification
             # proves that no command could have reached the intended device.
@@ -1192,6 +1219,8 @@ class AmtronControl:
         precondition: WritePrecondition | None = None,
     ) -> None:
         self._check_timed_command()
+        if spec == CHARGING_RELEASE and value == 1:
+            self._plug_charge.check_release(recovery=recovery_release)
         if self._active_command is not None:
             self._command_write_started = True
         try:
@@ -1264,6 +1293,8 @@ class AmtronControl:
         # physical identity. Recheck under the bus lock, immediately before
         # sending, so a refused start neither writes nor consumes the 5s floor.
         self._check_timed_command()
+        if spec == CHARGING_RELEASE and value == 1:
+            self._plug_charge.check_release(recovery=recovery_release)
         if (
             self._write_enables_charging(spec, value) and self.energy_goal_stop_requested
             and not (recovery_release and spec == CHARGING_RELEASE)

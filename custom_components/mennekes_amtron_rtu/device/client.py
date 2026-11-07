@@ -218,6 +218,7 @@ class MennekesModbusClient:
 
         self._identity_check_needed = True
         self._connection_generation += 1
+        self.write_state.plug_charge.invalidate()
 
     async def _async_verify_identity(self, client: ModbusTransport) -> None:
         """Confirm the bound serial while holding the transaction lock."""
@@ -263,6 +264,7 @@ class MennekesModbusClient:
         self._require_connection_usable()
         if client.connected:
             return
+        self.write_state.plug_charge.invalidate()
         self._identity_check_needed = True
         try:
             connected = await client.connect()
@@ -303,6 +305,7 @@ class MennekesModbusClient:
         async with self._lock:
             client = self._client
             self._client = None
+            self.write_state.plug_charge.invalidate()
             await _async_close_transport(client)
 
     @asynccontextmanager
@@ -316,6 +319,7 @@ class MennekesModbusClient:
         async with self._lock:
             was_pending = self._configuration_pending_restart
             self._configuration_pending_restart = True
+            self.write_state.plug_charge.invalidate()
             self._identity_check_needed = True
             guard = ConnectionConfigurationGuard()
             try:
