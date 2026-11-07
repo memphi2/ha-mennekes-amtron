@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from homeassistant.exceptions import ServiceValidationError
 
+from custom_components.mennekes_amtron_rtu.control import AmtronControl, ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
@@ -503,4 +504,48 @@ def test_deadline_expiring_during_write_ack_closes_uncertain_release(monkeypatch
         assert h.written(R.CHARGING_RELEASE) == [[0], [1], [0]]
         assert not c.plug_charge["authorized"]
         await c.async_shutdown()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("link_lost", [False, True])
+@pytest.mark.parametrize("granted", [False, True])
+def test_control_handoff_preserves_session_only_while_transport_continues(link_lost, granted):
+    async def run():
+        h = Harness()
+        old = await h.connect()
+        await old.async_configure_plug_charge(True, policy=POLICY)
+        absent_at = datetime.now(UTC) - timedelta(seconds=2)
+        old.observe_plug_charge(WallboxData(values={"evse_state": int(EvseState.IDLE), "cp_state": int(CpState.A1), "charging_release": 0}), observed_at=absent_at)
+        present(h)
+        if granted:
+            await authorize(old)
+        prior = old.plug_charge
+        await old.async_shutdown()
+        if link_lost:
+            h.client._connection_changed(False)
+        fresh = AmtronControl(
+            h.client, diagnostics=h.diagnostics, identity=h.identity,
+            options=ControlOptions(False, None, state_change_interval_seconds=0),
+            state=lambda: h.snapshot, monotonic=lambda: h.clock[0],
+        )
+        await h.client.async_connect()
+        await fresh.async_configure_plug_charge(True, policy=POLICY)
+        h.control = fresh
+        present(h)
+        if link_lost:
+            assert fresh.plug_charge["session"] != prior["session"]
+            assert datetime.fromisoformat(fresh.plug_charge["since"]) > absent_at
+            with pytest.raises(ServiceValidationError) as exc:
+                await fresh.async_authorize_plug_charge(prior["session"], deadline=deadline())
+            assert exc.value.translation_key == "plug_charge_session_changed"
+        else:
+            assert fresh.plug_charge == prior
+            assert fresh.plug_charge["since"] == absent_at.isoformat()
+            await fresh.async_authorize_plug_charge(prior["session"], deadline=deadline())
+            assert fresh.plug_charge["authorized"]
+        assert h.client.connected
+        assert h.transport.close_calls == 0
+        await fresh.async_shutdown()
+        await h.client.async_close()
+        assert fresh.plug_charge["session"] is None
     asyncio.run(run())
