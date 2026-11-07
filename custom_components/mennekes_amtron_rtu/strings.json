@@ -9,6 +9,7 @@
       "service_identity_changed": "The discovered wallbox changed. Start setup again.",
       "service_discovery_updated": "The existing integration now uses the discovered app connection.",
       "multiple_service_apps": "Multiple Modbus apps were found. Select the matching discovered app under Devices & services.",
+      "connection_settings_changed": "Connection settings changed during authentication. The checked credentials were not saved. Review the current connection before trying again.",
       "reauth_not_supported": "This connection does not use adapter TCP login. Use Change connection to update its settings."
     },
     "error": {

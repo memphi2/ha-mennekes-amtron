@@ -31,6 +31,7 @@ const messages = {
     saved_adapter: "Adapter settings applied and connection saved. The old connection is stopped. Restart this app from its Info tab to resume the heartbeat.",
     adapter_detection_required: "Read the adapter settings again before applying changes.",
     adapter_save_uncertain: "The adapter and saved app settings could not be confirmed together. The connection is stopped. Reload the settings and identify the adapter again before deciding how to reconnect; do not restart blindly.",
+    options_save_uncertain: "A previous save may still complete, even after an app restart. Further saves are blocked during this app session. Check the saved connection and adapter before reconnecting.",
     gateway_authentication_failed: "The adapter rejected its existing web password. Check the password used for its web interface.",
     tcp_authentication: "TCP login",
     tcp_auth_password: "Existing adapter web password",
@@ -70,6 +71,7 @@ const messages = {
     saved_adapter: "Adaptereinstellungen angewendet und Verbindung gespeichert. Die alte Verbindung ist angehalten. Starte diese App im Reiter Info neu, damit der Heartbeat weiterläuft.",
     adapter_detection_required: "Lies die Adaptereinstellungen vor dem Anwenden erneut ein.",
     adapter_save_uncertain: "Adapter und gespeicherte App-Einstellungen konnten nicht gemeinsam bestätigt werden. Die Verbindung ist angehalten. Lade die Einstellungen neu und erkenne den Adapter erneut, bevor du die Verbindung wiederherstellst. Nicht ungeprüft neu starten.",
+    options_save_uncertain: "Ein vorheriger Speichervorgang kann auch nach einem App-Neustart noch abgeschlossen werden. Weitere Änderungen sind während dieser App-Laufzeit gesperrt. Prüfe die gespeicherte Verbindung und den Adapter vor dem Wiederverbinden.",
     gateway_authentication_failed: "Der Adapter hat sein vorhandenes Webpasswort abgelehnt. Prüfe das Passwort für seine Weboberfläche.",
     tcp_authentication: "TCP-Anmeldung",
     tcp_auth_password: "Vorhandenes Webpasswort des Adapters",
@@ -108,6 +110,7 @@ const messages = {
     saved_adapter: "Réglages appliqués et connexion enregistrée. L’ancienne connexion est arrêtée. Redémarrez cette application depuis Infos pour reprendre le heartbeat.",
     adapter_detection_required: "Relisez les réglages de l’adaptateur avant d’appliquer les modifications.",
     adapter_save_uncertain: "Impossible de confirmer la cohérence entre l’adaptateur et les réglages enregistrés. La connexion est arrêtée. Rechargez les réglages et identifiez à nouveau l’adaptateur avant de vous reconnecter ; ne redémarrez pas sans vérification.",
+    options_save_uncertain: "Un enregistrement précédent peut encore aboutir, même après un redémarrage de l’application. Les autres enregistrements sont bloqués pendant cette session. Vérifiez la connexion enregistrée et l’adaptateur avant de vous reconnecter.",
     gateway_authentication_failed: "L’adaptateur a refusé son mot de passe web actuel. Vérifiez le mot de passe de son interface web.",
     tcp_authentication: "Authentification TCP",
     tcp_auth_password: "Mot de passe web actuel de l’adaptateur",
@@ -146,6 +149,7 @@ const messages = {
     saved_adapter: "Adapterinstellingen toegepast en verbinding opgeslagen. De oude verbinding is gestopt. Herstart deze app op het tabblad Info om de heartbeat te hervatten.",
     adapter_detection_required: "Lees de adapterinstellingen opnieuw voordat je wijzigingen toepast.",
     adapter_save_uncertain: "De adapter en opgeslagen appinstellingen konden niet samen worden bevestigd. De verbinding is gestopt. Herlaad de instellingen en herken de adapter opnieuw voordat je opnieuw verbinding maakt; herstart niet zonder controle.",
+    options_save_uncertain: "Een eerdere opslag kan nog worden voltooid, ook na een herstart van de app. Verder opslaan is tijdens deze appsessie geblokkeerd. Controleer de opgeslagen verbinding en adapter voordat je opnieuw verbinding maakt.",
     gateway_authentication_failed: "De adapter heeft zijn huidige webwachtwoord geweigerd. Controleer het wachtwoord voor de webinterface.",
     tcp_authentication: "TCP-aanmelding",
     tcp_auth_password: "Huidig webwachtwoord van de adapter",
@@ -184,6 +188,7 @@ const messages = {
     saved_adapter: "Impostazioni applicate e collegamento salvato. Il vecchio collegamento è arrestato. Riavvia questa app dalla scheda Informazioni per riprendere l’heartbeat.",
     adapter_detection_required: "Rileggi le impostazioni dell’adattatore prima di applicare modifiche.",
     adapter_save_uncertain: "Impossibile confermare insieme adattatore e impostazioni salvate. Il collegamento è arrestato. Ricarica le impostazioni e identifica di nuovo l’adattatore prima di riconnetterti; non riavviare senza verifica.",
+    options_save_uncertain: "Un salvataggio precedente potrebbe completarsi anche dopo un riavvio dell’app. Altri salvataggi sono bloccati durante questa sessione. Verifica la connessione salvata e l’adattatore prima di riconnetterti.",
     gateway_authentication_failed: "L’adattatore ha rifiutato la password web attuale. Controlla la password della sua interfaccia web.",
     tcp_authentication: "Accesso TCP",
     tcp_auth_password: "Password web attuale dell’adattatore",
@@ -207,6 +212,7 @@ let adapter = null;
 let adapterEpoch = 0;
 let restartPending = false;
 let uncertain = false;
+let writeBlocked = false;
 
 const sameEndpoint = () => savedSettings && el("host").value.trim().toLowerCase() === (savedSettings.host || "").toLowerCase()
   && Number(el("tcp_port").value) === Number(savedSettings.tcp_port);
@@ -223,7 +229,7 @@ function clearAdapter() {
 
 function setBusy(value) {
   busy = value;
-  el("save").disabled = value || restartPending || uncertain || !revision || !csrf;
+  el("save").disabled = value || restartPending || uncertain || writeBlocked || !revision || !csrf;
   el("reload").disabled = value;
   el("connection_type").disabled = value || restartPending;
   el("device_id").disabled = value || restartPending;
@@ -271,6 +277,7 @@ async function readSettings() {
     if (!response.ok) { showError(data.error); return; }
     revision = data.revision;
     csrf = data.csrf;
+    writeBlocked = data.write_blocked === true;
     const settings = data.settings;
     savedSettings = settings;
     el("connection_type").value = settings.connection_type;
@@ -290,7 +297,8 @@ async function readSettings() {
     showTransport();
     el("connection_form").hidden = false;
     el("status").textContent = restartPending ? text("saved_adapter") : "";
-    if (uncertain) showError("adapter_save_uncertain");
+    if (writeBlocked) showError("options_save_uncertain");
+    else if (uncertain) showError("adapter_save_uncertain");
   } catch (_) { showError("supervisor_unavailable"); }
   finally { setBusy(false); }
 }
@@ -345,13 +353,14 @@ el("detect_adapter").addEventListener("click", async () => {
     el("adapter_frame").value = supportedOption("adapter_frame", fromSerial ? savedSettings.frame : data.frame, "8n2");
     uncertain = false;
     el("status").textContent = "";
+    if (writeBlocked) showError("options_save_uncertain");
   } catch (_) { clearAdapter(); showError("gateway_unreachable"); }
   finally { setBusy(false); }
 });
 el("reload").addEventListener("click", readSettings);
 el("connection_form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (busy || restartPending || uncertain || !revision || !csrf || !event.target.reportValidity()) return;
+  if (busy || restartPending || uncertain || writeBlocked || !revision || !csrf || !event.target.reportValidity()) return;
   const serial = el("connection_type").value === "serial";
   const managed = !serial && applyingAdapter();
   const payload = { revision, connection_type: el("connection_type").value, device_id: Number(el("device_id").value) };
@@ -376,6 +385,7 @@ el("connection_form").addEventListener("submit", async (event) => {
     const data = await response.json();
     if (!response.ok) {
       uncertain = data.error === "adapter_save_uncertain" || data.error === "gateway_rollback_failed";
+      if (data.error === "adapter_save_uncertain" || data.error === "options_save_uncertain") writeBlocked = true;
       showError(data.error);
       return;
     }

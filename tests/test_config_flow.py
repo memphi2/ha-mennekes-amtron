@@ -297,7 +297,7 @@ def test_reconfigure_restores_the_entry_after_failed_or_cancelled_probes(
         entry.state = ConfigEntryState.LOADED
         events = []
 
-        async def unload(entry_id):
+        async def unload(entry_id, *, _lock=True):
             assert entry_id == entry.entry_id
             events.append("unload")
             if failure == "unload":
@@ -306,7 +306,7 @@ def test_reconfigure_restores_the_entry_after_failed_or_cancelled_probes(
             entry.state = ConfigEntryState.NOT_LOADED
             return True
 
-        async def setup(entry_id):
+        async def setup(entry_id, *, _lock=True):
             assert entry_id == entry.entry_id
             events.append("restore")
             await entry.runtime_data.client.async_connect()

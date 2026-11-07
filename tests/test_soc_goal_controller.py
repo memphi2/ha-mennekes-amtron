@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 from homeassistant.exceptions import ServiceValidationError
 
+from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.errors import (
     DeviceValidationError,
     validation_error,
@@ -18,6 +19,7 @@ from custom_components.mennekes_amtron_rtu.device.soc_goal_controller import (
     SocGoalController,
 )
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
+from tests.fakes import put
 from tests.test_energy_goal_controller import _runner, _settle, _snapshot
 from tests.test_modbus_service import current_writes, service_fixture
 
@@ -76,6 +78,33 @@ def test_reached_soc_persists_and_pauses_without_long_mode_wait():
         assert control.pause_requested is True
         await soc.async_stop()
         await energy.async_stop()
+    asyncio.run(run())
+
+
+def test_reached_soc_rechecks_old_pause_and_preserves_current_write_floor():
+    async def run():
+        harness, control, energy, _saved = await _runner(paused=True)
+        soc = SocGoalController(control, AsyncMock(), sleep=harness._sleep)
+        await soc.async_configure_source(SOURCE)
+        await soc.async_set_target(80, source=SOURCE, soc=20)
+        assert control.is_paused is True
+
+        # The cached pause no longer describes the wallbox. The retry must
+        # honor the five-second floor but still apply the newly reached stop.
+        put(harness.transport.bank, R.CHARGING_CURRENT_EMS, 16)
+        harness.client.write_state.limiter.record(
+            R.CHARGING_CURRENT_EMS.key, now=harness.clock[0],
+        )
+        await soc.async_observe(80, source=SOURCE)
+        await _settle(soc)
+        assert control.soc_goal.status == "reached"
+        assert current_writes(harness.transport) == [1]
+        assert harness.slept == [5]
+        assert harness.client.write_state.mode_change_at == harness.clock[0]
+        assert control.pause_requested is True
+        await soc.async_stop()
+        await energy.async_stop()
+
     asyncio.run(run())
 
 

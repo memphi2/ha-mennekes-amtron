@@ -251,16 +251,6 @@ class TariffConfig:
         intervals.append(PriceInterval(segment_start, end, price))
         return tuple(intervals)
 
-    def average_price(self, start: float, end: float, base_price: float | None) -> float | None:
-        intervals = self.price_intervals(start, end, base_price)
-        if any(interval.price is None for interval in intervals):
-            return None
-        return math.fsum(
-            _number(interval.price) * ((interval.end - interval.start) / (end - start))
-            for interval in intervals
-        )
-
-
 @dataclass(frozen=True, slots=True)
 class CostResult:
     """A bounded completed estimate; incomplete never masquerades as zero cost."""

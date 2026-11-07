@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import NoReturn
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
@@ -291,9 +292,7 @@ async def async_setup_entry(
                 # manual requests and other owners remain authoritative.
                 await control.async_cancel_timed_current(f"timed:{entry.entry_id}")
             except (AmtronBusError, HomeAssistantError) as err:
-                raise ConfigEntryNotReady(
-                    translation_domain=DOMAIN, translation_key="timed_goal_unavailable"
-                ) from err
+                _raise_optional_setup_error(client, err, "timed_goal_unavailable")
             if timed_reset_complete and CONF_TIMED_GOAL_RESET_PENDING in entry.options:
                 options = dict(entry.options)
                 options.pop(CONF_TIMED_GOAL_RESET_PENDING)
@@ -406,7 +405,10 @@ async def async_setup_entry(
                 entry.options.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY),
             )
             entry.runtime_data.vehicle_soc = observer
-            await observer.async_start()
+            try:
+                await observer.async_start()
+            except (AmtronBusError, HomeAssistantError, OSError) as err:
+                _raise_optional_setup_error(client, err, "soc_goal_unavailable")
         if (
             timed_reset_complete and entry.options.get(CONF_VEHICLE_SOC_ENTITY)
             and timed_goal_is_enabled(entry.options)
@@ -420,9 +422,7 @@ async def async_setup_entry(
                     translation_domain=DOMAIN, translation_key="timed_goal_state_invalid"
                 ) from err
             except (AmtronBusError, HomeAssistantError) as err:
-                raise ConfigEntryNotReady(
-                    translation_domain=DOMAIN, translation_key="timed_goal_unavailable"
-                ) from err
+                _raise_optional_setup_error(client, err, "timed_goal_unavailable")
         if remote:
             # The service owns its own durable goal. Old direct-mode intent must
             # not return when this entry later switches back from the service.
@@ -473,6 +473,23 @@ async def async_setup_entry(
         await client.async_close()
         raise
     return True
+
+
+def _raise_optional_setup_error(
+    client: MennekesModbusClient, err: Exception, translation_key: str,
+) -> NoReturn:
+    """Retry transient source setup failures while preserving reauthentication."""
+    if isinstance(err, ConfigEntryAuthFailed):
+        raise err
+    if isinstance(client, RemoteClient) and client.failure_reason == "service_auth_failed":
+        raise ConfigEntryAuthFailed(
+            translation_domain=DOMAIN, translation_key="service_auth_failed"
+        ) from err
+    if isinstance(err, ConfigEntryNotReady):
+        raise err
+    raise ConfigEntryNotReady(
+        translation_domain=DOMAIN, translation_key=translation_key
+    ) from err
 
 
 async def _async_reset_disabled_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> bool:

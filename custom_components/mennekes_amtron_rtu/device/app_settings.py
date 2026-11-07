@@ -178,6 +178,7 @@ class AppSettings:
         self._slots = asyncio.Semaphore(2)
         self._adapter_setup = AdapterSetup()
         self._configuration_guard = configuration_guard
+        self._options_write_uncertain = False
 
     async def lifecycle(self, _app: web.Application) -> AsyncIterator[None]:
         async with ClientSession(timeout=ClientTimeout(total=10), trust_env=False) as session:
@@ -257,6 +258,7 @@ class AppSettings:
             "adapters": [{"value": adapter.value, "label": adapter.label} for adapter in adapters],
             "revision": self._revision(options),
             "csrf": self._digest("csrf", user),
+            "write_blocked": self._options_write_uncertain,
         })
 
     async def _edit_request(self, request: web.Request) -> tuple[str, dict[str, Any]]:
@@ -311,6 +313,8 @@ class AppSettings:
         if payload.keys() & adapter_keys and not adapter_keys <= payload.keys():
             raise SettingsError("invalid_request")
         async with self._lock:
+            if self._options_write_uncertain:
+                raise SettingsError("options_save_uncertain", 503)
             options = await self._options()
             revision = self._check_revision(payload["revision"], options)
             updated = {**options, **{key: value for key, value in payload.items() if key in _FIELDS}}
@@ -328,7 +332,11 @@ class AppSettings:
                     host = validate_network_host(payload["host"])
                 except ValueError as err:
                     raise SettingsError("connection_invalid") from err
-                same_endpoint = host == options.get("host") and payload["tcp_port"] == options.get("tcp_port", 502)
+                try:
+                    previous_host = validate_network_host(options.get("host"))
+                except ValueError:
+                    previous_host = None
+                same_endpoint = host == previous_host and payload["tcp_port"] == options.get("tcp_port", 502)
                 password = payload.get("tcp_auth_password", "")
                 if not isinstance(password, str):
                     raise SettingsError("connection_invalid")
@@ -354,7 +362,7 @@ class AppSettings:
             if "adapter_token" in payload:
                 await self._save_with_adapter(payload, user, revision, options, updated, password)
             else:
-                await self._request("POST", "/addons/self/options", {"options": updated})
+                await self._persist_options(options, updated, "options_save_uncertain")
         return web.json_response({"saved": True, "restart_required": True, "revision": self._revision(updated)})
 
     async def _save_with_adapter(
@@ -383,11 +391,13 @@ class AppSettings:
                     # native Supervisor panel while that operation was running.
                     if await self._options() != original:
                         raise SettingsError("settings_changed", 409)
-                    save_attempted = True
-                    await self._persist_adapter_options(updated)
+                    save_attempted = updated != original
+                    await self._persist_options(original, updated, "adapter_save_uncertain")
                     await receipt.commit()
             except BaseException as err:
                 options_restored = not save_attempted or await self._restore_adapter_options(original, updated)
+                if not options_restored:
+                    self._options_write_uncertain = True
                 if isinstance(err, GatewayRollbackError):
                     raise SettingsError(err.reason, 503) from err
                 save_uncertain = isinstance(err, SettingsError) and err.key == "adapter_save_uncertain"
@@ -403,20 +413,30 @@ class AppSettings:
                 raise
         self._adapter_setup.forget(payload["adapter_token"])
 
-    async def _persist_adapter_options(self, updated: dict[str, Any]) -> None:
-        """A lost reply can follow a successful Supervisor write: read it back."""
+    async def _persist_options(
+        self, original: dict[str, Any], updated: dict[str, Any], error_key: str,
+    ) -> None:
+        """Confirm a lost reply or fence later writes while its outcome is unknown."""
+        if updated == original:
+            # An unchanged readback cannot prove that a timed-out no-op POST
+            # already happened; avoid issuing that unnecessary request at all.
+            return
         try:
-            await self._request("POST", "/addons/self/options", {"options": updated})
-        except (SettingsError, ClientError, TimeoutError, OSError, ValueError, TypeError) as err:
             try:
-                current = await self._options()
-            except (SettingsError, ClientError, TimeoutError, OSError, ValueError, TypeError):
-                raise SettingsError("adapter_save_uncertain", 503) from err
-            if current == updated:
-                return
-            # Even if the original options are still visible, the server may
-            # commit the interrupted POST after this read has completed.
-            raise SettingsError("adapter_save_uncertain", 503) from err
+                await self._request("POST", "/addons/self/options", {"options": updated})
+            except (SettingsError, ClientError, TimeoutError, OSError, ValueError, TypeError) as err:
+                try:
+                    current = await self._options()
+                except (SettingsError, ClientError, TimeoutError, OSError, ValueError, TypeError):
+                    raise SettingsError(error_key, 503) from err
+                if current != updated:
+                    # The delayed POST can still change Supervisor after a
+                    # readback of the old settings. Do not race another save.
+                    raise SettingsError(error_key, 503) from err
+        except BaseException:
+            # Cancellation can also leave a Supervisor request in flight.
+            self._options_write_uncertain = True
+            raise
 
     async def _restore_adapter_options(self, original: dict[str, Any], updated: dict[str, Any]) -> bool:
         """Undo only our own save, retaining unrelated concurrent administrator edits."""

@@ -9,6 +9,7 @@
       "service_identity_changed": "La borne détectée a changé. Recommencez la configuration.",
       "service_discovery_updated": "L’intégration existante utilise désormais la connexion de l’application détectée.",
       "multiple_service_apps": "Plusieurs applications Modbus ont été trouvées. Sélectionnez l’application détectée correspondante dans Appareils et services.",
+      "connection_settings_changed": "Les paramètres de connexion ont changé pendant l’authentification. Les identifiants vérifiés n’ont pas été enregistrés. Vérifiez la connexion actuelle avant de réessayer.",
       "reauth_not_supported": "Cette connexion n’utilise pas l’authentification TCP de l’adaptateur. Modifiez ses réglages via « Changer la connexion »."
     },
     "error": {

@@ -100,10 +100,6 @@ class LossStatistics:
         return self._previous_count + int(self._last_match is not None)
 
     @property
-    def last_session_id(self) -> str | None:
-        return self._current_session.session_id if self._current_session is not None else None
-
-    @property
     def association(self) -> str | None:
         return self._last_match.association if self.status == "matched" and self._last_match is not None else None
 

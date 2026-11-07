@@ -199,8 +199,14 @@ def test_reauth_never_saves_credentials_for_a_different_wallbox_or_changed_endpo
         entry.state = ConfigEntryState.LOADED
         entry.data = {**NETWORK_INPUT, "tcp_authentication": True, "tcp_auth_password": OLD_PASSWORD}
         flow._get_reauth_entry = lambda: entry
-        hass.config_entries.async_unload = AsyncMock(return_value=True)
+
+        async def unload(_entry_id, *, _lock=True):
+            entry.state = ConfigEntryState.NOT_LOADED
+            return True
+
+        hass.config_entries.async_unload = AsyncMock(side_effect=unload)
         hass.config_entries.async_setup = AsyncMock()
+        flow.async_abort = lambda **kwargs: {"type": "abort", **kwargs}
 
         async def probe(config):
             assert config.tcp_auth_password == NEW_PASSWORD
@@ -216,11 +222,104 @@ def test_reauth_never_saves_credentials_for_a_different_wallbox_or_changed_endpo
         flow._abort_if_unique_id_mismatch = mismatch
         if change == "endpoint":
             result = await flow.async_step_network_reauth({"tcp_auth_password": NEW_PASSWORD})
-            assert result["errors"] == {"base": "cannot_connect_network"}
+            assert result["reason"] == "connection_settings_changed"
             assert entry.data["host"] == "changed.invalid"
+            hass.config_entries.async_setup.assert_not_awaited()
         else:
             with pytest.raises(AbortFlow):
                 await flow.async_step_network_reauth({"tcp_auth_password": NEW_PASSWORD})
+            hass.config_entries.async_setup.assert_awaited_once_with(entry.entry_id, _lock=False)
         assert entry.data["tcp_auth_password"] == OLD_PASSWORD
-        hass.config_entries.async_setup.assert_awaited_once_with(entry.entry_id)
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("probe_outcome", ["success", "connection_error"])
+def test_inflight_network_reauth_yields_to_a_changed_entry(monkeypatch, tmp_path, probe_outcome):
+    async def run():
+        connections = []
+
+        class AuthenticatedTransport(FakeModbusClient):
+            def __init__(self, config, **_kwargs):
+                super().__init__(device_bank())
+                connections.append((config.host, config.tcp_auth_password))
+
+        started, release = asyncio.Event(), asyncio.Event()
+        task = None
+        with patch("custom_components.mennekes_amtron_rtu.device.client.WaveshareModbusTcpClient", AuthenticatedTransport):
+            hass = await _boot(tmp_path / "ha")
+            try:
+                manager = hass.config_entries.flow
+                flow = await manager.async_init(DOMAIN, context={"source": "user"})
+                flow = await manager.async_configure(flow["flow_id"], {"next_step_id": "network"})
+                flow = await manager.async_configure(flow["flow_id"], {**NETWORK_INPUT, "tcp_authentication": True})
+                result = await manager.async_configure(flow["flow_id"], {"tcp_auth_password": OLD_PASSWORD})
+                assert result["type"] == "create_entry"
+                await hass.async_block_till_done()
+                entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+                async def probe(config):
+                    assert config.host == NETWORK_INPUT["host"]
+                    assert config.tcp_auth_password == NEW_PASSWORD
+                    started.set()
+                    await release.wait()
+                    if probe_outcome == "connection_error":
+                        raise AmtronConnectionError("temporary outage")
+                    return DeviceIdentity(serial_number=entry.unique_id)
+
+                monkeypatch.setattr(config_flow, "async_test_connection", probe)
+                flow = await manager.async_init(
+                    DOMAIN, context={"source": "reauth", "entry_id": entry.entry_id}, data=dict(entry.data),
+                )
+                assert flow["step_id"] == "network_reauth"
+                task = asyncio.create_task(manager.async_configure(
+                    flow["flow_id"], {"tcp_auth_password": NEW_PASSWORD},
+                ))
+                await asyncio.wait_for(started.wait(), 5)
+                assert entry.state is ConfigEntryState.NOT_LOADED
+                replacement = {**entry.data, "host": "new-gateway.local", "tcp_auth_password": "Other123"}
+                hass.config_entries.async_update_entry(entry, data=replacement)
+                setup = asyncio.create_task(hass.config_entries.async_setup(entry.entry_id))
+                await asyncio.sleep(0)
+                assert not setup.done()
+
+                release.set()
+                result = await task
+                assert await setup
+                await hass.async_block_till_done()
+                assert result["type"] == "abort"
+                assert result["reason"] == "connection_settings_changed"
+                assert dict(entry.data) == replacement
+                assert entry.state is ConfigEntryState.LOADED
+                assert ("new-gateway.local", NEW_PASSWORD) not in connections
+                assert connections[-1] == ("new-gateway.local", "Other123")
+            finally:
+                release.set()
+                if task is not None:
+                    await asyncio.gather(task, return_exceptions=True)
+                await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), 60))
+
+
+def test_network_reauth_waiting_for_setup_lock_does_not_probe_a_newly_loaded_entry(monkeypatch):
+    async def run():
+        hass = FakeHass()
+        flow = Flow(hass)
+        entry = flow.reconfigure_entry
+        entry.state = ConfigEntryState.NOT_LOADED
+        entry.data = {**NETWORK_INPUT, "tcp_authentication": True, "tcp_auth_password": OLD_PASSWORD}
+        flow._get_reauth_entry = lambda: entry
+        flow.async_abort = lambda **kwargs: {"type": "abort", **kwargs}
+        probe = AsyncMock()
+        monkeypatch.setattr(config_flow, "async_test_connection", probe)
+        await entry.setup_lock.acquire()
+        try:
+            task = asyncio.create_task(flow.async_step_network_reauth({"tcp_auth_password": NEW_PASSWORD}))
+            await asyncio.sleep(0)
+            entry.state = ConfigEntryState.LOADED
+        finally:
+            entry.setup_lock.release()
+        assert await task == {"type": "abort", "reason": "connection_settings_changed"}
+        probe.assert_not_awaited()
+
+    asyncio.run(asyncio.wait_for(run(), 5))

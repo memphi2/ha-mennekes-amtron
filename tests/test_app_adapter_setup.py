@@ -142,6 +142,128 @@ def test_read_exposes_only_password_presence_and_reuses_it_only_for_same_endpoin
     asyncio.run(run())
 
 
+@pytest.mark.parametrize(("saved_host", "submitted_host", "canonical_host"), [
+    ("Box.Example.", "Box.Example.", "box.example"),
+    ("[2001:DB8::1]", "2001:db8::1", "2001:db8::1"),
+    ("täst.example", "xn--tst-qla.example", "xn--tst-qla.example"),
+])
+def test_saved_password_survives_equivalent_host_notation(
+    settings, saved_host, submitted_host, canonical_host
+):
+    settings.options.update(host=saved_host, tcp_authentication=True, tcp_auth_password=KEY)
+
+    async def run():
+        headers, payload = await prepare(settings)
+        payload.update(host=submitted_host, tcp_authentication=True, tcp_auth_password="")
+        response = await invoke(settings, request("POST", headers=headers, payload=payload))
+        assert response.status == 200
+        assert settings.options["host"] == canonical_host
+        assert settings.options["tcp_auth_password"] == KEY
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", ["timeout", "cancel"])
+def test_unconfirmed_ordinary_save_blocks_later_saves_but_allows_inspection(
+    settings, monkeypatch, failure
+):
+    async def run():
+        original_request = settings._request
+        writes = 0
+
+        async def interrupted(method, path, payload=None):
+            nonlocal writes
+            if method == "POST":
+                writes += 1
+                if failure == "cancel":
+                    raise asyncio.CancelledError
+                raise TimeoutError
+            return await original_request(method, path, payload)
+
+        monkeypatch.setattr(settings, "_request", interrupted)
+        headers, payload = await prepare(settings)
+        payload["device_id"] = 49
+        if failure == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await invoke(settings, request("POST", headers=headers, payload=payload))
+        else:
+            response = await invoke(settings, request("POST", headers=headers, payload=payload))
+            assert body(response) == {"error": "options_save_uncertain"}
+
+        state = body(await invoke(settings, request()))
+        assert state["write_blocked"] is True
+        headers, managed = await managed_request(settings)
+        managed["tcp_port"] = 1502
+        response = await invoke(settings, request("POST", headers=headers, payload=managed))
+        assert response.status == 503
+        assert body(response) == {"error": "options_save_uncertain"}
+        assert writes == 1  # no later Supervisor POST, even for an adapter apply
+
+    asyncio.run(run())
+
+
+def test_confirmed_ordinary_save_after_lost_reply_allows_another_save(settings):
+    settings.post_mode = "lost_reply"
+
+    async def run():
+        headers, payload = await prepare(settings)
+        payload["device_id"] = 49
+        response = await invoke(settings, request("POST", headers=headers, payload=payload))
+        assert response.status == 200
+        assert body(await invoke(settings, request()))["write_blocked"] is False
+        headers, payload = await prepare(settings)
+        payload["device_id"] = 48
+        assert (await invoke(settings, request("POST", headers=headers, payload=payload))).status == 200
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("managed", [False, True])
+def test_unchanged_options_do_not_post_or_overwrite_a_later_save(settings, monkeypatch, managed):
+    async def run():
+        settings.options["tcp_authentication"] = False
+        original = deepcopy(settings.options)
+        original_request = settings._request
+        delayed = None
+        writes = []
+        adapter = AdapterFixture()
+        monkeypatch.setattr(ui, "configure_gateway", adapter.configure)
+
+        async def simulate_delayed_noop(method, path, payload=None):
+            nonlocal delayed
+            if method == "POST":
+                writes.append(deepcopy(payload["options"]))
+                if payload["options"] == original:
+                    delayed = deepcopy(payload["options"])
+                    raise TimeoutError
+            return await original_request(method, path, payload)
+
+        monkeypatch.setattr(settings, "_request", simulate_delayed_noop)
+        headers, payload = await prepare(settings)
+        if managed:
+            detected = body(await inspect(settings, headers, payload["host"], payload["revision"]))
+            payload.update(
+                adapter_token=detected["adapter_token"], adapter_baudrate=57600,
+                adapter_frame="8n2", tcp_authentication=False, tcp_auth_password="",
+            )
+        result = await invoke(settings, request("POST", headers=headers, payload=payload))
+        assert result.status == 200
+        assert settings.options == original
+        if managed:
+            assert adapter.committed  # adapter configuration is still applied
+
+        headers, payload = await prepare(settings)
+        payload["device_id"] = 49
+        assert (await invoke(settings, request("POST", headers=headers, payload=payload))).status == 200
+        if delayed is not None:
+            settings.options = delayed  # the earlier request completes late
+        assert settings.options["device_id"] == 49
+        assert delayed is None
+        assert len(writes) == 1
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("change", ["csrf", "user", "admin", "origin"])
 def test_adapter_inspection_requires_admin_and_matching_csrf(settings, change):
     async def run():
@@ -476,6 +598,15 @@ def test_supervisor_post_may_finish_after_client_timeout_or_cancellation(setting
                     assert not adapter.changed
                     assert not adapter.committed
                     assert state["options"] == original
+                    assert body(await invoke(app, request()))["write_blocked"] is True
+                    new_headers, new_payload = await managed_request(app)
+                    new_payload["tcp_port"] = 1502
+                    rejected = await invoke(app, request("POST", headers=new_headers, payload=new_payload))
+                    assert rejected.status == 503
+                    assert body(rejected) == {"error": "options_save_uncertain"}
+                    assert len(adapter.calls) == 1
+                else:
+                    assert body(await invoke(app, request()))["write_blocked"] is False
                 with pytest.raises(AmtronConnectionError, match="restart"):
                     await client.async_connect()
                 allow_completion.set()

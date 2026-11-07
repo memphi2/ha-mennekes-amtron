@@ -9,6 +9,7 @@
       "service_identity_changed": "De gevonden wallbox is gewijzigd. Begin de configuratie opnieuw.",
       "service_discovery_updated": "De bestaande integratie gebruikt nu de verbinding met de gevonden app.",
       "multiple_service_apps": "Er zijn meerdere Modbus-apps gevonden. Selecteer de juiste gevonden app onder Apparaten & diensten.",
+      "connection_settings_changed": "De verbindingsinstellingen zijn tijdens de aanmelding gewijzigd. De gecontroleerde aanmeldgegevens zijn niet opgeslagen. Controleer de huidige verbinding voordat je het opnieuw probeert.",
       "reauth_not_supported": "Deze verbinding gebruikt geen TCP-aanmelding bij de adapter. Werk de instellingen bij via Verbinding wijzigen."
     },
     "error": {
