@@ -33,6 +33,20 @@ progress. Named commands retain device guards; the API has no raw
 register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 
+Explicit target saves finish before propagating cancellation, including time
+spent waiting for a storage lock. The corresponding in-memory model and command
+invalidation must finish with that save. This keeps a cancelled request from
+leaving a different target active until the next restart.
+
+An atomic replacement can succeed before its directory synchronization fails.
+The service records that phase directly; the HA store checks the resulting file.
+A confirmed replacement keeps the visible candidate active while reporting
+unconfirmed durability, and the write cache cannot suppress a retry. If the
+resulting file cannot be read, target controllers block starts and request a
+pause until a successful save resolves the uncertainty; departure planning also
+stays blocked. This process-local protection cannot prove what a damaged
+filesystem will retain after a crash or power loss.
+
 Direct USB and LAN modes remain available without the service. A service
 entry talks only to the service API; it never opens the USB or gateway Modbus
 connection or starts a local heartbeat/recovery task.
@@ -66,8 +80,11 @@ the old owner stopped. See [adapter setup and limitations](lan-adapters.md).
 Since **0.6.0b1**, an administrator connection page runs on a separate
 internal Ingress listener. It requires stable Supervisor 2026.11.0+, enumerates
 only locally mapped serial adapters and saves connection fields through the
-Supervisor API for this app. It neither exposes the service token to the browser
-nor changes the live transport; the user restarts the app after saving.
+Supervisor API for this app. It does not expose the service token to the browser.
+Ordinary connection saves take effect after an app restart. Explicit LAN-adapter
+setup stops the old connection before changing the adapter; local validation
+errors leave the existing connection running. The user restarts the app after
+a successful adapter change to resume Modbus with the saved settings.
 Other app settings remain in the native Configuration tab.
 
 An app with missing connection fields starts only its setup interface and health
