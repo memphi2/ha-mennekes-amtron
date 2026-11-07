@@ -32,7 +32,7 @@ service-connection failures now show Repairs notices that clear after recovery.
 
 ## Feature settings after an update
 
-The following profile, automatic-selection and dialog improvements are
+The following profile, automatic-selection, Virtual Plug & Charge and dialog improvements are
 **unreleased changes in this branch**. Published beta 0.7.0b4 does not contain
 them. Existing sources remain usable until you deliberately adopt new setup.
 
@@ -54,6 +54,13 @@ its entity identity and existing automations are retained. BavarianData is the
 first implemented vehicle adapter. Generic HA entity sources remain
 available for other vehicle integrations; manual and calendar departure work
 independently of a provider.
+
+Virtual Plug & Charge is separately optional and remains off after an update.
+It needs detection sources and permission for each participating profile;
+automatic profile selection alone does not enable it. Service mode also needs
+an app that supports the gate. Follow the [setup steps](vehicle-setup.md#optional-virtual-plug--charge)
+before enabling it; enabling may stop an existing charge while detection is
+pending. Disabling the feature does not resume charging.
 
 Departure planning has its own enable setting. Disabling it clears its active
 trip and cancels its queued commands while preserving the ordinary percentage

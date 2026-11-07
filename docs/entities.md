@@ -70,6 +70,13 @@ a communication error and a new confirmed response. Before the first response
 it is unknown; loss of the connection is still handled by normal availability.
 It exposes no frequently changing counters or timestamps.
 
+The **Virtual Plug & Charge** status sensor is optional and unreleased in this branch.
+When the feature is enabled, it shows whether vehicle detection, profile
+permission or charging release is still pending, whether another control blocks
+release, or whether the observed connection is authorized. Authorization does
+not mean that the vehicle is drawing power. The sensor has no per-poll timestamps
+or session-token attributes. See [setup and status help](vehicle-setup.md#optional-virtual-plug--charge).
+
 ## Controls
 
 For availability, use the connection table above. Service controls follow the

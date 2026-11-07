@@ -15,7 +15,7 @@ targets and schedules only when you want them:
 - [Losses and costs](charging-estimates.md)
 
 This branch also documents unreleased improvements. Vehicle profiles, automatic
-vehicle selection and app live debugging are marked separately; see
+vehicle selection, Virtual Plug & Charge and app live debugging are marked separately; see
 [version availability](README.md#versions-and-feature-availability).
 
 ## Optional charging losses and costs
@@ -131,7 +131,7 @@ Choose one of five independent sections:
 | Section | What you configure |
 |---|---|
 | **Wallbox** | Control mode, polling, current cap and transition timing, as applicable to the connection |
-| **Vehicle** | Vehicle sources, optional profiles/selection and the percentage target and charge limit |
+| **Vehicle** | Vehicle sources, optional profiles/selection, Virtual Plug & Charge and the percentage target and charge limit |
 | **Next departure** | Optional planning for the next trip, battery capacity and the departure sources you want |
 | **Charging costs** | A fixed price or price entity; German network tariffs when applicable |
 | **Charging losses** | A last-charge energy entity or a supported vehicle history adapter |
@@ -343,6 +343,19 @@ turns the automatic mode off. These signals are a selection aid, not vehicle
 identity supplied by the wallbox.
 
 [Configure automatic selection and understand its limits](vehicle-setup.md#optional-automatic-vehicle-selection).
+
+### Optional Virtual Plug & Charge
+
+**Unreleased and off by default.** Separately enable this feature and permit the
+profiles that may receive automatic charging release. It needs an unambiguous
+cable/home match for the active car and a fresh cable report after the wallbox
+observes the connection. Manual profile selection alone does not grant permission.
+Existing pauses, locks, disabled release and reached targets remain effective.
+The status sensor explains what it is waiting for.
+
+Enabling it may stop a charge while recognition is pending. Disabling it does
+not resume charging; use **Charging release** explicitly afterwards.
+[Set up Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge).
 
 ## Optional vehicle percentage target
 

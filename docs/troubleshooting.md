@@ -14,6 +14,7 @@ connection and HA connects to the app's HTTP API.
 | Charging does not follow the slider or pause switch | [Charging current](#the-charging-current-does-not-follow) |
 | Sensors became unavailable | [Missing readings](#some-sensors-became-unavailable) |
 | Vehicle selection is empty or chooses no car | [Vehicle profiles and automatic selection](#vehicle-profiles-and-automatic-selection) |
+| Virtual Plug & Charge is waiting | [Vehicle recognition and charging permission](#virtual-plug--charge-is-waiting) |
 | A percentage target or departure time is missing or not followed | [Targets and departure planning](#targets-and-departure-planning) |
 | A loss or cost estimate is unknown | [Charging estimates](#loss-or-cost-estimates-are-unknown) |
 | A new menu or debug panel is absent | [Feature availability](#a-documented-feature-is-missing) |
@@ -28,7 +29,7 @@ For installation, downloads and updates, see [Installation and updates](installa
 ## A documented feature is missing
 
 Check [versions and feature availability](README.md#versions-and-feature-availability).
-Central vehicle profiles, automatic profile selection and the app live-debug
+Central vehicle profiles, automatic profile selection, Virtual Plug & Charge and the app live-debug
 panel are currently **unreleased**, so installing published beta 0.7.0b4 does
 not add them. Do not delete and recreate the wallbox to reveal a new feature.
 
@@ -340,6 +341,21 @@ New positive matches settle for three seconds. Reports older than 30 minutes,
 unknown/unavailable states and an uncertain GPS position at the Home boundary
 cannot establish a positive match. See [vehicle setup](vehicle-setup.md) for the
 complete signal and freshness rules.
+
+## Virtual Plug & Charge is waiting
+
+**Unreleased in this branch.** Check its status on the wallbox device.
+
+| Symptom | What to check |
+|---|---|
+| No recognized vehicle | Select the intended profile or use automatic selection. Its cable and home signals must give one unambiguous match. |
+| The selected car is not permitted | Enable its separate permission under Configure → Vehicle → Virtual Plug & Charge. A source or vehicle identity change clears that permission. |
+| Cable is connected, but permission is still pending | The cable report must be newer than the wallbox's observed connection. Wait for the normal vehicle-integration update; a manual profile choice does not replace this evidence. |
+| Permission is granted, but charging has not started | Check the manual pause, wallbox lock, Charging release, reached goals and local RFID requirement. Granting permission does not remove them. |
+| It waits again after the app restarted or the bus was lost | The previous connection grant was invalidated. Fresh physical connection and vehicle evidence are required. An HA-only restart leaves the running app's existing grant intact. |
+| Disabling the feature did not restart charging | Expected: use Charging release explicitly, and resume only if any remaining pause or lock is also unwanted. |
+
+[Full setup and limits](vehicle-setup.md#optional-virtual-plug--charge).
 
 ## Targets and departure planning
 

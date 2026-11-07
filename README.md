@@ -75,7 +75,7 @@ setting belongs and why a requested change may wait.
 ## Development and releases
 
 **This branch includes unreleased changes.** Central vehicle profiles, optional
-automatic vehicle selection, live app Modbus debugging and the corrected
+automatic vehicle selection, Virtual Plug & Charge, live app Modbus debugging and the corrected
 Supervisor 2026.10.4 compatibility are not in published beta 0.7.0b4. The published
 stable version is 0.6.1. See [feature availability](docs/README.md#versions-and-feature-availability)
 and [release notes](CHANGELOG.md) before following a feature-specific guide.

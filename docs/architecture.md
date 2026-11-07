@@ -264,6 +264,39 @@ draft.
 Departure activation is independent of merely configuring an SoC sensor;
 disabling it clears the trip and cancels only its owned queued commands.
 
+### Virtual Plug & Charge separates evidence from physical permission
+
+This optional feature has two independent decisions: HA evaluates the active
+profile's permission and local cable/home evidence; the bus owner enforces a
+gate for one observed physical connection. Automatic profile selection remains
+optional. Manually choosing a profile never supplies identity evidence.
+
+HA requires a unique candidate matching the active permitted profile and a
+cable report after the current connection was observed. The adapter uses an
+upstream cable timestamp when available, otherwise HA's report time. It does
+not trigger a cloud update. The observation remains heuristic: upstream restore
+behavior cannot always be detected, and Modbus polling cannot prove that no
+unobserved vehicle change occurred between reads.
+
+The gate's enabled setting is durable; connection tokens and grants stay in RAM.
+A token belongs to the current observation cycle and cannot authorize a later
+one. A disconnect or unknown physical connection invalidates it. The service
+continues enforcing the gate and retains an existing grant while HA restarts;
+the service itself restarting loses that grant. Direct mode has the equivalent
+runtime boundary at its HA entry.
+
+Charging permission composes with existing current, pause, lock and goal
+guards. It does not erase a manual pause or an already reached target, and error
+recovery does not provide another path around it. A cloud-data interruption
+alone does not revoke an already granted physical connection. Enabling the gate
+requests release closure; disabling it does not restore charging release.
+Only configuration changes are persisted, so ordinary evidence reports and cycle
+tokens create neither per-poll storage writes nor Recorder attributes.
+
+The gate uses the documented EMS release register, not an RFID write or a
+vehicle authentication protocol. Local RFID authorization remains independent;
+see [limits and prerequisites](safety.md#virtual-plug--charge).
+
 ### One lock, because Modbus RTU has one master
 
 Poll snapshots carry an internal current-write generation. A current write

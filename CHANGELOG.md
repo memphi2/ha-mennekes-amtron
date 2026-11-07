@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Add optional Virtual Plug & Charge: permit individual vehicle profiles and
+  release a connection only after matching fresh cable/home evidence. Keep
+  manual pauses, locks and reached targets effective, with service-owned
+  permission across HA Core restarts and a clear status in Home Assistant.
+
 - Reorganize setup and everyday documentation around user tasks, with dedicated
   vehicle/departure guides, examples, missing-data help and clear distinctions
   between published features and development changes.
