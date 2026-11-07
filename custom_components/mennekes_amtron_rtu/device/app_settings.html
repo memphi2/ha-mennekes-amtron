@@ -51,16 +51,57 @@
         <label for="tcp_port" data-i18n="port">Adapter TCP port</label>
         <input id="tcp_port" name="tcp_port" type="number" min="1" max="65535" step="1" value="502" required>
         <p class="hint" data-i18n="lan_hint">Set the serial baud rate and format on the LAN adapter. Saving LAN settings removes any old USB adapter selection.</p>
+        <button id="detect_adapter" type="button" class="secondary" data-i18n="detect_adapter">Set up LAN adapter</button>
+        <section id="adapter_preview" class="adapter-preview" hidden aria-live="polite">
+          <h2 data-i18n="adapter_detected">Recognized adapter</h2>
+          <p id="adapter_identity"></p>
+          <p id="adapter_current" class="hint"></p>
+          <p id="adapter_unsupported" class="hint" data-i18n="gateway_unsupported" hidden></p>
+          <label class="check" for="apply_adapter">
+            <input id="apply_adapter" type="checkbox">
+            <span data-i18n="apply_adapter">Apply adapter settings when saving</span>
+          </label>
+          <fieldset id="adapter_fields" hidden disabled>
+            <legend data-i18n="adapter_target">Adapter serial settings</legend>
+            <div class="columns">
+              <div>
+                <label for="adapter_baudrate" data-i18n="baudrate">Baud rate</label>
+                <select id="adapter_baudrate" required>
+                  <option>9600</option><option>14400</option><option>19200</option><option>28800</option>
+                  <option>38400</option><option>57600</option>
+                </select>
+              </div>
+              <div>
+                <label for="adapter_frame" data-i18n="frame">Serial format</label>
+                <select id="adapter_frame" required>
+                  <option value="8n2">8N2</option><option value="8e1">8E1</option><option value="8o1">8O1</option>
+                </select>
+              </div>
+            </div>
+            <p class="hint" data-i18n="adapter_apply_hint">Saving applies the selected TCP port, connection mode, login and serial settings to the adapter immediately. Its existing web password is not changed.</p>
+          </fieldset>
+        </section>
+        <label class="check" for="tcp_authentication">
+          <input id="tcp_authentication" name="tcp_authentication" type="checkbox">
+          <span data-i18n="tcp_authentication">TCP login</span>
+        </label>
+        <p class="hint" data-i18n="auth_hint">Use the existing web password of a compatible adapter. For an adapter already configured manually, no setup step is needed.</p>
+        <div id="password_fields" hidden>
+          <label for="tcp_auth_password" data-i18n="tcp_auth_password">Existing adapter web password</label>
+          <input id="tcp_auth_password" name="tcp_auth_password" type="password" maxlength="9" pattern="[!-~]{1,9}" autocomplete="off" spellcheck="false" disabled>
+          <p id="password_hint" class="hint"></p>
+        </div>
+        <p class="hint" data-i18n="auth_security">Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.</p>
       </fieldset>
       <label for="device_id" data-i18n="address">Wallbox Modbus address</label>
       <input id="device_id" name="device_id" type="number" min="10" max="50" step="1" value="50" required>
-      <p class="hint" data-i18n="restart_hint">Saving keeps the current connection running. Restart the app afterwards to apply the change; this briefly interrupts its heartbeat.</p>
+      <p id="restart_hint" class="hint" data-i18n="restart_hint">Saving keeps the current connection running. Restart the app afterwards to apply the change; this briefly interrupts its heartbeat.</p>
       <div class="actions">
         <button id="reload" type="button" class="secondary" data-i18n="reload">Reload settings and adapters</button>
         <button id="save" type="submit" data-i18n="save">Save connection</button>
       </div>
     </form>
-    <footer data-i18n="security">Available to Home Assistant administrators with Supervisor 2026.11.0 or newer. No device or service credentials are needed here.</footer>
+    <footer data-i18n="security">Available to Home Assistant administrators with Supervisor 2026.11.0 or newer. No service token is needed here.</footer>
   </main>
 </body>
 </html>

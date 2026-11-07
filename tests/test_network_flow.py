@@ -38,8 +38,9 @@ NETWORK_INPUT = {
 
 def test_network_schema_exposes_only_gateway_fields():
     schema = network_schema()
-    assert {marker.schema for marker in schema.schema} == set(NETWORK_INPUT)
-    assert schema({"host": "wallbox-gateway.local"}) == NETWORK_INPUT
+    defaults = {**NETWORK_INPUT, "tcp_authentication": False, "configure_gateway": False}
+    assert {marker.schema for marker in schema.schema} == set(defaults)
+    assert schema({"host": "wallbox-gateway.local"}) == defaults
     protocol = next(
         selector for marker, selector in schema.schema.items()
         if marker.schema == "connection_type"
@@ -49,7 +50,7 @@ def test_network_schema_exposes_only_gateway_fields():
 
 def test_network_schema_accepts_integral_ui_numbers():
     data = network_schema()({**NETWORK_INPUT, "tcp_port": 502.0, "device_id": 50.0})
-    assert data == NETWORK_INPUT
+    assert data == {**NETWORK_INPUT, "tcp_authentication": False, "configure_gateway": False}
     assert type(data["tcp_port"]) is int
     assert type(data["device_id"]) is int
 
@@ -174,7 +175,9 @@ def test_network_reconfigure_from_another_backend_defaults_to_a_network_protocol
         flow.reconfigure_entry.data = data
         result = await flow.async_step_network_reconfigure()
         assert "connection_type" not in _suggested(result)
-        assert result["data_schema"]({"host": "wallbox-gateway.local"}) == NETWORK_INPUT
+        assert result["data_schema"]({"host": "wallbox-gateway.local"}) == {
+            **NETWORK_INPUT, "tcp_authentication": False, "configure_gateway": False,
+        }
 
     asyncio.run(run())
 

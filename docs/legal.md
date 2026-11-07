@@ -81,17 +81,41 @@ The legal gate fails if either hash changes without review.
 
 ## Runtime dependencies
 
-`manifest.json` requests exactly one runtime dependency, `pymodbus`, and
-declares it as a minimum rather than an exact pin so Home Assistant keeps
-owning the resolved version. `scripts/check_pymodbus_pin.py` enforces that.
-pymodbus is published on PyPI under the BSD-3-Clause license; it is not
-vendored into this repository.
+`manifest.json` requests `pymodbus[serial]>=3.13.1` and
+`cryptography>=48.0.1`. Both are minimum requirements so Home Assistant keeps
+owning the resolved versions. `scripts/check_pymodbus_pin.py` checks compatibility
+with HA's pymodbus version. pymodbus is published under the BSD-3-Clause license.
+The optional LAN-adapter login uses PyCA cryptography, available under
+[Apache-2.0 OR BSD-3-Clause](https://github.com/pyca/cryptography/blob/main/LICENSE).
+Neither dependency is vendored into this repository.
 
 The standalone service additionally depends on `aiohttp`; Home Assistant
 already provides it for the integration client. Python packages and their
 license notices are installed from their upstream distributions. The container
 build uses `requirements-service.txt`; the shared project-owned driver is not
 a third-party vendored payload.
+
+## Optional Waveshare adapter support
+
+The adapter implementation is project-written interoperability code. It uses
+protocol field definitions and independently checked behavior; no vendor
+application, SDK source, firmware image, document extraction or captured device
+configuration is distributed in this repository. Tests construct synthetic
+parameter images, identities and credentials rather than retaining device data.
+
+Sources are the parameter-management documentation and tools linked from the
+[Waveshare single-channel adapter wiki](https://www.waveshare.com/wiki/RS485_TO_POE_ETH_(B)),
+plus the manufacturer-supplied
+[TCP Secure Handshake Guide](https://drive.google.com/file/d/1NRPLhAJzy-iUi_50va8iRjyM60u2iHa5/view)
+and its [reference script](https://drive.google.com/file/d/1Gh0A4JFFqFNti8vNKh5M1ddvdUcN4CpZ/view).
+Those materials were used as protocol references, not copied into the runtime
+implementation. The project license does not grant rights to these external
+materials or Waveshare trademarks.
+
+Support is constrained to the documented family and verified firmware/layout;
+see [supported LAN adapters and verification limits](lan-adapters.md).
+The TCP handshake has a confirmed firmware weakness and does not encrypt
+Modbus traffic. Compatibility support is not a security certification.
 
 ## Repository gate
 

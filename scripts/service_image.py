@@ -71,6 +71,14 @@ def check_installed_assets(container: str) -> None:
     )
 
 
+def check_installed_authentication(container: str) -> None:
+    """Exercise the installed cipher and full login on loopback under policy."""
+    run(
+        "docker", "exec", container, "python", "-c",
+        (ROOT / "scripts/check_service_auth.py").read_text(),
+    )
+
+
 def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
     """Exercise the installed container API with no hardware or HA dependency."""
     if apparmor_profile is not None and (
@@ -174,6 +182,7 @@ def smoke(image: str, *, apparmor_profile: str | None = None) -> None:
             # the source checkout. This runs for both native architecture builds
             # under their actual AppArmor profile before any candidate is pushed.
             check_installed_assets(container)
+            check_installed_authentication(container)
             run("docker", "stop", "--time", "15", container)
             if (
                 json.loads(run("docker", "inspect", container))[0]["State"]["ExitCode"]

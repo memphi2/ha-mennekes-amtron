@@ -1,5 +1,19 @@
 # Changes
 
+## 0.7.0b2
+
+- Keep the old connection stopped when a delayed adapter update cannot be ruled
+  out after a failed setup operation.
+- Add optional Waveshare TCP login and guided LAN-adapter detection and setup.
+- Verify and restore communication settings when applying or saving fails, and
+  prevent reconnecting with outdated settings until the app is restarted.
+- Keep the existing adapter web password private and stop repeated login
+  attempts after a confirmed password rejection.
+- Include the connection page in the released Docker image; test the release
+  build context on both supported architectures.
+- Cancel planned charging commands after a confirmed vehicle disconnection,
+  even when Home Assistant is unavailable.
+
 ## 0.7.0b1
 
 Beta update; **0.6.1 remains stable**. Available through **#apps-beta** only.

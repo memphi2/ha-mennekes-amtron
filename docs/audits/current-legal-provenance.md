@@ -1,5 +1,34 @@
 # Current Legal and Provenance Audit Snapshot
 
+## LAN adapter development addendum, 2026-11-07
+
+The optional compatible-adapter setup adds targeted UDP parameter management,
+HTTP model identification and a TCP password handshake for the explicitly
+supported Waveshare single-channel family. All communication remains directed
+to the configured endpoint. Configuration changes require explicit setup;
+ordinary connection startup and reconnect never change adapter settings.
+
+The implementation is independently written from protocol facts, manufacturer
+references and verified behavior. Vendor scripts, SDKs, binaries, document
+extractions, private captures and device configuration images remain outside the
+repository. Regression fixtures use synthetic identities and credentials.
+Source links and the new **cryptography** dependency's dual license are recorded
+in [legal notes](../legal.md#optional-waveshare-adapter-support).
+
+Physical verification covers **RS485 TO POE ETH (B), firmware 1.523**. The ETH B
+and ETH C profiles rely on the manufacturer's same-software statement and
+synthetic tests; other firmware/layouts are refused for automatic setup. This
+is separate from wallbox-connected acceptance testing. A firmware handshake
+weakness was reproduced as login acceptance without a password on the detached
+adapter; serial command access through that bypass was not tested. TCP login
+adds no traffic encryption and is not a substitute for network isolation.
+
+The historical counts and network descriptions below predate this addition.
+Current user behavior and limits are in the [LAN adapter guide](../lan-adapters.md),
+[security policy](../../SECURITY.md) and [privacy policy](../../PRIVACY.md).
+
+## Historical evidence
+
 Development on 2026-11-05 also adds outgoing connections through transparent
 RTU-over-TCP adapters and translating Modbus TCP-to-RTU gateways. This changes
 the network trust boundary without expanding the documented RTU wallbox/model

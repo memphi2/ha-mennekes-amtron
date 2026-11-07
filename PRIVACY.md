@@ -9,14 +9,20 @@ USB/serial adapter or an outgoing TCP connection to a configured LAN-to-RS-485
 gateway. Service mode exchanges wallbox readings and control commands
 with the configured Modbus service URL. Keep that service on a trusted private
 network, or protect its HTTP connection with HTTPS. The gateway Modbus connection
-itself is unencrypted and unauthenticated; restrict it to a trusted private LAN.
+itself is unencrypted and has no authentication by default. The optional
+Waveshare login has known protocol weaknesses and does not provide TLS
+protection; restrict gateway access to a trusted private LAN. See
+[Security](SECURITY.md#threat-model).
 
 ## What is stored in Home Assistant
 
 - The serial port path, bus parameters and Modbus device address, in the
   config entry for direct USB mode. Direct LAN mode stores the gateway host,
-  TCP port, connection protocol and device address. Service mode stores the service URL
-  and access token in the config entry; protect HA backups accordingly.
+  TCP port, connection protocol and device address. When optional TCP
+  authentication is enabled, it also stores the adapter's existing password.
+  That password is not retained when authentication is disabled. Service mode
+  stores the service URL and access token in the config entry; protect HA
+  backups accordingly.
 - The wallbox serial number, if the firmware exposes it, as the config entry's
   unique id and in the device registry.
 - Register values, as entity states and in Home Assistant's recorder database
@@ -40,7 +46,8 @@ itself is unencrypted and unauthenticated; restrict it to a trusted private LAN.
 ## What the independent service stores
 
 Standalone service configuration contains its USB or LAN connection settings and
-access token. LAN settings include the gateway host, TCP port and protocol.
+access token. LAN settings include the gateway host, TCP port and protocol,
+plus the existing adapter password when optional TCP authentication is enabled.
 The Supervisor app exclusively manages its own token in an owner-only
 `service-token` file, reused across restarts. Supervisor stores the app's discovery
 address and token and transfers them locally to Home Assistant; no network
@@ -55,15 +62,28 @@ The app's **connection page**, available from 0.6.0b1, displays locally mapped a
 names and paths to an authenticated administrator through Supervisor Ingress.
 Those names can contain the adapter's serial number. Connection changes are
 saved in the app's Supervisor options. The page does not send the service token
-to the browser, request cloud data or keep a device-scan history. The HA user ID
-is used transiently for access and request validation, without being saved or
-logged by the page.
+or saved adapter password to the browser. It reports only whether a password
+is present; a blank password field reuses it only for the same gateway host
+and TCP port. A newly entered password is sent locally to the app for the
+explicitly requested configuration.
+
+Optional adapter detection queries only the entered endpoint and shows its
+model, firmware, native identifier and connection settings. A small temporary
+in-memory cache binds detected devices to the administrator and current app
+options; detection tokens expire after five minutes. The raw adapter settings
+are not returned through the API or saved as a scan history. Explicit setup
+may update the selected adapter's serial, TCP and authentication settings; it
+does not change its existing password. This work makes no cloud requests and
+does not run periodically or during normal reconnects. The HA user ID is used
+transiently for access and request validation, without being saved or logged
+by the page.
 
 ## What diagnostics contain
 
 The diagnostics download is built from an allowlist. It deliberately omits:
 
 - the service access token and URL;
+- the optional adapter password and authentication challenge/response frames;
 - the LAN gateway hostname/IP address;
 - the serial port path — a `/dev/serial/by-id/...` path contains the USB
   adapter's serial number. Direct USB mode reports only a category (`by-id`,

@@ -7,7 +7,8 @@ Direct USB and LAN connections remain available without the extra service.
 
 The service can reach the RTU wallbox through **USB or a LAN-to-RS-485 adapter**.
 LAN needs no USB device on its host; see [LAN setup](network-gateway.md) for the
-two supported gateway protocols.
+two supported protocols. Compatible Waveshare adapters also have optional
+[configuration from the app](lan-adapters.md#service-app).
 
 **Stable service: 0.6.1.** Integration 0.6.1 requires **service 0.6.1 or newer
 with API 2**. Update the app first. Later integration and service versions can
@@ -68,9 +69,9 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 The repository above provides stable **0.6.1**. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog provides beta
-**0.7.0b1**. Existing beta-catalog installations update in place. To switch
+**0.7.0b2**. Existing beta-catalog installations update in place. To switch
 catalogs, follow the [channel handover](#updates) and
-[beta update guide](upgrading.md#trying-070b1).
+[beta update guide](upgrading.md#trying-070b2).
 
 ### 3. Configure and start read-only
 
@@ -96,7 +97,7 @@ options**. Those older forms do not rearrange fields when the connection changes
 | Serial adapter | USB only: select the adapter, preferably `/dev/serial/by-id/...`. Leave unset for LAN. |
 | Adapter host / IP + TCP port | LAN: gateway hostname/IP and listening port, default **502**. No URL scheme or path. For USB, leave the host empty. |
 | Wallbox address | The configured address; factory default **50**. |
-| Baud rate / serial frame | USB only: match the wallbox; factory defaults **57600 / 8n2**. For LAN, configure these on the gateway itself. |
+| Baud rate / serial frame | USB only: match the wallbox; factory defaults **57600 / 8n2**. For LAN, configure these on the adapter or use [compatible adapter setup](lan-adapters.md#service-app). |
 | Read-only | Leave **on** while checking the readings. |
 | Current cap | The permitted charging current for your installation; default **6 A**. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. The measurement interval helps limit database traffic. |
@@ -164,7 +165,7 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 | Enable or disable all writes | Change **Read-only**, save and restart the app. HA needs no restart. Read-only stops the heartbeat as well as writes. |
 | Change Modbus polling intervals or the service current cap | Change the app configuration, save and restart the app. |
 | Set the time between charging changes | Set **Minimum time between state changes** in the app, in seconds; default **300**, range **0–3600**. Save and restart the app. |
-| Change USB/LAN connection settings | Open the app configuration, save and restart the app. For LAN, serial baud/frame belong on the gateway. |
+| Change USB/LAN connection settings | Open the app configuration, save and restart the app. For LAN, use the adapter interface or optional [adapter setup](lan-adapters.md#service-app). |
 | Change how often HA reads app status, or lower HA's current cap | Open the integration options. |
 | Hand the USB or LAN connection to another master | Stop the app. Disabling its HA entry or enabling read-only does not release the bus. |
 
@@ -265,8 +266,8 @@ The token, saved charging state and USB settings are retained;
 check the [connection choice](upgrading.md#app-connection-choice) before starting.
 LAN remains an optional connection change.
 
-Stable **0.6.1** is published to `#apps`; beta **0.7.0b1** is published to
-`#apps-beta`. For the shared control fixes in 0.7.0b1, update that beta app too;
+Stable **0.6.1** is published to `#apps`; beta **0.7.0b2** is published to
+`#apps-beta`. For the shared control fixes in 0.7.0b2, update that beta app too;
 the minimum compatible service remains **0.6.1 with API 2**. An existing beta
 app updates in place with its data intact. When updating from 0.5.1, check the
 [connection-choice change](upgrading.md#app-connection-choice).
@@ -294,6 +295,10 @@ Keep the old app and backup until the handover is verified.
 
 The log shows service startup, USB/LAN connection and heartbeat start/stop.
 Connection and heartbeat failures are logged when their state changes.
+Home Assistant also shows a repair after a continuous 60-second heartbeat or
+service-connection problem in a managed, write-enabled setup. It clears
+automatically on recovery. An unreachable service does not prove its heartbeat
+has stopped; see [connection repairs](troubleshooting.md#heartbeat-or-service-connection-repair).
 Watchdog can restart an exited app; recurring failures still need their cause fixed.
 
 For rejected data, the HA log names the affected field without exposing the

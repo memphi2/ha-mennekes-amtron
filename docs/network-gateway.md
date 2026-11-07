@@ -23,7 +23,12 @@ integration's LAN form. The app's default **USB / RS-485** is for a local adapte
 Set the adapter to accept a TCP client connection. Configure its RS-485 baud
 rate and frame to match the wallbox: factory defaults are **57600 baud, 8 data
 bits, no parity, 2 stop bits**. These settings belong on the adapter for LAN
-connections. The HA LAN form does not configure them remotely.
+connections. For recognized Waveshare models, optional [LAN adapter setup](lan-adapters.md)
+can apply those settings from HA or the app after confirmation.
+Manual setup must also disable storage/cache polling, automatic serial queries,
+registration/heartbeat packets and serial-buffer replay. A converting adapter
+must use request/reply mode; the manufacturer's default storage mode can issue
+its own requests and is unsuitable for exclusive bus ownership.
 
 Use the wallbox's Modbus address behind the gateway: factory default **50**,
 supported range **10–50**. Check that the gateway forwards that address unchanged.
@@ -113,8 +118,10 @@ the wallbox through LAN.
 
 ## Network access and troubleshooting
 
-The adapter connection has **no Modbus authentication or encryption**. Keep it
-on a trusted private network, restrict its TCP port to the selected HA/service
+Ordinary adapter connections have no authentication or encryption. Supported
+Waveshare adapters optionally offer [TCP login](lan-adapters.md#tcp-login-and-its-limits),
+which does not encrypt traffic and has a known firmware weakness. Keep the
+adapter on a trusted private network, restrict access to the selected HA/service
 host, and do not expose it to the Internet. The service token protects the
 HA-to-service API; it does not protect the gateway's Modbus port.
 

@@ -92,22 +92,28 @@ def test_diagnostics_do_not_expose_identifiers_as_words_or_errors() -> None:
 
 @pytest.mark.parametrize("connection_type", ["rtu_over_tcp", "modbus_tcp"])
 @pytest.mark.parametrize("host", ["wallbox.private.lan", "192.168.15.17", "fd00::1234"])
-def test_network_diagnostics_report_protocol_without_adapter_address(connection_type, host):
+@pytest.mark.parametrize("authenticated", [False, True])
+def test_network_diagnostics_report_protocol_without_adapter_address(connection_type, host, authenticated):
     async def run():
         hass, entry, _transport = await build_runtime()
         client = entry.runtime_data.client
-        config = NetworkConfig(host, connection_type=connection_type)
+        auth_key = "testkey5" if authenticated else ""
+        config = NetworkConfig(
+            host, connection_type=connection_type,
+            tcp_authentication=authenticated, tcp_auth_password=auth_key,
+        )
         client._config = config
         entry.runtime_data.diagnostics.last_error = (
-            f"cannot open {config.port}: cannot connect to {host}"
+            f"cannot open {config.port}: cannot connect to {host} with {auth_key}"
         )
         client.async_read_words = AsyncMock(
-            side_effect=AmtronConnectionError(f"connection to {host} lost")
+            side_effect=AmtronConnectionError(f"connection to {host} lost with {auth_key}")
         )
         try:
             dump = await async_get_config_entry_diagnostics(hass, entry)
             assert dump["bus"] == {
                 "transport": connection_type,
+                "tcp_authentication": authenticated,
                 "connected": True,
                 "device_id": 50,
                 "response_timeout_seconds": 1.0,
@@ -116,6 +122,8 @@ def test_network_diagnostics_report_protocol_without_adapter_address(connection_
             }
             assert host not in repr(dump)
             assert config.port not in repr(dump)
+            if authenticated:
+                assert auth_key not in repr(dump)
             assert "**REDACTED**" in dump["write_diagnostics"]["last_error"]
             assert "**REDACTED**" in dump["registers"]["status"]["error"]
         finally:

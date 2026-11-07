@@ -66,10 +66,11 @@ it expires obsolete queued departure commands even while HA is offline.
 See [how to update](docs/installation.md#updating-to-061) and
 [what changes](docs/upgrading.md#updating-to-061).
 
-**Beta 0.7.0b1** introduces the separate feature menus described below and keeps
-existing configurations. Opt into prereleases to select this integration
+**Beta 0.7.0b2** adds optional Waveshare adapter setup, TCP login and clearer
+connection Repairs, alongside the separate feature menus described below.
+Existing configurations are retained. Opt into prereleases to select this integration
 version; its app update is offered through **#apps-beta**. Stable **0.6.1**
-remains available. See [trying the beta](docs/upgrading.md#trying-070b1) before
+remains available. See [trying the beta](docs/upgrading.md#trying-070b2) before
 switching an app between channels.
 
 You need a compatible wallbox, a USB RS-485 adapter or supported LAN gateway,

@@ -25,7 +25,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from .capabilities import phase_switch_is_supported
-from .client import MennekesModbusClient
+from .client import LockedRegisterReader, MennekesModbusClient
 from .client_errors import (
     AmtronBusError,
     AmtronIdentityError,
@@ -694,15 +694,16 @@ class AmtronControl:
         target_paused = 0 < value < CHARGING_CURRENT_MINIMUM
         return paused is None or paused != target_paused
 
-    async def _async_vehicle_absent(self) -> bool:
+    async def _async_vehicle_absent(self, read: LockedRegisterReader | None = None) -> bool:
         """Grant an exception only from fresh, consistent EVSE and CP readings."""
         if self._identity.layout_version < CP_STATE.min_layout:
             return False
+        read = read or self._client.async_read_register
         try:
-            state = await self._client.async_read_register(EVSE_STATE)
+            state = await read(EVSE_STATE)
             if type(state) is not int or state != EvseState.IDLE:
                 return False
-            cp = await self._client.async_read_register(CP_STATE)
+            cp = await read(CP_STATE)
         except AmtronBusError:
             return False
         return type(cp) is int and cp in (CpState.A1, CpState.A2)
@@ -1136,14 +1137,14 @@ class AmtronControl:
         if self._active_command is not None:
             self._command_write_started = True
         try:
-            if self._write_enables_charging(spec, value) or (
-                self._active_command is not None and self._active_command.deadline is not None
-            ):
+            timed = self._active_command is not None and self._active_command.owner is not None
+            if self._write_enables_charging(spec, value) or timed:
                 await self._client.async_write_register(
                     spec, value, min_interval=min_interval,
                     before_write=lambda: self._check_write_allowed(
                         spec, value, recovery_release=recovery_release,
                     ),
+                    precondition=self._async_check_timed_vehicle if timed else None,
                 )
             else:
                 await self._client.async_write_register(
@@ -1203,6 +1204,13 @@ class AmtronControl:
             and not (recovery_release and spec == CHARGING_RELEASE)
         ):
             raise validation_error("energy_goal_stop_active")
+
+    async def _async_check_timed_vehicle(self, read: LockedRegisterReader) -> None:
+        """Cancel a trip's command if live EVSE and CP both prove unplugging."""
+        if await self._async_vehicle_absent(read):
+            # Keep the existing reason vocabulary: older compatible HA
+            # integrations reject service snapshots with unknown event values.
+            raise _TimedCommandCancelledError("unknown")
 
     def _timed_cancellation_reason(self, command: _PendingCommand) -> str | None:
         if command.owner is None:

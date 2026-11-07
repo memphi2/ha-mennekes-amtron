@@ -8,3 +8,6 @@
 !custom_components/mennekes_amtron_rtu/
 !custom_components/mennekes_amtron_rtu/device/
 !custom_components/mennekes_amtron_rtu/device/*.py
+!custom_components/mennekes_amtron_rtu/device/app_settings.html
+!custom_components/mennekes_amtron_rtu/device/app_settings.js
+!custom_components/mennekes_amtron_rtu/device/app_settings.css

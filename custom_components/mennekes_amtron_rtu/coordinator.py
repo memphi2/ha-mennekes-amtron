@@ -14,15 +14,17 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .data import ConnectionState, DeviceIdentity, WallboxData
 from .device.client import MennekesModbusClient
 from .device.client_errors import AmtronBusError
-from .device.const import DEFAULT_MEASUREMENT_INTERVAL_SECONDS
+from .device.const import DEFAULT_MEASUREMENT_INTERVAL_SECONDS, DOMAIN
 from .device.poller import DevicePoller
 from .device.registers import ERROR_CODE
 from .device.runtime_events import EventTimeline
+from .device.waveshare_auth import WaveshareAuthenticationRejectedError
 from .entry_types import MennekesAmtronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,6 +55,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
             always_update=False,
         )
         self._client = client
+        self._entry = entry
         self._identity = identity
         self.control_status: Callable[[], tuple[str | None, datetime | None]] | None = None
         self.observe_recovery: Callable[[object, int], None] | None = None
@@ -105,4 +108,18 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
                 self.observe_goal(WallboxData(
                     energy_read=True, energy_goal_generation=goal_generation,
                 ))
+            if isinstance(err, WaveshareAuthenticationRejectedError):
+                auth_error = ConfigEntryAuthFailed(
+                    translation_domain=DOMAIN, translation_key="gateway_authentication_failed"
+                )
+                # HA suppresses listener notifications for two consecutive
+                # failed polls. Publish this distinct reason before stopping
+                # heartbeat so an earlier connectivity repair can clear too.
+                was_available = self.last_update_success
+                self.async_set_update_error(auth_error)
+                if not was_available:
+                    self.async_update_listeners()
+                if (heartbeat := self._entry.runtime_data.heartbeat) is not None:
+                    await heartbeat.async_stop()
+                raise auth_error from err
             raise UpdateFailed(str(err)) from err

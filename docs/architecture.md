@@ -53,6 +53,16 @@ host, TCP port and device address; serial baud/frame are configured on the
 gateway. HA-to-service HTTP remains a separate connection. See
 [LAN setup](network-gateway.md) and the [security boundary](../SECURITY.md#threat-model).
 
+Optional Waveshare TCP login authenticates each new transport socket before
+pymodbus can send application traffic. Its adapter password is independent of
+the service's HTTP token. The explicit adapter-configuration path is separate
+from normal connection startup: it inspects one endpoint, validates the model
+and native parameter profile, applies passive request/reply settings and the
+selected connection fields, verifies readback and
+retains a reversible receipt until caller validation/persistence completes.
+Cancellation runs a bounded, shielded restoration. A failed restoration leaves
+the old owner stopped. See [adapter setup and limitations](lan-adapters.md).
+
 Since **0.6.0b1**, an administrator connection page runs on a separate
 internal Ingress listener. It requires stable Supervisor 2026.11.0+, enumerates
 only locally mapped serial adapters and saves connection fields through the

@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.7.0b2 — 2026-11-07
+
+- Add optional TCP login and guided setup for recognized Waveshare single-channel
+  LAN adapters, with verified communication settings and rollback on failure.
+- Keep adapter passwords private and request reauthentication after a confirmed
+  rejection. Document the firmware's authentication and transport limitations.
+- Show automatically clearing Repairs notices for sustained heartbeat or service
+  connection failures, including an unreachable Modbus bus.
+- Keep connections stopped after uncertain adapter changes, and clear obsolete
+  connection Repairs when Home Assistant requests renewed service access.
+- Include the connection-page assets in published service images and validate
+  the actual release build context on both supported architectures.
+- Cancel planned charging commands when the vehicle has disconnected, including
+  commands that were waiting for the bus or a charging-state interval.
+
 ## 0.7.0b1 — 2026-11-07
 
 Beta release of the integration and app; **0.6.1 remains stable**.

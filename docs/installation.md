@@ -34,7 +34,8 @@ passthrough. Leave the vehicle disconnected during the first control setup.
 | Availability | Since **0.5.0**, optional | Since **0.5.0**; existing USB entries remain supported |
 
 Both connection owners support USB and LAN; see
-[LAN adapter setup](network-gateway.md). A LAN connection
+[LAN connection setup](network-gateway.md). Compatible Waveshare adapters can
+also use the optional [LAN adapter configuration](lan-adapters.md). A LAN connection
 needs no local USB device, and does not change the supported RTU wallbox models.
 
 The service keeps an intentional pause, disabled charging release and selected
@@ -148,7 +149,7 @@ newer**; update it before the integration, even if you do not use timed planning
 - **App:** `https://github.com/memphi2/ha-mennekes-amtron#apps` offers stable
   **0.6.1**. Use **Check for updates** and keep the existing app data.
   The `#apps-beta` catalog may offer a newer prerelease; see
-  [trying 0.7.0b1](upgrading.md#trying-070b1). A catalog switch creates a separate
+  [trying 0.7.0b2](upgrading.md#trying-070b2). A catalog switch creates a separate
   app; follow the [channel handover](modbus-service.md#updates).
 
 Before updating the app from 0.5.1, save one of the three readable connection
@@ -167,7 +168,8 @@ losses** are separate optional sections; see [feature setup](user-guide.md#confi
   use the integration options for write permission, intervals and current cap.
 - **Direct LAN:** use **Reconfigure** for protocol, host, TCP port and wallbox
   address; the integration options control writes, intervals and current cap.
-  Set serial baud rate/frame on the gateway itself.
+  Set serial baud rate/frame on the adapter itself, or use optional
+  [Set up LAN adapter](lan-adapters.md) for a recognized model.
 - **Service:** use **Open Web UI** for USB/LAN connection settings and the native
   Configuration tab for write permission, limits and measurement interval.
   The integration options contain the HA

@@ -42,6 +42,7 @@ class ProbeSettings:
         raise web.HTTPForbidden
 
     save = read
+    inspect_adapter = read
 
 
 async def check_assets(expected: dict[str, str]) -> None:

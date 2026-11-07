@@ -19,7 +19,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from .control import AmtronControl, ControlOptions, ha_command
 from .coordinator import MennekesAmtronCoordinator
 from .device.charging_session import CompletedSession
-from .device.client import MennekesModbusClient, SerialConfig
+from .device.client import MennekesModbusClient, SerialConfig, WritePrecondition
 from .device.client_errors import AmtronConnectionError, AmtronWriteRejectedError
 from .device.command_events import CommandEvents
 from .device.const import (
@@ -101,6 +101,7 @@ class RemoteClient(MennekesModbusClient):
         self.failure_reason: ServiceFailure | None = None
         self.on_update: Callable[[], None] | None = None
         self.on_auth_failed: Callable[[], None] | None = None
+        self.on_auth_error: Callable[[bool], None] | None = None
         self._snapshot_lock = asyncio.Lock()
         self.pending_until: datetime | None = None
         self.events = CommandEvents(supported=False)
@@ -122,13 +123,17 @@ class RemoteClient(MennekesModbusClient):
     async def async_close(self) -> None:
         self._connected = False
         self.on_auth_failed = None
+        self.on_auth_error = None
 
     def _mark_unavailable(self, reason: ServiceFailure | None = None) -> None:
         """Publish a failed connection immediately, including command failures."""
+        new_auth_failure = reason == "service_auth_failed" and self.failure_reason != reason
         self.failure_reason = reason
         self._connected = False
         if self.on_update is not None:
             self.on_update()
+        if reason == "service_auth_failed" and self.on_auth_error is not None:
+            self.on_auth_error(new_auth_failure)
 
     async def request(
         self, method: str, path: str, payload: dict[str, Any] | None = None,
@@ -552,6 +557,7 @@ class RemoteClient(MennekesModbusClient):
         min_interval: float = 0.0,
         priority: bool = False,
         before_write: Callable[[], None] | None = None,
+        precondition: WritePrecondition | None = None,
     ) -> None:
         raise AmtronWriteRejectedError(
             "direct register writes are not available through the service"
@@ -582,6 +588,23 @@ class RemoteHeartbeat(HeartbeatTask):
 
 class RemoteCoordinator(MennekesAmtronCoordinator):
     """Poll the service's cache; the service independently schedules bus reads."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if isinstance(self._client, RemoteClient):
+            self._client.on_auth_error = self._publish_auth_error
+
+    def _publish_auth_error(self, new_failure: bool) -> None:
+        """Expose a changed failure reason even when already unavailable."""
+        was_available = self.last_update_success
+        self.async_set_update_error(ConfigEntryAuthFailed(
+            translation_domain=DOMAIN, translation_key="service_auth_failed"
+        ))
+        if new_failure and not was_available:
+            # HA suppresses notifications for consecutive failed refreshes.
+            # Repair listeners must still see this distinct authentication error,
+            # including one reported by a command or diagnostics request.
+            self.async_update_listeners()
 
     async def _async_update_data(self) -> WallboxData:
         if not isinstance(self._client, RemoteClient):

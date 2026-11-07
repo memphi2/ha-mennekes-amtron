@@ -9,7 +9,7 @@
       "service_identity_changed": "Die erkannte Wallbox hat sich geändert. Starte die Einrichtung erneut.",
       "service_discovery_updated": "Die vorhandene Integration verwendet jetzt die erkannte App-Verbindung.",
       "multiple_service_apps": "Mehrere Modbus-Apps wurden gefunden. Wähle die passende erkannte App unter Geräte & Dienste.",
-      "reauth_not_supported": "Eine direkte Modbus-Verbindung hat keine Zugangsdaten, die erneuert werden können."
+      "reauth_not_supported": "Diese Verbindung nutzt keine TCP-Anmeldung am Adapter. Aktualisiere ihre Einstellungen über „Verbindung ändern“."
     },
     "error": {
       "cannot_connect": "Der serielle Port konnte nicht geöffnet werden oder die Wallbox hat nicht geantwortet. Prüfe die Verkabelung (Modbus A ist +, B ist -), den Port und die Busparameter.",
@@ -24,7 +24,15 @@
       "cannot_connect_network": "Der LAN-Adapter ist nicht erreichbar oder die Wallbox antwortet nicht. Prüfe Host, Port, Protokoll und die am Adapter eingestellten seriellen Parameter.",
       "invalid_network_response": "Der Adapter hat geantwortet, aber kein gültiges Modbus-Layout geliefert. Prüfe Wallbox-Adresse, Adapterprotokoll und Satellite-Konfiguration.",
       "service_discovery_unavailable": "Die aktuellen Zugangsdaten dieser App konnten nicht abgerufen werden. Prüfe App und Supervisor, starte die App bei Bedarf oder starte sie neu und bestätige erneut.",
-      "service_version_mismatch": "Der Modbus-Dienst erfüllt die API- oder Mindestversionsanforderungen dieser Integration nicht. Verwende eine kompatible Dienstversion gemäß den Versionshinweisen der Integration. Falls beide Komponenten ein Update benötigen, aktualisiere zuerst die App oder den separat betriebenen Dienst."
+      "service_version_mismatch": "Der Modbus-Dienst erfüllt die API- oder Mindestversionsanforderungen dieser Integration nicht. Verwende eine kompatible Dienstversion gemäß den Versionshinweisen der Integration. Falls beide Komponenten ein Update benötigen, aktualisiere zuerst die App oder den separat betriebenen Dienst.",
+      "invalid_tcp_auth_password": "Gib das vorhandene Webpasswort des Adapters ein: 1–9 druckbare ASCII-Zeichen ohne Leerzeichen.",
+      "invalid_gateway_config": "Prüfe die unterstützte Baudrate, den Rahmen und das vorhandene Webpasswort. Die TCP-Anmeldung benötigt ein gültiges Passwort.",
+      "gateway_unsupported": "Dieses Adaptermodell, diese Firmware oder Betriebsart lässt sich nicht automatisch einrichten. Konfiguriere den Adapter manuell und deaktiviere „LAN-Adapter einrichten“.",
+      "gateway_unreachable": "Die Adaptereinstellungen konnten nicht gelesen werden. Prüfe Adresse und lokalen Netzwerkzugriff oder nutze die manuelle Einrichtung.",
+      "gateway_changed": "Die Adaptereinstellungen haben sich seit dieser Vorschau geändert. Starte die Verbindungseinrichtung erneut, um die aktuellen Werte einzulesen.",
+      "gateway_apply_failed": "Die Adaptereinstellungen konnten nicht angewendet und bestätigt werden. Prüfe das vorhandene Webpasswort und die Verbindung zum Adapter.",
+      "gateway_rollback_failed": "Nach der fehlgeschlagenen Änderung konnten die bisherigen Adaptereinstellungen nicht bestätigt werden. Die alte Integrationsverbindung bleibt angehalten. Prüfe die Adaptereinstellungen manuell, bevor du die Verbindung wiederherstellst.",
+      "gateway_authentication_failed": "Der Adapter hat sein vorhandenes Webpasswort abgelehnt. Prüfe das Passwort für seine Weboberfläche."
     },
     "progress": {
       "searching": "Der Bus wird nach einer Wallbox abgesucht: bis zu {candidates} Kombinationen, etwa {minutes} Minuten zuzüglich Verbindungsprüfungen. Es werden keine Register geschrieben. Beim Neukonfigurieren pausieren die bisherige Verbindung und der Heartbeat; das konfigurierte Ausfallverhalten der Wallbox greift."
@@ -108,13 +116,17 @@
           "connection_type": "Verbindungsprotokoll",
           "host": "Adapter-Host",
           "tcp_port": "TCP-Port des Adapters",
-          "device_id": "Modbus-Geräteadresse"
+          "device_id": "Modbus-Geräteadresse",
+          "tcp_authentication": "TCP-Anmeldung",
+          "configure_gateway": "LAN-Adapter einrichten"
         },
         "data_description": {
           "connection_type": "Muss zum Adaptermodus passen: transparentes RTU over TCP oder Übersetzung von Modbus TCP in RTU.",
           "host": "Hostname oder IP-Adresse des LAN-Adapters, ohne http:// oder URL-Pfad.",
           "tcp_port": "Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.",
-          "device_id": "Adresse der Wallbox hinter dem Adapter; Werkseinstellung 50, unterstützter Bereich 10–50."
+          "device_id": "Adresse der Wallbox hinter dem Adapter; Werkseinstellung 50, unterstützter Bereich 10–50.",
+          "tcp_authentication": "Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
+          "configure_gateway": "Die Einstellungen dieses Adapters auslesen und Änderungen vor dem Anwenden prüfen. Nur unterstützte Adaptermodelle und Firmware lassen sich hier einrichten."
         }
       },
       "network_reconfigure": {
@@ -124,13 +136,17 @@
           "connection_type": "Verbindungsprotokoll",
           "host": "Adapter-Host",
           "tcp_port": "TCP-Port des Adapters",
-          "device_id": "Modbus-Geräteadresse"
+          "device_id": "Modbus-Geräteadresse",
+          "tcp_authentication": "TCP-Anmeldung",
+          "configure_gateway": "LAN-Adapter einrichten"
         },
         "data_description": {
           "connection_type": "Muss zum Adaptermodus passen: transparentes RTU over TCP oder Übersetzung von Modbus TCP in RTU.",
           "host": "Hostname oder IP-Adresse des LAN-Adapters, ohne http:// oder URL-Pfad.",
           "tcp_port": "Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.",
-          "device_id": "Adresse der Wallbox hinter dem Adapter; Werkseinstellung 50, unterstützter Bereich 10–50."
+          "device_id": "Adresse der Wallbox hinter dem Adapter; Werkseinstellung 50, unterstützter Bereich 10–50.",
+          "tcp_authentication": "Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
+          "configure_gateway": "Die Einstellungen dieses Adapters auslesen und Änderungen vor dem Anwenden prüfen. Nur unterstützte Adaptermodelle und Firmware lassen sich hier einrichten."
         }
       },
       "reauth_confirm": {
@@ -143,6 +159,34 @@
       "reauth_app": {
         "title": "App-Zugang erneuern",
         "description": "Bestätige, um die aktuellen Zugangsdaten dieser Modbus-App vom Supervisor abzurufen. Die App muss laufen. Du musst keinen Token eingeben."
+      },
+      "network_auth": {
+        "title": "Am LAN-Adapter anmelden",
+        "description": "Gib das vorhandene Webpasswort deines kompatiblen Adapters ein. Die Verbindung wird geprüft; Einstellungen und Passwort des Adapters bleiben unverändert. Erlaubt sind 1–9 druckbare ASCII-Zeichen ohne Leerzeichen. Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
+        "data": {
+          "tcp_auth_password": "Vorhandenes Webpasswort des Adapters"
+        }
+      },
+      "network_adapter": {
+        "title": "LAN-Adapter einrichten",
+        "description": "Erkannt: **{model}**, Firmware **{firmware}**. Aktuell: **{baudrate} Baud, {frame}**, TCP-Port **{tcp_port}**.\n\nBeim Absenden werden Verbindungsprotokoll und TCP-Port der vorherigen Seite sowie die folgenden Einstellungen angewendet. Danach wird die Identität der Wallbox geprüft. Schlägt die Prüfung fehl, werden die bisherigen Adaptereinstellungen wiederhergestellt, sofern der Adapter erreichbar ist. Das vorhandene Webpasswort wird nicht geändert. Außerdem wird der passive TCP-Server-Betrieb eingerichtet: Eigene Modbus-Abfragen und Antwortspeicher, Flusssteuerung, zusätzliche Anmeldedaten, Wiedergabe gepufferter serieller Daten, automatische Parameterübertragung und datenabhängige Neustarts werden deaktiviert.",
+        "data": {
+          "baudrate": "Baudrate",
+          "frame": "Frame",
+          "tcp_authentication": "TCP-Anmeldung",
+          "tcp_auth_password": "Vorhandenes Webpasswort des Adapters"
+        },
+        "data_description": {
+          "tcp_authentication": "Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
+          "tcp_auth_password": "Gib das aktuelle Webpasswort des Adapters ein, falls eines gesetzt ist. Die TCP-Anmeldung benötigt ein Passwort mit 1–9 druckbaren ASCII-Zeichen ohne Leerzeichen. Gespeichert wird es nur bei aktivierter TCP-Anmeldung."
+        }
+      },
+      "network_reauth": {
+        "title": "Am LAN-Adapter anmelden",
+        "description": "Gib das vorhandene Webpasswort deines kompatiblen Adapters ein. Die Verbindung wird geprüft; Einstellungen und Passwort des Adapters bleiben unverändert. Erlaubt sind 1–9 druckbare ASCII-Zeichen ohne Leerzeichen. Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
+        "data": {
+          "tcp_auth_password": "Vorhandenes Webpasswort des Adapters"
+        }
       }
     }
   },
@@ -727,9 +771,20 @@
     },
     "timed_vehicle_unavailable": {
       "message": "Für das ausgewählte Fahrzeug wurde keine nutzbare kommende Abfahrt gefunden. Prüfe seine Integration, Timer-Sensoren und Einstellungen."
+    },
+    "gateway_authentication_failed": {
+      "message": "Der Adapter hat sein vorhandenes Webpasswort abgelehnt. Prüfe das Passwort für seine Weboberfläche."
     }
   },
   "issues": {
+    "heartbeat_unavailable": {
+      "title": "Heartbeat der Wallbox wird nicht bestätigt",
+      "description": "Seit mindestens einer Minute erhält der Controller keine Bestätigung des Wallbox-Heartbeats. Prüfe die Stromversorgung von Wallbox und Adapter, die USB- oder LAN-Verbindung sowie die RS485-Verkabelung. Im App-Modus hilft zusätzlich das App-Protokoll. Sobald der Heartbeat wieder bestätigt wird, verschwindet dieser Hinweis automatisch."
+    },
+    "service_unavailable": {
+      "title": "Verbindung zur Modbus-App nicht verfügbar",
+      "description": "Home Assistant kann seine Verbindung zur Modbus-App seit mindestens einer Minute nicht bestätigen. Die App kann ihren Heartbeat unabhängig davon weiter senden. Prüfe, ob die App läuft und ihre Netzwerkverbindung funktioniert. Sobald die Verbindung wiederhergestellt ist, verschwindet dieser Hinweis automatisch."
+    },
     "ems_fallback_not_configured": {
       "description": "Register 0x030E steht auf 0. Die Wallbox lädt damit mit den letzten empfangenen Werten weiter, wenn der aktive Modbus-Master keinen Heartbeat mehr sendet. Konfiguriere mit dem MENNEKES-Konfigurationstool ein Fallback-Verhalten oder einen Fallback-Strom, damit bei einem Ausfall ein definierter Zustand gilt.",
       "title": "Kein Energiemanager-Fallback konfiguriert"

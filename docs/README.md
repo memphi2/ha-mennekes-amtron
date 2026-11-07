@@ -51,7 +51,8 @@ configured fallback.
 | Document | What you will find |
 |---|---|
 | [Standalone service](service-standalone.md) | Run the service outside a Home Assistant app |
-| [LAN adapter setup](network-gateway.md) | Transparent RTU over TCP or a translating Modbus TCP-to-RTU gateway |
+| [LAN connection](network-gateway.md) | Transparent RTU over TCP or translating Modbus TCP |
+| [Compatible LAN adapter setup](lan-adapters.md) | Detect and explicitly configure supported Waveshare adapters |
 | [Service reference](service-reference.md) | Service configuration and technical details |
 | [Updates and switching connections](upgrading.md) | Updates and moving an existing wallbox to the service |
 | [Modbus register map](modbus-registers.md) | Register meanings, values and read blocks |

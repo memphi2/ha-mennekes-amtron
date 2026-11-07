@@ -9,7 +9,7 @@
       "service_identity_changed": "La borne détectée a changé. Recommencez la configuration.",
       "service_discovery_updated": "L’intégration existante utilise désormais la connexion de l’application détectée.",
       "multiple_service_apps": "Plusieurs applications Modbus ont été trouvées. Sélectionnez l’application détectée correspondante dans Appareils et services.",
-      "reauth_not_supported": "Une connexion Modbus directe n’a pas d’identifiants d’accès à renouveler."
+      "reauth_not_supported": "Cette connexion n’utilise pas l’authentification TCP de l’adaptateur. Modifiez ses réglages via « Changer la connexion »."
     },
     "error": {
       "cannot_connect": "Impossible d’ouvrir le port série ou la borne n’a pas répondu. Vérifiez le câblage (Modbus A est +, B est -), le port et les paramètres du bus.",
@@ -24,7 +24,15 @@
       "cannot_connect_network": "L’adaptateur réseau est inaccessible ou la borne n’a pas répondu. Vérifiez l’hôte, le port, le protocole et les paramètres série de l’adaptateur.",
       "invalid_network_response": "L’adaptateur a répondu, mais aucune table de registres Modbus valide n’a été indiquée. Vérifiez l’adresse de la borne, le protocole de l’adaptateur et le mode satellite.",
       "service_discovery_unavailable": "Les identifiants actuels de cette application n’ont pas pu être récupérés. Vérifiez l’application et le Supervisor, démarrez ou redémarrez l’application si nécessaire, puis confirmez à nouveau.",
-      "service_version_mismatch": "Le service Modbus ne respecte pas les exigences d’API ou de version minimale de cette intégration. Utilisez une version compatible du service, conformément aux notes de version de l’intégration. Si les deux composants doivent être mis à jour, commencez par l’application ou le service hébergé séparément."
+      "service_version_mismatch": "Le service Modbus ne respecte pas les exigences d’API ou de version minimale de cette intégration. Utilisez une version compatible du service, conformément aux notes de version de l’intégration. Si les deux composants doivent être mis à jour, commencez par l’application ou le service hébergé séparément.",
+      "invalid_tcp_auth_password": "Saisissez le mot de passe web actuel : 1 à 9 caractères ASCII imprimables, sans espaces.",
+      "invalid_gateway_config": "Vérifiez le débit pris en charge, la trame et le mot de passe web actuel. L’authentification TCP exige un mot de passe valide.",
+      "gateway_unsupported": "Ce modèle, firmware ou mode ne peut pas être configuré automatiquement. Configurez l’adaptateur manuellement et désactivez « Configurer l’adaptateur LAN ».",
+      "gateway_unreachable": "Impossible de lire les réglages. Vérifiez l’adresse et l’accès au réseau local ou utilisez la configuration manuelle.",
+      "gateway_changed": "Les réglages ont changé depuis cet aperçu. Recommencez la configuration de la connexion pour lire les valeurs actuelles.",
+      "gateway_apply_failed": "Les réglages n’ont pas pu être appliqués et vérifiés. Vérifiez le mot de passe web actuel et la connexion à l’adaptateur.",
+      "gateway_rollback_failed": "Impossible de confirmer les anciens réglages après l’échec. L’ancienne connexion de l’intégration reste arrêtée. Vérifiez manuellement l’adaptateur avant de vous reconnecter.",
+      "gateway_authentication_failed": "L’adaptateur a refusé son mot de passe web actuel. Vérifiez le mot de passe de son interface web."
     },
     "progress": {
       "searching": "Recherche d’une borne sur le bus : jusqu’à {candidates} combinaisons, soit environ {minutes} minutes, auxquelles s’ajoutent les vérifications de connexion. Aucun registre n’est modifié. Pendant la reconfiguration, la connexion existante et le signal de présence sont interrompus ; le comportement de repli configuré sur la borne s’applique."
@@ -108,13 +116,17 @@
           "connection_type": "Protocole de connexion",
           "host": "Hôte de l’adaptateur",
           "tcp_port": "Port TCP de l’adaptateur",
-          "device_id": "Adresse Modbus de la borne"
+          "device_id": "Adresse Modbus de la borne",
+          "tcp_authentication": "Authentification TCP",
+          "configure_gateway": "Configurer l’adaptateur LAN"
         },
         "data_description": {
           "connection_type": "Doit correspondre au mode de l’adaptateur : RTU over TCP transparent ou traduction de Modbus TCP en RTU.",
           "host": "Nom d’hôte ou adresse IP de l’adaptateur réseau, sans http:// ni chemin d’URL.",
           "tcp_port": "Port TCP configuré sur l’adaptateur ; 502 par défaut. Il ne s’agit pas du port HTTP 8765 du service indépendant.",
-          "device_id": "Adresse de la borne derrière l’adaptateur ; 50 par défaut, plage prise en charge de 10 à 50."
+          "device_id": "Adresse de la borne derrière l’adaptateur ; 50 par défaut, plage prise en charge de 10 à 50.",
+          "tcp_authentication": "L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
+          "configure_gateway": "Lire les réglages de cet adaptateur et vérifier les modifications avant de les appliquer. Seuls les modèles et firmwares pris en charge peuvent être configurés ici."
         }
       },
       "network_reconfigure": {
@@ -124,13 +136,17 @@
           "connection_type": "Protocole de connexion",
           "host": "Hôte de l’adaptateur",
           "tcp_port": "Port TCP de l’adaptateur",
-          "device_id": "Adresse Modbus de la borne"
+          "device_id": "Adresse Modbus de la borne",
+          "tcp_authentication": "Authentification TCP",
+          "configure_gateway": "Configurer l’adaptateur LAN"
         },
         "data_description": {
           "connection_type": "Doit correspondre au mode de l’adaptateur : RTU over TCP transparent ou traduction de Modbus TCP en RTU.",
           "host": "Nom d’hôte ou adresse IP de l’adaptateur réseau, sans http:// ni chemin d’URL.",
           "tcp_port": "Port TCP configuré sur l’adaptateur ; 502 par défaut. Il ne s’agit pas du port HTTP 8765 du service indépendant.",
-          "device_id": "Adresse de la borne derrière l’adaptateur ; 50 par défaut, plage prise en charge de 10 à 50."
+          "device_id": "Adresse de la borne derrière l’adaptateur ; 50 par défaut, plage prise en charge de 10 à 50.",
+          "tcp_authentication": "L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
+          "configure_gateway": "Lire les réglages de cet adaptateur et vérifier les modifications avant de les appliquer. Seuls les modèles et firmwares pris en charge peuvent être configurés ici."
         }
       },
       "reauth_confirm": {
@@ -143,6 +159,34 @@
       "reauth_app": {
         "title": "Renouveler l’accès à l’application",
         "description": "Confirmez pour récupérer les identifiants actuels de cette application Modbus auprès du Supervisor. L’application doit être en cours d’exécution. Vous n’avez pas de jeton à saisir."
+      },
+      "network_auth": {
+        "title": "Se connecter à l’adaptateur LAN",
+        "description": "Saisissez le mot de passe web actuel de votre adaptateur compatible. La connexion est vérifiée sans modifier les réglages ni le mot de passe. Utilisez 1 à 9 caractères ASCII imprimables, sans espaces. L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
+        "data": {
+          "tcp_auth_password": "Mot de passe web actuel de l’adaptateur"
+        }
+      },
+      "network_adapter": {
+        "title": "Configurer l’adaptateur LAN",
+        "description": "Détecté : **{model}**, firmware **{firmware}**. Réglages actuels : **{baudrate} bauds, {frame}**, port TCP **{tcp_port}**.\n\nValider applique le protocole et le port TCP choisis à la page précédente ainsi que les réglages ci-dessous, puis vérifie l’identité de la borne. En cas d’échec, les anciens réglages sont restaurés si l’adaptateur reste accessible. Le mot de passe web actuel n’est pas modifié. Le mode serveur TCP passif est également activé : interrogation/cache Modbus interne, contrôle de flux, préambules de connexion, répétition des données série mémorisées, envoi automatique des paramètres et redémarrages déclenchés par les données sont désactivés.",
+        "data": {
+          "baudrate": "Vitesse de transmission",
+          "frame": "Format de trame",
+          "tcp_authentication": "Authentification TCP",
+          "tcp_auth_password": "Mot de passe web actuel de l’adaptateur"
+        },
+        "data_description": {
+          "tcp_authentication": "L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
+          "tcp_auth_password": "Saisissez le mot de passe web actuel, s’il est défini. L’authentification TCP exige 1 à 9 caractères ASCII imprimables, sans espaces. Le mot de passe n’est enregistré que si cette authentification est activée."
+        }
+      },
+      "network_reauth": {
+        "title": "Se connecter à l’adaptateur LAN",
+        "description": "Saisissez le mot de passe web actuel de votre adaptateur compatible. La connexion est vérifiée sans modifier les réglages ni le mot de passe. Utilisez 1 à 9 caractères ASCII imprimables, sans espaces. L’authentification ne chiffre pas les données. Elle peut être contournée avec le firmware 1.523 ; utilisez un réseau local protégé.",
+        "data": {
+          "tcp_auth_password": "Mot de passe web actuel de l’adaptateur"
+        }
       }
     }
   },
@@ -727,9 +771,20 @@
     },
     "timed_vehicle_unavailable": {
       "message": "Aucun prochain départ utilisable n’a été trouvé pour le véhicule choisi. Vérifiez son intégration, ses capteurs et réglages de programmation."
+    },
+    "gateway_authentication_failed": {
+      "message": "L’adaptateur a refusé son mot de passe web actuel. Vérifiez le mot de passe de son interface web."
     }
   },
   "issues": {
+    "heartbeat_unavailable": {
+      "title": "Le heartbeat de la borne n’est pas confirmé",
+      "description": "Depuis au moins une minute, le contrôleur ne reçoit aucune confirmation du heartbeat de la borne. Vérifiez l’alimentation de la borne et de l’adaptateur, la connexion USB ou LAN et le câblage RS485. En mode application, consultez également le journal de l’application. Cet avertissement disparaît automatiquement dès que le heartbeat est de nouveau confirmé."
+    },
+    "service_unavailable": {
+      "title": "La connexion à l’application Modbus est indisponible",
+      "description": "Depuis au moins une minute, Home Assistant ne peut pas vérifier sa connexion à l’application Modbus. L’application peut continuer à envoyer son heartbeat indépendamment. Vérifiez que l’application fonctionne et que sa connexion réseau est disponible. Cet avertissement disparaît automatiquement lorsque la connexion est rétablie."
+    },
     "ems_fallback_not_configured": {
       "description": "Le registre 0x030E vaut 0 : la borne continue donc à charger avec les dernières valeurs reçues lorsque le maître Modbus actif cesse d’envoyer son signal de présence. Configurez un comportement ou un courant de repli avec l’outil de configuration MENNEKES pour obtenir un état défini en cas d’interruption.",
       "title": "Aucun repli du gestionnaire d’énergie configuré"

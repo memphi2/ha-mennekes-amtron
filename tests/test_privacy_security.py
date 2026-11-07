@@ -62,9 +62,11 @@ def test_the_manifest_names_the_public_integration_maintainer() -> None:
     assert "@" not in json.dumps(manifest)
 
 
-def test_the_manifest_requests_only_pymodbus_and_only_as_a_minimum() -> None:
+def test_the_manifest_requests_only_reviewed_runtime_dependencies_as_minimums() -> None:
     manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["requirements"] == ["pymodbus[serial]>=3.13.1"]
+    assert manifest["requirements"] == [
+        "pymodbus[serial]>=3.13.1", "cryptography>=48.0.1",
+    ]
 
 
 def test_diagnostics_never_report_the_port_or_the_serial_number() -> None:

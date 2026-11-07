@@ -9,7 +9,7 @@
       "service_identity_changed": "The discovered wallbox changed. Start setup again.",
       "service_discovery_updated": "The existing integration now uses the discovered app connection.",
       "multiple_service_apps": "Multiple Modbus apps were found. Select the matching discovered app under Devices & services.",
-      "reauth_not_supported": "A direct Modbus connection has no access credentials to renew."
+      "reauth_not_supported": "This connection does not use adapter TCP login. Use Change connection to update its settings."
     },
     "error": {
       "cannot_connect": "Could not open the serial port or the wallbox did not answer. Check the cabling (Modbus A is +, B is -), the port and the bus parameters.",
@@ -24,7 +24,15 @@
       "cannot_connect_network": "Could not reach the LAN adapter or the wallbox did not answer. Check the host, port, protocol and the serial settings configured on the adapter.",
       "invalid_network_response": "The adapter answered but no valid Modbus layout was reported. Check the wallbox address, adapter protocol and satellite configuration.",
       "service_discovery_unavailable": "The current credentials of this app could not be retrieved. Check the app and Supervisor, start or restart the app if needed, then confirm again.",
-      "service_version_mismatch": "The Modbus service does not meet this integration’s API or minimum-version requirements. Use a compatible service version as described in the integration’s release notes. If both components need updating, update the app or standalone service first."
+      "service_version_mismatch": "The Modbus service does not meet this integration’s API or minimum-version requirements. Use a compatible service version as described in the integration’s release notes. If both components need updating, update the app or standalone service first.",
+      "invalid_tcp_auth_password": "Enter the existing adapter web password: 1–9 printable ASCII characters, without spaces.",
+      "invalid_gateway_config": "Check the supported baud rate, frame and existing web password. TCP login requires a valid password.",
+      "gateway_unsupported": "This adapter model, firmware or operating mode cannot be configured automatically. Configure the adapter manually and turn off “Set up LAN adapter”.",
+      "gateway_unreachable": "The adapter settings could not be read. Check the address and local network access, or use manual configuration.",
+      "gateway_changed": "The adapter settings changed since this preview. Start the connection setup again to read the current settings.",
+      "gateway_apply_failed": "The adapter settings could not be applied and verified. Check the existing web password and adapter connection.",
+      "gateway_rollback_failed": "The previous adapter settings could not be confirmed after a failed change. The old integration connection remains stopped. Check the adapter settings manually before reconnecting.",
+      "gateway_authentication_failed": "The adapter rejected its existing web password. Check the password used for its web interface."
     },
     "progress": {
       "searching": "Searching the bus for a wallbox: up to {candidates} combinations, about {minutes} minutes plus connection checks. No registers are written. During reconfiguration, the existing connection and heartbeat are paused; the wallbox's configured fallback applies."
@@ -108,13 +116,17 @@
           "connection_type": "Connection protocol",
           "host": "Adapter host",
           "tcp_port": "Adapter TCP port",
-          "device_id": "Modbus device address"
+          "device_id": "Modbus device address",
+          "tcp_authentication": "TCP login",
+          "configure_gateway": "Set up LAN adapter"
         },
         "data_description": {
           "connection_type": "Match the adapter mode: transparent RTU over TCP or translating Modbus TCP to RTU.",
           "host": "Host name or IP address of the LAN adapter, without http:// or any URL path.",
           "tcp_port": "TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.",
-          "device_id": "Wallbox address behind the adapter; factory default 50, supported range 10–50."
+          "device_id": "Wallbox address behind the adapter; factory default 50, supported range 10–50.",
+          "tcp_authentication": "Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
+          "configure_gateway": "Read this adapter’s settings and review changes before applying them. Only supported adapter models and firmware can be configured here."
         }
       },
       "network_reconfigure": {
@@ -124,13 +136,17 @@
           "connection_type": "Connection protocol",
           "host": "Adapter host",
           "tcp_port": "Adapter TCP port",
-          "device_id": "Modbus device address"
+          "device_id": "Modbus device address",
+          "tcp_authentication": "TCP login",
+          "configure_gateway": "Set up LAN adapter"
         },
         "data_description": {
           "connection_type": "Match the adapter mode: transparent RTU over TCP or translating Modbus TCP to RTU.",
           "host": "Host name or IP address of the LAN adapter, without http:// or any URL path.",
           "tcp_port": "TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.",
-          "device_id": "Wallbox address behind the adapter; factory default 50, supported range 10–50."
+          "device_id": "Wallbox address behind the adapter; factory default 50, supported range 10–50.",
+          "tcp_authentication": "Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
+          "configure_gateway": "Read this adapter’s settings and review changes before applying them. Only supported adapter models and firmware can be configured here."
         }
       },
       "reauth_confirm": {
@@ -143,6 +159,34 @@
       "reauth_app": {
         "title": "Renew app access",
         "description": "Confirm to retrieve the current credentials of this Modbus app from Supervisor. The app must be running. You do not need to enter a token."
+      },
+      "network_auth": {
+        "title": "Log in to the LAN adapter",
+        "description": "Enter the existing web password of your compatible adapter. This checks the connection without changing the adapter’s settings or password. Use 1–9 printable ASCII characters without spaces. Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
+        "data": {
+          "tcp_auth_password": "Existing adapter web password"
+        }
+      },
+      "network_adapter": {
+        "title": "Set up LAN adapter",
+        "description": "Recognized: **{model}**, firmware **{firmware}**. Current serial settings: **{baudrate} baud, {frame}**, TCP port **{tcp_port}**.\n\nSubmitting applies the connection protocol and TCP port chosen on the previous page together with the settings below. It then checks the wallbox identity. If validation fails, the previous adapter settings are restored where reachable. Your existing web password is not changed. This also selects passive TCP-server operation and disables the adapter’s own Modbus polling/cache, flow control, connection preambles, replay of buffered serial data, automatic parameter uploads and data-triggered restarts.",
+        "data": {
+          "baudrate": "Baud rate",
+          "frame": "Frame",
+          "tcp_authentication": "TCP login",
+          "tcp_auth_password": "Existing adapter web password"
+        },
+        "data_description": {
+          "tcp_authentication": "Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
+          "tcp_auth_password": "Enter the current adapter web password, if set. TCP login requires a password with 1–9 printable ASCII characters without spaces. The password is saved only when TCP login is enabled."
+        }
+      },
+      "network_reauth": {
+        "title": "Log in to the LAN adapter",
+        "description": "Enter the existing web password of your compatible adapter. This checks the connection without changing the adapter’s settings or password. Use 1–9 printable ASCII characters without spaces. Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network.",
+        "data": {
+          "tcp_auth_password": "Existing adapter web password"
+        }
       }
     }
   },
@@ -727,9 +771,20 @@
     },
     "timed_vehicle_unavailable": {
       "message": "No usable upcoming departure was found for the selected vehicle. Check its integration, timer sensors and settings."
+    },
+    "gateway_authentication_failed": {
+      "message": "The adapter rejected its existing web password. Check the password used for its web interface."
     }
   },
   "issues": {
+    "heartbeat_unavailable": {
+      "title": "Wallbox heartbeat is not confirmed",
+      "description": "The controller has not received confirmation of the wallbox heartbeat for at least one minute. Check power to the wallbox and adapter, the USB or LAN connection, and the RS485 wiring. In app mode, also check the app log. This notice clears automatically when the heartbeat is confirmed again."
+    },
+    "service_unavailable": {
+      "title": "Connection to the Modbus app is unavailable",
+      "description": "For at least one minute, Home Assistant could not verify its connection to the Modbus app. The app may continue its heartbeat independently. Check that the app is running and its network connection is working. This notice clears automatically when the connection returns."
+    },
     "ems_fallback_not_configured": {
       "description": "Register 0x030E is 0, so the wallbox keeps charging with the last values it received when the active Modbus master stops sending a heartbeat. Configure a fallback behaviour or a fallback current with the MENNEKES configuration tool to get a defined state during an outage.",
       "title": "No energy-manager fallback configured"

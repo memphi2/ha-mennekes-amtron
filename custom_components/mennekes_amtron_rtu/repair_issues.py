@@ -17,6 +17,8 @@ ISSUE_EMS_HEARTBEAT_LOST: Final = "ems_heartbeat_lost"
 ISSUE_EMS_FALLBACK_NOT_CONFIGURED: Final = "ems_fallback_not_configured"
 ISSUE_UNSUPPORTED_LAYOUT: Final = "unsupported_modbus_layout"
 ISSUE_WRITE_REJECTED: Final = "write_rejected"
+ISSUE_HEARTBEAT_UNAVAILABLE: Final = "heartbeat_unavailable"
+ISSUE_SERVICE_UNAVAILABLE: Final = "service_unavailable"
 
 def heartbeat_lost(data: WallboxData) -> bool:
     """Return true while the wallbox reports the missing-heartbeat error."""

@@ -21,6 +21,7 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
+    TextSelectorType,
 )
 
 from ._flow_serial import PortOption
@@ -48,6 +49,7 @@ from .charging_cost_const import (
 )
 from .device.const import (
     CONF_BAUDRATE,
+    CONF_CONFIGURE_GATEWAY,
     CONF_CONNECTION_TYPE,
     CONF_CONTROL_MODE,
     CONF_CURRENT_LIMIT,
@@ -60,6 +62,8 @@ from .device.const import (
     CONF_SCAN_INTERVAL_SECONDS,
     CONF_SEARCH,
     CONF_STATE_CHANGE_INTERVAL_SECONDS,
+    CONF_TCP_AUTH_PASSWORD,
+    CONF_TCP_AUTHENTICATION,
     CONF_TCP_PORT,
     CONNECTION_RTU_OVER_TCP,
     CONTROL_MODES,
@@ -174,8 +178,29 @@ def network_schema() -> probatio.Schema:
                     mode=NumberSelectorMode.BOX,
                 )
             ),
+            probatio.Optional(CONF_TCP_AUTHENTICATION, default=False): BooleanSelector(),
+            probatio.Optional(CONF_CONFIGURE_GATEWAY, default=False): BooleanSelector(),
         }
     )
+
+
+def network_auth_schema() -> probatio.Schema:
+    """Ask for an existing adapter password without publishing it as a default."""
+    return probatio.Schema({
+        probatio.Required(CONF_TCP_AUTH_PASSWORD): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+    })
+
+
+def network_adapter_schema(baudrates: tuple[int, ...]) -> probatio.Schema:
+    """Configure only supported adapter settings, keeping passwords optional."""
+    return probatio.Schema({
+        probatio.Required(CONF_BAUDRATE): probatio.In(baudrates),
+        probatio.Required(CONF_FRAME): SelectSelector(SelectSelectorConfig(
+            options=list(SUPPORTED_FRAMES), translation_key="frame", mode=SelectSelectorMode.DROPDOWN,
+        )),
+        probatio.Required(CONF_TCP_AUTHENTICATION): BooleanSelector(),
+        probatio.Optional(CONF_TCP_AUTH_PASSWORD): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+    })
 
 
 class _IntegerSelector(NumberSelector):

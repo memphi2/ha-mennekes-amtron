@@ -19,6 +19,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from ._flow_connect import async_test_connection
+from ._flow_gateway import GatewayChange
 from ._flow_search import (
     PROBE_RETRIES,
     PROBE_TIMEOUT,
@@ -27,14 +28,25 @@ from ._flow_search import (
     search_space,
 )
 from ._flow_serial import list_by_id_ports, list_comports, merge_port_options
-from .config_schemas import network_schema, service_schema, user_schema
+from .config_schemas import (
+    network_adapter_schema,
+    network_auth_schema,
+    network_schema,
+    service_schema,
+    user_schema,
+)
 from .data import DeviceIdentity
 from .device.client import SerialConfig
 from .device.client_errors import AmtronBusError, AmtronConnectionError
-from .device.connection import ConnectionConfig, NetworkConfig
+from .device.connection import (
+    ConnectionConfig,
+    NetworkConfig,
+    validate_tcp_auth_password,
+)
 from .device.const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
+    CONF_CONFIGURE_GATEWAY,
     CONF_CONNECTION_TYPE,
     CONF_DEVICE_ID,
     CONF_FRAME,
@@ -44,6 +56,8 @@ from .device.const import (
     CONF_SEARCH,
     CONF_SERIAL_NUMBER,
     CONF_STOPBITS,
+    CONF_TCP_AUTH_PASSWORD,
+    CONF_TCP_AUTHENTICATION,
     CONF_TCP_PORT,
     CONNECTION_RTU_OVER_TCP,
     CONNECTION_SERIAL,
@@ -58,6 +72,7 @@ from .device.const import (
     DOMAIN,
     SEARCH_FULL,
     SEARCH_OFF,
+    SUPPORTED_FRAMES,
     frame_display,
     frame_label,
     frame_parts,
@@ -66,6 +81,15 @@ from .device.identity import async_read_identity, display_identifier
 from .device.registers import VALIDATED_LAYOUT, layout_label
 from .device.service_config import validate_token
 from .device.service_discovery import APP_HOSTNAME
+from .device.waveshare_auth import WaveshareAuthenticationRejectedError
+from .device.waveshare_gateway import (
+    GATEWAY_BAUDRATES,
+    GatewayError,
+    GatewayRollbackError,
+    GatewaySettings,
+    GatewaySnapshot,
+    inspect_gateway,
+)
 from .entry_types import MennekesAmtronConfigEntry
 from .options_flow import MennekesAmtronOptionsFlow
 from .remote import CONF_SERVER_TOKEN, CONF_SERVER_URL, RemoteClient, server_url
@@ -106,6 +130,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         self._pending_step: str = "serial"
         self._discovered_service: dict[str, Any] | None = None
         self._discovered_serial: str | None = None
+        self._gateway_snapshot: GatewaySnapshot | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -126,6 +151,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         """Replace failed service credentials without recreating the device."""
         entry = self._get_reauth_entry()
         if CONF_SERVER_URL not in entry.data:
+            if entry.data.get(CONF_TCP_AUTHENTICATION) is True:
+                return await self.async_step_network_reauth()
             return self.async_abort(reason="reauth_not_supported")
         parts = urlsplit(str(entry.data[CONF_SERVER_URL]))
         if (
@@ -156,6 +183,47 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=service_schema(credentials_only=True),
             errors=errors,
         )
+
+    async def async_step_network_reauth(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
+        """Replace only the stored login after confirming this wallbox's identity."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                await self._async_reauthenticate_network(user_input.get(CONF_TCP_AUTH_PASSWORD))
+                return self.async_update_reload_and_abort(
+                    self._get_reauth_entry(), data_updates={CONF_TCP_AUTH_PASSWORD: user_input[CONF_TCP_AUTH_PASSWORD]},
+                )
+            except ValueError:
+                errors[CONF_TCP_AUTH_PASSWORD] = "invalid_tcp_auth_password"
+            except WaveshareAuthenticationRejectedError:
+                errors["base"] = "gateway_authentication_failed"
+            except AmtronConnectionError:
+                errors["base"] = "cannot_connect_network"
+            except AmtronBusError:
+                errors["base"] = "invalid_network_response"
+        return self.async_show_form(
+            step_id="network_reauth", data_schema=network_auth_schema(), errors=errors,
+        )
+
+    async def _async_reauthenticate_network(self, password: Any) -> None:
+        entry = self._get_reauth_entry()
+        original_data = dict(entry.data)
+        config = _network_config({**original_data, CONF_TCP_AUTH_PASSWORD: password})
+        loaded = entry.state is ConfigEntryState.LOADED
+        if loaded and not await self.hass.config_entries.async_unload(entry.entry_id):
+            raise AmtronConnectionError("cannot release the active connection")
+        try:
+            identity = await async_test_connection(config)
+            await self.async_set_unique_id(identity.serial_number or f"{DOMAIN}_{config.port}_{config.device_id}")
+            self._abort_if_unique_id_mismatch()
+            if dict(entry.data) != original_data:
+                raise AmtronConnectionError("connection settings changed during authentication")
+        except BaseException:
+            if loaded:
+                await self.hass.config_entries.async_setup(entry.entry_id)
+            raise
 
     async def async_step_reauth_app(
         self, user_input: dict[str, Any] | None = None
@@ -232,8 +300,27 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
-                config = _network_config(user_input)
-                return await self._async_test_and_finish(step_id, user_input, config)
+                if user_input.get(CONF_CONFIGURE_GATEWAY) is True:
+                    base = _network_config({**user_input, CONF_TCP_AUTHENTICATION: False, CONF_TCP_AUTH_PASSWORD: ""})
+                    snapshot = await inspect_gateway(base.host)
+                    if not snapshot.can_configure:
+                        errors["base"] = "gateway_unsupported"
+                    else:
+                        self._gateway_snapshot = snapshot
+                        self._pending_input = dict(user_input)
+                        self._pending_step = step_id
+                        return await self.async_step_network_adapter()
+                elif user_input.get(CONF_TCP_AUTHENTICATION) is True:
+                    # Validate the endpoint before asking for its credentials.
+                    _network_config({**user_input, CONF_TCP_AUTHENTICATION: False, CONF_TCP_AUTH_PASSWORD: ""})
+                    self._pending_input = dict(user_input)
+                    self._pending_step = step_id
+                    return await self.async_step_network_auth()
+                else:
+                    config = _network_config(user_input)
+                    return await self._async_test_and_finish(step_id, user_input, config)
+            except GatewayError as err:
+                errors["base"] = err.reason
             except ValueError:
                 errors["base"] = "invalid_network_config"
             except AmtronConnectionError as err:
@@ -250,6 +337,96 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={
                 "validated_layout": layout_label(VALIDATED_LAYOUT)
+            },
+        )
+
+    async def async_step_network_auth(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
+        """Authenticate an already configured adapter without changing it."""
+        pending = getattr(self, "_pending_input", None)
+        if pending is None:
+            return await self.async_step_network()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                config = _network_config({**pending, **user_input})
+                return await self._async_test_and_finish(self._pending_step, pending, config)
+            except ValueError:
+                errors[CONF_TCP_AUTH_PASSWORD] = "invalid_tcp_auth_password"
+            except WaveshareAuthenticationRejectedError:
+                errors["base"] = "gateway_authentication_failed"
+            except AmtronConnectionError:
+                errors["base"] = "cannot_connect_network"
+            except AmtronBusError:
+                errors["base"] = "invalid_network_response"
+        return self.async_show_form(
+            step_id="network_auth", data_schema=network_auth_schema(), errors=errors,
+        )
+
+    async def async_step_network_adapter(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
+        """Preview the recognized adapter, then explicitly apply and verify it."""
+        snapshot = getattr(self, "_gateway_snapshot", None)
+        pending = getattr(self, "_pending_input", None)
+        if snapshot is None or pending is None:
+            return await self.async_step_network()
+        errors: dict[str, str] = {}
+        suggested = {
+            CONF_BAUDRATE: snapshot.baudrate,
+            CONF_FRAME: snapshot.frame,
+            CONF_TCP_AUTHENTICATION: pending.get(CONF_TCP_AUTHENTICATION) is True or snapshot.tcp_authentication,
+        }
+        if self._pending_step in RECONFIGURE_STEPS:
+            old_data = self._get_reconfigure_entry().data
+            if old_data.get(CONF_CONNECTION_TYPE, CONNECTION_SERIAL) == CONNECTION_SERIAL and CONF_PORT in old_data:
+                serial = _serial_config(dict(old_data))
+                suggested.update({
+                    CONF_BAUDRATE: serial.baudrate,
+                    CONF_FRAME: frame_label(serial.bytesize, serial.parity, serial.stopbits),
+                })
+        if suggested[CONF_BAUDRATE] not in GATEWAY_BAUDRATES:
+            suggested[CONF_BAUDRATE] = DEFAULT_BAUDRATE
+        if suggested[CONF_FRAME] not in SUPPORTED_FRAMES:
+            suggested[CONF_FRAME] = DEFAULT_FRAME
+        if user_input is not None:
+            suggested.update({key: value for key, value in user_input.items() if key != CONF_TCP_AUTH_PASSWORD})
+            try:
+                password = user_input.get(CONF_TCP_AUTH_PASSWORD, "")
+                authentication = user_input[CONF_TCP_AUTHENTICATION]
+                if password or authentication:
+                    validate_tcp_auth_password(password)
+                config = _network_config({
+                    **pending, CONF_TCP_AUTHENTICATION: authentication,
+                    CONF_TCP_AUTH_PASSWORD: password if authentication else "",
+                })
+                change = GatewayChange(
+                    config.host, snapshot,
+                    GatewaySettings(
+                        baudrate=user_input[CONF_BAUDRATE], frame=user_input[CONF_FRAME],
+                        connection_type=config.connection_type,
+                        tcp_port=config.tcp_port, tcp_authentication=authentication,
+                    ),
+                    password,
+                )
+                return await self._async_test_and_finish(self._pending_step, pending, config, gateway=change)
+            except GatewayError as err:
+                errors["base"] = err.reason
+            except ValueError:
+                errors["base"] = "invalid_gateway_config"
+            except AmtronConnectionError:
+                errors["base"] = "cannot_connect_network"
+            except AmtronBusError:
+                errors["base"] = "invalid_network_response"
+        return self.async_show_form(
+            step_id="network_adapter",
+            data_schema=self.add_suggested_values_to_schema(network_adapter_schema(GATEWAY_BAUDRATES), suggested),
+            errors=errors,
+            description_placeholders={
+                "model": snapshot.model, "firmware": snapshot.firmware,
+                "baudrate": str(snapshot.baudrate), "frame": snapshot.frame,
+                "tcp_port": str(snapshot.tcp_port),
             },
         )
 
@@ -439,7 +616,8 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         return await self._async_show_bus_form(step_id, user_input, errors)
 
     async def _async_test_and_finish(
-        self, step_id: str, user_input: dict[str, Any], config: ConnectionConfig
+        self, step_id: str, user_input: dict[str, Any], config: ConnectionConfig,
+        *, gateway: GatewayChange | None = None,
     ) -> ConfigFlowResult:
         entry = (
             self._get_reconfigure_entry()
@@ -447,7 +625,9 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             else None
         )
         loaded = entry is not None and entry.state is ConfigEntryState.LOADED
-        if loaded and entry is not None and config == entry.runtime_data.client.config:
+        original_data = dict(entry.data) if gateway is not None and entry is not None else None
+        saved_data: dict[str, Any] | None = None
+        if loaded and entry is not None and gateway is None and config == entry.runtime_data.client.config:
             # The existing client owns the bus connection and serializes reads
             # with polling and heartbeat; an unchanged form needs no new client.
             identity = await async_read_identity(entry.runtime_data.client)
@@ -458,13 +638,32 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
             and not await self.hass.config_entries.async_unload(entry.entry_id)
         ):
             raise AmtronConnectionError("cannot release the active connection")
-        try:
+        async def finish() -> ConfigFlowResult:
+            nonlocal saved_data
             identity = await async_test_connection(config)
-            return await self._async_finish(step_id, user_input, identity, config=config)
-        except BaseException:
+            result = await self._async_finish(
+                step_id, user_input, identity, config=config, defer_reload=gateway is not None,
+            )
+            if original_data is not None and entry is not None:
+                saved_data = dict(entry.data)
+            return result
+
+        try:
+            result = await gateway.async_apply(finish) if gateway is not None else await finish()
+            if gateway is not None and entry is not None and result.get("reason") == "reconfigure_successful":
+                self.hass.config_entries.async_schedule_reload(entry.entry_id)
+            return result
+        except BaseException as err:
+            if original_data is not None and entry is not None:
+                if dict(entry.data) != (saved_data if saved_data is not None else original_data):
+                    # Another actor changed the entry while commit was pending;
+                    # do not overwrite it or resume a now-ambiguous connection.
+                    raise GatewayRollbackError from err
+                if saved_data is not None and saved_data != original_data:
+                    self.hass.config_entries.async_update_entry(entry, data=original_data)
             # A failed probe, wrong device or cancelled flow keeps the old entry
             # usable. On success the flow's update/reload helper starts it instead.
-            if loaded and entry is not None:
+            if loaded and entry is not None and not isinstance(err, GatewayRollbackError):
                 await self.hass.config_entries.async_setup(entry.entry_id)
             raise
 
@@ -609,6 +808,7 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         identity: DeviceIdentity,
         *,
         config: ConnectionConfig | None = None,
+        defer_reload: bool = False,
     ) -> ConfigFlowResult:
         if config is None:
             config = _serial_config(user_input)
@@ -633,6 +833,10 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         if step_id in RECONFIGURE_STEPS:
             self._abort_if_unique_id_mismatch()
             entry = self._get_reconfigure_entry()
+            if defer_reload:
+                # The old client is unloaded. Publish the new entry data, but
+                # do not start its connection until adapter commit succeeds.
+                return self.async_update_and_abort(entry, data=data)
             if not entry.update_listeners:
                 # An unloaded or failed setup has no listener to start it.
                 return self.async_update_reload_and_abort(entry, data=data)
@@ -656,9 +860,10 @@ class MennekesAmtronConfigFlow(ConfigFlow, domain=DOMAIN):
         """
 
         if user_input is not None:
-            return dict(user_input)
+            return {key: value for key, value in user_input.items() if key != CONF_TCP_AUTH_PASSWORD}
         if step_id in RECONFIGURE_STEPS:
             data = dict(self._get_reconfigure_entry().data)
+            data.pop(CONF_TCP_AUTH_PASSWORD, None)
             if step_id == "network_reconfigure":
                 # Serial/service data must not preselect an invalid LAN protocol.
                 if data.get(CONF_CONNECTION_TYPE, CONNECTION_SERIAL) == CONNECTION_SERIAL:
@@ -733,6 +938,8 @@ def _network_config(user_input: dict[str, Any]) -> NetworkConfig:
         tcp_port=user_input.get(CONF_TCP_PORT, DEFAULT_TCP_PORT),
         connection_type=user_input.get(CONF_CONNECTION_TYPE, CONNECTION_RTU_OVER_TCP),
         device_id=user_input.get(CONF_DEVICE_ID, DEFAULT_DEVICE_ID),
+        tcp_authentication=user_input.get(CONF_TCP_AUTHENTICATION, False),
+        tcp_auth_password=user_input.get(CONF_TCP_AUTH_PASSWORD, ""),
     )
 
 
@@ -744,6 +951,10 @@ def _network_input(config: NetworkConfig) -> dict[str, Any]:
         CONF_HOST: config.host,
         CONF_TCP_PORT: config.tcp_port,
         CONF_DEVICE_ID: config.device_id,
+        **({
+            CONF_TCP_AUTHENTICATION: True,
+            CONF_TCP_AUTH_PASSWORD: config.tcp_auth_password,
+        } if config.tcp_authentication else {}),
     }
 
 

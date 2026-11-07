@@ -5,7 +5,7 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
-The setup instructions below follow **beta 0.7.0b1** and its separate feature
+The setup instructions below follow **beta 0.7.0b2** and its separate feature
 menus. **0.6.1 remains the stable release.** Optional charging targets,
 departure planning, loss/cost estimates and command-result events are described here. For service
 connections, [update the app first](installation.md#updating-to-061).
@@ -63,12 +63,16 @@ Changing the current while paused can also queue a resume. The latest charging
 request replaces an older pending request. Repeating the same requested state
 does not extend the wait.
 
-With **no vehicle connected**, the longer wait is skipped when fresh wallbox
+For manually requested changes with **no vehicle connected**, the longer wait is skipped when fresh wallbox
 readings agree: EVSE is Idle and CP is A1 or A2. Unplugging during a queued
 wait is checked every five seconds, so the request can run earlier than the
 displayed due time. The five-second register-write guards and heartbeat remain.
 Unknown, inconsistent or unreadable status keeps the longer wait; older register
 layouts without CP status also keep it.
+
+Timed departure commands are cancelled when unplugging is confirmed before
+their write, including commands already waiting for the bus or an interval.
+This requires integration 0.7.0b2 in direct mode or service 0.7.0b2 in service mode.
 
 **Pending change** shows what is waiting, and **Pending change due** shows
 the planned execution time when known. While a phase change waits for the
@@ -157,7 +161,7 @@ changes and returns to the menu. Other sections keep their settings.
 |---|---|---|
 | Write permission | **Configure → Wallbox → Current limit and polling → Control mode** | App configuration: **Read-only** |
 | USB adapter, or LAN protocol/host/TCP port, and wallbox address | Integration entry: **Reconfigure** | App: **Open Web UI** |
-| Baud rate and frame | USB: **Reconfigure**; LAN: gateway configuration | USB: app **Open Web UI**; LAN: gateway configuration |
+| Baud rate and frame | USB: **Reconfigure**; LAN: adapter interface or optional [adapter setup](lan-adapters.md) | USB: app **Open Web UI**; LAN: adapter interface or optional [adapter setup](lan-adapters.md#service-app) |
 | Status and measurement polling | Integration options | App configuration |
 | How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
 | Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
@@ -202,6 +206,12 @@ The service cannot bridge its own shutdown, a host restart or a lost USB/LAN
 connection. In those cases, the wallbox follows its configured
 [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
 Check that behavior before relying on unattended charging.
+
+A continuous heartbeat or service-connection fault raises a repair after
+**60 seconds** when the heartbeat is managed and writes are enabled. It clears
+automatically after recovery; a connection repair has no recovery button.
+A lost HA-to-service link does not establish that the app stopped sending its
+heartbeat. See [connection repairs](troubleshooting.md#heartbeat-or-service-connection-repair).
 
 ## Energy dashboard and database size
 
@@ -461,6 +471,10 @@ request. Expiry does not undo a command already applied or stop an ongoing
 charge. The service continues its heartbeat and last applied state, subject
 to its charging limits. Service mode requires **app/service 0.6.1 or newer**
 for this behavior; update it before the integration.
+
+From **0.7.0b2**, the bus owner also checks for a disconnected vehicle before
+applying a planned command. Confirmed unplugging cancels that command, including
+while HA is offline when using service 0.7.0b2. Manual controls remain available.
 
 Current adjustments require at least 1 A difference and are spaced by at least
 five minutes; the status sensor has

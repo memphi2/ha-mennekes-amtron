@@ -62,6 +62,8 @@ from .device.const import (
     CONF_SERIAL_NUMBER,
     CONF_STATE_CHANGE_INTERVAL_SECONDS,
     CONF_STOPBITS,
+    CONF_TCP_AUTH_PASSWORD,
+    CONF_TCP_AUTHENTICATION,
     CONF_TCP_PORT,
     CONNECTION_SERIAL,
     DEFAULT_BAUDRATE,
@@ -82,6 +84,7 @@ from .device.errors import device_error
 from .device.heartbeat import HeartbeatTask
 from .device.identity import async_read_identity
 from .device.soc_goal_controller import SocGoalController
+from .device.waveshare_auth import WaveshareAuthenticationRejectedError
 from .device.write_state import WriteState
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import (
@@ -190,6 +193,10 @@ async def async_setup_entry(
             client.bind_identity(identity.serial_number)
     except BaseException as err:
         await client.async_close()
+        if isinstance(err, WaveshareAuthenticationRejectedError):
+            raise ConfigEntryAuthFailed(
+                translation_domain=DOMAIN, translation_key="gateway_authentication_failed"
+            ) from err
         if isinstance(err, ServiceConnectionError) and err.reason == "service_auth_failed":
             raise ConfigEntryAuthFailed(
                 translation_domain=DOMAIN, translation_key="service_auth_failed"
@@ -596,6 +603,8 @@ def _connection_config(entry: MennekesAmtronConfigEntry) -> ConnectionConfig:
             tcp_port=data.get(CONF_TCP_PORT, DEFAULT_TCP_PORT),
             connection_type=connection_type,
             device_id=data.get(CONF_DEVICE_ID, DEFAULT_DEVICE_ID),
+            tcp_authentication=data.get(CONF_TCP_AUTHENTICATION, False),
+            tcp_auth_password=data.get(CONF_TCP_AUTH_PASSWORD, ""),
         )
     return _serial_config(entry)
 
