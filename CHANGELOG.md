@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Recheck live wallbox state immediately before restart and phase writes,
+  including a vehicle disconnecting and reconnecting during the operation.
+- Keep saved targets and charging intent ordered when shutdown or a cancelled
+  request interrupts the same storage operation more than once.
+- Preserve charging-loss history while a vehicle identity is temporarily
+  unavailable; prevent costs from carrying over into a different plug cycle.
+- Reject unusable service tokens and detect concurrent Supervisor edits before
+  saving the app's connection settings.
+- Report complete polling failures without treating valid Modbus exceptions
+  as a lost connection.
+- Verify installed app catalog files as well as release metadata; remove an
+  unused release flag and correct support and configuration documentation.
+
 ## 0.7.0b3 — 2026-11-07
 
 Beta update of the integration and app; **0.6.1 remains stable**. This includes

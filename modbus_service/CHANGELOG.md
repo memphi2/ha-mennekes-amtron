@@ -1,5 +1,13 @@
 # Changes
 
+## Unreleased
+
+- Recheck live status before restart and phase writes, including reconnecting vehicles.
+- Finish interrupted intent saves in order, even after repeated cancellation.
+- Reject service tokens that cannot be used in an HTTP header and detect
+  concurrent Supervisor configuration changes before saving connection options.
+- Report complete polling failures while preserving valid Modbus exception responses.
+
 ## 0.7.0b3
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**. Includes the
