@@ -37,10 +37,10 @@ configuration:
     description: Fixé à 8765 ; la publication du port sur l’hôte est facultative et généralement inutile.
   connection_type:
     name: Connexion à la borne
-    description: "Ouvrez l’interface Web pour choisir un adaptateur USB ou saisir l’hôte et le port réseau. Enregistrez puis redémarrez l’application."
+    description: "Pour un adaptateur LAN compatible, ouvrez l’interface Web depuis l’onglet Infos de l’application. Choisissez LAN, saisissez l’hôte et sélectionnez « Lire les réglages de l’adaptateur LAN ». Pour le configurer, choisissez « Appliquer les réglages de l’adaptateur lors de l’enregistrement », puis enregistrez et redémarrez l’application. Les adaptateurs USB peuvent aussi y être choisis."
   host:
     name: Hôte / adresse IP de l’adaptateur
-    description: "Obligatoire en mode réseau : nom d’hôte ou adresse IP de l’adaptateur, sans schéma ni chemin d’URL. Laissez vide pour USB / RS-485. Utilisez un réseau privé de confiance."
+    description: "Obligatoire en mode réseau : nom d’hôte ou adresse IP de l’adaptateur, sans schéma ni chemin d’URL. Pour détecter et configurer un adaptateur compatible, saisissez cet hôte dans l’interface Web. Laissez vide pour USB / RS-485. Utilisez un réseau privé de confiance."
   tcp_port:
     name: Port TCP de l’adaptateur
     description: Port TCP configuré sur l’adaptateur ; 502 par défaut. Il ne s’agit pas du port HTTP 8765 du service indépendant.

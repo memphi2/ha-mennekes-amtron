@@ -103,6 +103,15 @@ restarts the adapter and stops the app's old Modbus connection immediately.
 After successful saving, restart the app to connect using the new settings.
 Detection alone changes nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/lan-adapters.md).
 
+The native **Configuration** tab contains manual connection fields; it does
+not have an adapter detection button. To detect and configure a compatible
+adapter, go to the app's **Info** tab, select **Open Web UI**, choose the LAN
+protocol and enter the adapter's host. Select **Read LAN adapter settings**,
+then select **Apply adapter settings when saving** and save. Reading inspects
+only the entered host. Applying changes the adapter immediately; restart the
+app afterwards to resume the connection. The native TCP-login switch changes
+the app connection only; it does not enable login on the adapter.
+
 This page requires a Home Assistant administrator and **Supervisor 2026.11.0 or
 newer** (stable). Older Supervisor versions can still save LAN settings in the
 native **Configuration** tab, including when an old USB adapter is absent. For

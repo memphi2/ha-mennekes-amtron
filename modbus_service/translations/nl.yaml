@@ -37,10 +37,10 @@ configuration:
     description: Vast ingesteld op 8765; het beschikbaar stellen van een hostpoort is optioneel en meestal niet nodig.
   connection_type:
     name: Wallboxverbinding
-    description: "Kies via Webinterface openen een USB-adapter of vul de LAN-host en poort in. Sla de wijzigingen op en herstart daarna de app."
+    description: "Open voor een compatibele LAN-adapter de Webinterface via het tabblad Info van de app. Kies LAN, vul de host in en kies ‘Instellingen van LAN-adapter lezen’. Kies om deze in te stellen ‘Adapterinstellingen toepassen bij opslaan’, sla op en herstart de app. Hier kun je ook USB-adapters kiezen."
   host:
     name: Adapterhost / IP-adres
-    description: "Verplicht voor LAN: hostnaam of IP-adres van de adapter, zonder URL-schema of pad. Laat dit leeg voor USB / RS-485. Gebruik een vertrouwd privénetwerk."
+    description: "Verplicht voor LAN: hostnaam of IP-adres van de adapter, zonder URL-schema of pad. Vul deze host in de Webinterface in om een compatibele adapter te herkennen en in te stellen. Laat dit leeg voor USB / RS-485. Gebruik een vertrouwd privénetwerk."
   tcp_port:
     name: TCP-poort van adapter
     description: TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.

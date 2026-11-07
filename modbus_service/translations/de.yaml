@@ -37,10 +37,10 @@ configuration:
     description: Fest auf 8765; eine Freigabe am Host ist optional und normalerweise unnötig.
   connection_type:
     name: Wallbox-Verbindung
-    description: "Die Verbindung am einfachsten unter „Weboberfläche öffnen“ einstellen: USB-Adapterliste oder LAN-Host und Port. Änderungen speichern und die App anschließend neu starten."
+    description: "Für einen kompatiblen LAN-Adapter im App-Reiter Info „Weboberfläche öffnen“ wählen. LAN auswählen, Host eingeben und „LAN-Adapter auslesen“ wählen. Zum Einrichten „Adaptereinstellungen beim Speichern anwenden“ auswählen und speichern. Danach die App neu starten. Dort lassen sich auch USB-Adapter auswählen."
   host:
     name: Adapter-Host / IP-Adresse
-    description: "Bei LAN erforderlich: Hostname oder IP-Adresse des Adapters, ohne URL-Schema oder Pfad. Bei USB / RS-485 leer lassen. Ein vertrauenswürdiges privates Netzwerk verwenden."
+    description: "Bei LAN erforderlich: Hostname oder IP-Adresse des Adapters, ohne URL-Schema oder Pfad. Zur Erkennung und Einrichtung eines kompatiblen Adapters diesen Host unter „Weboberfläche öffnen“ eingeben. Bei USB / RS-485 leer lassen. Ein vertrauenswürdiges privates Netzwerk verwenden."
   tcp_port:
     name: TCP-Port des Adapters
     description: Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.

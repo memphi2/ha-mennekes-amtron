@@ -37,10 +37,10 @@ configuration:
     description: Fissa a 8765; esporre la porta sull'host è facoltativo e normalmente non necessario.
   connection_type:
     name: Connessione wallbox
-    description: "Apri l’interfaccia Web per scegliere un adattatore USB o inserire host e porta LAN. Salva le modifiche e riavvia l’app."
+    description: "Per un adattatore LAN compatibile, apri l’interfaccia Web dalla scheda Informazioni dell’app. Scegli LAN, inserisci l’host e seleziona «Leggi impostazioni adattatore LAN». Per configurarlo, scegli «Applica le impostazioni dell’adattatore al salvataggio», salva e riavvia l’app. Qui puoi scegliere anche gli adattatori USB."
   host:
     name: Host / indirizzo IP adattatore
-    description: "Obbligatorio per LAN: nome host o indirizzo IP dell’adattatore, senza schema o percorso URL. Lascia vuoto per USB / RS-485. Usa una rete privata affidabile."
+    description: "Obbligatorio per LAN: nome host o indirizzo IP dell’adattatore, senza schema o percorso URL. Per rilevare e configurare un adattatore compatibile, inserisci questo host nell’interfaccia Web. Lascia vuoto per USB / RS-485. Usa una rete privata affidabile."
   tcp_port:
     name: Porta TCP adattatore
     description: Porta TCP configurata sull’adattatore; valore predefinito 502. Non è la porta HTTP 8765 del servizio indipendente.
