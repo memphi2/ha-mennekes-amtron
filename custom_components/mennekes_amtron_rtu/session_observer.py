@@ -17,6 +17,7 @@ from .device.charging_session import SessionHistory
 from .device.data import DeviceIdentity, WallboxData
 from .device.registers import CP_STATE, ENERGY_TOTAL
 from .goal_store import SessionHistoryStore
+from .vehicle_profiles import vehicle_options
 
 _LOGGER = logging.getLogger(__name__)
 _RETRY_SECONDS = 60.0
@@ -41,7 +42,7 @@ class SessionObserver:
         self._coordinator = coordinator
         self._enabled = (
             (
-                entry.options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+                vehicle_options(entry.options).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
                 or entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
             )
             and identity.layout_version >= ENERGY_TOTAL.min_layout

@@ -32,7 +32,7 @@ from .sensor_descriptions import (
     SENSOR_DESCRIPTIONS,
     AmtronSensorEntityDescription,
 )
-from .vehicle_soc_const import CONF_VEHICLE_SOC_ENTITY
+from .vehicle_profiles import vehicle_options, vehicle_soc_is_configured
 
 PARALLEL_UPDATES = 0
 
@@ -66,7 +66,7 @@ async def async_setup_entry(
         AmtronStateSensor(entry, runtime_data.coordinator, description)
         for description in CONTROL_SENSOR_DESCRIPTIONS
         if (description.key != "energy_goal_status" or identity.layout_version >= ENERGY_TOTAL.min_layout)
-        and (description.key != "soc_goal_status" or entry.options.get(CONF_VEHICLE_SOC_ENTITY))
+        and (description.key != "soc_goal_status" or vehicle_soc_is_configured(vehicle_options(entry.options)))
         and (description.key != "timed_goal_status" or runtime_data.timed_goal is not None)
     )
     entities.extend(

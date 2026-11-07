@@ -69,6 +69,9 @@
           "sunshine": "mdi:weather-sunny",
           "sunshine_plus": "mdi:solar-power-variant"
         }
+      },
+      "active_vehicle": {
+        "default": "mdi:car-multiple"
       }
     },
     "sensor": {

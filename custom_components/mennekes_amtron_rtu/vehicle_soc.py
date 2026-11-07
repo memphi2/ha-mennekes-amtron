@@ -29,6 +29,8 @@ from .device.client_errors import AmtronBusError
 from .device.errors import DeviceError
 from .device.soc_goal import SocGoal
 from .exceptions import service_validation_error
+from .vehicle_profiles import LEGACY_PROFILE_ID
+from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
 
 if TYPE_CHECKING:
     from .coordinator import MennekesAmtronCoordinator
@@ -152,13 +154,25 @@ class VehicleSocObserver:
         self, hass: HomeAssistant, control: SocControl,
         coordinator: MennekesAmtronCoordinator,
         soc_entity: str | None, limit_entity: str | None = None,
+        *, telemetry: VehicleTelemetrySource | None = None,
+        use_vehicle_soc: bool = False, use_vehicle_limit: bool = False,
+        profile_id: str | None = None,
     ) -> None:
         self._hass = hass
         self._control = control
         self._coordinator = coordinator
         self._soc_entity = soc_entity
         self._limit_entity = limit_entity
+        self._telemetry = telemetry
+        self._use_vehicle_soc = use_vehicle_soc
+        self._use_vehicle_limit = use_vehicle_limit
         self.source = f"{soc_entity}|{limit_entity or ''}" if soc_entity else None
+        if use_vehicle_soc:
+            self.source = f"vehicle:{telemetry.source_key}" if telemetry is not None else None
+        if self.source is not None and use_vehicle_limit:
+            self.source += f"|maximum:{telemetry.source_key if telemetry is not None else 'unavailable'}"
+        if self.source is not None and profile_id and profile_id != LEGACY_PROFILE_ID:
+            self.source = f"profile:{profile_id}:{self.source}"
         self._unsubscribers: list[CALLBACK_TYPE] = []
         self._pending: _Observations | None = None
         self._inflight: _Observations | None = None
@@ -176,12 +190,16 @@ class VehicleSocObserver:
 
     @property
     def latest_soc(self) -> float | None:
+        if self._use_vehicle_soc:
+            return self._telemetry.snapshot.soc_percent if self._telemetry is not None else None
         return vehicle_percentage(
             self._hass.states.get(self._soc_entity) if self._soc_entity else None,
         )
 
     @property
     def maximum(self) -> float | None:
+        if self._use_vehicle_limit:
+            return self._telemetry.snapshot.maximum_percent if self._telemetry is not None else None
         return vehicle_percentage(
             self._hass.states.get(self._limit_entity) if self._limit_entity else None,
             limit=True,
@@ -192,11 +210,24 @@ class VehicleSocObserver:
         self._unsubscribers.append(
             self._coordinator.async_add_listener(self._coordinator_updated),
         )
-        if self._soc_entity:
-            entities = [self._soc_entity]
-            if self._limit_entity:
-                entities.append(self._limit_entity)
-            observed_values = _Observation(self.latest_soc, self.maximum)
+        observed_values = _Observation(self.latest_soc, self.maximum)
+        if self._telemetry is not None and (self._use_vehicle_soc or self._use_vehicle_limit):
+            @callback
+            def telemetry_changed(value: VehicleTelemetry) -> None:
+                nonlocal observed_values
+                observed_values = _Observation(
+                    value.soc_percent if self._use_vehicle_soc else observed_values.soc,
+                    value.maximum_percent if self._use_vehicle_limit else observed_values.maximum,
+                )
+                self._queue_observation(observed_values)
+
+            self._unsubscribers.append(self._telemetry.subscribe(telemetry_changed))
+        entities = []
+        if self._soc_entity and not self._use_vehicle_soc:
+            entities.append(self._soc_entity)
+        if self._limit_entity and not self._use_vehicle_limit:
+            entities.append(self._limit_entity)
+        if entities:
 
             @callback
             def observed(event: Event[EventStateChangedData] | Event[EventStateReportedData]) -> None:
@@ -359,7 +390,8 @@ class VehicleSocObserver:
                 self._last_sent = None
                 self._clear_target_models()
             if (
-                value > 0 and self._limit_entity is not None and self.maximum is None
+                value > 0 and (self._limit_entity is not None or self._use_vehicle_limit)
+                and self.maximum is None
                 and self._control.soc_goal.maximum_percent is None
             ):
                 raise service_validation_error("soc_goal_limit_unavailable")

@@ -25,11 +25,22 @@ from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_charging_session import complete, reading
 
 
-def observer_at(path, *, source="sensor", layout=R.LAYOUT_V01_03, serial="wallbox", cost="disabled"):
+def observer_at(path, *, source="sensor", layout=R.LAYOUT_V01_03, serial="wallbox", cost="disabled", profile=False):
     hass = FakeHass(str(path))
     hass.async_add_executor_job = asyncio.to_thread
     options = {CONF_CHARGE_LOSS_SOURCE: source} if source is not None else {}
     options[CONF_CHARGING_COST_SOURCE] = cost
+    if profile:
+        profile_id = "a" * 32
+        options = {
+            "vehicle_profiles": {profile_id: {
+                "name": "Car", "provider": "none", "device_id": "", "options": {
+                    CONF_CHARGE_LOSS_SOURCE: source,
+                },
+            }},
+            "active_vehicle_profile": profile_id,
+            CONF_CHARGING_COST_SOURCE: cost,
+        }
     entry = FakeConfigEntry(options=options)
     coordinator = SimpleNamespace(observe_session=None)
     clock = [1000.0]
@@ -54,9 +65,10 @@ async def cycle(observer, clock, *, offset=0, baseline=100):
     return await observe(observer, clock, offset + 1030, total=baseline + 10)
 
 
-def test_complete_session_survives_restart_without_storing_partial_progress(tmp_path):
+@pytest.mark.parametrize("profile", [False, True])
+def test_complete_session_survives_restart_without_storing_partial_progress(tmp_path, profile):
     async def run():
-        observer, clock = observer_at(tmp_path)
+        observer, clock = observer_at(tmp_path, profile=profile)
         await observer.async_setup()
         assert not await asyncio.to_thread(observer._store.path.exists)
         await observe(observer, clock, 1000)
@@ -75,7 +87,7 @@ def test_complete_session_survives_restart_without_storing_partial_progress(tmp_
         assert json.loads(saved)["data"]["identity"] == "wallbox"
         await observer.async_close()
         assert observer._coordinator.observe_session is None
-        restarted, clock = observer_at(tmp_path)
+        restarted, clock = observer_at(tmp_path, profile=profile)
         await restarted.async_setup()
         after = await observe(restarted, clock, 1050, total=110)
         assert after.charging_session == finished.charging_session

@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from .session_observer import SessionObserver
     from .timed_goal_observer import TimedGoalObserver
     from .vehicle_soc import VehicleSocObserver
+    from .vehicle_sources import VehicleTelemetrySource
 
 
 @dataclass(slots=True)
@@ -45,6 +46,7 @@ class MennekesAmtronRuntimeData:
     goal: EnergyGoalController | None = None
     soc_goal: SocGoalController | None = None
     vehicle_soc: VehicleSocObserver | None = None
+    vehicle_telemetry: VehicleTelemetrySource | None = None
     timed_goal: TimedGoalObserver | None = None
     sessions: SessionObserver | None = None
     charge_loss: ChargeLossObserver | None = None

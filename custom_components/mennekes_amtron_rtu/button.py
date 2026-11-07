@@ -18,6 +18,7 @@ from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
 from .remote import CONF_SERVER_URL
 from .timed_goal_const import CONF_TIMED_CALENDAR_ENTITY
+from .vehicle_profiles import vehicle_options
 
 if TYPE_CHECKING:
     from homeassistant.components.button.const import ButtonDeviceClass
@@ -46,7 +47,7 @@ async def async_setup_entry(
         entities.append(AmtronRestartButton(entry, coordinator))
     if runtime_data.charge_loss is not None and runtime_data.charge_loss.mode == LOSS_SOURCE_SENSOR:
         entities.append(AmtronAssignChargeButton(entry, coordinator))
-    if runtime_data.timed_goal is not None and entry.options.get(CONF_TIMED_CALENDAR_ENTITY):
+    if runtime_data.timed_goal is not None and vehicle_options(entry.options).get(CONF_TIMED_CALENDAR_ENTITY):
         entities.append(AmtronNextDepartureButton(entry, coordinator))
     if runtime_data.timed_goal is not None and runtime_data.timed_goal.vehicle_departure_configured:
         entities.append(AmtronVehicleDepartureButton(entry, coordinator))

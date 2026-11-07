@@ -95,7 +95,7 @@ from .goal_store import (
     SocGoalStore,
     TimedGoalStore,
 )
-from .loss_store import LossStore
+from .loss_store import LossStore, async_prune_profile_losses
 from .network_tariff_year import (
     async_refresh_tariff_year,
     async_track_tariff_midnight,
@@ -121,8 +121,18 @@ from .timed_goal_const import (
     timed_goal_is_enabled,
 )
 from .timed_goal_observer import TimedGoalObserver
+from .vehicle_profiles import (
+    CONF_VEHICLE_LIMIT_USE_PROFILE,
+    CONF_VEHICLE_PROFILE_ID,
+    CONF_VEHICLE_PROFILES,
+    CONF_VEHICLE_SOC_USE_PROFILE,
+    profiles,
+    vehicle_options,
+    vehicle_soc_is_configured,
+)
 from .vehicle_soc import VehicleSocObserver
 from .vehicle_soc_const import CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_ENTITY
+from .vehicle_sources import resolve_telemetry_source
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _LOGGER = logging.getLogger(__name__)
@@ -155,6 +165,15 @@ async def async_setup_entry(
     # A failed optional cleanup leaves wallbox control available but cannot
     # restore the old trip, even if the feature has since been re-enabled.
     timed_reset_complete = await _async_reset_disabled_trip(hass, entry)
+    options = vehicle_options(entry.options)
+    if CONF_VEHICLE_PROFILES in entry.options:
+        catalog = profiles(entry.options)
+        raw_catalog = entry.options.get(CONF_VEHICLE_PROFILES)
+        if isinstance(raw_catalog, dict) and len(catalog) == len(raw_catalog):
+            try:
+                await async_prune_profile_losses(hass, entry.entry_id, catalog)
+            except OSError:
+                _LOGGER.warning("Deleted vehicle loss storage could not be removed; cleanup will retry on setup")
     remote = CONF_SERVER_URL in entry.data
     expected_serial = _entry_serial_binding(entry)
     client: MennekesModbusClient
@@ -283,7 +302,7 @@ async def async_setup_entry(
 
     try:
         if (
-            entry.options.get(CONF_TIMED_GOAL_ENABLED) is False
+            vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is False
             or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
             or not timed_reset_complete
         ):
@@ -294,13 +313,13 @@ async def async_setup_entry(
             except (AmtronBusError, HomeAssistantError) as err:
                 _raise_optional_setup_error(client, err, "timed_goal_unavailable")
             if timed_reset_complete and CONF_TIMED_GOAL_RESET_PENDING in entry.options:
-                options = dict(entry.options)
-                options.pop(CONF_TIMED_GOAL_RESET_PENDING)
+                stored_options = dict(entry.options)
+                stored_options.pop(CONF_TIMED_GOAL_RESET_PENDING)
                 # Complete both halves of the reset before consuming its
                 # authority. A failed reconnect must still cancel the old
                 # service queue on the next attempt, even after re-enabling.
-                hass.config_entries.async_update_entry(entry, options=options)
-        loss_enabled = entry.options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+                hass.config_entries.async_update_entry(entry, options=stored_options)
+        loss_enabled = options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
         cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
         if loss_enabled or cost_enabled:
             if not remote:
@@ -398,11 +417,16 @@ async def async_setup_entry(
         if loss_enabled:
             entry.runtime_data.charge_loss = ChargeLossObserver(hass, entry)
             await entry.runtime_data.charge_loss.async_start()
-        if entry.options.get(CONF_VEHICLE_SOC_ENTITY) or control.soc_goal.source is not None:
+        entry.runtime_data.vehicle_telemetry = resolve_telemetry_source(hass, options)
+        if vehicle_soc_is_configured(options) or control.soc_goal.source is not None:
             observer = VehicleSocObserver(
                 hass, control, coordinator,
-                entry.options.get(CONF_VEHICLE_SOC_ENTITY),
-                entry.options.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY),
+                options.get(CONF_VEHICLE_SOC_ENTITY),
+                options.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY),
+                telemetry=entry.runtime_data.vehicle_telemetry,
+                use_vehicle_soc=options.get(CONF_VEHICLE_SOC_USE_PROFILE) is True,
+                use_vehicle_limit=options.get(CONF_VEHICLE_LIMIT_USE_PROFILE) is True,
+                profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
             )
             entry.runtime_data.vehicle_soc = observer
             try:
@@ -410,8 +434,8 @@ async def async_setup_entry(
             except (AmtronBusError, HomeAssistantError, OSError) as err:
                 _raise_optional_setup_error(client, err, "soc_goal_unavailable")
         if (
-            timed_reset_complete and entry.options.get(CONF_VEHICLE_SOC_ENTITY)
-            and timed_goal_is_enabled(entry.options)
+            timed_reset_complete and vehicle_soc_is_configured(options)
+            and timed_goal_is_enabled(options)
         ):
             timed = TimedGoalObserver(hass, entry)
             entry.runtime_data.timed_goal = timed
@@ -495,7 +519,7 @@ def _raise_optional_setup_error(
 async def _async_reset_disabled_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> bool:
     """Remove the saved trip; retain reset authority until queues are cancelled."""
     if (
-        entry.options.get(CONF_TIMED_GOAL_ENABLED) is not False
+        vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is not False
         and entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True
     ):
         return True
@@ -587,6 +611,7 @@ async def async_remove_entry(
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()
     await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
     await LossStore(hass, entry.entry_id, "").async_remove()
+    await async_prune_profile_losses(hass, entry.entry_id, ())
     await ModelStore(hass, entry.entry_id, "", kind="charging_cost", model=LastChargingCost).async_remove()
     prefix = f"{entry.entry_id}_"
     for domain, issue_id in tuple(ir.async_get(hass).issues):
@@ -604,8 +629,11 @@ def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:
     platforms = list(READ_PLATFORMS)
     if CONF_SERVER_URL in entry.data or control_mode_is_master(dict(entry.options)):
         platforms.extend(CONTROL_PLATFORMS)
-    elif entry.options.get(CONF_CHARGE_LOSS_SOURCE) == LOSS_SOURCE_SENSOR:
-        platforms.append(Platform.BUTTON)
+    else:
+        if vehicle_options(entry.options).get(CONF_CHARGE_LOSS_SOURCE) == LOSS_SOURCE_SENSOR:
+            platforms.append(Platform.BUTTON)
+        if profiles(entry.options):
+            platforms.append(Platform.SELECT)
     return platforms
 
 

@@ -34,6 +34,11 @@ from .timed_goal_const import (
     CONF_TIMED_CAPACITY_KWH,
     CONF_TIMED_DEPARTURE_ENTITY,
 )
+from .vehicle_profiles import (
+    CONF_TIMED_USE_VEHICLE_CAPACITY,
+    CONF_VEHICLE_SOC_USE_PROFILE,
+    vehicle_options,
+)
 from .vehicle_soc import vehicle_percentage
 from .vehicle_soc_const import CONF_VEHICLE_SOC_ENTITY
 from .vehicle_sources import resolve_departure_source
@@ -87,6 +92,7 @@ class TimedGoalObserver:
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass = hass
         self._entry = entry
+        self._options = vehicle_options(entry.options)
         self._runtime = entry.runtime_data
         self._store = TimedGoalStore(hass, entry.entry_id, entry.runtime_data.identity.serial_number or "")
         self.goal = TimedGoal()
@@ -110,7 +116,7 @@ class TimedGoalObserver:
         self._command_submitted = True
         await self._cancel_command()
         self.goal = await self._store.async_load()
-        options = self._entry.options
+        options = self._options
         sources = [
             options.get(CONF_VEHICLE_SOC_ENTITY),
             options.get(CONF_TIMED_CAPACITY_ENTITY),
@@ -121,6 +127,11 @@ class TimedGoalObserver:
             self._unsubs.append(async_track_state_change_event(
                 self._hass, entities, self._source_changed,
             ))
+        if self._runtime.vehicle_telemetry is not None and (
+            options.get(CONF_TIMED_USE_VEHICLE_CAPACITY) is True
+            or options.get(CONF_VEHICLE_SOC_USE_PROFILE) is True
+        ):
+            self._unsubs.append(self._runtime.vehicle_telemetry.subscribe(self._source_changed))
         self._unsubs.append(async_track_time_interval(
             self._hass, self._timer, timedelta(minutes=1),
         ))
@@ -200,7 +211,7 @@ class TimedGoalObserver:
             if source is None:
                 # An explicit selection/clear wins over the current external
                 # timestamp until that source changes to another trip.
-                source_entity = self._entry.options.get(CONF_TIMED_DEPARTURE_ENTITY)
+                source_entity = self._options.get(CONF_TIMED_DEPARTURE_ENTITY)
                 source_time = departure_time(self._hass.states.get(source_entity)) if source_entity else None
                 source = (
                     f"entity:{source_entity}:{source_time.isoformat()}"
@@ -276,8 +287,8 @@ class TimedGoalObserver:
 
     async def async_use_next_calendar_event(self) -> None:
         """Select a single matching future event; later events never roll in."""
-        entity_id = self._entry.options.get(CONF_TIMED_CALENDAR_ENTITY)
-        title = self._entry.options.get(CONF_TIMED_CALENDAR_TITLE)
+        entity_id = self._options.get(CONF_TIMED_CALENDAR_ENTITY)
+        title = self._options.get(CONF_TIMED_CALENDAR_TITLE)
         if not isinstance(entity_id, str) or not isinstance(title, str) or not title:
             raise HomeAssistantError("A calendar and exact event title are required")
         now = dt_util.utcnow()
@@ -315,25 +326,28 @@ class TimedGoalObserver:
     @property
     def vehicle_departure_configured(self) -> bool:
         """Keep the import button when a configured vehicle is temporarily absent."""
-        return resolve_departure_source(self._hass, self._entry.options) is not None
+        return resolve_departure_source(self._hass, self._options) is not None
 
     @property
     def vehicle_departure_available(self) -> bool:
         """Whether the optional adapter has a valid selected vehicle."""
-        source = resolve_departure_source(self._hass, self._entry.options)
+        source = resolve_departure_source(self._hass, self._options)
         return source is not None and source.available
 
     async def async_use_vehicle_departure(self) -> None:
         """Copy one enabled local vehicle timer; never arm a recurring schedule."""
         original = self.goal
-        source = resolve_departure_source(self._hass, self._entry.options)
+        source = resolve_departure_source(self._hass, self._options)
         value = source.next_departure(dt_util.utcnow()) if source is not None else None
         if value is None:
             raise service_validation_error("timed_vehicle_unavailable")
         await self._set_deadline(value, source=None, expected=original)
 
     def _capacity(self) -> float | None:
-        options = self._entry.options
+        options = self._options
+        if options.get(CONF_TIMED_USE_VEHICLE_CAPACITY) is True:
+            telemetry = self._runtime.vehicle_telemetry
+            return telemetry.snapshot.capacity_kwh if telemetry is not None else None
         entity = options.get(CONF_TIMED_CAPACITY_ENTITY)
         if entity:
             return capacity_from_state(self._hass.states.get(entity))
@@ -362,7 +376,7 @@ class TimedGoalObserver:
         if self._save_unknown:
             await self._wait_for_input("error")
             return
-        options = self._entry.options
+        options = self._options
         source_entity = options.get(CONF_TIMED_DEPARTURE_ENTITY)
         if source_entity:
             value = departure_time(self._hass.states.get(source_entity))
@@ -394,7 +408,8 @@ class TimedGoalObserver:
             await self._wait_for_input("waiting_for_capacity")
             return
         soc_entity = options.get(CONF_VEHICLE_SOC_ENTITY)
-        soc = vehicle_percentage(
+        observer = self._runtime.vehicle_soc
+        soc = observer.latest_soc if observer is not None else vehicle_percentage(
             self._hass.states.get(soc_entity) if isinstance(soc_entity, str) else None
         )
         if soc is None:
