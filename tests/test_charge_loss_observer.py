@@ -257,6 +257,59 @@ def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path)
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("failed_attempts", [1, 2])
+def test_history_match_is_retried_after_storage_recovers_without_poll_churn(tmp_path, failed_attempts):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "bavariandata")
+        with patch(
+            "custom_components.mennekes_amtron_rtu.charge_loss_observer.async_read_history",
+            new=AsyncMock(return_value=HistoryMatch(8, 1)),
+        ) as read:
+            try:
+                await observer.async_start()
+                with patch.object(observer._store, "async_save", side_effect=OSError) as failed_save:
+                    coordinator.complete(energy=10)
+                    await hass.async_block_till_done()
+                    for attempt in range(failed_attempts):
+                        if attempt:
+                            observer._last_storage_attempt -= 61
+                            coordinator.async_update_listeners()
+                            await hass.async_block_till_done()
+                        assert not observer.available
+                        assert observer.statistics.sample_count == 0
+                        assert read.await_count == failed_save.await_count == attempt + 1
+                        # Polling during the retry interval neither queries the
+                        # vehicle history again nor attempts another disk write.
+                        for _ in range(5):
+                            coordinator.async_update_listeners()
+                            await hass.async_block_till_done()
+                        assert read.await_count == failed_save.await_count == attempt + 1
+
+                observer._last_storage_attempt -= 61
+                coordinator.async_update_listeners()
+                await hass.async_block_till_done()
+                assert observer.available
+                assert observer.statistics.last_loss_percent == pytest.approx(20)
+                assert observer.statistics.sample_count == 1
+                assert observer.statistics.association == "history"
+                assert read.await_count == failed_attempts + 1
+                restored = await observer._store.async_load()
+                assert restored.snapshot() == observer.statistics.snapshot()
+
+                with patch.object(observer._store, "async_save", wraps=observer._store.async_save) as save:
+                    for _ in range(5):
+                        coordinator.async_update_listeners()
+                        await hass.async_block_till_done()
+                    save.assert_not_awaited()
+                    assert read.await_count == failed_attempts + 1
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+
+    asyncio.run(run())
+
+
 def test_old_history_response_is_discarded_and_inflight_query_cancels_on_unload(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))
