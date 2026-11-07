@@ -44,5 +44,11 @@ configuration:
   tcp_port:
     name: TCP-Port des Adapters
     description: Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.
+  tcp_authentication:
+    name: "TCP-Anmeldung"
+    description: "Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz."
+  tcp_auth_password:
+    name: "Vorhandenes Webpasswort des Adapters"
+    description: "Vorhandenes Webpasswort des Adapters für die TCP-Anmeldung: 1–9 druckbare ASCII-Zeichen ohne Leerzeichen. Das Adapterpasswort wird dadurch nicht geändert."
 network:
   8765/tcp: Geschützte Dienst-API; interner Zugriff benötigt keine Portfreigabe am Host.

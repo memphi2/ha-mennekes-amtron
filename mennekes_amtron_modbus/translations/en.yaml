@@ -44,5 +44,11 @@ configuration:
   tcp_port:
     name: Adapter TCP port
     description: TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.
+  tcp_authentication:
+    name: "TCP login"
+    description: "Login does not encrypt the traffic. Firmware 1.523 allows bypassing it; use a protected local network."
+  tcp_auth_password:
+    name: "Existing adapter web password"
+    description: "Existing adapter web password for TCP login: 1–9 printable ASCII characters without spaces. This does not change the adapter password."
 network:
   8765/tcp: Authenticated service API; internal access needs no host port.

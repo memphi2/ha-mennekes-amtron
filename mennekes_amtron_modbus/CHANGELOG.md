@@ -1,5 +1,34 @@
 # Changes
 
+## 0.7.0b3
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**. Includes the
+changes from the incomplete 0.7.0b2 publication.
+
+- Recover failed measurements with individual, bounded retries.
+- Confirm the current pause before skipping a stop at an energy or SoC target.
+- Let the heartbeat pass between identity verification and data reads after
+  reconnecting, without accepting data from a changed connection.
+- Prevent further connection saves after an unconfirmed Supervisor write;
+  unchanged options no longer send a redundant save request.
+- Retain saved login credentials for equivalent hostnames and clarify the
+  recovery guidance in all five app languages.
+- Remove unused charging helpers; keep API 2 and existing app data.
+
+## 0.7.0b2
+
+- Keep the old connection stopped when a delayed adapter update cannot be ruled
+  out after a failed setup operation.
+- Add optional Waveshare TCP login and guided LAN-adapter detection and setup.
+- Verify and restore communication settings when applying or saving fails, and
+  prevent reconnecting with outdated settings until the app is restarted.
+- Keep the existing adapter web password private and stop repeated login
+  attempts after a confirmed password rejection.
+- Include the connection page in the released Docker image; test the release
+  build context on both supported architectures.
+- Cancel planned charging commands after a confirmed vehicle disconnection,
+  even when Home Assistant is unavailable.
+
 ## 0.7.0b1
 
 Beta update; **0.6.1 remains stable**. Available through **#apps-beta** only.
