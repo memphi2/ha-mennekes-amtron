@@ -173,6 +173,38 @@ def test_definite_invalid_target_is_rejected_but_unknown_storage_is_not(tmp_path
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("original_unknown", [False, True])
+def test_final_save_failure_never_reports_an_uncertain_goal_rejected(tmp_path, original_unknown):
+    async def run():
+        service = await _ready(tmp_path)
+        persist, goal_persist = service._persist, service.soc_goal._persist
+
+        async def fail_final_save():
+            raise OSError("final save failed")
+
+        async def unknown_goal_save():
+            raise StorageStateUnknownError("readback failed")
+
+        try:
+            service._persist = fail_final_save
+            if original_unknown:
+                # The explicit zero candidate has the same snapshot as before.
+                # A later ordinary save error must not mask the first unknown
+                # disk state and cause the command to be reported as rejected.
+                service.soc_goal._persist = unknown_goal_save
+            token = service.soc_transactions.reserve()
+            result = await service.soc_transactions.commit(
+                _target(service, token, 0 if original_unknown else 80),
+            )
+            assert result["outcome"] == "unknown"
+            assert service.control.soc_goal.target_percent == (0 if original_unknown else 80)
+        finally:
+            service._persist, service.soc_goal._persist = persist, goal_persist
+            await service.stop()
+
+    asyncio.run(run())
+
+
 def test_http_reservation_is_authenticated_and_late_commit_is_fenced(tmp_path):
     async def run():
         service = await _ready(tmp_path)
@@ -195,6 +227,84 @@ def test_http_reservation_is_authenticated_and_late_commit_is_fenced(tmp_path):
                     assert (await response.json())["outcome"] == "cancelled"
                 assert service.control.soc_goal.target_percent == 0
         finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("path", "payload"), [
+    ("reserve", {"unexpected": True}),
+    ("resolve", {}),
+    ("resolve", {"token": "a" * 32, "unexpected": True}),
+    ("commit", {"token": "a" * 32}),
+])
+def test_http_rejects_malformed_transaction_without_mutation(tmp_path, path, payload):
+    async def run():
+        service = await _ready(tmp_path)
+        try:
+            async with TestServer(create_app(service)) as server, ClientSession() as client:
+                async with client.post(
+                    server.make_url(f"/v2/soc-goal/{path}"), json=payload,
+                    headers={"Authorization": f"Bearer {TOKEN}"},
+                ) as response:
+                    assert response.status == 400
+                    assert await response.json() == {"error": "invalid_request"}
+                assert service.control.soc_goal.status == "disabled"
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_http_resolve_can_fence_target_while_bus_admission_is_full(tmp_path):
+    async def run():
+        service = await _ready(tmp_path)
+        entered, release = asyncio.Event(), asyncio.Event()
+        in_flight = 0
+        requests = []
+
+        async def blocked_read(_payload):
+            nonlocal in_flight
+            in_flight += 1
+            if in_flight == 8:
+                entered.set()
+            await release.wait()
+            return {"value": 0}
+
+        service.read = blocked_read
+        try:
+            async with TestServer(create_app(service)) as server, ClientSession() as client:
+                headers = {"Authorization": f"Bearer {TOKEN}"}
+                async with client.post(
+                    server.make_url("/v2/soc-goal/reserve"), json={}, headers=headers,
+                ) as response:
+                    token = (await response.json())["token"]
+                requests = [asyncio.create_task(client.post(
+                    server.make_url("/v2/read"), json={"register": "error_code"}, headers=headers,
+                )) for _ in range(8)]
+                await asyncio.wait_for(entered.wait(), 3)
+                async with client.post(
+                    server.make_url("/v2/soc-goal/commit"), json=_target(service, token), headers=headers,
+                ) as response:
+                    assert response.status == 503
+                async with client.post(
+                    server.make_url("/v2/soc-goal/resolve"), json={"token": token}, headers=headers,
+                ) as response:
+                    assert response.status == 200
+                    assert (await response.json())["outcome"] == "cancelled"
+                release.set()
+                for response in await asyncio.gather(*requests):
+                    async with response:
+                        assert response.status == 200
+                async with client.post(
+                    server.make_url("/v2/soc-goal/commit"), json=_target(service, token), headers=headers,
+                ) as response:
+                    assert (await response.json())["outcome"] == "cancelled"
+                assert service.control.soc_goal.status == "disabled"
+        finally:
+            release.set()
+            if requests:
+                await asyncio.gather(*requests, return_exceptions=True)
             await service.stop()
 
     asyncio.run(run())
