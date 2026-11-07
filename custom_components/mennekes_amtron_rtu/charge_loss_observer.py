@@ -32,6 +32,7 @@ from .device.charging_session import CompletedSession
 from .device.registers import CP_STATE, EVSE_STATE
 from .device.vehicle import vehicle_connected
 from .exceptions import service_validation_error
+from .goal_store import _finish_atomic
 from .loss_store import LossStore
 from .vehicle_sources import loss_source, resolve_history_source
 
@@ -264,6 +265,14 @@ class ChargeLossObserver:
 
     async def _save(self, candidate: LossStatistics) -> bool:
         self._last_storage_attempt = time.monotonic()
+
+        # The atomic store completes its write even when its caller is
+        # cancelled. Commit the corresponding in-memory snapshot as part of
+        # the same protected operation before cancellation reaches the caller.
+        await _finish_atomic(asyncio.create_task(self._save_and_publish(candidate)))
+        return self._storage_ok
+
+    async def _save_and_publish(self, candidate: LossStatistics) -> None:
         try:
             await self._store.async_save(candidate)
         except (OSError, ValueError):
@@ -277,7 +286,6 @@ class ChargeLossObserver:
             self._storage_ok = True
         if changed:
             self._coordinator.async_update_listeners()
-        return self._storage_ok
 
     async def async_assign(self) -> None:
         """Explicitly associate a last-energy value; never change charging state."""

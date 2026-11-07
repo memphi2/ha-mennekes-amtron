@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -13,6 +14,7 @@ from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 
+from custom_components.mennekes_amtron_rtu import goal_store
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
     CONF_LOSS_AUTO_MATCH,
@@ -295,6 +297,45 @@ def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path)
         finally:
             await observer.async_stop()
             await hass.async_stop()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("cancel_count", [1, 2])
+def test_cancelled_assignment_keeps_memory_and_durable_loss_in_sync(tmp_path, monkeypatch, cancel_count):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        started, release = threading.Event(), threading.Event()
+        writer = goal_store.write_utf8_file_atomic
+
+        def delayed(*args, **kwargs):
+            started.set()
+            assert release.wait(5)
+            writer(*args, **kwargs)
+
+        try:
+            await observer.async_start()
+            coordinator.complete()
+            await hass.async_block_till_done()
+            hass.states.async_set("sensor.car_energy", "8", {"unit_of_measurement": "kWh"})
+            monkeypatch.setattr(goal_store, "write_utf8_file_atomic", delayed)
+            task = asyncio.create_task(observer.async_assign())
+            try:
+                assert await asyncio.to_thread(started.wait, 5)
+                for _ in range(cancel_count):
+                    task.cancel()
+                    await asyncio.sleep(0)
+            finally:
+                release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert observer.statistics.last_loss_percent == pytest.approx(20)
+            assert (await observer._store.async_load()).snapshot() == observer.statistics.snapshot()
+        finally:
+            release.set()
+            await observer.async_stop()
+            await hass.async_stop()
+
     asyncio.run(run())
 
 
