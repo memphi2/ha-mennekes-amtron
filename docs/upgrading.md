@@ -32,6 +32,10 @@ service-connection failures now show Repairs notices that clear after recovery.
 
 ## Feature settings after an update
 
+The following profile, automatic-selection and dialog improvements are
+**unreleased changes in this branch**. Published beta 0.7.0b4 does not contain
+them. Existing sources remain usable until you deliberately adopt new setup.
+
 The integration's **Configure** menu separates **Wallbox**, **Vehicle**,
 **Next departure**, **Charging costs** and **Charging losses**. Each section
 shows the inputs for the features you enable and saves independently.
@@ -56,8 +60,11 @@ trip and cancels its queued commands while preserving the ordinary percentage
 target and current pause state. See [feature setup](user-guide.md#configuration-and-options).
 
 Module 3 now offers **Enter or edit manually** or **Import for HA Home**. Opening its
-settings alone makes no external lookup. Yearly refresh is still a separate
-optional choice; existing choices are retained.
+settings alone makes no external lookup. Yearly refresh is a separate
+optional choice after manual entry or import; it can replace saved manual prices
+and windows with the new year's published tariff. It repeats the Home-coordinate
+lookup, with daily retries if no usable tariff is available. Existing choices
+are retained; opening settings alone does not enable it.
 
 ## Updating to 0.6.1
 
@@ -138,13 +145,15 @@ LAN shows the gateway host/IP and TCP port. Saving LAN also clears any old USB
 path, so an unplugged adapter cannot block the change. A missing USB adapter is
 never replaced automatically.
 
-The updated page requires stable **Supervisor 2026.10.4 or newer** for its
-administrator access check. App releases through 0.7.0b4 require 2026.11.0 or
-newer; update the app to use the lower requirement. This is a requirement of
+The **unreleased correction in this branch** accepts stable **Supervisor
+2026.10.4 or newer** for the administrator access check. Published app releases
+through 0.7.0b4 still require 2026.11.0. Until a release includes the correction,
+use the native Configuration tab if the guided page rejects your Supervisor. This is a requirement of
 the page, not a new minimum Home Assistant
 version for the integration. On older Supervisor versions, the native app
 **Configuration** tab remains available; its serial path is a text field in
-0.6.0b1. Update Supervisor to use the guided USB dropdown.
+0.6.0b1. Follow the release notes for the guided-page correction rather than
+reinstalling the integration.
 
 Save, then restart the app from its **Info** tab. Saving does not change a running
 connection. **Read-only**, current limits and polling intervals remain in the

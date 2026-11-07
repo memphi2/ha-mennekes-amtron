@@ -1,68 +1,69 @@
 # Mennekes Amtron RTU documentation
 
-Connect your wallbox, control charging and track its energy use in Home
-Assistant. Communication stays local over RS-485.
+Choose the task you want to complete. Basic charging needs no vehicle cloud
+account, calendar, tariff import or YAML configuration.
 
-Reach the RS-485 bus through USB or a [LAN adapter](network-gateway.md).
-A LAN connection requires no local USB device.
+## Start here
 
-## Get started
+1. [Install and choose a connection](installation.md): the service app is
+   recommended but optional; direct USB and LAN remain supported.
+2. [Check the wallbox and try a first charge](quickstart.md).
+3. [Use current control and pause/resume](user-guide.md).
+4. [Add optional functions](features.md) only when you need them.
 
-1. Check your model in the [compatibility matrix](compatibility.md) and prepare
-   the connection using the [hardware guide](hardware.md).
-2. [Install the integration](installation.md), then connect through the
-   recommended [service app](modbus-service.md) or a
-   [direct USB](quickstart.md) / [LAN connection](network-gateway.md).
-3. Open the [User guide](user-guide.md) for the current slider, pause switch,
-   readings and options.
+Already installed? Keep your device and entity IDs. Use
+[Updates and connection changes](upgrading.md) instead of adding the wallbox again.
 
-You can connect the USB or LAN adapter directly to the integration or use the
-**optional, recommended [Modbus service](modbus-service.md)**. The service keeps
-the heartbeat and last charging state through Home Assistant Core restarts.
-An app shutdown, host restart or USB/LAN failure still requires the wallbox's
-configured fallback.
+## Find the right guide
 
-## Use your wallbox
-
-| I want to… | Read |
+| Your task | Guide |
 |---|---|
-| Set current, pause charging or change options | [User guide](user-guide.md) |
-| Understand a sensor or find its template states | [Entity reference](entities.md) |
-| Charge from PV surplus | [Blueprints](blueprints.md) |
-| Charge for the next trip | [Departure planning](user-guide.md#charge-for-the-next-departure), [calendar and climate blueprints](blueprints.md) |
-| Set up a tariff schedule or action | [Automations](automations.md) |
-| Estimate charging losses or costs | [Charging estimates](charging-estimates.md) |
-| Use the Energy dashboard and reduce database growth | [Recorder](recorder.md) |
-| Solve a connection, control or heartbeat problem | [Troubleshooting](troubleshooting.md) |
-| Update or remove the integration | [Installation and updates](installation.md) |
-| Understand hardware limits and fallback behavior | [Safety and limitations](safety.md) |
+| Install the recommended service app | [Modbus service](modbus-service.md) |
+| Use a LAN-to-RS-485 adapter | [LAN connection](network-gateway.md) |
+| Select one car, several cars or optional automatic detection | [Vehicle setup](vehicle-setup.md) |
+| Reach a charge target for the next trip | [Departure planning](departure-planning.md) |
+| Use a calendar, climate action or PV surplus | [Blueprints](blueprints.md) |
+| Estimate charging costs or losses | [Charging estimates](charging-estimates.md) |
+| Find a control, sensor or template state | [Entity reference](entities.md) |
+| Reduce Recorder/database growth | [Recorder guide](recorder.md) |
+| Resolve a missing control, heartbeat fault or unclear vehicle match | [Troubleshooting](troubleshooting.md) |
+| Understand wiring, supported models and operating limits | [Hardware](hardware.md), [compatibility](compatibility.md), [safety](safety.md) |
 
-## Three settings worth knowing
+## Versions and feature availability
 
-- **0 A removes the current limit.** Use **Charging paused** to stop charging.
-- **Write access has one setting.** With direct USB or LAN, select **Modbus master**
-  in the integration options. With the service, disable **Read-only** in the
-  app configuration, save and restart the app. HA follows its next status update
-  without a Core restart.
-- **One connection owns the bus.** Read-only mode still sends requests. Do not
-  run a direct connection and the service against the same adapter at the same time.
+These pages follow the current development branch. A feature described here may
+not yet be present in the release installed in Home Assistant.
 
-## Advanced setup and reference
-
-| Document | What you will find |
+| Version | Available functionality |
 |---|---|
-| [Standalone service](service-standalone.md) | Run the service outside a Home Assistant app |
-| [LAN connection](network-gateway.md) | Transparent RTU over TCP or translating Modbus TCP |
-| [Compatible LAN adapter setup](lan-adapters.md) | Detect and explicitly configure supported Waveshare adapters |
-| [Service reference](service-reference.md) | Service configuration and technical details |
-| [Updates and switching connections](upgrading.md) | Updates and moving an existing wallbox to the service |
-| [Modbus register map](modbus-registers.md) | Register meanings, values and read blocks |
-| [Architecture](architecture.md) | How the integration and service fit together |
-| [Quality scale](quality-scale.md) | Home Assistant quality-scale status |
-| [Maintenance validation](validation.md) | Compatibility, resource, privacy and release checks |
-| [Recorder validation](recorder-validation.md) | Database measurements, retention tests and their limits |
-| [Service publication](service-releasing.md) | App channels and container publication |
-| [Repository settings](repository-settings.md) | Branch protection and security requirements |
-| [Legal notes](legal.md) | Licence and trademark information |
-| [Provenance audit](audits/current-legal-provenance.md) | Source and licensing evidence |
-| [November compatibility audit](ha-2026-11-validation.md) | Recorded compatibility and Recorder validation |
+| **Stable 0.6.1** | USB/LAN, optional service app, normal controls, kWh/percentage targets, next-trip planning, calendar/BavarianData timer import, costs and losses. |
+| **Published beta 0.7.0b4** | Separate feature menus, optional supported Waveshare setup/TCP login and additional control/recovery fixes. |
+| **Unreleased changes in this branch** | Central vehicle profiles, manual or optional automatic profile selection, shared BavarianData telemetry, live app Modbus debugging, improved configuration dialogs and corrected guided-page support for Supervisor 2026.10.4+. |
+
+Published app releases through 0.7.0b4 still require Supervisor 2026.11.0 to open
+the guided page. If that page rejects your current stable Supervisor, use the
+app's native **Configuration** tab; see [the version-specific explanation](upgrading.md#app-connection-page).
+Installing an existing beta does not include changes marked **unreleased**.
+
+The integration and app do not need matching version numbers. Follow the
+release's minimum-service requirement and [update instructions](installation.md#updates).
+Switching app catalogs creates a separate app and requires a controlled handover.
+
+## Three settings to remember
+
+- **0 A removes the current limit.** Use **Charging paused** to pause.
+- **Enable writes in one place.** Service: app Read-only off. Direct: integration
+  Control mode set to Modbus master.
+- **One owner uses the bus.** Stop the old owner before starting another;
+  read-only mode still sends requests.
+
+## Advanced reference
+
+- [Standalone service](service-standalone.md), [service configuration](service-reference.md)
+  and [LAN adapter configuration](lan-adapters.md)
+- [Automation actions](automations.md) and [Modbus register map](modbus-registers.md)
+- [Architecture](architecture.md), [quality scale](quality-scale.md),
+  [maintenance validation](validation.md) and [Recorder validation](recorder-validation.md)
+- [Service publication](service-releasing.md), [repository settings](repository-settings.md)
+  and [November compatibility audit](ha-2026-11-validation.md)
+- [Legal information](legal.md) and [provenance evidence](audits/current-legal-provenance.md)

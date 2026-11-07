@@ -13,9 +13,30 @@ connection and HA connects to the app's HTTP API.
 | Heartbeat is unhealthy or error 200 appears | [Heartbeat recovery](#error-200-energy-manager-unavailable) |
 | Charging does not follow the slider or pause switch | [Charging current](#the-charging-current-does-not-follow) |
 | Sensors became unavailable | [Missing readings](#some-sensors-became-unavailable) |
+| Vehicle selection is empty or chooses no car | [Vehicle profiles and automatic selection](#vehicle-profiles-and-automatic-selection) |
+| A percentage target or departure time is missing or not followed | [Targets and departure planning](#targets-and-departure-planning) |
+| A loss or cost estimate is unknown | [Charging estimates](#loss-or-cost-estimates-are-unknown) |
+| A new menu or debug panel is absent | [Feature availability](#a-documented-feature-is-missing) |
 | History keeps growing | [Database size](#the-database-keeps-growing) |
 
+Before restarting, note the current charging/pause state and download diagnostics
+if the issue is intermittent. A restart can erase useful in-memory evidence and
+interrupt the heartbeat. Use the targeted check below first.
+
 For installation, downloads and updates, see [Installation and updates](installation.md).
+
+## A documented feature is missing
+
+Check [versions and feature availability](README.md#versions-and-feature-availability).
+Central vehicle profiles, automatic profile selection and the app live-debug
+panel are currently **unreleased**, so installing published beta 0.7.0b4 does
+not add them. Do not delete and recreate the wallbox to reveal a new feature.
+
+For a released optional feature, enable it in its own configuration section.
+A percentage target needs a vehicle SoC source; departure planning also needs
+usable capacity. Some diagnostics and the running-cost entity are disabled by
+default and can be enabled in the entity's settings.
+
 
 ## Entities are missing
 
@@ -81,7 +102,7 @@ itself, or configure those fields in the app when the service owns it.
 | App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
 | Older app **0.5.2b2** rejects LAN settings because an old USB device no longer exists | Update to **0.6.1**, which includes the fix for this validation conflict. Before updating, clear the saved **Serial adapter** selection in the native Configuration tab, then save LAN settings and restart. LAN needs no local USB device. |
 | **Connection setup required** | Open the app's **Web UI**, choose USB or LAN, save and restart. Until then, the app runs only setup and health checks, without Modbus, heartbeat or discovery. |
-| Web UI requests a Supervisor update | The guided connection page requires an administrator and stable **Supervisor 2026.10.4+**. The native Configuration tab remains available; see [connection setup](upgrading.md#app-connection-page). This does not change the integration's HA minimum version. |
+| Web UI requests Supervisor 2026.11.0 while stable Supervisor is 2026.10.x | Published app releases through 0.7.0b4 have an overly strict version check. The 2026.10.4+ correction is currently unreleased. Use the native Configuration tab in the meantime; see [connection setup](upgrading.md#app-connection-page). The integration's HA minimum version is unchanged. |
 
 An app that starts successfully can still be waiting for the wallbox. The log
 separates API startup, USB/LAN connection, heartbeat start/stop and shutdown.
@@ -300,6 +321,66 @@ determines when confirmation arrives. Once confirmed, the due time shows the end
 of the configured extra wait. An idle wallbox with no vehicle skips confirmation
 and that extra wait.
 
+## Vehicle profiles and automatic selection
+
+These functions are **unreleased in this branch**. If your installed build
+includes them, check the following before changing unrelated wallbox settings:
+
+| Symptom | What to do |
+|---|---|
+| No vehicle is selected | Select the connected profile manually, or check the automatic mode below. Basic wallbox controls still work without a vehicle profile. |
+| The selector says Automatic selection, but no profile is active | Open its details. Exactly one configured car must have clear cable-connected and home signals. No match, multiple matches or unresolved candidates leave no active profile. |
+| A second car's missing signal blocks detection | A definite disconnected/away signal excludes that car. Otherwise its missing signal leaves an unresolved candidate; fix the source or choose manually. |
+| Detection does not use BavarianData | Choose the vehicle integration as the profile's detection source and enable its cable/tracker entities. Choosing BavarianData for SoC alone does not enable detection. |
+| A recent HA state still seems wrong | The vehicle integration may have restored or cached an old cable/GPS value. A recent HA report does not prove a recent vehicle measurement. Check the vehicle integration and choose the correct profile manually. |
+| Detection stopped after a manual selection | Expected: choosing a car or no vehicle manually turns automatic mode off. Select Automatic selection again when you want it back. |
+| The old percentage target or trip vanished | Expected after a profile/source change or loss of an automatic assignment. Set a new target for the confirmed car; the integration does not carry another car's target over. |
+
+New positive matches settle for three seconds. Reports older than 30 minutes,
+unknown/unavailable states and an uncertain GPS position at the Home boundary
+cannot establish a positive match. See [vehicle setup](vehicle-setup.md) for the
+complete signal and freshness rules.
+
+## Targets and departure planning
+
+| Symptom | Meaning and next step |
+|---|---|
+| Setting 80% did not start charging | A percentage target only limits charging. Resume explicitly, or configure a timed departure plan. |
+| A paused car resumed while a departure was active | The timed plan is allowed to lift a manual pause. Clear Next departure when you want the pause to remain. |
+| No percentage-target entity | Enable its SoC source under Vehicle and select the correct profile/source. Check write permission for control availability. |
+| No positive target can be set with the vehicle maximum enabled | Wait for its first valid maximum report, or disable that optional source and choose your own maximum. |
+| SoC disappeared but charging continued | This is the configured behavior. Monitoring resumes on valid data; use the vehicle's own limit for protection during data outages. |
+| The planner does not adjust current | Check SoC, usable capacity, target and a future departure time. Missing data leaves the current charging state unchanged. Current adjustments also have their own minimum spacing. |
+| Calendar time changed but Next departure did not | The button copied one event. Press it again or use the calendar blueprint to select the next trip. |
+| The BMW departure button found no time | Enable the selected car's timer action/hour/minute entities. The action must be active; recurring timers also need configured weekdays. Check vehicle time zone. |
+| Climate did not start | Importing a departure time does not operate climate. Configure the preconditioning blueprint and your vehicle action/script; inspect that automation's trace. |
+| A target was reached but the car is still briefly drawing power | Meter/vehicle reports and commands take time. Check pending state, power and pause confirmation. These targets are not instantaneous cutoffs. |
+
+[Vehicle targets](vehicle-setup.md#optional-vehicle-percentage-target),
+[energy-target recovery](user-guide.md#energy-target) and
+[departure setup](departure-planning.md) explain each control's behavior.
+
+## Loss or cost estimates are unknown
+
+A completed charge ends when you unplug; a pause is part of the same connection
+cycle. The integration needs to observe a complete cycle and reliable meter data.
+If it started observing halfway through, an unknown result is more accurate
+than assigning an old result to that charge.
+
+- **Losses:** confirm that the car value is energy entering the battery, from
+  the same charge. History must match its times; a lone last-charge kWh value
+  may need explicit assignment. Select the profile before charging starts.
+- **Costs:** check the price sensor's unit and recent reports. Missing prices,
+  meter gaps or HA downtime make the result incomplete. The old dynamic price
+  expires after 90 minutes without reports.
+- **German Module 3:** check the tariff year, all three prices and time windows.
+  A new year without a valid tariff makes the estimate unknown. Optional annual
+  import can retry daily and replace manual values; keep it off if you want to
+  manage the schedule yourself.
+
+See [charging estimates](charging-estimates.md) for source quality, corrections
+and the exact tariff behavior. These are estimates, not billing measurements.
+
 ## The database keeps growing
 
 A slower measurement interval reduces state-history traffic, but does not
@@ -329,7 +410,8 @@ full serial-port path.
 
 ### Watch app Modbus communication live
 
-In the app, select **Open Web UI → Live Modbus communication**, then enable
+**Unreleased in this branch.** In an app build containing this feature, select
+**Open Web UI → Live Modbus communication**, then enable
 **Capture communication for 10 minutes**. This is optional and off after every
 app restart. It shows existing reads, writes and heartbeats, register addresses,
 decoded values, transaction durations and confirmed or failed responses. Each
@@ -349,6 +431,23 @@ exception-message contents are never captured.
 This view requires the app's administrator-only ingress page and a configured
 connection. It remains available when that connection is failing. Direct-mode
 integration users can use the diagnostics described above.
+
+## Optional command-line bus check
+
+Normal setup needs no shell. For troubleshooting with existing host access,
+stop the current serial owner first, then run the included read-only check:
+
+```bash
+docker exec -it homeassistant \
+  python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py \
+  /dev/serial/by-id/REPLACE_WITH_YOUR_ADAPTER
+```
+
+Adjust the container and path for your installation. `--scan` searches addresses;
+`--scan-baudrate` extends the search to bus settings. The check sends no writes or
+heartbeat, but still needs [exclusive bus access](safety.md#modbus-rtu-uses-a-single-master).
+Remove device serial numbers and adapter paths before sharing its output.
+See [Removal](installation.md#removal) before uninstalling.
 
 ## Getting help
 

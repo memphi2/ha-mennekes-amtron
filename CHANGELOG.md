@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Reorganize setup and everyday documentation around user tasks, with dedicated
+  vehicle/departure guides, examples, missing-data help and clear distinctions
+  between published features and development changes.
+
 - Add optional live Modbus debugging in the app Web UI: decoded reads, writes,
   retries and heartbeats in a redacted 200-entry RAM buffer that expires after
   ten minutes, without additional bus requests, Recorder history or log files.

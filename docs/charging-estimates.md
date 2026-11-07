@@ -3,8 +3,9 @@
 These optional features are available in **stable 0.6.1**, including automatic
 tariff import and yearly refresh. For service connections,
 [update the app first](installation.md#updating-to-061).
-The setup steps below describe the current configuration menus and optional
-vehicle profiles.
+The setup steps follow this development branch. Central vehicle profiles and
+the improved configuration dialogs are unreleased; existing separate sources
+continue to work. [Check feature availability](README.md#versions-and-feature-availability).
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure**, then **Charging costs** or **Charging losses**.
@@ -164,7 +165,9 @@ Choose one model:
 | Module 1 + 3 | Standard, high and low network prices; daily high/low windows; active quarters; tariff year | Replace the regular network component with the price for that local time. |
 
 After choosing Module 3, select **Enter or edit manually** or **Import for HA Home**.
-Manual entry opens the combined price and time-window form without an external lookup.
+Manual entry opens the combined price and time-window form without an external
+lookup. If you later enable annual refresh, that separate choice permits
+background lookups even for a manually entered tariff.
 Choosing the import makes a **one-time lookup**: it sends the configured HA Home coordinates to
 [VNBdigital](https://www.vnbdigital.de/) to find the responsible low-voltage
 network operator, then reads the current year's public data from
@@ -187,7 +190,10 @@ to Par14a-Database (the78mole), [CC BY 4.0](https://creativecommons.org/licenses
 The network operator's original price sheet governs. Choose **Import for HA
 Home** again whenever you want to retrieve the current published values.
 **Automatic yearly refresh** is a separate optional switch in the Module 3
-tariff form. When enabled, the integration checks the new year's tariff
+tariff form. It can be enabled after either manual entry or an initial import.
+It uses HA Home coordinates again and can replace manually entered prices and
+time windows with the new published tariff. Keep it off if you want to manage
+those values yourself. When enabled, the integration checks the new year's tariff
 on 1 January in **Europe/Berlin** and applies it only if the operator
 and published schedule are unambiguous and valid. If no usable sheet is
 available, it retries once a day; cost estimates remain unknown for that year

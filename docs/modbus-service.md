@@ -79,7 +79,9 @@ If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
 In the updated app, start the app and choose **Open Web UI** as an
-administrator. It requires stable **Supervisor 2026.10.4 or newer**. Choose USB
+administrator. Published apps through 0.7.0b4 request Supervisor 2026.11.0;
+the correction for stable **2026.10.4+** is unreleased. If that blocks the page,
+use the native Configuration tab as described below. Choose USB
 or LAN; USB provides an adapter dropdown, while LAN shows the host/IP and port.
 A missing USB adapter is never replaced automatically. Saving LAN removes its
 old serial path. Save and restart the app from the Info tab to apply changes.
@@ -271,6 +273,9 @@ Keep the old app and backup until the handover is verified.
 
 ## If something is wrong
 
+For optional vehicle targets, profiles or departure planning, use the
+[feature troubleshooting guide](troubleshooting.md#targets-and-departure-planning).
+
 | Symptom | First check |
 |---|---|
 | HA asks for a URL or token | Confirm that the app is running, then use its discovery card or **Connect to the Modbus service**. Manual credentials are for standalone services. |
@@ -284,6 +289,8 @@ Keep the old app and backup until the handover is verified.
 | Error 200 or an occasional write timeout | Download integration diagnostics **before restarting the app**, then follow [heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable). |
 
 The log shows service startup, USB/LAN connection and heartbeat start/stop.
+The optional [live communication view](troubleshooting.md#watch-app-modbus-communication-live)
+is an unreleased addition; existing releases still provide logs and diagnostics.
 Connection and heartbeat failures are logged when their state changes.
 Home Assistant also shows a repair after a continuous 60-second heartbeat or
 service-connection problem in a managed, write-enabled setup. It clears

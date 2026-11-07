@@ -4,10 +4,16 @@ Keep the wallbox heartbeat running through Home Assistant Core restarts.
 This optional app is the preferred way to operate the integration: it holds
 the last charging state, including a deliberate pause, while HA is offline.
 
-**Beta 0.7.0b4 · amd64 and aarch64 · separate integration required**
+**amd64 and aarch64 · separate integration required**
 
-This beta is available through **#apps-beta**; **#apps** keeps stable **0.6.1**.
-Existing beta-catalog installations update in place. Keep the app data and HA
+This branch documents **unreleased improvements**, including live Modbus
+debugging and guided-page support for Supervisor 2026.10.4+. Published beta
+0.7.0b4 does not include them; its guided page still requires Supervisor
+2026.11.0. Use native Configuration if that page rejects your current Supervisor.
+
+Published beta **0.7.0b4** is available through **#apps-beta**; **#apps** keeps
+stable **0.6.1**. Changes marked unreleased above are not in either published
+channel yet. Existing beta-catalog installations update in place. Keep the app data and HA
 entry. For all beta fixes, update this app before integration **0.7.0b4**.
 Switching catalogs creates a separate app and requires a handover.
 See [Updates](#updates).
@@ -112,10 +118,11 @@ only the entered host. Applying changes the adapter immediately; restart the
 app afterwards to resume the connection. The native TCP-login switch changes
 the app connection only; it does not enable login on the adapter.
 
-This page requires a Home Assistant administrator and **Supervisor 2026.10.4 or
-newer** (stable). Older Supervisor versions can still save LAN settings in the
+The page requires a Home Assistant administrator. The unreleased correction
+in this branch supports stable **Supervisor 2026.10.4+**; published releases
+through 0.7.0b4 require 2026.11.0. You can still save LAN settings in the
 native **Configuration** tab, including when an old USB adapter is absent. For
-the USB dropdown, update Supervisor. Read-only, current limits and polling
+the USB dropdown, use a release compatible with your Supervisor version. Read-only, current limits and polling
 intervals remain in the native Configuration tab. Avoid editing both forms at
 once; reload the connection page after changing native options.
 
@@ -273,7 +280,7 @@ uses HA's own security policy and does not automatically use this service profil
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
 | Connection setup required | Open **Web UI**, configure USB or LAN, save and restart the app. Setup mode is running but does not advertise ready wallbox data. |
-| Web UI asks for a Supervisor update | Update Supervisor to stable **2026.10.4 or newer**. This requirement concerns the connection page, not the integration's HA minimum version. |
+| Web UI asks for Supervisor 2026.11.0 | Published apps through 0.7.0b4 have this stricter check. The 2026.10.4+ correction is unreleased; use native Configuration in the meantime. The integration's HA minimum version is unchanged. |
 | Serial adapter marked missing | Reconnect the saved adapter or choose its replacement from the dropdown. For LAN, change the connection type and save; the old serial path is removed. |
 | Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. A managed heartbeat or HA-to-app link failing continuously for 60 seconds raises a repair that clears on recovery; a connection fault has no Fix button. |
 
@@ -282,7 +289,8 @@ Diagnostics include the last 20 failed write/recovery records in RAM, with timin
 information and no packet contents or credentials. They add no Recorder rows and
 are lost when the app restarts.
 
-For optional live troubleshooting, open **Web UI → Live Modbus communication**
+**Unreleased feature:** for optional live troubleshooting, open
+**Web UI → Live Modbus communication**
 and enable capture. Existing reads, writes, retries and heartbeats appear with
 register addresses, decoded values, duration and outcome. A failed write shows
 the requested value, not proof that it was applied. Capture is off by default,
