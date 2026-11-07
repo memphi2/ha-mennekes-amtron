@@ -119,16 +119,13 @@ def user_schema(ports: list[PortOption]) -> probatio.Schema:
             probatio.Required(CONF_PORT): _port_selector(ports),
             # A bare integer with a range renders as a slider, which is the
             # wrong control for a bus address somebody reads off a tool.
-            probatio.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): probatio.All(
-                NumberSelector(
-                    NumberSelectorConfig(
-                        min=DEVICE_ID_MIN,
-                        max=DEVICE_ID_MAX,
-                        step=1,
-                        mode=NumberSelectorMode.BOX,
-                    )
-                ),
-                probatio.Coerce(int),
+            probatio.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): _IntegerSelector(
+                NumberSelectorConfig(
+                    min=DEVICE_ID_MIN,
+                    max=DEVICE_ID_MAX,
+                    step=1,
+                    mode=NumberSelectorMode.BOX,
+                )
             ),
             probatio.Required(CONF_BAUDRATE, default=DEFAULT_BAUDRATE): probatio.In(
                 SUPPORTED_BAUDRATES
@@ -166,39 +163,35 @@ def network_schema() -> probatio.Schema:
                 )
             ),
             probatio.Required(CONF_HOST): cv.string,
-            probatio.Required(CONF_TCP_PORT, default=DEFAULT_TCP_PORT): probatio.All(
-                _network_integer,
-                NumberSelector(
-                    NumberSelectorConfig(
-                        min=1, max=65535, step=1, mode=NumberSelectorMode.BOX
-                    )
-                ),
-                probatio.Coerce(int),
+            probatio.Required(CONF_TCP_PORT, default=DEFAULT_TCP_PORT): _IntegerSelector(
+                NumberSelectorConfig(
+                    min=1, max=65535, step=1, mode=NumberSelectorMode.BOX
+                )
             ),
-            probatio.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): probatio.All(
-                _network_integer,
-                NumberSelector(
-                    NumberSelectorConfig(
-                        min=DEVICE_ID_MIN,
-                        max=DEVICE_ID_MAX,
-                        step=1,
-                        mode=NumberSelectorMode.BOX,
-                    )
-                ),
-                probatio.Coerce(int),
+            probatio.Required(CONF_DEVICE_ID, default=DEFAULT_DEVICE_ID): _IntegerSelector(
+                NumberSelectorConfig(
+                    min=DEVICE_ID_MIN,
+                    max=DEVICE_ID_MAX,
+                    step=1,
+                    mode=NumberSelectorMode.BOX,
+                )
             ),
         }
     )
 
 
-def _network_integer(value: Any) -> int:
-    """Accept whole UI numbers without truncating fractions or accepting bools."""
+class _IntegerSelector(NumberSelector):
+    """Keep integer validation inside a selector HA can serialize for its UI.
 
-    if type(value) is int:
-        return value
-    if type(value) is float and value.is_integer():
-        return int(value)
-    raise probatio.Invalid("expected a whole number")
+    An arbitrary validator in ``All`` cannot be serialized by the flow API.
+    The number selector's ``step`` only controls the UI, so validate whole
+    numbers here as well instead of silently truncating submitted fractions.
+    """
+
+    def __call__(self, data: Any) -> int:
+        if type(data) is not int and not (type(data) is float and data.is_integer()):
+            raise probatio.Invalid("expected a whole number")
+        return int(super().__call__(data))
 
 
 def options_schema(
@@ -267,18 +260,14 @@ def options_schema(
                 CONF_STATE_CHANGE_INTERVAL_SECONDS,
                 DEFAULT_STATE_CHANGE_INTERVAL_SECONDS,
             ),
-        ): probatio.All(
-            _network_integer,
-            NumberSelector(
-                NumberSelectorConfig(
-                    min=0,
-                    max=MAX_STATE_CHANGE_INTERVAL_SECONDS,
-                    step=1,
-                    unit_of_measurement="s",
-                    mode=NumberSelectorMode.BOX,
-                )
-            ),
-            probatio.Coerce(int),
+        ): _IntegerSelector(
+            NumberSelectorConfig(
+                min=0,
+                max=MAX_STATE_CHANGE_INTERVAL_SECONDS,
+                step=1,
+                unit_of_measurement="s",
+                mode=NumberSelectorMode.BOX,
+            )
         ),
         probatio.Required(
             CONF_PHASE_SWITCH_GRACE_SECONDS,
@@ -286,18 +275,14 @@ def options_schema(
                 CONF_PHASE_SWITCH_GRACE_SECONDS,
                 DEFAULT_PHASE_SWITCH_GRACE_SECONDS,
             ),
-        ): probatio.All(
-            _network_integer,
-            NumberSelector(
-                NumberSelectorConfig(
-                    min=0,
-                    max=MAX_PHASE_SWITCH_GRACE_SECONDS,
-                    step=1,
-                    unit_of_measurement="s",
-                    mode=NumberSelectorMode.BOX,
-                )
-            ),
-            probatio.Coerce(int),
+        ): _IntegerSelector(
+            NumberSelectorConfig(
+                min=0,
+                max=MAX_PHASE_SWITCH_GRACE_SECONDS,
+                step=1,
+                unit_of_measurement="s",
+                mode=NumberSelectorMode.BOX,
+            )
         ),
     }
     if service_mode:
@@ -455,9 +440,9 @@ def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Sch
         fields[probatio.Required(
             CONF_TARIFF_YEAR,
             description={"suggested_value": current.get(CONF_TARIFF_YEAR)},
-        )] = probatio.All(_network_integer, NumberSelector(NumberSelectorConfig(
+        )] = _IntegerSelector(NumberSelectorConfig(
             min=2024, max=9998, step=1, mode=NumberSelectorMode.BOX,
-        )), probatio.Coerce(int))
+        ))
     return probatio.Schema(fields)
 
 
