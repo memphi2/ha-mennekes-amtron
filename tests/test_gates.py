@@ -7,6 +7,7 @@ and the ones with a pure rule are also shown a broken input.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -329,6 +330,37 @@ def test_the_legal_gate_allows_a_citation_of_the_specification() -> None:
     assert check_legal_audit._check_vendor_documents(
         [Path("docs/modbus-registers.md"), Path("docs/legal.md")]
     ) == []
+
+
+def test_the_legal_gate_checks_git_quoted_names_and_missing_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Git path quoting must not hide payloads or vendor text from the audit."""
+
+    import check_legal_audit
+
+    git = shutil.which("git")
+    assert git is not None
+    subprocess.run([git, "init", "-q", str(tmp_path)], check=True)
+    paths = [Path("vendor/café.pdf"), Path("notes/café.txt"), Path("line\nbreak.txt")]
+    for path in paths:
+        file = tmp_path / path
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text("Doc. Revision\nModbus-Version:\n", encoding="utf-8")
+    subprocess.run([git, "add", "--", *map(str, paths)], cwd=tmp_path, check=True)
+    monkeypatch.setattr(check_legal_audit, "ROOT", tmp_path)
+
+    tracked = check_legal_audit._tracked_files()
+    assert tracked is not None
+    assert set(tracked) == set(paths)
+    payload_failures = check_legal_audit._check_tracked_payloads(tracked)
+    assert len(payload_failures) == 2  # forbidden directory and .pdf
+    vendor_failures = check_legal_audit._check_vendor_documents(tracked)
+    assert len(vendor_failures) == 2  # both names still lead to scanned text
+
+    (tmp_path / paths[1]).unlink()
+    failures = check_legal_audit._check_vendor_documents(tracked)
+    assert any("unable to inspect tracked text file" in failure for failure in failures)
 
 
 def test_the_repository_gate_keeps_catalog_names_consistent(

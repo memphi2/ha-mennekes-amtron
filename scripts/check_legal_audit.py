@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from collections import Counter
@@ -142,15 +143,16 @@ def main() -> int:
 
 def _tracked_files() -> list[Path] | None:
     result = subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files"],
+        ["git", "-C", str(ROOT), "ls-files", "-z"],
         capture_output=True,
         check=False,
-        text=True,
     )
     if result.returncode != 0:
         sys.stderr.write("FAIL: unable to inspect tracked files\n")
         return None
-    return [Path(line) for line in result.stdout.splitlines() if line.strip()]
+    # Git quotes non-ASCII and control characters without -z. Parse raw paths
+    # so quoted names cannot evade suffix or directory checks.
+    return [Path(os.fsdecode(name)) for name in result.stdout.split(b"\0") if name]
 
 
 def _check_tracked_payloads(paths: list[Path]) -> list[str]:
@@ -182,9 +184,13 @@ def _check_vendor_documents(paths: list[Path]) -> list[str]:
         if str(rel) in VENDOR_MARKER_SOURCES:
             continue
         path = ROOT / rel
-        if not path.is_file():
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            # A tracked file may be missing from the working tree, for
+            # example after staging it and then deleting the local copy.
+            failures.append(f"unable to inspect tracked text file: {rel}")
             continue
-        text = path.read_text(encoding="utf-8", errors="ignore")
         found = [marker for marker in VENDOR_DOCUMENT_MARKERS if marker in text]
         if len(found) >= VENDOR_DOCUMENT_MARKER_LIMIT:
             failures.append(
