@@ -10,7 +10,7 @@ from uuid import uuid4
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.selector import SelectOptionDict
 
-from ._options_estimates import EstimateOptionsFlow
+from ._options_detection import DetectionOptionsFlow
 from .config_schemas import (
     vehicle_device_schema,
     vehicle_profile_choice_schema,
@@ -18,6 +18,7 @@ from .config_schemas import (
 )
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
+    CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_DEVICE,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
     CONF_VEHICLE_PROFILES,
@@ -35,12 +36,13 @@ from .vehicle_sources import provider_device_is_valid, provider_identity
 _PROFILE_KEYS = {
     CONF_VEHICLE_PROFILES,
     CONF_ACTIVE_VEHICLE_PROFILE,
+    CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
     RESET_PENDING,
 } | set(PROFILE_OPTION_KEYS)
 
 
-class ProfileOptionsFlow(EstimateOptionsFlow):
+class ProfileOptionsFlow(DetectionOptionsFlow):
     """Keep a small explicit catalog and never select another car implicitly."""
 
     async def async_step_vehicle_profiles(
@@ -90,6 +92,7 @@ class ProfileOptionsFlow(EstimateOptionsFlow):
         if (draft := self._section("profiles")) is None:
             return await self.async_step_init()
         draft.values = activate_profile(draft.values, None)
+        draft.values[CONF_VEHICLE_AUTO_SELECTION] = False
         return self._finish_section()
 
     async def _profile_choice(
@@ -111,6 +114,7 @@ class ProfileOptionsFlow(EstimateOptionsFlow):
             else:
                 if action == "select":
                     draft.values = activate_profile(draft.values, key)
+                    draft.values[CONF_VEHICLE_AUTO_SELECTION] = False
                 else:
                     draft.values[CONF_VEHICLE_PROFILES].pop(key)
                     if draft.values.get(CONF_ACTIVE_VEHICLE_PROFILE) == key:
@@ -258,6 +262,7 @@ class ProfileOptionsFlow(EstimateOptionsFlow):
             device,
             options,
             identity,
+            existing.detection if existing is not None and same_identity else None,
         ).as_dict()
         if CONF_ACTIVE_VEHICLE_PROFILE not in draft.values:
             draft.values = activate_profile(draft.values, key)

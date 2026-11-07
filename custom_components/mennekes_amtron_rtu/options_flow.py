@@ -56,6 +56,7 @@ from .vehicle_profiles import (
     CONF_VEHICLE_PROVIDER,
     CONF_VEHICLE_SOC_USE_PROFILE,
     active_profile,
+    profiles,
     vehicle_options,
     vehicle_soc_is_configured,
 )
@@ -190,6 +191,8 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
     ) -> ConfigFlowResult:
         draft = self._begin("vehicle", VEHICLE_KEYS)
         choices = ["vehicle_profiles"]
+        if profiles(self.config_entry.options):
+            choices.append("vehicle_detection")
         if CONF_VEHICLE_PROFILES not in self.config_entry.options or active_profile(self.config_entry.options) is not None:
             choices += [
                 "vehicle_source" if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none") else "vehicle_soc",

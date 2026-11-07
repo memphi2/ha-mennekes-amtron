@@ -494,6 +494,36 @@ def vehicle_profile_choice_schema(
     return probatio.Schema(fields)
 
 
+def vehicle_detection_mode_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema({
+        probatio.Required("vehicle_auto_selection", default=current.get("vehicle_auto_selection") is True):
+            BooleanSelector(),
+    })
+
+
+def vehicle_detection_source_schema(current: str, *, profile: bool) -> probatio.Schema:
+    choices = ["disabled", "entities"]
+    if profile:
+        choices.insert(1, "profile")
+    return probatio.Schema({
+        probatio.Required("vehicle_detection_source", default=current if current in choices else "disabled"):
+            SelectSelector(SelectSelectorConfig(
+                options=choices, translation_key="vehicle_detection_source", mode=SelectSelectorMode.DROPDOWN,
+            )),
+    })
+
+
+def vehicle_detection_entities_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema({
+        probatio.Required("vehicle_connected_entity", description={
+            "suggested_value": current.get("vehicle_connected_entity"),
+        }): EntitySelector(EntitySelectorConfig(domain="binary_sensor")),
+        probatio.Required("vehicle_home_entity", description={
+            "suggested_value": current.get("vehicle_home_entity"),
+        }): EntitySelector(EntitySelectorConfig(domain=["device_tracker", "person", "binary_sensor"])),
+    })
+
+
 def vehicle_source_schema(current: dict[str, Any]) -> probatio.Schema:
     return probatio.Schema({
         probatio.Required("vehicle_soc_source", default=(

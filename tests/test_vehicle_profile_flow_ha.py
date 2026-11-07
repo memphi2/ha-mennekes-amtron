@@ -7,6 +7,9 @@ import pytest
 from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.mennekes_amtron_rtu.config_schemas import (
+    vehicle_detection_entities_schema,
+    vehicle_detection_mode_schema,
+    vehicle_detection_source_schema,
     vehicle_profile_choice_schema,
     vehicle_profile_details_schema,
     vehicle_profile_soc_schema,
@@ -22,6 +25,22 @@ from tests.test_soc_goal_ha_lifecycle import _entry
 @pytest.mark.parametrize(
     ("step", "schema"),
     [
+        ("vehicle_detection_mode", vehicle_detection_mode_schema({})),
+        (
+            "vehicle_detection_source",
+            vehicle_detection_source_schema("profile", profile=True),
+        ),
+        (
+            "vehicle_detection_source",
+            vehicle_detection_source_schema("profile", profile=False),
+        ),
+        ("vehicle_detection_entities", vehicle_detection_entities_schema({})),
+        (
+            "vehicle_detection_profile",
+            vehicle_profile_choice_schema(
+                [{"value": "1" * 32, "label": "Owner's EV"}], "1" * 32
+            ),
+        ),
         ("vehicle_profile_add", vehicle_profile_details_schema({})),
         (
             "vehicle_profile_edit",
@@ -131,6 +150,35 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                 assert entry.options["vehicle_profiles"][second]["options"] == {
                     "vehicle_soc_entity": "sensor.external_soc"
                 }
+                form = await manager.async_init(entry.entry_id)
+                form = await submit(form, "vehicle")
+                form = await submit(form, "vehicle_detection")
+                form = await submit(form, "vehicle_detection_profile")
+                form = await submit(form, {"vehicle_profile_id": first})
+                form = await submit(form, {"vehicle_detection_source": "entities"})
+                await submit(
+                    form,
+                    {
+                        "vehicle_connected_entity": "binary_sensor.car_connected",
+                        "vehicle_home_entity": "device_tracker.car",
+                    },
+                )
+                assert entry.options["vehicle_profiles"][first]["detection"] == {
+                    "source": "entities",
+                    "connected_entity": "binary_sensor.car_connected",
+                    "home_entity": "device_tracker.car",
+                }
+                assert not entry.options.get("vehicle_auto_selection")
+                assert entry.options["active_vehicle_profile"] == second
+                form = await manager.async_init(entry.entry_id)
+                form = await submit(form, "vehicle")
+                form = await submit(form, "vehicle_detection")
+                form = await submit(form, "vehicle_detection_mode")
+                await submit(form, {"vehicle_auto_selection": True})
+                assert entry.options["vehicle_auto_selection"] is True
+                form = await submit(await begin(), "vehicle_profile_select")
+                await submit(form, {"vehicle_profile_id": second})
+                assert entry.options["vehicle_auto_selection"] is False
                 await submit(await begin(), "vehicle_profile_clear")
                 assert entry.options["active_vehicle_profile"] is None
                 assert len(profile_list(entry.options)) == 2

@@ -373,6 +373,7 @@ def test_no_active_profile_exposes_only_profile_selection_for_vehicle_features()
         flow = Flow(FakeConfigEntry(options=profile_options(active=None)))
         assert (await flow.async_step_vehicle())["menu_options"] == [
             "vehicle_profiles",
+            "vehicle_detection",
             "back",
         ]
         assert (await flow.async_step_losses())["menu_options"] == [

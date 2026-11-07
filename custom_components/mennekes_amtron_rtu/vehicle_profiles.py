@@ -11,6 +11,10 @@ from typing import Any, Final
 
 CONF_VEHICLE_PROFILES: Final = "vehicle_profiles"
 CONF_ACTIVE_VEHICLE_PROFILE: Final = "active_vehicle_profile"
+CONF_VEHICLE_AUTO_SELECTION: Final = "vehicle_auto_selection"
+CONF_VEHICLE_DETECTION_SOURCE: Final = "vehicle_detection_source"
+CONF_VEHICLE_CONNECTED_ENTITY: Final = "vehicle_connected_entity"
+CONF_VEHICLE_HOME_ENTITY: Final = "vehicle_home_entity"
 CONF_VEHICLE_PROFILE_ID: Final = "vehicle_profile_id"
 CONF_VEHICLE_PROFILE_SELECTED_AT: Final = "vehicle_profile_selected_at"
 CONF_VEHICLE_PROVIDER: Final = "vehicle_provider"
@@ -56,6 +60,52 @@ _IDENTITY_KEYS = {
     CONF_VEHICLE_SOURCE_IDENTITY,
 }
 _PROFILE_ID = re.compile(r"[0-9a-f]{32}")
+_DETECTION_ENTITY = re.compile(r"(binary_sensor|device_tracker|person)\.[a-z0-9_]+")
+
+
+@dataclass(frozen=True, slots=True)
+class VehicleDetectionConfig:
+    """Explicit evidence sources; configuring them does not enable detection."""
+
+    source: str
+    connected_entity: str = ""
+    home_entity: str = ""
+
+    def as_dict(self) -> dict[str, str]:
+        result = {"source": self.source}
+        if self.source == "entities":
+            result.update(
+                connected_entity=self.connected_entity, home_entity=self.home_entity
+            )
+        return result
+
+
+def valid_detection_entity(value: Any, *, home: bool = False) -> bool:
+    """Accept only bounded HA identifiers with the required binary semantics."""
+    return (
+        isinstance(value, str)
+        and len(value) <= 255
+        and _DETECTION_ENTITY.fullmatch(value) is not None
+        and (home or value.startswith("binary_sensor."))
+    )
+
+
+def _detection_config(value: Any) -> VehicleDetectionConfig | None:
+    if not isinstance(value, dict):
+        return None
+    if value == {"source": "profile"}:
+        return VehicleDetectionConfig("profile")
+    if (
+        value.keys() != {"source", "connected_entity", "home_entity"}
+        or value["source"] != "entities"
+        or not valid_detection_entity(value["connected_entity"])
+        or not valid_detection_entity(value["home_entity"], home=True)
+        or value["connected_entity"] == value["home_entity"]
+    ):
+        return None
+    return VehicleDetectionConfig(
+        "entities", value["connected_entity"], value["home_entity"]
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +118,7 @@ class VehicleProfile:
     device_id: str
     options: dict[str, Any]
     identity: str = ""
+    detection: VehicleDetectionConfig | None = None
 
     def as_dict(self) -> dict[str, Any]:
         result = {
@@ -78,6 +129,8 @@ class VehicleProfile:
         }
         if self.identity:
             result["identity"] = self.identity
+        if self.detection is not None:
+            result["detection"] = self.detection.as_dict()
         return result
 
 
@@ -94,7 +147,7 @@ def profiles(raw: Mapping[str, Any]) -> dict[str, VehicleProfile]:
             or not isinstance(value, dict)
             or not {"name", "provider", "device_id", "options"} <= value.keys()
             or not value.keys()
-            <= {"name", "provider", "device_id", "options", "identity"}
+            <= {"name", "provider", "device_id", "options", "identity", "detection"}
         ):
             return {}
         name, provider, device, options = (
@@ -104,6 +157,7 @@ def profiles(raw: Mapping[str, Any]) -> dict[str, VehicleProfile]:
             value["options"],
         )
         identity = value.get("identity", "")
+        detection = _detection_config(value.get("detection"))
         if (
             not isinstance(name, str)
             or not name.strip()
@@ -118,6 +172,12 @@ def profiles(raw: Mapping[str, Any]) -> dict[str, VehicleProfile]:
             or not options.keys() <= PROFILE_OPTION_KEYS
             or not isinstance(identity, str)
             or len(identity) > 256
+            or ("detection" in value and detection is None)
+            or (
+                detection is not None
+                and detection.source == "profile"
+                and provider == "none"
+            )
             or any(
                 item.name.casefold() == name.strip().casefold()
                 for item in result.values()
@@ -125,7 +185,7 @@ def profiles(raw: Mapping[str, Any]) -> dict[str, VehicleProfile]:
         ):
             return {}
         result[key] = VehicleProfile(
-            key, name, provider, device, deepcopy(options), identity
+            key, name, provider, device, deepcopy(options), identity, detection
         )
     return result
 
