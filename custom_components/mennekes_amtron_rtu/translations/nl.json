@@ -282,6 +282,12 @@
           "sunshine": "Zonnestroom",
           "sunshine_plus": "Zonnestroom+"
         }
+      },
+      "active_vehicle": {
+        "name": "Actief voertuig",
+        "state": {
+          "none": "Geen voertuig geselecteerd"
+        }
       }
     },
     "sensor": {
@@ -786,6 +792,9 @@
     },
     "gateway_authentication_failed": {
       "message": "De adapter heeft zijn huidige webwachtwoord geweigerd. Controleer het wachtwoord voor de webinterface."
+    },
+    "vehicle_profile_invalid": {
+      "message": "Kies een bestaand voertuigprofiel dat eenduidig herkenbaar is."
     }
   },
   "issues": {
@@ -835,7 +844,7 @@
         "title": "Instellingen",
         "menu_options": {
           "wallbox": "Wallbox",
-          "vehicle": "Laaddoel voertuig",
+          "vehicle": "Voertuig",
           "departure": "Volgend vertrek",
           "costs": "Laadkosten",
           "losses": "Laadverliezen"
@@ -879,13 +888,15 @@
         }
       },
       "vehicle": {
-        "title": "Laaddoel voertuig",
+        "title": "Voertuig",
         "menu_options": {
           "vehicle_soc": "Laadniveau instellen",
           "vehicle_disable": "Procentdoel uitschakelen",
-          "back": "Terug zonder opslaan"
+          "back": "Terug zonder opslaan",
+          "vehicle_profiles": "Voertuigprofielen",
+          "vehicle_source": "Laadniveau instellen"
         },
-        "description": "Optioneel: gebruik een bestaande laadniveau-entiteit voor een procentdoel. De laadlimiet van het voertuig is afzonderlijk te kiezen."
+        "description": "Stel voertuigprofielen en het optionele percentagedoel in. Kies elke auto eenmaal en bepaal daarna afzonderlijk of u zijn laadlimiet, capaciteit, vertrektijden of geschiedenis wilt gebruiken."
       },
       "vehicle_soc": {
         "title": "Laadniveau instellen",
@@ -919,10 +930,10 @@
       "departure_requires_vehicle": {
         "title": "Laadniveau vereist",
         "menu_options": {
-          "vehicle": "Laaddoel voertuig",
+          "vehicle": "Voertuig",
           "back": "Terug zonder opslaan"
         },
-        "description": "Stel eerst een laadniveau-entiteit in en ga daarna terug naar vertrekplanning."
+        "description": "Stel eerst een bron voor het laadniveau van het voertuig in en ga daarna terug naar de vertrekplanning."
       },
       "departure_configure": {
         "title": "Vertrekplanning instellen",
@@ -992,7 +1003,7 @@
           "timed_timer1_days": "Kies de in de BMW ingestelde dagen voor klimaattimer 1. BavarianData levert deze dagen niet. Laat leeg om deze timer te negeren.",
           "timed_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren."
         },
-        "description": "Kies het voertuig eenmalig. Neem met de vertrekknop één actieve timer over. Schakel bij BavarianData de timersensoren voor actie, uur en minuut in; stel terugkerende weekdagen hier in omdat die niet worden gepubliceerd."
+        "description": "Gebruik de vertrekknop om één actieve timer van het gekozen voertuig over te nemen. Bij een profiel is het voertuig al gekozen. Schakel in BavarianData de sensoren voor actie, uur en minuut in; geef hier terugkerende weekdagen op, omdat de integratie die niet publiceert."
       },
       "costs": {
         "title": "Bron van de stroomprijs",
@@ -1062,7 +1073,8 @@
           "loss_sensor": "Laadverliezen via een sensor",
           "loss_vehicle": "Laadgeschiedenis van het voertuig",
           "loss_disable": "Verliesraming uitschakelen",
-          "back": "Terug zonder opslaan"
+          "back": "Terug zonder opslaan",
+          "loss_profile": "Laadgeschiedenis van het gekozen voertuig gebruiken"
         },
         "description": "Optionele vergelijking van wallboxenergie met energie in de voertuigaccu. Kies bestaande laadgeschiedenis of een sensor voor energie van de laatste laadbeurt."
       },
@@ -1100,10 +1112,90 @@
         "data": {
           "charging_network_module": "Aanpassing van netwerktarieven"
         }
+      },
+      "vehicle_profiles": {
+        "title": "Voertuigprofielen",
+        "description": "Elke auto behoudt eigen optionele bronnen en instellingen. Kies de aangesloten auto handmatig. Een profiel toevoegen schakelt geen laadfuncties in.",
+        "menu_options": {
+          "vehicle_profile_add": "Profiel toevoegen",
+          "vehicle_profile_select": "Voertuig kiezen",
+          "vehicle_profile_edit_select": "Profiel bewerken",
+          "vehicle_profile_remove": "Profiel verwijderen",
+          "back": "Terug zonder opslaan",
+          "vehicle_profile_clear": "Geen voertuig kiezen"
+        }
+      },
+      "vehicle_profile_add": {
+        "title": "Profiel toevoegen",
+        "description": "Geef het profiel een herkenbare naam en kies BavarianData of handmatige entiteitskeuze. Optionele laadfuncties staan bij nieuwe profielen uit.",
+        "data": {
+          "vehicle_profile_name": "Profielnaam",
+          "vehicle_provider": "Voertuigintegratie"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Voer een unieke profielnaam van 1 tot 80 tekens in."
+        }
+      },
+      "vehicle_profile_edit": {
+        "title": "Profiel bewerken",
+        "description": "Bij hernoemen blijven instellingen behouden. Een andere integratie of ander voertuig kiezen wist de functie-instellingen van dit profiel, zodat gegevens van de vorige auto niet worden hergebruikt.",
+        "data": {
+          "vehicle_profile_name": "Profielnaam",
+          "vehicle_provider": "Voertuigintegratie"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Voer een unieke profielnaam van 1 tot 80 tekens in."
+        }
+      },
+      "vehicle_profile_select": {
+        "title": "Voertuig kiezen",
+        "data": {
+          "vehicle_profile_id": "Voertuigprofiel"
+        },
+        "description": "Kies het voertuig dat op deze laadpaal is aangesloten. Wisselen wist het vorige percentagedoel en vertrekplan zonder het laden te starten. Elk profiel behoudt zijn instellingen en gemiddelde laadverlies."
+      },
+      "vehicle_profile_edit_select": {
+        "title": "Profiel bewerken",
+        "data": {
+          "vehicle_profile_id": "Voertuigprofiel"
+        }
+      },
+      "vehicle_profile_remove": {
+        "title": "Profiel verwijderen",
+        "description": "Verwijdert het gekozen profiel en zijn functie-instellingen. Het actieve profiel verwijderen wist ook het percentagedoel en vertrekplan zonder het laden te starten.",
+        "data": {
+          "vehicle_profile_id": "Voertuigprofiel",
+          "confirm": "Dit profiel verwijderen"
+        }
+      },
+      "vehicle_profile_device": {
+        "title": "Voertuig",
+        "description": "Kies het apparaat van de auto in BavarianData. Laadniveau, laadlimiet, capaciteit, vertrektijden en geschiedenis kunnen vervolgens dezelfde auto gebruiken. Schakel elke functie afzonderlijk in.",
+        "data": {
+          "vehicle_device": "Voertuig"
+        }
+      },
+      "vehicle_source": {
+        "title": "Laadniveau instellen",
+        "description": "Gebruik het gemelde laadniveau van het actieve profiel of kies handmatig een entiteit. Daarna verschijnen alleen de instellingen van de gekozen bron.",
+        "data": {
+          "vehicle_soc_source": "Bron van het laadniveau"
+        }
+      },
+      "vehicle_profile_soc": {
+        "title": "Laadniveau instellen",
+        "description": "Gebruik het gemelde laadniveau van het actieve profiel voor het optionele percentagedoel. De laadlimiet van dezelfde auto kan ook als extra maximum dienen. Er wordt geen instelling in het voertuig gewijzigd.",
+        "data": {
+          "use_vehicle_limit": "Ook de laadlimiet van het voertuig gebruiken"
+        }
+      },
+      "loss_profile": {
+        "title": "Laadgeschiedenis van het voertuig",
+        "description": "Gebruikt de lokale laadgeschiedenis van het actieve profiel zonder een voertuigverversing aan te vragen. Ontbrekende of onduidelijke overeenkomsten blijven onbekend."
       }
     },
     "error": {
-      "vehicle_soc_required": "Selecteer eerst een entiteit voor het laadniveau voordat je de optionele laadlimiet toevoegt.",
+      "vehicle_soc_required": "Stel een bron voor het laadniveau van het voertuig in voordat u zijn optionele laadlimiet toevoegt.",
       "invalid_vehicle_entity": "Selecteer een entiteit van het ondersteunde type.",
       "loss_source_invalid": "Selecteer een ondersteunde bron voor laadverliezen en stel het bijbehorende voertuig of de sensor in.",
       "cost_source_invalid": "Selecteer een ondersteunde kostenbron en een sensorentiteit voor een prijs uit een sensor.",
@@ -1118,8 +1210,14 @@
       "options_changed": "Deze sectie is tijdens het bewerken gewijzigd. Ga terug en open haar opnieuw met de actuele waarden; je concept is niet opgeslagen.",
       "vehicle_provider_invalid": "Kies een ondersteunde voertuigintegratie.",
       "vehicle_device_invalid": "Kies een voertuig van de gekozen integratie.",
-      "capacity_source_invalid": "Kies een vaste capaciteit of een capaciteitsentiteit.",
-      "tariff_lookup_failed": "Er is geen eenduidig ondersteund tarief gevonden. Vul de waarden handmatig in of probeer later opnieuw te importeren."
+      "capacity_source_invalid": "Kies een vaste capaciteit, een capaciteitsentiteit of het voertuigprofiel.",
+      "tariff_lookup_failed": "Er is geen eenduidig ondersteund tarief gevonden. Vul de waarden handmatig in of probeer later opnieuw te importeren.",
+      "vehicle_profile_invalid": "Kies een bestaand voertuigprofiel dat eenduidig herkenbaar is.",
+      "vehicle_profile_limit": "Er kunnen maximaal acht voertuigprofielen worden ingesteld.",
+      "vehicle_profile_required": "Kies eerst een voertuigprofiel.",
+      "vehicle_capability_unavailable": "Het gekozen voertuig levert de vereiste gegevens niet. Schakel de bijbehorende entiteit in zijn integratie in of kies een handmatige bron.",
+      "vehicle_profile_name_invalid": "Voer een unieke profielnaam van 1 tot 80 tekens in.",
+      "vehicle_profile_confirm_required": "Bevestig dat u dit profiel wilt verwijderen."
     }
   },
   "selector": {
@@ -1185,12 +1283,14 @@
     "capacity_source": {
       "options": {
         "fixed": "Vaste capaciteit in kWh",
-        "entity": "Capaciteit uit een entiteit"
+        "entity": "Capaciteit uit een entiteit",
+        "profile": "Bruikbare capaciteit uit het voertuigprofiel"
       }
     },
     "vehicle_provider": {
       "options": {
-        "bavariandata": "BavarianData"
+        "bavariandata": "BavarianData",
+        "none": "Entiteiten handmatig kiezen"
       }
     },
     "charging_cost_source": {
@@ -1198,6 +1298,12 @@
         "fixed": "Vaste stroomprijs",
         "sensor": "Stroomprijssensor",
         "disabled": "Kostenraming uitschakelen"
+      }
+    },
+    "vehicle_soc_source": {
+      "options": {
+        "profile": "Uit het actieve voertuigprofiel",
+        "entity": "Handmatig een entiteit kiezen"
       }
     }
   },

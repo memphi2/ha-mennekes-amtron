@@ -101,11 +101,11 @@ direct USB or LAN mode, select **Wallbox → Current limit and polling → Contr
 the integration options.
 
 **Choose only the extras you need.** Under **Configure**, separate sections
-cover **Wallbox**, **Vehicle charge target**, **Next departure**, **Charging costs**
-and **Charging losses**. Each feature asks for its own sources and settings.
-Vehicle SoC, capacity, price and energy sensors can come from other HA
-integrations. The optional vehicle adapter currently supports BavarianData's
-local departure timers and charging history.
+cover **Wallbox**, **Vehicle**, **Next departure**, **Charging costs** and
+**Charging losses**. Optional vehicle profiles keep each car's settings together;
+you select the connected car manually. Choose BavarianData once per profile or
+use existing HA entities. Charge targets, departure planning and loss estimates
+remain separately optional. See [vehicle setup](docs/user-guide.md#vehicle-profiles).
 
 ## Find your way
 

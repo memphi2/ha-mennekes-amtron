@@ -282,6 +282,12 @@
           "sunshine": "Sunshine",
           "sunshine_plus": "Sunshine+"
         }
+      },
+      "active_vehicle": {
+        "name": "Veicolo attivo",
+        "state": {
+          "none": "Nessun veicolo selezionato"
+        }
       }
     },
     "sensor": {
@@ -786,6 +792,9 @@
     },
     "gateway_authentication_failed": {
       "message": "L’adattatore ha rifiutato la password web attuale. Controlla la password della sua interfaccia web."
+    },
+    "vehicle_profile_invalid": {
+      "message": "Seleziona un profilo veicolo esistente e identificabile senza ambiguità."
     }
   },
   "issues": {
@@ -835,7 +844,7 @@
         "title": "Impostazioni",
         "menu_options": {
           "wallbox": "Wallbox",
-          "vehicle": "Obiettivo di carica del veicolo",
+          "vehicle": "Veicolo",
           "departure": "Prossima partenza",
           "costs": "Costi di ricarica",
           "losses": "Perdite di ricarica"
@@ -879,13 +888,15 @@
         }
       },
       "vehicle": {
-        "title": "Obiettivo di carica del veicolo",
+        "title": "Veicolo",
         "menu_options": {
           "vehicle_soc": "Configura il livello di carica",
           "vehicle_disable": "Disattiva l’obiettivo percentuale",
-          "back": "Indietro senza salvare"
+          "back": "Indietro senza salvare",
+          "vehicle_profiles": "Profili veicolo",
+          "vehicle_source": "Configura livello di carica"
         },
-        "description": "Facoltativo: usa un’entità del livello di carica per un obiettivo percentuale. Il limite del veicolo si può aggiungere separatamente."
+        "description": "Configura i profili e l’obiettivo percentuale facoltativo. Seleziona ogni auto una volta, poi scegli separatamente se usarne limite, capacità, partenze o cronologia."
       },
       "vehicle_soc": {
         "title": "Configura il livello di carica",
@@ -919,10 +930,10 @@
       "departure_requires_vehicle": {
         "title": "Livello di carica necessario",
         "menu_options": {
-          "vehicle": "Obiettivo di carica del veicolo",
+          "vehicle": "Veicolo",
           "back": "Indietro senza salvare"
         },
-        "description": "Configura prima un’entità del livello di carica, poi torna alla pianificazione della partenza."
+        "description": "Configura prima una fonte del livello di carica del veicolo, poi torna alla pianificazione della partenza."
       },
       "departure_configure": {
         "title": "Configura la pianificazione della partenza",
@@ -992,7 +1003,7 @@
           "timed_timer1_days": "Seleziona i giorni impostati nel BMW per il timer climatizzazione 1. BavarianData non fornisce questi giorni. Lascia vuoto per ignorare il timer.",
           "timed_timer2_days": "Seleziona i giorni impostati nel BMW per il timer 2. Lascia vuoto per ignorarlo."
         },
-        "description": "Seleziona il veicolo una volta. Il pulsante di partenza copia un timer attivo. Per BavarianData, attiva i sensori di azione, ora e minuto; indica qui i giorni ricorrenti perché non vengono pubblicati."
+        "description": "Usa il pulsante di partenza per copiare un timer attivo del veicolo selezionato. Con un profilo il veicolo è già scelto. In BavarianData attiva i sensori di azione, ora e minuto; inserisci qui i giorni ricorrenti perché l’integrazione non li pubblica."
       },
       "costs": {
         "title": "Fonte del prezzo dell’energia",
@@ -1062,7 +1073,8 @@
           "loss_sensor": "Perdite di ricarica da un sensore",
           "loss_vehicle": "Cronologia di ricarica del veicolo",
           "loss_disable": "Disattiva la stima delle perdite",
-          "back": "Indietro senza salvare"
+          "back": "Indietro senza salvare",
+          "loss_profile": "Usa la cronologia di ricarica del veicolo selezionato"
         },
         "description": "Confronto facoltativo tra energia della wallbox ed energia immessa nella batteria. Scegli una cronologia esistente o un sensore di energia dell’ultima ricarica."
       },
@@ -1100,10 +1112,90 @@
         "data": {
           "charging_network_module": "Adeguamento della tariffa di rete"
         }
+      },
+      "vehicle_profiles": {
+        "title": "Profili veicolo",
+        "description": "Ogni auto conserva le proprie fonti e impostazioni facoltative. Seleziona manualmente l’auto collegata. Aggiungere un profilo non attiva funzioni di ricarica.",
+        "menu_options": {
+          "vehicle_profile_add": "Aggiungi profilo",
+          "vehicle_profile_select": "Seleziona veicolo",
+          "vehicle_profile_edit_select": "Modifica profilo",
+          "vehicle_profile_remove": "Rimuovi profilo",
+          "back": "Indietro senza salvare",
+          "vehicle_profile_clear": "Non selezionare alcun veicolo"
+        }
+      },
+      "vehicle_profile_add": {
+        "title": "Aggiungi profilo",
+        "description": "Assegna al profilo un nome riconoscibile e scegli BavarianData o la selezione manuale delle entità. Nei nuovi profili le funzioni di ricarica facoltative sono disattivate.",
+        "data": {
+          "vehicle_profile_name": "Nome del profilo",
+          "vehicle_provider": "Integrazione del veicolo"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Inserisci un nome di profilo univoco da 1 a 80 caratteri."
+        }
+      },
+      "vehicle_profile_edit": {
+        "title": "Modifica profilo",
+        "description": "Rinominare conserva le impostazioni. Cambiare integrazione o veicolo cancella le impostazioni delle funzioni del profilo, per evitare di riutilizzare i dati dell’auto precedente.",
+        "data": {
+          "vehicle_profile_name": "Nome del profilo",
+          "vehicle_provider": "Integrazione del veicolo"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Inserisci un nome di profilo univoco da 1 a 80 caratteri."
+        }
+      },
+      "vehicle_profile_select": {
+        "title": "Seleziona veicolo",
+        "data": {
+          "vehicle_profile_id": "Profilo veicolo"
+        },
+        "description": "Seleziona il veicolo collegato a questa wallbox. Il cambio cancella l’obiettivo percentuale e il piano di partenza precedenti senza avviare la ricarica. Ogni profilo conserva impostazioni e perdite medie."
+      },
+      "vehicle_profile_edit_select": {
+        "title": "Modifica profilo",
+        "data": {
+          "vehicle_profile_id": "Profilo veicolo"
+        }
+      },
+      "vehicle_profile_remove": {
+        "title": "Rimuovi profilo",
+        "description": "Rimuove il profilo scelto e le impostazioni delle sue funzioni. Rimuovere il profilo attivo cancella anche il suo obiettivo percentuale e il piano di partenza senza avviare la ricarica.",
+        "data": {
+          "vehicle_profile_id": "Profilo veicolo",
+          "confirm": "Rimuovi questo profilo"
+        }
+      },
+      "vehicle_profile_device": {
+        "title": "Veicolo",
+        "description": "Seleziona il dispositivo del veicolo in BavarianData. Livello di carica, limite, capacità, partenze e cronologia potranno usare la stessa auto. Attiva ogni funzione separatamente.",
+        "data": {
+          "vehicle_device": "Veicolo"
+        }
+      },
+      "vehicle_source": {
+        "title": "Configura livello di carica",
+        "description": "Usa il livello di carica riportato dal profilo attivo oppure scegli manualmente un’entità. Seguono solo le impostazioni della fonte scelta.",
+        "data": {
+          "vehicle_soc_source": "Fonte del livello di carica"
+        }
+      },
+      "vehicle_profile_soc": {
+        "title": "Configura livello di carica",
+        "description": "Usa il livello di carica riportato dal profilo attivo per l’obiettivo percentuale facoltativo. Il limite di carica della stessa auto può anche fungere da massimo. Nessuna impostazione viene scritta nel veicolo.",
+        "data": {
+          "use_vehicle_limit": "Usa anche il limite di carica del veicolo"
+        }
+      },
+      "loss_profile": {
+        "title": "Cronologia di ricarica del veicolo",
+        "description": "Usa la cronologia locale del profilo attivo senza richiedere aggiornamenti del veicolo. Le corrispondenze mancanti o ambigue restano sconosciute."
       }
     },
     "error": {
-      "vehicle_soc_required": "Seleziona un’entità del livello di carica prima di aggiungere il limite facoltativo.",
+      "vehicle_soc_required": "Configura una fonte del livello di carica del veicolo prima di aggiungerne il limite facoltativo.",
       "invalid_vehicle_entity": "Seleziona un’entità del tipo supportato.",
       "loss_source_invalid": "Seleziona una fonte supportata per le perdite di ricarica e configura il veicolo o il sensore corrispondente.",
       "cost_source_invalid": "Seleziona una fonte di costo supportata e un’entità sensore per un prezzo basato su sensore.",
@@ -1118,8 +1210,14 @@
       "options_changed": "Questa sezione è cambiata durante la modifica. Torna indietro e riaprila con i valori aggiornati; la bozza non è stata salvata.",
       "vehicle_provider_invalid": "Scegli un’integrazione del veicolo supportata.",
       "vehicle_device_invalid": "Scegli un veicolo dell’integrazione selezionata.",
-      "capacity_source_invalid": "Scegli una capacità fissa o un’entità di capacità.",
-      "tariff_lookup_failed": "Non è stata trovata una tariffa supportata univoca. Inserisci i valori manualmente o riprova l’importazione più tardi."
+      "capacity_source_invalid": "Scegli una capacità fissa, un’entità di capacità o il profilo veicolo.",
+      "tariff_lookup_failed": "Non è stata trovata una tariffa supportata univoca. Inserisci i valori manualmente o riprova l’importazione più tardi.",
+      "vehicle_profile_invalid": "Seleziona un profilo veicolo esistente e identificabile senza ambiguità.",
+      "vehicle_profile_limit": "È possibile configurare al massimo otto profili veicolo.",
+      "vehicle_profile_required": "Seleziona prima un profilo veicolo.",
+      "vehicle_capability_unavailable": "Il veicolo selezionato non fornisce i dati necessari. Attiva l’entità corrispondente nella sua integrazione oppure scegli una fonte manuale.",
+      "vehicle_profile_name_invalid": "Inserisci un nome di profilo univoco da 1 a 80 caratteri.",
+      "vehicle_profile_confirm_required": "Conferma di voler rimuovere questo profilo."
     }
   },
   "selector": {
@@ -1185,12 +1283,14 @@
     "capacity_source": {
       "options": {
         "fixed": "Capacità fissa in kWh",
-        "entity": "Capacità da un’entità"
+        "entity": "Capacità da un’entità",
+        "profile": "Capacità utile dal profilo veicolo"
       }
     },
     "vehicle_provider": {
       "options": {
-        "bavariandata": "BavarianData"
+        "bavariandata": "BavarianData",
+        "none": "Selezione manuale delle entità"
       }
     },
     "charging_cost_source": {
@@ -1198,6 +1298,12 @@
         "fixed": "Prezzo fisso dell’elettricità",
         "sensor": "Sensore del prezzo dell’elettricità",
         "disabled": "Disattiva la stima dei costi"
+      }
+    },
+    "vehicle_soc_source": {
+      "options": {
+        "profile": "Dal profilo veicolo attivo",
+        "entity": "Scegli un’entità manualmente"
       }
     }
   },

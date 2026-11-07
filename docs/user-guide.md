@@ -148,7 +148,7 @@ Choose one of five independent sections:
 | Section | What you configure |
 |---|---|
 | **Wallbox** | Control mode, polling, current cap and transition timing, as applicable to the connection |
-| **Vehicle charge target** | An optional SoC sensor and, separately, the car's maximum-charge sensor |
+| **Vehicle** | Vehicle profiles, the selected vehicle and its optional percentage target and charge limit |
 | **Next departure** | Optional planning for the next trip, battery capacity and the departure sources you want |
 | **Charging costs** | A fixed price or price entity; German network tariffs when applicable |
 | **Charging losses** | A last-charge energy entity or a supported vehicle history adapter |
@@ -159,12 +159,10 @@ Cancel or **Back** discards an unfinished section. Other sections keep their
 settings, and a concurrent edit to the same section is reported instead of
 being overwritten.
 
-To select a supported vehicle integration, open **Next departure → Configure
-departure planning** and enable **Use the vehicle's departure times**. Its
-integration and vehicle selectors appear after the capacity settings. For
-charging history, use **Charging losses → Vehicle charging history**. The
-special adapter currently supports BavarianData; SoC and other generic sensors
-can come from any integration and are selected by entity instead.
+Use **Vehicle** to configure a vehicle profile once, then choose which optional
+features should use it. BavarianData is the first supported vehicle integration.
+You can also select existing HA entities manually, including entities from other
+vehicle integrations. Calendar and manual departure inputs remain available.
 
 | Setting | Direct USB or LAN connection | Modbus service connection |
 |---|---|---|
@@ -345,17 +343,60 @@ use the new goal controls. Switching an entry between direct and service mode
 does not transfer an active goal: the new connection owner has its own stored
 state. Set the intended goal with that owner before continuing the charge.
 
+## Vehicle profiles
+
+Vehicle profiles keep the data and settings of different cars together. You can
+configure up to eight profiles and select the active vehicle manually. Adding a
+profile does not enable a percentage target, departure planning or loss estimates.
+Enable only the features you want for that profile.
+
+Open **Configure → Vehicle → Vehicle profiles → Add profile**. Give the profile
+a name, choose **BavarianData**, then choose the vehicle device. Select the car
+using **Active vehicle** on the wallbox device, or **Select vehicle** in the
+profile menu. The integration finds that vehicle's supported data through Home
+Assistant's entity registry, so renamed entities do not require guessed entity
+names. Each optional feature uses the same selected car. No BMW credentials or
+additional cloud requests are needed.
+
+The charge level, the car's maximum charge limit, usable battery capacity,
+departure timers and charging history are separate choices. A missing value
+does not cause the integration to select another car. Unsupported or unavailable
+data stays unavailable; manual sources remain an alternative.
+
+Enable the corresponding vehicle entities in BavarianData if they are disabled.
+The adapter reads the reported high-voltage battery charge level, target charge
+level and maximum usable battery energy. It does not enable entities itself.
+For capacity, it uses the car's reported usable energy when full, accounting for
+its current battery condition; it does not substitute nominal battery size or a
+battery-health percentage. If that value is missing, choose a suitable manual
+capacity source instead.
+
+Select the correct profile **before charging**. Profile selection is manual: cable
+presence and location do not automatically identify the connected car. Changing
+the active profile clears the previous car's percentage target and departure
+plan without starting charging. Charging-loss averages are kept separately for
+each profile; changing its data source starts a new average for that source.
+A charge that began before you selected a profile is not newly assigned to it.
+The profile's saved last result and average remain available when you return
+to it.
+
+Existing manually selected sources keep working after an update. They are not
+silently replaced by a BavarianData vehicle, even when old departure and history
+settings refer to different cars. When you start using profiles, those existing
+settings are retained as a manual profile.
+
 ## Optional vehicle percentage target
 
-The percentage target is **off by default**. Open **Configure → Vehicle charge
-target → Configure charge level** and select **Vehicle charge level entity** from
-your existing vehicle integration.
+The percentage target is **off by default**. Open **Configure → Vehicle →
+Configure charge level**. Use the active BavarianData profile's charge level or
+select a **Vehicle charge level entity** from an existing vehicle integration.
 This adds **Vehicle charge target** and its status sensor. The integration only
-reads that vehicle entity; it does not change the car's settings or estimate
+reads the selected vehicle data; it does not change the car's settings or estimate
 battery capacity from wallbox energy.
 
-Enable the separate option to use the car's maximum if you want to select a
-**Vehicle charge limit entity**. Its entity picker appears only then. Without it,
+Enable the separate option to use the car's maximum if you want to use the
+profile's reported charge limit or select a **Vehicle charge limit entity**.
+Only the chosen source's settings appear. Without a charge-limit source,
 you can choose a target up to **100%**. With it, the reported car limit becomes
 the maximum you can select. A falling car limit also lowers an existing target;
 a later increase never raises the target you chose. If this optional source is
@@ -378,8 +419,8 @@ not a replacement for the car's own charge limit. The five-second write floor
 and wallbox response time also still apply when a stop is requested.
 
 Changing or removing either selected source clears the old percentage target
-and remembered maximum without starting charging. Disable **Vehicle charge
-target** in its section to remove this optional feature. This also disables
+and remembered maximum without starting charging. Choose **Disable percentage
+target** under **Vehicle** to remove this optional feature. This also disables
 departure planning and clears its trip, because that plan needs the SoC source.
 The kWh goal is independent. In service mode, changing a percentage target
 requires an app version that supports confirmed target updates. Update the
@@ -388,10 +429,11 @@ remain available with older compatible app versions.
 
 ## Charge for the next departure
 
-Set up a vehicle charge-level entity and a positive **Vehicle charge target**
+Set up a vehicle charge-level source and a positive **Vehicle charge target**
 first. Open **Configure → Next departure → Configure departure planning** and enable departure planning. Choose
-a fixed **usable battery capacity** in kWh, or an entity that reports it in kWh
-or Wh. Only the chosen capacity input appears. The integration never guesses
+a fixed **usable battery capacity** in kWh, a suitable value from the active
+vehicle profile, or an entity that reports it in kWh or Wh. Only the chosen
+capacity input appears. The integration never guesses
 it from the nominal model capacity.
 
 Manual entry is available once planning is enabled. Calendar, dated entity
@@ -411,11 +453,12 @@ time; press the button again to import the updated event. The
 [calendar blueprint](blueprints.md#plan-the-next-trip-from-a-calendar) can
 perform this selection ahead of the next trip using a Toggle helper.
 
-For the optional vehicle adapter, choose **BavarianData**, then the vehicle
-in the **Next departure** section. Use **Use vehicle departure** when you want to
-copy the next active climate timer. BavarianData is currently the only
-implemented provider for this adapter. Other vehicle integrations can supply
-the generic SoC, capacity and dated departure entities described here.
+To use the active BavarianData profile's timers, enable **Use vehicle departure
+timers** in **Next departure**. You do not need to select the integration and car
+again. Use **Use vehicle departure** when you want to copy the next active climate
+timer. Existing setups without profiles retain their separate vehicle selection.
+Other vehicle integrations can supply the generic SoC, capacity and dated
+departure entities described here.
 The adapter reads the vehicle's last locally
 published Home Assistant states; it does not fetch BMW cloud data or change the
 vehicle's timers. Those states may be cached, so check **Next departure** after

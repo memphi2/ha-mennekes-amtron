@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Add optional vehicle profiles with manual selection and shared BavarianData
+  sources for charge level, limit, usable capacity, departure and history.
+  Keep each car's settings and loss averages separate; preserve manual sources
+  and calendar use without enabling charging features automatically.
 - Allow the app connection page on stable Supervisor 2026.10.4 and newer,
   while retaining its administrator and trusted-ingress checks.
 - Keep TCP-login and password fields visible in the app's native configuration,

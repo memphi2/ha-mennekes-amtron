@@ -32,18 +32,21 @@ service-connection failures now show Repairs notices that clear after recovery.
 
 ## Feature settings after an update
 
-The integration's **Configure** menu separates **Wallbox**, **Vehicle charge
-target**, **Next departure**, **Charging costs** and **Charging losses**. Each section
+The integration's **Configure** menu separates **Wallbox**, **Vehicle**,
+**Next departure**, **Charging costs** and **Charging losses**. Each section
 shows the inputs for the features you enable and saves independently.
 Existing SoC, departure, cost and loss settings continue to work; you do not
 need to recreate them.
 
-The optional vehicle-provider selections now separate the provider from its
-vehicle. Existing BavarianData selections are retained, including independent
-vehicles for departure and charging history and the existing loss average.
+Optional [vehicle profiles](user-guide.md#vehicle-profiles) let you choose
+BavarianData and the car once, then enable its supported features separately.
+Select the active car manually. Existing configurations continue without
+profiles, including independent vehicles for departure and charging history and
+the existing loss average. When you first add profiles, the old settings are
+retained in a manual profile instead of being assigned to a guessed car.
 **Use vehicle departure** is the new display name of the former BMW button;
 its entity identity and existing automations are retained. BavarianData is the
-only implemented departure/history adapter. Generic HA entity sources remain
+first implemented vehicle adapter. Generic HA entity sources remain
 available for other vehicle integrations; manual and calendar departure work
 independently of a provider.
 

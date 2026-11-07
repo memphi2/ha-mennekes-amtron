@@ -282,6 +282,12 @@
           "sunshine": "Sunshine",
           "sunshine_plus": "Sunshine+"
         }
+      },
+      "active_vehicle": {
+        "name": "Active vehicle",
+        "state": {
+          "none": "No vehicle selected"
+        }
       }
     },
     "sensor": {
@@ -786,6 +792,9 @@
     },
     "gateway_authentication_failed": {
       "message": "The adapter rejected its existing web password. Check the password used for its web interface."
+    },
+    "vehicle_profile_invalid": {
+      "message": "Select an existing, unambiguous vehicle profile."
     }
   },
   "issues": {
@@ -835,7 +844,7 @@
         "title": "Settings",
         "menu_options": {
           "wallbox": "Wallbox",
-          "vehicle": "Vehicle charge target",
+          "vehicle": "Vehicle",
           "departure": "Next departure",
           "costs": "Charging costs",
           "losses": "Charging losses"
@@ -879,13 +888,15 @@
         }
       },
       "vehicle": {
-        "title": "Vehicle charge target",
+        "title": "Vehicle",
         "menu_options": {
           "vehicle_soc": "Configure charge level",
           "vehicle_disable": "Disable percentage target",
-          "back": "Back without saving"
+          "back": "Back without saving",
+          "vehicle_profiles": "Vehicle profiles",
+          "vehicle_source": "Configure charge level"
         },
-        "description": "Optional: use an existing vehicle charge-level entity for a percentage target. The vehicle’s own charge limit can be selected separately."
+        "description": "Configure vehicle profiles and the optional percentage target. Select each car once, then choose independently whether to use its charge limit, capacity, departure timers or history."
       },
       "vehicle_soc": {
         "title": "Configure charge level",
@@ -919,10 +930,10 @@
       "departure_requires_vehicle": {
         "title": "Charge level required",
         "menu_options": {
-          "vehicle": "Vehicle charge target",
+          "vehicle": "Vehicle",
           "back": "Back without saving"
         },
-        "description": "Configure a vehicle charge-level entity first, then return to departure planning."
+        "description": "Configure a vehicle charge-level source first, then return to departure planning."
       },
       "departure_configure": {
         "title": "Configure departure planning",
@@ -992,7 +1003,7 @@
           "timed_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
           "timed_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer."
         },
-        "description": "Select the vehicle once. Use the departure button to copy one active timer. For BavarianData, enable its action, hour and minute timer sensors; enter recurring weekdays here because the integration does not publish them."
+        "description": "Use the departure button to copy one active timer from the selected vehicle. With a profile, the vehicle is already selected. For BavarianData, enable the timer action, hour and minute sensors; enter recurring weekdays here because the integration does not publish them."
       },
       "costs": {
         "title": "Electricity price source",
@@ -1062,7 +1073,8 @@
           "loss_sensor": "Charging losses from a sensor",
           "loss_vehicle": "Vehicle charging history",
           "loss_disable": "Disable loss estimates",
-          "back": "Back without saving"
+          "back": "Back without saving",
+          "loss_profile": "Use the selected vehicle’s charging history"
         },
         "description": "Optional comparison of wallbox energy with energy added to the vehicle battery. Choose existing charging history or a last-charge energy sensor."
       },
@@ -1100,10 +1112,90 @@
         "data": {
           "charging_network_module": "Network price adjustment"
         }
+      },
+      "vehicle_profiles": {
+        "title": "Vehicle profiles",
+        "description": "Keep each car’s optional data and settings in its own profile. Select the connected car manually. Adding a profile does not enable charging features.",
+        "menu_options": {
+          "vehicle_profile_add": "Add profile",
+          "vehicle_profile_select": "Select vehicle",
+          "vehicle_profile_edit_select": "Edit profile",
+          "vehicle_profile_remove": "Remove profile",
+          "back": "Back without saving",
+          "vehicle_profile_clear": "Select no vehicle"
+        }
+      },
+      "vehicle_profile_add": {
+        "title": "Add profile",
+        "description": "Give the profile a recognizable name and choose BavarianData or manual entity selection. New profiles start with optional charging features disabled.",
+        "data": {
+          "vehicle_profile_name": "Profile name",
+          "vehicle_provider": "Vehicle integration"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Enter a unique profile name with 1 to 80 characters."
+        }
+      },
+      "vehicle_profile_edit": {
+        "title": "Edit profile",
+        "description": "Renaming keeps the settings. Changing the integration or vehicle clears this profile’s feature settings so data from the previous car cannot be reused.",
+        "data": {
+          "vehicle_profile_name": "Profile name",
+          "vehicle_provider": "Vehicle integration"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Enter a unique profile name with 1 to 80 characters."
+        }
+      },
+      "vehicle_profile_select": {
+        "title": "Select vehicle",
+        "data": {
+          "vehicle_profile_id": "Vehicle profile"
+        },
+        "description": "Select the vehicle connected to this wallbox. Switching clears the previous percentage target and departure plan without starting charging. Each profile keeps its settings and loss average."
+      },
+      "vehicle_profile_edit_select": {
+        "title": "Edit profile",
+        "data": {
+          "vehicle_profile_id": "Vehicle profile"
+        }
+      },
+      "vehicle_profile_remove": {
+        "title": "Remove profile",
+        "description": "Remove the selected profile and its saved feature settings. Removing the active profile also clears its percentage target and departure plan without starting charging.",
+        "data": {
+          "vehicle_profile_id": "Vehicle profile",
+          "confirm": "Remove this profile"
+        }
+      },
+      "vehicle_profile_device": {
+        "title": "Vehicle",
+        "description": "Select the actual vehicle device in BavarianData. Charge level, charge limit, capacity, departure timers and history can then use this same car; enable each feature separately.",
+        "data": {
+          "vehicle_device": "Vehicle"
+        }
+      },
+      "vehicle_source": {
+        "title": "Configure charge level",
+        "description": "Choose the active profile’s reported charge level or select an entity manually. Only the chosen source’s settings follow.",
+        "data": {
+          "vehicle_soc_source": "Charge level source"
+        }
+      },
+      "vehicle_profile_soc": {
+        "title": "Configure charge level",
+        "description": "Use the active profile’s reported charge level for the optional percentage target. You can also use that car’s charge limit as an additional maximum. No setting is written to the vehicle.",
+        "data": {
+          "use_vehicle_limit": "Also use the vehicle’s charge limit"
+        }
+      },
+      "loss_profile": {
+        "title": "Vehicle charging history",
+        "description": "Use the active profile’s local charging history. No vehicle refresh is requested. Missing or ambiguous matches remain unknown."
       }
     },
     "error": {
-      "vehicle_soc_required": "Select a vehicle charge level entity before adding its optional charge limit.",
+      "vehicle_soc_required": "Configure a vehicle charge-level source before adding its optional charge limit.",
       "invalid_vehicle_entity": "Select an entity of the supported type.",
       "loss_source_invalid": "Select a supported charging loss source and configure its matching vehicle or sensor.",
       "cost_source_invalid": "Select a supported cost source and a sensor entity for a sensor-based price.",
@@ -1118,8 +1210,14 @@
       "options_changed": "This section changed while you were editing it. Return and reopen it to use the latest values; your draft was not saved.",
       "vehicle_provider_invalid": "Select a supported vehicle integration.",
       "vehicle_device_invalid": "Select a vehicle belonging to the chosen integration.",
-      "capacity_source_invalid": "Select a fixed capacity or a capacity entity.",
-      "tariff_lookup_failed": "No unambiguous supported tariff was found. Enter the price-sheet values manually or try importing again later."
+      "capacity_source_invalid": "Select a fixed capacity, a capacity entity or the vehicle profile.",
+      "tariff_lookup_failed": "No unambiguous supported tariff was found. Enter the price-sheet values manually or try importing again later.",
+      "vehicle_profile_invalid": "Select an existing, unambiguous vehicle profile.",
+      "vehicle_profile_limit": "A maximum of eight vehicle profiles can be configured.",
+      "vehicle_profile_required": "Select a vehicle profile first.",
+      "vehicle_capability_unavailable": "The selected vehicle does not provide the required data. Enable the corresponding entity in its integration or choose a manual source.",
+      "vehicle_profile_name_invalid": "Enter a unique profile name with 1 to 80 characters.",
+      "vehicle_profile_confirm_required": "Confirm that you want to remove this profile."
     }
   },
   "selector": {
@@ -1185,12 +1283,14 @@
     "capacity_source": {
       "options": {
         "fixed": "Fixed capacity in kWh",
-        "entity": "Capacity from an entity"
+        "entity": "Capacity from an entity",
+        "profile": "Usable capacity from the vehicle profile"
       }
     },
     "vehicle_provider": {
       "options": {
-        "bavariandata": "BavarianData"
+        "bavariandata": "BavarianData",
+        "none": "Manual entity selection"
       }
     },
     "charging_cost_source": {
@@ -1198,6 +1298,12 @@
         "fixed": "Fixed electricity price",
         "sensor": "Electricity price sensor",
         "disabled": "Disable cost estimates"
+      }
+    },
+    "vehicle_soc_source": {
+      "options": {
+        "profile": "From the active vehicle profile",
+        "entity": "Choose an entity manually"
       }
     }
   },

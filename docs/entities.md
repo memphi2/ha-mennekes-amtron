@@ -74,9 +74,12 @@ It exposes no frequently changing counters or timestamps.
 
 For availability, use the connection table above. Service controls follow the
 app's **Read-only** setting; direct controls require **Modbus master**.
+**Active vehicle** changes the integration's selected profile and remains usable
+in read-only mode; it does not send a charging command.
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
+| `select.*_active_vehicle` | Active vehicle | optional vehicle profiles configured | Select the connected car manually before charging, or select no vehicle. Switching clears the previous percentage target and departure plan without resuming; profile settings and loss averages remain separate. |
 | `number.*_vehicle_charge_target` | Vehicle charge target | optional configured vehicle SoC source; compatible service in service mode | Percentage ceiling, 0 = off. Only limits charging. Up to 100%, or the separately optional vehicle charge-limit source. Neither setting nor disabling resumes charging. |
 | `datetime.*_next_departure` | Next departure | Departure planning enabled, vehicle SoC source and usable battery capacity | One dated target for the next trip. A timed goal may resume a pause to meet this time; the ordinary percentage goal alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
 | `button.*_use_next_calendar_event` | Use next calendar event | optional calendar and exact event title | Copies one matching timed event from the next 14 days into Next departure. Later events are not selected automatically. |

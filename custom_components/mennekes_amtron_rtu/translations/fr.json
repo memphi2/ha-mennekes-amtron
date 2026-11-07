@@ -282,6 +282,12 @@
           "sunshine": "Sunshine",
           "sunshine_plus": "Sunshine+"
         }
+      },
+      "active_vehicle": {
+        "name": "Véhicule actif",
+        "state": {
+          "none": "Aucun véhicule sélectionné"
+        }
       }
     },
     "sensor": {
@@ -786,6 +792,9 @@
     },
     "gateway_authentication_failed": {
       "message": "L’adaptateur a refusé son mot de passe web actuel. Vérifiez le mot de passe de son interface web."
+    },
+    "vehicle_profile_invalid": {
+      "message": "Choisissez un profil de véhicule existant et identifiable sans ambiguïté."
     }
   },
   "issues": {
@@ -835,7 +844,7 @@
         "title": "Paramètres",
         "menu_options": {
           "wallbox": "Borne",
-          "vehicle": "Objectif de charge du véhicule",
+          "vehicle": "Véhicule",
           "departure": "Prochain départ",
           "costs": "Coûts de recharge",
           "losses": "Pertes de recharge"
@@ -879,13 +888,15 @@
         }
       },
       "vehicle": {
-        "title": "Objectif de charge du véhicule",
+        "title": "Véhicule",
         "menu_options": {
           "vehicle_soc": "Configurer le niveau de charge",
           "vehicle_disable": "Désactiver l’objectif en pourcentage",
-          "back": "Retour sans enregistrer"
+          "back": "Retour sans enregistrer",
+          "vehicle_profiles": "Profils de véhicule",
+          "vehicle_source": "Configurer le niveau de charge"
         },
-        "description": "Facultatif : utilisez une entité de niveau de charge pour un objectif en pourcentage. La limite du véhicule peut être ajoutée séparément."
+        "description": "Configurez les profils et l’objectif facultatif en pourcentage. Choisissez chaque voiture une fois, puis activez séparément sa limite, sa capacité, ses départs ou son historique."
       },
       "vehicle_soc": {
         "title": "Configurer le niveau de charge",
@@ -919,10 +930,10 @@
       "departure_requires_vehicle": {
         "title": "Niveau de charge requis",
         "menu_options": {
-          "vehicle": "Objectif de charge du véhicule",
+          "vehicle": "Véhicule",
           "back": "Retour sans enregistrer"
         },
-        "description": "Configurez d’abord une entité de niveau de charge, puis revenez à la planification du départ."
+        "description": "Configurez d’abord une source du niveau de charge du véhicule, puis revenez à la planification du départ."
       },
       "departure_configure": {
         "title": "Configurer la planification du départ",
@@ -992,7 +1003,7 @@
           "timed_timer1_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur de climatisation 1. BavarianData ne fournit pas ces jours. Laissez vide pour ignorer ce programmateur.",
           "timed_timer2_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur 2. Laissez vide pour l’ignorer."
         },
-        "description": "Sélectionnez le véhicule une fois. Le bouton de départ copie une programmation active. Pour BavarianData, activez les capteurs d’action, d’heure et de minute ; indiquez ici les jours récurrents car ils ne sont pas publiés."
+        "description": "Utilisez le bouton de départ pour copier un programmateur actif du véhicule choisi. Avec un profil, le véhicule est déjà sélectionné. Dans BavarianData, activez les capteurs d’action, d’heure et de minute ; indiquez ici les jours récurrents car l’intégration ne les publie pas."
       },
       "costs": {
         "title": "Source du prix de l’électricité",
@@ -1062,7 +1073,8 @@
           "loss_sensor": "Pertes de charge avec un capteur",
           "loss_vehicle": "Historique de recharge du véhicule",
           "loss_disable": "Désactiver l’estimation des pertes",
-          "back": "Retour sans enregistrer"
+          "back": "Retour sans enregistrer",
+          "loss_profile": "Utiliser l’historique de charge du véhicule choisi"
         },
         "description": "Comparaison facultative de l’énergie de la borne et de celle ajoutée à la batterie. Choisissez un historique existant ou un capteur d’énergie de la dernière recharge."
       },
@@ -1100,10 +1112,90 @@
         "data": {
           "charging_network_module": "Ajustement du tarif de réseau"
         }
+      },
+      "vehicle_profiles": {
+        "title": "Profils de véhicule",
+        "description": "Chaque voiture conserve ses propres sources et réglages facultatifs. Choisissez manuellement la voiture branchée. Ajouter un profil n’active aucune fonction de charge.",
+        "menu_options": {
+          "vehicle_profile_add": "Ajouter un profil",
+          "vehicle_profile_select": "Choisir le véhicule",
+          "vehicle_profile_edit_select": "Modifier un profil",
+          "vehicle_profile_remove": "Supprimer un profil",
+          "back": "Retour sans enregistrer",
+          "vehicle_profile_clear": "Ne sélectionner aucun véhicule"
+        }
+      },
+      "vehicle_profile_add": {
+        "title": "Ajouter un profil",
+        "description": "Donnez au profil un nom identifiable et choisissez BavarianData ou la sélection manuelle d’entités. Les fonctions de charge facultatives sont désactivées dans les nouveaux profils.",
+        "data": {
+          "vehicle_profile_name": "Nom du profil",
+          "vehicle_provider": "Intégration du véhicule"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Saisissez un nom de profil unique de 1 à 80 caractères."
+        }
+      },
+      "vehicle_profile_edit": {
+        "title": "Modifier un profil",
+        "description": "Renommer conserve les réglages. Changer d’intégration ou de véhicule efface les réglages des fonctions de ce profil afin de ne pas réutiliser les données de l’ancienne voiture.",
+        "data": {
+          "vehicle_profile_name": "Nom du profil",
+          "vehicle_provider": "Intégration du véhicule"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Saisissez un nom de profil unique de 1 à 80 caractères."
+        }
+      },
+      "vehicle_profile_select": {
+        "title": "Choisir le véhicule",
+        "data": {
+          "vehicle_profile_id": "Profil de véhicule"
+        },
+        "description": "Choisissez le véhicule branché à cette borne. Le changement efface l’objectif en pourcentage et le départ précédents sans démarrer la charge. Chaque profil conserve ses réglages et sa moyenne des pertes."
+      },
+      "vehicle_profile_edit_select": {
+        "title": "Modifier un profil",
+        "data": {
+          "vehicle_profile_id": "Profil de véhicule"
+        }
+      },
+      "vehicle_profile_remove": {
+        "title": "Supprimer un profil",
+        "description": "Supprime le profil choisi et les réglages de ses fonctions. Supprimer le profil actif efface aussi son objectif en pourcentage et son départ sans démarrer la charge.",
+        "data": {
+          "vehicle_profile_id": "Profil de véhicule",
+          "confirm": "Supprimer ce profil"
+        }
+      },
+      "vehicle_profile_device": {
+        "title": "Véhicule",
+        "description": "Choisissez l’appareil correspondant à la voiture dans BavarianData. Niveau de charge, limite, capacité, départs et historique pourront utiliser cette même voiture. Activez chaque fonction séparément.",
+        "data": {
+          "vehicle_device": "Véhicule"
+        }
+      },
+      "vehicle_source": {
+        "title": "Configurer le niveau de charge",
+        "description": "Utilisez le niveau de charge indiqué par le profil actif ou choisissez une entité manuellement. Seuls les réglages de la source choisie apparaîtront ensuite.",
+        "data": {
+          "vehicle_soc_source": "Source du niveau de charge"
+        }
+      },
+      "vehicle_profile_soc": {
+        "title": "Configurer le niveau de charge",
+        "description": "Utilisez le niveau de charge indiqué par le profil actif pour l’objectif facultatif en pourcentage. La limite de charge de cette voiture peut aussi servir de maximum. Aucun réglage du véhicule n’est modifié.",
+        "data": {
+          "use_vehicle_limit": "Utiliser aussi la limite de charge du véhicule"
+        }
+      },
+      "loss_profile": {
+        "title": "Historique de recharge du véhicule",
+        "description": "Utilise l’historique local du profil actif sans demander d’actualisation du véhicule. Les correspondances absentes ou ambiguës restent inconnues."
       }
     },
     "error": {
-      "vehicle_soc_required": "Sélectionnez une entité de niveau de charge avant d’ajouter sa limite de charge facultative.",
+      "vehicle_soc_required": "Configurez une source du niveau de charge du véhicule avant d’ajouter sa limite de charge facultative.",
       "invalid_vehicle_entity": "Sélectionnez une entité du type pris en charge.",
       "loss_source_invalid": "Sélectionnez une source de pertes de charge prise en charge et configurez le véhicule ou le capteur correspondant.",
       "cost_source_invalid": "Sélectionnez une source de coût prise en charge et une entité capteur pour un prix issu d’un capteur.",
@@ -1118,8 +1210,14 @@
       "options_changed": "Cette section a changé pendant la modification. Revenez et rouvrez-la avec les valeurs actuelles ; votre brouillon n’a pas été enregistré.",
       "vehicle_provider_invalid": "Choisissez une intégration de véhicule prise en charge.",
       "vehicle_device_invalid": "Choisissez un véhicule de l’intégration sélectionnée.",
-      "capacity_source_invalid": "Choisissez une capacité fixe ou une entité de capacité.",
-      "tariff_lookup_failed": "Aucun tarif compatible et sans ambiguïté n’a été trouvé. Saisissez les valeurs manuellement ou réessayez l’import plus tard."
+      "capacity_source_invalid": "Choisissez une capacité fixe, une entité de capacité ou le profil de véhicule.",
+      "tariff_lookup_failed": "Aucun tarif compatible et sans ambiguïté n’a été trouvé. Saisissez les valeurs manuellement ou réessayez l’import plus tard.",
+      "vehicle_profile_invalid": "Choisissez un profil de véhicule existant et identifiable sans ambiguïté.",
+      "vehicle_profile_limit": "Huit profils de véhicule au maximum peuvent être configurés.",
+      "vehicle_profile_required": "Choisissez d’abord un profil de véhicule.",
+      "vehicle_capability_unavailable": "Le véhicule choisi ne fournit pas les données nécessaires. Activez l’entité correspondante dans son intégration ou choisissez une source manuelle.",
+      "vehicle_profile_name_invalid": "Saisissez un nom de profil unique de 1 à 80 caractères.",
+      "vehicle_profile_confirm_required": "Confirmez la suppression de ce profil."
     }
   },
   "selector": {
@@ -1185,12 +1283,14 @@
     "capacity_source": {
       "options": {
         "fixed": "Capacité fixe en kWh",
-        "entity": "Capacité depuis une entité"
+        "entity": "Capacité depuis une entité",
+        "profile": "Capacité utile du profil de véhicule"
       }
     },
     "vehicle_provider": {
       "options": {
-        "bavariandata": "BavarianData"
+        "bavariandata": "BavarianData",
+        "none": "Sélection manuelle des entités"
       }
     },
     "charging_cost_source": {
@@ -1198,6 +1298,12 @@
         "fixed": "Prix d’électricité fixe",
         "sensor": "Capteur de prix d’électricité",
         "disabled": "Désactiver l’estimation des coûts"
+      }
+    },
+    "vehicle_soc_source": {
+      "options": {
+        "profile": "Depuis le profil de véhicule actif",
+        "entity": "Choisir une entité manuellement"
       }
     }
   },

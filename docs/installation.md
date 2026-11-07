@@ -157,7 +157,7 @@ pause, current limiting and heartbeat on your hardware after the update.
 ## Change settings later
 
 Open **Configure → Wallbox** for the integration's operating settings.
-**Vehicle charge target**, **Next departure**, **Charging costs** and **Charging
+**Vehicle**, **Next departure**, **Charging costs** and **Charging
 losses** are separate optional sections; see [feature setup](user-guide.md#configuration-and-options).
 
 - **Direct serial:** use **Reconfigure** for the adapter and bus settings;

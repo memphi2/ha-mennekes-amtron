@@ -282,6 +282,12 @@
           "sunshine": "Sunshine",
           "sunshine_plus": "Sunshine+"
         }
+      },
+      "active_vehicle": {
+        "name": "Fahrzeug",
+        "state": {
+          "none": "Kein Fahrzeug ausgewählt"
+        }
       }
     },
     "sensor": {
@@ -786,6 +792,9 @@
     },
     "gateway_authentication_failed": {
       "message": "Der Adapter hat sein vorhandenes Webpasswort abgelehnt. Prüfe das Passwort für seine Weboberfläche."
+    },
+    "vehicle_profile_invalid": {
+      "message": "Wähle ein vorhandenes, eindeutig benanntes Fahrzeugprofil."
     }
   },
   "issues": {
@@ -835,7 +844,7 @@
         "title": "Einstellungen",
         "menu_options": {
           "wallbox": "Wallbox",
-          "vehicle": "Fahrzeug-Ladeziel",
+          "vehicle": "Fahrzeug",
           "departure": "Nächste Abfahrt",
           "costs": "Ladekosten",
           "losses": "Ladeverluste"
@@ -879,13 +888,15 @@
         }
       },
       "vehicle": {
-        "title": "Fahrzeug-Ladeziel",
+        "title": "Fahrzeug",
         "menu_options": {
           "vehicle_soc": "Ladestand einrichten",
           "vehicle_disable": "Prozentziel deaktivieren",
-          "back": "Zurück ohne Speichern"
+          "back": "Zurück ohne Speichern",
+          "vehicle_profiles": "Fahrzeugprofile",
+          "vehicle_source": "Ladestand einrichten"
         },
-        "description": "Optional: Verwende eine vorhandene Fahrzeug-Ladestandentität für ein Prozentziel. Die Ladegrenze des Fahrzeugs ist separat zuschaltbar."
+        "description": "Richte Fahrzeugprofile und das optionale Prozentziel ein. Wähle jedes Auto einmal aus und entscheide anschließend unabhängig über Ladegrenze, Kapazität, Abfahrtszeiten und Historie."
       },
       "vehicle_soc": {
         "title": "Ladestand einrichten",
@@ -919,10 +930,10 @@
       "departure_requires_vehicle": {
         "title": "Ladestand erforderlich",
         "menu_options": {
-          "vehicle": "Fahrzeug-Ladeziel",
+          "vehicle": "Fahrzeug",
           "back": "Zurück ohne Speichern"
         },
-        "description": "Richte zuerst eine Fahrzeug-Ladestandentität ein und kehre danach zur Abfahrtsplanung zurück."
+        "description": "Richte zuerst eine Quelle für den Fahrzeug-Ladestand ein und kehre dann zur Abfahrtsplanung zurück."
       },
       "departure_configure": {
         "title": "Abfahrtsplanung einrichten",
@@ -992,7 +1003,7 @@
           "timed_timer1_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 1. BavarianData liefert diese Tage nicht. Leer lassen, um diesen Timer zu ignorieren.",
           "timed_timer2_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 2. Leer lassen, um diesen Timer zu ignorieren."
         },
-        "description": "Wähle das Fahrzeug einmal aus. Mit der Abfahrt-Schaltfläche übernimmst du einen aktiven Timer. Aktiviere bei BavarianData die Timer-Sensoren für Aktion, Stunde und Minute; wiederkehrende Wochentage trägst du hier ein, da sie nicht veröffentlicht werden."
+        "description": "Übernimm mit der Abfahrtsschaltfläche einen aktiven Timer des gewählten Fahrzeugs. Bei einem Profil steht das Fahrzeug bereits fest. Aktiviere in BavarianData die Timer-Sensoren für Aktion, Stunde und Minute. Wiederkehrende Wochentage gibst du hier an, weil die Integration sie nicht veröffentlicht."
       },
       "costs": {
         "title": "Strompreisquelle",
@@ -1062,7 +1073,8 @@
           "loss_sensor": "Ladeverluste aus einem Sensor",
           "loss_vehicle": "Ladehistorie des Fahrzeugs",
           "loss_disable": "Verlustschätzung deaktivieren",
-          "back": "Zurück ohne Speichern"
+          "back": "Zurück ohne Speichern",
+          "loss_profile": "Ladehistorie des ausgewählten Fahrzeugs verwenden"
         },
         "description": "Optionaler Vergleich von Wallbox-Energie und Energie im Fahrzeugakku. Wähle eine vorhandene Ladehistorie oder einen Sensor für die Energie der letzten Ladung."
       },
@@ -1100,10 +1112,90 @@
         "data": {
           "charging_network_module": "Netzentgelt-Anpassung"
         }
+      },
+      "vehicle_profiles": {
+        "title": "Fahrzeugprofile",
+        "description": "Jedes Auto erhält eigene optionale Datenquellen und Einstellungen. Wähle das angeschlossene Fahrzeug manuell aus. Ein neues Profil aktiviert noch keine Ladefunktion.",
+        "menu_options": {
+          "vehicle_profile_add": "Profil hinzufügen",
+          "vehicle_profile_select": "Fahrzeug auswählen",
+          "vehicle_profile_edit_select": "Profil bearbeiten",
+          "vehicle_profile_remove": "Profil entfernen",
+          "back": "Zurück ohne Speichern",
+          "vehicle_profile_clear": "Kein Fahrzeug auswählen"
+        }
+      },
+      "vehicle_profile_add": {
+        "title": "Profil hinzufügen",
+        "description": "Gib dem Profil einen eindeutigen Namen und wähle BavarianData oder die manuelle Entitätsauswahl. Optionale Ladefunktionen sind bei neuen Profilen zunächst ausgeschaltet.",
+        "data": {
+          "vehicle_profile_name": "Profilname",
+          "vehicle_provider": "Fahrzeugintegration"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Gib einen eindeutigen Profilnamen mit 1 bis 80 Zeichen ein."
+        }
+      },
+      "vehicle_profile_edit": {
+        "title": "Profil bearbeiten",
+        "description": "Beim Umbenennen bleiben die Einstellungen erhalten. Ein Wechsel der Integration oder des Fahrzeugs löscht die Funktionseinstellungen dieses Profils, damit keine Daten des bisherigen Autos weiterverwendet werden.",
+        "data": {
+          "vehicle_profile_name": "Profilname",
+          "vehicle_provider": "Fahrzeugintegration"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Gib einen eindeutigen Profilnamen mit 1 bis 80 Zeichen ein."
+        }
+      },
+      "vehicle_profile_select": {
+        "title": "Fahrzeug auswählen",
+        "data": {
+          "vehicle_profile_id": "Fahrzeugprofil"
+        },
+        "description": "Wähle das an dieser Wallbox angeschlossene Fahrzeug. Beim Wechsel werden das bisherige Prozentziel und der Abfahrtsplan gelöscht, ohne das Laden zu starten. Einstellungen und mittlere Ladeverluste bleiben je Profil erhalten."
+      },
+      "vehicle_profile_edit_select": {
+        "title": "Profil bearbeiten",
+        "data": {
+          "vehicle_profile_id": "Fahrzeugprofil"
+        }
+      },
+      "vehicle_profile_remove": {
+        "title": "Profil entfernen",
+        "description": "Entfernt das gewählte Profil mit seinen Funktionseinstellungen. Wird das aktive Profil entfernt, werden auch dessen Prozentziel und Abfahrtsplan gelöscht, ohne das Laden zu starten.",
+        "data": {
+          "vehicle_profile_id": "Fahrzeugprofil",
+          "confirm": "Dieses Profil entfernen"
+        }
+      },
+      "vehicle_profile_device": {
+        "title": "Fahrzeug",
+        "description": "Wähle das tatsächliche Fahrzeuggerät aus BavarianData. Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten und Historie können anschließend dasselbe Auto verwenden. Jede Funktion bleibt einzeln zuschaltbar.",
+        "data": {
+          "vehicle_device": "Fahrzeug"
+        }
+      },
+      "vehicle_source": {
+        "title": "Ladestand einrichten",
+        "description": "Verwende den gemeldeten Ladestand des aktiven Profils oder wähle eine Entität manuell. Anschließend erscheinen nur die Einstellungen der gewählten Quelle.",
+        "data": {
+          "vehicle_soc_source": "Quelle des Ladestands"
+        }
+      },
+      "vehicle_profile_soc": {
+        "title": "Ladestand einrichten",
+        "description": "Verwende den gemeldeten Ladestand des aktiven Profils für das optionale Prozentziel. Die Ladegrenze dieses Autos lässt sich zusätzlich als Maximum verwenden. Im Fahrzeug wird keine Einstellung geändert.",
+        "data": {
+          "use_vehicle_limit": "Ladegrenze des Fahrzeugs zusätzlich verwenden"
+        }
+      },
+      "loss_profile": {
+        "title": "Ladehistorie des Fahrzeugs",
+        "description": "Verwendet die lokale Ladehistorie des aktiven Profils. Es wird keine Fahrzeugaktualisierung angefordert. Fehlende oder mehrdeutige Zuordnungen bleiben unbekannt."
       }
     },
     "error": {
-      "vehicle_soc_required": "Wähle zuerst eine Entität für den Fahrzeug-Ladestand, bevor du das optionale Ladelimit ergänzt.",
+      "vehicle_soc_required": "Richte zuerst eine Quelle für den Fahrzeug-Ladestand ein, bevor du dessen optionale Ladegrenze hinzufügst.",
       "invalid_vehicle_entity": "Wähle eine Entität des unterstützten Typs.",
       "loss_source_invalid": "Wähle eine unterstützte Quelle für Ladeverluste und richte das passende Fahrzeug oder den Sensor ein.",
       "cost_source_invalid": "Wähle eine unterstützte Kostenquelle und für einen sensorbasierten Preis eine Sensor-Entität.",
@@ -1118,8 +1210,14 @@
       "options_changed": "Dieser Bereich wurde während der Bearbeitung geändert. Kehre zurück und öffne ihn mit den aktuellen Werten erneut; dein Entwurf wurde nicht gespeichert.",
       "vehicle_provider_invalid": "Wähle eine unterstützte Fahrzeug-Integration.",
       "vehicle_device_invalid": "Wähle ein Fahrzeug der ausgewählten Integration.",
-      "capacity_source_invalid": "Wähle eine feste Kapazität oder eine Kapazitätsentität.",
-      "tariff_lookup_failed": "Es wurde kein eindeutig passender, unterstützter Tarif gefunden. Trage die Werte aus dem Preisblatt manuell ein oder importiere später erneut."
+      "capacity_source_invalid": "Wähle eine feste Kapazität, eine Kapazitätsentität oder das Fahrzeugprofil.",
+      "tariff_lookup_failed": "Es wurde kein eindeutig passender, unterstützter Tarif gefunden. Trage die Werte aus dem Preisblatt manuell ein oder importiere später erneut.",
+      "vehicle_profile_invalid": "Wähle ein vorhandenes, eindeutig benanntes Fahrzeugprofil.",
+      "vehicle_profile_limit": "Es können höchstens acht Fahrzeugprofile angelegt werden.",
+      "vehicle_profile_required": "Wähle zuerst ein Fahrzeugprofil aus.",
+      "vehicle_capability_unavailable": "Das ausgewählte Fahrzeug stellt die benötigten Daten nicht bereit. Aktiviere die passende Entität in seiner Integration oder wähle eine manuelle Quelle.",
+      "vehicle_profile_name_invalid": "Gib einen eindeutigen Profilnamen mit 1 bis 80 Zeichen ein.",
+      "vehicle_profile_confirm_required": "Bestätige, dass du dieses Profil entfernen möchtest."
     }
   },
   "selector": {
@@ -1185,12 +1283,14 @@
     "capacity_source": {
       "options": {
         "fixed": "Feste Kapazität in kWh",
-        "entity": "Kapazität aus einer Entität"
+        "entity": "Kapazität aus einer Entität",
+        "profile": "Nutzbare Akkukapazität aus dem Fahrzeugprofil"
       }
     },
     "vehicle_provider": {
       "options": {
-        "bavariandata": "BavarianData"
+        "bavariandata": "BavarianData",
+        "none": "Entitäten manuell auswählen"
       }
     },
     "charging_cost_source": {
@@ -1198,6 +1298,12 @@
         "fixed": "Fester Strompreis",
         "sensor": "Strompreissensor",
         "disabled": "Kostenschätzung deaktivieren"
+      }
+    },
+    "vehicle_soc_source": {
+      "options": {
+        "profile": "Aus dem aktiven Fahrzeugprofil",
+        "entity": "Entität manuell auswählen"
       }
     }
   },

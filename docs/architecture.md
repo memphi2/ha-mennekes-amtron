@@ -165,8 +165,9 @@ entity.py             entity base: unique id, device info, availability
 config_flow.py        + _flow_serial.py, _flow_connect.py, config_schemas.py
 options_flow.py       options menu and section routing
 _options_*.py         independent draft, vehicle, departure and estimate steps
+vehicle_profiles.py  bounded profiles and effective vehicle options
 vehicle_sources/     optional provider capabilities and selection compatibility
-vehicle_sources/bavariandata/  local timer and charging-history adapters
+vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapters
 timed_goal_observer.py  departure plan from generic HA sources or a provider
 charge_loss_observer.py  bounded matching and durable loss aggregate
 sensor.py             + sensor_descriptions.py
@@ -182,32 +183,50 @@ repairs.py            + repair_issues.py
 
 ### Vehicle integrations provide data through narrow capabilities
 
-Generic Home Assistant entities are the baseline for SoC, usable capacity,
+Generic Home Assistant entities remain available for SoC, usable capacity,
 dated departure, price and last-charge energy. Manual departure and calendar
 selection work without a manufacturer adapter. The optional `vehicle_sources`
-package exposes only the implemented `departure` and `charge_history`
-capabilities. Its provider metadata also supplies the configuration's device
-filter. BavarianData is currently the only adapter; this structure does not
-claim support for other manufacturers' proprietary timer or history formats.
+package translates supported vehicle telemetry, departure timers and charging
+history into small provider-independent contracts. Its metadata also supplies
+the configuration's device filter. BavarianData is the first adapter; this does
+not claim support for other manufacturers' proprietary timer or history formats.
 
-The scheduling observer requests a next departure instant. The loss observer
+The SoC observer consumes bounded telemetry updates. The scheduling observer
+requests usable capacity and a next departure instant. The loss observer
 requests a bounded match and subscribes to local history changes. VIN parsing,
 entity descriptors, provider event names and the local public history service
 remain inside the adapter. Neither observer calls a vehicle cloud API or
 interprets manufacturer identities, and the Modbus control layer has no
 vehicle-provider dependency.
 
-Departure and loss history retain independent vehicle selections. Generic
-provider/device keys take precedence over saved legacy keys, including an
-explicitly disabled provider. Existing BavarianData settings are read without
-resetting the stored hashed source identity or loss average. History adapters
-bind that identity for their lifetime and reject a device rebound to another
-vehicle before and after an asynchronous read.
+BavarianData telemetry is resolved by the selected device and its registered
+`VIN_descriptor` identities, with matching descriptor attributes. Charge level
+uses `vehicle.drivetrain.batteryManagement.header`, the optional maximum uses
+`vehicle.powertrain.electric.battery.stateOfCharge.target`, and usable capacity
+uses `vehicle.drivetrain.batteryManagement.maxEnergy`. Installed battery size
+and formatted battery-health estimates are not capacity fallbacks. Only already
+enabled local entities are read; missing or invalid values remain unavailable.
+
+Profiles hold a stable ID, name, provider/device selection and independent
+feature settings. One explicitly selected profile supplies effective vehicle
+options; wallbox and cost settings remain shared. Creating or selecting a
+profile does not enable optional features. No automatic vehicle recognition is
+performed. Profile changes invalidate the previous target and trip, while loss
+aggregates are retained separately per profile. Provider adapters bind the
+vehicle identity and reject a device rebound to another car.
+
+Without profile configuration, existing flat options retain their behavior,
+including independently selected departure and history vehicles. Explicit
+profile setup preserves those settings as a manual profile instead of guessing
+that two old selections describe the same car. Provider/device keys still take
+precedence over older keys, including an explicitly disabled provider.
 
 Options edits are held in a section-local draft until the final form is
 submitted. Completing it merges only that section's keys into the latest
-options and rejects a concurrent edit to the same section. Returning to the
-main menu discards an unfinished draft.
+options and rejects a concurrent edit to the same section. Vehicle sections
+also retain the active profile identity, so an open form cannot modify another
+car after a profile switch. Returning to the main menu discards an unfinished
+draft.
 Departure activation is independent of merely configuring an SoC sensor;
 disabling it clears the trip and cancels only its owned queued commands.
 
