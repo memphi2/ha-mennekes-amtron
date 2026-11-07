@@ -8,6 +8,8 @@ Beta update; **0.6.1 remains stable**. Available through **#apps-beta** only.
   writes, including commands waiting for the Modbus connection.
 - Preserve previously saved minute-level tariff windows at startup while
   keeping quarter-hour validation for new tariff settings.
+- Serialize solar display changes with charging commands so a cancelled timed
+  charge cannot reject an unrelated display-mode change.
 - Keep existing app data and connection settings. API 2 remains unchanged.
 
 ## 0.6.1
