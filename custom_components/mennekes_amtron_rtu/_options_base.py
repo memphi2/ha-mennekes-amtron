@@ -8,10 +8,13 @@ import probatio
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 
 from ._options_draft import OptionsChangedError, OptionsDraft
+from .vehicle_profiles import CONF_VEHICLE_DEVICE, CONF_VEHICLE_PROVIDER
 from .vehicle_sources import (
     Capability,
     ProviderSelection,
+    profile_capabilities,
     provider_device_is_valid,
+    provider_identity,
     provider_selection,
 )
 from .vehicle_sources.const import PROVIDER_NONE
@@ -39,6 +42,15 @@ class SectionOptionsFlow(OptionsFlow):
     def _section(self, section: str) -> OptionsDraft | None:
         draft = self._draft
         return draft if draft is not None and draft.section == section else None
+
+    def _vehicle_capabilities(self, values: dict[str, Any]) -> frozenset[Capability]:
+        provider, device = values.get(CONF_VEHICLE_PROVIDER), values.get(CONF_VEHICLE_DEVICE)
+        if not isinstance(provider, str) or not isinstance(device, str):
+            return frozenset()
+        identity = values.get("vehicle_source_identity")
+        if identity and identity != provider_identity(self.hass, provider, device):
+            return frozenset()
+        return profile_capabilities(self.hass, provider, device)
 
     def _suggested_vehicle(
         self, values: dict[str, Any], capability: Capability

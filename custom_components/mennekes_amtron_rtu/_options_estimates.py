@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import probatio
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import valid_entity_id
 
@@ -47,6 +48,11 @@ from .config_schemas import (
 )
 from .network_tariff_config import parse_tariff_inputs, tariff_form_values
 from .network_tariff_lookup import async_lookup_home_tariff
+from .vehicle_profiles import (
+    CONF_VEHICLE_PROFILES,
+    CONF_VEHICLE_PROVIDER,
+    active_profile,
+)
 from .vehicle_sources import (
     provider_definitions,
     provider_device_is_valid,
@@ -291,11 +297,32 @@ class EstimateOptionsFlow(SectionOptionsFlow):
     async def async_step_losses(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        self._begin("losses", LOSS_KEYS)
+        draft = self._begin("losses", LOSS_KEYS)
+        choices = ["loss_sensor"]
+        if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none"):
+            choices.append("loss_profile")
+        elif CONF_VEHICLE_PROFILES not in self.config_entry.options or self._suggested_vehicle(draft.values, "charge_history").provider_id != "none":
+            choices.append("loss_vehicle")
+        choices.append("loss_disable")
+        if CONF_VEHICLE_PROFILES in self.config_entry.options and active_profile(self.config_entry.options) is None:
+            choices = ["vehicle_profiles"]
         return self.async_show_menu(
             step_id="losses",
-            menu_options=["loss_sensor", "loss_vehicle", "loss_disable", "back"],
+            menu_options=[*choices, "back"],
         )
+
+    async def async_step_loss_profile(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if (draft := self._section("losses")) is None:
+            return await self.async_step_init()
+        if "charge_history" not in self._vehicle_capabilities(draft.values):
+            return self.async_show_form(
+                step_id="loss_profile", data_schema=probatio.Schema({}),
+                errors={"base": "vehicle_capability_unavailable"},
+            )
+        draft.clear(LOSS_KEYS)
+        draft.values[CONF_CHARGE_LOSS_SOURCE] = "vehicle_history"
+        draft.values[CONF_LOSS_VEHICLE_PROVIDER] = "profile"
+        return self._finish_section()
 
     async def async_step_loss_disable(
         self, user_input: dict[str, Any] | None = None

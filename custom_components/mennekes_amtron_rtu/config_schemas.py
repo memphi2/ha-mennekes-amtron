@@ -347,19 +347,21 @@ def vehicle_limit_schema(current: dict[str, Any]) -> probatio.Schema:
 
 
 def departure_configure_schema(
-    current: dict[str, Any], *, vehicle_timer: bool
+    current: dict[str, Any], *, vehicle_timer: bool, profile_capacity: bool = False,
 ) -> probatio.Schema:
-    return probatio.Schema(
-        {
+    profile = current.get("vehicle_provider") not in (None, "none")
+    capacity_sources = ["fixed", "entity", "profile"] if profile_capacity else ["fixed", "entity"]
+    default_source = "profile" if profile_capacity and current.get("timed_use_vehicle_capacity") is True else "entity" if current.get(CONF_TIMED_CAPACITY_ENTITY) else "fixed"
+    selected_source = current.get("capacity_source", default_source)
+    if selected_source not in capacity_sources:
+        selected_source = default_source
+    fields = {
             probatio.Required(
                 "capacity_source",
-                default=current.get(
-                    "capacity_source",
-                    "entity" if current.get(CONF_TIMED_CAPACITY_ENTITY) else "fixed",
-                ),
+                default=selected_source,
             ): SelectSelector(
                 SelectSelectorConfig(
-                    options=["fixed", "entity"],
+                    options=capacity_sources,
                     translation_key="capacity_source",
                     mode=SelectSelectorMode.DROPDOWN,
                 )
@@ -377,12 +379,15 @@ def departure_configure_schema(
                     bool(current.get(CONF_TIMED_DEPARTURE_ENTITY)),
                 ),
             ): BooleanSelector(),
+    }
+    if profile or "vehicle_profile_id" not in current or vehicle_timer:
+        fields[
             probatio.Required(
                 "use_vehicle_timer",
                 default=current.get("use_vehicle_timer", vehicle_timer),
-            ): BooleanSelector(),
-        }
-    )
+            )
+        ] = BooleanSelector()
+    return probatio.Schema(fields)
 
 
 def departure_capacity_schema(
@@ -461,18 +466,66 @@ def vehicle_provider_schema(
     )
 
 
+def vehicle_profile_details_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Name a profile and choose its optional manufacturer integration."""
+    return probatio.Schema({
+        probatio.Required("vehicle_profile_name", description={
+            "suggested_value": current.get("vehicle_profile_name"),
+        }): TextSelector(),
+        probatio.Required("vehicle_provider", default=(
+            current.get("vehicle_provider") if current.get("vehicle_provider") in ("none", "bavariandata") else "none"
+        )):
+            SelectSelector(SelectSelectorConfig(
+                options=["none", "bavariandata"], translation_key="vehicle_provider",
+                mode=SelectSelectorMode.DROPDOWN,
+            )),
+    })
+
+
+def vehicle_profile_choice_schema(
+    choices: list[SelectOptionDict], current: str | None, *, remove: bool = False,
+) -> probatio.Schema:
+    fields: dict[Any, Any] = {
+        probatio.Required("vehicle_profile_id", description={"suggested_value": current}):
+            SelectSelector(SelectSelectorConfig(options=choices, mode=SelectSelectorMode.DROPDOWN)),
+    }
+    if remove:
+        fields[probatio.Required("confirm", default=False)] = BooleanSelector()
+    return probatio.Schema(fields)
+
+
+def vehicle_source_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema({
+        probatio.Required("vehicle_soc_source", default=(
+            "profile" if current.get("vehicle_soc_use_profile") is True else "entity"
+        )): SelectSelector(SelectSelectorConfig(
+            options=["profile", "entity"], translation_key="vehicle_soc_source",
+            mode=SelectSelectorMode.DROPDOWN,
+        )),
+    })
+
+
+def vehicle_profile_soc_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema({
+        probatio.Required("use_vehicle_limit", default=bool(
+            current.get("vehicle_limit_use_profile") or current.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY)
+        )): BooleanSelector(),
+    })
+
+
 def vehicle_device_schema(
     current: dict[str, Any],
     *,
     key: str,
     integration: str,
     timer_options: bool = False,
+    include_device: bool = True,
 ) -> probatio.Schema:
     fields: dict[Any, Any] = {
         probatio.Required(
             key, description={"suggested_value": current.get(key)}
         ): DeviceSelector(DeviceSelectorConfig(integration=integration)),
-    }
+    } if include_device else {}
     if timer_options:
         fields[
             probatio.Optional(
