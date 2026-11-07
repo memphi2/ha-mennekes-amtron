@@ -21,6 +21,10 @@ from custom_components.mennekes_amtron_rtu.device.energy_goal_controller import 
 )
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceValidationError
+from custom_components.mennekes_amtron_rtu.device.persistence import (
+    StorageCommitUncertainError,
+    StorageStateUnknownError,
+)
 from custom_components.mennekes_amtron_rtu.device.poller import DevicePoller
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
@@ -454,6 +458,112 @@ def test_cancelled_committed_target_invalidates_queued_timed_command():
             release.set()
             await runner.async_stop()
             await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_uncertain_target_preserves_storage_error_if_queue_notification_fails():
+    async def run():
+        _harness, control, runner, _saved = await _runner()
+        runner._persist = AsyncMock(side_effect=StorageCommitUncertainError("directory sync"))
+        control.cancel_goal_resume = lambda: (_ for _ in ()).throw(RuntimeError("listener failed"))
+        with pytest.raises(StorageCommitUncertainError, match="directory sync"):
+            await runner.async_set_target(12)
+        assert control.energy_goal.target_kwh == 12
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("target", [0, 8])
+def test_unknown_goal_store_fences_and_retries_pause_until_saved(tmp_path, target):
+    async def run():
+        harness, control, runner, _saved = await _runner()
+        store = store_at(tmp_path)
+        runner._persist = lambda: store.async_save(control.energy_goal)
+        await runner.async_set_target(12)
+        write, read = store._write, store._validate_file
+
+        def replace_then_fail(payload):
+            write(payload)
+            raise OSError("directory sync failed")
+
+        def unreadable():
+            raise OSError("readback failed")
+
+        store._write = replace_then_fail
+        store._validate_file = unreadable
+        harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = 2
+        with pytest.raises(StorageStateUnknownError):
+            await runner.async_set_target(target)
+        assert control.energy_goal.target_kwh == target
+        assert runner.stop_requested
+        await _settle(runner)
+        assert runner.stop_requested
+        assert current_writes(harness.transport) == []
+        del harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address]
+        # A normal poll must retry even when the requested goal is disabled.
+        runner.observe(_snapshot(harness, 1234.5, energy_read=False))
+        await _settle(runner)
+        assert current_writes(harness.transport) == [1]
+        assert runner.stop_requested
+        store._write, store._validate_file = write, read
+        await runner.async_set_target(target)
+        assert not runner.stop_requested
+        assert (await store.async_load()).snapshot() == control.energy_goal.snapshot()
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+def test_unknown_worker_save_fences_until_a_later_poll_saves():
+    async def run():
+        harness, control, runner, _saved = await _runner()
+        await runner.async_set_target(12)
+        runner._persist = AsyncMock(side_effect=[StorageStateUnknownError("readback failed"), None, None])
+        runner.observe(None)
+        await _settle(runner)
+        assert runner._storage_unknown
+        assert current_writes(harness.transport) == [1]
+        runner.observe(_snapshot(harness, 1235))
+        await _settle(runner)
+        assert not runner._storage_unknown
+        assert not control.energy_goal.resume_on_recovery
+        assert current_writes(harness.transport) == [1]
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+def test_unknown_recovery_save_never_resumes_before_storage_recovers():
+    async def run():
+        harness, control, runner, _saved = await _runner()
+        await runner.async_set_target(12)
+        runner.observe(None)
+        await _settle(runner)
+        assert control.energy_goal.resume_on_recovery
+        saving_allowed = False
+
+        async def save():
+            if not saving_allowed and control.energy_goal.status == "active" and not control.energy_goal.resume_on_recovery:
+                raise StorageStateUnknownError("readback failed")
+
+        runner._persist = save
+        runner.observe(_snapshot(harness, 1235))
+        await _settle(runner)
+        assert runner.stop_requested
+        assert current_writes(harness.transport) == [1]
+        runner.observe(_snapshot(harness, 1235, energy_read=False))
+        await _settle(runner)
+        assert runner.stop_requested
+        assert current_writes(harness.transport) == [1]
+        saving_allowed = True
+        runner.observe(_snapshot(harness, 1235, energy_read=False))
+        await _settle(runner)
+        assert not runner.stop_requested
+        assert current_writes(harness.transport) == [1]
+        await runner.async_stop()
+        await control.async_shutdown()
 
     asyncio.run(run())
 

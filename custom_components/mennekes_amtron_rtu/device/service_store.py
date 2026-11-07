@@ -11,6 +11,7 @@ from typing import Any
 
 from .charging_session import SessionHistory
 from .energy_goal import EnergyGoal
+from .persistence import StorageCommitUncertainError
 from .service_config import number
 from .soc_goal import SocGoal
 from .write_state import WriteState
@@ -84,11 +85,19 @@ class IntentStore:
                 stream.flush()
                 os.fsync(stream.fileno())
             temporary.replace(self.path)
-            directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            # A later directory-sync failure must not let an older cached
+            # payload skip the write that would restore it.
+            self._last = None
             try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
+                directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
+            except OSError as err:
+                # The target file already names the new snapshot. It must not
+                # be treated as an uncommitted save by the goal controllers.
+                raise StorageCommitUncertainError("intent replaced but directory sync failed") from err
             self._last = payload
         finally:
             temporary.unlink(missing_ok=True)

@@ -13,6 +13,10 @@ from custom_components.mennekes_amtron_rtu.device.errors import (
     DeviceValidationError,
     validation_error,
 )
+from custom_components.mennekes_amtron_rtu.device.persistence import (
+    StorageCommitUncertainError,
+    StorageStateUnknownError,
+)
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
 from custom_components.mennekes_amtron_rtu.device.soc_goal_controller import (
@@ -368,6 +372,124 @@ def test_repeated_cancellation_still_enforces_committed_reached_goal():
         assert control.soc_goal.status == "reached"
         await _settle(soc)
         assert current_writes(harness.transport) == [1]
+        await soc.async_stop()
+        await energy.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("recovery", ["fails", "cancelled"])
+def test_uncertain_reached_goal_reports_storage_error_and_still_pauses(recovery):
+    async def run():
+        harness, control, energy, soc, _ = await _soc_runner()
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        soc._persist = AsyncMock(side_effect=[StorageCommitUncertainError("directory sync"), None])
+
+        async def revoke_recovery():
+            entered.set()
+            if recovery == "fails":
+                raise RuntimeError("recovery failed")
+            await release.wait()
+
+        energy.async_cancel_recovery_locked = revoke_recovery
+        task = asyncio.create_task(soc.async_set_target(50, source=SOURCE, soc=80))
+        await entered.wait()
+        if recovery == "cancelled":
+            task.cancel()
+            await asyncio.sleep(0)
+            release.set()
+        with pytest.raises(StorageCommitUncertainError, match="directory sync"):
+            await task
+        assert control.soc_goal.status == "reached"
+        await _settle(soc)
+        assert current_writes(harness.transport) == [1]
+        await soc.async_stop()
+        await energy.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("with_energy", [False, True])
+def test_uncertain_active_soc_goal_retries_without_another_observation(with_energy):
+    async def run():
+        harness, control, energy, soc, _ = await _soc_runner()
+        if not with_energy:
+            control.goal_controller = None
+        soc._persist = AsyncMock(side_effect=[StorageCommitUncertainError("directory sync"), None])
+        with pytest.raises(StorageCommitUncertainError, match="directory sync"):
+            await soc.async_set_target(80, source=SOURCE, soc=20)
+        await _settle(soc)
+        assert soc._persist.await_count == 2
+        assert not soc._dirty
+        assert control.soc_goal.status == "active"
+        assert not current_writes(harness.transport)
+        await soc.async_stop()
+        await energy.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("target", "soc_value"), [(0, 20), (50, 80)])
+def test_unknown_soc_store_fences_and_retries_pause_until_saved(tmp_path, target, soc_value):
+    async def run():
+        from custom_components.mennekes_amtron_rtu.goal_store import SocGoalStore
+
+        harness, control, energy, soc, _ = await _soc_runner()
+        base = store_at(tmp_path)
+        store = SocGoalStore(base._hass, "entry", "wallbox")
+        soc._persist = lambda: store.async_save(control.soc_goal)
+        await soc.async_set_target(80, source=SOURCE, soc=20)
+        write, read = store._write, store._validate_file
+
+        def replace_then_fail(payload):
+            write(payload)
+            raise OSError("directory sync failed")
+
+        def unreadable():
+            raise OSError("readback failed")
+
+        store._write = replace_then_fail
+        store._validate_file = unreadable
+        harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address] = 2
+        with pytest.raises(StorageStateUnknownError):
+            await soc.async_set_target(target, source=SOURCE, soc=soc_value)
+        assert control.soc_goal.target_percent == target
+        assert soc.stop_requested
+        await _settle(soc)
+        assert soc.stop_requested
+        assert current_writes(harness.transport) == []
+        del harness.transport.write_exceptions[R.CHARGING_CURRENT_EMS.address]
+        soc.retry_stop()
+        await _settle(soc)
+        assert current_writes(harness.transport) == [1]
+        store._write, store._validate_file = write, read
+        await soc.async_set_target(target, source=SOURCE, soc=soc_value)
+        assert not soc._storage_unknown
+        assert soc.stop_requested is (target != 0)
+        assert (await store.async_load()).snapshot() == control.soc_goal.snapshot()
+        await soc.async_stop()
+        await energy.async_stop()
+
+    asyncio.run(run())
+
+
+def test_unknown_soc_observation_fences_and_retries_without_new_value():
+    async def run():
+        harness, control, energy, soc, _ = await _soc_runner()
+        await soc.async_set_target(80, source=SOURCE, soc=20)
+        soc._persist = AsyncMock(side_effect=[
+            StorageStateUnknownError("readback failed"), OSError("disk failed"), None,
+        ])
+        with pytest.raises(StorageStateUnknownError):
+            await soc.async_observe(20, maximum=70, source=SOURCE)
+        await _settle(soc)
+        assert soc._storage_unknown
+        assert control.soc_goal.target_percent == 70
+        assert current_writes(harness.transport) == [1]
+        soc.retry_stop()
+        await _settle(soc)
+        assert not soc._storage_unknown
         await soc.async_stop()
         await energy.async_stop()
 

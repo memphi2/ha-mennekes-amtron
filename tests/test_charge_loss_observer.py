@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import atomicwrites
 import pytest
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -297,6 +298,69 @@ def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path)
         finally:
             await observer.async_stop()
             await hass.async_stop()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", ["file_sync", "directory_sync"])
+def test_assignment_sync_failure_keeps_visible_aggregate_and_reports_failure(tmp_path, monkeypatch, failure):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        try:
+            await observer.async_start()
+            coordinator.complete()
+            await hass.async_block_till_done()
+            hass.states.async_set("sensor.car_energy", "8", {"unit_of_measurement": "kWh"})
+
+            def fail(*_args):
+                raise OSError("injected fsync failure")
+
+            with monkeypatch.context() as scope:
+                scope.setattr(atomicwrites, "_proper_fsync" if failure == "file_sync" else "_sync_directory", fail)
+                with pytest.raises(ServiceValidationError) as error:
+                    await observer.async_assign()
+                assert error.value.translation_key == "loss_storage_unavailable"
+            visible = await observer._store.async_load()
+            assert observer.statistics.snapshot() == visible.snapshot()
+            assert observer.statistics.sample_count == (1 if failure == "directory_sync" else 0)
+            assert not observer.available
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_unknown_assignment_is_unavailable_until_pending_candidate_is_saved(tmp_path, monkeypatch):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass)
+        try:
+            await observer.async_start()
+            coordinator.complete()
+            await hass.async_block_till_done()
+            hass.states.async_set("sensor.car_energy", "8", {"unit_of_measurement": "kWh"})
+
+            def fail(*_args):
+                raise OSError("injected failure")
+
+            with monkeypatch.context() as scope:
+                scope.setattr(atomicwrites, "_sync_directory", fail)
+                scope.setattr(observer._store, "_validate_file", fail)
+                with pytest.raises(ServiceValidationError) as error:
+                    await observer.async_assign()
+                assert error.value.translation_key == "loss_storage_unavailable"
+            assert not observer.available
+            assert observer.statistics.last_loss_percent == pytest.approx(20)
+            observer._last_storage_attempt -= 61
+            coordinator.async_update_listeners()
+            await hass.async_block_till_done()
+            assert observer.available
+            assert (await observer._store.async_load()).snapshot() == observer.statistics.snapshot()
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+
     asyncio.run(run())
 
 

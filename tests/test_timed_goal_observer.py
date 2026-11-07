@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
+import atomicwrites
 import pytest
 from aiohttp import ClientSession
 from aiohttp.test_utils import TestServer
@@ -12,11 +13,17 @@ import custom_components.mennekes_amtron_rtu.timed_goal_observer as observer_mod
 from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.data import WallboxData, WriteDiagnostics
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.persistence import (
+    StorageCommitUncertainError,
+    StorageStateUnknownError,
+)
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
+from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.timed_goal_observer import departure_time
+from tests.ha_fakes import FakeHass
 from tests.test_control import Harness
 from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 from tests.test_timed_goal import NOW, setup_observer, state
@@ -345,6 +352,94 @@ def test_cancelled_failed_save_preserves_live_trip(monkeypatch):
         with pytest.raises(OSError, match="disk failed"):
             await task
         assert observer.goal is original
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", ["file_sync", "directory_sync"])
+def test_failed_trip_save_matches_visible_state_and_reports_failure(tmp_path, monkeypatch, failure):
+    async def run():
+        observer, _control, _hass = setup_observer(monkeypatch)
+        storage_hass = FakeHass(str(tmp_path))
+        storage_hass.async_add_executor_job = asyncio.to_thread
+        observer._store = TimedGoalStore(storage_hass, "entry", "SERIAL")
+        observer.goal.set(NOW + timedelta(hours=8))
+        await observer._store.async_save(observer.goal)
+        original = observer.goal.snapshot()
+        deadline = NOW + timedelta(hours=9)
+
+        def fail(*_args):
+            raise OSError("injected fsync failure")
+
+        with monkeypatch.context() as scope:
+            scope.setattr(atomicwrites, "_proper_fsync" if failure == "file_sync" else "_sync_directory", fail)
+            expected = OSError if failure == "file_sync" else StorageCommitUncertainError
+            with pytest.raises(expected):
+                await observer.async_set_deadline(deadline)
+        visible = await TimedGoalStore(storage_hass, "entry", "SERIAL").async_load()
+        assert observer.goal.snapshot() == visible.snapshot()
+        assert (observer.goal.deadline == deadline) is (failure == "directory_sync")
+        if failure == "file_sync":
+            assert observer.goal.snapshot() == original
+        else:
+            assert observer._save_dirty
+            writes = []
+            write = observer._store._write
+
+            def record_write(payload):
+                writes.append(payload)
+                write(payload)
+
+            monkeypatch.setattr(observer._store, "_write", record_write)
+            await observer.async_set_deadline(deadline)
+            assert not observer._save_dirty
+            assert len(writes) == 1
+
+    asyncio.run(run())
+
+
+def test_unknown_trip_storage_blocks_commands_until_cancelled_retry_succeeds(tmp_path, monkeypatch):
+    async def run():
+        observer, control, _hass = setup_observer(monkeypatch)
+        storage_hass = FakeHass(str(tmp_path))
+        storage_hass.async_add_executor_job = asyncio.to_thread
+        observer._store = TimedGoalStore(storage_hass, "entry", "SERIAL")
+        deadline = NOW + timedelta(hours=8)
+
+        def fail(*_args):
+            raise OSError("injected failure")
+
+        with monkeypatch.context() as scope:
+            scope.setattr(atomicwrites, "_sync_directory", fail)
+            scope.setattr(observer._store, "_validate_file", fail)
+            with pytest.raises(StorageStateUnknownError):
+                await observer.async_set_deadline(deadline)
+        assert observer._save_dirty
+        assert observer._save_unknown
+        await observer._evaluate()
+        assert observer.status == "error"
+        assert not control.commands
+
+        started, release = asyncio.Event(), asyncio.Event()
+        save = observer._store.async_save
+
+        async def delayed_save(goal):
+            started.set()
+            await release.wait()
+            await save(goal)
+
+        observer._store.async_save = delayed_save
+        task = asyncio.create_task(observer.async_set_deadline(deadline))
+        await started.wait()
+        task.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not observer._save_dirty
+        assert not observer._save_unknown
+        assert (await observer._store.async_load()).snapshot() == observer.goal.snapshot()
+        await observer._evaluate()
+        assert control.commands
 
     asyncio.run(run())
 

@@ -24,6 +24,7 @@ from .enums import RequestedPhases, SolarChargingMode
 from .errors import DeviceError, DeviceValidationError
 from .heartbeat import HeartbeatTask
 from .identity import async_read_identity
+from .persistence import StorageCommitUncertainError
 from .poller import DevicePoller
 from .register_blocks import REGISTER_BLOCKS
 from .registers import ENERGY_TOTAL, ERROR_CODE, REGISTERS_BY_KEY
@@ -347,12 +348,20 @@ class ModbusService:
                 # until it completes, even if shutdown or the HTTP handler is
                 # cancelled again; otherwise an older save can overwrite a
                 # newer intent after that newer save has already returned.
-                while not saving.done():
-                    try:
-                        await asyncio.shield(saving)
-                    except asyncio.CancelledError:
-                        cancelled = True
-                saving.result()
+                try:
+                    while not saving.done():
+                        try:
+                            await asyncio.shield(saving)
+                        except asyncio.CancelledError:
+                            cancelled = True
+                    saving.result()
+                except StorageCommitUncertainError:
+                    if include_session_history:
+                        # An ordinary intent save must retain the summary now
+                        # visible on disk, even though its fsync needs retry.
+                        self._saved_session_history = history
+                        self._session_history_dirty = True
+                    raise
                 if include_session_history:
                     self._saved_session_history = history
                     self._session_history_dirty = original.session_history.snapshot() != history

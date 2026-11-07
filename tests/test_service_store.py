@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import stat
 
@@ -9,6 +10,7 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device.service_store import IntentStore
 from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
+from tests.test_modbus_service import service_fixture
 
 
 @pytest.mark.parametrize("fail_directory_sync", [False, True])
@@ -52,3 +54,70 @@ def test_intent_is_committed_only_after_file_and_directory_sync(
     store.save(state)
     assert calls == ["file", "directory"]
     assert list(tmp_path.glob(".intent-*")) == []
+
+
+@pytest.mark.parametrize("kind", ["energy", "soc"])
+def test_cleared_goal_remains_visible_when_directory_sync_fails(tmp_path, monkeypatch, kind):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        sync = os.fsync
+        try:
+            if kind == "energy":
+                await service.control.async_set_energy_goal(12)
+                clear = service.control.async_set_energy_goal(0)
+            else:
+                await service.control.async_configure_soc("sensor.soc")
+                await service.control.async_set_soc_goal(80, source="sensor.soc", soc=20)
+                clear = service.control.async_set_soc_goal(0, source="sensor.soc")
+
+            def fail_directory(descriptor):
+                if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+                    raise OSError("directory sync failed")
+                return sync(descriptor)
+
+            with monkeypatch.context() as patcher:
+                patcher.setattr(os, "fsync", fail_directory)
+                with pytest.raises(OSError, match="directory sync failed"):
+                    await clear
+            current = service.control.energy_goal if kind == "energy" else service.control.soc_goal
+            assert current.status == "disabled"
+            restored = WriteState()
+            IntentStore(service._store.path, service._store.identity).load(restored)
+            saved = restored.energy_goal if kind == "energy" else restored.soc_goal
+            assert saved.snapshot() == current.snapshot()
+            # An explicit repeat retries the directory sync rather than
+            # treating the uncertain prior write as durable.
+            if kind == "energy":
+                assert service._store._last is None
+                await service.control.async_set_energy_goal(0)
+            else:
+                await service.control.async_set_soc_goal(0, source="sensor.soc")
+            assert service._store._last is not None
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_post_rename_failure_invalidates_old_deduplication_cache(tmp_path, monkeypatch):
+    path = tmp_path / "intent.json"
+    store = IntentStore(path, "wallbox")
+    state = WriteState(pause_requested=True)
+    store.save(state)
+    sync = os.fsync
+
+    def fail_directory(descriptor):
+        if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise OSError("directory sync failed")
+        return sync(descriptor)
+
+    state.pause_requested = False
+    with monkeypatch.context() as patcher:
+        patcher.setattr(os, "fsync", fail_directory)
+        with pytest.raises(OSError, match="directory sync failed"):
+            store.save(state)
+    state.pause_requested = True
+    store.save(state)
+    restored = WriteState()
+    IntentStore(path, "wallbox").load(restored)
+    assert restored.pause_requested is True

@@ -29,6 +29,7 @@ from .charge_loss_const import (
 )
 from .device.charge_loss import LossStatistics
 from .device.charging_session import CompletedSession
+from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.registers import CP_STATE, EVSE_STATE
 from .device.vehicle import vehicle_connected
 from .exceptions import service_validation_error
@@ -275,6 +276,18 @@ class ChargeLossObserver:
     async def _save_and_publish(self, candidate: LossStatistics) -> None:
         try:
             await self._store.async_save(candidate)
+        except (StorageCommitUncertainError, StorageStateUnknownError):
+            # The replacement is visible or its state could not be read.
+            # Retain the candidate for a retry and make estimates unavailable.
+            self.statistics = candidate
+            if self._storage_ok:
+                _LOGGER.warning("Charging-loss estimate could not be saved; retrying without affecting charging")
+            self._storage_ok = False
+            try:
+                self._coordinator.async_update_listeners()
+            except Exception:  # noqa: BLE001 - preserve the storage failure
+                _LOGGER.error("Unable to publish an uncertain charging-loss update")
+            return
         except (OSError, ValueError):
             if self._storage_ok:
                 _LOGGER.warning("Charging-loss estimate could not be saved; retrying without affecting charging")

@@ -14,7 +14,11 @@ from .control import AmtronControl
 from .data import WallboxData
 from .energy_goal import EnergyGoal
 from .errors import DeviceError, validation_error
-from .persistence import finish_goal_save
+from .persistence import (
+    StorageCommitUncertainError,
+    StorageStateUnknownError,
+    finish_goal_save,
+)
 from .registers import ENERGY_TOTAL
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,6 +53,7 @@ class EnergyGoalController:
         self._task: asyncio.Task[None] | None = None
         self._stopping = False
         self._failure_logged = False
+        self._storage_unknown = False
         control.goal_controller = self
         self.model.resume_on_recovery = False
 
@@ -60,11 +65,29 @@ class EnergyGoalController:
     @property
     def stop_requested(self) -> bool:
         """Fence waiting starts as soon as terminal evidence has been observed."""
-        return self.model.stop_requested or (
+        return self._storage_unknown or self.model.stop_requested or (
             self._pending is not None
             and self._pending_generation == self._client.write_state.energy_goal_generation
             and self._pending.stop_requested
         )
+
+    async def _save_state(self) -> None:
+        """Fence an unknown disk state until any later save succeeds."""
+        try:
+            await self._persist()
+        except StorageStateUnknownError:
+            self._storage_unknown = True
+            # A pause required by an unknown store cannot grant automatic
+            # recovery later, even if the wallbox was already paused.
+            self.model.resume_on_recovery = False
+            if self._pending is not None:
+                self._pending.resume_on_recovery = False
+            try:
+                self._control.cancel_goal_resume()
+            except Exception as err:  # noqa: BLE001 - retain the storage error
+                _LOGGER.error("Cannot publish cancelled goal recovery (%s)", type(err).__name__)
+            raise
+        self._storage_unknown = False
 
     async def async_set_target(self, value: object) -> None:
         """Persist a new ceiling before it can affect subsequent commands."""
@@ -102,11 +125,35 @@ class EnergyGoalController:
             state.energy_goal_generation += 1
             self._pending = None
             try:
-                await finish_goal_save(self._persist())
+                await finish_goal_save(self._save_state())
             except asyncio.CancelledError:
                 # Owners shield an atomic save and may report cancellation
                 # after it committed. Keep the explicit target in memory too.
+                self._storage_unknown = False
                 self._control.cancel_goal_resume()
+                self._notify_changed()
+                raise
+            except StorageStateUnknownError:
+                # Until a later save succeeds neither the old nor the new
+                # on-disk limit can be assumed. Fence starts and schedule a
+                # pause, including when the requested candidate is disabled.
+                self._storage_unknown = True
+                self._pending = copy(candidate)
+                self._pending_generation = state.energy_goal_generation
+                self._ensure_task()
+                try:
+                    self._control.cancel_goal_resume()
+                except Exception as err:  # noqa: BLE001 - retain the storage error
+                    _LOGGER.error("Cannot publish cancelled goal recovery (%s)", type(err).__name__)
+                self._notify_changed()
+                raise
+            except StorageCommitUncertainError:
+                # The new snapshot is already visible on disk; preserve the
+                # same intent in memory while still reporting the sync error.
+                try:
+                    self._control.cancel_goal_resume()
+                except Exception as err:  # noqa: BLE001 - retain the storage error
+                    _LOGGER.error("Cannot publish cancelled goal recovery (%s)", type(err).__name__)
                 self._notify_changed()
                 raise
             except Exception:
@@ -141,22 +188,26 @@ class EnergyGoalController:
             self._pending.resume_on_recovery = False
         if changed:
             try:
-                await self._persist()
+                await self._save_state()
             except (OSError, RuntimeError, ValueError) as err:
                 # A failed disk must not prevent a deliberate stop command.
+                if self._storage_unknown:
+                    self._pending = copy(self.model)
+                    self._pending_generation = self._client.write_state.energy_goal_generation
+                    self._ensure_task()
                 _LOGGER.error("Cannot save cancelled goal recovery (%s)", type(err).__name__)
         self._control.cancel_goal_resume()
 
     def observe(self, snapshot: WallboxData | None) -> None:
         """Fold new evidence and arrange one worker; cached meter data is ignored."""
-        if self._stopping or not self.model.target_kwh:
+        if self._stopping or (not self.model.target_kwh and not self._storage_unknown):
             return
         generation = self._client.write_state.energy_goal_generation
         if snapshot is not None and snapshot.energy_goal_generation != generation:
             return
         if (
             snapshot is not None and not snapshot.energy_read
-            and not self.model.stop_requested and not self.model.resume_on_recovery
+            and not self.stop_requested and not self.model.resume_on_recovery
         ):
             return
         if self._pending is None or self._pending_generation != generation:
@@ -199,19 +250,22 @@ class EnergyGoalController:
                         pending.resume_on_recovery = True
                     changed = pending.snapshot() != self.model.snapshot()
                     self._client.write_state.energy_goal = pending
-                    if pending.stop_requested:
-                        self._control.pause_requested = True
+                    if pending.stop_requested or self._storage_unknown:
                         # Reattempt a failed persistence before each idempotent
                         # stop retry; stores suppress unchanged disk writes.
                         try:
-                            await self._persist()
+                            await self._save_state()
                         except (OSError, RuntimeError, ValueError) as err:
                             # Disk trouble must not leave an already reached
-                            # goal charging. The old durable active baseline
-                            # still detects the limit again after a restart.
+                            # goal charging. A failed save can leave either
+                            # snapshot on disk, so restart state is uncertain.
                             persistence_error = err
+                            if isinstance(err, StorageStateUnknownError):
+                                self._storage_unknown = True
+                        if pending.stop_requested or self._storage_unknown:
+                            self._control.pause_requested = True
                     elif changed or pending.resume_on_recovery:
-                        await self._persist()
+                        await self._save_state()
                     if (
                         pending.status == "active" and pending.resume_on_recovery
                         and await self._control.async_energy_goal_recovery_ready()
@@ -220,16 +274,32 @@ class EnergyGoalController:
                         # Resume follows the ordinary vehicle guard and is
                         # invalidated by later explicit goals or commands.
                         pending.resume_on_recovery = False
-                        await self._persist()
+                        await self._save_state()
                         if not self._control.energy_goal_stop_requested:
                             await self._control.async_resume_for_energy_goal_locked(generation)
                     if changed:
                         self._notify_changed()
-                if pending.stop_requested:
+                if pending.stop_requested or self._storage_unknown:
                     await self._async_pause()
                 if persistence_error is not None:
+                    if isinstance(persistence_error, StorageStateUnknownError):
+                        if not self._failure_logged:
+                            _LOGGER.error("Cannot verify energy goal storage")
+                            self._failure_logged = True
+                        self._notify_changed()
+                        return
                     raise persistence_error
                 self._failure_logged = False
+        except StorageStateUnknownError:
+            self._storage_unknown = True
+            self._control.pause_requested = True
+            if not self._failure_logged:
+                _LOGGER.error("Cannot verify energy goal storage")
+                self._failure_logged = True
+            # A later poll retries the fenced stop after a command failure.
+            with suppress(DeviceError, AmtronBusError, OSError, RuntimeError, ValueError):
+                await self._async_pause()
+            self._notify_changed()
         except (DeviceError, AmtronBusError, OSError, RuntimeError, ValueError) as err:
             if not self._failure_logged:
                 _LOGGER.error("Cannot enforce energy goal (%s)", type(err).__name__)
@@ -273,6 +343,6 @@ class EnergyGoalController:
                 self._client.write_state.energy_goal = pending
                 self._control.pause_requested = True
                 try:
-                    await self._persist()
+                    await self._save_state()
                 except (OSError, RuntimeError, ValueError) as err:
                     _LOGGER.error("Cannot save energy goal stop on shutdown (%s)", type(err).__name__)
