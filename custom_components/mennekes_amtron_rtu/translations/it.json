@@ -291,6 +291,11 @@
         "state": {
           "none": "Nessun veicolo selezionato",
           "automatic": "Selezione automatica"
+        },
+        "state_attributes": {
+          "active_vehicle": {
+            "name": "Profilo selezionato"
+          }
         }
       }
     },

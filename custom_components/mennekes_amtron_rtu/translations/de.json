@@ -287,10 +287,15 @@
         }
       },
       "active_vehicle": {
-        "name": "Fahrzeug",
+        "name": "Aktives Fahrzeug",
         "state": {
           "none": "Kein Fahrzeug ausgewählt",
           "automatic": "Automatische Auswahl"
+        },
+        "state_attributes": {
+          "active_vehicle": {
+            "name": "Ausgewähltes Profil"
+          }
         }
       }
     },

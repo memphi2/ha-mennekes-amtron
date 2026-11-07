@@ -291,6 +291,11 @@
         "state": {
           "none": "Geen voertuig geselecteerd",
           "automatic": "Automatische keuze"
+        },
+        "state_attributes": {
+          "active_vehicle": {
+            "name": "Geselecteerd profiel"
+          }
         }
       }
     },
