@@ -101,6 +101,7 @@ class TimedGoalObserver:
         self._goal_lock = asyncio.Lock()
         self._command_owner = f"timed:{entry.entry_id}"
         self._command_submitted = False
+        self._command_current: float | None = None
 
     async def async_start(self) -> None:
         # The service may retain a queued command after an unreachable unload
@@ -371,10 +372,16 @@ class TimedGoalObserver:
             # block commands without proving that either target was reached.
             await self._wait_for_input("waiting_for_device")
             return
+        pause_until_start = (
+            plan.start_at is not None and plan.start_at - dt_util.utcnow() > _PAUSE_MARGIN
+        )
+        desired_current = None if pause_until_start else plan.current_a
+        if control.pending_action is not None:
+            await self._cancel_outdated_command(desired_current, trip)
         if control.pending_action is not None:
             self._set_status("queued")
             return
-        if plan.start_at is not None and plan.start_at - dt_util.utcnow() > _PAUSE_MARGIN:
+        if pause_until_start:
             self._set_status("paused_until_start")
             if control.is_paused is False:
                 await self._write(None, trip)
@@ -387,6 +394,22 @@ class TimedGoalObserver:
             current == 0 or abs(float(current) - plan.current_a) >= _MIN_CHANGE_A
         ):
             await self._write(plan.current_a, trip)
+
+    async def _cancel_outdated_command(self, current: float | None, expected: TimedGoal) -> None:
+        async with self._goal_lock:
+            if self.goal is not expected or self._stopping or not self._command_submitted:
+                return
+            previous = self._command_current
+            if previous == current or (
+                previous is not None and current is not None
+                and abs(previous - current) < _MIN_CHANGE_A
+            ):
+                return
+            # Fresh valid SoC/capacity/phase data can make our queued start or
+            # pause obsolete. Cancellation checks the owner at the service,
+            # so a newer manual request survives. Replacement writes retain
+            # the ordinary pacing interval, even after uncertain commands.
+            await self._cancel_command()
 
     async def _write(self, current: float | None, expected: TimedGoal) -> None:
         async with self._goal_lock:
@@ -403,6 +426,7 @@ class TimedGoalObserver:
         # Record even uncertain writes, so reconnect churn cannot flood the bus.
         self._last_write_at = now
         self._command_submitted = True
+        self._command_current = current
         await self._runtime.control.async_set_timed_current(
             current, deadline=deadline, owner=self._command_owner,
         )
