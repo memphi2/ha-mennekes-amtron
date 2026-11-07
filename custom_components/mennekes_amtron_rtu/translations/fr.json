@@ -886,7 +886,7 @@
       },
       "cost_network": {
         "title": "Tarif réseau : module {module}",
-        "description": "Recopiez les prix TTC du barème de votre gestionnaire de réseau. Le module 2 utilise 40 % du prix réseau normal. Le module 3 applique les prix hauts et bas publiés pendant les trimestres et l’année sélectionnés ; le tarif standard s’applique le reste du temps. Utilisez le fuseau horaire de Home Assistant et des quarts d’heure. Les plages peuvent traverser minuit mais ne doivent pas se chevaucher. Ces paramètres estiment les coûts variables de charge ; ils ne confirment pas l’éligibilité et ne modifient pas votre contrat. Source des valeurs préremplies : {source} Le symbole ⚠ signale une fiche tarifaire provisoire susceptible de changer.",
+        "description": "Recopiez les prix TTC du barème de votre gestionnaire de réseau. Le module 2 utilise 40 % du prix réseau normal. Le module 3 applique les prix hauts et bas publiés pendant les trimestres et l’année sélectionnés ; le tarif standard s’applique le reste du temps. Utilisez l’heure locale allemande du tarif (Europe/Berlin, heure d’été comprise) et des quarts d’heure. Les plages peuvent traverser minuit mais ne doivent pas se chevaucher. Ces paramètres estiment les coûts variables de charge ; ils ne confirment pas l’éligibilité et ne modifient pas votre contrat. Source des valeurs préremplies : {source} Le symbole ⚠ signale une fiche tarifaire provisoire susceptible de changer.",
         "data": {
           "regular_network": "Prix réseau normal (tarif standard)",
           "price_includes_network": "Le prix d’électricité inclut déjà le prix réseau normal",

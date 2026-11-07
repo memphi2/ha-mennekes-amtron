@@ -886,7 +886,7 @@
       },
       "cost_network": {
         "title": "Nettarief: module {module}",
-        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de tijdzone van Home Assistant en kwartiergrenzen. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet. Bron van vooraf ingevulde waarden: {source} Het symbool ⚠ markeert een voorlopig tariefblad dat nog kan veranderen.",
+        "description": "Neem prijzen inclusief belastingen over uit de prijslijst van je netbeheerder. Module 2 gebruikt 40% van het normale nettarief. Module 3 gebruikt de gepubliceerde hoge en lage tarieven in de geselecteerde kwartalen en het tariefjaar; op overige tijden geldt het standaardtarief. Gebruik de Duitse lokale tarieftijd (Europe/Berlin, inclusief zomertijd) en kwartiergrenzen. Tijdvakken mogen over middernacht lopen, maar elkaar niet overlappen. Deze instellingen ramen variabele laadkosten; ze bepalen geen recht op een regeling en wijzigen je contract niet. Bron van vooraf ingevulde waarden: {source} Het symbool ⚠ markeert een voorlopig tariefblad dat nog kan veranderen.",
         "data": {
           "regular_network": "Normaal nettarief (standaardtarief)",
           "price_includes_network": "De stroomprijs bevat al het normale nettarief",

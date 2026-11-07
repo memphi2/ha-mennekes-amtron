@@ -5,12 +5,14 @@ from datetime import datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
+import pytest
 from homeassistant.config_entries import ConfigEntryState
 
 from custom_components.mennekes_amtron_rtu.charging_cost_const import (
     CONF_AUTO_TARIFF_REFRESH,
     CONF_CHARGING_NETWORK_TARIFF,
 )
+from custom_components.mennekes_amtron_rtu.device.charging_cost import TariffConfig
 from custom_components.mennekes_amtron_rtu.network_tariff_year import (
     async_refresh_tariff_year,
     needs_year_refresh,
@@ -181,3 +183,35 @@ def test_inflight_tariff_lookup_does_not_mutate_unloaded_or_replaced_runtime(mon
             async_update_entry=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected update")),
         ))
         assert not asyncio.run(async_refresh_tariff_year(hass, entry))
+
+
+@pytest.mark.parametrize(("month", "offset"), [(1, "+01:00"), (7, "+02:00")])
+def test_annual_refresh_uses_the_same_german_tariff_clock_as_initial_setup(
+    monkeypatch, month, offset,
+):
+    year = datetime.now(ZoneInfo("Europe/Berlin")).year
+
+    async def lookup(_hass):
+        return {
+            **NETWORK, "tariff_year": year,
+            "active_quarters": ["1", "2", "3", "4"],
+            "high_periods": "16:30-20:15",
+        }
+
+    monkeypatch.setattr(
+        "custom_components.mennekes_amtron_rtu.network_tariff_year.async_lookup_home_tariff",
+        lookup,
+    )
+    entry = _entry()
+    hass = SimpleNamespace(
+        config=SimpleNamespace(time_zone="UTC"),
+        config_entries=SimpleNamespace(
+            async_update_entry=lambda _entry, *, options: setattr(entry, "options", options),
+        ),
+    )
+    assert asyncio.run(async_refresh_tariff_year(hass, entry))
+    tariff = TariffConfig.parse(entry.options[CONF_CHARGING_NETWORK_TARIFF])
+    assert tariff.timezone == "Europe/Berlin"
+    for clock, expected in (("16:15", 0.3), ("16:45", 0.4), ("20:30", 0.3)):
+        instant = datetime.fromisoformat(f"{year}-{month:02}-10T{clock}:00{offset}")
+        assert tariff.price_at(instant.timestamp(), 0.3) == pytest.approx(expected)

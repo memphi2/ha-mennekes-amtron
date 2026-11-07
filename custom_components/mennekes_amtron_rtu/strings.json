@@ -886,7 +886,7 @@
       },
       "cost_network": {
         "title": "Network tariff: module {module}",
-        "description": "Copy gross prices from your network operator’s price sheet. Module 2 uses 40% of the regular network price. Module 3 uses the published high and low prices in the selected quarters and tariff year; remaining times use the standard price. Use Home Assistant’s time zone and quarter-hour boundaries. Windows may cross midnight but must not overlap. These settings estimate variable charging costs; they do not establish eligibility or change your contract. Source of prefilled values: {source} The ⚠ symbol marks a provisional price sheet that may change.",
+        "description": "Copy gross prices from your network operator’s price sheet. Module 2 uses 40% of the regular network price. Module 3 uses the published high and low prices in the selected quarters and tariff year; remaining times use the standard price. Use German local tariff time (Europe/Berlin, including daylight saving time) and quarter-hour boundaries. Windows may cross midnight but must not overlap. These settings estimate variable charging costs; they do not establish eligibility or change your contract. Source of prefilled values: {source} The ⚠ symbol marks a provisional price sheet that may change.",
         "data": {
           "regular_network": "Regular network price (standard tariff)",
           "price_includes_network": "Electricity price already includes the regular network price",

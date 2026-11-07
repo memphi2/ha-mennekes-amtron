@@ -189,9 +189,11 @@ overlap and must leave some time
 at the standard rate. Select **two to four quarters** from the operator's
 schedule. Outside those quarters, the standard rate applies. There are no
 invented default prices, time windows or tariff year: copy these from the
-published price sheet. The form uses Home Assistant's configured timezone,
-including daylight saving changes. Check that this agrees with your operator's
-price sheet.
+published price sheet. German network-tariff windows always use
+**Europe/Berlin**, including daylight saving changes. Enter the clock times
+shown on the operator's sheet without converting them to Home Assistant's
+display time zone. Manual entry, imported values and annual refresh all use
+this same tariff clock.
 A different tariff year makes the price unknown until you update the settings.
 The form accepts up to eight high and eight low periods. For more complex
 published schedules, use a sensor supplying the complete correct price instead.

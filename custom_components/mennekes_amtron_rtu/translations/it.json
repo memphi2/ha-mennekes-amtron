@@ -886,7 +886,7 @@
       },
       "cost_network": {
         "title": "Tariffa di rete: modulo {module}",
-        "description": "Copia i prezzi lordi dal tariffario del gestore di rete. Il modulo 2 usa il 40% del prezzo di rete ordinario. Il modulo 3 usa i prezzi alti e bassi pubblicati nei trimestri e nell’anno selezionati; negli altri periodi si applica il prezzo standard. Usa il fuso orario di Home Assistant e intervalli di 15 minuti. Le fasce possono attraversare la mezzanotte ma non sovrapporsi. Queste impostazioni stimano i costi variabili di ricarica; non confermano l’idoneità e non modificano il contratto. Fonte dei valori precompilati: {source} Il simbolo ⚠ indica un listino provvisorio che potrebbe cambiare.",
+        "description": "Copia i prezzi lordi dal tariffario del gestore di rete. Il modulo 2 usa il 40% del prezzo di rete ordinario. Il modulo 3 usa i prezzi alti e bassi pubblicati nei trimestri e nell’anno selezionati; negli altri periodi si applica il prezzo standard. Usa l’ora locale tedesca della tariffa (Europe/Berlin, inclusa l’ora legale) e intervalli di 15 minuti. Le fasce possono attraversare la mezzanotte ma non sovrapporsi. Queste impostazioni stimano i costi variabili di ricarica; non confermano l’idoneità e non modificano il contratto. Fonte dei valori precompilati: {source} Il simbolo ⚠ indica un listino provvisorio che potrebbe cambiare.",
         "data": {
           "regular_network": "Prezzo di rete ordinario (tariffa standard)",
           "price_includes_network": "Il prezzo dell’elettricità include già il prezzo di rete ordinario",

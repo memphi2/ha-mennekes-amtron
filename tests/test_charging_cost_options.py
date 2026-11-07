@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from types import SimpleNamespace
 
 import probatio
@@ -329,7 +330,7 @@ def test_network_form_persists_validated_tariff_only_after_every_step(module):
         assert tariff.module == module
         assert tariff.regular_network == 0.1
         if module == NETWORK_MODULE_3:
-            assert tariff.timezone == "Europe/Paris"
+            assert tariff.timezone == "Europe/Berlin"
             assert tariff.windows[0].as_dict() == {"start": "16:00", "end": "20:00", "rate": "ht"}
             assert tariff.windows[1].contains(60)
             assert tariff.active_quarters == (1, 4)
@@ -502,3 +503,51 @@ def test_cost_schema_has_no_invented_tariff_prices_or_windows():
         price({CONF_CHARGING_PRICE: -1001})
     sensor = cost_source_schema({}, source=COST_SOURCE_SENSOR)
     assert next(iter(sensor.schema.values())).config["filter"] == [{"domain": ["sensor"]}]
+
+
+@pytest.mark.parametrize("imported", [False, True], ids=["manual", "import"])
+@pytest.mark.parametrize(("month", "offset"), [(1, "+01:00"), (7, "+02:00")])
+def test_german_network_windows_keep_local_time_when_ha_uses_utc(
+    monkeypatch, imported, month, offset,
+):
+    values = {
+        **NETWORK,
+        CONF_HIGH_PERIODS: "16:30-20:15",
+        CONF_ACTIVE_QUARTERS: ["1", "2", "3", "4"],
+    }
+
+    async def lookup(_hass):
+        return {"_source_url": "https://example.org/price.pdf", **values} if imported else None
+
+    monkeypatch.setattr(
+        "custom_components.mennekes_amtron_rtu.options_flow.async_lookup_home_tariff",
+        lookup,
+    )
+
+    async def run():
+        flow = _flow()
+        flow.hass.config.time_zone = "UTC"
+        await flow.async_step_init(_values())
+        form = await flow.async_step_cost_fixed({
+            CONF_CHARGING_PRICE: 0.3,
+            CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
+        })
+        if imported:
+            # Submit the actual imported form values, as the frontend would.
+            supplied = {
+                marker.schema: marker.description["suggested_value"]
+                for marker in form["data_schema"].schema
+                if marker.description and "suggested_value" in marker.description
+            }
+            supplied[CONF_PRICE_INCLUDES_NETWORK] = True
+            supplied[CONF_AUTO_TARIFF_REFRESH] = True
+        else:
+            supplied = values
+        saved = await flow.async_step_cost_network(form["data_schema"](supplied))
+        tariff = TariffConfig.parse(saved["data"][CONF_CHARGING_NETWORK_TARIFF])
+        assert tariff.timezone == "Europe/Berlin"
+        for clock, expected in (("16:15", 0.3), ("16:45", 0.4), ("20:30", 0.3)):
+            instant = datetime.fromisoformat(f"2026-{month:02}-10T{clock}:00{offset}")
+            assert tariff.price_at(instant.timestamp(), 0.3) == pytest.approx(expected)
+
+    asyncio.run(run())

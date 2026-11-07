@@ -273,7 +273,9 @@ class MennekesAmtronOptionsFlow(OptionsFlow):
                     raise ValueError("auto tariff refresh must be boolean")
                 pending[CONF_CHARGING_NETWORK_TARIFF] = _network_tariff(
                     user_input, module=module,
-                    timezone=self.hass.config.time_zone,
+                    # German network windows use the operator's local clock,
+                    # independently of HA's display/configuration time zone.
+                    timezone="Europe/Berlin",
                 )
             except (KeyError, TypeError, ValueError):
                 errors["base"] = "network_tariff_invalid"

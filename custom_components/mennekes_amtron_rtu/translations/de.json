@@ -886,7 +886,7 @@
       },
       "cost_network": {
         "title": "Netzentgelt: Modul {module}",
-        "description": "Übernimm die Bruttopreise aus dem Preisblatt deines Netzbetreibers. Modul 2 verwendet 40 % des regulären Netzentgelts. Modul 3 verwendet in den gewählten Quartalen und im angegebenen Tarifjahr die veröffentlichten Hoch- und Niedrigtarife; sonst gilt der Standardtarif. Es gelten die Zeitzone von Home Assistant und Viertelstundengrenzen. Zeitfenster dürfen über Mitternacht reichen, sich aber nicht überschneiden. Diese Angaben schätzen variable Ladekosten; sie bestätigen keine Berechtigung und ändern keinen Vertrag. Quelle der vorausgefüllten Werte: {source} Das Zeichen ⚠ kennzeichnet ein vorläufiges Preisblatt, dessen Werte sich ändern können.",
+        "description": "Übernimm die Bruttopreise aus dem Preisblatt deines Netzbetreibers. Modul 2 verwendet 40 % des regulären Netzentgelts. Modul 3 verwendet in den gewählten Quartalen und im angegebenen Tarifjahr die veröffentlichten Hoch- und Niedrigtarife; sonst gilt der Standardtarif. Es gelten die deutsche Tarifzeit (Europe/Berlin, einschließlich Sommerzeit) und Viertelstundengrenzen. Zeitfenster dürfen über Mitternacht reichen, sich aber nicht überschneiden. Diese Angaben schätzen variable Ladekosten; sie bestätigen keine Berechtigung und ändern keinen Vertrag. Quelle der vorausgefüllten Werte: {source} Das Zeichen ⚠ kennzeichnet ein vorläufiges Preisblatt, dessen Werte sich ändern können.",
         "data": {
           "regular_network": "Reguläres Netzentgelt (Standardtarif)",
           "price_includes_network": "Der Strompreis enthält bereits das reguläre Netzentgelt",
