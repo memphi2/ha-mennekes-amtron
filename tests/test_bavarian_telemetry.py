@@ -72,6 +72,12 @@ def test_profile_selection_is_shared_only_when_explicit(tmp_path):
             assert VIN not in source.source_key
             assert source.source_key.startswith("bavariandata:car:")
             assert source.snapshot == VehicleTelemetry()
+            # Optional identity was absent from the first profile schema. Its
+            # projection uses an empty string, which must retain legacy binding.
+            unpinned = {**selected, "vehicle_source_identity": ""}
+            assert resolve_telemetry_source(hass, unpinned).available
+            assert resolve_departure_source(hass, {**unpinned, "timed_vehicle_provider": "profile"}).available
+            assert resolve_history_source(hass, {**unpinned, "charge_loss_vehicle_provider": "profile"}).available
             for provider, device in (("unsupported", "car"), ("none", "car"), ("bavariandata", "")):
                 assert resolve_telemetry_source(hass, {"vehicle_provider": provider, "vehicle_device": device}) is None
             assert provider_selection({"vehicle_provider": 123, "vehicle_device": None}, "soc") == ProviderSelection("none", "")

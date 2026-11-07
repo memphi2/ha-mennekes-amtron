@@ -96,7 +96,7 @@ def provider_identity(hass: HomeAssistant, provider_id: str, device_id: str) -> 
 
 def _expected_identity(options: Mapping[str, Any]) -> str | None:
     identity = options.get("vehicle_source_identity")
-    return identity if isinstance(identity, str) else None
+    return identity if isinstance(identity, str) and identity else None
 
 
 def profile_capabilities(hass: HomeAssistant, provider_id: str, device_id: str) -> frozenset[Capability]:
