@@ -230,11 +230,7 @@ class MennekesModbusClient:
         for _attempt in range(2):
             generation = self._connection_generation
             try:
-                words = await _client_read.read_words(
-                    client, address=SERIAL_NUMBER.address, count=SERIAL_NUMBER.count,
-                    device_id=self._config.device_id, retries=self._config.retries,
-                    observe=self.link_quality.observe, trace=self.modbus_trace,
-                )
+                words = await self._async_read_transport(client, SERIAL_NUMBER.address, SERIAL_NUMBER.count)
             except asyncio.CancelledError as err:
                 # No write was attempted. Preserve cancellation, but distinguish
                 # this from an acknowledgement lost after an actual command.
@@ -367,14 +363,7 @@ class MennekesModbusClient:
             generation = self._connection_generation
             bound_serial = self._bound_serial
             if bound_serial is None or not (checking_identity or generation != old_generation):
-                return await _client_read.read_words(
-                    client,
-                    address=address,
-                    count=count,
-                    device_id=self._config.device_id,
-                    retries=self._config.retries,
-                    observe=self.link_quality.observe, trace=self.modbus_trace,
-                )
+                return await self._async_read_transport(client, address, count)
 
         # Identity and the target are separate Modbus transactions. Keep the
         # queue, but let an already waiting heartbeat acquire the bus first.
@@ -388,14 +377,21 @@ class MennekesModbusClient:
                 or not self.identity_verified
             ):
                 raise AmtronConnectionError("connection changed during read")
-            return await _client_read.read_words(
-                client,
-                address=address,
-                count=count,
-                device_id=self._config.device_id,
-                retries=self._config.retries,
-                observe=self.link_quality.observe, trace=self.modbus_trace,
-            )
+            return await self._async_read_transport(client, address, count)
+
+    async def _async_read_transport(
+        self, client: ModbusTransport, address: int, count: int,
+    ) -> list[int]:
+        """Apply shared read policy to the caller's locked transport snapshot.
+
+        Connection generation checks and heartbeat priority belong to the
+        caller; this helper must never select or reconnect another transport.
+        """
+        return await _client_read.read_words(
+            client, address=address, count=count,
+            device_id=self._config.device_id, retries=self._config.retries,
+            observe=self.link_quality.observe, trace=self.modbus_trace,
+        )
 
     async def async_read_register(
         self, spec: RegisterSpec, *, verify_identity: bool = False,
@@ -505,14 +501,7 @@ class MennekesModbusClient:
                             or not client.connected
                         ):
                             raise AmtronConnectionError("connection changed during write precondition")
-                        words = await _client_read.read_words(
-                            client,
-                            address=register.address,
-                            count=register.count,
-                            device_id=self._config.device_id,
-                            retries=self._config.retries,
-                            observe=self.link_quality.observe, trace=self.modbus_trace,
-                        )
+                        words = await self._async_read_transport(client, register.address, register.count)
                         return decode_register(register, words)
 
                     await precondition(read_locked)
