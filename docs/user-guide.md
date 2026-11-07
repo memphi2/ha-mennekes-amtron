@@ -423,10 +423,13 @@ unclear, choose the correct profile manually.
 
 These signals are an optional selection aid, not an identity supplied by the
 wallbox. The 30-minute check concerns the latest **Home Assistant report**, which
-cannot establish when the vehicle originally measured its position. BavarianData
-can restore tracker coordinates after a restart without marking their origin
-or original timestamp; a recently reported location can therefore still be old.
-Check the selected car before relying on its charge target or loss estimate.
+cannot always establish when the vehicle originally measured its cable state
+or position. Other integrations can report saved values again after restarting.
+BavarianData can restore both the cable state and tracker coordinates; an exposed
+BMW cable timestamp is checked, but missing timestamps cannot prove measurement
+freshness. The GPS accuracy area must also fit fully inside or outside the Home
+zone; a position crossing its boundary remains unknown. Check the selected car
+before relying on its charge target or loss estimate.
 
 Charging-loss assignment remains conservative: automatic recognition after a
 charge has already begun does not retrospectively assign that charge to the

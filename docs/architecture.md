@@ -227,10 +227,11 @@ observer reevaluates expiry even without new state changes. It never issues a
 vehicle cloud request or a charging command. Removing an assignment or changing
 cars invalidates the previous targets before activating new profile sources.
 
-The timestamp bound covers HA reports, not proven GPS measurement age. Upstream
-BavarianData restores tracker coordinates without preserving their original
-timestamp or marking restoration, so that source cannot provide strict
-fresh-location evidence. Detection remains a heuristic; manually selecting a
+The timestamp bound covers HA reports, not necessarily the original measurement
+age. Upstream BavarianData can restore cable state and tracker coordinates;
+available cable descriptor timestamps are checked, but missing timestamps and
+tracker coordinates without restore provenance cannot prove measurement
+freshness. A GPS accuracy circle crossing the Home-zone boundary is unknown. Detection remains a heuristic; manually selecting a
 profile is always possible. Loss matching does not newly assign a completed
 session whose start predates activation of that profile.
 
