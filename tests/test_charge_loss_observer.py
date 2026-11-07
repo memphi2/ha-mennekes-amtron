@@ -225,6 +225,40 @@ def test_history_uses_public_adapter_retries_and_does_not_call_on_each_poll(tmp_
     asyncio.run(run())
 
 
+def test_provider_exception_during_setup_does_not_block_wallbox_and_retries(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        observer, coordinator = build(hass, "vehicle_history")
+        coordinator.complete()
+        callbacks = []
+
+        def schedule(_hass, delay, callback):
+            callbacks.append((delay, callback))
+            return lambda: None
+
+        with (
+            patch(
+                "custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.async_read_history",
+                new=AsyncMock(side_effect=[ValueError("private vehicle data"), HistoryMatch(8, 1)]),
+            ),
+            patch("custom_components.mennekes_amtron_rtu.charge_loss_observer.async_call_later", side_effect=schedule),
+        ):
+            try:
+                await observer.async_start()
+                assert observer.statistics.last_loss_percent is None
+                assert callbacks[0][0] == 60
+                assert "ValueError" in caplog.text
+                assert "private vehicle data" not in caplog.text
+                callbacks[0][1](None)
+                await hass.async_block_till_done()
+                assert observer.statistics.last_loss_percent == pytest.approx(20)
+            finally:
+                await observer.async_stop()
+                await hass.async_stop()
+
+    asyncio.run(run())
+
+
 def test_storage_failures_never_modify_a_saved_match_or_break_controls(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))

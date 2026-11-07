@@ -220,6 +220,13 @@ class ChargeLossObserver:
                     match = await self._history_source.async_match(session) if self._history_source is not None else None
                 except (HomeAssistantError, TimeoutError):
                     match = None
+                except Exception as err:  # noqa: BLE001 - isolate third-party services
+                    # A third-party history service can fail with its own
+                    # exception types. Keep the wallbox and its setup usable;
+                    # the same bounded retry policy applies to this provider.
+                    # Do not log exception messages that may contain VINs.
+                    _LOGGER.warning("Vehicle charging history failed (%s)", type(err).__name__)
+                    match = None
                 energy = match.vehicle_kwh if match is not None else None
                 association = "history"
                 if match is None and session == self._session:
