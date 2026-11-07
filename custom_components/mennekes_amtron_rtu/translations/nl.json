@@ -286,7 +286,8 @@
       "active_vehicle": {
         "name": "Actief voertuig",
         "state": {
-          "none": "Geen voertuig geselecteerd"
+          "none": "Geen voertuig geselecteerd",
+          "automatic": "Automatische keuze"
         }
       }
     },
@@ -894,7 +895,8 @@
           "vehicle_disable": "Procentdoel uitschakelen",
           "back": "Terug zonder opslaan",
           "vehicle_profiles": "Voertuigprofielen",
-          "vehicle_source": "Laadniveau instellen"
+          "vehicle_source": "Laadniveau instellen",
+          "vehicle_detection": "Automatische voertuigkeuze"
         },
         "description": "Stel voertuigprofielen en het optionele percentagedoel in. Kies elke auto eenmaal en bepaal daarna afzonderlijk of u zijn laadlimiet, capaciteit, vertrektijden of geschiedenis wilt gebruiken."
       },
@@ -1115,7 +1117,7 @@
       },
       "vehicle_profiles": {
         "title": "Voertuigprofielen",
-        "description": "Elke auto behoudt eigen optionele bronnen en instellingen. Kies de aangesloten auto handmatig. Een profiel toevoegen schakelt geen laadfuncties in.",
+        "description": "Elke auto behoudt eigen optionele bronnen en instellingen. Kies de auto handmatig of stel onder Voertuig de optionele automatische keuze in. Een profiel toevoegen schakelt geen laadfuncties in.",
         "menu_options": {
           "vehicle_profile_add": "Profiel toevoegen",
           "vehicle_profile_select": "Voertuig kiezen",
@@ -1192,6 +1194,44 @@
       "loss_profile": {
         "title": "Laadgeschiedenis van het voertuig",
         "description": "Gebruikt de lokale laadgeschiedenis van het actieve profiel zonder een voertuigverversing aan te vragen. Ontbrekende of onduidelijke overeenkomsten blijven onbekend."
+      },
+      "vehicle_detection": {
+        "title": "Automatische voertuigkeuze",
+        "description": "Optioneel: kies de aangesloten auto op basis van kabel- en thuissignalen. Handmatig kiezen blijft de standaard. Configureer de signalen van deelnemende profielen en schakel daarna de automatische keuze in.",
+        "menu_options": {
+          "vehicle_detection_mode": "Automatische keuze in- of uitschakelen",
+          "vehicle_detection_profile": "Herkenningssignalen van een profiel instellen",
+          "back": "Terug zonder opslaan"
+        }
+      },
+      "vehicle_detection_mode": {
+        "title": "Automatische voertuigkeuze",
+        "description": "Er wordt slechts één auto gekozen met geldige signalen voor kabel aangesloten en thuis die recent aan Home Assistant zijn gemeld. Een zeker losgekoppelde kabel of een auto die zeker niet thuis is sluit die auto uit. Anders blokkeren onbekende, niet beschikbare of langer dan 30 minuten niet gemelde signalen de keuze. Bij geen of meerdere overeenkomsten wordt geen voertuig gekozen. Handmatig een auto kiezen schakelt de automatische keuze uit. Herkenning start of hervat het laden niet.",
+        "data": {
+          "vehicle_auto_selection": "Voertuig automatisch kiezen"
+        }
+      },
+      "vehicle_detection_profile": {
+        "title": "Herkenningssignalen van een profiel instellen",
+        "description": "Kies het profiel waarvan u de kabel- en thuissignalen wilt instellen. Alleen profielen met ingeschakelde herkenning doen mee.",
+        "data": {
+          "vehicle_profile_id": "Voertuigprofiel"
+        }
+      },
+      "vehicle_detection_source": {
+        "title": "Herkenningssignalen",
+        "description": "Gebruik ondersteunde lokale entiteiten van de voertuigintegratie, kies bestaande Home Assistant-entiteiten of schakel herkenning voor dit profiel uit. Zowel de kabelverbinding als aanwezigheid thuis is nodig. Er worden geen extra cloudverzoeken gedaan.",
+        "data": {
+          "vehicle_detection_source": "Bron voor herkenning"
+        }
+      },
+      "vehicle_detection_entities": {
+        "title": "Kabel- en thuissignalen",
+        "description": "Kies aparte signalen voor deze auto. De kabel vereist een binaire sensor met on = aangesloten. Thuis vereist een binaire sensor met on = thuis, of een persoon/apparaattracker met home = thuis. De signalen moeten binnen 30 minuten aan Home Assistant worden gemeld. Een melding bewijst niet wanneer de auto zijn locatie heeft gemeten.",
+        "data": {
+          "vehicle_connected_entity": "Laadkabel aangesloten",
+          "vehicle_home_entity": "Voertuig thuis"
+        }
       }
     },
     "error": {
@@ -1217,7 +1257,11 @@
       "vehicle_profile_required": "Kies eerst een voertuigprofiel.",
       "vehicle_capability_unavailable": "Het gekozen voertuig levert de vereiste gegevens niet. Schakel de bijbehorende entiteit in zijn integratie in of kies een handmatige bron.",
       "vehicle_profile_name_invalid": "Voer een unieke profielnaam van 1 tot 80 tekens in.",
-      "vehicle_profile_confirm_required": "Bevestig dat u dit profiel wilt verwijderen."
+      "vehicle_profile_confirm_required": "Bevestig dat u dit profiel wilt verwijderen.",
+      "vehicle_detection_required": "Stel eerst kabel- en thuissignalen in voor minstens één voertuigprofiel.",
+      "vehicle_detection_source_invalid": "Kies een van de beschikbare herkenningsbronnen.",
+      "vehicle_detection_entity_invalid": "Kies een bestaande binaire kabelsensor en een ondersteunde entiteit voor aanwezigheid thuis.",
+      "vehicle_detection_entities_distinct": "Kies verschillende entiteiten voor de kabelverbinding en aanwezigheid thuis."
     }
   },
   "selector": {
@@ -1304,6 +1348,13 @@
       "options": {
         "profile": "Uit het actieve voertuigprofiel",
         "entity": "Handmatig een entiteit kiezen"
+      }
+    },
+    "vehicle_detection_source": {
+      "options": {
+        "disabled": "Herkenning voor dit profiel uitgeschakeld",
+        "profile": "Voertuigintegratie gebruiken",
+        "entities": "Home Assistant-entiteiten selecteren"
       }
     }
   },

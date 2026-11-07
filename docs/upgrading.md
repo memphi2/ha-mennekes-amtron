@@ -40,8 +40,9 @@ need to recreate them.
 
 Optional [vehicle profiles](user-guide.md#vehicle-profiles) let you choose
 BavarianData and the car once, then enable its supported features separately.
-Select the active car manually. Existing configurations continue without
-profiles, including independent vehicles for departure and charging history and
+Manual selection remains the default. Automatic selection from cable and home
+signals is separately optional; an update does not enable it. Existing
+configurations continue without profiles, including independent vehicles for departure and charging history and
 the existing loss average. When you first add profiles, the old settings are
 retained in a manual profile instead of being assigned to a guessed car.
 **Use vehicle departure** is the new display name of the former BMW button;

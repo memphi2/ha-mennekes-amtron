@@ -11,10 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   retries and heartbeats in a redacted 200-entry RAM buffer that expires after
   ten minutes, without additional bus requests, Recorder history or log files.
 
-- Add optional vehicle profiles with manual selection and shared BavarianData
+- Add optional vehicle profiles with manual or opt-in cable/home selection
+  and shared BavarianData
   sources for charge level, limit, usable capacity, departure and history.
   Keep each car's settings and loss averages separate; preserve manual sources
-  and calendar use without enabling charging features automatically.
+  and calendar use without enabling charging features automatically. Unresolved
+  or ambiguous detection signals leave no active vehicle; choosing manually
+  overrides automatic selection without starting or resuming charging.
 - Allow the app connection page on stable Supervisor 2026.10.4 and newer,
   while retaining its administrator and trusted-ingress checks.
 - Keep TCP-login and password fields visible in the app's native configuration,

@@ -210,10 +210,29 @@ enabled local entities are read; missing or invalid values remain unavailable.
 Profiles hold a stable ID, name, provider/device selection and independent
 feature settings. One explicitly selected profile supplies effective vehicle
 options; wallbox and cost settings remain shared. Creating or selecting a
-profile does not enable optional features. No automatic vehicle recognition is
-performed. Profile changes invalidate the previous target and trip, while loss
-aggregates are retained separately per profile. Provider adapters bind the
+profile does not enable optional features. Automatic selection is separately
+opt-in; manual selection disables it. Profile changes invalidate the previous
+target and trip, while loss aggregates are retained separately per profile. Provider adapters bind the
 vehicle identity and reject a device rebound to another car.
+
+Optional detection resolves two independent signals per participating profile:
+cable connection and home presence. Provider-backed BavarianData detection uses
+its registered cable entity and GPS tracker against HA's Home zone; generic
+profiles can use explicit binary sensors and person/device-tracker entities.
+A definite disconnected or away signal excludes that profile. Only one positive
+candidate with no unresolved remaining candidates can be selected, after a
+three-second settling interval. Missing, unavailable, restored or HA reports
+older than 30 minutes invalidate the affected signal. The
+observer reevaluates expiry even without new state changes. It never issues a
+vehicle cloud request or a charging command. Removing an assignment or changing
+cars invalidates the previous targets before activating new profile sources.
+
+The timestamp bound covers HA reports, not proven GPS measurement age. Upstream
+BavarianData restores tracker coordinates without preserving their original
+timestamp or marking restoration, so that source cannot provide strict
+fresh-location evidence. Detection remains a heuristic; manually selecting a
+profile is always possible. Loss matching does not newly assign a completed
+session whose start predates activation of that profile.
 
 Without profile configuration, existing flat options retain their behavior,
 including independently selected departure and history vehicles. Explicit

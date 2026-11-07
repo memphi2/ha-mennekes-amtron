@@ -99,8 +99,10 @@ A changed value does not prove which charge it belongs to. Use manual assignment
 if the vehicle has charged elsewhere, updates arrive late, or two consecutive
 charges have the same kWh value. Without charging timestamps the result is always
 an estimate. This setting does not automatically identify which vehicle is plugged
-in. Select the correct [vehicle profile](user-guide.md#vehicle-profiles) manually
-before charging; the sensor and its settings belong to that profile.
+in. Check the correct [vehicle profile](user-guide.md#vehicle-profiles) before
+charging, whether selected manually or through the separately optional cable/home
+recognition. Recognition after a charge begins does not assign that charge to a
+new profile. The energy sensor and its settings belong to the selected profile.
 
 ## Charging costs: fixed or dynamic price
 

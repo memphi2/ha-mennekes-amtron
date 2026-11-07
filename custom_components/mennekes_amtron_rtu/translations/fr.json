@@ -286,7 +286,8 @@
       "active_vehicle": {
         "name": "Véhicule actif",
         "state": {
-          "none": "Aucun véhicule sélectionné"
+          "none": "Aucun véhicule sélectionné",
+          "automatic": "Sélection automatique"
         }
       }
     },
@@ -894,7 +895,8 @@
           "vehicle_disable": "Désactiver l’objectif en pourcentage",
           "back": "Retour sans enregistrer",
           "vehicle_profiles": "Profils de véhicule",
-          "vehicle_source": "Configurer le niveau de charge"
+          "vehicle_source": "Configurer le niveau de charge",
+          "vehicle_detection": "Sélection automatique du véhicule"
         },
         "description": "Configurez les profils et l’objectif facultatif en pourcentage. Choisissez chaque voiture une fois, puis activez séparément sa limite, sa capacité, ses départs ou son historique."
       },
@@ -1115,7 +1117,7 @@
       },
       "vehicle_profiles": {
         "title": "Profils de véhicule",
-        "description": "Chaque voiture conserve ses propres sources et réglages facultatifs. Choisissez manuellement la voiture branchée. Ajouter un profil n’active aucune fonction de charge.",
+        "description": "Chaque voiture conserve ses propres sources et réglages facultatifs. Choisissez-la manuellement ou configurez la sélection automatique facultative dans Véhicule. Ajouter un profil n’active aucune fonction de charge.",
         "menu_options": {
           "vehicle_profile_add": "Ajouter un profil",
           "vehicle_profile_select": "Choisir le véhicule",
@@ -1192,6 +1194,44 @@
       "loss_profile": {
         "title": "Historique de recharge du véhicule",
         "description": "Utilise l’historique local du profil actif sans demander d’actualisation du véhicule. Les correspondances absentes ou ambiguës restent inconnues."
+      },
+      "vehicle_detection": {
+        "title": "Sélection automatique du véhicule",
+        "description": "Facultatif : choisir la voiture branchée selon le câble et sa présence à domicile. La sélection reste manuelle par défaut. Configurez les signaux des profils concernés, puis activez la sélection automatique.",
+        "menu_options": {
+          "vehicle_detection_mode": "Activer ou désactiver la sélection automatique",
+          "vehicle_detection_profile": "Configurer les signaux d’un profil",
+          "back": "Retour sans enregistrer"
+        }
+      },
+      "vehicle_detection_mode": {
+        "title": "Sélection automatique du véhicule",
+        "description": "Une seule voiture avec des signaux valides récemment signalés à Home Assistant « câble branché » et « à domicile » peut être sélectionnée. Un câble clairement débranché ou une absence certaine exclut cette voiture. Sinon, les signaux inconnus, indisponibles ou non signalés depuis plus de 30 minutes bloquent la sélection. Aucun véhicule n’est choisi si aucun ou plusieurs correspondent. Un choix manuel désactive la sélection automatique. La détection ne démarre ni ne reprend la charge.",
+        "data": {
+          "vehicle_auto_selection": "Sélectionner le véhicule automatiquement"
+        }
+      },
+      "vehicle_detection_profile": {
+        "title": "Configurer les signaux d’un profil",
+        "description": "Choisissez le profil dont vous souhaitez configurer les signaux de câble et de présence. Seuls les profils dont la détection est activée participent.",
+        "data": {
+          "vehicle_profile_id": "Profil du véhicule"
+        }
+      },
+      "vehicle_detection_source": {
+        "title": "Signaux de détection",
+        "description": "Utilisez les entités locales compatibles de l’intégration du véhicule, choisissez des entités Home Assistant existantes ou désactivez la détection pour ce profil. Le branchement du câble et la présence à domicile sont tous deux nécessaires. Aucune requête cloud supplémentaire.",
+        "data": {
+          "vehicle_detection_source": "Source de détection"
+        }
+      },
+      "vehicle_detection_entities": {
+        "title": "Câble et présence à domicile",
+        "description": "Choisissez des signaux distincts pour cette voiture. Le câble exige un capteur binaire dont on signifie branché. La présence exige un capteur binaire dont on signifie à domicile, ou une personne/un traceur dont home signifie à domicile. Les signaux doivent être signalés à Home Assistant dans les 30 minutes. Cela ne prouve pas la date de mesure de la position.",
+        "data": {
+          "vehicle_connected_entity": "Câble de charge branché",
+          "vehicle_home_entity": "Véhicule à domicile"
+        }
       }
     },
     "error": {
@@ -1217,7 +1257,11 @@
       "vehicle_profile_required": "Choisissez d’abord un profil de véhicule.",
       "vehicle_capability_unavailable": "Le véhicule choisi ne fournit pas les données nécessaires. Activez l’entité correspondante dans son intégration ou choisissez une source manuelle.",
       "vehicle_profile_name_invalid": "Saisissez un nom de profil unique de 1 à 80 caractères.",
-      "vehicle_profile_confirm_required": "Confirmez la suppression de ce profil."
+      "vehicle_profile_confirm_required": "Confirmez la suppression de ce profil.",
+      "vehicle_detection_required": "Configurez d’abord les signaux de câble et de présence à domicile d’au moins un profil.",
+      "vehicle_detection_source_invalid": "Choisissez une source de détection proposée.",
+      "vehicle_detection_entity_invalid": "Choisissez un capteur binaire de câble existant et une entité de présence à domicile compatible.",
+      "vehicle_detection_entities_distinct": "Choisissez des entités différentes pour le câble et la présence à domicile."
     }
   },
   "selector": {
@@ -1304,6 +1348,13 @@
       "options": {
         "profile": "Depuis le profil de véhicule actif",
         "entity": "Choisir une entité manuellement"
+      }
+    },
+    "vehicle_detection_source": {
+      "options": {
+        "disabled": "Détection désactivée pour ce profil",
+        "profile": "Utiliser l’intégration du véhicule",
+        "entities": "Choisir des entités Home Assistant"
       }
     }
   },

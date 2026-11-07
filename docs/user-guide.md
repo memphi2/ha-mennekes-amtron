@@ -346,8 +346,10 @@ state. Set the intended goal with that owner before continuing the charge.
 ## Vehicle profiles
 
 Vehicle profiles keep the data and settings of different cars together. You can
-configure up to eight profiles and select the active vehicle manually. Adding a
-profile does not enable a percentage target, departure planning or loss estimates.
+configure up to eight profiles. Manual selection is the default; optional
+[automatic selection](#optional-automatic-vehicle-selection) can use cable and
+home signals. Adding a profile does not enable a percentage target, departure
+planning or loss estimates.
 Enable only the features you want for that profile.
 
 Open **Configure → Vehicle → Vehicle profiles → Add profile**. Give the profile
@@ -371,10 +373,9 @@ its current battery condition; it does not substitute nominal battery size or a
 battery-health percentage. If that value is missing, choose a suitable manual
 capacity source instead.
 
-Select the correct profile **before charging**. Profile selection is manual: cable
-presence and location do not automatically identify the connected car. Changing
-the active profile clears the previous car's percentage target and departure
-plan without starting charging. Charging-loss averages are kept separately for
+Check the selected profile **before charging**, whether you chose it manually or
+enabled automatic selection. Changing the active profile clears the previous
+car's percentage target and departure plan without starting charging. Charging-loss averages are kept separately for
 each profile; changing its data source starts a new average for that source.
 A charge that began before you selected a profile is not newly assigned to it.
 The profile's saved last result and average remain available when you return
@@ -384,6 +385,52 @@ Existing manually selected sources keep working after an update. They are not
 silently replaced by a BavarianData vehicle, even when old departure and history
 settings refer to different cars. When you start using profiles, those existing
 settings are retained as a manual profile.
+
+### Optional automatic vehicle selection
+
+Automatic selection is **off by default** and separately configurable for each
+profile. Open **Configure → Vehicle → Automatic vehicle selection**. Under
+**Configure a profile’s detection signals**, select a profile and choose:
+
+- **Use the vehicle integration**: BavarianData supplies the vehicle's cable
+  sensor and GPS tracker. Its position is compared with Home Assistant's Home
+  zone. Existing enabled entities are used; no extra cloud requests or vehicle
+  commands are sent.
+- **Select Home Assistant entities**: choose two separate signals for this car.
+  The cable source must be a binary sensor with `on` meaning connected. The home
+  source may be a binary sensor with `on` meaning at home, or a `person`/
+  `device_tracker` with state `home`. Prefer a signal that follows the vehicle;
+  a person's presence alone does not establish where the car is.
+- **Detection disabled for this profile**: exclude this profile from automatic
+  selection while keeping its manual selection and optional features.
+
+After configuring the participating profiles, enable **Select the vehicle
+automatically**. The **Active vehicle** selector also offers **Automatic
+selection** when detection sources are configured. Open the selector’s details
+to see the currently selected profile. Selecting a particular car or no vehicle
+manually turns the automatic mode off.
+
+The integration selects a car only when exactly one configured profile reports
+both **cable connected** and **at home**. A positive change must remain stable
+for three seconds. A valid disconnected or away signal excludes that car, even
+if its other signal is missing. For the remaining candidates, unknown or
+unavailable signals block selection, as do signals not reported to Home Assistant
+within 30 minutes.
+No matching car or several matching cars means **no active vehicle**. Previous
+car-specific targets and the departure plan are cleared when the assignment
+changes; detection never starts charging or lifts a pause. If the result is
+unclear, choose the correct profile manually.
+
+These signals are an optional selection aid, not an identity supplied by the
+wallbox. The 30-minute check concerns the latest **Home Assistant report**, which
+cannot establish when the vehicle originally measured its position. BavarianData
+can restore tracker coordinates after a restart without marking their origin
+or original timestamp; a recently reported location can therefore still be old.
+Check the selected car before relying on its charge target or loss estimate.
+
+Charging-loss assignment remains conservative: automatic recognition after a
+charge has already begun does not retrospectively assign that charge to the
+new profile. Saved loss results and averages remain separate for each car.
 
 ## Optional vehicle percentage target
 

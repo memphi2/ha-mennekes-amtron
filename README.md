@@ -103,8 +103,8 @@ the integration options.
 **Choose only the extras you need.** Under **Configure**, separate sections
 cover **Wallbox**, **Vehicle**, **Next departure**, **Charging costs** and
 **Charging losses**. Optional vehicle profiles keep each car's settings together;
-you select the connected car manually. Choose BavarianData once per profile or
-use existing HA entities. Charge targets, departure planning and loss estimates
+choose the connected car manually or enable optional selection from cable and
+home signals. Choose BavarianData once per profile or use existing HA entities. Charge targets, departure planning and loss estimates
 remain separately optional. See [vehicle setup](docs/user-guide.md#vehicle-profiles).
 
 ## Find your way

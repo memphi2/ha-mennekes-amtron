@@ -286,7 +286,8 @@
       "active_vehicle": {
         "name": "Active vehicle",
         "state": {
-          "none": "No vehicle selected"
+          "none": "No vehicle selected",
+          "automatic": "Automatic selection"
         }
       }
     },
@@ -894,7 +895,8 @@
           "vehicle_disable": "Disable percentage target",
           "back": "Back without saving",
           "vehicle_profiles": "Vehicle profiles",
-          "vehicle_source": "Configure charge level"
+          "vehicle_source": "Configure charge level",
+          "vehicle_detection": "Automatic vehicle selection"
         },
         "description": "Configure vehicle profiles and the optional percentage target. Select each car once, then choose independently whether to use its charge limit, capacity, departure timers or history."
       },
@@ -1115,7 +1117,7 @@
       },
       "vehicle_profiles": {
         "title": "Vehicle profiles",
-        "description": "Keep each car’s optional data and settings in its own profile. Select the connected car manually. Adding a profile does not enable charging features.",
+        "description": "Keep each car’s optional data and settings in its own profile. Select the car manually or configure optional automatic selection under Vehicle. Adding a profile does not enable charging features.",
         "menu_options": {
           "vehicle_profile_add": "Add profile",
           "vehicle_profile_select": "Select vehicle",
@@ -1192,6 +1194,44 @@
       "loss_profile": {
         "title": "Vehicle charging history",
         "description": "Use the active profile’s local charging history. No vehicle refresh is requested. Missing or ambiguous matches remain unknown."
+      },
+      "vehicle_detection": {
+        "title": "Automatic vehicle selection",
+        "description": "Optional: select the connected car from cable and home signals. Manual selection remains the default. Configure each participating profile, then enable automatic selection.",
+        "menu_options": {
+          "vehicle_detection_mode": "Enable or disable automatic selection",
+          "vehicle_detection_profile": "Configure a profile’s detection signals",
+          "back": "Back without saving"
+        }
+      },
+      "vehicle_detection_mode": {
+        "title": "Automatic vehicle selection",
+        "description": "Only one car with valid “cable connected” and “at home” signals recently reported to Home Assistant is selected. A definite disconnected or away signal excludes that car. Otherwise, unknown, unavailable or unreported signals for over 30 minutes block selection. If no car or several cars match, no vehicle is selected. Choosing a car manually disables automatic selection. Detection never starts or resumes charging.",
+        "data": {
+          "vehicle_auto_selection": "Select the vehicle automatically"
+        }
+      },
+      "vehicle_detection_profile": {
+        "title": "Configure a profile’s detection signals",
+        "description": "Choose the profile whose cable and home signals you want to configure. Only profiles with detection enabled participate.",
+        "data": {
+          "vehicle_profile_id": "Vehicle profile"
+        }
+      },
+      "vehicle_detection_source": {
+        "title": "Detection signals",
+        "description": "Use supported local entities from this profile’s vehicle integration, choose existing Home Assistant entities, or disable detection for this profile. Both cable connection and home presence are required. No additional cloud requests are made.",
+        "data": {
+          "vehicle_detection_source": "Source for detection"
+        }
+      },
+      "vehicle_detection_entities": {
+        "title": "Cable and home signals",
+        "description": "Choose separate signals for this car. Cable connection must be a binary sensor with on = connected. Home presence must be a binary sensor with on = at home, or a person/device tracker with home = at home. Use signals reported to Home Assistant within 30 minutes. Reports do not prove when the car measured its location.",
+        "data": {
+          "vehicle_connected_entity": "Charging cable connected",
+          "vehicle_home_entity": "Vehicle at home"
+        }
       }
     },
     "error": {
@@ -1217,7 +1257,11 @@
       "vehicle_profile_required": "Select a vehicle profile first.",
       "vehicle_capability_unavailable": "The selected vehicle does not provide the required data. Enable the corresponding entity in its integration or choose a manual source.",
       "vehicle_profile_name_invalid": "Enter a unique profile name with 1 to 80 characters.",
-      "vehicle_profile_confirm_required": "Confirm that you want to remove this profile."
+      "vehicle_profile_confirm_required": "Confirm that you want to remove this profile.",
+      "vehicle_detection_required": "First configure cable and home signals for at least one vehicle profile.",
+      "vehicle_detection_source_invalid": "Select one of the available detection sources.",
+      "vehicle_detection_entity_invalid": "Select an existing cable binary sensor and a supported home-presence entity.",
+      "vehicle_detection_entities_distinct": "Select separate entities for cable connection and home presence."
     }
   },
   "selector": {
@@ -1304,6 +1348,13 @@
       "options": {
         "profile": "From the active vehicle profile",
         "entity": "Choose an entity manually"
+      }
+    },
+    "vehicle_detection_source": {
+      "options": {
+        "disabled": "Detection disabled for this profile",
+        "profile": "Use the vehicle integration",
+        "entities": "Select Home Assistant entities"
       }
     }
   },

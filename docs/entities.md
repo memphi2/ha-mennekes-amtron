@@ -79,7 +79,7 @@ in read-only mode; it does not send a charging command.
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
-| `select.*_active_vehicle` | Active vehicle | optional vehicle profiles configured | Select the connected car manually before charging, or select no vehicle. Switching clears the previous percentage target and departure plan without resuming; profile settings and loss averages remain separate. |
+| `select.*_active_vehicle` | Active vehicle | optional vehicle profiles configured | Choose a car or no vehicle manually; either choice disables automatic selection. With detection sources configured, Automatic selection uses cable and home signals. Switching clears the previous percentage target and departure plan without resuming; settings and loss averages remain separate. |
 | `number.*_vehicle_charge_target` | Vehicle charge target | optional configured vehicle SoC source; compatible service in service mode | Percentage ceiling, 0 = off. Only limits charging. Up to 100%, or the separately optional vehicle charge-limit source. Neither setting nor disabling resumes charging. |
 | `datetime.*_next_departure` | Next departure | Departure planning enabled, vehicle SoC source and usable battery capacity | One dated target for the next trip. A timed goal may resume a pause to meet this time; the ordinary percentage goal alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
 | `button.*_use_next_calendar_event` | Use next calendar event | optional calendar and exact event title | Copies one matching timed event from the next 14 days into Next departure. Later events are not selected automatically. |

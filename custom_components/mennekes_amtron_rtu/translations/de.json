@@ -286,7 +286,8 @@
       "active_vehicle": {
         "name": "Fahrzeug",
         "state": {
-          "none": "Kein Fahrzeug ausgewählt"
+          "none": "Kein Fahrzeug ausgewählt",
+          "automatic": "Automatische Auswahl"
         }
       }
     },
@@ -894,7 +895,8 @@
           "vehicle_disable": "Prozentziel deaktivieren",
           "back": "Zurück ohne Speichern",
           "vehicle_profiles": "Fahrzeugprofile",
-          "vehicle_source": "Ladestand einrichten"
+          "vehicle_source": "Ladestand einrichten",
+          "vehicle_detection": "Automatische Fahrzeugauswahl"
         },
         "description": "Richte Fahrzeugprofile und das optionale Prozentziel ein. Wähle jedes Auto einmal aus und entscheide anschließend unabhängig über Ladegrenze, Kapazität, Abfahrtszeiten und Historie."
       },
@@ -1115,7 +1117,7 @@
       },
       "vehicle_profiles": {
         "title": "Fahrzeugprofile",
-        "description": "Jedes Auto erhält eigene optionale Datenquellen und Einstellungen. Wähle das angeschlossene Fahrzeug manuell aus. Ein neues Profil aktiviert noch keine Ladefunktion.",
+        "description": "Jedes Auto erhält eigene optionale Datenquellen und Einstellungen. Wähle das Auto manuell oder richte unter Fahrzeug die optionale automatische Auswahl ein. Ein neues Profil aktiviert noch keine Ladefunktion.",
         "menu_options": {
           "vehicle_profile_add": "Profil hinzufügen",
           "vehicle_profile_select": "Fahrzeug auswählen",
@@ -1192,6 +1194,44 @@
       "loss_profile": {
         "title": "Ladehistorie des Fahrzeugs",
         "description": "Verwendet die lokale Ladehistorie des aktiven Profils. Es wird keine Fahrzeugaktualisierung angefordert. Fehlende oder mehrdeutige Zuordnungen bleiben unbekannt."
+      },
+      "vehicle_detection": {
+        "title": "Automatische Fahrzeugauswahl",
+        "description": "Optional: das angeschlossene Auto anhand von Kabel- und Zuhause-Signalen auswählen. Standardmäßig bleibt die Auswahl manuell. Richte die Signale der beteiligten Profile ein und schalte anschließend die automatische Auswahl ein.",
+        "menu_options": {
+          "vehicle_detection_mode": "Automatische Auswahl ein- oder ausschalten",
+          "vehicle_detection_profile": "Erkennungssignale eines Profils einrichten",
+          "back": "Zurück ohne Speichern"
+        }
+      },
+      "vehicle_detection_mode": {
+        "title": "Automatische Fahrzeugauswahl",
+        "description": "Ausgewählt wird nur genau ein Auto mit gültigen, kürzlich an Home Assistant gemeldeten Signalen für „Kabel angeschlossen“ und „zu Hause“. Ein sicher getrenntes Kabel oder ein sicher abwesendes Auto schließt dieses Fahrzeug aus. Andernfalls verhindern unbekannte, nicht verfügbare oder seit über 30 Minuten nicht gemeldete Signale die Auswahl. Bei keinem oder mehreren Treffern wird kein Fahrzeug ausgewählt. Eine manuelle Fahrzeugauswahl schaltet die Automatik aus. Die Erkennung startet keine Ladung und hebt keine Pause auf.",
+        "data": {
+          "vehicle_auto_selection": "Fahrzeug automatisch auswählen"
+        }
+      },
+      "vehicle_detection_profile": {
+        "title": "Erkennungssignale eines Profils einrichten",
+        "description": "Wähle das Profil, dessen Kabel- und Zuhause-Signale du einrichten möchtest. Nur Profile mit eingeschalteter Erkennung nehmen teil.",
+        "data": {
+          "vehicle_profile_id": "Fahrzeugprofil"
+        }
+      },
+      "vehicle_detection_source": {
+        "title": "Signale zur Fahrzeugerkennung",
+        "description": "Nutze unterstützte lokale Entitäten der Fahrzeugintegration dieses Profils, wähle vorhandene Home-Assistant-Entitäten oder schalte die Erkennung für dieses Profil aus. Kabelverbindung und Anwesenheit zu Hause werden beide benötigt. Es gibt keine zusätzlichen Cloud-Abfragen.",
+        "data": {
+          "vehicle_detection_source": "Quelle für die Erkennung"
+        }
+      },
+      "vehicle_detection_entities": {
+        "title": "Kabel- und Zuhause-Signale",
+        "description": "Wähle getrennte Signale für dieses Auto. Für das Kabel ist ein Binärsensor mit Ein = angeschlossen erforderlich. Für zu Hause nutze einen Binärsensor mit Ein = zu Hause oder eine Person/Geräteverfolgung mit home = zu Hause. Die Signale müssen innerhalb von 30 Minuten an Home Assistant gemeldet werden. Eine Meldung belegt nicht, wann das Auto seinen Standort ermittelt hat.",
+        "data": {
+          "vehicle_connected_entity": "Ladekabel angeschlossen",
+          "vehicle_home_entity": "Fahrzeug zu Hause"
+        }
       }
     },
     "error": {
@@ -1217,7 +1257,11 @@
       "vehicle_profile_required": "Wähle zuerst ein Fahrzeugprofil aus.",
       "vehicle_capability_unavailable": "Das ausgewählte Fahrzeug stellt die benötigten Daten nicht bereit. Aktiviere die passende Entität in seiner Integration oder wähle eine manuelle Quelle.",
       "vehicle_profile_name_invalid": "Gib einen eindeutigen Profilnamen mit 1 bis 80 Zeichen ein.",
-      "vehicle_profile_confirm_required": "Bestätige, dass du dieses Profil entfernen möchtest."
+      "vehicle_profile_confirm_required": "Bestätige, dass du dieses Profil entfernen möchtest.",
+      "vehicle_detection_required": "Richte zuerst für mindestens ein Fahrzeugprofil Kabel- und Zuhause-Signale ein.",
+      "vehicle_detection_source_invalid": "Wähle eine der angebotenen Erkennungsquellen.",
+      "vehicle_detection_entity_invalid": "Wähle einen vorhandenen Kabel-Binärsensor und eine unterstützte Entität für die Anwesenheit zu Hause.",
+      "vehicle_detection_entities_distinct": "Wähle unterschiedliche Entitäten für Kabelverbindung und Anwesenheit zu Hause."
     }
   },
   "selector": {
@@ -1304,6 +1348,13 @@
       "options": {
         "profile": "Aus dem aktiven Fahrzeugprofil",
         "entity": "Entität manuell auswählen"
+      }
+    },
+    "vehicle_detection_source": {
+      "options": {
+        "disabled": "Erkennung für dieses Profil ausgeschaltet",
+        "profile": "Fahrzeugintegration verwenden",
+        "entities": "Home-Assistant-Entitäten auswählen"
       }
     }
   },

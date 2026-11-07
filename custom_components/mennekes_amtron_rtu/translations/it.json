@@ -286,7 +286,8 @@
       "active_vehicle": {
         "name": "Veicolo attivo",
         "state": {
-          "none": "Nessun veicolo selezionato"
+          "none": "Nessun veicolo selezionato",
+          "automatic": "Selezione automatica"
         }
       }
     },
@@ -894,7 +895,8 @@
           "vehicle_disable": "Disattiva l’obiettivo percentuale",
           "back": "Indietro senza salvare",
           "vehicle_profiles": "Profili veicolo",
-          "vehicle_source": "Configura livello di carica"
+          "vehicle_source": "Configura livello di carica",
+          "vehicle_detection": "Selezione automatica del veicolo"
         },
         "description": "Configura i profili e l’obiettivo percentuale facoltativo. Seleziona ogni auto una volta, poi scegli separatamente se usarne limite, capacità, partenze o cronologia."
       },
@@ -1115,7 +1117,7 @@
       },
       "vehicle_profiles": {
         "title": "Profili veicolo",
-        "description": "Ogni auto conserva le proprie fonti e impostazioni facoltative. Seleziona manualmente l’auto collegata. Aggiungere un profilo non attiva funzioni di ricarica.",
+        "description": "Ogni auto conserva le proprie fonti e impostazioni facoltative. Seleziona l’auto manualmente o configura la selezione automatica facoltativa in Veicolo. Aggiungere un profilo non attiva funzioni di ricarica.",
         "menu_options": {
           "vehicle_profile_add": "Aggiungi profilo",
           "vehicle_profile_select": "Seleziona veicolo",
@@ -1192,6 +1194,44 @@
       "loss_profile": {
         "title": "Cronologia di ricarica del veicolo",
         "description": "Usa la cronologia locale del profilo attivo senza richiedere aggiornamenti del veicolo. Le corrispondenze mancanti o ambigue restano sconosciute."
+      },
+      "vehicle_detection": {
+        "title": "Selezione automatica del veicolo",
+        "description": "Facoltativa: seleziona l’auto collegata in base al cavo e alla presenza a casa. La selezione rimane manuale per impostazione predefinita. Configura i segnali dei profili interessati, poi attiva la selezione automatica.",
+        "menu_options": {
+          "vehicle_detection_mode": "Attiva o disattiva la selezione automatica",
+          "vehicle_detection_profile": "Configura i segnali di un profilo",
+          "back": "Indietro senza salvare"
+        }
+      },
+      "vehicle_detection_mode": {
+        "title": "Selezione automatica del veicolo",
+        "description": "Viene selezionata solo un’auto con segnali validi di cavo collegato e presenza a casa segnalati recentemente a Home Assistant. Un cavo sicuramente scollegato o un’auto certamente fuori casa esclude quel veicolo. Altrimenti, segnali sconosciuti, non disponibili o non segnalati da oltre 30 minuti impediscono la selezione. Se non corrisponde nessun’auto o ne corrispondono più di una, non viene selezionato alcun veicolo. Una scelta manuale disattiva la selezione automatica. Il rilevamento non avvia né riprende la ricarica.",
+        "data": {
+          "vehicle_auto_selection": "Seleziona il veicolo automaticamente"
+        }
+      },
+      "vehicle_detection_profile": {
+        "title": "Configura i segnali di un profilo",
+        "description": "Scegli il profilo di cui configurare i segnali del cavo e della presenza a casa. Partecipano solo i profili con rilevamento attivo.",
+        "data": {
+          "vehicle_profile_id": "Profilo del veicolo"
+        }
+      },
+      "vehicle_detection_source": {
+        "title": "Segnali di rilevamento",
+        "description": "Usa le entità locali supportate dell’integrazione del veicolo, scegli entità Home Assistant esistenti o disattiva il rilevamento per questo profilo. Servono sia il cavo collegato sia la presenza a casa. Nessuna richiesta cloud aggiuntiva.",
+        "data": {
+          "vehicle_detection_source": "Fonte di rilevamento"
+        }
+      },
+      "vehicle_detection_entities": {
+        "title": "Cavo e presenza a casa",
+        "description": "Scegli segnali distinti per questa auto. Per il cavo serve un sensore binario con on = collegato. Per la presenza serve un sensore binario con on = a casa, oppure una persona/un localizzatore con home = a casa. I segnali devono essere segnalati a Home Assistant entro 30 minuti. La segnalazione non prova quando l’auto ha rilevato la posizione.",
+        "data": {
+          "vehicle_connected_entity": "Cavo di ricarica collegato",
+          "vehicle_home_entity": "Veicolo a casa"
+        }
       }
     },
     "error": {
@@ -1217,7 +1257,11 @@
       "vehicle_profile_required": "Seleziona prima un profilo veicolo.",
       "vehicle_capability_unavailable": "Il veicolo selezionato non fornisce i dati necessari. Attiva l’entità corrispondente nella sua integrazione oppure scegli una fonte manuale.",
       "vehicle_profile_name_invalid": "Inserisci un nome di profilo univoco da 1 a 80 caratteri.",
-      "vehicle_profile_confirm_required": "Conferma di voler rimuovere questo profilo."
+      "vehicle_profile_confirm_required": "Conferma di voler rimuovere questo profilo.",
+      "vehicle_detection_required": "Configura prima i segnali del cavo e della presenza a casa per almeno un profilo.",
+      "vehicle_detection_source_invalid": "Seleziona una delle fonti di rilevamento disponibili.",
+      "vehicle_detection_entity_invalid": "Seleziona un sensore binario del cavo esistente e un’entità di presenza a casa supportata.",
+      "vehicle_detection_entities_distinct": "Seleziona entità diverse per il cavo e la presenza a casa."
     }
   },
   "selector": {
@@ -1304,6 +1348,13 @@
       "options": {
         "profile": "Dal profilo veicolo attivo",
         "entity": "Scegli un’entità manualmente"
+      }
+    },
+    "vehicle_detection_source": {
+      "options": {
+        "disabled": "Rilevamento disattivato per questo profilo",
+        "profile": "Usa l’integrazione del veicolo",
+        "entities": "Seleziona entità Home Assistant"
       }
     }
   },
