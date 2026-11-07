@@ -2,12 +2,12 @@
 
 Install the Modbus service from `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`.
 
-App version: 0.6.1. Source release: [v0.6.1](https://github.com/memphi2/ha-mennekes-amtron/releases/tag/v0.6.1).
+App version: 0.7.0b1. Source release: [v0.7.0b1](https://github.com/memphi2/ha-mennekes-amtron/releases/tag/v0.7.0b1).
 
 Standalone container reference for this release:
 
 ```text
-ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:8c99585ef683673bfaf3fb79af15d1281f67ecdaa580abdaaf51e62ad564a8df
+ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:876c3e53e39a018805baa85450f5d28d40c48f3c041262ef9b0476f2d6050862
 ```
 
 This branch is generated after publication; source changes belong on main.

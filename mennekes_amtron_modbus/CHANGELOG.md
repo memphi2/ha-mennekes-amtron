@@ -1,5 +1,17 @@
 # Changes
 
+## 0.7.0b1
+
+Beta update; **0.6.1 remains stable**. Available through **#apps-beta** only.
+
+- Recheck reached energy and percentage targets immediately before enabling
+  writes, including commands waiting for the Modbus connection.
+- Preserve previously saved minute-level tariff windows at startup while
+  keeping quarter-hour validation for new tariff settings.
+- Serialize solar display changes with charging commands so a cancelled timed
+  charge cannot reject an unrelated display-mode change.
+- Keep existing app data and connection settings. API 2 remains unchanged.
+
 ## 0.6.1
 
 - Expire queued timed charging commands at their deadline even while Home
