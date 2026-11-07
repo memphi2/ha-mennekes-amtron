@@ -61,16 +61,16 @@
       },
       "serial": {
         "data": {
-          "baudrate": "Baudrate",
+          "baudrate": "Serielle Geschwindigkeit (Baudrate)",
           "device_id": "Modbus-Geräteadresse",
-          "frame": "Frame",
+          "frame": "Serielles Datenformat",
           "port": "Serieller Port",
           "search": "Wenn diese Werte nicht funktionieren"
         },
         "data_description": {
-          "baudrate": "Werkseinstellung ist 57600.",
+          "baudrate": "Muss zur Einstellung der Wallbox passen. Die Werkseinstellung ist 57600 Baud.",
           "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
-          "frame": "Die Wallbox dokumentiert genau diese drei. Werkseinstellung sind 8 Datenbits, keine Parität, 2 Stoppbits.",
+          "frame": "Datenbits, Parität und Stoppbits müssen zur Wallbox passen. Die Werkseinstellung ist 8N2.",
           "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
           "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Die Suche sendet Leseanfragen. Nur auf einem Bus ohne anderen Modbus-Master verwenden."
         },
@@ -79,16 +79,16 @@
       },
       "serial_reconfigure": {
         "data": {
-          "baudrate": "Baudrate",
+          "baudrate": "Serielle Geschwindigkeit (Baudrate)",
           "device_id": "Modbus-Geräteadresse",
-          "frame": "Frame",
+          "frame": "Serielles Datenformat",
           "port": "Serieller Port",
           "search": "Wenn diese Werte nicht funktionieren"
         },
         "data_description": {
-          "baudrate": "Werkseinstellung ist 57600.",
+          "baudrate": "Muss zur Einstellung der Wallbox passen. Die Werkseinstellung ist 57600 Baud.",
           "device_id": "Werkseinstellung ist 50. Mit dem MENNEKES-Konfigurationstool sind Adressen von 10 bis 50 möglich.",
-          "frame": "Die Wallbox dokumentiert genau diese drei. Werkseinstellung sind 8 Datenbits, keine Parität, 2 Stoppbits.",
+          "frame": "Datenbits, Parität und Stoppbits müssen zur Wallbox passen. Die Werkseinstellung ist 8N2.",
           "port": "Pfad des USB-RS-485-Adapters. Bevorzuge einen /dev/serial/by-id-Pfad: /dev/ttyUSB0 kann sich nach einem Neustart ändern.",
           "search": "Geräteadresse und Busparameter lassen sich mit dem MENNEKES-Konfigurationstool ändern, eine übernommene Installation nutzt also oft andere Werte. Die Suche sendet Leseanfragen. Nur auf einem Bus ohne anderen Modbus-Master verwenden."
         },
@@ -115,10 +115,10 @@
         "description": "Verbinde eine unterstützte RTU-Wallbox über einen Ethernet-RS-485-Adapter. Wähle transparentes RTU over TCP oder ein Gateway, das Modbus TCP in RTU übersetzt. Baudrate und Rahmenformat stellst du am Adapter ein. Nutze ein vertrauenswürdiges privates Netzwerk und exklusiven Buszugriff. Validiertes Register-Layout: {validated_layout}.",
         "data": {
           "connection_type": "Verbindungsprotokoll",
-          "host": "Adapter-Host",
+          "host": "IP-Adresse oder Hostname des Adapters",
           "tcp_port": "TCP-Port des Adapters",
           "device_id": "Modbus-Geräteadresse",
-          "tcp_authentication": "TCP-Anmeldung",
+          "tcp_authentication": "Mit TCP-Anmeldung verbinden",
           "configure_gateway": "LAN-Adapter einrichten"
         },
         "data_description": {
@@ -126,8 +126,8 @@
           "host": "Hostname oder IP-Adresse des LAN-Adapters, ohne http:// oder URL-Pfad.",
           "tcp_port": "Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.",
           "device_id": "Adresse der Wallbox hinter dem Adapter; Werkseinstellung 50, unterstützter Bereich 10–50.",
-          "tcp_authentication": "Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
-          "configure_gateway": "Die Einstellungen dieses Adapters auslesen und Änderungen vor dem Anwenden prüfen. Nur unterstützte Adaptermodelle und Firmware lassen sich hier einrichten."
+          "tcp_authentication": "Verwendet die bereits am Adapter aktivierte Anmeldung. Dieser Schalter allein aktiviert sie nicht am Adapter; wähle dafür „LAN-Adapter einrichten“. Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
+          "configure_gateway": "Erkennt einen kompatiblen Adapter. Anschließend kannst du dessen TCP-Anmeldung, serielle Geschwindigkeit, Datenformat, Verbindungsprotokoll und TCP-Port einstellen. Auf der nächsten Seite prüfst du die Werte vor dem Speichern."
         }
       },
       "network_reconfigure": {
@@ -135,10 +135,10 @@
         "description": "Verbinde eine unterstützte RTU-Wallbox über einen Ethernet-RS-485-Adapter. Wähle transparentes RTU over TCP oder ein Gateway, das Modbus TCP in RTU übersetzt. Baudrate und Rahmenformat stellst du am Adapter ein. Nutze ein vertrauenswürdiges privates Netzwerk und exklusiven Buszugriff. Validiertes Register-Layout: {validated_layout}.",
         "data": {
           "connection_type": "Verbindungsprotokoll",
-          "host": "Adapter-Host",
+          "host": "IP-Adresse oder Hostname des Adapters",
           "tcp_port": "TCP-Port des Adapters",
           "device_id": "Modbus-Geräteadresse",
-          "tcp_authentication": "TCP-Anmeldung",
+          "tcp_authentication": "Mit TCP-Anmeldung verbinden",
           "configure_gateway": "LAN-Adapter einrichten"
         },
         "data_description": {
@@ -146,8 +146,8 @@
           "host": "Hostname oder IP-Adresse des LAN-Adapters, ohne http:// oder URL-Pfad.",
           "tcp_port": "Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.",
           "device_id": "Adresse der Wallbox hinter dem Adapter; Werkseinstellung 50, unterstützter Bereich 10–50.",
-          "tcp_authentication": "Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
-          "configure_gateway": "Die Einstellungen dieses Adapters auslesen und Änderungen vor dem Anwenden prüfen. Nur unterstützte Adaptermodelle und Firmware lassen sich hier einrichten."
+          "tcp_authentication": "Verwendet die bereits am Adapter aktivierte Anmeldung. Dieser Schalter allein aktiviert sie nicht am Adapter; wähle dafür „LAN-Adapter einrichten“. Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
+          "configure_gateway": "Erkennt einen kompatiblen Adapter. Anschließend kannst du dessen TCP-Anmeldung, serielle Geschwindigkeit, Datenformat, Verbindungsprotokoll und TCP-Port einstellen. Auf der nächsten Seite prüfst du die Werte vor dem Speichern."
         }
       },
       "reauth_confirm": {
@@ -166,20 +166,25 @@
         "description": "Gib das vorhandene Webpasswort deines kompatiblen Adapters ein. Die Verbindung wird geprüft; Einstellungen und Passwort des Adapters bleiben unverändert. Erlaubt sind 1–9 druckbare ASCII-Zeichen ohne Leerzeichen. Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
         "data": {
           "tcp_auth_password": "Vorhandenes Webpasswort des Adapters"
+        },
+        "data_description": {
+          "tcp_auth_password": "Das Passwort für die eigene Weboberfläche des Adapters, kein Home-Assistant-Passwort oder App-Zugriffstoken. Für die TCP-Anmeldung sind 1–9 druckbare ASCII-Zeichen ohne Leerzeichen erlaubt."
         }
       },
       "network_adapter": {
         "title": "LAN-Adapter einrichten",
         "description": "Erkannt: **{model}**, Firmware **{firmware}**. Aktuell: **{baudrate} Baud, {frame}**, TCP-Port **{tcp_port}**.\n\nBeim Absenden werden Verbindungsprotokoll und TCP-Port der vorherigen Seite sowie die folgenden Einstellungen angewendet. Danach wird die Identität der Wallbox geprüft. Schlägt die Prüfung fehl, werden die bisherigen Adaptereinstellungen wiederhergestellt, sofern der Adapter erreichbar ist. Das vorhandene Webpasswort wird nicht geändert. Außerdem wird der passive TCP-Server-Betrieb eingerichtet: Eigene Modbus-Abfragen und Antwortspeicher, Flusssteuerung, zusätzliche Anmeldedaten, Wiedergabe gepufferter serieller Daten, automatische Parameterübertragung und datenabhängige Neustarts werden deaktiviert.",
         "data": {
-          "baudrate": "Baudrate",
-          "frame": "Frame",
-          "tcp_authentication": "TCP-Anmeldung",
+          "baudrate": "Serielle Geschwindigkeit (Baudrate)",
+          "frame": "Serielles Datenformat",
+          "tcp_authentication": "TCP-Anmeldung am Adapter aktivieren",
           "tcp_auth_password": "Vorhandenes Webpasswort des Adapters"
         },
         "data_description": {
-          "tcp_authentication": "Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
-          "tcp_auth_password": "Gib das aktuelle Webpasswort des Adapters ein, falls eines gesetzt ist. Die TCP-Anmeldung benötigt ein Passwort mit 1–9 druckbaren ASCII-Zeichen ohne Leerzeichen. Gespeichert wird es nur bei aktivierter TCP-Anmeldung."
+          "tcp_authentication": "Beim Speichern wird die Anmeldung am Adapter ein- oder ausgeschaltet und die Integration passend eingerichtet. Verwendet wird das vorhandene Webpasswort des Adapters; ein Passwort wird damit weder angelegt noch geändert. Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
+          "tcp_auth_password": "Gib das aktuelle Webpasswort des Adapters ein, falls eines gesetzt ist. Die TCP-Anmeldung benötigt ein Passwort mit 1–9 druckbaren ASCII-Zeichen ohne Leerzeichen. Gespeichert wird es nur bei aktivierter TCP-Anmeldung.",
+          "baudrate": "Muss zur Einstellung der Wallbox passen. Die Werkseinstellung ist 57600 Baud.",
+          "frame": "Datenbits, Parität und Stoppbits müssen zur Wallbox passen. Die Werkseinstellung ist 8N2."
         }
       },
       "network_reauth": {
@@ -187,6 +192,9 @@
         "description": "Gib das vorhandene Webpasswort deines kompatiblen Adapters ein. Die Verbindung wird geprüft; Einstellungen und Passwort des Adapters bleiben unverändert. Erlaubt sind 1–9 druckbare ASCII-Zeichen ohne Leerzeichen. Die Anmeldung verschlüsselt den Datenverkehr nicht. Bei Firmware 1.523 ist sie umgehbar; verwende ein geschütztes lokales Netz.",
         "data": {
           "tcp_auth_password": "Vorhandenes Webpasswort des Adapters"
+        },
+        "data_description": {
+          "tcp_auth_password": "Das Passwort für die eigene Weboberfläche des Adapters, kein Home-Assistant-Passwort oder App-Zugriffstoken. Für die TCP-Anmeldung sind 1–9 druckbare ASCII-Zeichen ohne Leerzeichen erlaubt."
         }
       }
     }

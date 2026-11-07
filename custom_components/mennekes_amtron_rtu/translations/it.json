@@ -61,16 +61,16 @@
       },
       "serial": {
         "data": {
-          "baudrate": "Velocità in baud",
+          "baudrate": "Velocità seriale (baud)",
           "device_id": "Indirizzo del dispositivo Modbus",
-          "frame": "Formato seriale",
+          "frame": "Formato dei dati seriali",
           "port": "Porta seriale",
           "search": "Se questi valori non funzionano"
         },
         "data_description": {
-          "baudrate": "Il valore di fabbrica è 57600.",
+          "baudrate": "Deve corrispondere all’impostazione della wallbox. Il valore di fabbrica è 57600 baud.",
           "device_id": "Il valore di fabbrica è 50. Con lo strumento di configurazione MENNEKES si possono impostare indirizzi da 10 a 50.",
-          "frame": "La documentazione della wallbox prevede solo questi tre formati. Il valore di fabbrica è 8 bit di dati, nessuna parità, 2 bit di stop.",
+          "frame": "Bit di dati, parità e bit di stop devono corrispondere alla wallbox. L’impostazione di fabbrica è 8N2.",
           "port": "Percorso dell'adattatore USB RS-485. Preferisci un percorso /dev/serial/by-id: /dev/ttyUSB0 può cambiare tra un riavvio e l'altro.",
           "search": "L'indirizzo del dispositivo e i parametri del bus possono essere modificati con lo strumento di configurazione MENNEKES. Un impianto esistente può quindi usare valori diversi. La ricerca invia richieste di lettura. Usala solo su un bus senza altri master Modbus."
         },
@@ -79,16 +79,16 @@
       },
       "serial_reconfigure": {
         "data": {
-          "baudrate": "Velocità in baud",
+          "baudrate": "Velocità seriale (baud)",
           "device_id": "Indirizzo del dispositivo Modbus",
-          "frame": "Formato seriale",
+          "frame": "Formato dei dati seriali",
           "port": "Porta seriale",
           "search": "Se questi valori non funzionano"
         },
         "data_description": {
-          "baudrate": "Il valore di fabbrica è 57600.",
+          "baudrate": "Deve corrispondere all’impostazione della wallbox. Il valore di fabbrica è 57600 baud.",
           "device_id": "Il valore di fabbrica è 50. Con lo strumento di configurazione MENNEKES si possono impostare indirizzi da 10 a 50.",
-          "frame": "La documentazione della wallbox prevede solo questi tre formati. Il valore di fabbrica è 8 bit di dati, nessuna parità, 2 bit di stop.",
+          "frame": "Bit di dati, parità e bit di stop devono corrispondere alla wallbox. L’impostazione di fabbrica è 8N2.",
           "port": "Percorso dell'adattatore USB RS-485. Preferisci un percorso /dev/serial/by-id: /dev/ttyUSB0 può cambiare tra un riavvio e l'altro.",
           "search": "L'indirizzo del dispositivo e i parametri del bus possono essere modificati con lo strumento di configurazione MENNEKES. Un impianto esistente può quindi usare valori diversi. La ricerca invia richieste di lettura. Usala solo su un bus senza altri master Modbus."
         },
@@ -115,10 +115,10 @@
         "description": "Collega una wallbox RTU supportata tramite un adattatore Ethernet-RS-485. Scegli RTU over TCP trasparente oppure un gateway che traduce Modbus TCP in RTU. Imposta velocità e formato seriale sull’adattatore. Usa una rete privata affidabile e l’accesso esclusivo al bus. Mappa registri verificata: {validated_layout}.",
         "data": {
           "connection_type": "Protocollo di connessione",
-          "host": "Host adattatore",
+          "host": "Indirizzo IP o nome host dell’adattatore",
           "tcp_port": "Porta TCP adattatore",
           "device_id": "Indirizzo dispositivo Modbus",
-          "tcp_authentication": "Accesso TCP",
+          "tcp_authentication": "Connetti tramite accesso TCP",
           "configure_gateway": "Configura adattatore LAN"
         },
         "data_description": {
@@ -126,8 +126,8 @@
           "host": "Nome host o indirizzo IP dell’adattatore LAN, senza http:// o percorsi URL.",
           "tcp_port": "Porta TCP configurata sull’adattatore; valore predefinito 502. Non è la porta HTTP 8765 del servizio indipendente.",
           "device_id": "Indirizzo della wallbox dietro l’adattatore; predefinito 50, intervallo supportato 10–50.",
-          "tcp_authentication": "L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta.",
-          "configure_gateway": "Leggi le impostazioni di questo adattatore e verifica le modifiche prima di applicarle. Sono configurabili solo modelli e firmware supportati."
+          "tcp_authentication": "Usa l’accesso già attivato sull’adattatore. Questo interruttore da solo non lo attiva sull’adattatore; scegli “Configura adattatore LAN” per modificare tale impostazione. L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta.",
+          "configure_gateway": "Rileva un adattatore compatibile, quindi permette di impostarne accesso TCP, velocità seriale, formato dati, protocollo e porta TCP. Controlla i valori nella pagina successiva prima di salvarli."
         }
       },
       "network_reconfigure": {
@@ -135,10 +135,10 @@
         "description": "Collega una wallbox RTU supportata tramite un adattatore Ethernet-RS-485. Scegli RTU over TCP trasparente oppure un gateway che traduce Modbus TCP in RTU. Imposta velocità e formato seriale sull’adattatore. Usa una rete privata affidabile e l’accesso esclusivo al bus. Mappa registri verificata: {validated_layout}.",
         "data": {
           "connection_type": "Protocollo di connessione",
-          "host": "Host adattatore",
+          "host": "Indirizzo IP o nome host dell’adattatore",
           "tcp_port": "Porta TCP adattatore",
           "device_id": "Indirizzo dispositivo Modbus",
-          "tcp_authentication": "Accesso TCP",
+          "tcp_authentication": "Connetti tramite accesso TCP",
           "configure_gateway": "Configura adattatore LAN"
         },
         "data_description": {
@@ -146,8 +146,8 @@
           "host": "Nome host o indirizzo IP dell’adattatore LAN, senza http:// o percorsi URL.",
           "tcp_port": "Porta TCP configurata sull’adattatore; valore predefinito 502. Non è la porta HTTP 8765 del servizio indipendente.",
           "device_id": "Indirizzo della wallbox dietro l’adattatore; predefinito 50, intervallo supportato 10–50.",
-          "tcp_authentication": "L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta.",
-          "configure_gateway": "Leggi le impostazioni di questo adattatore e verifica le modifiche prima di applicarle. Sono configurabili solo modelli e firmware supportati."
+          "tcp_authentication": "Usa l’accesso già attivato sull’adattatore. Questo interruttore da solo non lo attiva sull’adattatore; scegli “Configura adattatore LAN” per modificare tale impostazione. L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta.",
+          "configure_gateway": "Rileva un adattatore compatibile, quindi permette di impostarne accesso TCP, velocità seriale, formato dati, protocollo e porta TCP. Controlla i valori nella pagina successiva prima di salvarli."
         }
       },
       "reauth_confirm": {
@@ -166,20 +166,25 @@
         "description": "Inserisci la password web attuale dell’adattatore compatibile. La connessione viene verificata senza modificare impostazioni o password. Usa da 1 a 9 caratteri ASCII stampabili, senza spazi. L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta.",
         "data": {
           "tcp_auth_password": "Password web attuale dell’adattatore"
+        },
+        "data_description": {
+          "tcp_auth_password": "La password dell’interfaccia web dell’adattatore, non una password di Home Assistant o un token di accesso all’app. L’accesso TCP accetta da 1 a 9 caratteri ASCII stampabili senza spazi."
         }
       },
       "network_adapter": {
         "title": "Configura adattatore LAN",
         "description": "Rilevato: **{model}**, firmware **{firmware}**. Impostazioni attuali: **{baudrate} baud, {frame}**, porta TCP **{tcp_port}**.\n\nConfermando vengono applicati protocollo e porta TCP scelti nella pagina precedente insieme alle impostazioni seguenti, poi viene verificata l’identità della wallbox. In caso di errore vengono ripristinate le impostazioni precedenti, se l’adattatore è raggiungibile. La password web attuale non viene modificata. Viene inoltre impostato il server TCP passivo, disattivando interrogazioni/cache Modbus interne, controllo di flusso, preamboli di connessione, ripetizione dei dati seriali memorizzati, invio automatico dei parametri e riavvii attivati dai dati.",
         "data": {
-          "baudrate": "Velocità in baud",
-          "frame": "Formato seriale",
-          "tcp_authentication": "Accesso TCP",
+          "baudrate": "Velocità seriale (baud)",
+          "frame": "Formato dei dati seriali",
+          "tcp_authentication": "Attiva l’accesso TCP sull’adattatore",
           "tcp_auth_password": "Password web attuale dell’adattatore"
         },
         "data_description": {
-          "tcp_authentication": "L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta.",
-          "tcp_auth_password": "Inserisci la password web attuale, se impostata. L’accesso TCP richiede da 1 a 9 caratteri ASCII stampabili, senza spazi. La password viene salvata solo con accesso TCP attivo."
+          "tcp_authentication": "Il salvataggio attiva o disattiva l’accesso sull’adattatore e configura questa integrazione di conseguenza. Viene usata la password web attuale dell’adattatore; non viene creata né modificata alcuna password. L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta.",
+          "tcp_auth_password": "Inserisci la password web attuale, se impostata. L’accesso TCP richiede da 1 a 9 caratteri ASCII stampabili, senza spazi. La password viene salvata solo con accesso TCP attivo.",
+          "baudrate": "Deve corrispondere all’impostazione della wallbox. Il valore di fabbrica è 57600 baud.",
+          "frame": "Bit di dati, parità e bit di stop devono corrispondere alla wallbox. L’impostazione di fabbrica è 8N2."
         }
       },
       "network_reauth": {
@@ -187,6 +192,9 @@
         "description": "Inserisci la password web attuale dell’adattatore compatibile. La connessione viene verificata senza modificare impostazioni o password. Usa da 1 a 9 caratteri ASCII stampabili, senza spazi. L’accesso non cifra il traffico. Con il firmware 1.523 può essere aggirato; usa una rete locale protetta.",
         "data": {
           "tcp_auth_password": "Password web attuale dell’adattatore"
+        },
+        "data_description": {
+          "tcp_auth_password": "La password dell’interfaccia web dell’adattatore, non una password di Home Assistant o un token di accesso all’app. L’accesso TCP accetta da 1 a 9 caratteri ASCII stampabili senza spazi."
         }
       }
     }
