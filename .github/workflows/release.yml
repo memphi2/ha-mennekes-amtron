@@ -379,7 +379,7 @@ jobs:
           RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          python scripts/check_release_tag.py "$RELEASE_TAG" --attestation-context
+          python scripts/check_release_tag.py "$RELEASE_TAG"
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "ref=refs/tags/$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
