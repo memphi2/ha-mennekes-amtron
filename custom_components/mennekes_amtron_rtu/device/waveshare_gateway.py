@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import logging
 import socket
 from dataclasses import dataclass, field, replace
 from html.parser import HTMLParser
@@ -54,6 +55,11 @@ _BIT_FIELDS = frozenset((0x6E, 0x72))
 # replay of buffered serial bytes. P2P/ping/broadcast-filter settings are retained.
 _AUTONOMOUS_FLAGS = 0xA3
 _LOCKS: WeakKeyDictionary[asyncio.AbstractEventLoop, WeakValueDictionary[str, asyncio.Lock]] = WeakKeyDictionary()
+_LOGGER = logging.getLogger(__name__)
+_FAILURE_REASONS = frozenset((
+    "gateway_unreachable", "gateway_unsupported", "gateway_changed",
+    "gateway_rollback_failed", "gateway_apply_failed", "gateway_authentication_failed",
+))
 
 
 class GatewayError(AmtronConnectionError):
@@ -77,6 +83,12 @@ class GatewayConflictError(GatewayError):
 class GatewayRollbackError(GatewayError):
     def __init__(self) -> None:
         super().__init__("gateway_rollback_failed")
+
+
+def _log_failure(phase: str, error: BaseException) -> None:
+    """Record bounded setup context without exception text or native data."""
+    reason = error.reason if isinstance(error, GatewayError) and error.reason in _FAILURE_REASONS else "unclassified"
+    _LOGGER.warning("LAN adapter %s failed: %s (%s)", phase, type(error).__name__, reason)
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,13 +277,20 @@ async def _verify_model(snapshot: GatewaySnapshot) -> str:
 
 async def inspect_gateway(host: str) -> GatewaySnapshot:
     """Read one configured endpoint; no scan, credentials or mutation."""
-    address = await _resolve_address(host)
-    snapshot = await _query_native(address)
-    model = await _verify_model(snapshot)
-    current = replace(await _query_native(address), model=model)
-    _assert_identity(snapshot, current)
-    if _stable(current._native) != _stable(snapshot._native):
-        raise GatewayConflictError
+    _LOGGER.info("LAN adapter inspection: reading management settings")
+    try:
+        address = await _resolve_address(host)
+        snapshot = await _query_native(address)
+        _LOGGER.debug("LAN adapter inspection: checking model and unchanged settings")
+        model = await _verify_model(snapshot)
+        current = replace(await _query_native(address), model=model)
+        _assert_identity(snapshot, current)
+        if _stable(current._native) != _stable(snapshot._native):
+            raise GatewayConflictError
+    except Exception as err:
+        _log_failure("inspection", err)
+        raise
+    _LOGGER.info("LAN adapter detected: %s (firmware %s); automatic setup available: %s", current.model, current.firmware, current.can_configure)
     return current
 
 
@@ -325,6 +344,40 @@ async def _verify_auth(snapshot: GatewaySnapshot, password: str) -> None:
         except WaveshareAuthenticationError:
             raise GatewayError("gateway_unreachable") from None
         sock.close()
+
+
+async def _verify_tcp_ready(snapshot: GatewaySnapshot) -> None:
+    """Check the pinned data endpoint without sending serial/application bytes."""
+    try:
+        async with asyncio.timeout(_AUTH_TIMEOUT):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.setblocking(False)
+                await asyncio.get_running_loop().sock_connect(sock, (snapshot.address, snapshot.tcp_port))
+    except (OSError, TimeoutError):
+        raise GatewayError("gateway_unreachable") from None
+
+
+async def _verify_restarted_connection(snapshot: GatewaySnapshot, password: str) -> None:
+    """Allow TCP to start after UDP already confirms the changed parameters.
+
+    This grace period is only used after a confirmed settings write. A proven
+    password rejection is final; temporary connection failures share one bound.
+    """
+    try:
+        async with asyncio.timeout(_APPLY_TIMEOUT):
+            while True:
+                try:
+                    if snapshot.tcp_authentication:
+                        await _verify_auth(snapshot, password)
+                    else:
+                        await _verify_tcp_ready(snapshot)
+                    return
+                except GatewayError as err:
+                    if err.reason != "gateway_unreachable":
+                        raise
+                await asyncio.sleep(0.5)
+    except TimeoutError:
+        raise GatewayError("gateway_unreachable") from None
 
 
 async def _send_parameters(snapshot: GatewaySnapshot, native: bytes) -> None:
@@ -401,11 +454,13 @@ class GatewayReceipt:
         async with self._completion_lock:
             if self._finished:
                 return
+            _LOGGER.debug("LAN adapter setup commit: checking saved settings")
             current = await _query_native(self.before.address)
             _assert_identity(self.before, current)
             if _stable(current._native) != _stable(self.after._native):
                 raise GatewayConflictError
             self._release()
+            _LOGGER.info("LAN adapter setup committed")
 
     async def rollback(self) -> None:
         """Complete one bounded restoration task independently of cancellation."""
@@ -428,6 +483,7 @@ class GatewayReceipt:
         async with self._completion_lock:
             if self._finished:
                 return
+            _LOGGER.info("LAN adapter rollback: restoring changes from this setup")
             try:
                 async with asyncio.timeout(_ROLLBACK_TIMEOUT):
                     if self._attempted:
@@ -444,14 +500,18 @@ class GatewayReceipt:
                         if _stable(bytes(restore)) != _stable(current._native):
                             await _send_parameters(current, bytes(restore))
                             current = await _wait_readback(current, bytes(restore))
-                        await _verify_auth(current, self._password)
+                            await _verify_restarted_connection(current, self._password)
+                        else:
+                            await _verify_auth(current, self._password)
                         if not self._apply_confirmed:
                             # UDP has no delivery acknowledgement. A readback of
                             # the old settings cannot rule out the original write
                             # arriving after this best-effort restoration.
                             raise GatewayRollbackError
                     self.rollback_verified = True
-            except Exception:  # noqa: BLE001 - Every failed restoration must prevent reconnect.
+                    _LOGGER.info("LAN adapter rollback verified")
+            except Exception as err:  # noqa: BLE001 - Every failed restoration must prevent reconnect.
+                _log_failure("rollback", err)
                 raise GatewayRollbackError from None
             finally:
                 self._release()
@@ -467,6 +527,7 @@ async def configure_gateway(
     lock = locks.setdefault(address, asyncio.Lock())
     await lock.acquire()
     receipt: GatewayReceipt | None = None
+    phase = "inspection"
     try:
         before = await inspect_gateway(address)
         if expected is not None:
@@ -479,7 +540,10 @@ async def configure_gateway(
         after = _snapshot(address, native)
         if before.tcp_authentication or after.tcp_authentication:
             validate_tcp_auth_password(password)
+        phase = "initial authentication"
+        _LOGGER.info("LAN adapter setup: checking existing authentication")
         await _verify_auth(before, password)
+        phase = "pre-write settings check"
         current = replace(await _query_native(address), model=before.model)
         _assert_identity(before, current)
         if _stable(current._native) != _stable(before._native):
@@ -488,13 +552,24 @@ async def configure_gateway(
         native, masks = _desired(current, settings)
         receipt = GatewayReceipt(current, replace(_snapshot(address, native), model=before.model), masks, password, lock)
         if _stable(native) != _stable(current._native):
+            phase = "parameter write"
+            _LOGGER.info("LAN adapter setup: applying selected settings and passive profile")
             receipt._attempted = True
             await _send_parameters(current, native)
+            phase = "settings readback"
             receipt.after = await _wait_readback(current, native)
             receipt._apply_confirmed = True
-        await _verify_auth(receipt.after, password)
+            _LOGGER.info("LAN adapter setup: changed settings confirmed by readback")
+        phase = "connection verification"
+        _LOGGER.info("LAN adapter setup: checking connection after settings verification")
+        if receipt._apply_confirmed:
+            await _verify_restarted_connection(receipt.after, password)
+        else:
+            await _verify_auth(receipt.after, password)
+        _LOGGER.info("LAN adapter setup verified; waiting for connection settings to be saved")
         return receipt
-    except BaseException:
+    except BaseException as err:
+        _log_failure(phase, err)
         if receipt is not None:
             await receipt.rollback()
         else:
