@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0b4 — 2026-11-08
+
+Beta update of the integration and app; **0.6.1 remains stable**. Update the app
+through **#apps-beta** before the integration when updating both components.
+
+- Entities no longer turn unavailable for a moment after a single disturbed
+  Modbus read: recently read status and measurements are kept for up to
+  30 seconds (driver change; in service mode it needs app 0.8.0b4). The energy
+  meter and error recovery still use only fresh reads.
+- Automatic vehicle selection keeps the selected car after unplugging and while
+  its reports are stale, instead of reloading the integration. It ends the
+  selection when another car is detected or the wallbox sees a car while the
+  selected one reports itself elsewhere.
+- Each vehicle profile remembers its percentage target. Returning to a car
+  restores it, capped at its current limit, instead of no target.
+- Virtual Plug & Charge lifts a manual pause and adopts the car's limit only for
+  a plug-in observed after unplugging. A restart, update or reconnect with the
+  car still connected restores the grant but keeps the pause and target.
+
 ## 0.8.0b3 — 2026-11-08
 
 Beta update of the integration and app; **0.6.1 remains stable**. Update the app

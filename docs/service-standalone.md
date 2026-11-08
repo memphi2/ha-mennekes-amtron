@@ -113,7 +113,7 @@ Copy the **standalone container reference** from the
 [published app catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps)
 for stable **0.6.1**, or from the
 [beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta)
-for **0.8.0b3**. Use the beta service for Virtual Plug & Charge, optional
+for **0.8.0b4**. Use the beta service for Virtual Plug & Charge, optional
 Waveshare TCP login and the shared control fixes. The
 integration's minimum compatible service remains **0.6.1 with API 2**.
 Use the complete `ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference

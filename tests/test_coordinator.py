@@ -238,11 +238,10 @@ def test_a_configuration_change_is_picked_up_at_the_slow_cadence() -> None:
 
 
 def test_a_failing_block_drops_its_values_instead_of_freezing_them() -> None:
-    """A block that was read and failed has no current value.
+    """A block that keeps failing has no current value.
 
-    Carrying the last one forward made the entities report a frozen
-    measurement as a live one, which an automation cannot tell apart from a
-    real reading.
+    One disturbed read is bridged so entities do not flicker unavailable.
+    Beyond that, a frozen measurement reported as live is worse than none.
     """
 
     async def run() -> None:
@@ -259,10 +258,16 @@ def test_a_failing_block_drops_its_values_instead_of_freezing_them() -> None:
         clock[0] += 5
         second = await coordinator._async_update_data()
         assert second.failed_blocks == ("measurements",)
-        assert not second.has("voltage_l1")
-        assert second.get("voltage_l1") is None
+        assert second.has("voltage_l1")
+        assert second.fresh("voltage_l1") is None
         # The blocks that did answer are untouched.
-        assert second.get("evse_state") == EvseState.CHARGING
+        assert second.fresh("evse_state") == EvseState.CHARGING
+        coordinator.data = second
+
+        clock[0] += 30
+        third = await coordinator._async_update_data()
+        assert not third.has("voltage_l1")
+        assert third.get("voltage_l1") is None
 
     asyncio.run(run())
 
@@ -473,14 +478,14 @@ def test_a_failed_measurement_stays_unavailable_until_read_again() -> None:
         )
         coordinator.data = await coordinator._async_update_data()
         transport.read_exceptions[0x0500] = 4
-        clock[0] = 30
+        clock[0] = 31
         coordinator.data = await coordinator._async_update_data()
         transport.read_exceptions.clear()
-        clock[0] = 34
+        clock[0] = 35
         coordinator.data = await coordinator._async_update_data()
         assert not coordinator.data.has("voltage_l1")
         assert coordinator.data.failed_blocks == ("measurements",)
-        clock[0] = 35
+        clock[0] = 36
         coordinator.data = await coordinator._async_update_data()
         assert coordinator.data.has("voltage_l1")
         assert coordinator.data.failed_blocks == ()

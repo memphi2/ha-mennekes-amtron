@@ -148,6 +148,7 @@ from .vehicle_profiles import (
 from .vehicle_soc import VehicleSocObserver
 from .vehicle_soc_const import CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_ENTITY
 from .vehicle_sources import resolve_telemetry_source
+from .vehicle_targets import VehicleTargetMemory, VehicleTargetStore
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _LOGGER = logging.getLogger(__name__)
@@ -503,6 +504,8 @@ async def async_setup_entry(
         validate_vehicle_selection()
         entry.runtime_data.vehicle_telemetry = resolve_telemetry_source(hass, options)
         if vehicle_soc_is_configured(options) or control.soc_goal.source is not None:
+            memory = VehicleTargetMemory(hass, entry.entry_id, identity.serial_number or "")
+            await memory.async_load()
             observer = VehicleSocObserver(
                 hass, control, coordinator,
                 options.get(CONF_VEHICLE_SOC_ENTITY),
@@ -511,6 +514,7 @@ async def async_setup_entry(
                 use_vehicle_soc=options.get(CONF_VEHICLE_SOC_USE_PROFILE) is True,
                 use_vehicle_limit=options.get(CONF_VEHICLE_LIMIT_USE_PROFILE) is True,
                 profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
+                memory=memory,
             )
             entry.runtime_data.vehicle_soc = observer
             try:
@@ -770,6 +774,7 @@ async def async_remove_entry(
     forget_loss_attribution(hass, entry.entry_id)
     await GoalStore(hass, entry.entry_id, "").async_remove()
     await SocGoalStore(hass, entry.entry_id, "").async_remove()
+    await VehicleTargetStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()
     await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
     await LossStore(hass, entry.entry_id, "").async_remove()

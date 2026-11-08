@@ -34,6 +34,7 @@ from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
 
 if TYPE_CHECKING:
     from .coordinator import MennekesAmtronCoordinator
+    from .vehicle_targets import VehicleTargetMemory
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -160,8 +161,14 @@ class VehicleSocObserver:
         *, telemetry: VehicleTelemetrySource | None = None,
         use_vehicle_soc: bool = False, use_vehicle_limit: bool = False,
         profile_id: str | None = None,
+        memory: VehicleTargetMemory | None = None,
     ) -> None:
         self._hass = hass
+        self._memory = memory
+        # Record targets only after a remembered one had its chance: binding
+        # a new vehicle source resets the goal before it can be restored.
+        self._remembering = False
+        self._restore_task: asyncio.Task[None] | None = None
         self._control = control
         self._coordinator = coordinator
         self._soc_entity = soc_entity
@@ -253,10 +260,12 @@ class VehicleSocObserver:
             if self._control.supports_soc_goal:
                 async with self._command_lock:
                     await self._control.async_configure_soc(self.source)
-                    self._configured = True
+                    self._source_configured()
             self._queue_current()
             if self._task is not None:
                 await asyncio.shield(self._task)
+            if self._restore_task is not None:
+                await asyncio.shield(self._restore_task)
         except BaseException:
             await self.async_stop()
             raise
@@ -271,6 +280,45 @@ class VehicleSocObserver:
             self._queue_current()
         else:
             self._ensure_task()
+        self._remember_target()
+
+    @callback
+    def _source_configured(self) -> None:
+        self._configured = True
+        self._remember_target()
+
+    async def _async_restore_target(self) -> None:
+        """Give a reselected vehicle its own target instead of none."""
+        try:
+            goal = self._control.soc_goal
+            remembered = self._memory.recall(self.source) if self._memory and self.source else None
+            # A read-only owner refuses the command; nothing is restored then.
+            if remembered and not self._stopping and goal.status == "disabled":
+                maximum = self.maximum or goal.maximum_percent
+                try:
+                    await self.async_set_target(min(remembered, maximum) if maximum else remembered)
+                except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
+                    _LOGGER.debug("Remembered vehicle charge target not restored: %s", err)
+        finally:
+            self._remembering = True
+            self._remember_target()
+
+    @callback
+    def _remember_target(self) -> None:
+        if self._stopping or self._memory is None or self.source is None or not self._configured:
+            return
+        goal = self._control.soc_goal
+        # A service snapshot can still show the previous source after binding.
+        if goal.source != self.source:
+            return
+        if not self._remembering:
+            if self._restore_task is None:
+                self._restore_task = self._hass.async_create_task(
+                    self._async_restore_target(), "amtron_vehicle_target", eager_start=False,
+                )
+            return
+        if self._memory.remember(self.source, goal.target_percent):
+            self._hass.async_create_task(self._memory.async_save(), eager_start=False)
 
     @callback
     def _queue_current(self) -> None:
@@ -347,7 +395,7 @@ class VehicleSocObserver:
                     try:
                         if not self._configured:
                             await self._control.async_configure_soc(self.source)
-                            self._configured = True
+                            self._source_configured()
                         if self.source is not None:
                             for observation in observations.outgoing():
                                 transaction = self._transaction_control()
@@ -374,6 +422,7 @@ class VehicleSocObserver:
         finally:
             self._inflight = None
             self._task = None
+            self._remember_target()
 
     async def async_set_target(self, value: float) -> None:
         """Use the current sources atomically when the user chooses a target."""
@@ -448,6 +497,7 @@ class VehicleSocObserver:
                 if not self._resolution_pending():
                     self._clear_target_models()
                 self._ensure_task()
+                self._remember_target()
 
     def _resolution_pending(self) -> bool:
         transaction = self._transaction_control()
@@ -471,7 +521,8 @@ class VehicleSocObserver:
             unsubscribe()
         self._unsubscribers.clear()
         self._pending = None
-        if self._task is not None:
-            self._task.cancel()
-            with suppress(asyncio.CancelledError):
-                await self._task
+        for task in (self._task, self._restore_task):
+            if task is not None and not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task

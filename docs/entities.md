@@ -5,7 +5,7 @@ Use **Charging current limit** and **Charging paused** for everyday charging.
 energy and connection health. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
 
-This reference follows **beta 0.8.0b3**, including vehicle profiles and the
+This reference follows **beta 0.8.0b4**, including vehicle profiles and the
 optional Virtual Plug & Charge status. **0.6.1 remains stable.** Ordinary service
 connections require **app/service 0.6.1 or newer with API 2**; Virtual Plug & Charge
 in service mode needs the capability in **app 0.8.0b1 or newer**.

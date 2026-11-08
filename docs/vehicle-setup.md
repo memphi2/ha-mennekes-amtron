@@ -12,7 +12,7 @@ can also supply supported data from one selected BMW vehicle.
 stable 0.6.1. Central vehicle profiles, optional automatic selection and
 Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
 below; existing manual sources continue to work after updating.
-The steps below follow **beta 0.8.0b3**, which adds the wallbox **Virtual Plug &
+The steps below follow **beta 0.8.0b4**, which adds the wallbox **Virtual Plug &
 Charge** switch, guided detection setup and clearer **Stop using vehicle charge
 level** action. Existing activation settings and profile permissions are kept.
 See [versions and feature availability](README.md#versions-and-feature-availability).
@@ -78,7 +78,10 @@ capacity source instead.
 
 Check the selected profile **before charging**, whether you chose it manually or
 enabled automatic selection. Changing the active profile clears the previous
-car's percentage target and departure plan without starting charging. Charging-loss averages are kept separately for
+car's departure plan without starting charging. From **0.8.0b4**, each profile
+keeps its own percentage target: returning to a car restores its last target,
+capped at its current limit, instead of no target. With no vehicle selected, no
+percentage target applies. Charging-loss averages are kept separately for
 each profile; changing its data source starts a new average for that source.
 A charge that began before a manual profile selection is not newly assigned to it.
 Automatic recognition can arrive later within the same observed connection,
@@ -121,7 +124,12 @@ manually turns the automatic mode off.
 
 The integration selects a car only when exactly one configured profile reports
 both **cable connected** and **at home**. A positive change must remain stable
-for three seconds. A valid disconnected or away signal excludes that car, even
+for three seconds. From **0.8.0b4**, the selected car stays selected after it is
+unplugged or while its reports are stale or unknown, because each profile change
+briefly reloads the integration's entities. The selection ends when another
+configured car reports itself connected and at home, or when the wallbox sees a
+car while the selected one reports itself disconnected or away; no percentage
+target then applies to the unknown car. A valid disconnected or away signal excludes that car, even
 if its other signal is missing. For the remaining candidates, unknown or
 unavailable signals block selection, as do signals not reported to Home Assistant
 within 30 minutes.
@@ -164,7 +172,7 @@ manually, but that choice alone never proves which car is connected.
    **Configuration**. This switch controls the feature for the whole wallbox;
    the vehicle options only manage each profile's permission. The feature requires
    write access. Service mode needs **app 0.8.0b1 or newer** for the
-   charging-permission capability; use **0.8.0b3** for the current beta app.
+   charging-permission capability; use **0.8.0b4** for the current beta app.
 4. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 
@@ -193,7 +201,10 @@ needed before permission is granted.
 The grant belongs to that observed connection. From **0.8.0b3**, a manual pause
 ends when a permitted vehicle is granted: plugging it in means it should charge.
 The pause is lifted while the charging release is still off, so the release
-follows immediately without the state-change interval.
+follows immediately without the state-change interval. From **0.8.0b4**, only a
+plug-in that HA observed after the car was unplugged counts: after an HA or app
+restart, update or reconnect with the car still connected, the grant returns
+without lifting the pause or replacing the percentage target.
 
 With an armed [departure plan](departure-planning.md), manual or imported from
 the car, the plan decides instead. The grant waits until the plan has applied its
@@ -310,7 +321,7 @@ remain available with older compatible app versions.
 | First valid optional vehicle maximum | A positive percentage target cannot be set yet. Disable that optional source if you want to choose your own maximum. |
 | A previously valid vehicle maximum | The last valid maximum is retained; a later increase raises only a target at that maximum. |
 | Usable battery capacity | The departure planner cannot calculate a new current; see [departure planning](departure-planning.md). |
-| Detection signals are unclear | Automatic mode selects no vehicle. Choose the correct profile manually if needed. |
+| Detection signals are unclear | Automatic mode keeps the previously selected car until another car or an unknown car at the wallbox is detected. Choose the correct profile manually if needed. |
 | Virtual Plug & Charge is waiting for detection | Wait for a new cable report for this connection and check that the selected profile is permitted. Manually selecting it does not replace the detection check. |
 | Virtual Plug & Charge shows **Charging blocked** | Open the status sensor and check its **Blocking reason** attribute, for example a switched-off charging release, a wallbox lock or authorization, a reached target or a missing register value. |
 | Charging history cannot be matched | Loss estimates stay unknown instead of being assigned to the wrong charge. See [charging estimates](charging-estimates.md). |

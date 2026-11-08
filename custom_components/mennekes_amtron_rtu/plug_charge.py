@@ -69,6 +69,10 @@ class PlugChargeObserver:
         self._switch_applied = False
         self._pending_enabled: bool | None = None
         self._session: str | None = None
+        # Only a plug-in seen while running is new. After a restart, reconnect
+        # or app update the same car gets a new session but keeps its state.
+        self._unplugged = False
+        self._fresh_session: str | None = None
         self._candidate: tuple[str, str] | None = None
         self._timer: CALLBACK_TYPE | None = None
         self._task: asyncio.Task[None] | None = None
@@ -158,8 +162,11 @@ class PlugChargeObserver:
         session = gate.get("session")
         session = session if isinstance(session, str) else None
         if session != self._session:
+            if session is not None and self._unplugged:
+                self._fresh_session = session
             self._session = session
             self._retry_at = 0.0
+        self._unplugged = session is None
         if not isinstance(session, str):
             self._set_status("waiting_vehicle")
             return None
@@ -246,12 +253,12 @@ class PlugChargeObserver:
         return self._plan_status() is not None or self._control.pending_action in (None, "resume")
 
     def _adopt_vehicle_target(self, session: str) -> None:
-        """Start each recognized connection at the car's own charge limit.
+        """Start each new plug-in at the car's own charge limit.
 
         An explicit new target also ends a reached latch left over from the
         previous connection. It never starts charging by itself.
         """
-        if session == self._target_session:
+        if session != self._fresh_session or session == self._target_session:
             return
         self._target_session = session
         observer = self._entry.runtime_data.vehicle_soc
@@ -324,11 +331,14 @@ class PlugChargeObserver:
         try:
             if self._selection() == candidate:
                 if (
-                    self._control.pause_requested is True and self._control.pending_action is None
+                    candidate[1] == self._fresh_session
+                    and self._control.pause_requested is True and self._control.pending_action is None
                     and self._plan_status() is None
                 ):
                     # The gate keeps the release off until the grant below, so
                     # this resume switches no charge and starts no long guard.
+                    # A restored session keeps the pause; the grant then only
+                    # restores the release at the pause current.
                     await self._control.async_resume_charging()
                 await self._control.async_authorize_plug_charge(
                     candidate[1], deadline=dt_util.utcnow() + timedelta(seconds=10),

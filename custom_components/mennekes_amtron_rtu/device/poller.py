@@ -19,6 +19,11 @@ from .runtime_events import EventTimeline, EventType
 
 _LOGGER = logging.getLogger(__name__)
 _BLOCK_RETRY_INITIAL_SECONDS = 5.0
+# A single disturbed bus transaction must not make every entity of a block
+# flicker unavailable. Recently read status and measurements bridge it; the
+# energy meter never does, as energy goals rely on its failure being visible.
+_BLOCK_HOLD_SECONDS = 30.0
+_NEVER_HELD = frozenset({"statistics"})
 
 
 class DevicePoller:
@@ -46,6 +51,7 @@ class DevicePoller:
         # meter reading must not wait for the next complete slow poll, while an
         # unsupported register must not occupy the bus on every status poll.
         self._block_retries: dict[str, tuple[float, float]] = {}
+        self._block_read_at: dict[str, float] = {}
 
     def _retry_due(self, name: str) -> bool:
         retry = self._block_retries.get(name)
@@ -82,6 +88,7 @@ class DevicePoller:
         read: dict[str, RegisterValue] = {}
         failed = set(previous.failed_blocks)
         stale: list[str] = []
+        held: set[str] = set()
         answered = False
         # Read status first: a plug/start/stop transition must refresh the
         # measurements and final energy counters in this same poll.
@@ -124,16 +131,24 @@ class DevicePoller:
                 # A valid Modbus exception proves the device answered even
                 # though it did not supply this block's data.
                 answered |= isinstance(err, AmtronProtocolError) and err.exception_code is not None
-                # Carrying a block forward is only right while it was not due.
-                # A block that was read and failed has no current value, and a
-                # frozen measurement an automation still believes is worse than
-                # an entity that admits it knows nothing.
-                stale.extend(block.keys)
+                # Carrying a block forward is otherwise only right while it was
+                # not due. A block that keeps failing has no current value, and
+                # a frozen measurement an automation still believes is worse
+                # than an entity that admits it knows nothing.
+                read_at = self._block_read_at.get(block.name)
+                if (
+                    block.name in _NEVER_HELD or read_at is None
+                    or self._monotonic() - read_at > _BLOCK_HOLD_SECONDS
+                ):
+                    stale.extend(block.keys)
+                else:
+                    held.update(block.keys)
                 if block.cadence is not BlockCadence.FAST:
                     self._retry_later(block.name)
                 _LOGGER.debug("Block %s failed: %s", block.name, err)
             else:
                 read.update(result)
+                self._block_read_at[block.name] = self._monotonic()
                 total = result.get("energy_total") if block.name == "statistics" else None
                 invalid_meter = block.name == "statistics" and (
                     isinstance(total, bool) or not isinstance(total, (int, float))
@@ -159,6 +174,7 @@ class DevicePoller:
         return WallboxData(
             values=values,
             failed_blocks=tuple(sorted(failed)),
+            held=frozenset(held - read.keys()),
             current_write_generation=generation,
             connection_quality=self._client.link_quality.state,
             energy_read="energy_total" in read or "energy_total" in stale,

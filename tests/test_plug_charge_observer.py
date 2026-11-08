@@ -39,7 +39,7 @@ class Coordinator:
 
 
 @asynccontextmanager
-async def observer_harness(tmp_path, monkeypatch, *, selected=A, permitted=True):
+async def observer_harness(tmp_path, monkeypatch, *, selected=A, permitted=True, plugged_in=True):
     hass = HomeAssistant(str(tmp_path))
     options = detection_catalog()
     options["vehicle_auto_selection"] = False
@@ -53,7 +53,7 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, permitted=True)
         soc_goal=SimpleNamespace(target_percent=0.0, stop_requested=False),
         async_resume_charging=AsyncMock(),
         plug_charge={"enabled": True, "policy": m.plug_charge_policy(options),
-                     "session": "first-session", "authorized": False},
+                     "session": None if plugged_in else "first-session", "authorized": False},
     )
 
     async def authorize(session, *, deadline):
@@ -80,6 +80,10 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, permitted=True)
     control.plug_charge["since"] = dt_util.utcnow().isoformat()
     observer = m.PlugChargeObserver(hass, entry)
     observer.start()
+    if plugged_in:
+        # The owner reported no vehicle before this session started.
+        control.plug_charge["session"] = "first-session"
+        coordinator.async_update_listeners()
     harness = SimpleNamespace(hass=hass, entry=entry, control=control,
                               coordinator=coordinator, observer=observer, timers=timers)
     try:
@@ -473,6 +477,8 @@ def test_each_recognized_connection_starts_at_the_car_limit(tmp_path, monkeypatc
             h.coordinator.async_update_listeners()
             await h.hass.async_block_till_done()
             observer.async_set_target.assert_awaited_once()
+            h.control.plug_charge["session"] = None
+            h.coordinator.async_update_listeners()
             h.control.plug_charge["session"] = "second-session"
             h.coordinator.async_update_listeners()
             await h.hass.async_block_till_done()
@@ -509,4 +515,36 @@ def test_a_refused_car_limit_does_not_affect_the_grant(tmp_path, monkeypatch):
             h.timers[-1].callback(None)
             await h.hass.async_block_till_done()
             h.control.async_authorize_plug_charge.assert_awaited_once()
+    asyncio.run(run())
+
+
+def test_a_restored_session_keeps_the_pause_and_the_target(tmp_path, monkeypatch):
+    """A restart or reconnect re-creates the session of a car already plugged in."""
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch, plugged_in=False) as h:
+            observer = vehicle_limit(h, 80)
+            h.control.soc_goal = SimpleNamespace(target_percent=60.0, stop_requested=True)
+            await plug_in_paused(h)
+            assert h.observer.status == "waiting_release"
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            h.control.async_resume_charging.assert_not_awaited()
+            observer.async_set_target.assert_not_awaited()
+            h.control.async_authorize_plug_charge.assert_awaited_once()
+            assert h.control.pause_requested is True
+    asyncio.run(run())
+
+
+def test_a_session_replaced_without_an_unplug_is_not_a_new_plug_in(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            observer = vehicle_limit(h, 80)
+            await report(h)
+            observer.async_set_target.assert_awaited_once()
+            h.control.plug_charge["session"] = "second-session"
+            await plug_in_paused(h)
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            observer.async_set_target.assert_awaited_once()
+            h.control.async_resume_charging.assert_not_awaited()
     asyncio.run(run())
