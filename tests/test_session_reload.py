@@ -110,6 +110,8 @@ def test_unclaimed_estimate_owners_are_closed_on_reload(tmp_path, monkeypatch, o
             assert await integration.async_setup_entry(hass, entry)
 
         monkeypatch.setattr(hass.config_entries, "async_reload", reload)
+        # This test is about reload handoff, not the in-place vehicle switch.
+        monkeypatch.setattr(integration, "_async_switch_vehicle", AsyncMock(return_value=False))
         try:
             if outcome == "failed":
                 with pytest.raises(RuntimeError, match="replacement setup failed"):

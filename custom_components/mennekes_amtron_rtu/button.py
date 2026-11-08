@@ -9,7 +9,6 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .charge_loss_const import LOSS_SOURCE_SENSOR
 from .coordinator import MennekesAmtronCoordinator
 from .device.capabilities import capability_is_supported
 from .device.registers import ERROR_CODE, SYSTEM_RESTART
@@ -18,6 +17,13 @@ from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
 from .remote import CONF_SERVER_URL
 from .timed_goal_const import CONF_TIMED_CALENDAR_ENTITY
+from .vehicle_features import (
+    CALENDAR,
+    LOSS_ASSIGN,
+    TIMED,
+    VEHICLE_DEPARTURE,
+    vehicle_features,
+)
 from .vehicle_profiles import vehicle_options
 
 if TYPE_CHECKING:
@@ -45,13 +51,14 @@ async def async_setup_entry(
         identity.layout_version, identity.phase_options_hw, SYSTEM_RESTART.key
     ):
         entities.append(AmtronRestartButton(entry, coordinator))
-    if runtime_data.charge_loss is not None and runtime_data.charge_loss.mode == LOSS_SOURCE_SENSOR:
+    features = vehicle_features(hass, entry)
+    if LOSS_ASSIGN in features:
         entities.append(AmtronAssignChargeButton(entry, coordinator))
-    if runtime_data.timed_goal is not None and vehicle_options(entry.options).get(CONF_TIMED_CALENDAR_ENTITY):
+    if CALENDAR in features:
         entities.append(AmtronNextDepartureButton(entry, coordinator))
-    if runtime_data.timed_goal is not None and runtime_data.timed_goal.vehicle_departure_configured:
+    if VEHICLE_DEPARTURE in features:
         entities.append(AmtronVehicleDepartureButton(entry, coordinator))
-    if runtime_data.timed_goal is not None:
+    if TIMED in features:
         entities.append(AmtronClearDepartureButton(entry, coordinator))
     if runtime_data.control.read_only and CONF_SERVER_URL not in entry.data:
         entities = [entity for entity in entities if isinstance(entity, AmtronAssignChargeButton)]
@@ -70,7 +77,11 @@ class AmtronNextDepartureButton(MennekesAmtronControlEntity, ButtonEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and not self.runtime_data.control.read_only
+        return (
+            self.coordinator.last_update_success and not self.runtime_data.control.read_only
+            and self.runtime_data.timed_goal is not None
+            and bool(vehicle_options(self._entry.options).get(CONF_TIMED_CALENDAR_ENTITY))
+        )
 
     async def async_press(self) -> None:
         observer = self.runtime_data.timed_goal
@@ -93,8 +104,8 @@ class AmtronVehicleDepartureButton(AmtronNextDepartureButton):
     def available(self) -> bool:
         observer = self.runtime_data.timed_goal
         return (
-            super().available and observer is not None
-            and observer.vehicle_departure_available
+            self.coordinator.last_update_success and not self.runtime_data.control.read_only
+            and observer is not None and observer.vehicle_departure_available
         )
 
     async def async_press(self) -> None:
@@ -115,7 +126,10 @@ class AmtronClearDepartureButton(MennekesAmtronControlEntity, ButtonEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and not self.runtime_data.control.read_only
+        return (
+            self.coordinator.last_update_success and not self.runtime_data.control.read_only
+            and self.runtime_data.timed_goal is not None
+        )
 
     async def async_press(self) -> None:
         observer = self.runtime_data.timed_goal

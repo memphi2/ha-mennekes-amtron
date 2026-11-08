@@ -29,6 +29,7 @@ from .vehicle_profiles import (
     CONF_VIRTUAL_PLUG_CHARGE,
     active_profile,
     profiles,
+    without_selection,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -107,7 +108,9 @@ class PlugChargeObserver:
         """Skip only the option notification for an already applied switch."""
         return (
             self._switch_applied
-            and self._configured_options == dict(self._entry.options)
+            # A vehicle switch is applied at runtime and must not count as
+            # an unrelated settings change here.
+            and without_selection(self._configured_options) == without_selection(self._entry.options)
             and self._entry.runtime_data.entry_data == dict(self._entry.data)
         )
 
@@ -185,6 +188,11 @@ class PlugChargeObserver:
             or profile.options.get(CONF_VEHICLE_PLUG_CHARGE) is not True
         ):
             self._set_status("vehicle_not_permitted")
+            return None
+        if self._entry.runtime_data.vehicle_profile_id != profile.id:
+            # The car's target and departure plan are still being started.
+            # Grant nothing before they apply; the switch ends with an update.
+            self._set_status("waiting_detection")
             return None
         evidence = self._evidence.snapshot(selected)
         raw_since = gate.get("since")

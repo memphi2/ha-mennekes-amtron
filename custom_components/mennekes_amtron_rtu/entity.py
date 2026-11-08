@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -84,6 +85,14 @@ class MennekesAmtronEntity(CoordinatorEntity[MennekesAmtronCoordinator]):
 
         data: MennekesAmtronRuntimeData = self._entry.runtime_data
         return data
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        # A vehicle switch replaces observers in place. Publish only its
+        # result, never the brief gap between the old and the new car.
+        if self.runtime_data.vehicle_switching:
+            return
+        super()._handle_coordinator_update()
 
     @property
     def wallbox_data(self) -> WallboxData:

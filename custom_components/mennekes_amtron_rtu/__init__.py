@@ -10,7 +10,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import NoReturn
+from collections.abc import Callable
+from typing import Any, NoReturn
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
@@ -141,9 +142,12 @@ from .vehicle_profiles import (
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_SOC_USE_PROFILE,
     CONF_VIRTUAL_PLUG_CHARGE,
+    SELECTION_KEYS,
+    each_vehicle_options,
     profiles,
     vehicle_options,
     vehicle_soc_is_configured,
+    without_selection,
 )
 from .vehicle_soc import VehicleSocObserver
 from .vehicle_soc_const import CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_ENTITY
@@ -363,25 +367,7 @@ async def async_setup_entry(
                 _raise_optional_setup_error(client, err, "plug_charge_unavailable")
         if control.supports_plug_charge:
             entry.runtime_data.plug_charge = PlugChargeObserver(hass, entry)
-        if (
-            vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is False
-            or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
-            or not timed_reset_complete
-        ):
-            try:
-                # Reclaim only this entry's work after an unreachable unload;
-                # manual requests and other owners remain authoritative.
-                await control.async_cancel_timed_current(f"timed:{entry.entry_id}")
-            except (AmtronBusError, HomeAssistantError) as err:
-                _raise_optional_setup_error(client, err, "timed_goal_unavailable")
-            if timed_reset_complete and CONF_TIMED_GOAL_RESET_PENDING in entry.options:
-                stored_options = dict(entry.options)
-                stored_options.pop(CONF_TIMED_GOAL_RESET_PENDING)
-                # Complete both halves of the reset before consuming its
-                # authority. A failed reconnect must still cancel the old
-                # service queue on the next attempt, even after re-enabling.
-                hass.config_entries.async_update_entry(entry, options=stored_options)
-        loss_enabled = loss_vehicle_options(hass, entry).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+        await _async_cancel_old_trip(hass, entry, timed_reset_complete)
         cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
         if session_capture_enabled(entry):
             if not remote:
@@ -498,48 +484,11 @@ async def async_setup_entry(
             )
         await coordinator.async_config_entry_first_refresh()
         validate_vehicle_selection()
-        if loss_enabled:
-            entry.runtime_data.charge_loss = ChargeLossObserver(hass, entry)
-            await entry.runtime_data.charge_loss.async_start()
-        validate_vehicle_selection()
-        entry.runtime_data.vehicle_telemetry = resolve_telemetry_source(hass, options)
-        if vehicle_soc_is_configured(options) or control.soc_goal.source is not None:
-            memory = VehicleTargetMemory(hass, entry.entry_id, identity.serial_number or "")
-            await memory.async_load()
-            observer = VehicleSocObserver(
-                hass, control, coordinator,
-                options.get(CONF_VEHICLE_SOC_ENTITY),
-                options.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY),
-                telemetry=entry.runtime_data.vehicle_telemetry,
-                use_vehicle_soc=options.get(CONF_VEHICLE_SOC_USE_PROFILE) is True,
-                use_vehicle_limit=options.get(CONF_VEHICLE_LIMIT_USE_PROFILE) is True,
-                profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
-                memory=memory,
-            )
-            entry.runtime_data.vehicle_soc = observer
-            try:
-                await observer.async_start()
-            except (AmtronBusError, HomeAssistantError, OSError) as err:
-                _raise_optional_setup_error(client, err, "soc_goal_unavailable")
-        validate_vehicle_selection()
+        await _async_start_vehicle(hass, entry, options, timed_reset_complete, validate_vehicle_selection)
         if entry.runtime_data.soc_goal is not None:
             # The first poll must never retry a restored old vehicle's stop
             # before its source has been rebound or deliberately cleared.
             coordinator.retry_soc_goal = entry.runtime_data.soc_goal.retry_stop
-        if (
-            timed_reset_complete and vehicle_soc_is_configured(options)
-            and timed_goal_is_enabled(options)
-        ):
-            timed = TimedGoalObserver(hass, entry)
-            entry.runtime_data.timed_goal = timed
-            try:
-                await timed.async_start()
-            except (OSError, ValueError) as err:
-                raise ConfigEntryNotReady(
-                    translation_domain=DOMAIN, translation_key="timed_goal_state_invalid"
-                ) from err
-            except (AmtronBusError, HomeAssistantError) as err:
-                _raise_optional_setup_error(client, err, "timed_goal_unavailable")
         if remote:
             # The service owns its own durable goal. Old direct-mode intent must
             # not return when this entry later switches back from the service.
@@ -584,8 +533,153 @@ async def async_setup_entry(
         finally:
             forget_loss_attribution(hass, entry.entry_id)
         raise
+    _remember_vehicle(entry)
     if handoff is not None:
         handoff.setup_complete = True
+    return True
+
+
+async def _async_cancel_old_trip(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, timed_reset_complete: bool,
+) -> None:
+    """Withdraw a disabled or replaced trip's current before a car starts."""
+    runtime = entry.runtime_data
+    if (
+        vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is False
+        or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
+        or not timed_reset_complete
+    ):
+        try:
+            # Reclaim only this entry's work after an unreachable unload;
+            # manual requests and other owners remain authoritative.
+            await runtime.control.async_cancel_timed_current(f"timed:{entry.entry_id}")
+        except (AmtronBusError, HomeAssistantError) as err:
+            _raise_optional_setup_error(runtime.client, err, "timed_goal_unavailable")
+        if timed_reset_complete and CONF_TIMED_GOAL_RESET_PENDING in entry.options:
+            stored_options = dict(entry.options)
+            stored_options.pop(CONF_TIMED_GOAL_RESET_PENDING)
+            # Complete both halves of the reset before consuming its
+            # authority. A failed reconnect must still cancel the old
+            # service queue on the next attempt, even after re-enabling.
+            hass.config_entries.async_update_entry(entry, options=stored_options)
+
+
+async def _async_start_vehicle(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, options: dict[str, Any],
+    timed_reset_complete: bool, validate_vehicle_selection: Callable[[], None],
+) -> None:
+    """Start the observers that belong to the selected vehicle."""
+    runtime = entry.runtime_data
+    control, coordinator, client = runtime.control, runtime.coordinator, runtime.client
+    loss_enabled = loss_vehicle_options(hass, entry).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+    if loss_enabled:
+        runtime.charge_loss = ChargeLossObserver(hass, entry)
+        await runtime.charge_loss.async_start()
+    validate_vehicle_selection()
+    runtime.vehicle_telemetry = resolve_telemetry_source(hass, options)
+    if vehicle_soc_is_configured(options) or control.soc_goal.source is not None:
+        memory = VehicleTargetMemory(hass, entry.entry_id, runtime.identity.serial_number or "")
+        await memory.async_load()
+        observer = VehicleSocObserver(
+            hass, control, coordinator,
+            options.get(CONF_VEHICLE_SOC_ENTITY),
+            options.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY),
+            telemetry=runtime.vehicle_telemetry,
+            use_vehicle_soc=options.get(CONF_VEHICLE_SOC_USE_PROFILE) is True,
+            use_vehicle_limit=options.get(CONF_VEHICLE_LIMIT_USE_PROFILE) is True,
+            profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
+            memory=memory,
+        )
+        runtime.vehicle_soc = observer
+        try:
+            await observer.async_start()
+        except (AmtronBusError, HomeAssistantError, OSError) as err:
+            _raise_optional_setup_error(client, err, "soc_goal_unavailable")
+    validate_vehicle_selection()
+    if (
+        timed_reset_complete and vehicle_soc_is_configured(options)
+        and timed_goal_is_enabled(options)
+    ):
+        timed = TimedGoalObserver(hass, entry)
+        runtime.timed_goal = timed
+        try:
+            await timed.async_start()
+        except (OSError, ValueError) as err:
+            raise ConfigEntryNotReady(
+                translation_domain=DOMAIN, translation_key="timed_goal_state_invalid"
+            ) from err
+        except (AmtronBusError, HomeAssistantError) as err:
+            _raise_optional_setup_error(client, err, "timed_goal_unavailable")
+    runtime.vehicle_profile_id = options.get(CONF_VEHICLE_PROFILE_ID)
+
+
+async def _async_stop_vehicle(runtime: MennekesAmtronRuntimeData) -> None:
+    """Stop the selected vehicle's observers; the wallbox keeps running."""
+    runtime.vehicle_profile_id = None
+    timed, soc, loss = runtime.timed_goal, runtime.vehicle_soc, runtime.charge_loss
+    runtime.timed_goal = runtime.vehicle_soc = runtime.charge_loss = None
+    runtime.vehicle_telemetry = None
+    for owner in (timed, soc, loss):
+        if owner is not None:
+            await owner.async_stop()
+
+
+def _remember_vehicle(entry: MennekesAmtronConfigEntry) -> None:
+    """Record what the running observers were started for."""
+    runtime = entry.runtime_data
+    runtime.vehicle_base_options = without_selection(entry.options)
+    runtime.vehicle_selection = {
+        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_TIMED_GOAL_RESET_PENDING
+    }
+
+
+async def _async_switch_vehicle(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry,
+) -> bool:
+    """Apply a pure vehicle selection change without reloading entities.
+
+    Returns False when anything else changed or the switch failed; the caller
+    then reloads the entry, which retries the new vehicle's setup.
+    """
+    runtime = entry.runtime_data
+    if (
+        runtime.entry_data != dict(entry.data)
+        or runtime.vehicle_base_options != without_selection(entry.options)
+    ):
+        return False
+    selection = {
+        key: entry.options.get(key) for key in SELECTION_KEYS if key != CONF_TIMED_GOAL_RESET_PENDING
+    }
+    if selection == runtime.vehicle_selection and entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True:
+        return True
+    # Like at setup, a poll during the switch must not retry the previous
+    # car's stop before the new car's source has been bound or cleared.
+    retry = runtime.coordinator.retry_soc_goal
+    runtime.coordinator.retry_soc_goal = None
+    runtime.vehicle_switching = True
+    try:
+        await _async_stop_vehicle(runtime)
+        auto = entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
+        if not auto and runtime.vehicle_detection is not None:
+            runtime.vehicle_detection.stop()
+            runtime.vehicle_detection = None
+        timed_reset_complete = await _async_reset_disabled_trip(hass, entry)
+        await _async_cancel_old_trip(hass, entry, timed_reset_complete)
+        options = vehicle_options(entry.options)
+        await _async_start_vehicle(hass, entry, options, timed_reset_complete, lambda: None)
+        if auto and runtime.vehicle_detection is None:
+            runtime.vehicle_detection = VehicleDetectionObserver(hass, entry)
+            runtime.vehicle_detection.start()
+    except Exception:
+        # Any failure falls back to a full reload, which retries the setup.
+        _LOGGER.debug("Vehicle switch needs a reload", exc_info=True)
+        await _async_stop_vehicle(runtime)
+        return False
+    finally:
+        runtime.vehicle_switching = False
+    runtime.coordinator.retry_soc_goal = retry
+    runtime.vehicle_selection = selection
+    runtime.coordinator.async_update_listeners()
     return True
 
 
@@ -716,11 +810,16 @@ async def _async_reload_entry_locked(
     """Inspect the current owner only after earlier option reloads finish."""
 
     runtime = getattr(entry, "runtime_data", None)
-    if runtime is not None and runtime.plug_charge is not None and runtime.plug_charge.options_applied() is True:
-        return
     cost = runtime.charging_cost if runtime is not None else None
-    if cost is not None and cost.apply_tariff_only_update():
-        return
+    if runtime is not None:
+        if (
+            runtime.plug_charge is not None and runtime.plug_charge.options_applied() is True
+        ) or (cost is not None and cost.apply_tariff_only_update()):
+            # Applied in place. The same update may also have changed the
+            # vehicle, which must still be switched, not silently skipped.
+            runtime.vehicle_base_options = without_selection(entry.options)
+        if await _async_switch_vehicle(hass, entry):
+            return
     # Automatic profile changes reload optional observers. Preserve the open
     # physical connection so this logical reload does not discard the current
     # cable observation or an already granted session. Real disconnects still
@@ -797,7 +896,10 @@ def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:
     if CONF_SERVER_URL in entry.data or control_mode_is_master(dict(entry.options)):
         platforms.extend(CONTROL_PLATFORMS)
     else:
-        if vehicle_options(entry.options).get(CONF_CHARGE_LOSS_SOURCE) == LOSS_SOURCE_SENSOR:
+        if any(
+            options.get(CONF_CHARGE_LOSS_SOURCE) == LOSS_SOURCE_SENSOR
+            for options in each_vehicle_options(entry.options)
+        ):
             platforms.append(Platform.BUTTON)
         if profiles(entry.options):
             platforms.append(Platform.SELECT)

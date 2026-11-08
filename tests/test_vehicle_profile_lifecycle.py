@@ -13,6 +13,7 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
 from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
+from custom_components.mennekes_amtron_rtu.vehicle_targets import VehicleTargetMemory
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
 from tests.test_modbus_service import current_writes
@@ -71,10 +72,24 @@ def test_real_profile_select_rebinds_sources_clears_old_trip_and_preserves_pause
                 old_trip.set(dt_util.utcnow() + timedelta(hours=8))
                 await TimedGoalStore(hass, entry.entry_id, SERIAL_NUMBER).async_save(old_trip)
                 writes = current_writes(transport)
+                runtime = entry.runtime_data
+                unavailable = []
+
+                def watch(event):
+                    state = event.data["new_state"]
+                    if state is None or state.state == "unavailable":
+                        unavailable.append(event.data["entity_id"])
+
+                unsubscribe = hass.bus.async_listen("state_changed", watch)
                 await hass.services.async_call("select", "select_option", {
                     "entity_id": select, "option": "Second car",
                 }, blocking=True)
                 await hass.async_block_till_done()
+                # The switch is applied in place: no reload, no entity flicker.
+                assert entry.runtime_data is runtime
+                assert unavailable == [], unavailable
+                assert entry.runtime_data.vehicle_profile_id == B
+                assert "timed_goal_reset_pending" not in entry.options
                 assert entry.options["active_vehicle_profile"] == B
                 assert entry.runtime_data.control.soc_goal.target_percent == 0
                 assert entry.runtime_data.timed_goal.goal.deadline is None
@@ -92,6 +107,17 @@ def test_real_profile_select_rebinds_sources_clears_old_trip_and_preserves_pause
                 await hass.async_block_till_done()
                 assert entry.runtime_data.control.soc_goal.source is None
                 assert entry.runtime_data.timed_goal is None
+                assert entry.runtime_data is runtime
+                # Vehicle entities stay, unavailable without a selected car.
+                assert {entity.split(".")[1] for entity in unavailable} == {
+                    "mennekes_amtron_vehicle_charge_target",
+                    "mennekes_amtron_vehicle_charge_target_status",
+                    "mennekes_amtron_timed_charging_status",
+                    "mennekes_amtron_next_departure",
+                    "mennekes_amtron_clear_departure_time",
+                }
+                assert hass.states.get(target).state == "unavailable"
+                unsubscribe()
                 assert entry.runtime_data.control.is_paused is True
                 assert current_writes(transport) == writes
             finally:
@@ -160,6 +186,77 @@ def test_real_automatic_selection_reloads_goals_and_respects_manual_override(tmp
                 assert entry.options["active_vehicle_profile"] == A
                 assert entry.runtime_data.vehicle_detection is None
                 assert current_writes(transport) == writes
+            finally:
+                await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), timeout=75))
+
+
+def test_vehicle_switch_runs_in_place_and_reloads_only_on_failure_or_other_changes(tmp_path, monkeypatch):
+    async def run():
+        transport = FakeModbusClient(device_bank(charging_current=8))
+        with patch(
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
+            return_value=transport,
+        ):
+            hass = await _boot(tmp_path / "config")
+            try:
+                for name in ("first", "second"):
+                    hass.states.async_set(f"sensor.{name}_soc", "20", {"unit_of_measurement": "%"})
+                    hass.states.async_set(f"binary_sensor.{name}_plug", "off")
+                    hass.states.async_set(f"device_tracker.{name}", "home")
+                entry = await _entry(hass)
+                options = detection_catalog()
+                options.update({"control_mode": "master", "scan_interval_seconds": 300,
+                                "measurement_interval_seconds": 300, "vehicle_auto_selection": False})
+                for profile in options["vehicle_profiles"].values():
+                    profile["options"].pop("charge_loss_source")
+                    profile["options"].pop("vehicle_last_charge_energy_entity")
+                hass.config_entries.async_update_entry(entry, options=options)
+                await hass.async_block_till_done()
+                runtime = entry.runtime_data
+                assert runtime.vehicle_detection is None
+                selector = er.async_get(hass).async_get_entity_id(
+                    "select", DOMAIN, f"{SERIAL_NUMBER}_active_vehicle",
+                )
+                # Re-enabling automatic selection starts its detector in place.
+                await hass.services.async_call("select", "select_option", {
+                    "entity_id": selector, "option": "automatic",
+                }, blocking=True)
+                await hass.async_block_till_done()
+                assert entry.runtime_data is runtime
+                assert runtime.vehicle_detection is not None
+                # An unchanged save is neither a switch nor a reload.
+                hass.config_entries.async_update_entry(
+                    entry, options={**entry.options, "vehicle_profile_selected_at": entry.options.get("vehicle_profile_selected_at")},
+                )
+                await hass.async_block_till_done()
+                assert entry.runtime_data is runtime
+
+                failures = [OSError("storage failed")]
+                original_load = VehicleTargetMemory.async_load
+
+                async def broken_start(self):
+                    if failures:
+                        raise failures.pop()
+                    await original_load(self)
+
+                # A failed switch falls back to a reload, which retries setup.
+                monkeypatch.setattr(
+                    "custom_components.mennekes_amtron_rtu.VehicleTargetMemory.async_load", broken_start,
+                )
+                await hass.services.async_call("select", "select_option", {
+                    "entity_id": selector, "option": "Second car",
+                }, blocking=True)
+                await hass.async_block_till_done()
+                assert entry.runtime_data is not runtime
+                assert entry.options["active_vehicle_profile"] == B
+                assert not failures
+                runtime = entry.runtime_data
+                # Any other setting still reloads the entry.
+                hass.config_entries.async_update_entry(entry, options={**entry.options, "scan_interval_seconds": 200})
+                await hass.async_block_till_done()
+                assert entry.runtime_data is not runtime
             finally:
                 await hass.async_stop()
 

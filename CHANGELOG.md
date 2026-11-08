@@ -14,10 +14,13 @@ through **#apps-beta** before the integration when updating both components.
   Modbus read: recently read status and measurements are kept for up to
   30 seconds (driver change; in service mode it needs app 0.8.0b4). The energy
   meter and error recovery still use only fresh reads.
+- Changing the vehicle, manually or automatically, no longer reloads the
+  integration, so no entity turns unavailable for a moment. Vehicle entities
+  exist as soon as any profile uses their feature and are unavailable while the
+  selected car does not use it.
 - Automatic vehicle selection keeps the selected car after unplugging and while
-  its reports are stale, instead of reloading the integration. It ends the
-  selection when another car is detected or the wallbox sees a car while the
-  selected one reports itself elsewhere.
+  its reports are stale. It ends the selection when another car is detected or
+  the wallbox sees a car while the selected one reports itself elsewhere.
 - Each vehicle profile remembers its percentage target. Returning to a car
   restores it, capped at its current limit, instead of no target.
 - Virtual Plug & Charge lifts a manual pause and adopts the car's limit only for

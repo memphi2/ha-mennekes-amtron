@@ -324,11 +324,6 @@ class TimedGoalObserver:
         )
 
     @property
-    def vehicle_departure_configured(self) -> bool:
-        """Keep the import button when a configured vehicle is temporarily absent."""
-        return resolve_departure_source(self._hass, self._options) is not None
-
-    @property
     def vehicle_departure_available(self) -> bool:
         """Whether the optional adapter has a valid selected vehicle."""
         source = resolve_departure_source(self._hass, self._options)

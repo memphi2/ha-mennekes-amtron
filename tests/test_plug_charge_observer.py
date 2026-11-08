@@ -65,6 +65,7 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, permitted=True,
     control.async_authorize_plug_charge = AsyncMock(side_effect=authorize)
     entry = SimpleNamespace(options=options, runtime_data=SimpleNamespace(
         control=control, coordinator=coordinator, timed_goal=None, vehicle_soc=None,
+        vehicle_profile_id=selected,
     ))
 
     def schedule(_hass, seconds, callback):
@@ -116,6 +117,24 @@ def test_cached_match_waits_for_a_post_connection_report_and_never_resumes(tmp_p
             assert h.control.pause_requested is False
             assert h.control.charging_release_requested is None
             assert h.entry.options["vehicle_auto_selection"] is False
+    asyncio.run(run())
+
+
+def test_no_grant_while_the_selected_car_is_still_being_switched_in(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            # The options already name the car, but its target and departure
+            # plan have not been started yet.
+            h.entry.runtime_data.vehicle_profile_id = None
+            await report(h)
+            assert h.observer.status == "waiting_detection"
+            assert not h.timers
+            h.entry.runtime_data.vehicle_profile_id = A
+            h.coordinator.async_update_listeners()
+            assert h.observer.status == "waiting_release"
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            h.control.async_authorize_plug_charge.assert_awaited_once()
     asyncio.run(run())
 
 

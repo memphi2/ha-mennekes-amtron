@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
+from .vehicle_features import TIMED, vehicle_features
 
 PARALLEL_UPDATES = 1
 
@@ -19,7 +20,7 @@ async def async_setup_entry(
     entry: MennekesAmtronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    if entry.runtime_data.timed_goal is not None:
+    if TIMED in vehicle_features(hass, entry):
         async_add_entities([AmtronDepartureTime(entry)])
 
 
@@ -33,7 +34,10 @@ class AmtronDepartureTime(MennekesAmtronEntity, DateTimeEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.last_update_success and not self.runtime_data.control.read_only
+        return (
+            self.coordinator.last_update_success and not self.runtime_data.control.read_only
+            and self.runtime_data.timed_goal is not None
+        )
 
     @property
     def native_value(self) -> datetime | None:

@@ -264,6 +264,11 @@ def test_tariff_only_option_update_does_not_restart_modbus() -> None:
         entry.runtime_data = SimpleNamespace(
             plug_charge=None,
             charging_cost=SimpleNamespace(apply_tariff_only_update=lambda: True),
+            entry_data=dict(entry.data), vehicle_base_options={},
+            vehicle_selection={
+                "active_vehicle_profile": None, "vehicle_profile_selected_at": None,
+                "vehicle_auto_selection": None,
+            },
         )
         await async_reload_entry(hass, entry)
         assert hass.config_entries.reloaded == []

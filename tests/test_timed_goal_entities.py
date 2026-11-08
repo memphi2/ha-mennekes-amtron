@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from custom_components.mennekes_amtron_rtu import vehicle_features as features
 from custom_components.mennekes_amtron_rtu.button import (
     async_setup_entry as setup_buttons,
 )
@@ -34,9 +35,13 @@ def _timed_observer():
         async_set_deadline=AsyncMock(),
         async_use_next_calendar_event=AsyncMock(),
         async_use_vehicle_departure=AsyncMock(),
-        vehicle_departure_configured=False,
         vehicle_departure_available=False,
     )
+
+
+def _plan_departures(entry):
+    # Entities exist once a vehicle uses departure planning.
+    entry.options.update(vehicle_soc_entity="sensor.car_soc", timed_goal_enabled=True)
 
 
 def test_departure_entities_are_absent_when_timed_goals_are_disabled():
@@ -56,6 +61,7 @@ def test_departure_entities_are_absent_when_timed_goals_are_disabled():
 def test_departure_status_remains_visible_without_calendar_configuration():
     async def run():
         hass, entry, transport = await build_runtime()
+        _plan_departures(entry)
         entry.runtime_data.timed_goal = _timed_observer()
         datetimes, buttons, sensors = await _entities(hass, entry)
         assert "timed_next_calendar_event" not in buttons
@@ -70,8 +76,13 @@ def test_departure_status_remains_visible_without_calendar_configuration():
         assert not status.available
         assert not datetimes["timed_departure"].available
         assert not buttons["timed_clear_departure"].available
+        entry.runtime_data.coordinator.last_update_success = True
         entry.runtime_data.timed_goal = None
+        # A car without departure planning leaves the entities unavailable.
         assert status.native_value is None
+        assert not status.available
+        assert not datetimes["timed_departure"].available
+        assert not buttons["timed_clear_departure"].available
         assert not transport.writes
         await entry.runtime_data.control.async_shutdown()
 
@@ -79,14 +90,15 @@ def test_departure_status_remains_visible_without_calendar_configuration():
 
 
 @pytest.mark.parametrize("remote", [False, True])
-def test_departure_controls_respect_read_only_but_status_is_observable(remote):
+def test_departure_controls_respect_read_only_but_status_is_observable(remote, monkeypatch):
     async def run():
         hass, entry, transport = await build_runtime(read_only=True)
         if remote:
             entry.data["server_url"] = "http://service:8765"
         entry.options["timed_calendar_entity"] = "calendar.trips"
+        _plan_departures(entry)
+        monkeypatch.setattr(features, "resolve_departure_source", lambda *_: object())
         entry.runtime_data.timed_goal = _timed_observer()
-        entry.runtime_data.timed_goal.vehicle_departure_configured = True
         entry.runtime_data.timed_goal.vehicle_departure_available = True
         datetimes, buttons, sensors = await _entities(hass, entry)
         assert not datetimes["timed_departure"].available
@@ -105,13 +117,14 @@ def test_departure_controls_respect_read_only_but_status_is_observable(remote):
     asyncio.run(run())
 
 
-def test_vehicle_import_button_keeps_its_identity_and_tracks_provider_availability():
+def test_vehicle_import_button_keeps_its_identity_and_tracks_provider_availability(monkeypatch):
     async def run():
         hass, entry, transport = await build_runtime()
+        _plan_departures(entry)
         entry.runtime_data.timed_goal = observer = _timed_observer()
         _, buttons, _ = await _entities(hass, entry)
         assert "timed_vehicle_departure" not in buttons
-        observer.vehicle_departure_configured = True
+        monkeypatch.setattr(features, "resolve_departure_source", lambda *_: object())
         _, buttons, _ = await _entities(hass, entry)
         button = buttons["timed_vehicle_departure"]
         assert button.unique_id.endswith("_timed_bmw_departure")
