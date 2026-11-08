@@ -1,5 +1,25 @@
 # Changes
 
+## 0.8.0b1
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**.
+
+- Support optional Virtual Plug & Charge permissions from Home Assistant. Keep
+  an accepted permission through HA Core restarts, revoke it on disconnection
+  and preserve manual pauses, locks and reached targets. Restarting the app
+  requires fresh vehicle recognition; this feature is off by default.
+- Add optional decoded Modbus debugging in the Web UI, with reads, writes,
+  retries and heartbeats. Keep at most 200 redacted entries in memory and stop
+  after ten minutes, without extra bus requests or persistent log files.
+
+- Allow the connection page on stable Supervisor 2026.10.4 and newer,
+  while retaining its administrator and trusted-ingress checks.
+- Show TCP-login and password fields in native app configuration and retain
+  their visibility when the connection page saves USB or disabled login.
+- Confirm or cancel uncertain percentage-target requests and reject observations
+  belonging to a replaced target. Bound the temporary request state in memory.
+- Retry energy-target storage after a recovered meter or interrupted shutdown.
+
 ## 0.7.0b4
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**.

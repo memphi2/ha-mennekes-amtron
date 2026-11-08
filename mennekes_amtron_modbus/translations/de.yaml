@@ -4,7 +4,7 @@ configuration:
     description: "USB-Adapter unter „Weboberfläche öffnen“ aus der Liste wählen. Dieser Pfad wird dort gespeichert. Bei LAN wird er ignoriert und beim Speichern über die Weboberfläche entfernt."
   device_id:
     name: Wallbox-Adresse
-    description: Die in der Wallbox eingestellte Modbus-Adresse.
+    description: "Adresse der Wallbox am RS-485-Bus, auch bei LAN. Werkseinstellung: 50; unterstützter Bereich: 10–50. Verwende die in der Wallbox eingestellte Adresse."
   baudrate:
     name: Baudrate
     description: "Nur für USB / RS-485: muss zur Wallbox passen. Bei LAN die Baudrate am Adapter einstellen."
@@ -13,7 +13,7 @@ configuration:
     description: "Nur für USB / RS-485: Datenbits, Parität und Stoppbits müssen zur Wallbox passen. Bei LAN am Adapter einstellen."
   read_only:
     name: Nur lesen
-    description: Schaltet Steuerbefehle einschließlich der Home-Assistant-Steuerung und den Heartbeat des Dienstes ab; Modbus-Leseanfragen bleiben aktiv.
+    description: "Eingeschaltet: nur Werte überwachen; Ladebefehle und der App-Heartbeat sind deaktiviert, auch die Steuerung aus Home Assistant. Schalte diese Option aus, um Heartbeat und Ladesteuerung zu erlauben. Modbus-Lesezugriffe laufen in beiden Modi."
   current_cap:
     name: Stromobergrenze
     description: Höchster angeforderter EMS-Strom in Ampere. Bewusste Befehle mit 0 A heben die EMS-Begrenzung auf.
@@ -28,19 +28,19 @@ configuration:
     description: Sekunden zwischen Statusabfragen. Der Heartbeat läuft unabhängig davon.
   measurement_interval:
     name: Messwertintervall
-    description: Sekunden zwischen Messwertabfragen; 30 Sekunden begrenzen die Recorder-Last.
+    description: "Sekunden zwischen Leistungs-, Spannungs-, Strom- und Energiemessungen. Der Standard von 30 Sekunden reduziert häufige Aktualisierungen der Home-Assistant-Historie. Statusabfragen und Heartbeat haben eigene Intervalle."
   listen:
     name: API-Listenadresse
     description: Für den Zugriff über das private App-Netzwerk bei 0.0.0.0 belassen.
   port:
     name: Interner API-Port
-    description: Fest auf 8765; eine Freigabe am Host ist optional und normalerweise unnötig.
+    description: "Die HTTP-API der App nutzt 8765. Home Assistant erreicht sie normalerweise über das private App-Netz ohne freigegebenen Host-Port. Der TCP-Port des LAN-Adapters wird separat eingestellt."
   connection_type:
     name: Wallbox-Verbindung
-    description: "Die Verbindung am einfachsten unter „Weboberfläche öffnen“ einstellen: USB-Adapterliste oder LAN-Host und Port. Änderungen speichern und die App anschließend neu starten."
+    description: "Für einen kompatiblen LAN-Adapter im App-Reiter Info „Weboberfläche öffnen“ wählen. LAN auswählen, Host eingeben und „LAN-Adapter auslesen“ wählen. Zum Einrichten „Adaptereinstellungen beim Speichern anwenden“ auswählen und speichern. Danach die App neu starten. Dort lassen sich auch USB-Adapter auswählen."
   host:
     name: Adapter-Host / IP-Adresse
-    description: "Bei LAN erforderlich: Hostname oder IP-Adresse des Adapters, ohne URL-Schema oder Pfad. Bei USB / RS-485 leer lassen. Ein vertrauenswürdiges privates Netzwerk verwenden."
+    description: "Bei LAN erforderlich: Hostname oder IP-Adresse des Adapters, ohne URL-Schema oder Pfad. Zur Erkennung und Einrichtung eines kompatiblen Adapters diesen Host unter „Weboberfläche öffnen“ eingeben. Bei USB / RS-485 leer lassen. Ein vertrauenswürdiges privates Netzwerk verwenden."
   tcp_port:
     name: TCP-Port des Adapters
     description: Am Adapter eingestellter TCP-Port; Standard 502. Das ist nicht der HTTP-Port 8765 des eigenständigen Dienstes.
@@ -49,6 +49,6 @@ configuration:
     description: "Dies ändert nur die Verbindung der App. Um die Anmeldung auch am kompatiblen Adapter ein- oder auszuschalten, zuerst dessen Einstellungen auslesen und „Adaptereinstellungen beim Speichern anwenden“ auswählen. Die Adaptereinrichtung findest du unter „Weboberfläche öffnen“. Die Anmeldung verschlüsselt nicht und ist bei Firmware 1.523 umgehbar. Ein geschütztes lokales Netz verwenden."
   tcp_auth_password:
     name: "Vorhandenes Webpasswort des Adapters"
-    description: "Vorhandenes Webpasswort des Adapters für die TCP-Anmeldung: 1–9 druckbare ASCII-Zeichen ohne Leerzeichen. Das Adapterpasswort wird dadurch nicht geändert."
+    description: "Vorhandenes Webpasswort des Adapters für die TCP-Anmeldung: 1–9 druckbare ASCII-Zeichen ohne Leerzeichen. Bei ausgeschalteter TCP-Anmeldung leer lassen. Das Adapterpasswort wird dadurch nicht geändert."
 network:
   8765/tcp: Geschützte Dienst-API; interner Zugriff benötigt keine Portfreigabe am Host.
