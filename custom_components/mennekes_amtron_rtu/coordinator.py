@@ -96,7 +96,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
                 data.pending_change, data.pending_change_until = self.control_status()
             if self.observe_recovery is not None:
                 self.observe_recovery(
-                    data.values.get(ERROR_CODE.key), data.current_write_generation,
+                    data.fresh(ERROR_CODE.key), data.current_write_generation,
                 )
             if self.observe_goal is not None:
                 self.observe_goal(data)

@@ -288,7 +288,7 @@ class ModbusService:
             if self.control is not None:
                 self.control.observe_plug_charge(self.data, observed_at=observed_at)
                 self.control.observe_recovery(
-                    self.data.get("error_code"), self.data.current_write_generation,
+                    self.data.fresh("error_code"), self.data.current_write_generation,
                 )
             if self.goal is not None:
                 self.goal.observe(self.data)

@@ -74,15 +74,17 @@ setting belongs and why a requested change may wait.
 
 ## Development and releases
 
-**Stable: 0.6.1 · Beta: 0.8.0b3.** The beta includes vehicle profiles, optional
+**Stable: 0.6.1 · Beta: 0.8.0b4.** The beta includes vehicle profiles, optional
 automatic selection and Virtual Plug & Charge, live app Modbus debugging and
 guided app setup on Supervisor 2026.10.4+. Beta 2 adds a wallbox Plug & Charge
 switch, guided vehicle setup and a separate app **Debug log** tab. Beta 3 lets
 Plug & Charge end a manual pause for a permitted car without the state-change
-delay and names the reason when charging stays blocked. Optional
+delay and names the reason when charging stays blocked. Beta 4 stops entities
+briefly turning unavailable, keeps the selected car after unplugging and
+remembers each car's percentage target. Optional
 features stay off until you configure them. In service mode, update the beta app
 first through
-**#apps-beta**. See [the beta update guide](docs/upgrading.md#trying-080b3),
+**#apps-beta**. See [the beta update guide](docs/upgrading.md#trying-080b4),
 [feature availability](docs/README.md#versions-and-feature-availability) and
 [release notes](CHANGELOG.md).
 

@@ -6,13 +6,18 @@ the last charging state, including a deliberate pause, while HA is offline.
 
 **amd64 and aarch64 · separate integration required**
 
-Beta **0.8.0b3** is available through **#apps-beta**; **#apps** keeps stable
+Beta **0.8.0b4** is available through **#apps-beta**; **#apps** keeps stable
 **0.6.1**. Existing beta-catalog installations update in place. Keep the app data
 and HA entry. For all beta features and fixes, update this app before integration
-**0.8.0b3**. Switching catalogs creates a separate app and requires a handover.
+**0.8.0b4**. Switching catalogs creates a separate app and requires a handover.
 See [Updates](#updates).
 
-**New in 0.8.0b3:** while the charging release is off or no car is connected, a
+**New in 0.8.0b4:** a single disturbed bus read no longer makes the affected
+values briefly unavailable in Home Assistant; recently read status and
+measurements are kept for up to 30 seconds. The energy meter and error recovery
+still use only fresh reads.
+
+**Since 0.8.0b3:** while the charging release is off or no car is connected, a
 current change such as ending a pause no longer starts or waits for the
 state-change interval. Virtual Plug & Charge can therefore end a manual pause and
 release a permitted car immediately. Since 0.8.0b2, decoded Modbus communication
@@ -22,9 +27,9 @@ setup, target-saving fixes and visible TCP-login/password fields from 0.8.0b1.
 Existing connections keep their settings until you change them.
 
 LAN-to-RS-485 adapters are supported without local USB.
-See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/network-gateway.md)
+See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/network-gateway.md)
 for transparent RTU over TCP versus translating Modbus TCP. Supported Waveshare
-models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/lan-adapters.md#service-app).
+models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/lan-adapters.md#service-app).
 
 [First setup](#first-setup) · [Daily use](#daily-use) ·
 [Updates](#updates) · [Help](#help)
@@ -32,8 +37,8 @@ models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-men
 ## First setup
 
 For a new beta setup, enable beta versions in HACS and select **Mennekes Amtron
-RTU integration 0.8.0b3**. Complete any requested Home Assistant Core restart.
-See [Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/installation.md).
+RTU integration 0.8.0b4**. Complete any requested Home Assistant Core restart.
+See [Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/installation.md).
 The integration and this app are
 separate installations. Already using the app? Follow [Updates](#updates)
 instead: the app and integration can be updated independently.
@@ -106,7 +111,7 @@ TCP-server mode and disables storage polling, autonomous preambles and old
 serial-buffer replay. Unknown custom payloads are refused. Applying these settings
 restarts the adapter and stops the app's old Modbus connection immediately.
 After successful saving, restart the app to connect using the new settings.
-Detection alone changes nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/lan-adapters.md).
+Detection alone changes nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/lan-adapters.md).
 
 The native **Configuration** tab contains manual connection fields; it does
 not have an adapter detection button. To detect and configure a compatible
@@ -163,16 +168,16 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
   health changes rather than every beat.
 - **Charging targets:** set an **Energy target** in kWh, or configure an optional
   vehicle percentage target through the integration. Targets only limit charging.
-  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/user-guide.md#energy-target).
+  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/user-guide.md#energy-target).
 - **Next departure:** select a one-trip charging deadline in HA. This optional
   plan may resume a pause to meet the time; ordinary kWh/percentage limits alone
   never do. The service discards queued timed-plan commands after their deadline.
   Configure the vehicle's charge level under **Configure → Vehicle**, then
   enable **Next departure → Configure departure planning** and choose its
   battery-capacity source.
-  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/departure-planning.md).
+  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/departure-planning.md).
 - **Loss and cost estimates:** choose optional vehicle and price sources in the
-  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/charging-estimates.md).
+  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/charging-estimates.md).
 
 Early pause/resume, phase, release and lock changes are queued.
 HA's **Pending change** and **Pending change due** show the request and its
@@ -220,7 +225,7 @@ Vehicle → Virtual Plug & Charge**. Integration **0.8.0b2** activates the featu
 with **Virtual Plug & Charge** under **Configuration** on the wallbox device
 page, preserving the existing activation setting. Automatic profile selection is a separate option; selecting a profile
 manually does not replace the detection check. See the
-[vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/vehicle-setup.md#optional-virtual-plug--charge).
+[vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/vehicle-setup.md#optional-virtual-plug--charge).
 
 The app initially withholds charging release until HA recognizes the active,
 permitted vehicle unambiguously. A grant is valid only for the current physical
@@ -243,13 +248,13 @@ ordinary service connections keep their lower minimum version.
 ## Updates
 
 **The app does not need an update whenever the integration changes.** Their
-version numbers may differ. Integrations 0.6.1 and 0.8.0b3 need **service 0.6.1
+version numbers may differ. Integrations 0.6.1 and 0.8.0b4 need **service 0.6.1
 or newer with API 2** so timed commands expire in the service even while HA is offline.
 Update older apps first, including 0.6.0b1. Future integration-only updates can
 reuse a compatible service without restarting its heartbeat.
 
 For the separate live Modbus **Debug log** tab and all beta app fixes, update
-the app to **0.8.0b3**. Virtual Plug & Charge needs **0.8.0b1 or newer**. Changing
+the app to **0.8.0b4**. Virtual Plug & Charge needs **0.8.0b1 or newer**. Changing
 a vehicle percentage target also needs the confirmed-update capability included
 since 0.8.0b1; HA requests an app update
 if that capability is missing. Other controls remain available with an older
@@ -262,7 +267,7 @@ components need updating, update the app first**, wait for initialization, then
 update the integration and restart Core. **Updating the app itself briefly
 interrupts the heartbeat.** Keep its data and the existing HA entry.
 
-**From an older version:** update this app to **0.8.0b3 first**, then the
+**From an older version:** update this app to **0.8.0b4 first**, then the
 beta integration. The API 2 minimum introduced in 0.6.1 still applies; no
 intermediate installation of 0.6.1 is needed. The old beta integration may show unavailable controls between
 updates because its API differs. Keep the existing beta app and its data; no
@@ -271,7 +276,7 @@ select its matching readable name as described above before starting the app.
 The token, saved charging state and USB settings are retained; switching to LAN
 is optional.
 
-Stable **0.6.1** is offered through `#apps`; beta **0.8.0b3** is offered through
+Stable **0.6.1** is offered through `#apps`; beta **0.8.0b4** is offered through
 `#apps-beta`. Keep an existing beta app and update normally. Switching catalogs is optional and
 creates a different app in Supervisor. For that change, back up the data, note
 the charging settings and disconnect the vehicle. Copy the options, set the new
@@ -305,12 +310,12 @@ uses HA's own security policy and does not automatically use this service profil
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
 | Not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
-| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/troubleshooting.md#renew-service-access). |
+| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/troubleshooting.md#renew-service-access). |
 | Service API or minimum version is incompatible | Check the API and minimum service version required in the integration’s release notes. Version numbers do not need to match. Follow [Updates](#updates) if needed; changing the token does not fix this. |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
 | Connection setup required | Open **Web UI**, configure USB or LAN, save and restart the app. Setup mode is running but does not advertise ready wallbox data. |
-| Web UI asks for Supervisor 2026.11.0 | Update the app to **0.8.0b3** and reopen the page. This beta accepts Supervisor **2026.10.4+**; the integration's HA minimum version is unchanged. |
+| Web UI asks for Supervisor 2026.11.0 | Update the app to **0.8.0b4** and reopen the page. This beta accepts Supervisor **2026.10.4+**; the integration's HA minimum version is unchanged. |
 | Serial adapter marked missing | Reconnect the saved adapter or choose its replacement from the dropdown. For LAN, change the connection type and save; the old serial path is removed. |
 | Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. A managed heartbeat or HA-to-app link failing continuously for 60 seconds raises a repair that clears on recovery; a connection fault has no Fix button. |
 
@@ -319,7 +324,7 @@ Diagnostics include the last 20 failed write/recovery records in RAM, with timin
 information and no packet contents or credentials. They add no Recorder rows and
 are lost when the app restarts.
 
-For optional live troubleshooting in **app 0.8.0b3**, open **Web UI → Debug log**
+For optional live troubleshooting in **app 0.8.0b4**, open **Web UI → Debug log**
 (German: **Debugprotokoll**) and enable capture. The separate **Connection** tab
 (**Verbindung**) contains connection settings, preserving unsaved inputs when
 you switch tabs. The app's native Supervisor **Configuration** tab remains
@@ -341,4 +346,4 @@ Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Error-200 recovery while paused and particular LAN gateways still need
 confirmation on the actual hardware; automated tests do not establish that.
 
-[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b3/docs/modbus-service.md)
+[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b4/docs/modbus-service.md)

@@ -15,6 +15,8 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
+from .device.registers import CP_STATE, EVSE_STATE
+from .device.vehicle import vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .loss_attribution import confirm_automatic_vehicle
 from .vehicle_profiles import (
@@ -102,6 +104,27 @@ class VehicleEvidence:
             candidates.append(key)
         return candidates[0] if len(candidates) == 1 else None
 
+    def effective(self, active: str | None, *, wallbox_connected: bool | None = None) -> str | None:
+        """Keep the active car until another one is identified or unknown.
+
+        Unplugging or stale reports do not deselect it: switching profiles
+        reloads every entity. Another car reporting itself plugged in, or a
+        car at the wallbox while the active one reports itself elsewhere,
+        ends the selection, so its goals never apply to another vehicle.
+        """
+        selected = self.selected()
+        if selected is not None or active is None or (profile := self._profiles.get(active)) is None:
+            return selected
+        for key, other in self._profiles.items():
+            if key != active and other.detection is not None:
+                evidence = self._snapshot(other)
+                if evidence.connected is True and evidence.home is True:
+                    return None
+        evidence = self._snapshot(profile)
+        if wallbox_connected is True and (evidence.connected is False or evidence.home is False):
+            return None
+        return active
+
     def subscribe(self, on_change: Callable[..., None]) -> CALLBACK_TYPE:
         """Watch configured sources; callers decide what a match may do."""
         unsubs: list[CALLBACK_TYPE] = []
@@ -161,9 +184,10 @@ class VehicleDetectionObserver(VehicleEvidence):
         if not self._current():
             self._cancel_pending()
             return
-        selected = self.selected()
-        if selected == self._entry.options.get(CONF_ACTIVE_VEHICLE_PROFILE):
-            if selected is not None:
+        active = self._entry.options.get(CONF_ACTIVE_VEHICLE_PROFILE)
+        selected = self.effective(active, wallbox_connected=self._wallbox_connected())
+        if selected == active:
+            if selected is not None and selected == self.selected():
                 confirm_automatic_vehicle(self._hass, self._entry, selected)
             self._cancel_pending()
             return
@@ -193,6 +217,16 @@ class VehicleDetectionObserver(VehicleEvidence):
         if self._current() and candidate == self.selected():
             self._apply(candidate)
 
+    def _wallbox_connected(self) -> bool | None:
+        runtime = getattr(self._entry, "runtime_data", None)
+        if runtime is None or not runtime.coordinator.last_update_success:
+            return None
+        data = runtime.coordinator.current_data()
+        return vehicle_connected(
+            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
+            cp_supported=runtime.identity.layout_version >= CP_STATE.min_layout,
+        )
+
     def _apply(self, selected: str | None) -> None:
         if selected is not None:
             confirm_automatic_vehicle(self._hass, self._entry, selected)
@@ -221,7 +255,8 @@ def prepare_vehicle_selection(hass: HomeAssistant, entry: MennekesAmtronConfigEn
     """Recheck persisted automatic selection before restoring any vehicle goal."""
     if entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True:
         detector = VehicleDetectionObserver(hass, entry)
-        if entry.options.get(CONF_ACTIVE_VEHICLE_PROFILE) != detector.selected():
+        active = entry.options.get(CONF_ACTIVE_VEHICLE_PROFILE)
+        if active != detector.effective(active):
             updated = activate_profile(entry.options, None)
             if updated != dict(entry.options):
                 hass.config_entries.async_update_entry(entry, options=updated)
@@ -247,5 +282,5 @@ def vehicle_selection_matches(
     return (
         expected is None
         or entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is not True
-        or VehicleDetectionObserver(hass, entry).selected() == expected
+        or VehicleDetectionObserver(hass, entry).effective(expected) == expected
     )

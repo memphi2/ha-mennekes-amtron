@@ -56,6 +56,8 @@ class WallboxData:
     # Only completed-session metadata changes; no per-poll progress is exposed.
     charging_session: dict[str, Any] | None = field(default=None, repr=False)
     session_summary_supported: bool = field(default=False, repr=False)
+    # Keys kept from an earlier poll across one failed read, for display only.
+    held: frozenset[str] = field(default=frozenset(), compare=False, repr=False)
 
     def get(self, key: str) -> RegisterValue:
         """Return one decoded register value, or ``None`` when unavailable."""
@@ -66,6 +68,11 @@ class WallboxData:
         """Return true when this snapshot carries a value for a key."""
 
         return self.values.get(key) is not None
+
+    def fresh(self, key: str) -> RegisterValue:
+        """Return a value read in this poll; safety decisions never use a held one."""
+
+        return None if key in self.held else self.values.get(key)
 
 
 @dataclass(slots=True)

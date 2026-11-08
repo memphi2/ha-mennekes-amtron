@@ -55,8 +55,8 @@ def test_automatic_selection_setup_waits_for_complete_signals_and_can_be_cancell
                     "source": "entities", "connected_entity": "binary_sensor.car_plugged_in",
                     "home_entity": "device_tracker.car",
                 }
-                # Missing live evidence is not permission to pick this car.
-                assert entry.options["active_vehicle_profile"] is None
+                # Missing live evidence neither picks nor drops the chosen car.
+                assert entry.options["active_vehicle_profile"] == original["active_vehicle_profile"]
             finally:
                 await hass.async_stop()
 
