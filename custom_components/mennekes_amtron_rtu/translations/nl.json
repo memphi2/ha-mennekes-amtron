@@ -1347,7 +1347,7 @@
       },
       "vehicle_detection_entities": {
         "title": "Kabel- en thuissignalen",
-        "description": "Actief voertuig: **{vehicle}**.\n\nKies aparte signalen voor deze auto. De kabel vereist een binaire sensor met on = aangesloten. Voor de kabel kan ook een sensor waarvan je in de volgende stap de statussen ‘aangesloten’ kiest. Thuis vereist een binaire sensor met on = thuis, of een persoon/apparaattracker met home = thuis. De signalen moeten binnen 30 minuten aan Home Assistant worden gemeld. Een melding bewijst niet wanneer de auto zijn locatie heeft gemeten.",
+        "description": "Actief voertuig: **{vehicle}**.\n\nKies aparte signalen voor deze auto. Gebruik voor de kabel een binaire sensor met on = aangesloten, of een sensor waarvan je in de volgende stap de statussen ‘aangesloten’ kiest. Thuis vereist een binaire sensor met on = thuis, of een persoon/apparaattracker met home = thuis. De signalen moeten binnen 30 minuten aan Home Assistant worden gemeld. Een melding bewijst niet wanneer de auto zijn locatie heeft gemeten.",
         "data": {
           "vehicle_connected_entity": "Laadkabel aangesloten",
           "vehicle_home_entity": "Voertuig thuis"

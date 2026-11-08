@@ -64,8 +64,8 @@ release and restart Home Assistant. If needed, add
 repositories**, category **Integration**.
 
 **0.6.1 remains stable.** For vehicle profiles, optional automatic selection and
-Virtual Plug & Charge, choose **beta 0.8.0b4** and follow the
-[beta update guide](upgrading.md#trying-080b4).
+Virtual Plug & Charge, choose **beta 0.8.0b5** and follow the
+[beta update guide](upgrading.md#trying-080b5).
 [Check feature availability](README.md#versions-and-feature-availability)
 before looking for a new option in an installed release.
 

@@ -116,8 +116,8 @@ class VehicleEvidence:
         """Keep the active car until another one is identified or unknown.
 
         Unplugging or stale reports do not deselect it, so a briefly missing
-        signal does not switch the car's goals off. Another car reporting itself plugged in, or a
-        car at the wallbox while the active one reports itself elsewhere,
+        signal does not switch the car's goals off. Another car reporting
+        itself plugged in, or a car at the wallbox while the active one reports itself elsewhere,
         ends the selection, so its goals never apply to another vehicle.
         """
         selected = self.selected()

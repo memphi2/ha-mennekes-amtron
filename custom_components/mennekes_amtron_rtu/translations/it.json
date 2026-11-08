@@ -1347,7 +1347,7 @@
       },
       "vehicle_detection_entities": {
         "title": "Cavo e presenza a casa",
-        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli segnali distinti per questa auto. Per il cavo serve un sensore binario con on = collegato. Per il cavo va bene anche un sensore di cui scegli gli stati « collegato » nel passaggio successivo. Per la presenza serve un sensore binario con on = a casa, oppure una persona/un localizzatore con home = a casa. I segnali devono essere segnalati a Home Assistant entro 30 minuti. La segnalazione non prova quando l’auto ha rilevato la posizione.",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli segnali distinti per questa auto. Per il cavo usa un sensore binario con on = collegato, oppure un sensore di cui scegli gli stati « collegato » nel passaggio successivo. Per la presenza serve un sensore binario con on = a casa, oppure una persona/un localizzatore con home = a casa. I segnali devono essere segnalati a Home Assistant entro 30 minuti. La segnalazione non prova quando l’auto ha rilevato la posizione.",
         "data": {
           "vehicle_connected_entity": "Cavo di ricarica collegato",
           "vehicle_home_entity": "Veicolo a casa"

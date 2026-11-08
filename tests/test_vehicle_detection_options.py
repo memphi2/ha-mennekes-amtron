@@ -445,6 +445,17 @@ def test_connected_states_step_requires_a_chosen_sensor():
     asyncio.run(run())
 
 
+def test_a_binary_cable_signal_tolerates_empty_stored_states():
+    raw = profile_options()
+    raw["vehicle_profiles"][A]["detection"] = {
+        "source": "entities", "connected_entity": "binary_sensor.plug",
+        "home_entity": "person.owner", "connected_states": None,
+    }
+    assert profiles(raw)[A].detection == VehicleDetectionConfig(
+        "entities", "binary_sensor.plug", "person.owner",
+    )
+
+
 @pytest.mark.parametrize("detection", [
     {"source": "entities", "connected_entity": "sensor.port", "home_entity": "person.owner"},
     {"source": "entities", "connected_entity": "sensor.port", "home_entity": "person.owner",

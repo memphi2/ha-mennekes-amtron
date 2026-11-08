@@ -550,7 +550,12 @@ async def _async_park_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry
     runtime = entry.runtime_data
     if runtime.vehicle_profile_id is None or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True:
         return
-    trip = runtime.timed_goal.goal if runtime.timed_goal is not None else None
+    # A deleted profile's trip is dropped rather than kept for no car.
+    trip = (
+        runtime.timed_goal.goal
+        if runtime.timed_goal is not None and runtime.vehicle_profile_id in profiles(entry.options)
+        else None
+    )
     await _trip_memory(hass, entry).async_swap(runtime.vehicle_profile_id, trip, None)
 
 

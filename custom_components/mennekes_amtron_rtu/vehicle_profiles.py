@@ -135,7 +135,7 @@ def _detection_config(value: Any) -> VehicleDetectionConfig | None:
         return None
     return VehicleDetectionConfig(
         "entities", value["connected_entity"], value["home_entity"],
-        tuple(value.get("connected_states", ())),
+        tuple(value.get("connected_states") or ()),
     )
 
 
