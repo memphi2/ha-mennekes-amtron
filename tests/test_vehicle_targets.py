@@ -102,3 +102,29 @@ def test_a_restored_target_is_capped_by_a_lower_vehicle_limit(tmp_path):
             await hass.async_stop()
 
     asyncio.run(run())
+
+
+def test_storage_problems_only_cost_the_remembered_targets(tmp_path, monkeypatch, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.config.config_dir = str(tmp_path)
+        memory = VehicleTargetMemory(hass, "entry", "serial")
+        try:
+            memory._store.path.parent.mkdir(parents=True, exist_ok=True)
+            memory._store.path.write_text("not json")
+            await memory.async_load()
+            assert memory.recall("car") is None
+            assert "Ignoring saved vehicle charge targets" in caplog.text
+
+            async def fail(_goal):
+                raise OSError("disk full")
+
+            monkeypatch.setattr(memory._store, "async_save", fail)
+            assert memory.remember("car", 80)
+            await memory.async_save()
+            assert memory.recall("car") == 80
+            assert "Vehicle charge target not saved" in caplog.text
+        finally:
+            await hass.async_stop()
+
+    asyncio.run(run())
