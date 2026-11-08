@@ -430,8 +430,14 @@ full serial-port path.
 
 ### Watch app Modbus communication live
 
-In **app 0.8.0b1**, select **Open Web UI → Live Modbus communication**, then enable
-**Capture communication for 10 minutes**. This is optional and off after every
+In the development version, select **Open Web UI → Debug log**
+(German: **Debugprotokoll**), then enable **Capture communication for 10 minutes**.
+It is a separate tab beside **Connection** (**Verbindung**), independent of the
+app's native Supervisor **Configuration** tab. Published app **0.8.0b1** still
+uses the **Live Modbus communication** section on its connection page; the
+separate debug tab is not released yet.
+
+Capture is optional and off after every
 app restart. It shows existing reads, writes and heartbeats, register addresses,
 decoded values, transaction durations and confirmed or failed responses. Each
 retry is a separate row. A failed write shows the requested value; it does not
@@ -441,8 +447,8 @@ the Modbus register map.
 The app keeps only the latest **200 transactions in RAM** and automatically
 stops and erases the capture after **10 minutes**, even when the browser closes.
 Switching capture off also erases it; **Clear entries** clears the view without
-extending the deadline. Closing the panel or hiding the browser tab stops UI
-updates while capture continues until its deadline. Capture produces no extra
+extending the deadline. Switching back to **Connection** or hiding the browser
+tab stops UI updates while capture continues until its deadline. Capture produces no extra
 Modbus requests, Recorder history or log files. Serial numbers and all text
 registers are masked, including inside block reads; network login traffic and
 exception-message contents are never captured.

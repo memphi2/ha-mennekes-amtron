@@ -35,6 +35,8 @@ Already installed? Keep your device and entity IDs. Use
 These pages cover **beta 0.8.0b1** and identify features already available in
 **stable 0.6.1**. Check your installed integration and app versions before looking
 for a new option.
+The separate app **Debug log** tab described in troubleshooting is an unreleased
+navigation improvement; beta 0.8.0b1 uses the **Live Modbus communication** section.
 
 | Version | Available functionality |
 |---|---|

@@ -293,6 +293,9 @@ The log shows service startup, USB/LAN connection and heartbeat start/stop.
 The optional [live communication view](troubleshooting.md#watch-app-modbus-communication-live)
 is available in **app 0.8.0b1**, optional and off by default. Logs and
 downloadable integration diagnostics remain available without it.
+The development version moves this view to its own **Open Web UI → Debug log**
+tab (**Debugprotokoll** in German), beside **Connection** (**Verbindung**).
+This navigation change is not in the published 0.8.0b1 app yet.
 Connection and heartbeat failures are logged when their state changes.
 Home Assistant also shows a repair after a continuous 60-second heartbeat or
 service-connection problem in a managed, write-enabled setup. It clears

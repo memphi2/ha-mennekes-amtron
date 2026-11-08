@@ -9,80 +9,85 @@
 </head>
 <body>
   <main>
-    <header>
-      <p class="eyebrow">Mennekes Amtron</p>
-      <h1 data-i18n="title">Wallbox connection</h1>
-      <p data-i18n="intro">Choose the adapter used by this app. Charging permissions and other settings remain in the app Configuration tab.</p>
-    </header>
-    <p id="error" role="alert" hidden></p>
-    <p id="status" role="status" aria-live="polite" data-i18n="loading">Loading settings…</p>
-    <form id="connection_form" hidden>
-      <label for="connection_type" data-i18n="transport">Connection</label>
-      <select id="connection_type" name="connection_type" required>
-        <option value="serial" data-i18n="usb">USB / RS-485</option>
-        <option value="rtu_over_tcp" data-i18n="rtu">LAN: Modbus RTU over TCP</option>
-        <option value="modbus_tcp" data-i18n="tcp">LAN: Modbus TCP</option>
-      </select>
-      <p class="hint" data-i18n="transport_hint">USB uses an adapter connected to the host running this app. For LAN, match the adapter mode: transparent RTU over TCP or translating Modbus TCP.</p>
-      <fieldset id="serial_fields">
-        <legend data-i18n="usb_settings">USB adapter</legend>
-        <label for="serial_port" data-i18n="adapter">Serial adapter</label>
-        <select id="serial_port" name="serial_port" required></select>
-        <p class="hint" data-i18n="adapter_hint">Choose your adapter from the list. Stable device names are preferred automatically; an adapter is never selected for you.</p>
-        <div class="columns">
-          <div>
-            <label for="baudrate" data-i18n="baudrate">Baud rate</label>
-            <select id="baudrate" name="baudrate" required>
-              <option>9600</option><option>14400</option><option>19200</option><option>28800</option>
-              <option>38400</option><option>56000</option><option selected>57600</option>
-            </select>
-          </div>
-          <div>
-            <label for="frame" data-i18n="frame">Serial format</label>
-            <select id="frame" name="frame" required>
-              <option value="8n2">8N2</option><option value="8e1">8E1</option><option value="8o1">8O1</option>
-            </select>
-          </div>
-        </div>
-        <p class="hint" data-i18n="serial_hint">Speed and data format must match the wallbox; factory defaults are 57600 baud and 8N2. Changing these app settings does not reconfigure the wallbox.</p>
-      </fieldset>
-      <fieldset id="network_fields" hidden disabled>
-        <legend data-i18n="lan_settings">LAN adapter</legend>
-        <label for="host" data-i18n="host">Adapter IP address or hostname</label>
-        <input id="host" name="host" type="text" maxlength="253" autocomplete="off" spellcheck="false" required>
-        <label for="tcp_port" data-i18n="port">Adapter TCP port</label>
-        <input id="tcp_port" name="tcp_port" type="number" min="1" max="65535" step="1" value="502" required>
-        <p class="hint" data-i18n="endpoint_hint">Enter the LAN adapter address without http:// or a path. Use its configured TCP port, commonly 502. The Modbus service’s HTTP port 8765 does not belong here.</p>
-        <p class="hint" data-i18n="lan_hint">Set the serial baud rate and format on the LAN adapter. Saving LAN settings removes any old USB adapter selection.</p>
-        <button id="detect_adapter" type="button" class="secondary" data-i18n="detect_adapter">Set up LAN adapter</button>
-        <section id="adapter_preview" class="adapter-preview" hidden aria-live="polite">
-          <h2 data-i18n="adapter_detected">Recognized adapter</h2>
-          <p id="adapter_identity"></p>
-          <p id="adapter_current" class="hint"></p>
-          <p id="adapter_unsupported" class="hint" data-i18n="gateway_unsupported" hidden></p>
-          <label class="check" for="apply_adapter">
-            <input id="apply_adapter" type="checkbox">
-            <span data-i18n="apply_adapter">Apply adapter settings when saving</span>
-          </label>
-          <fieldset id="adapter_fields" hidden disabled>
-            <legend data-i18n="adapter_target">Adapter serial settings</legend>
-            <div class="columns">
-              <div>
-                <label for="adapter_baudrate" data-i18n="baudrate">Baud rate</label>
-                <select id="adapter_baudrate" required>
-                  <option>9600</option><option>14400</option><option>19200</option><option>28800</option>
-                  <option>38400</option><option>57600</option>
-                </select>
-              </div>
-              <div>
-                <label for="adapter_frame" data-i18n="frame">Serial format</label>
-                <select id="adapter_frame" required>
-                  <option value="8n2">8N2</option><option value="8e1">8E1</option><option value="8o1">8O1</option>
-                </select>
-              </div>
+    <p class="eyebrow">Mennekes Amtron</p>
+    <div class="tabs" role="tablist" aria-label="Mennekes Amtron">
+      <button id="connection_tab" type="button" role="tab" aria-selected="true" aria-controls="connection_panel" data-i18n="connection_tab">Connection</button>
+      <button id="debug_tab" type="button" role="tab" aria-selected="false" aria-controls="modbus_debug" tabindex="-1" data-i18n="debug_tab">Debug log</button>
+    </div>
+    <section id="connection_panel" role="tabpanel" aria-labelledby="connection_tab" tabindex="0">
+      <header>
+        <h1 data-i18n="title">Wallbox connection</h1>
+        <p data-i18n="intro">Choose the adapter used by this app. Charging permissions and other settings remain in the app Configuration tab.</p>
+      </header>
+      <p id="error" role="alert" hidden></p>
+      <p id="status" role="status" aria-live="polite" data-i18n="loading">Loading settings…</p>
+      <form id="connection_form" hidden>
+        <label for="connection_type" data-i18n="transport">Connection</label>
+        <select id="connection_type" name="connection_type" required>
+          <option value="serial" data-i18n="usb">USB / RS-485</option>
+          <option value="rtu_over_tcp" data-i18n="rtu">LAN: Modbus RTU over TCP</option>
+          <option value="modbus_tcp" data-i18n="tcp">LAN: Modbus TCP</option>
+        </select>
+        <p class="hint" data-i18n="transport_hint">USB uses an adapter connected to the host running this app. For LAN, match the adapter mode: transparent RTU over TCP or translating Modbus TCP.</p>
+        <fieldset id="serial_fields">
+          <legend data-i18n="usb_settings">USB adapter</legend>
+          <label for="serial_port" data-i18n="adapter">Serial adapter</label>
+          <select id="serial_port" name="serial_port" required></select>
+          <p class="hint" data-i18n="adapter_hint">Choose your adapter from the list. Stable device names are preferred automatically; an adapter is never selected for you.</p>
+          <div class="columns">
+            <div>
+              <label for="baudrate" data-i18n="baudrate">Baud rate</label>
+              <select id="baudrate" name="baudrate" required>
+                <option>9600</option><option>14400</option><option>19200</option><option>28800</option>
+                <option>38400</option><option>56000</option><option selected>57600</option>
+              </select>
             </div>
-            <p class="hint" data-i18n="adapter_apply_hint">Saving applies the selected TCP port, connection mode, login and serial settings to the adapter immediately. Its existing web password is not changed.</p>
-          </fieldset>
+            <div>
+              <label for="frame" data-i18n="frame">Serial format</label>
+              <select id="frame" name="frame" required>
+                <option value="8n2">8N2</option><option value="8e1">8E1</option><option value="8o1">8O1</option>
+              </select>
+            </div>
+          </div>
+          <p class="hint" data-i18n="serial_hint">Speed and data format must match the wallbox; factory defaults are 57600 baud and 8N2. Changing these app settings does not reconfigure the wallbox.</p>
+        </fieldset>
+        <fieldset id="network_fields" hidden disabled>
+          <legend data-i18n="lan_settings">LAN adapter</legend>
+          <label for="host" data-i18n="host">Adapter IP address or hostname</label>
+          <input id="host" name="host" type="text" maxlength="253" autocomplete="off" spellcheck="false" required>
+          <label for="tcp_port" data-i18n="port">Adapter TCP port</label>
+          <input id="tcp_port" name="tcp_port" type="number" min="1" max="65535" step="1" value="502" required>
+          <p class="hint" data-i18n="endpoint_hint">Enter the LAN adapter address without http:// or a path. Use its configured TCP port, commonly 502. The Modbus service’s HTTP port 8765 does not belong here.</p>
+          <p class="hint" data-i18n="lan_hint">Set the serial baud rate and format on the LAN adapter. Saving LAN settings removes any old USB adapter selection.</p>
+          <button id="detect_adapter" type="button" class="secondary" data-i18n="detect_adapter">Set up LAN adapter</button>
+          <section id="adapter_preview" class="adapter-preview" hidden aria-live="polite">
+            <h2 data-i18n="adapter_detected">Recognized adapter</h2>
+            <p id="adapter_identity"></p>
+            <p id="adapter_current" class="hint"></p>
+            <p id="adapter_unsupported" class="hint" data-i18n="gateway_unsupported" hidden></p>
+            <label class="check" for="apply_adapter">
+              <input id="apply_adapter" type="checkbox">
+              <span data-i18n="apply_adapter">Apply adapter settings when saving</span>
+            </label>
+            <fieldset id="adapter_fields" hidden disabled>
+              <legend data-i18n="adapter_target">Adapter serial settings</legend>
+              <div class="columns">
+                <div>
+                  <label for="adapter_baudrate" data-i18n="baudrate">Baud rate</label>
+                  <select id="adapter_baudrate" required>
+                    <option>9600</option><option>14400</option><option>19200</option><option>28800</option>
+                    <option>38400</option><option>57600</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="adapter_frame" data-i18n="frame">Serial format</label>
+                  <select id="adapter_frame" required>
+                    <option value="8n2">8N2</option><option value="8e1">8E1</option><option value="8o1">8O1</option>
+                  </select>
+                </div>
+              </div>
+              <p class="hint" data-i18n="adapter_apply_hint">Saving applies the selected TCP port, connection mode, login and serial settings to the adapter immediately. Its existing web password is not changed.</p>
+            </fieldset>
         </section>
         <label class="check" for="tcp_authentication">
           <input id="tcp_authentication" name="tcp_authentication" type="checkbox">
@@ -105,15 +110,16 @@
         <button id="save" type="submit" data-i18n="save">Save connection</button>
       </div>
     </form>
-    <details id="modbus_debug" class="modbus-debug">
-      <summary data-i18n="debug_title">Live Modbus communication</summary>
+    </section>
+    <section id="modbus_debug" class="modbus-debug" role="tabpanel" aria-labelledby="debug_tab" tabindex="0" hidden>
+      <h1 data-i18n="debug_title">Live Modbus communication</h1>
       <p class="hint" data-i18n="debug_hint">Optional troubleshooting: observe existing reads, writes and heartbeats for up to 10 minutes. Only the latest 200 entries stay in memory; nothing is stored in the Home Assistant database or log files.</p>
       <label class="check" for="debug_enabled">
         <input id="debug_enabled" type="checkbox" disabled>
         <span data-i18n="debug_enable">Capture communication for 10 minutes</span>
       </label>
       <p id="debug_status" role="status" aria-live="polite" data-i18n="debug_off">Capture is off.</p>
-      <p class="hint" data-i18n="debug_privacy">Serial numbers and text registers are hidden. Network login traffic is never captured. Closing this panel stops updates; capture continues until switched off or automatically expired.</p>
+      <p class="hint" data-i18n="debug_privacy">Serial numbers and text registers are hidden. Network login traffic is never captured. Switching tabs stops updates; capture continues until switched off or automatically expired.</p>
       <button id="debug_clear" type="button" class="secondary" data-i18n="debug_clear" disabled>Clear entries</button>
       <div class="debug-scroll" tabindex="0" role="region" aria-labelledby="debug_table_title">
         <table>
@@ -128,7 +134,7 @@
           <tbody id="debug_records"></tbody>
         </table>
       </div>
-    </details>
+    </section>
     <footer data-i18n="security">Available to Home Assistant administrators with Supervisor 2026.10.4 or newer. No service token is needed here.</footer>
   </main>
 </body>

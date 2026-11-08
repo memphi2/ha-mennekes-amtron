@@ -25,9 +25,12 @@ new connections need fresh recognition. Deliberate pauses, locks and reached
 charging targets remain effective. This is a convenience feature, not ISO 15118
 vehicle authentication. See [charging permission](DOCS.md#virtual-plug--charge).
 
-The new **Live Modbus communication** panel shows decoded existing reads, writes
-and heartbeats when you enable it. Capture is off by default, limited to ten
-minutes and 200 entries in RAM, and creates no extra Modbus requests or history.
+The live Modbus view shows decoded existing reads, writes and heartbeats when
+you enable it. The development version puts it in **Open Web UI → Debug log**
+(German: **Debugprotokoll**), beside **Connection** (**Verbindung**).
+Published app **0.8.0b1** still uses the **Live Modbus communication** section.
+Capture is off by default, limited to ten minutes and 200 entries in RAM, and
+creates no extra Modbus requests or history.
 
 The app also provides optional Waveshare adapter setup and TCP login, configurable
 charging waits, vehicle-aware phase switching and AppArmor protection. Ordinary
