@@ -1,5 +1,16 @@
 # Changes
 
+## 0.8.0b3
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**.
+
+- Treat a current change while the charging release is off or no car is
+  connected as no charging transition: it neither waits for nor starts the
+  state-change interval. Virtual Plug & Charge can end a manual pause and
+  release a permitted car without delay. Phase switching keeps its guard.
+- A percentage target at the car's limit follows every later change of that
+  limit. A raised limit can end a reached target but never resumes charging.
+
 ## 0.8.0b2
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**.
