@@ -1,5 +1,15 @@
 # Changes
 
+## 0.8.0b4
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**.
+
+- Keep recently read status and measurement values across a single failed
+  block read for up to 30 seconds, so entities no longer turn unavailable for a
+  moment. The energy meter and error recovery still use only fresh reads.
+- Report the number of failed Modbus transactions since start to HA, shown as
+  an attribute of connection quality.
+
 ## 0.8.0b3
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**.
