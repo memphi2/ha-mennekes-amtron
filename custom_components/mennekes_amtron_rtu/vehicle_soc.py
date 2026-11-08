@@ -117,9 +117,9 @@ class _Observations:
         self.latest = _Observation(None, None)
 
     def add(self, observation: _Observation) -> None:
-        reached = self.model.stop_requested
+        reached = self.model.status == "reached"
         self.model.observe(observation.soc, observation.maximum)
-        if not reached and self.model.stop_requested:
+        if not reached and self.model.status == "reached":
             self.reached_soc = observation.soc
         if observation.maximum is not None:
             self.minimum = (
@@ -136,7 +136,7 @@ class _Observations:
         # A target following a raised car limit can end that reach again; then
         # the stale reaching SoC must not latch the newer target.
         current = _Observation(
-            self.reached_soc if self.reached_soc is not None and self.model.stop_requested
+            self.reached_soc if self.reached_soc is not None and self.model.status == "reached"
             else self.latest.soc,
             self.maximum,
         )

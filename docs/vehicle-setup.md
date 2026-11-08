@@ -196,7 +196,7 @@ manually, but that choice alone never proves which car is connected.
    **Configuration**. This switch controls the feature for the whole wallbox.
    The feature requires
    write access. Service mode needs **app 0.8.0b1 or newer** for the
-   charging-permission capability; use **0.8.0b4** for the current beta app.
+   charging-permission capability; use **0.8.0b6** for the current beta app.
 3. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 
@@ -300,15 +300,19 @@ resume manually or plug in again. If this optional source is
 temporarily unavailable, the last valid maximum is kept. Before its first valid
 reading, setting a positive target is refused rather than assuming 100%.
 
-For example, with a reported charge level of 45%, set a target of **80%**.
-Charging pauses when the vehicle reports at least 80%. Setting a target never
+For example, with a reported charge level of 45%, set a target of **80%**
+below the car's own limit. Charging pauses when the vehicle reports at least
+80%. From **0.8.0b6**, a target at the car's own limit is only shown as reached:
+the car ends that charge itself, like at any other charger, and nothing is
+paused or switched off until you unplug (app **0.8.0b6** for service mode). Setting a target never
 starts charging or lifts a pause; **0%** switches this target off without
 resuming. A reached target stays reached even if the reported charge level later
 falls. Setting a new positive target establishes a new limit. With
 [Virtual Plug & Charge](#optional-virtual-plug--charge), each recognized
 connection starts with the car's current limit as its target, which also ends a
 target reached during the previous connection. The independent
-kWh target can also remain active: reaching either target stops the charge.
+kWh target can also remain active: reaching either target stops the charge,
+except that a percentage target at the car's own limit leaves stopping to the car.
 
 As selected for this integration, missing or invalid vehicle data **does not
 pause charging**. Monitoring resumes when a valid value returns. The same applies

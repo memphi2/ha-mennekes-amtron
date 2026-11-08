@@ -515,7 +515,7 @@ def test_car_limit_adoption_skips_missing_unchanged_or_read_only(
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:
             observer = vehicle_limit(h, limit)
-            h.control.soc_goal = SimpleNamespace(target_percent=target, stop_requested=reached)
+            h.control.soc_goal = SimpleNamespace(target_percent=target, status="reached" if reached else "active")
             h.control.read_only = read_only
             await report(h)
             assert observer.async_set_target.await_count == int(adopted)

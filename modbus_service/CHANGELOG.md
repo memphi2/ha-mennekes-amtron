@@ -1,5 +1,13 @@
 # Changes
 
+## 0.8.0b6
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**.
+
+- A percentage target at the car's own charge limit no longer pauses the
+  wallbox when reached. The car ends that charge itself, and the session stays
+  untouched until unplugging. A target below the car's limit still pauses.
+
 ## 0.8.0b4
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**.

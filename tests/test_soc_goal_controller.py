@@ -125,7 +125,9 @@ def test_cap_reduction_can_reach_goal_and_old_source_is_rejected():
         await control.async_observe_soc(65, 60, source=SOURCE)
         await _settle(soc)
         assert control.soc_goal.target_percent == 60
-        assert current_writes(harness.transport) == [1]
+        # At its own lowered limit the car ends the charge; nothing is paused.
+        assert control.soc_goal.status == "reached"
+        assert current_writes(harness.transport) == []
         await control.async_configure_soc("sensor.other|")
         assert control.soc_goal.status == "disabled"
         with pytest.raises(ServiceValidationError):

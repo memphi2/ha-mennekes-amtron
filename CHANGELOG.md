@@ -5,10 +5,10 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.8.0b6 — 2026-11-08
+## 0.8.0b6 — 2026-11-09
 
-Beta update of the integration only; **0.6.1 remains stable**. The app stays at
-**0.8.0b4**.
+Beta update of the integration and app; **0.6.1 remains stable**. In service
+mode, update the app to **0.8.0b6** first.
 
 - BavarianData is offered again as a vehicle source when adding or editing a
   vehicle profile. On the supported Home Assistant versions the integration
@@ -33,6 +33,10 @@ Beta update of the integration only; **0.6.1 remains stable**. The app stays at
   charging, or started.
 - Raising **Vehicle charge target** after a trip was reached plans the same
   departure again instead of leaving it finished.
+- A percentage target at the car's own charge limit no longer pauses the
+  wallbox when reached. The car ends that charge itself, like at any other
+  charger, and nothing changes until unplugging. A target below the car's limit
+  still pauses. Service mode needs app **0.8.0b6**.
 
 ## 0.8.0b5 — 2026-11-08
 

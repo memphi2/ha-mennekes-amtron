@@ -273,7 +273,7 @@ class PlugChargeObserver:
         if observer is None or self._control.read_only or not self._control.supports_soc_goal:
             return
         limit, goal = observer.maximum, self._control.soc_goal
-        if limit is None or (limit == goal.target_percent and not goal.stop_requested):
+        if limit is None or (limit == goal.target_percent and goal.status != "reached"):
             return
 
         async def adopt() -> None:
