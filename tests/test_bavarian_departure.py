@@ -171,7 +171,6 @@ def test_vehicle_import_uses_local_options_once_and_retains_manual_override_mark
         hass.states["sensor.trip"] = state("sensor.trip", (NOW + timedelta(hours=3)).isoformat())
         reader = Mock(return_value=NOW + timedelta(hours=2))
         monkeypatch.setattr(adapter, "read_bavarian_departure", reader)
-        assert observer.vehicle_departure_configured
         assert observer.vehicle_departure_available
         await observer.async_use_vehicle_departure()
         reader.assert_called_once_with(
@@ -185,7 +184,6 @@ def test_vehicle_import_uses_local_options_once_and_retains_manual_override_mark
             await observer.async_use_vehicle_departure()
         assert observer.goal is before
         observer._entry.options["timed_vehicle_provider"] = "none"
-        assert not observer.vehicle_departure_configured
         assert not observer.vehicle_departure_available
         with pytest.raises(ServiceValidationError) as error:
             await observer.async_use_vehicle_departure()

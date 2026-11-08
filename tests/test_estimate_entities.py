@@ -55,6 +55,8 @@ def test_only_configured_estimate_groups_are_added(loss_enabled, cost_enabled):
         runtime = entry.runtime_data
         runtime.charge_loss = loss_observer() if loss_enabled else None
         runtime.charging_cost = cost_observer() if cost_enabled else None
+        if loss_enabled:
+            entry.options[CONF_CHARGE_LOSS_SOURCE] = "sensor"
         entities = {}
         await sensor.async_setup_entry(hass, entry, lambda rows: entities.update(collect(rows)))
         for description in ESTIMATE_SENSOR_DESCRIPTIONS:

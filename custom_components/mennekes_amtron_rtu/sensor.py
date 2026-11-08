@@ -32,7 +32,7 @@ from .sensor_descriptions import (
     SENSOR_DESCRIPTIONS,
     AmtronSensorEntityDescription,
 )
-from .vehicle_profiles import vehicle_options, vehicle_soc_is_configured
+from .vehicle_features import LOSS, SOC, TIMED, vehicle_features
 
 PARALLEL_UPDATES = 0
 
@@ -46,6 +46,7 @@ async def async_setup_entry(
 
     runtime_data = entry.runtime_data
     identity = runtime_data.identity
+    features = vehicle_features(hass, entry)
     entities: list[SensorEntity] = []
     for description in SENSOR_DESCRIPTIONS:
         if not capability_is_supported(
@@ -66,14 +67,14 @@ async def async_setup_entry(
         AmtronStateSensor(entry, runtime_data.coordinator, description)
         for description in CONTROL_SENSOR_DESCRIPTIONS
         if (description.key != "energy_goal_status" or identity.layout_version >= ENERGY_TOTAL.min_layout)
-        and (description.key != "soc_goal_status" or vehicle_soc_is_configured(vehicle_options(entry.options)))
-        and (description.key != "timed_goal_status" or runtime_data.timed_goal is not None)
+        and (description.key != "soc_goal_status" or SOC in features)
+        and (description.key != "timed_goal_status" or TIMED in features)
         and (description.key != "virtual_plug_charge_status" or runtime_data.plug_charge is not None)
     )
     entities.extend(
         AmtronEstimateSensor(entry, runtime_data.coordinator, description)
         for description in ESTIMATE_SENSOR_DESCRIPTIONS
-        if (runtime_data.charge_loss is not None if description.key in LOSS_SENSOR_KEYS else runtime_data.charging_cost is not None)
+        if (LOSS in features if description.key in LOSS_SENSOR_KEYS else runtime_data.charging_cost is not None)
     )
     async_add_entities(entities)
 
@@ -97,7 +98,13 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
         if self.entity_description.key == "energy_goal_status":
             return self.runtime_data.control.supports_energy_goal
         if self.entity_description.key == "soc_goal_status":
-            return self.runtime_data.control.supports_soc_goal
+            observer = self.runtime_data.vehicle_soc
+            return (
+                self.runtime_data.control.supports_soc_goal
+                and observer is not None and observer.source is not None
+            )
+        if self.entity_description.key == "timed_goal_status":
+            return self.runtime_data.timed_goal is not None
         return True
 
     @property

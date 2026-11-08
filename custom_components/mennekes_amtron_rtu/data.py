@@ -49,6 +49,12 @@ class MennekesAmtronRuntimeData:
     # Config data/options are already replaced when an update starts unloading.
     # Retain this runtime's platform set instead of recomputing from the new mode.
     loaded_platforms: tuple[Platform, ...] = ()
+    # The settings and vehicle the running observers were started for. A
+    # change of the selection alone switches vehicles without a reload.
+    vehicle_base_options: dict[str, Any] = field(default_factory=dict)
+    vehicle_selection: dict[str, Any] = field(default_factory=dict)
+    vehicle_profile_id: str | None = None
+    vehicle_switching: bool = False
     heartbeat: HeartbeatTask | None = None
     recovery: HeartbeatRecovery | None = None
     goal: EnergyGoalController | None = None

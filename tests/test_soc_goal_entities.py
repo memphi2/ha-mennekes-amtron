@@ -48,7 +48,7 @@ def test_vehicle_number_uses_reported_cap_and_respects_write_permission(read_onl
     async def run():
         hass, entry, transport = await build_runtime(read_only=read_only)
         entry.options[CONF_VEHICLE_SOC_ENTITY] = "sensor.car_soc"
-        observer = SimpleNamespace(async_set_target=AsyncMock())
+        observer = SimpleNamespace(async_set_target=AsyncMock(), source=SOURCE)
         entry.runtime_data.vehicle_soc = observer
         control = entry.runtime_data.control
         control.soc_goal.configure_source(SOURCE)
@@ -104,7 +104,7 @@ def test_remote_vehicle_observations_need_no_extra_wallbox_poll_and_old_service_
                 entry.options[CONF_VEHICLE_SOC_ENTITY] = "sensor.car_soc"
                 direct_client = entry.runtime_data.client
                 entry.runtime_data.control = wrapper
-                entry.runtime_data.vehicle_soc = SimpleNamespace(async_set_target=AsyncMock())
+                entry.runtime_data.vehicle_soc = SimpleNamespace(async_set_target=AsyncMock(), source=SOURCE)
                 numbers, sensors = {}, {}
                 await setup_numbers(hass, entry, lambda items: numbers.update(collect(items)))
                 await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))

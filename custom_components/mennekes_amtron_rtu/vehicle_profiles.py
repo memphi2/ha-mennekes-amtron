@@ -259,3 +259,29 @@ def activate_profile(raw: Mapping[str, Any], profile_id: str | None) -> dict[str
         result[RESET_PENDING] = True
         result[CONF_VEHICLE_PROFILE_SELECTED_AT] = time.time()
     return result
+
+
+# Changing only these keys switches the vehicle at runtime instead of reloading.
+SELECTION_KEYS: Final = frozenset(
+    {
+        CONF_ACTIVE_VEHICLE_PROFILE,
+        CONF_VEHICLE_PROFILE_SELECTED_AT,
+        CONF_VEHICLE_AUTO_SELECTION,
+        RESET_PENDING,
+    }
+)
+
+
+def without_selection(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """The settings a vehicle switch must leave unchanged."""
+    return {key: value for key, value in raw.items() if key not in SELECTION_KEYS}
+
+
+def each_vehicle_options(raw: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
+    """Project every profile, so entities exist for any car that uses them."""
+    catalog = profiles(raw)
+    if not catalog:
+        return (vehicle_options(raw),)
+    return tuple(
+        vehicle_options({**raw, CONF_ACTIVE_VEHICLE_PROFILE: key}) for key in catalog
+    )

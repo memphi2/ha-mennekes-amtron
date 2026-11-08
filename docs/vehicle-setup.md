@@ -125,8 +125,7 @@ manually turns the automatic mode off.
 The integration selects a car only when exactly one configured profile reports
 both **cable connected** and **at home**. A positive change must remain stable
 for three seconds. From **0.8.0b4**, the selected car stays selected after it is
-unplugged or while its reports are stale or unknown, because each profile change
-briefly reloads the integration's entities. The selection ends when another
+unplugged or while its reports are stale or unknown. The selection ends when another
 configured car reports itself connected and at home, or when the wallbox sees a
 car while the selected one reports itself disconnected or away; no percentage
 target then applies to the unknown car. A valid disconnected or away signal excludes that car, even
@@ -137,6 +136,12 @@ No matching car or several matching cars means **no active vehicle**. Previous
 car-specific targets and the departure plan are cleared when the assignment
 changes; detection alone never starts charging or lifts a pause. If the result is
 unclear, choose the correct profile manually.
+
+From **0.8.0b4**, changing the vehicle, manually or automatically, no longer
+reloads the integration: the wallbox entities stay available throughout.
+Vehicle entities, such as the vehicle charge target, the departure time and the
+charging-loss sensors, exist as soon as any profile uses the feature. They are
+unavailable while the selected car, or no car, does not use it.
 
 These signals are an optional selection aid, not an identity supplied by the
 wallbox. The 30-minute check concerns the latest **Home Assistant report**, which

@@ -443,10 +443,12 @@ def test_departure_controls_show_saved_trip_and_delegate_actions() -> None:
         timed = SimpleNamespace(
             goal=goal, async_set_deadline=AsyncMock(),
             async_use_next_calendar_event=AsyncMock(),
-            vehicle_departure_configured=False,
         )
         entry.runtime_data.timed_goal = timed
-        entry.options["timed_calendar_entity"] = "calendar.trips"
+        entry.options.update(
+            timed_calendar_entity="calendar.trips", vehicle_soc_entity="sensor.car_soc",
+            timed_goal_enabled=True,
+        )
         datetimes: dict[str, object] = {}
         buttons: dict[str, object] = {}
         await setup_datetime(hass, entry, lambda items: datetimes.update(collect(items)))

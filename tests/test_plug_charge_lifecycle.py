@@ -98,6 +98,8 @@ def test_profile_reload_hands_over_only_the_same_open_connection(tmp_path, monke
                 assert entry.runtime_data.control.plug_charge["session"] != token
 
         monkeypatch.setattr(hass.config_entries, "async_reload", reload)
+        # Unchanged options are a no-op vehicle switch; force the real reload.
+        monkeypatch.setattr(integration, "_async_switch_vehicle", AsyncMock(return_value=False))
         try:
             await integration.async_reload_entry(hass, entry)
             assert not old.retain_client_on_unload
@@ -145,6 +147,8 @@ def test_overlapping_profile_reloads_preserve_the_successor_client_and_session(t
             assert entry.runtime_data.control.plug_charge["session"] == token
 
         monkeypatch.setattr(hass.config_entries, "async_reload", reload)
+        # Unchanged options are a no-op vehicle switch; force the real reload.
+        monkeypatch.setattr(integration, "_async_switch_vehicle", AsyncMock(return_value=False))
         first = asyncio.create_task(integration.async_reload_entry(hass, entry))
         await started.wait()
         second = asyncio.create_task(integration.async_reload_entry(hass, entry))

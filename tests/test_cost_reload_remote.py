@@ -71,7 +71,10 @@ def test_remote_profile_reload_retains_costs_or_closes_failed_handoff(tmp_path, 
                 with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 10):
                     await old.coordinator.async_refresh()
                 assert old.charging_cost.current.complete
-                entry.options = {**entry.options, "active_vehicle_profile": "b" * 32}
+                # A profile edit, unlike a pure vehicle switch, reloads the entry.
+                profiles = {key: dict(value) for key, value in entry.options["vehicle_profiles"].items()}
+                profiles["b" * 32]["name"] = "Renamed"
+                entry.options = {**entry.options, "vehicle_profiles": profiles, "active_vehicle_profile": "b" * 32}
 
                 async def reload(_entry_id):
                     assert await integration.async_unload_entry(hass, entry)
