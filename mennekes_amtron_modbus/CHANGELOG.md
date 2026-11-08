@@ -1,5 +1,15 @@
 # Changes
 
+## 0.8.0b2
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**.
+
+- Give decoded Modbus communication its own **Debug log** tab beside
+  **Connection**, with mobile layout and keyboard navigation.
+- Preserve unsaved connection settings when switching tabs and stop browser
+  polling while the debug tab is hidden. Capture remains optional, limited to
+  ten minutes and 200 entries in memory, with no extra Modbus requests or history.
+
 ## 0.8.0b1
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**.
