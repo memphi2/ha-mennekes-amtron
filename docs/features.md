@@ -51,7 +51,7 @@ useful independently of HA.
 ## Example: several cars at the same wallbox
 
 Create a profile for each car, select one and configure its optional features.
-Repeat for the other car. Select the connected profile **before charging**; the
+Repeat for the other car. Select a manual profile **before charging**; the
 active selection determines which SoC, departure and loss sources are used.
 Manual selection is the simplest default. Enable automatic selection only when
 your available cable and home signals are reliable enough for that purpose.

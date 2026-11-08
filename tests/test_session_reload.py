@@ -75,6 +75,7 @@ def test_unselected_profile_captures_baseline_and_survives_selection_reload(tmp_
         finally:
             await integration.async_unload_entry(hass, entry)
         assert current.sessions._closed
+        assert not hass.data.get("mennekes_amtron_rtu_loss_attribution")
         if costs:
             assert current.charging_cost._closed
         assert not current.client.connected
@@ -123,6 +124,8 @@ def test_unclaimed_estimate_owners_are_closed_on_reload(tmp_path, monkeypatch, o
             assert old.sessions._closed is (outcome != "cost_changed")
             if outcome in {"skipped", "failed", "connection_changed", "identity_changed"}:
                 assert not old.client.connected
+            if outcome in {"skipped", "failed", "identity_changed"}:
+                assert not hass.data.get("mennekes_amtron_rtu_loss_attribution")
         finally:
             if entry.runtime_data is not old:
                 await integration.async_unload_entry(hass, entry)

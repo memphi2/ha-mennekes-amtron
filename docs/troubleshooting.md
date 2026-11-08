@@ -388,7 +388,8 @@ than assigning an old result to that charge.
 
 - **Losses:** confirm that the car value is energy entering the battery, from
   the same charge. History must match its times; a lone last-charge kWh value
-  may need explicit assignment. Select the profile before charging starts.
+  may need explicit assignment. Select a manual profile before charging starts;
+  automatic recognition may arrive later within the same observed connection.
 - **Costs:** check the price sensor's unit and recent reports. Missing prices,
   meter gaps or HA downtime make the result incomplete. The old dynamic price
   expires after 90 minutes without reports.

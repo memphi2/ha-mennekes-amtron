@@ -34,11 +34,11 @@ from .device.registers import CP_STATE, EVSE_STATE
 from .device.vehicle import vehicle_connected
 from .exceptions import service_validation_error
 from .goal_store import _finish_atomic
+from .loss_attribution import attributed_session, loss_vehicle_options
 from .loss_store import LossStore
 from .vehicle_profiles import (
     CONF_VEHICLE_PROFILE_ID,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
-    vehicle_options,
 )
 from .vehicle_sources import loss_source, resolve_history_source
 
@@ -70,8 +70,9 @@ class ChargeLossObserver:
         self._hass = hass
         self._entry = entry
         self._coordinator = entry.runtime_data.coordinator
-        options = vehicle_options(entry.options)
-        self._profiled = CONF_VEHICLE_PROFILE_ID in options
+        options = loss_vehicle_options(hass, entry)
+        self._profile_id: str | None = options.get(CONF_VEHICLE_PROFILE_ID)
+        self._profiled = self._profile_id is not None
         selected_at = options.get(CONF_VEHICLE_PROFILE_SELECTED_AT, 0)
         self._selected_at = (
             float(selected_at)
@@ -200,7 +201,14 @@ class ChargeLossObserver:
             initial = True
         data = self._coordinator.current_data()
         session = CompletedSession.parse(data.charging_session) if data.charging_session else None
-        if self._profiled and (session is None or session.started_after < self._selected_at):
+        ownership = (
+            attributed_session(self._hass, self._entry, self._profile_id, session)
+            if self._profile_id is not None and session is not None else None
+        )
+        if self._profiled and (
+            session is None or ownership is False
+            or (ownership is None and session.started_after < self._selected_at)
+        ):
             # A newly selected vehicle does not own an earlier wallbox session.
             # Retain this profile's saved last match and weighted average.
             self._session = None

@@ -44,10 +44,12 @@ Changing a profile's selected vehicle or energy source starts a new average for
 that source. Existing configurations without profiles keep their original
 single-source average.
 
-Select the correct profile **before charging begins**. A completed cycle that
-started before the profile was selected is not newly assigned to that profile,
-even if its times happen to match a vehicle history record. Switching back to a
-profile retains its saved last result and average.
+For manual selection, choose the correct profile **before charging begins**.
+Automatic cable/home recognition may arrive after the wallbox detects charging;
+it can still identify that same observed cycle if no conflicting vehicle was
+selected and connection observation remained valid. After unplugging, the loss
+calculation retains the recognized owner even when automatic selection clears
+the active vehicle. Switching profiles retains each car's saved results.
 
 If a selected vehicle is temporarily missing from Home Assistant, its loss
 estimates become unavailable while the saved history is retained. They resume
@@ -100,10 +102,10 @@ A changed value does not prove which charge it belongs to. Use manual assignment
 if the vehicle has charged elsewhere, updates arrive late, or two consecutive
 charges have the same kWh value. Without charging timestamps the result is always
 an estimate. This setting does not automatically identify which vehicle is plugged
-in. Check the correct [vehicle profile](user-guide.md#vehicle-profiles) before
-charging, whether selected manually or through the separately optional cable/home
-recognition. Recognition after a charge begins does not assign that charge to a
-new profile. The energy sensor and its settings belong to the selected profile.
+in. Choose the correct [vehicle profile](user-guide.md#vehicle-profiles) before
+charging when using manual selection. Separately optional cable/home recognition
+can associate a delayed vehicle report with the same observed charge, as described
+above. The energy sensor and its settings belong to that vehicle's profile.
 
 ## Charging costs: fixed or dynamic price
 

@@ -16,6 +16,7 @@ from homeassistant.helpers.event import (
 from homeassistant.util import dt as dt_util
 
 from .entry_types import MennekesAmtronConfigEntry
+from .loss_attribution import confirm_automatic_vehicle
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
     CONF_VEHICLE_AUTO_SELECTION,
@@ -151,6 +152,8 @@ class VehicleDetectionObserver(VehicleEvidence):
     def start(self) -> None:
         """Subscribe after setup; unchanged reports cause no writes."""
         self._unsubs.append(self.subscribe(self._changed))
+        if (runtime := getattr(self._entry, "runtime_data", None)) is not None:
+            self._unsubs.append(runtime.coordinator.async_add_listener(self._changed))
         self._changed()
 
     @callback
@@ -160,6 +163,8 @@ class VehicleDetectionObserver(VehicleEvidence):
             return
         selected = self.selected()
         if selected == self._entry.options.get(CONF_ACTIVE_VEHICLE_PROFILE):
+            if selected is not None:
+                confirm_automatic_vehicle(self._hass, self._entry, selected)
             self._cancel_pending()
             return
         if selected is None:
@@ -189,6 +194,8 @@ class VehicleDetectionObserver(VehicleEvidence):
             self._apply(candidate)
 
     def _apply(self, selected: str | None) -> None:
+        if selected is not None:
+            confirm_automatic_vehicle(self._hass, self._entry, selected)
         updated = activate_profile(self._entry.options, selected)
         if updated != dict(self._entry.options):
             self._hass.config_entries.async_update_entry(self._entry, options=updated)

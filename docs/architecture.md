@@ -246,8 +246,20 @@ age. Upstream BavarianData can restore cable state and tracker coordinates;
 available cable descriptor timestamps are checked, but missing timestamps and
 tracker coordinates without restore provenance cannot prove measurement
 freshness. A GPS accuracy circle crossing the Home-zone boundary is unknown. Detection remains a heuristic; manually selecting a
-profile is always possible. Loss matching does not newly assign a completed
-session whose start predates activation of that profile.
+profile is always possible. Manual loss matching requires the profile to have
+been selected before charging. Automatic selection can arrive later: a bounded
+transient attribution records the uniquely confirmed vehicle within the observed
+physical cycle, then binds it to the completed session ID. A conflicting profile
+or observation loss prevents attribution. This record supplies only loss
+settings after automatic deselection; it cannot reactivate SoC or departure goals.
+
+Direct-mode session capture starts when any configured profile needs loss
+estimates or wallbox costs are enabled, before an active vehicle is selected.
+Controlled reloads on the same physical connection hand over the live session
+observer and compatible cost observer, including their meter baseline and price
+observations. Transport generation changes discard incomplete measurements;
+full unload and failed setup close all retained owners. Only completed summaries
+are stored, so retaining these bounded in-memory models adds no Recorder writes.
 
 Without profile configuration, existing flat options retain their behavior,
 including independently selected departure and history vehicles. Explicit

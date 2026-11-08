@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .device.data import ConnectionState as ConnectionState
 from .device.data import DeviceIdentity as DeviceIdentity
@@ -42,6 +43,9 @@ class MennekesAmtronRuntimeData:
     connection_state: ConnectionState
     retain_client_on_unload: bool = False
     retain_cost_on_unload: bool = False
+    retain_attribution_on_unload: bool = False
+    entry_data: dict[str, Any] = field(default_factory=dict)
+    loss_attribution_unsubscribe: Callable[[], None] | None = None
     # Config data/options are already replaced when an update starts unloading.
     # Retain this runtime's platform set instead of recomputing from the new mode.
     loaded_platforms: tuple[Platform, ...] = ()
@@ -67,6 +71,8 @@ class RuntimeHandoff:
     """Owners retained only for the duration of a controlled entry reload."""
 
     identity: DeviceIdentity
+    unloaded: bool = False
+    setup_complete: bool = False
     connection_generation: int | None = None
     client: MennekesModbusClient | None = None
     sessions: SessionObserver | None = None

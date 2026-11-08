@@ -97,6 +97,11 @@ from .goal_store import (
     SocGoalStore,
     TimedGoalStore,
 )
+from .loss_attribution import (
+    forget_loss_attribution,
+    loss_vehicle_options,
+    track_loss_attribution,
+)
 from .loss_store import LossStore, async_prune_profile_losses
 from .network_tariff_year import (
     async_refresh_tariff_year,
@@ -327,6 +332,7 @@ async def async_setup_entry(
         identity=identity,
         diagnostics=diagnostics,
         connection_state=connection_state,
+        entry_data=dict(entry.data),
     )
     try:
         if handoff is not None:
@@ -337,6 +343,9 @@ async def async_setup_entry(
                 not remote and handoff.connection_generation != client.connection_generation
             ):
                 await handoff.async_close()
+                forget_loss_attribution(hass, entry.entry_id)
+        if profiles(entry.options):
+            entry.runtime_data.loss_attribution_unsubscribe = track_loss_attribution(hass, entry)
         validate_vehicle_selection()
         # Configure the gate before starting heartbeat/recovery. The app owns
         # the previous grant; an unchanged policy survives this HA reload.
@@ -371,7 +380,7 @@ async def async_setup_entry(
                 # authority. A failed reconnect must still cancel the old
                 # service queue on the next attempt, even after re-enabling.
                 hass.config_entries.async_update_entry(entry, options=stored_options)
-        loss_enabled = options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
+        loss_enabled = loss_vehicle_options(hass, entry).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
         cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
         if session_capture_enabled(entry):
             if not remote:
@@ -566,8 +575,13 @@ async def async_setup_entry(
             entry.runtime_data.recovery = HeartbeatRecovery(hass, entry)
             entry.runtime_data.recovery.start()
     except BaseException:
-        await _async_stop_runtime(entry.runtime_data)
+        try:
+            await _async_stop_runtime(entry.runtime_data)
+        finally:
+            forget_loss_attribution(hass, entry.entry_id)
         raise
+    if handoff is not None:
+        handoff.setup_complete = True
     return True
 
 
@@ -633,12 +647,17 @@ async def async_unload_entry(
         return False
     retain_client = runtime_data.retain_client_on_unload
     retain_cost = runtime_data.retain_cost_on_unload
-    if retain_client or retain_cost:
+    if retain_client or retain_cost or runtime_data.retain_attribution_on_unload:
         handoff = hass.data[f"{DOMAIN}_reload_clients"][entry.entry_id]
+        handoff.unloaded = True
         handoff.client = runtime_data.client if retain_client else None
         handoff.sessions = runtime_data.sessions if retain_client else None
         handoff.charging_cost = runtime_data.charging_cost if retain_cost else None
-    await _async_stop_runtime(runtime_data, close_client=not retain_client, retain_cost=retain_cost)
+    try:
+        await _async_stop_runtime(runtime_data, close_client=not retain_client, retain_cost=retain_cost)
+    finally:
+        if not runtime_data.retain_attribution_on_unload:
+            forget_loss_attribution(hass, entry.entry_id)
     return unloaded
 
 
@@ -653,6 +672,9 @@ async def _async_stop_runtime(
     """
     if runtime.vehicle_detection is not None:
         runtime.vehicle_detection.stop()
+    if runtime.loss_attribution_unsubscribe is not None:
+        runtime.loss_attribution_unsubscribe()
+        runtime.loss_attribution_unsubscribe = None
     if runtime.plug_charge is not None:
         await runtime.plug_charge.async_stop()
     runtime.coordinator.observe_plug_charge = None
@@ -708,9 +730,11 @@ async def _async_reload_entry_locked(
         runtime.retain_client_on_unload = True
     remote = CONF_SERVER_URL in entry.data
     retain_cost = cost is not None and (remote or retain) and cost.retain_for_reload(entry, remote=remote)
+    retain_attribution = runtime is not None and (remote or retain) and runtime.entry_data == dict(entry.data)
     if runtime is not None:
         runtime.retain_cost_on_unload = retain_cost
-    if runtime is not None and (retain or retain_cost):
+        runtime.retain_attribution_on_unload = retain_attribution
+    if runtime is not None and (retain or retain_cost or retain_attribution):
         handoff = RuntimeHandoff(
             identity=runtime.identity,
             connection_generation=runtime.client.connection_generation if retain else None,
@@ -721,12 +745,17 @@ async def _async_reload_entry_locked(
     try:
         await hass.config_entries.async_reload(entry.entry_id)
     finally:
-        if runtime is not None and (retain or retain_cost):
+        if runtime is not None and (retain or retain_cost or retain_attribution):
             runtime.retain_client_on_unload = False
             runtime.retain_cost_on_unload = False
+            runtime.retain_attribution_on_unload = False
             unused = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
             if unused is not None:
-                await unused.async_close()
+                try:
+                    await unused.async_close()
+                finally:
+                    if unused.unloaded and not unused.setup_complete:
+                        forget_loss_attribution(hass, entry.entry_id)
 
 
 async def async_remove_entry(
@@ -736,6 +765,7 @@ async def async_remove_entry(
 
     hass.data.get(f"{DOMAIN}_write_states", {}).pop(entry.entry_id, None)
     hass.data.get(f"{DOMAIN}_reload_locks", {}).pop(entry.entry_id, None)
+    forget_loss_attribution(hass, entry.entry_id)
     await GoalStore(hass, entry.entry_id, "").async_remove()
     await SocGoalStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()

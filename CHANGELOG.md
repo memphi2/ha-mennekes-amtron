@@ -13,6 +13,10 @@ through **#apps-beta** before the integration to use the new service features.
 - Preserve observed charging sessions and running costs across logical vehicle
   profile reloads, including the meter baseline before a vehicle is selected.
   Real connection interruptions still invalidate incomplete measurements.
+- Attribute delayed automatic vehicle recognition to its observed charging
+  cycle, while keeping manual selection boundaries and conflicting vehicles
+  separate. Keep the recognized loss owner through automatic deselection so
+  the completed charge can still be matched.
 
 - Add optional Virtual Plug & Charge: permit individual vehicle profiles and
   release a connection only after matching fresh cable/home evidence. Keep

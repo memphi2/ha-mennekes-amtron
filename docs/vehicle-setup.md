@@ -71,7 +71,9 @@ Check the selected profile **before charging**, whether you chose it manually or
 enabled automatic selection. Changing the active profile clears the previous
 car's percentage target and departure plan without starting charging. Charging-loss averages are kept separately for
 each profile; changing its data source starts a new average for that source.
-A charge that began before you selected a profile is not newly assigned to it.
+A charge that began before a manual profile selection is not newly assigned to it.
+Automatic recognition can arrive later within the same observed connection,
+as described below.
 The profile's saved last result and average remain available when you return
 to it.
 
@@ -125,9 +127,12 @@ freshness. The GPS accuracy area must also fit fully inside or outside the Home
 zone; a position crossing its boundary remains unknown. Check the selected car
 before relying on its charge target or loss estimate.
 
-Charging-loss assignment remains conservative: automatic recognition after a
-charge has already begun does not retrospectively assign that charge to the
-new profile. Saved loss results and averages remain separate for each car.
+The car may report its cable connection later than the wallbox. Automatic
+recognition can still associate that same observed charging cycle with the car,
+even if charging has already started. A conflicting vehicle selection or a gap
+in connection observation prevents this association. With Virtual Plug & Charge
+enabled, charging release waits for recognition. Saved loss results and averages
+remain separate for each car.
 
 ## Optional Virtual Plug & Charge
 
