@@ -31,7 +31,7 @@ For installation, downloads and updates, see [Installation and updates](installa
 Check [versions and feature availability](README.md#versions-and-feature-availability).
 Central vehicle profiles, optional automatic selection and Virtual Plug & Charge
 are new in **integration beta 0.8.0b1**. In service mode, Virtual Plug & Charge
-also needs **app 0.8.0b1**; the live-debug panel belongs to that app release.
+also needs **app 0.8.0b1 or newer**. App **0.8.0b2** gives live debugging its own tab.
 Older betas do not include them. Do not delete and recreate the wallbox to reveal
 a new feature.
 
@@ -105,7 +105,7 @@ itself, or configure those fields in the app when the service owns it.
 | App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
 | Older app **0.5.2b2** rejects LAN settings because an old USB device no longer exists | Update to **0.6.1**, which includes the fix for this validation conflict. Before updating, clear the saved **Serial adapter** selection in the native Configuration tab, then save LAN settings and restart. LAN needs no local USB device. |
 | **Connection setup required** | Open the app's **Web UI**, choose USB or LAN, save and restart. Until then, the app runs only setup and health checks, without Modbus, heartbeat or discovery. |
-| Web UI requests Supervisor 2026.11.0 while Supervisor is 2026.10.x | Update the beta app to **0.8.0b1**, which supports **Supervisor 2026.10.4+**. Older apps through 0.7.0b4 had an overly strict version check. See [connection setup](upgrading.md#app-connection-page); the integration's HA minimum version is unchanged. |
+| Web UI requests Supervisor 2026.11.0 while Supervisor is 2026.10.x | Update the beta app to **0.8.0b2**, which supports **Supervisor 2026.10.4+**. Older apps through 0.7.0b4 had an overly strict version check. See [connection setup](upgrading.md#app-connection-page); the integration's HA minimum version is unchanged. |
 
 An app that starts successfully can still be waiting for the wallbox. The log
 separates API startup, USB/LAN connection, heartbeat start/stop and shutdown.
@@ -430,12 +430,11 @@ full serial-port path.
 
 ### Watch app Modbus communication live
 
-In the development version, select **Open Web UI → Debug log**
+In **app 0.8.0b2**, select **Open Web UI → Debug log**
 (German: **Debugprotokoll**), then enable **Capture communication for 10 minutes**.
 It is a separate tab beside **Connection** (**Verbindung**), independent of the
-app's native Supervisor **Configuration** tab. Published app **0.8.0b1** still
-uses the **Live Modbus communication** section on its connection page; the
-separate debug tab is not released yet.
+app's native Supervisor **Configuration** tab. Switching tabs preserves unsaved
+connection settings.
 
 Capture is optional and off after every
 app restart. It shows existing reads, writes and heartbeats, register addresses,

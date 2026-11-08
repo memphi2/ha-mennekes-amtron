@@ -12,10 +12,9 @@ can also supply supported data from one selected BMW vehicle.
 stable 0.6.1. Central vehicle profiles, optional automatic selection and
 Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
 below; existing manual sources continue to work after updating.
-The wallbox **Virtual Plug & Charge** switch, guided detection setup and the
-**Stop using vehicle charge level** wording below are unreleased usability improvements.
-Published beta 0.8.0b1 still enables Plug & Charge in the vehicle options and
-calls SoC removal **Disable percentage target**.
+The steps below follow **beta 0.8.0b2**, which adds the wallbox **Virtual Plug &
+Charge** switch, guided detection setup and clearer **Stop using vehicle charge
+level** action. Existing activation settings and profile permissions are kept.
 See [versions and feature availability](README.md#versions-and-feature-availability).
 
 ## Choose the setup that fits
@@ -58,7 +57,7 @@ Assistant's entity registry, so renamed entities do not require guessed entity
 names. Each optional feature uses the same selected car. No BMW credentials or
 additional cloud requests are needed.
 
-In the unreleased development version, BavarianData appears in this choice only
+From **0.8.0b2**, BavarianData appears in this choice only
 when Home Assistant has a supported vehicle device from that integration.
 Manual entity sources remain available for other cars. If a saved integration
 is temporarily absent, you can still rename its existing profile without losing
@@ -111,7 +110,7 @@ profile. Open **Configure → Vehicle → Automatic vehicle selection**. Under
   selection while keeping its manual selection and optional features.
 
 After configuring the participating profiles, enable **Select the vehicle
-automatically**. In the unreleased development version, you can also enable it
+automatically**. From **0.8.0b2**, you can also enable it
 before any detection sources exist: the next steps select a profile and configure
 its sources. Automatic selection starts only after those settings are saved;
 cancelling the setup leaves the previous settings unchanged.
@@ -164,8 +163,8 @@ manually, but that choice alone never proves which car is connected.
 3. Open the wallbox's device page and turn on **Virtual Plug & Charge** under
    **Configuration**. This switch controls the feature for the whole wallbox;
    the vehicle options only manage each profile's permission. The feature requires
-   write access. In service mode, update the app to **0.8.0b1** first: older
-   compatible services do not provide this charging-permission capability.
+   write access. Service mode needs **app 0.8.0b1 or newer** for the
+   charging-permission capability; use **0.8.0b2** for the current beta app.
 4. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 

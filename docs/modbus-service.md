@@ -49,9 +49,9 @@ if the wallbox has not yet been prepared.
 
 Install **Mennekes Amtron RTU** from the Marketplace on HA 2026.11+, or
 HACS on HA 2026.9/2026.10, and complete the requested Core restart.
-**0.6.1 remains stable.** Choose **beta 0.8.0b1** for vehicle profiles,
+**0.6.1 remains stable.** Choose **beta 0.8.0b2** for vehicle profiles,
 Virtual Plug & Charge and the new app features; follow the
-[beta update guide](upgrading.md#trying-080b1) for an existing installation.
+[beta update guide](upgrading.md#trying-080b2) for an existing installation.
 
 Already using the service? Go to [Updates](#updates); keep your existing entry.
 
@@ -70,9 +70,9 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 The repository above provides stable **0.6.1**. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog provides beta
-**0.8.0b1**. Existing beta-catalog installations update in place. To switch
+**0.8.0b2**. Existing beta-catalog installations update in place. To switch
 catalogs, follow the [channel handover](#updates) and
-[beta update guide](upgrading.md#trying-080b1).
+[beta update guide](upgrading.md#trying-080b2).
 
 ### 3. Configure and start read-only
 
@@ -80,7 +80,7 @@ If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
 In the updated app, start the app and choose **Open Web UI** as an
-administrator. App **0.8.0b1** supports **Supervisor 2026.10.4+**; update an
+administrator. App **0.8.0b2** supports **Supervisor 2026.10.4+**; update an
 older beta app if it incorrectly requests 2026.11.0. Choose USB or LAN; USB
 provides an adapter dropdown, while LAN shows the host/IP and port.
 A missing USB adapter is never replaced automatically. Saving LAN removes its
@@ -258,7 +258,7 @@ app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
 **Updating the app itself briefly interrupts its heartbeat.**
 
-Stable **0.6.1** uses `#apps`; beta **0.8.0b1** uses `#apps-beta`.
+Stable **0.6.1** uses `#apps`; beta **0.8.0b2** uses `#apps-beta`.
 Update the beta app first for Virtual Plug & Charge, live Modbus debugging,
 Supervisor 2026.10.4+ guided setup and the shared control fixes. The general
 minimum compatible service remains **0.6.1 with API 2**. An existing beta
@@ -293,9 +293,9 @@ The log shows service startup, USB/LAN connection and heartbeat start/stop.
 The optional [live communication view](troubleshooting.md#watch-app-modbus-communication-live)
 is available in **app 0.8.0b1**, optional and off by default. Logs and
 downloadable integration diagnostics remain available without it.
-The development version moves this view to its own **Open Web UI → Debug log**
-tab (**Debugprotokoll** in German), beside **Connection** (**Verbindung**).
-This navigation change is not in the published 0.8.0b1 app yet.
+App **0.8.0b2** gives this view its own **Open Web UI → Debug log** tab
+(**Debugprotokoll** in German), beside **Connection** (**Verbindung**).
+Switching tabs preserves unsaved connection settings.
 Connection and heartbeat failures are logged when their state changes.
 Home Assistant also shows a repair after a continuous 60-second heartbeat or
 service-connection problem in a managed, write-enabled setup. It clears

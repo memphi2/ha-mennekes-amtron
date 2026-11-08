@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0b2 — 2026-11-08
+
+Beta update of the integration and app; **0.6.1 remains stable**. Update the app
+through **#apps-beta** before the integration when updating both components.
+
+- Control Virtual Plug & Charge with its own Home Assistant configuration switch.
+  Keep per-vehicle permissions in setup, preserve pauses and reached targets, and
+  reconcile confirmed policy changes after interrupted service responses.
+- Guide vehicle setup through missing profiles and detection signals. Show the
+  selected vehicle and available sources, and clarify the difference between
+  removing charge-level use and clearing the current percentage target.
+- Move live Modbus debugging into a dedicated app Web UI tab. Preserve unsaved
+  connection settings and only refresh the visible debug tab, with temporary
+  memory-only capture and no additional Recorder history or bus requests.
+
 ## 0.8.0b1 — 2026-11-08
 
 Beta update of the integration and app; **0.6.1 remains stable**. Update the app
