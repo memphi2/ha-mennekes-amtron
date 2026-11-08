@@ -126,8 +126,11 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
         return control.pending_until
 
     @property
-    def extra_state_attributes(self) -> dict[str, str] | None:
+    def extra_state_attributes(self) -> dict[str, str | int] | None:
         """Explain a blocked virtual release without exposing session data."""
+        if self.entity_description.key == "connection_quality":
+            failures = self.wallbox_data.connection_failures
+            return {"failed_transactions": failures} if failures is not None else None
         if self.entity_description.key != "virtual_plug_charge_status":
             return None
         plug_charge = self.runtime_data.plug_charge

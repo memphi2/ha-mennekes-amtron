@@ -69,7 +69,10 @@ including a failed read that a retry subsequently recovers. A valid device error
 reply still proves communication. It returns to good after 300 seconds without
 a communication error and a new confirmed response. Before the first response
 it is unknown; loss of the connection is still handled by normal availability.
-It exposes no frequently changing counters or timestamps.
+The attribute **Failed transactions** counts every timeout or malformed response
+since the last start of HA (direct connection) or the app (service mode),
+including failed reads hidden by a successful retry. It changes only when a
+transaction fails, so a healthy bus records nothing. Older apps do not report it.
 
 The **Virtual Plug & Charge** status sensor is new in **beta 0.8.0b1** and optional.
 From **0.8.0b2**, supported direct connections and services
@@ -171,7 +174,7 @@ These sit under *Diagnostic* on the device page.
 |---|---|---|---|---|
 | `sensor.*_cp_state` | CP state |  | layout v01.02 | The control-pilot state between wallbox and vehicle. Use the current and power sensors to check actual consumption. |
 | `sensor.*_error_code` | Error code |  | always | The active error, as a documented category. The raw number is in the `code` attribute. |
-| `sensor.*_connection_quality` | Connection quality |  | direct connection or supporting service | `good` or `degraded`; a stable communication-health summary, without recurring counter changes. |
+| `sensor.*_connection_quality` | Connection quality |  | direct connection or supporting service | `good` or `degraded`; a stable communication-health summary. Attribute `failed_transactions` counts broken transactions since start and changes only on failures. |
 | `sensor.*_temperature` | Temperature | °C | layout v01.02 | Temperature inside the wallbox. |
 | `sensor.*_modbus_layout_version` | Modbus layout version |  | always | The register layout the firmware implements. Decides which entities exist. Disabled by default. |
 | `sensor.*_downgrade_current` | Downgrade current | A | always | The current limit the wallbox applies while a grid-operator downgrade is active. |

@@ -89,15 +89,18 @@ def test_remote_goal_and_quality_metadata_are_optional_and_change_snapshots(tmp_
                 "target_kwh": 12.0, "baseline_kwh": 1200.0, "status": "active",
             }
             changed["connection_quality"] = "degraded"
+            changed["connection_failures"] = 7
             second = remote.apply_snapshot(changed)
             assert second != first
             assert second.connection_quality == "degraded"
+            assert second.connection_failures == 7
             assert wrapper.energy_goal.target_kwh == 12
             legacy = deepcopy(service.snapshot())
             legacy["control"].pop("supports_energy_goal")
             legacy["control"].pop("energy_goal")
             legacy.pop("connection_quality")
-            remote.apply_snapshot(legacy)
+            legacy.pop("connection_failures")
+            assert remote.apply_snapshot(legacy).connection_failures is None
             assert not wrapper.supports_energy_goal
             with pytest.raises(ServiceValidationError):
                 await wrapper.async_set_energy_goal(12)
@@ -109,6 +112,9 @@ def test_remote_goal_and_quality_metadata_are_optional_and_change_snapshots(tmp_
 @pytest.mark.parametrize("mutate", [
     lambda raw: raw.update(connection_quality="private arbitrary value"),
     lambda raw: raw.update(connection_quality=[]),
+    lambda raw: raw.update(connection_failures=-1),
+    lambda raw: raw.update(connection_failures=True),
+    lambda raw: raw.update(connection_failures="3"),
     lambda raw: raw["control"].update(supports_energy_goal=1),
     lambda raw: raw["control"].update(energy_goal=None),
     lambda raw: raw["control"].update(energy_goal={"target_kwh": True}),

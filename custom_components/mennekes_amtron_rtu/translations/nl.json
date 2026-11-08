@@ -518,6 +518,11 @@
         "state": {
           "good": "Goed",
           "degraded": "Communicatiefouten gedetecteerd"
+        },
+        "state_attributes": {
+          "failed_transactions": {
+            "name": "Mislukte transacties"
+          }
         }
       },
       "energy_goal_status": {

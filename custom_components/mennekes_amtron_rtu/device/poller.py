@@ -177,6 +177,7 @@ class DevicePoller:
             held=frozenset(held - read.keys()),
             current_write_generation=generation,
             connection_quality=self._client.link_quality.state,
+            connection_failures=self._client.link_quality.failures,
             energy_read="energy_total" in read or "energy_total" in stale,
             energy_goal_generation=goal_generation,
         )

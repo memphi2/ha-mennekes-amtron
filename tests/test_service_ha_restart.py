@@ -56,7 +56,9 @@ def test_remote_write_repairs_change_without_register_or_entity_updates(tmp_path
                     lambda: updates.append(1)
                 )
                 try:
-                    transport.write_exceptions[CHARGING_RELEASE.address] = "error"
+                    # A device rejection is not a broken transaction, so the
+                    # failure count stays unchanged as well.
+                    transport.write_exceptions[CHARGING_RELEASE.address] = 3
                     with pytest.raises(HomeAssistantError):
                         await runtime.control.async_set_charging_release(True)
                     await runtime.coordinator.async_refresh()
