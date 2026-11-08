@@ -8,7 +8,8 @@ clearer configuration dialogs. Existing separate sources continue to work.
 [Check feature availability](README.md#versions-and-feature-availability).
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
-Amtron RTU → Configure**, then **Charging costs** or **Charging losses**.
+Amtron RTU → Configure**, then **Charging costs**. Charging losses belong to a
+car: open its profile under **Vehicles**, then **Charging losses**.
 Choose a source to see only its relevant inputs; confirming the last form saves
 the section directly. They work with a
 direct USB/LAN connection and with the Modbus app/service. No extra Modbus

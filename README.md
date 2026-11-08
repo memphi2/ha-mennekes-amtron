@@ -78,7 +78,7 @@ setting belongs and why a requested change may wait.
 automatic selection and Virtual Plug & Charge, live app Modbus debugging and
 guided app setup on Supervisor 2026.10.4+. Beta 2 adds a wallbox Plug & Charge
 switch, guided vehicle setup and a separate app **Debug log** tab. Beta 3 lets
-Plug & Charge end a manual pause for a permitted car without the state-change
+Plug & Charge end a manual pause for a recognized car without the state-change
 delay and names the reason when charging stays blocked. Beta 4 stops entities
 briefly turning unavailable, keeps the selected car after unplugging and
 remembers each car's percentage target. Beta 5 also keeps each car's upcoming

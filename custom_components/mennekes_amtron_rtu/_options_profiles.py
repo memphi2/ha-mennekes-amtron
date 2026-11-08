@@ -14,7 +14,6 @@ from homeassistant.helpers.selector import SelectOptionDict
 from ._options_detection import DetectionOptionsFlow
 from .config_schemas import (
     vehicle_device_schema,
-    vehicle_plug_charge_schema,
     vehicle_profile_choice_schema,
     vehicle_profile_details_schema,
 )
@@ -22,7 +21,6 @@ from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
     CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_DEVICE,
-    CONF_VEHICLE_PLUG_CHARGE,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
@@ -63,71 +61,85 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             providers.append("bavariandata")
         return providers
 
-    async def async_step_vehicle_plug_charge(
-        self, user_input: dict[str, Any] | None = None,
-    ) -> ConfigFlowResult:
-        draft = self._begin(
-            "plug_charge",
-            {
-                CONF_VEHICLE_PROFILES,
-                CONF_ACTIVE_VEHICLE_PROFILE,
-                CONF_VEHICLE_PROFILE_SELECTED_AT,
-            },
-        )
-        profile = active_profile(draft.values)
-        if profile is None or profile.detection is None:
-            choices = ["vehicle_profiles"]
-            if profiles(draft.values):
-                choices.append("vehicle_detection")
-            return self.async_show_menu(
-                step_id="vehicle_plug_charge",
-                menu_options=[*choices, "back"],
-                description_placeholders={
-                    "vehicle": profile.name if profile is not None else "—",
-                },
-            )
-        current = {
-            CONF_VEHICLE_PLUG_CHARGE: profile.options.get(CONF_VEHICLE_PLUG_CHARGE) is True,
-        }
-        errors = {}
-        if user_input is not None:
-            allowed = user_input.get(
-                CONF_VEHICLE_PLUG_CHARGE, current[CONF_VEHICLE_PLUG_CHARGE]
-            )
-            if type(allowed) is not bool:
-                errors[CONF_VEHICLE_PLUG_CHARGE] = "plug_charge_invalid"
-            if not errors:
-                options = draft.values[CONF_VEHICLE_PROFILES][profile.id]["options"]
-                if allowed is True:
-                    options[CONF_VEHICLE_PLUG_CHARGE] = True
-                else:
-                    options.pop(CONF_VEHICLE_PLUG_CHARGE, None)
-                return self._finish_section()
-            current.update(user_input)
-        return self.async_show_form(
-            step_id="vehicle_plug_charge",
-            data_schema=vehicle_plug_charge_schema(current, permission=True),
-            description_placeholders={
-                "vehicle": profile.name,
-            },
-            errors=errors,
-            last_step=True,
-        )
-
-    async def async_step_vehicle_profiles(
+    async def async_step_vehicle(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        """List the cars; each car's own settings are reached through its profile."""
         draft = self._begin("profiles", _PROFILE_KEYS)
+        self._profile_target = None
         choices = ["vehicle_profile_add"]
-        if profiles(draft.values):
+        if CONF_VEHICLE_PROFILES not in self.config_entry.options:
+            choices.append("vehicle_settings")
+        elif profiles(draft.values):
             choices += [
+                "vehicle_profile_open",
                 "vehicle_profile_select",
-                "vehicle_profile_edit_select",
                 "vehicle_profile_remove",
                 "vehicle_profile_clear",
             ]
+        selected = active_profile(draft.values)
         return self.async_show_menu(
-            step_id="vehicle_profiles", menu_options=[*choices, "back"]
+            step_id="vehicle",
+            menu_options=[*choices, "back"],
+            description_placeholders={
+                "vehicle": selected.name if selected is not None else "—",
+            },
+        )
+
+    async def async_step_vehicle_profile_open(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        catalog = profiles(self.config_entry.options)
+        if not catalog:
+            return await self.async_step_vehicle()
+        key = next(iter(catalog)) if len(catalog) == 1 else None
+        errors = {}
+        if user_input is not None:
+            key = user_input.get("vehicle_profile_id")
+            if not isinstance(key, str) or key not in catalog:
+                key = None
+                errors["vehicle_profile_id"] = "vehicle_profile_required"
+        if key is not None:
+            self._profile_target = key
+            return await self.async_step_vehicle_profile()
+        choices: list[SelectOptionDict] = [
+            {"value": item.id, "label": item.name} for item in catalog.values()
+        ]
+        return self.async_show_form(
+            step_id="vehicle_profile_open",
+            errors=errors,
+            data_schema=vehicle_profile_choice_schema(
+                choices, self.config_entry.options.get(CONF_ACTIVE_VEHICLE_PROFILE)
+            ),
+        )
+
+    async def async_step_vehicle_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Without profiles, the vehicle settings are shared by every car."""
+        self._profile_target = None
+        return await self.async_step_vehicle_profile()
+
+    async def async_step_vehicle_profile(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Everything that belongs to one car, in one place."""
+        self._draft = None
+        self._details = {}
+        if not self._target_ready():
+            return await self.async_step_vehicle()
+        profile = self._target_profile()
+        choices = ["vehicle_battery", "departure", "losses"]
+        if profile is not None:
+            choices = [
+                "vehicle_profile_edit",
+                *choices,
+                "vehicle_detection_signals",
+            ]
+        return self.async_show_menu(
+            step_id="vehicle_profile" if profile is not None else "vehicle_settings",
+            menu_options=[*choices, "vehicle"],
+            description_placeholders=self._vehicle_placeholders(),
         )
 
     async def async_step_vehicle_profile_add(
@@ -138,12 +150,12 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
     async def async_step_vehicle_profile_edit(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        if user_input is None:
+            if (profile := self._target_profile()) is None:
+                return await self.async_step_vehicle()
+            self._begin("profiles", _PROFILE_KEYS)
+            self._details["profile_edit"] = profile.id
         return await self._profile_details(True, user_input)
-
-    async def async_step_vehicle_profile_edit_select(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        return await self._profile_choice("edit_select", user_input)
 
     async def async_step_vehicle_profile_select(
         self, user_input: dict[str, Any] | None = None
@@ -177,9 +189,6 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                 errors["vehicle_profile_id"] = "vehicle_profile_required"
             elif action == "remove" and user_input.get("confirm") is not True:
                 errors["confirm"] = "vehicle_profile_confirm_required"
-            elif action == "edit_select":
-                self._details["profile_edit"] = key
-                return await self.async_step_vehicle_profile_edit()
             else:
                 if action == "select":
                     draft.values = activate_profile(draft.values, key)
@@ -200,7 +209,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                 draft.values.get(CONF_ACTIVE_VEHICLE_PROFILE),
                 remove=action == "remove",
             ),
-            last_step=action != "edit_select",
+            last_step=True,
         )
 
     async def _profile_details(
@@ -212,7 +221,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
         key = self._details.get("profile_edit") if edit else None
         existing = catalog.get(key) if isinstance(key, str) else None
         if edit and existing is None:
-            return await self.async_step_vehicle_profiles()
+            return await self.async_step_vehicle()
         available_providers = self._profile_providers()
         selectable_providers = available_providers.copy()
         if existing is not None and existing.provider_id not in selectable_providers:

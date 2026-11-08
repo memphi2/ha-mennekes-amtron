@@ -352,7 +352,7 @@ mode it also requires the new app. Check its status on the wallbox device.
 | Symptom | What to check |
 |---|---|
 | No recognized vehicle | Select the intended profile or use automatic selection. Its cable and home signals must give one unambiguous match. |
-| The selected car is not permitted | Enable its separate permission under Configure → Vehicle → Virtual Plug & Charge. A source or vehicle identity change clears that permission. |
+| Recognized vehicle not selected | Another car, or none, is selected manually. Select the recognized car in **Active vehicle**, or choose **Automatic selection**. |
 | Cable is connected, but permission is still pending | A new cable report for this connection is needed, since the last confirmed disconnected wallbox reading or controller startup. Wait for the normal vehicle-integration update; a manual profile choice does not replace this evidence. |
 | Permission is granted, but charging has not started | Check the manual pause, wallbox lock, Charging release, reached goals and local RFID requirement. Granting permission does not remove them. |
 | It waits again after the app restarted or the bus was lost | The previous connection grant was invalidated. Fresh physical connection and vehicle evidence are required. An HA-only restart leaves the running app's existing grant intact. |

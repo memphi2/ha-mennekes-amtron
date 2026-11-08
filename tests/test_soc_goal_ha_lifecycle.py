@@ -52,7 +52,7 @@ async def _options(hass, entry, *, limit=False):
         hass, entry, "wallbox", "wallbox_advanced",
         {"measurement_interval_seconds": 300, "state_change_interval_seconds": 0, "phase_switch_grace_seconds": 0},
     )
-    steps = ["vehicle", "vehicle_soc", {CONF_VEHICLE_SOC_ENTITY: SOC, "use_vehicle_limit": limit}]
+    steps = ["vehicle", "vehicle_settings", "vehicle_battery", "vehicle_soc", {CONF_VEHICLE_SOC_ENTITY: SOC, "use_vehicle_limit": limit}]
     if limit:
         steps.append({CONF_VEHICLE_CHARGE_LIMIT_ENTITY: LIMIT})
     await async_options(hass, entry, *steps)

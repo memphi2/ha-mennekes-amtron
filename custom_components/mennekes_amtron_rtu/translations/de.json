@@ -609,12 +609,15 @@
           "error": "Fehler"
         }
       },
+      "timed_goal_planned_start": {
+        "name": "Geplanter Ladestart"
+      },
       "virtual_plug_charge_status": {
         "name": "Status von virtuellem Plug & Charge",
         "state": {
           "waiting_vehicle": "Wartet auf Fahrzeug",
           "waiting_detection": "Wartet auf aktuelle Fahrzeugdaten",
-          "vehicle_not_permitted": "Fahrzeug nicht erlaubt",
+          "vehicle_not_selected": "Erkanntes Fahrzeug nicht ausgewählt",
           "waiting_release": "Wartet auf Ladefreigabe",
           "authorized": "Fahrzeug freigegeben",
           "blocked": "Laden gesperrt",
@@ -912,12 +915,10 @@
         "title": "Einstellungen",
         "menu_options": {
           "wallbox": "Wallbox",
-          "vehicle": "Fahrzeug",
-          "departure": "Nächste Abfahrt",
-          "costs": "Ladekosten",
-          "losses": "Ladeverluste"
+          "vehicle": "Fahrzeuge",
+          "costs": "Ladekosten"
         },
-        "description": "Beginne mit Wallbox. Fahrzeugdaten, Abfahrtsplanung, Kostenschätzung und Ladeverluste sind optional. Jeder Bereich wird auf seinem letzten Formular separat gespeichert; es erscheinen nur die Einstellungen der gewählten Funktionen."
+        "description": "Beginne mit Wallbox. Unter Fahrzeuge hat jedes Auto ein eigenes Profil mit allem, was dazugehört: Ladestand, Abfahrtsplanung, Ladeverluste, Erkennung und Plug & Charge. Die Ladekosten gelten für alle Autos. Jeder Bereich wird auf seinem letzten Formular separat gespeichert; es erscheinen nur die Einstellungen der gewählten Funktionen."
       },
       "wallbox": {
         "title": "Wallbox",
@@ -957,17 +958,17 @@
         "description": "Die Standardwerte verbinden schnelle Statusmeldungen mit weniger gespeicherten Messwerten und schonenden Zustandswechseln. Bei vorgemerkten Befehlen zeigt Home Assistant die verbleibende Wartezeit. Der unabhängige Heartbeat wird dadurch nicht langsamer."
       },
       "vehicle": {
-        "title": "Fahrzeug",
+        "title": "Fahrzeuge",
+        "description": "Ausgewähltes Fahrzeug: **{vehicle}**.\n\nÖffne ein Profil, um alles für dieses Auto an einer Stelle einzurichten. Mit Fahrzeug auswählen legst du fest, welches Auto gerade lädt. Soll das Auto stattdessen anhand von Kabel- und Zuhause-Signalen gewählt werden, richte in jedem Profil die Erkennungssignale ein und wähle in der Entität **Aktives Fahrzeug** auf der Geräteseite der Wallbox **Automatische Auswahl**. Ein neues Profil aktiviert noch keine Ladefunktion.\n\nOhne Profile gelten die Fahrzeugeinstellungen für jedes Auto. Beim ersten neuen Profil bleiben sie in einem Profil namens „Existing sources“ erhalten.",
         "menu_options": {
-          "vehicle_soc": "Ladestand einrichten",
-          "vehicle_disable": "Ladestand nicht mehr verwenden",
-          "back": "Zurück ohne Speichern",
-          "vehicle_profiles": "Fahrzeugprofile",
-          "vehicle_source": "Ladestand einrichten",
-          "vehicle_detection": "Automatische Fahrzeugauswahl",
-          "vehicle_plug_charge": "Virtuelles Plug & Charge"
-        },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nRichte Fahrzeugprofile und das optionale Prozentziel ein. Wähle jedes Auto einmal aus und entscheide anschließend unabhängig über Ladegrenze, Kapazität, Abfahrtszeiten und Historie.\n\nUm nur das aktuelle Prozentziel aufzuheben, stelle Fahrzeug-Ladeziel auf 0. Ladestand nicht mehr verwenden entfernt hier die Quellenzuordnung dieses Profils einschließlich des optionalen Maximums, löscht sein Prozentziel und seine geplante Fahrt und deaktiviert die Abfahrtsplanung. Die Quellentitäten der Fahrzeugintegration bleiben erhalten, ebenso Fahrzeugberechtigung, kWh-Ziel und Ladezustand."
+          "vehicle_profile_add": "Profil hinzufügen",
+          "vehicle_settings": "Fahrzeugeinstellungen ohne Profil",
+          "vehicle_profile_open": "Einstellungen eines Profils öffnen",
+          "vehicle_profile_select": "Fahrzeug auswählen",
+          "vehicle_profile_remove": "Profil entfernen",
+          "vehicle_profile_clear": "Kein Fahrzeug auswählen",
+          "back": "Zurück ohne Speichern"
+        }
       },
       "vehicle_soc": {
         "title": "Ladestand einrichten",
@@ -979,7 +980,7 @@
           "vehicle_soc_entity": "Wähle den Sensor für den tatsächlichen Fahrzeug-Ladestand in %. Fehlende Daten lassen die Ladung unverändert, bis gültige Werte zurückkehren. Ein Quellenwechsel löscht das Prozentziel, ohne das Laden zu starten. Zum Deaktivieren dient das vorherige Menü.",
           "use_vehicle_limit": "Aktiviere dies, um die Ladegrenze des Fahrzeugs als zusätzliches Maximum auszuwählen. Es wird keine Einstellung ins Fahrzeug geschrieben."
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nDamit richtest du das optionale Prozent-Ladeziel über einen vorhandenen Ladestandssensor ein. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein. Ein Ladeziel begrenzt nur die Ladung; es hebt eine manuelle Pause nicht auf."
+        "description": "Profil: **{vehicle}**.\n\nDamit richtest du das optionale Prozent-Ladeziel über einen vorhandenen Ladestandssensor ein. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein. Ein Ladeziel begrenzt nur die Ladung; es hebt eine manuelle Pause nicht auf."
       },
       "vehicle_limit": {
         "title": "Ladegrenze des Fahrzeugs",
@@ -989,24 +990,24 @@
         "data_description": {
           "vehicle_charge_limit_entity": "Optional: Begrenze das Prozentziel zusätzlich mit der Ladelimit-Entität des Fahrzeugs. Ohne diese Entität sind Ziele bis 100 % möglich. Ein niedrigeres Limit senkt ein bestehendes Ziel; ein höheres hebt es nicht an. Bei nicht verfügbarer Entität bleibt das letzte gültige Limit bestehen. Im Fahrzeug wird nichts verstellt."
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nNutze die im Fahrzeug eingestellte Ladegrenze als zusätzliche Obergrenze für das Prozent-Ladeziel in Home Assistant. Wähle die vom Auto gemeldete Zielgrenze, nicht seinen aktuellen Ladestand."
+        "description": "Profil: **{vehicle}**.\n\nNutze die im Fahrzeug eingestellte Ladegrenze als zusätzliche Obergrenze für das Prozent-Ladeziel in Home Assistant. Wähle die vom Auto gemeldete Zielgrenze, nicht seinen aktuellen Ladestand."
       },
       "departure": {
         "title": "Nächste Abfahrt",
         "menu_options": {
           "departure_configure": "Abfahrtsplanung einrichten",
           "departure_disable": "Abfahrtsplanung deaktivieren",
-          "back": "Zurück ohne Speichern"
+          "vehicle_profile": "Zurück zum Profil"
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nPlane die nächste einzelne Fahrt mit Prozent-Ladeziel, nutzbarer Akkukapazität und Abfahrtszeit. Den konkreten Zeitpunkt wählst du anschließend auf der Geräteseite oder übernimmst ihn aus einer optionalen Quelle. Dies ist kein täglicher Zeitplan. Deaktivieren löscht die Fahrt und vorgemerkte Planbefehle; das Prozent-Ladeziel bleibt bestehen."
+        "description": "Profil: **{vehicle}**.\n\nMit der Abfahrtsplanung startet Home Assistant das Laden so rechtzeitig, dass das Prozentziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n\nPlane die nächste einzelne Fahrt mit Prozent-Ladeziel, nutzbarer Akkukapazität und Abfahrtszeit. Den konkreten Zeitpunkt wählst du anschließend auf der Geräteseite oder übernimmst ihn aus einer optionalen Quelle. Dies ist kein täglicher Zeitplan. Deaktivieren löscht die Fahrt und vorgemerkte Planbefehle; das Prozent-Ladeziel bleibt bestehen."
       },
       "departure_requires_vehicle": {
         "title": "Ladestand erforderlich",
         "menu_options": {
-          "vehicle": "Fahrzeug",
-          "back": "Zurück ohne Speichern"
+          "vehicle_battery": "Ladestand und Ladegrenze",
+          "vehicle_profile": "Zurück zum Profil"
         },
-        "description": "Richte zuerst eine Quelle für den Fahrzeug-Ladestand ein und kehre dann zur Abfahrtsplanung zurück."
+        "description": "Profil: **{vehicle}**.\n\nDie Abfahrtsplanung muss wissen, wie voll der Akku dieses Autos ist. Richte zuerst seinen Ladestand ein und kehre dann zu Nächste Abfahrt zurück."
       },
       "departure_configure": {
         "title": "Abfahrtsplanung einrichten",
@@ -1016,7 +1017,7 @@
           "use_departure_entity": "Entität für Abfahrtszeit verwenden",
           "use_vehicle_timer": "Abfahrtszeiten des Fahrzeugs verwenden"
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nDatum und Uhrzeit lassen sich immer manuell eingeben. Aktiviere nur gewünschte Zusatzquellen; deren Einstellungen folgen anschließend. Ein aktiver Plan kann eine manuelle Pause aufheben, um das Abfahrtsziel zu erreichen.",
+        "description": "Profil: **{vehicle}**.\n\nDatum und Uhrzeit lassen sich immer manuell eingeben. Aktiviere nur gewünschte Zusatzquellen; deren Einstellungen folgen anschließend. Ein aktiver Plan kann eine manuelle Pause aufheben, um das Abfahrtsziel zu erreichen.",
         "data_description": {
           "capacity_source": "Verwende die nutzbare Akkukapazität: als festen Wert, kWh-/Wh-Sensor oder unterstützten Profilwert. Fehlt die gewählte Kapazität oder der Ladestand, wartet die Planung.",
           "use_calendar": "Ergänzt einen Button zum Übernehmen des nächsten passenden Kalendereintrags. Jeder Druck wählt eine Fahrt; für zeitgesteuerte Kalenderübernahmen kannst du die mitgelieferte Blaupause nutzen.",
@@ -1032,7 +1033,7 @@
         "data_description": {
           "timed_capacity_kwh": "Gib die nutzbare Akkukapazität ein, nicht die Nennkapazität."
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nTrage die Energie ein, die der Akku tatsächlich zum Fahren speichern kann. Daraus wird die nötige Ladezeit geschätzt; die Akkueinstellungen des Autos werden nicht verändert."
+        "description": "Profil: **{vehicle}**.\n\nTrage die Energie ein, die der Akku tatsächlich zum Fahren speichern kann. Daraus wird die nötige Ladezeit geschätzt; die Akkueinstellungen des Autos werden nicht verändert."
       },
       "departure_capacity_entity": {
         "title": "Entität für Akkukapazität",
@@ -1042,7 +1043,7 @@
         "data_description": {
           "timed_capacity_entity": "Sensor für die nutzbare Akkukapazität in kWh oder Wh auswählen."
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle einen Sensor für die nutzbare Gesamtkapazität, nicht für Restenergie oder Ladeprozent. Die Einheit muss kWh oder Wh sein. Ohne gültigen Wert wartet die Planung auf Kapazitätsdaten, statt zu schätzen."
+        "description": "Profil: **{vehicle}**.\n\nWähle einen Sensor für die nutzbare Gesamtkapazität, nicht für Restenergie oder Ladeprozent. Die Einheit muss kWh oder Wh sein. Ohne gültigen Wert wartet die Planung auf Kapazitätsdaten, statt zu schätzen."
       },
       "departure_calendar": {
         "title": "Abfahrtskalender",
@@ -1054,7 +1055,7 @@
           "timed_calendar_entity": "Kalender auswählen und mit „Nächsten Kalendertermin übernehmen“ einen passenden Termin als Abfahrtszeit setzen.",
           "timed_calendar_title": "Nur Termine mit exakt diesem Titel werden berücksichtigt. Ganztägige Termine werden ignoriert."
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle einen Kalender und einen exakten Termin-Titel, zum Beispiel „Fahrt zur Arbeit“. Der Terminbeginn wird zur Abfahrtszeit. Der Button durchsucht die nächsten 14 Tage; ganztägige Termine werden ignoriert."
+        "description": "Profil: **{vehicle}**.\n\nWähle einen Kalender und einen exakten Termin-Titel, zum Beispiel „Fahrt zur Arbeit“. Der Terminbeginn wird zur Abfahrtszeit. Der Button durchsucht die nächsten 14 Tage; ganztägige Termine werden ignoriert."
       },
       "departure_entity": {
         "title": "Entität für Abfahrtszeit",
@@ -1064,7 +1065,7 @@
         "data_description": {
           "timed_departure_entity": "Sensor mit vollständigem Datum und Uhrzeit oder input_datetime mit Datum und Uhrzeit auswählen. Eine bloße Uhrzeit reicht für die nächste Fahrt nicht."
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle eine Quelle mit Datum und Uhrzeit. Ein neuer gültiger Zeitpunkt in der Zukunft wird automatisch übernommen. Richte dafür nur eine Quelle ein; manuelle Eingabe und Kalender-/Fahrzeugbuttons bleiben verfügbar."
+        "description": "Profil: **{vehicle}**.\n\nWähle eine Quelle mit Datum und Uhrzeit. Ein neuer gültiger Zeitpunkt in der Zukunft wird automatisch übernommen. Richte dafür nur eine Quelle ein; manuelle Eingabe und Kalender-/Fahrzeugbuttons bleiben verfügbar."
       },
       "departure_vehicle": {
         "title": "Fahrzeug-Integration",
@@ -1086,7 +1087,7 @@
           "timed_timer1_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 1. BavarianData liefert diese Tage nicht. Leer lassen, um diesen Timer zu ignorieren.",
           "timed_timer2_days": "Wähle die im BMW eingestellten Wochentage für Klimatimer 2. Leer lassen, um diesen Timer zu ignorieren."
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nÜbernimm mit der Abfahrtsschaltfläche einen aktiven Timer des gewählten Fahrzeugs. Bei einem Profil steht das Fahrzeug bereits fest. Aktiviere in BavarianData die Timer-Sensoren für Aktion, Stunde und Minute. Wiederkehrende Wochentage gibst du hier an, weil die Integration sie nicht veröffentlicht."
+        "description": "Profil: **{vehicle}**.\n\nÜbernimm mit der Abfahrtsschaltfläche einen aktiven Timer des gewählten Fahrzeugs. Bei einem Profil steht das Fahrzeug bereits fest. Aktiviere in BavarianData die Timer-Sensoren für Aktion, Stunde und Minute. Wiederkehrende Wochentage gibst du hier an, weil die Integration sie nicht veröffentlicht."
       },
       "costs": {
         "title": "Strompreisquelle",
@@ -1170,16 +1171,15 @@
         "menu_options": {
           "loss_sensor": "Ladeverluste aus einem Sensor",
           "loss_vehicle": "Ladehistorie des Fahrzeugs",
+          "loss_profile": "Ladehistorie dieses Profils verwenden",
           "loss_disable": "Verlustschätzung deaktivieren",
-          "back": "Zurück ohne Speichern",
-          "loss_profile": "Ladehistorie des ausgewählten Fahrzeugs verwenden",
-          "vehicle_profiles": "Fahrzeugprofile"
+          "vehicle_profile": "Zurück zum Profil"
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nVergleiche die an der Wallbox gemessene Energie mit der im Akku angekommenen Energie derselben abgeschlossenen Ladung. Letzter Verlust und Durchschnitt sind Schätzwerte. Wähle das Fahrzeug vor Ladebeginn; fehlende oder mehrdeutige Zuordnungen bleiben unbekannt, statt eine andere Ladung zu verwenden.\n\nIst kein Fahrzeug ausgewählt, wähle zuerst ein Profil. Fehlt dessen Ladehistorie, prüfe das ausgewählte Profil unter Fahrzeugprofile oder wähle einen Energiesensor."
+        "description": "Profil: **{vehicle}**.\n\nDie Ladeverluste zeigen, wie viel der von der Wallbox gemessenen Energie tatsächlich im Akku dieses Autos angekommen ist.\n\nVergleiche die an der Wallbox gemessene Energie mit der im Akku angekommenen Energie derselben abgeschlossenen Ladung. Letzter Verlust und Durchschnitt sind Schätzwerte. Wähle das Fahrzeug vor Ladebeginn; fehlende oder mehrdeutige Zuordnungen bleiben unbekannt, statt eine andere Ladung zu verwenden.\n\nFehlt die Ladehistorie dieses Autos, prüfe seine Fahrzeugquelle unter Name und Fahrzeugquelle oder wähle einen Energiesensor."
       },
       "loss_sensor": {
         "title": "Ladeverluste aus einem Sensor",
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle einen Sensor für die Energie, die beim letzten Laden im Fahrzeugakku angekommen ist, in kWh oder Wh. Verwende weder den Wallbox-Zähler noch einen Gesamtzähler. Ohne Ladezeitangaben ist das Ergebnis eine Schätzung. Bestätige den passenden Ladevorgang standardmäßig mit „Fahrzeug-Ladeenergie zuordnen“.",
+        "description": "Profil: **{vehicle}**.\n\nWähle einen Sensor für die Energie, die beim letzten Laden im Fahrzeugakku angekommen ist, in kWh oder Wh. Verwende weder den Wallbox-Zähler noch einen Gesamtzähler. Ohne Ladezeitangaben ist das Ergebnis eine Schätzung. Bestätige den passenden Ladevorgang standardmäßig mit „Fahrzeug-Ladeenergie zuordnen“.",
         "data": {
           "vehicle_last_charge_energy_entity": "Akkuenergie des Fahrzeugs, letzte Ladung",
           "charge_loss_auto_match": "Geänderten Energiewert automatisch zuordnen"
@@ -1194,14 +1194,14 @@
         "data": {
           "charge_loss_vehicle_provider": "Fahrzeug-Integration"
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle eine installierte Integration mit unterstütztem Adapter. Allgemeine HA-Entitäten lassen sich ohne Adapter auswählen. Es werden nur bereits vorhandene lokale Fahrzeugdaten gelesen."
+        "description": "Profil: **{vehicle}**.\n\nWähle eine installierte Integration mit unterstütztem Adapter. Allgemeine HA-Entitäten lassen sich ohne Adapter auswählen. Es werden nur bereits vorhandene lokale Fahrzeugdaten gelesen."
       },
       "loss_vehicle_details": {
         "title": "Fahrzeug für Ladehistorie",
         "data": {
           "charge_loss_vehicle_device": "Fahrzeug"
         },
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle das Fahrzeug an dieser Wallbox. Es wird nur vorhandene lokale Ladehistorie gelesen, keine Fahrzeugaktualisierung angefordert. Fehlende oder mehrdeutige Zuordnungen bleiben unbekannt."
+        "description": "Profil: **{vehicle}**.\n\nWähle das Fahrzeug an dieser Wallbox. Es wird nur vorhandene lokale Ladehistorie gelesen, keine Fahrzeugaktualisierung angefordert. Fehlende oder mehrdeutige Zuordnungen bleiben unbekannt."
       },
       "options_changed": {
         "title": "Einstellungen wurden geändert",
@@ -1217,21 +1217,9 @@
           "charging_network_module": "Diese Optionen erscheinen, wenn in Home Assistant Deutschland als Land eingestellt ist. Wähle das für deinen Anschluss vereinbarte Modul. Die Integration berechnet eine Schätzung; sie beantragt keinen Tarif und ändert deinen Stromvertrag nicht."
         }
       },
-      "vehicle_profiles": {
-        "title": "Fahrzeugprofile",
-        "description": "Jedes Auto erhält eigene optionale Datenquellen und Einstellungen. Wähle das Auto manuell oder richte unter Fahrzeug die optionale automatische Auswahl ein. Ein neues Profil aktiviert noch keine Ladefunktion.",
-        "menu_options": {
-          "vehicle_profile_add": "Profil hinzufügen",
-          "vehicle_profile_select": "Fahrzeug auswählen",
-          "vehicle_profile_edit_select": "Profil bearbeiten",
-          "vehicle_profile_remove": "Profil entfernen",
-          "back": "Zurück ohne Speichern",
-          "vehicle_profile_clear": "Kein Fahrzeug auswählen"
-        }
-      },
       "vehicle_profile_add": {
         "title": "Profil hinzufügen",
-        "description": "Gib dem Profil einen eindeutigen Namen und wähle BavarianData oder die manuelle Entitätsauswahl. Optionale Ladefunktionen sind bei neuen Profilen zunächst ausgeschaltet.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.",
+        "description": "Gib dem Profil einen eindeutigen Namen und wähle BavarianData oder die manuelle Entitätsauswahl. Optionale Ladefunktionen sind bei neuen Profilen zunächst ausgeschaltet.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.",
         "data": {
           "vehicle_profile_name": "Profilname",
           "vehicle_provider": "Fahrzeugintegration"
@@ -1243,7 +1231,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Profil bearbeiten",
-        "description": "Beim Umbenennen bleiben die Einstellungen erhalten. Ein Wechsel der Integration oder des Fahrzeugs löscht die Funktionseinstellungen dieses Profils, damit keine Daten des bisherigen Autos weiterverwendet werden.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.",
+        "description": "Beim Umbenennen bleiben die Einstellungen erhalten. Ein Wechsel der Integration oder des Fahrzeugs löscht die Funktionseinstellungen dieses Profils, damit keine Daten des bisherigen Autos weiterverwendet werden.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.",
         "data": {
           "vehicle_profile_name": "Profilname",
           "vehicle_provider": "Fahrzeugintegration"
@@ -1262,13 +1250,6 @@
         "data_description": {
           "vehicle_profile_id": "Wähle das tatsächlich angeschlossene Auto vor Ladebeginn, besonders für den Vergleich der Ladeverluste. Diese manuelle Wahl schaltet die automatische Fahrzeugauswahl aus."
         }
-      },
-      "vehicle_profile_edit_select": {
-        "title": "Profil bearbeiten",
-        "data": {
-          "vehicle_profile_id": "Fahrzeugprofil"
-        },
-        "description": "Wähle das zu bearbeitende Profil. Das Bearbeiten eines anderen Profils wählt dieses Fahrzeug nicht zum Laden aus."
       },
       "vehicle_profile_remove": {
         "title": "Profil entfernen",
@@ -1290,7 +1271,7 @@
       },
       "vehicle_source": {
         "title": "Ladestand einrichten",
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nVerwende den gemeldeten Ladestand des aktiven Profils oder wähle eine Entität manuell. Anschließend erscheinen nur die Einstellungen der gewählten Quelle.",
+        "description": "Profil: **{vehicle}**.\n\nVerwende den gemeldeten Ladestand dieses Profils oder wähle eine Entität manuell. Anschließend erscheinen nur die Einstellungen der gewählten Quelle.",
         "data": {
           "vehicle_soc_source": "Quelle des Ladestands"
         },
@@ -1300,7 +1281,7 @@
       },
       "vehicle_profile_soc": {
         "title": "Ladestand einrichten",
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nVerwende den gemeldeten Ladestand des aktiven Profils für das optionale Prozentziel. Die Ladegrenze dieses Autos lässt sich zusätzlich als Maximum verwenden. Im Fahrzeug wird keine Einstellung geändert.",
+        "description": "Profil: **{vehicle}**.\n\nVerwende den gemeldeten Ladestand dieses Profils für das optionale Prozentziel. Die Ladegrenze dieses Autos lässt sich zusätzlich als Maximum verwenden. Im Fahrzeug wird keine Einstellung geändert.",
         "data": {
           "use_vehicle_limit": "Ladegrenze des Fahrzeugs zusätzlich verwenden"
         },
@@ -1310,44 +1291,18 @@
       },
       "loss_profile": {
         "title": "Ladehistorie des Fahrzeugs",
-        "description": "Verwendet die lokale Ladehistorie des aktiven Profils. Es wird keine Fahrzeugaktualisierung angefordert. Fehlende oder mehrdeutige Zuordnungen bleiben unbekannt."
-      },
-      "vehicle_detection": {
-        "title": "Automatische Fahrzeugauswahl",
-        "description": "Optional: das angeschlossene Auto anhand von Kabel- und Zuhause-Signalen auswählen. Standardmäßig bleibt die Auswahl manuell. Richte die Signale der beteiligten Profile ein und schalte anschließend die automatische Auswahl ein.",
-        "menu_options": {
-          "vehicle_detection_mode": "Automatische Auswahl ein- oder ausschalten",
-          "vehicle_detection_profile": "Erkennungssignale eines Profils einrichten",
-          "back": "Zurück ohne Speichern"
-        }
-      },
-      "vehicle_detection_mode": {
-        "title": "Automatische Fahrzeugauswahl",
-        "description": "Ausgewählt wird nur genau ein Auto mit gültigen, kürzlich an Home Assistant gemeldeten Signalen für „Kabel angeschlossen“ und „zu Hause“. Ein sicher getrenntes Kabel oder ein sicher abwesendes Auto schließt dieses Fahrzeug aus. Andernfalls verhindern unbekannte, nicht verfügbare oder seit über 30 Minuten nicht gemeldete Signale die Auswahl. Bei keinem oder mehreren Treffern wird kein Fahrzeug ausgewählt. Eine manuelle Fahrzeugauswahl schaltet die Automatik aus. Die Erkennung startet keine Ladung und hebt keine Pause auf.",
-        "data": {
-          "vehicle_auto_selection": "Fahrzeug automatisch auswählen"
-        },
-        "data_description": {
-          "vehicle_auto_selection": "Sind noch für kein Profil Erkennungssignale eingerichtet, führen dich die nächsten Schritte durch die Profil- und Quellenwahl. Die Automatik wird erst nach dem Speichern gültiger Erkennungseinstellungen aktiviert. Sie nutzt Fahrzeugsignale und keine Identifizierung über das Wallboxkabel. Du kannst ein Auto jederzeit manuell wählen."
-        }
-      },
-      "vehicle_detection_profile": {
-        "title": "Erkennungssignale eines Profils einrichten",
-        "description": "Wähle das Profil, dessen Kabel- und Zuhause-Signale du einrichten möchtest. Nur Profile mit eingeschalteter Erkennung nehmen teil.",
-        "data": {
-          "vehicle_profile_id": "Fahrzeugprofil"
-        }
+        "description": "Verwendet die lokale Ladehistorie dieses Profils. Es wird keine Fahrzeugaktualisierung angefordert. Fehlende oder mehrdeutige Zuordnungen bleiben unbekannt."
       },
       "vehicle_detection_source": {
         "title": "Signale zur Fahrzeugerkennung",
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nNutze unterstützte lokale Entitäten der Fahrzeugintegration dieses Profils, wähle vorhandene Home-Assistant-Entitäten oder schalte die Erkennung für dieses Profil aus. Kabelverbindung und Anwesenheit zu Hause werden beide benötigt. Es gibt keine zusätzlichen Cloud-Abfragen.",
+        "description": "Profil: **{vehicle}**.\n\nErkennungssignale melden, dass dieses Auto eingesteckt und zu Hause ist. Die automatische Fahrzeugauswahl und das virtuelle Plug & Charge verwenden sie.\n\nNutze unterstützte lokale Entitäten der Fahrzeugintegration dieses Profils, wähle vorhandene Home-Assistant-Entitäten oder schalte die Erkennung für dieses Profil aus. Kabelverbindung und Anwesenheit zu Hause werden beide benötigt. Es gibt keine zusätzlichen Cloud-Abfragen.",
         "data": {
           "vehicle_detection_source": "Quelle für die Erkennung"
         }
       },
       "vehicle_detection_entities": {
         "title": "Kabel- und Zuhause-Signale",
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle getrennte Signale für dieses Auto. Für das Kabel nutze einen Binärsensor mit Ein = angeschlossen oder einen Sensor, dessen Zustände für „angeschlossen“ du im nächsten Schritt auswählst. Für zu Hause nutze einen Binärsensor mit Ein = zu Hause oder eine Person/Geräteverfolgung mit home = zu Hause. Die Signale müssen innerhalb von 30 Minuten an Home Assistant gemeldet werden. Eine Meldung belegt nicht, wann das Auto seinen Standort ermittelt hat.",
+        "description": "Profil: **{vehicle}**.\n\nWähle getrennte Signale für dieses Auto. Für das Kabel nutze einen Binärsensor mit Ein = angeschlossen oder einen Sensor, dessen Zustände für „angeschlossen“ du im nächsten Schritt auswählst. Für zu Hause nutze einen Binärsensor mit Ein = zu Hause oder eine Person/Geräteverfolgung mit home = zu Hause. Die Signale müssen innerhalb von 30 Minuten an Home Assistant gemeldet werden. Eine Meldung belegt nicht, wann das Auto seinen Standort ermittelt hat.",
         "data": {
           "vehicle_connected_entity": "Ladekabel angeschlossen",
           "vehicle_home_entity": "Fahrzeug zu Hause"
@@ -1359,7 +1314,7 @@
       },
       "vehicle_detection_connected_states": {
         "title": "Zustände für „Kabel angeschlossen“",
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle, welche Zustände von `{entity}` bedeuten, dass das Ladekabel an diesem Auto steckt. Jeder andere gemeldete Zustand gilt als nicht angeschlossen; unbekannt oder nicht verfügbar verhindert die automatische Auswahl.",
+        "description": "Profil: **{vehicle}**.\n\nWähle, welche Zustände von `{entity}` bedeuten, dass das Ladekabel an diesem Auto steckt. Jeder andere gemeldete Zustand gilt als nicht angeschlossen; unbekannt oder nicht verfügbar verhindert die automatische Auswahl.",
         "data": {
           "vehicle_connected_states": "Zustände für angeschlossen"
         },
@@ -1367,19 +1322,43 @@
           "vehicle_connected_states": "Wähle die Zustände, die der Sensor bei eingestecktem Kabel meldet, oder gib einen genau so ein, wie der Sensor ihn anzeigt."
         }
       },
-      "vehicle_plug_charge": {
-        "title": "Virtuelles Plug & Charge",
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nErlaube hier die automatische Ladefreigabe für dieses Profil. Die Funktion selbst schaltest du separat mit **Virtuelles Plug & Charge** unter **Konfiguration** auf der Geräteseite der Wallbox ein oder aus.\n\nFehlen ein Profil oder seine Erkennungssignale, lege unten unter Fahrzeugprofile ein Auto an oder wähle eines aus. Unter Automatische Fahrzeugauswahl richtest du seine Kabel-/Zuhause-Signale ein. Kehre danach hierher zurück, um das Profil freizugeben. Die automatische Profilwahl kann ausgeschaltet bleiben. Eine neue Ladefreigabe benötigt ein eindeutig erkanntes, erlaubtes aktives Profil und eine aktuelle Kabelmeldung für den Steckvorgang. Die manuelle Profilwahl allein beweist keine Verbindung.\n\nDiese optionale Komfortfunktion nutzt keine ISO-15118-Authentifizierung und setzt deaktivierte RFID-Freigabe an der Wallbox voraus. Vorhandene Pausen, Sperren und erreichte Ladeziele bleiben wirksam. Einschalten kann eine laufende Ladung bis zur Erkennung unterbrechen. Ausschalten setzt die Ladung nicht fort; nutze danach bei Bedarf ausdrücklich Ladefreigabe.",
+      "vehicle_profile_open": {
+        "title": "Profil öffnen",
+        "description": "Wähle das Auto, dessen Einstellungen du ändern möchtest. Das Öffnen eines Profils wählt dieses Auto nicht zum Laden aus.",
         "data": {
-          "vehicle_plug_charge": "Dieses Fahrzeug automatisch freigeben"
-        },
-        "data_description": {
-          "vehicle_plug_charge": "Erlaubnis nur für das aktive Profil. Eine manuelle Profilwahl beweist nicht, dass dessen Auto angeschlossen ist. Aktuelle passende Kabel-/Zuhause-Signale bleiben erforderlich. Ein Wechsel des Fahrzeugs oder seiner Erkennungsquellen entfernt diese Erlaubnis."
-        },
+          "vehicle_profile_id": "Fahrzeugprofil"
+        }
+      },
+      "vehicle_profile": {
+        "title": "Fahrzeugprofil",
+        "description": "Profil: **{vehicle}**.\n\nAlles hier gehört nur zu diesem Auto und bleibt erhalten, auch wenn gerade ein anderes Auto ausgewählt ist. Jeder Punkt ist optional:\n\n- **Name und Fahrzeugquelle:** Profil umbenennen oder mit dem Auto in einer Fahrzeugintegration wie BavarianData verknüpfen, damit seine Daten automatisch gelesen werden.\n- **Ladestand und Ladegrenze:** damit stoppt Home Assistant bei einem Prozentziel, zum Beispiel 80 %. Wird für die Abfahrtsplanung benötigt.\n- **Nächste Abfahrt:** startet das Laden rechtzeitig, damit das Ziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n- **Ladeverluste:** zeigt, wie viel der Energie aus der Wallbox tatsächlich im Akku angekommen ist.\n- **Erkennungssignale:** Kabel- und Zuhause-Signale, an denen dieses Auto erkannt wird. **Automatische Auswahl** in der Entität **Aktives Fahrzeug** nutzt sie, und ist der Wallbox-Schalter **Virtuelles Plug & Charge** an, beginnt das erkannte Auto beim Einstecken zu laden. Mit geplanter Abfahrt wird zuerst pausiert und rechtzeitig gestartet; reicht die Zeit sonst nicht, wird sofort geladen.",
         "menu_options": {
-          "vehicle_profiles": "Fahrzeugprofile",
-          "vehicle_detection": "Automatische Fahrzeugauswahl",
-          "back": "Zurück ohne Speichern"
+          "vehicle_profile_edit": "Name und Fahrzeugquelle",
+          "vehicle_battery": "Ladestand und Ladegrenze",
+          "departure": "Nächste Abfahrt",
+          "losses": "Ladeverluste",
+          "vehicle_detection_signals": "Erkennungssignale",
+          "vehicle": "Zurück zu Fahrzeuge"
+        }
+      },
+      "vehicle_settings": {
+        "title": "Fahrzeugeinstellungen",
+        "description": "Es gibt noch keine Fahrzeugprofile, daher gelten diese Einstellungen für jedes Auto. Jeder Punkt ist optional:\n\n- **Ladestand und Ladegrenze:** damit stoppt Home Assistant bei einem Prozentziel, zum Beispiel 80 %. Wird für die Abfahrtsplanung benötigt.\n- **Nächste Abfahrt:** startet das Laden rechtzeitig, damit das Ziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n- **Ladeverluste:** zeigt, wie viel der Energie aus der Wallbox tatsächlich im Akku angekommen ist.\n\nLege unter Fahrzeuge ein Profil an, um für jedes Auto eigene Einstellungen zu haben.",
+        "menu_options": {
+          "vehicle_battery": "Ladestand und Ladegrenze",
+          "departure": "Nächste Abfahrt",
+          "losses": "Ladeverluste",
+          "vehicle": "Zurück zu Fahrzeuge"
+        }
+      },
+      "vehicle_battery": {
+        "title": "Ladestand und Ladegrenze",
+        "description": "Profil: **{vehicle}**.\n\nMit dem Ladestand stoppt Home Assistant bei einem Prozentziel, zum Beispiel 80 %, und die Abfahrtsplanung berechnet damit die nötige Ladezeit. Die Ladegrenze im Auto lässt sich zusätzlich als Obergrenze verwenden. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein.\n\nUm nur das aktuelle Prozentziel aufzuheben, stelle Fahrzeug-Ladeziel auf 0. Ladestand nicht mehr verwenden entfernt hier die Quellenzuordnung dieses Profils einschließlich des optionalen Maximums und deaktiviert seine Abfahrtsplanung; beim ausgewählten Auto werden außerdem Prozentziel und geplante Fahrt gelöscht. Die Quellentitäten der Fahrzeugintegration bleiben erhalten, ebenso Fahrzeugberechtigung, kWh-Ziel und Ladezustand.",
+        "menu_options": {
+          "vehicle_soc": "Ladestand einrichten",
+          "vehicle_source": "Ladestand einrichten",
+          "vehicle_disable": "Ladestand nicht mehr verwenden",
+          "vehicle_profile": "Zurück zum Profil"
         }
       }
     },
@@ -1412,7 +1391,6 @@
       "vehicle_detection_entity_invalid": "Wähle einen vorhandenen Kabel-Binärsensor und eine unterstützte Entität für die Anwesenheit zu Hause.",
       "vehicle_detection_entities_distinct": "Wähle unterschiedliche Entitäten für Kabelverbindung und Anwesenheit zu Hause.",
       "vehicle_connected_states_invalid": "Wähle einen bis acht Zustände für angeschlossen, jeweils genau so, wie der Sensor sie meldet.",
-      "plug_charge_invalid": "Wähle für diese Einstellung Ein oder Aus.",
       "plug_charge_detection_required": "Wähle ein Fahrzeugprofil und richte seine Kabel-/Zuhause-Erkennung ein, bevor du es automatisch freigibst."
     }
   },

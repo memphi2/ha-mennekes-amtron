@@ -12,9 +12,9 @@ can also supply supported data from one selected BMW vehicle.
 stable 0.6.1. Central vehicle profiles, optional automatic selection and
 Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
 below; existing manual sources continue to work after updating.
-The steps below follow **beta 0.8.0b6**, which adds the wallbox **Virtual Plug &
-Charge** switch, guided detection setup and clearer **Stop using vehicle charge
-level** action. Existing activation settings and profile permissions are kept.
+The steps below follow **beta 0.8.0b6**, which keeps every setting of a car in
+its profile: open **Configure → Vehicles**, then the profile. Existing activation
+settings are kept.
 See [versions and feature availability](README.md#versions-and-feature-availability).
 
 ## Choose the setup that fits
@@ -22,11 +22,11 @@ See [versions and feature availability](README.md#versions-and-feature-availabil
 | Your setup | What to do |
 |---|---|
 | No vehicle integration | Use the current slider, pause switch and optional kWh target. No vehicle setup is needed. |
-| One car with an existing SoC sensor | Under **Configure → Vehicle**, choose that charge-level entity. Add a maximum-limit entity only if you want one. |
+| One car with an existing SoC sensor | Add a profile, open it and choose that charge-level entity under **Charge level and charge limit**. Add a maximum-limit entity only if you want one. |
 | One BavarianData car | Create one profile, select its vehicle once, then enable only the data you want to use. |
 | Several cars | Create a profile for each car and select the connected car before charging. Each profile keeps its own optional settings and loss average. |
-| Choose the car automatically | First configure working profiles, then opt into cable/home detection. Manual selection always remains available. |
-| Allow a recognized car to charge automatically | Configure its detection signals, permit that profile and separately enable [Virtual Plug & Charge](#optional-virtual-plug--charge). |
+| Choose the car automatically | Configure each profile's detection signals, then choose **Automatic selection** in the **Active vehicle** entity. Manual selection always remains available. |
+| Let a recognized car charge automatically | Configure its detection signals and enable [Virtual Plug & Charge](#optional-virtual-plug--charge) on the wallbox. |
 
 A profile does not enable every feature at once:
 
@@ -37,8 +37,7 @@ A profile does not enable every feature at once:
 | Usable battery capacity | Planning current for a selected departure time |
 | Vehicle departure timers | A button to copy the next supported vehicle climate timer |
 | Vehicle charging history | Better matching for estimated charging losses |
-| Cable and home signals | Optional selection of the active profile |
-| Virtual Plug & Charge permission | Optional charging permission for a recognized, permitted profile |
+| Cable and home signals | Optional selection of the active profile, and recognition for Virtual Plug & Charge |
 
 ## Vehicle profiles
 
@@ -49,10 +48,10 @@ home signals. Adding a profile does not enable a percentage target, departure
 planning or loss estimates.
 Enable only the features you want for that profile.
 
-Open **Configure → Vehicle → Vehicle profiles → Add profile**. Give the profile
+Open **Configure → Vehicles → Add profile**. Give the profile
 a name, choose **BavarianData**, then choose the vehicle device. Select the car
 using **Active vehicle** on the wallbox device, or **Select vehicle** in the
-profile menu. The integration finds that vehicle's supported data through Home
+**Vehicles** menu. The integration finds that vehicle's supported data through Home
 Assistant's entity registry, so renamed entities do not require guessed entity
 names. Each optional feature uses the same selected car. No BMW credentials or
 additional cloud requests are needed.
@@ -91,6 +90,25 @@ as described below.
 The profile's saved last result and average remain available when you return
 to it.
 
+### Everything for one car in its profile
+
+From **0.8.0b6**, **Configure → Vehicles → Open a profile’s settings** shows
+everything that belongs to that car. Each item explains what it is for, and
+each is optional:
+
+| Item | What it is for |
+|---|---|
+| Name and vehicle source | Rename the profile or link it to the car in BavarianData, so its data is read automatically |
+| Charge level and charge limit | Stop at a percentage target; needed for departure planning |
+| Next departure | Start charging in time for a departure instead of at once |
+| Charging losses | Compare wallbox energy with the energy that reached the battery |
+| Detection signals | Cable and home signals for automatic selection and Virtual Plug & Charge |
+
+You can open and change any profile, not only the selected car. Changing a car
+that is not selected leaves the selected car's target and departure untouched.
+Without profiles, **Vehicle settings without a profile** holds the shared charge
+level, departure and loss settings instead.
+
 Existing manually selected sources keep working after an update. They are not
 silently replaced by a BavarianData vehicle, even when old departure and history
 settings refer to different cars. When you start using profiles, those existing
@@ -99,8 +117,8 @@ settings are retained as a manual profile.
 ### Optional automatic vehicle selection
 
 Automatic selection is **off by default** and separately configurable for each
-profile. Open **Configure → Vehicle → Automatic vehicle selection**. Under
-**Configure a profile’s detection signals**, select a profile and choose:
+profile. Open **Configure → Vehicles → Open a profile’s settings → Detection
+signals** and choose:
 
 - **Use the vehicle integration**: BavarianData supplies the vehicle's cable
   sensor and GPS tracker. Its position is compared with Home Assistant's Home
@@ -117,13 +135,10 @@ profile. Open **Configure → Vehicle → Automatic vehicle selection**. Under
 - **Detection disabled for this profile**: exclude this profile from automatic
   selection while keeping its manual selection and optional features.
 
-After configuring the participating profiles, enable **Select the vehicle
-automatically**. From **0.8.0b2**, you can also enable it
-before any detection sources exist: the next steps select a profile and configure
-its sources. Automatic selection starts only after those settings are saved;
-cancelling the setup leaves the previous settings unchanged.
-The **Active vehicle** selector also offers **Automatic
-selection** when detection sources are configured. Open the selector’s details
+After configuring the participating profiles, choose **Automatic selection**
+in the **Active vehicle** selector on the wallbox device page. It is offered once
+at least one profile has detection signals. From **0.8.0b6**, this is the only
+place to switch automatic selection on. Open the selector’s details
 to see the currently selected profile. Selecting a particular car or no vehicle
 manually turns the automatic mode off.
 
@@ -168,28 +183,24 @@ remain separate for each car.
 ## Optional Virtual Plug & Charge
 
 **New in beta 0.8.0b1 and off by default.** Virtual Plug & Charge keeps charging disabled
-until the active vehicle is recognized and its profile is permitted.
+until the active vehicle is recognized by its detection signals.
 It uses your existing vehicle data; it does not send a vehicle-cloud request.
 Automatic profile selection is a separate option: you can choose the profile
 manually, but that choice alone never proves which car is connected.
 
 1. Create a profile and configure its [cable and home signals](#optional-automatic-vehicle-selection).
    You can leave automatic profile selection off.
-2. Select that profile. Open **Configure → Vehicle → Virtual Plug & Charge**
-   and enable **Allow this vehicle to charge automatically**. Repeat for any
-   other profiles you want to permit.
-3. Open the wallbox's device page and turn on **Virtual Plug & Charge** under
-   **Configuration**. This switch controls the feature for the whole wallbox;
-   the vehicle options only manage each profile's permission. The feature requires
+   Every profile with detection signals takes part; from **0.8.0b6** there is
+   no separate permission per profile.
+2. Open the wallbox's device page and turn on **Virtual Plug & Charge** under
+   **Configuration**. This switch controls the feature for the whole wallbox.
+   The feature requires
    write access. Service mode needs **app 0.8.0b1 or newer** for the
    charging-permission capability; use **0.8.0b4** for the current beta app.
-4. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
+3. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 
-If a profile or its detection signals are missing, the permission page offers
-**Vehicle profiles** to create or select a car and, when profiles exist,
-**Automatic vehicle selection** to configure its cable/home signals. Return to
-the permission page afterwards to allow that car. You can still switch the feature off on the wallbox
+You can still switch the feature off on the wallbox
 device page without a selected vehicle. The switch preserves an existing
 activation setting when updating; it does not enable the feature by itself.
 
@@ -199,8 +210,8 @@ authorization must already be disabled in the wallbox's installation settings.
 This feature controls the energy manager's charging release; it cannot switch
 off or bypass the wallbox's RFID requirement.
 
-Permission requires one unambiguous matching vehicle, an allowed active profile
-and a **new cable report for the current connection cycle**. The last confirmed
+Permission requires one unambiguous matching vehicle, that car's profile
+selected, and a **new cable report for the current connection cycle**. The last confirmed
 disconnected wallbox reading marks the earliest acceptable report; if the app
 starts with a car already connected, it needs a report from after startup.
 A matching value left over from a previous connection is insufficient. When BavarianData
@@ -209,7 +220,7 @@ only the HA report time is available. The next normal vehicle update may be
 needed before permission is granted.
 
 The grant belongs to that observed connection. From **0.8.0b3**, a manual pause
-ends when a permitted vehicle is granted: plugging it in means it should charge.
+ends when a recognized vehicle is granted: plugging it in means it should charge.
 The pause is lifted while the charging release is still off, so the release
 follows immediately without the state-change interval. From **0.8.0b4**, only a
 plug-in that HA observed after the car was unplugged counts: after an HA or app
@@ -232,15 +243,13 @@ A disconnect, unknown wallbox connection state or app restart requires a fresh
 grant. Direct mode loses its grant on a full HA restart or when its physical
 connection closes. Automatic profile changes preserve the open connection.
 Choosing another profile alone also leaves an existing grant with that same
-physical connection. Removing a vehicle's permission or changing its identity
-or detection sources invalidates the grant; the next connection always needs a
-fresh match for the then-active permitted profile.
+physical connection. Changing a vehicle's identity or detection sources invalidates the grant; the
+next connection always needs a fresh match for the then-active profile.
 
 Enabling the feature can stop an ongoing charge while it waits for a valid
 grant. Disabling it **does not resume charging**: use **Charging release**
-explicitly afterwards, and leave a wanted pause or lock in place. Changing a
-profile's vehicle or detection sources clears its saved automatic permission;
-check the new sources before allowing it again.
+explicitly afterwards, and leave a wanted pause or lock in place. Check new
+detection sources before relying on them.
 
 Without Virtual Plug & Charge, an open charging release lets any car charge.
 From **0.8.0b3**, turn on **Switch off charging release when unplugged** under
@@ -250,7 +259,7 @@ charge. This runs in Home Assistant, so it is not enforced while HA is down.
 
 If you previously switched **Charging release** off, switch it on when you want
 to allow charging again. With virtual Plug & Charge enabled this records your
-request; it still waits for the permitted vehicle and cannot bypass recognition.
+request; it still waits for the recognized vehicle and cannot bypass recognition.
 
 Cable and home signals provide a convenience check, not cryptographic vehicle
 identification or ISO 15118 Plug & Charge. Restored upstream values and a vehicle
@@ -265,13 +274,14 @@ the connected car in **Active vehicle** and set its intended target. Selecting
 another car clears the previous percentage target and trip; it never starts
 charging. If you do not want vehicle-based features for this charge, select
 **No vehicle selected** and use the normal wallbox controls. With Virtual Plug & Charge
-enabled, a new grant still needs a permitted active profile and matching
+enabled, a new grant still needs a recognized active profile and matching
 detection; choosing no vehicle does not bypass that requirement.
 
 ## Optional vehicle percentage target
 
-The percentage target is **off by default**. Open **Configure → Vehicle →
-Configure charge level**. Use the active BavarianData profile's charge level or
+The percentage target is **off by default**. Open the profile under
+**Configure → Vehicles**, then **Charge level and charge limit → Configure charge
+level**. Use the BavarianData profile's charge level or
 select a **Vehicle charge level entity** from an existing vehicle integration.
 This adds **Vehicle charge target** and its status sensor. The integration only
 reads the selected vehicle data; it does not change the car's settings or estimate
@@ -332,7 +342,7 @@ remain available with older compatible app versions.
 | A previously valid vehicle maximum | The last valid maximum is retained; a later increase raises only a target at that maximum. |
 | Usable battery capacity | The departure planner cannot calculate a new current; see [departure planning](departure-planning.md). |
 | Detection signals are unclear | Automatic mode keeps the previously selected car until another car or an unknown car at the wallbox is detected. Choose the correct profile manually if needed. |
-| Virtual Plug & Charge is waiting for detection | Wait for a new cable report for this connection and check that the selected profile is permitted. Manually selecting it does not replace the detection check. |
+| Virtual Plug & Charge is waiting for detection | Wait for a new cable report for this connection and check that the recognized car's profile is selected. Manually selecting it does not replace the detection check. |
 | Virtual Plug & Charge shows **Charging blocked** | Open the status sensor and check its **Blocking reason** attribute, for example a switched-off charging release, a wallbox lock or authorization, a reached target or a missing register value. |
 | Charging history cannot be matched | Loss estimates stay unknown instead of being assigned to the wrong charge. See [charging estimates](charging-estimates.md). |
 

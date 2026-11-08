@@ -279,11 +279,11 @@ disabling it clears the trip and cancels only its owned queued commands.
 ### Virtual Plug & Charge separates evidence from physical permission
 
 This optional feature has two independent decisions: HA evaluates the active
-profile's permission and local cable/home evidence; the bus owner enforces a
+profile's local cable/home evidence; the bus owner enforces a
 gate for one observed physical connection. Automatic profile selection remains
 optional. Manually choosing a profile never supplies identity evidence.
 
-HA requires a unique candidate matching the active permitted profile and a
+HA requires a unique candidate matching the active profile and a
 cable report since the last confirmed physical absence before this cycle.
 If observation begins with a car already connected, startup is the lower bound.
 The adapter uses an upstream cable timestamp when available, otherwise HA's report time. It does
@@ -300,9 +300,10 @@ when its physical client closes. A controlled options/profile reload hands over
 the same open client when connection settings match; normal unload, failed
 setup and a changed connection close it. Transport disconnect callbacks still
 invalidate the token immediately.
-The policy digest includes vehicle identities, detection sources and profile
-permissions, but not the active-profile label. Changing those permissions or
-sources invalidates grants. A manual selection change or an automatic selection
+The policy digest includes vehicle identities and detection sources, but not
+the active-profile label. Changing those sources invalidates grants. From
+0.8.0b6, profiles have no separate permission; the wallbox switch is the only
+one. A manual selection change or an automatic selection
 cleared by stale cloud data leaves an established physical-session grant intact.
 The vehicle decision is taken when HA sends the request. A submitted request
 expires after ten seconds and is checked again against the physical token at

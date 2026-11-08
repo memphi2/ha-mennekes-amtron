@@ -21,7 +21,7 @@ Already installed? Keep your device and entity IDs. Use
 | Install the recommended service app | [Modbus service](modbus-service.md) |
 | Use a LAN-to-RS-485 adapter | [LAN connection](network-gateway.md) |
 | Select one car, several cars or optional automatic detection | [Vehicle setup](vehicle-setup.md) |
-| Automatically release charging for a recognized, permitted profile | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — beta 0.8.0b4 |
+| Automatically release charging for a recognized profile | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — beta 0.8.0b4 |
 | Reach a charge target for the next trip | [Departure planning](departure-planning.md) |
 | Use a calendar, climate action or PV surplus | [Blueprints](blueprints.md) |
 | Estimate charging costs or losses | [Charging estimates](charging-estimates.md) |
@@ -37,7 +37,7 @@ These pages cover **beta 0.8.0b6** and identify features already available in
 for a new option.
 Beta 2 adds a separate app **Debug log** tab, a wallbox **Virtual Plug & Charge**
 activation switch and guided vehicle setup. Beta 3 lets Virtual Plug & Charge end
-a manual pause for a permitted car, releases charging without the state-change
+a manual pause for a recognized car, releases charging without the state-change
 delay and shows why charging stays blocked. Beta 4 keeps entities available
 across a single disturbed Modbus read, keeps the selected car after unplugging
 and remembers each car's percentage target.

@@ -39,13 +39,12 @@ class Coordinator:
 
 
 @asynccontextmanager
-async def observer_harness(tmp_path, monkeypatch, *, selected=A, permitted=True, plugged_in=True):
+async def observer_harness(tmp_path, monkeypatch, *, selected=A, plugged_in=True):
     hass = HomeAssistant(str(tmp_path))
     options = detection_catalog()
     options["vehicle_auto_selection"] = False
     options["virtual_plug_charge"] = True
     options["active_vehicle_profile"] = selected
-    options["vehicle_profiles"][A]["options"]["vehicle_plug_charge"] = permitted
     coordinator, timers = Coordinator(), []
     control = SimpleNamespace(
         read_only=False, pause_requested=False, charging_release_requested=None,
@@ -175,12 +174,12 @@ def test_ambiguous_or_unknown_other_vehicle_never_grants(tmp_path, monkeypatch, 
     asyncio.run(run())
 
 
-@pytest.mark.parametrize(("selected", "permitted"), [(B, True), (None, True), (A, False)])
-def test_manual_selection_and_profile_permission_are_not_detection(tmp_path, monkeypatch, selected, permitted):
+@pytest.mark.parametrize("selected", [B, None])
+def test_manual_selection_of_another_car_is_not_detection(tmp_path, monkeypatch, selected):
     async def run():
-        async with observer_harness(tmp_path, monkeypatch, selected=selected, permitted=permitted) as h:
+        async with observer_harness(tmp_path, monkeypatch, selected=selected) as h:
             await report(h)
-            assert h.observer.status == "vehicle_not_permitted"
+            assert h.observer.status == "vehicle_not_selected"
             h.control.async_authorize_plug_charge.assert_not_awaited()
     asyncio.run(run())
 
@@ -256,15 +255,13 @@ def test_granted_session_survives_missing_cloud_data_and_ha_observer_restart(tmp
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("change", ["permission", "source", "policy", "disabled"])
+@pytest.mark.parametrize("change", ["source", "policy", "disabled"])
 def test_old_observer_cannot_grant_after_configuration_change(tmp_path, monkeypatch, change):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:
             await report(h)
             timer = h.timers[-1]
-            if change == "permission":
-                h.entry.options["vehicle_profiles"][A]["options"]["vehicle_plug_charge"] = False
-            elif change == "source":
+            if change == "source":
                 h.entry.options["vehicle_profiles"][A]["detection"]["connected_entity"] = "binary_sensor.other"
             elif change == "policy":
                 h.control.plug_charge["policy"] = "new-policy"
@@ -355,8 +352,9 @@ def test_policy_tracks_permissions_and_identity_without_binding_cosmetic_or_sele
         if key == "provider":
             changed["vehicle_profiles"][A]["device_id"] = "car"
         assert m.plug_charge_policy(changed) != original
+    # A stored former per-profile permission no longer changes the policy.
     modified["vehicle_profiles"][A]["options"]["vehicle_plug_charge"] = True
-    assert m.plug_charge_policy(modified) != original
+    assert m.plug_charge_policy(modified) == original
 
 
 def arm_plan(h, status):
@@ -380,7 +378,7 @@ async def plug_in_paused(h, *, pending=None, plan=None, goal_stop=False, paused=
     await report(h)
 
 
-def test_permitted_plug_in_ends_a_manual_pause_before_the_grant(tmp_path, monkeypatch):
+def test_recognized_plug_in_ends_a_manual_pause_before_the_grant(tmp_path, monkeypatch):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:
             order = []

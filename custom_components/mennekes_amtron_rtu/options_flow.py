@@ -51,12 +51,8 @@ from .vehicle_profiles import (
     CONF_TIMED_USE_VEHICLE_CAPACITY,
     CONF_VEHICLE_DEVICE,
     CONF_VEHICLE_LIMIT_USE_PROFILE,
-    CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
     CONF_VEHICLE_SOC_USE_PROFILE,
-    active_profile,
-    profiles,
-    vehicle_options,
     vehicle_soc_is_configured,
 )
 from .vehicle_soc_const import (
@@ -114,20 +110,15 @@ DEPARTURE_KEYS = {
 class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
     """Configure only the chosen feature, leaving all other options intact."""
 
-    def _vehicle_placeholders(self) -> dict[str, str]:
-        profile = active_profile(
-            self._draft.original if self._draft is not None else self.config_entry.options
-        )
-        return {"vehicle": profile.name if profile is not None else "—"}
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         self._draft = None
         self._details = {}
+        self._profile_target = None
+        # Departure planning and charging losses belong to a car's profile.
         return self.async_show_menu(
-            step_id="init",
-            menu_options=["wallbox", "vehicle", "departure", "costs", "losses"],
+            step_id="init", menu_options=["wallbox", "vehicle", "costs"],
         )
 
     async def async_step_wallbox(
@@ -191,21 +182,19 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             last_step=True,
         )
 
-    async def async_step_vehicle(
+    async def async_step_vehicle_battery(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        if not self._target_ready():
+            return await self.async_step_vehicle()
         draft = self._begin("vehicle", VEHICLE_KEYS)
-        choices = ["vehicle_profiles", "vehicle_plug_charge"]
-        if profiles(self.config_entry.options):
-            choices.append("vehicle_detection")
-        if CONF_VEHICLE_PROFILES not in self.config_entry.options or active_profile(self.config_entry.options) is not None:
-            choices.append(
-                "vehicle_source" if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none") else "vehicle_soc"
-            )
-            if vehicle_soc_is_configured(draft.values):
-                choices.append("vehicle_disable")
+        choices = [
+            "vehicle_source" if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none") else "vehicle_soc"
+        ]
+        if vehicle_soc_is_configured(draft.values):
+            choices.append("vehicle_disable")
         return self.async_show_menu(
-            step_id="vehicle", menu_options=[*choices, "back"],
+            step_id="vehicle_battery", menu_options=[*choices, "vehicle_profile"],
             description_placeholders=self._vehicle_placeholders(),
         )
 
@@ -333,14 +322,16 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
     async def async_step_departure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        if not self._target_ready():
+            return await self.async_step_vehicle()
         draft = self._begin("departure", DEPARTURE_KEYS)
-        if not vehicle_soc_is_configured(vehicle_options(self.config_entry.options)):
+        if not vehicle_soc_is_configured(self._target_options()):
             return await self.async_step_departure_requires_vehicle()
         choices = ["departure_configure"]
         if draft.values.get(CONF_TIMED_GOAL_ENABLED) is True:
             choices.append("departure_disable")
         return self.async_show_menu(
-            step_id="departure", menu_options=[*choices, "back"],
+            step_id="departure", menu_options=[*choices, "vehicle_profile"],
             description_placeholders=self._vehicle_placeholders(),
         )
 
@@ -348,7 +339,9 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         return self.async_show_menu(
-            step_id="departure_requires_vehicle", menu_options=["vehicle", "back"]
+            step_id="departure_requires_vehicle",
+            menu_options=["vehicle_battery", "vehicle_profile"],
+            description_placeholders=self._vehicle_placeholders(),
         )
 
     async def async_step_departure_disable(
@@ -370,7 +363,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             source = user_input.get("capacity_source")
             if source not in ("fixed", "entity", "profile"):
                 errors["capacity_source"] = "capacity_source_invalid"
-            elif not vehicle_soc_is_configured(vehicle_options(self.config_entry.options)):
+            elif not vehicle_soc_is_configured(self._target_options()):
                 return await self.async_step_departure()
             elif source == "profile" and "capacity" not in self._vehicle_capabilities(draft.values):
                 errors["capacity_source"] = "vehicle_capability_unavailable"
@@ -604,7 +597,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         if (
             (draft := self._section("departure")) is not None
             and draft.values.get(CONF_TIMED_GOAL_ENABLED) is True
-            and not vehicle_soc_is_configured(vehicle_options(self.config_entry.options))
+            and not vehicle_soc_is_configured(self._target_options())
         ):
             return self._options_changed()
         return super()._finish_section()

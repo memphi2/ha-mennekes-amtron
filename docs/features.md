@@ -25,7 +25,7 @@ automatic selection, Virtual Plug & Charge and live app Modbus debugging.
 | Start climate before departure | An existing HA vehicle action or script | [Preconditioning blueprint](blueprints.md#start-vehicle-climate-before-departure) |
 | Choose between several cars | Optional vehicle profiles | [Vehicle selection](vehicle-setup.md#example-two-cars-manual-selection) — beta 0.8.0b4 |
 | Recognize the connected car automatically | Optional profiles and cable/home signals | [Automatic selection](vehicle-setup.md#optional-automatic-vehicle-selection) — beta 0.8.0b4 |
-| Release charging for a recognized, permitted car | A permitted active profile and fresh cable/home detection | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — beta 0.8.0b4 |
+| Release charging for a recognized car | An active profile with fresh cable/home detection | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — beta 0.8.0b4 |
 | Charge from solar surplus | A suitable power sensor and the PV blueprint | [PV charging](blueprints.md#set-up-pv-charging) |
 | Estimate charging costs | A fixed gross price or existing dynamic price sensor | [Charging costs](charging-estimates.md#charging-costs-fixed-or-dynamic-price) |
 | Estimate losses | Battery energy from the matching vehicle charge | [Charging losses](charging-estimates.md#charging-losses-choose-the-available-data) |
@@ -41,7 +41,7 @@ because readings and commands take time.
 
 ## Example: one car with a SoC sensor
 
-Under **Configure → Vehicle**, select that car's charge-level entity and enable
+In that car's profile under **Configure → Vehicles**, select its charge-level entity and enable
 only the percentage target. Set **Vehicle charge target** to 80%. Add the car's
 maximum-limit sensor only if you want its value to bound the selectable target.
 No departure time or capacity estimate is needed for a simple percentage limit.
@@ -59,7 +59,7 @@ An uncertain automatic match selects no car instead of borrowing another car's
 target. Profile changes never start charging.
 
 To also control charging permission, enable **Virtual Plug & Charge** separately
-and permit each intended profile. It waits for fresh detection after plugging in;
+and configure detection signals for each intended profile. It waits for fresh detection after plugging in;
 selecting a profile by hand is not enough. Automatic selection can remain off.
 Existing pauses, locks and reached targets remain effective.
 
@@ -82,7 +82,7 @@ that plan; the ordinary percentage limit remains independent.
 | Percentage target | Never starts by itself | Pauses at the reported percentage; missing SoC does not pause |
 | Timed departure plan | May resume, including a manual pause | May pause to spread charging toward the trip; completed targets still apply |
 | Vehicle selection/detection | Never starts or resumes | Changes the data used by optional features and clears the previous car's percentage target/trip |
-| Virtual Plug & Charge | Can release charging for a freshly recognized, permitted car; does not lift an existing pause, lock or reached target | Keeps charging disabled until permission is granted; disabling the feature does not resume |
+| Virtual Plug & Charge | Can release charging for a freshly recognized car; does not lift an existing pause, lock or reached target | Keeps charging disabled until permission is granted; disabling the feature does not resume |
 | Cost/loss estimates | No | No; these are estimates, not charging controls |
 
 Wallbox authorization, hardware limits, locking, charging release and read-only

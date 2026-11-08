@@ -52,7 +52,7 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         translation_key="virtual_plug_charge_status",
         device_class=SensorDeviceClass.ENUM,
         options=[
-            "disabled", "waiting_vehicle", "waiting_detection", "vehicle_not_permitted",
+            "disabled", "waiting_vehicle", "waiting_detection", "vehicle_not_selected",
             "waiting_release", "authorized", "blocked",
         ],
     ),
@@ -66,6 +66,11 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
             "paused_until_start", "paced", "early_at_minimum", "unreachable",
             "late", "reached", "write_pending", "error",
         ],
+    ),
+    SensorEntityDescription(
+        key="timed_goal_planned_start",
+        translation_key="timed_goal_planned_start",
+        device_class=SensorDeviceClass.TIMESTAMP,
     ),
     SensorEntityDescription(
         key="soc_goal_status",

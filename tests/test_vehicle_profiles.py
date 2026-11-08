@@ -185,7 +185,7 @@ def test_profile_switch_is_explicit_atomic_and_marks_old_trip_unusable():
 def test_profile_draft_merges_other_sections_without_overwriting_them():
     raw = profile_options(feature={"vehicle_soc_entity": "sensor.first"})
     draft = OptionsDraft(
-        "vehicle", raw, {"vehicle_soc_entity", "timed_goal_reset_pending"}
+        "vehicle", raw, {"vehicle_soc_entity", "timed_goal_reset_pending"}, A
     )
     draft.values["vehicle_soc_entity"] = "sensor.replacement"
     draft.values["timed_goal_reset_pending"] = True
@@ -210,7 +210,7 @@ def test_profile_draft_merges_other_sections_without_overwriting_them():
 )
 def test_stale_profile_draft_cannot_write_into_another_vehicle(change):
     raw = profile_options(feature={"vehicle_soc_entity": "sensor.first"})
-    draft = OptionsDraft("vehicle", raw, {"vehicle_soc_entity"})
+    draft = OptionsDraft("vehicle", raw, {"vehicle_soc_entity"}, A)
     current = deepcopy(raw)
     if change == "selection":
         current["active_vehicle_profile"] = B
@@ -236,7 +236,7 @@ def test_profile_draft_deletes_only_selected_feature_and_keeps_global_reset_glob
     )
     raw["timed_goal_reset_pending"] = True
     draft = OptionsDraft(
-        "vehicle", raw, {"vehicle_soc_entity", "timed_goal_reset_pending"}
+        "vehicle", raw, {"vehicle_soc_entity", "timed_goal_reset_pending"}, A
     )
     draft.clear({"vehicle_soc_entity", "timed_goal_reset_pending"})
     result = draft.merge(raw)
@@ -254,7 +254,7 @@ def test_draft_distinguishes_missing_from_explicit_none_in_both_storage_modes(
 ):
     feature = {"vehicle_soc_entity": None} if initially_present else {}
     raw = profile_options(feature=feature) if profiled else feature
-    draft = OptionsDraft("vehicle", raw, {"vehicle_soc_entity"})
+    draft = OptionsDraft("vehicle", raw, {"vehicle_soc_entity"}, A if profiled else None)
     current = deepcopy(raw)
     live = current["vehicle_profiles"][A]["options"] if profiled else current
     if initially_present:
@@ -274,6 +274,7 @@ def test_draft_has_the_same_deletion_copy_and_global_reset_semantics_in_both_mod
     draft = OptionsDraft(
         "departure", raw,
         {"vehicle_soc_entity", "timed_timer1_days", "timed_goal_reset_pending"},
+        A if profiled else None,
     )
     draft.clear({"vehicle_soc_entity"})
     draft.values["timed_timer1_days"] = ["tue"]
@@ -299,7 +300,29 @@ def test_draft_has_the_same_deletion_copy_and_global_reset_semantics_in_both_mod
 def test_unchanged_explicit_none_can_be_saved_without_becoming_a_deletion(profiled):
     feature = {"vehicle_soc_entity": None}
     raw = profile_options(feature=feature) if profiled else feature
-    saved = OptionsDraft("vehicle", raw, {"vehicle_soc_entity"}).merge(raw)
+    saved = OptionsDraft(
+        "vehicle", raw, {"vehicle_soc_entity"}, A if profiled else None
+    ).merge(raw)
     options = saved["vehicle_profiles"][A]["options"] if profiled else saved
     assert "vehicle_soc_entity" in options
     assert options["vehicle_soc_entity"] is None
+
+
+def test_a_car_that_is_not_selected_is_edited_without_touching_the_selected_trip():
+    raw = profile_options(feature={"vehicle_soc_entity": "sensor.first"})
+    draft = OptionsDraft(
+        "vehicle", raw, {"vehicle_soc_entity", "timed_goal_reset_pending"}, B
+    )
+    assert draft.values["vehicle_soc_entity"] == "sensor.other"
+    draft.values["vehicle_soc_entity"] = "sensor.second"
+    draft.values["timed_goal_reset_pending"] = True
+    # Automatic selection may switch between other cars meanwhile.
+    current = deepcopy(raw)
+    current["vehicle_profile_selected_at"] = 1234
+    saved = draft.merge(current)
+    assert saved["vehicle_profiles"][B]["options"]["vehicle_soc_entity"] == "sensor.second"
+    assert saved["vehicle_profiles"][A]["options"] == {"vehicle_soc_entity": "sensor.first"}
+    assert "timed_goal_reset_pending" not in saved
+    current["active_vehicle_profile"] = B
+    with pytest.raises(OptionsChangedError):
+        draft.merge(current)

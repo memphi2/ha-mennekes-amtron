@@ -14,7 +14,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
 from custom_components.mennekes_amtron_rtu.vehicle_sources import provider_identity
 from tests.ha_fakes import FakeConfigEntry
 from tests.test_options_flow import fields
-from tests.test_vehicle_profile_options import Flow
+from tests.test_vehicle_profile_options import Flow, open_profile
 from tests.test_vehicle_profiles import A, B, profile_options
 
 
@@ -102,15 +102,9 @@ def test_manual_profile_cannot_claim_an_automatic_provider_source():
 
 
 async def select_detector(flow, profile=A):
-    menu = await flow.async_step_vehicle_detection()
-    assert menu["menu_options"] == [
-        "vehicle_detection_mode",
-        "vehicle_detection_profile",
-        "back",
-    ]
-    return await flow.async_step_vehicle_detection_profile(
-        {"vehicle_profile_id": profile}
-    )
+    menu = await open_profile(flow, profile)
+    assert "vehicle_detection_signals" in menu["menu_options"]
+    return await flow.async_step_vehicle_detection_signals()
 
 
 def test_each_manual_signal_pair_is_saved_only_to_its_profile_without_enabling_automatic():
@@ -147,119 +141,6 @@ def test_each_manual_signal_pair_is_saved_only_to_its_profile_without_enabling_a
         assert "vehicle_auto_selection" not in saved
         assert "timed_goal_reset_pending" not in saved
         assert entry.options == original
-
-    asyncio.run(run())
-
-
-def test_detection_mode_requires_explicit_boolean_and_configured_evidence():
-    async def run():
-        entry = FakeConfigEntry(options=profile_options())
-        flow = Flow(entry)
-        await flow.async_step_vehicle_detection()
-        for value in [None, "yes", 1, []]:
-            invalid = await flow.async_step_vehicle_detection_mode(
-                {"vehicle_auto_selection": value}
-            )
-            assert (
-                invalid["errors"]["vehicle_auto_selection"]
-                == "vehicle_detection_source_invalid"
-            )
-        missing = await flow.async_step_vehicle_detection_mode(
-            {"vehicle_auto_selection": True}
-        )
-        assert missing["step_id"] == "vehicle_detection_source"
-        assert missing["errors"] == {}
-        assert not entry.options.get("vehicle_auto_selection")
-        disabled = (
-            await flow.async_step_vehicle_detection_mode(
-                {"vehicle_auto_selection": False}
-            )
-        )["data"]
-        assert disabled == {**entry.options, "vehicle_auto_selection": False}
-        entry.options = detected_options()
-        await flow.async_step_vehicle_detection()
-        enabled = (
-            await flow.async_step_vehicle_detection_mode(
-                {"vehicle_auto_selection": True}
-            )
-        )["data"]
-        assert enabled == {**entry.options, "vehicle_auto_selection": True}
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("active", [A, None])
-@pytest.mark.parametrize("source", ["profile", "entities"])
-def test_enable_detection_guides_missing_sources_and_saves_atomically(active, source):
-    async def run():
-        entry = FakeConfigEntry(options=profile_options(active=active))
-        original = deepcopy(entry.options)
-        flow = Flow(entry)
-        flow._vehicle_capabilities = lambda _: frozenset({"detection"}) if source == "profile" else frozenset()
-        await flow.async_step_vehicle_detection()
-        mode = await flow.async_step_vehicle_detection_mode()
-        assert mode["last_step"] is False
-        form = await flow.async_step_vehicle_detection_mode({"vehicle_auto_selection": True})
-        if active is None:
-            assert form["step_id"] == "vehicle_detection_profile"
-            assert form["errors"] == {}
-            form = await flow.async_step_vehicle_detection_profile({"vehicle_profile_id": A})
-        assert form["step_id"] == "vehicle_detection_source"
-        assert form["description_placeholders"] == {"vehicle": "Car A"}
-        assert form["data_schema"]({})["vehicle_detection_source"] == source
-        assert entry.options == original
-        result = await flow.async_step_vehicle_detection_source({"vehicle_detection_source": source})
-        if source == "entities":
-            assert result["step_id"] == "vehicle_detection_entities"
-            invalid = await flow.async_step_vehicle_detection_entities({"vehicle_connected_entity": "binary_sensor.plug"})
-            assert invalid["errors"] == {"vehicle_home_entity": "vehicle_detection_entity_invalid"}
-            assert entry.options == original
-            result = await flow.async_step_vehicle_detection_entities({
-                "vehicle_connected_entity": "binary_sensor.plug", "vehicle_home_entity": "device_tracker.car",
-            })
-        assert result["type"] == "create_entry"
-        assert result["data"]["vehicle_auto_selection"] is True
-        assert profiles(result["data"])[A].detection.source == source
-        assert result["data"]["active_vehicle_profile"] == active
-        assert result["data"]["vehicle_profiles"][B] == original["vehicle_profiles"][B]
-        assert entry.options == original
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("cancel_at", ["source", "entities"])
-def test_cancel_guided_detection_preserves_manual_mode_and_all_profile_data(cancel_at):
-    async def run():
-        entry = FakeConfigEntry(options=profile_options())
-        original = deepcopy(entry.options)
-        flow = Flow(entry)
-        await flow.async_step_vehicle_detection()
-        await flow.async_step_vehicle_detection_mode({"vehicle_auto_selection": True})
-        if cancel_at == "entities":
-            await flow.async_step_vehicle_detection_source({"vehicle_detection_source": "entities"})
-        assert (await flow.async_step_back())["step_id"] == "init"
-        assert entry.options == original
-        # A subsequent manual source edit must not reuse the abandoned intent.
-        await select_detector(flow)
-        await flow.async_step_vehicle_detection_source({"vehicle_detection_source": "entities"})
-        saved = (await flow.async_step_vehicle_detection_entities({
-            "vehicle_connected_entity": "binary_sensor.plug", "vehicle_home_entity": "device_tracker.car",
-        }))["data"]
-        assert "vehicle_auto_selection" not in saved
-
-    asyncio.run(run())
-
-
-def test_declining_source_during_guided_setup_does_not_enable_automatic_mode():
-    async def run():
-        entry = FakeConfigEntry(options=profile_options())
-        flow = Flow(entry)
-        await flow.async_step_vehicle_detection()
-        await flow.async_step_vehicle_detection_mode({"vehicle_auto_selection": True})
-        saved = (await flow.async_step_vehicle_detection_source({"vehicle_detection_source": "disabled"}))["data"]
-        assert saved["vehicle_auto_selection"] is False
-        assert profiles(saved)[A].detection is None
-        assert profiles(saved)[B] == profiles(entry.options)[B]
 
     asyncio.run(run())
 
@@ -474,16 +355,15 @@ def test_detector_profile_choice_and_stale_draft_cannot_configure_the_wrong_car(
     async def run():
         entry = FakeConfigEntry(options=profile_options())
         flow = Flow(entry)
-        await flow.async_step_vehicle_detection()
-        assert (await flow.async_step_vehicle_detection_profile())[
+        assert (await flow.async_step_vehicle_profile_open())[
             "step_id"
-        ] == "vehicle_detection_profile"
+        ] == "vehicle_profile_open"
         for invalid in [None, "unknown", []]:
-            form = await flow.async_step_vehicle_detection_profile(
+            form = await flow.async_step_vehicle_profile_open(
                 {"vehicle_profile_id": invalid}
             )
             assert form["errors"]["vehicle_profile_id"] == "vehicle_profile_required"
-        await flow.async_step_vehicle_detection_profile({"vehicle_profile_id": A})
+        await select_detector(flow)
         await flow.async_step_vehicle_detection_source(
             {"vehicle_detection_source": "entities"}
         )
@@ -501,35 +381,9 @@ def test_detector_profile_choice_and_stale_draft_cannot_configure_the_wrong_car(
 
 
 @pytest.mark.parametrize(
-    "changed",
-    ["active_vehicle_profile", "vehicle_profile_selected_at", "vehicle_auto_selection"],
-)
-def test_stale_automatic_mode_form_cannot_override_a_more_recent_vehicle_selection(
-    changed,
-):
-    async def run():
-        entry = FakeConfigEntry(options=detected_options())
-        flow = Flow(entry)
-        await flow.async_step_vehicle_detection()
-        entry.options[changed] = {
-            "active_vehicle_profile": B,
-            "vehicle_profile_selected_at": 1234,
-            "vehicle_auto_selection": False,
-        }[changed]
-        form = await flow.async_step_vehicle_detection_mode(
-            {"vehicle_auto_selection": True}
-        )
-        assert form["step_id"] == "options_changed"
-        assert not entry.options.get("vehicle_auto_selection")
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize(
     "step",
     [
-        "vehicle_detection_mode",
-        "vehicle_detection_profile",
+        "vehicle_detection_signals",
         "vehicle_detection_source",
         "vehicle_detection_entities",
     ],
@@ -537,9 +391,10 @@ def test_stale_automatic_mode_form_cannot_override_a_more_recent_vehicle_selecti
 def test_detector_steps_cannot_skip_their_section_or_profile(step):
     async def run():
         flow = Flow(FakeConfigEntry(options=profile_options()))
-        assert (await getattr(flow, "async_step_" + step)())["step_id"] == "init"
-        if step in ("vehicle_detection_source", "vehicle_detection_entities"):
-            await flow.async_step_vehicle_detection()
+        # Without an opened profile, there is no car to configure.
+        assert (await getattr(flow, "async_step_" + step)())["step_id"] in ("init", "vehicle")
+        if step != "vehicle_detection_signals":
+            await open_profile(flow)
             assert (await getattr(flow, "async_step_" + step)())["step_id"] == "init"
         with pytest.raises(RuntimeError, match="incomplete vehicle detection"):
             flow._save_detection(None)
@@ -565,7 +420,7 @@ def test_manual_profile_selection_explicitly_overrides_automatic_mode(clear):
         raw = detected_options()
         raw["vehicle_auto_selection"] = True
         flow = Flow(FakeConfigEntry(options=raw))
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         result = (
             await flow.async_step_vehicle_profile_clear()
             if clear
@@ -585,8 +440,8 @@ def test_profile_rename_preserves_detection_but_changed_identity_discards_old_ca
         entry.options["vehicle_profiles"][A]["identity"] = provider_identity(
             flow.hass, "bavariandata", "car"
         )
-        await flow.async_step_vehicle_profiles()
-        await flow.async_step_vehicle_profile_edit_select({"vehicle_profile_id": A})
+        await open_profile(flow)
+        await flow.async_step_vehicle_profile_edit()
         await flow.async_step_vehicle_profile_edit(
             {"vehicle_profile_name": "Renamed", "vehicle_provider": "bavariandata"}
         )
@@ -595,8 +450,8 @@ def test_profile_rename_preserves_detection_but_changed_identity_discards_old_ca
         )["data"]
         assert profiles(saved)[A].detection == profiles(entry.options)[A].detection
         entry.options = saved
-        await flow.async_step_vehicle_profiles()
-        await flow.async_step_vehicle_profile_edit_select({"vehicle_profile_id": A})
+        await open_profile(flow)
+        await flow.async_step_vehicle_profile_edit()
         changed = (
             await flow.async_step_vehicle_profile_edit(
                 {"vehicle_profile_name": "Other car", "vehicle_provider": "none"}

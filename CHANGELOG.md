@@ -15,6 +15,24 @@ Beta update of the integration only; **0.6.1 remains stable**. The app stays at
   did not find the registered car, so only **None** was offered and editing an
   existing BavarianData profile skipped choosing the car and its vehicle
   entities.
+- All settings of a car are now in its profile. **Configure → Vehicles** lists
+  the profiles; opening one shows its name and vehicle source, charge level and
+  charge limit, next departure, charging losses, detection signals and Virtual
+  Plug & Charge, each with a short explanation of what it is for. Any profile
+  can be changed, not only the selected car. **Next departure** and **Charging
+  losses** are no longer top-level menus.
+- Automatic vehicle selection is switched on only in the **Active vehicle**
+  entity. The duplicate switch in the options is gone; each profile's detection
+  signals stay in the profile.
+- Virtual Plug & Charge no longer needs a separate permission per profile.
+  Every profile with detection signals takes part once the wallbox switch
+  **Virtual Plug & Charge** is on. The status **Recognized vehicle not
+  selected** means another car is
+  selected manually.
+- New sensor **Planned charging start** shows when the departure plan starts
+  charging, or started.
+- Raising **Vehicle charge target** after a trip was reached plans the same
+  departure again instead of leaving it finished.
 
 ## 0.8.0b5 — 2026-11-08
 

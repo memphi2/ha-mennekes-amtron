@@ -68,7 +68,7 @@ async def async_setup_entry(
         for description in CONTROL_SENSOR_DESCRIPTIONS
         if (description.key != "energy_goal_status" or identity.layout_version >= ENERGY_TOTAL.min_layout)
         and (description.key != "soc_goal_status" or SOC in features)
-        and (description.key != "timed_goal_status" or TIMED in features)
+        and (description.key not in ("timed_goal_status", "timed_goal_planned_start") or TIMED in features)
         and (description.key != "virtual_plug_charge_status" or runtime_data.plug_charge is not None)
     )
     entities.extend(
@@ -103,7 +103,7 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
                 self.runtime_data.control.supports_soc_goal
                 and observer is not None and observer.source is not None
             )
-        if self.entity_description.key == "timed_goal_status":
+        if self.entity_description.key in ("timed_goal_status", "timed_goal_planned_start"):
             return self.runtime_data.timed_goal is not None
         return True
 
@@ -125,6 +125,9 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
         if key == "timed_goal_status":
             observer = self.runtime_data.timed_goal
             return observer.status if observer is not None else None
+        if key == "timed_goal_planned_start":
+            observer = self.runtime_data.timed_goal
+            return observer.planned_start if observer is not None else None
         if key == "virtual_plug_charge_status":
             plug_charge = self.runtime_data.plug_charge
             return plug_charge.status if plug_charge is not None else None

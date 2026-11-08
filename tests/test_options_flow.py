@@ -67,7 +67,7 @@ def test_obsolete_review_and_save_routes_are_not_available():
 
 
 @pytest.mark.parametrize("service", [False, True])
-def test_five_independent_sections_and_scoped_wallbox_save(service):
+def test_independent_sections_and_scoped_wallbox_save(service):
     async def run():
         entry = FakeConfigEntry(
             data={"server_url": "http://app:8765"} if service else None,
@@ -79,13 +79,13 @@ def test_five_independent_sections_and_scoped_wallbox_save(service):
         )
         flow = Flow(entry)
         root = await flow.async_step_init()
-        assert root["menu_options"] == [
-            "wallbox",
-            "vehicle",
-            "departure",
-            "costs",
-            "losses",
-        ]
+        assert root["menu_options"] == ["wallbox", "vehicle", "costs"]
+        # Without profiles, the shared vehicle settings hold departure and losses.
+        vehicles = await flow.async_step_vehicle()
+        assert vehicles["menu_options"] == ["vehicle_profile_add", "vehicle_settings", "back"]
+        settings = await flow.async_step_vehicle_settings()
+        assert settings["step_id"] == "vehicle_settings"
+        assert settings["menu_options"] == ["vehicle_battery", "departure", "losses", "vehicle"]
         menu = await flow.async_step_wallbox()
         assert ("wallbox_advanced" in menu["menu_options"]) is not service
         form = await flow.async_step_wallbox_basic()
@@ -212,7 +212,7 @@ def test_vehicle_source_limit_is_conditional_and_disable_resets_departure(limit)
             options={"timed_goal_enabled": True, "timed_capacity_kwh": 80}
         )
         flow = Flow(entry)
-        await flow.async_step_vehicle()
+        await flow.async_step_vehicle_battery()
         assert set(fields(await flow.async_step_vehicle_soc())) == {
             "vehicle_soc_entity",
             "use_vehicle_limit",
@@ -229,14 +229,14 @@ def test_vehicle_source_limit_is_conditional_and_disable_resets_departure(limit)
         stored = result["data"]
         assert ("vehicle_charge_limit_entity" in stored) is limit
         entry.options = stored
-        assert "vehicle_disable" in (await flow.async_step_vehicle())["menu_options"]
+        assert "vehicle_disable" in (await flow.async_step_vehicle_battery())["menu_options"]
         disabled = (await flow.async_step_vehicle_disable())["data"]
         assert "vehicle_soc_entity" not in disabled
         assert disabled["timed_goal_enabled"] is False
         assert disabled["timed_goal_reset_pending"] is True
         assert disabled["timed_capacity_kwh"] == 80
         entry.options = disabled
-        assert "vehicle_disable" not in (await flow.async_step_vehicle())["menu_options"]
+        assert "vehicle_disable" not in (await flow.async_step_vehicle_battery())["menu_options"]
 
     asyncio.run(run())
 
@@ -244,7 +244,7 @@ def test_vehicle_source_limit_is_conditional_and_disable_resets_departure(limit)
 def test_no_percentage_feature_has_no_remove_action():
     async def run():
         flow = Flow(FakeConfigEntry())
-        menu = (await flow.async_step_vehicle())["menu_options"]
+        menu = (await flow.async_step_vehicle_battery())["menu_options"]
         assert "vehicle_soc" in menu
         assert "vehicle_disable" not in menu
 
@@ -255,7 +255,7 @@ def test_no_percentage_feature_has_no_remove_action():
 def test_vehicle_validation_and_correction(value):
     async def run():
         flow = Flow(FakeConfigEntry())
-        await flow.async_step_vehicle()
+        await flow.async_step_vehicle_battery()
         assert (await flow.async_step_vehicle_soc({"vehicle_soc_entity": value}))[
             "errors"
         ]

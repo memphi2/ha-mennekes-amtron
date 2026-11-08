@@ -86,6 +86,13 @@ def capacity_from_state(state: State | None) -> float | None:
     return usable_capacity(value, state.attributes.get("unit_of_measurement", ""))
 
 
+# Statuses of a computed plan; a pending command keeps its start time.
+_PLANNED = frozenset({
+    "queued", "write_pending", "paused_until_start", "paced",
+    "early_at_minimum", "unreachable", "late",
+})
+
+
 class TimedGoalObserver:
     """Own one departure and issue only meaningful, bounded current changes."""
 
@@ -97,6 +104,10 @@ class TimedGoalObserver:
         self._store = TimedGoalStore(hass, entry.entry_id, entry.runtime_data.identity.serial_number or "")
         self.goal = TimedGoal()
         self.status = "disabled"
+        # When the plan starts, or started, charging for the open trip.
+        self.planned_start: datetime | None = None
+        # The target a reached trip met; only a higher one plans it again.
+        self._reached_target: float | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
         self._task: asyncio.Task[None] | None = None
         self._pending = False
@@ -226,6 +237,7 @@ class TimedGoalObserver:
                 return
             await self._cancel_command()
             await self._save_goal(candidate)
+            self._reached_target = None
         self._notify()
         self.request_evaluate()
 
@@ -237,6 +249,10 @@ class TimedGoalObserver:
                 return
             candidate = TimedGoal.restore(expected.snapshot())
             candidate.finish(reason, clear_deadline=clear_deadline)
+            self.planned_start = None
+            self._reached_target = (
+                self._runtime.control.soc_goal.target_percent if reason == "reached" else None
+            )
             await self._cancel_command()
             await self._save_goal(candidate)
         self._set_status(reason)
@@ -387,11 +403,19 @@ class TimedGoalObserver:
         if deadline <= dt_util.utcnow():
             await self._finish(trip.finished or "late", trip, clear_deadline=True)
             return
+        control = self._runtime.control
+        goal = control.soc_goal
+        if trip.finished == "reached":
+            if self._reached_target is None:
+                self._reached_target = goal.target_percent
+            if self._target_raised():
+                # A higher target plans the trip again. A charge level that
+                # falls before departure, e.g. from preconditioning, does not.
+                await self._set_deadline(deadline, source=trip.source, expected=trip)
+                return
         if trip.finished is not None:
             self._set_status(trip.finished)
             return
-        control = self._runtime.control
-        goal = control.soc_goal
         if goal.status == "reached":
             await self._finish("reached", trip)
             return
@@ -437,9 +461,15 @@ class TimedGoalObserver:
             # block commands without proving that either target was reached.
             await self._wait_for_input("waiting_for_device")
             return
+        now = dt_util.utcnow()
         pause_until_start = (
-            plan.start_at is not None and plan.start_at - dt_util.utcnow() > _PAUSE_MARGIN
+            plan.start_at is not None and plan.start_at - now > _PAUSE_MARGIN
         )
+        if plan.start_at is not None:
+            self.planned_start = plan.start_at
+        elif self.planned_start is None or self.planned_start > now:
+            # The plan charges now; keep when it began.
+            self.planned_start = now
         desired_current = None if pause_until_start else plan.current_a
         if control.pending_action is not None:
             await self._cancel_outdated_command(desired_current, trip)
@@ -508,7 +538,27 @@ class TimedGoalObserver:
         await self._cancel_command()
         self._set_status(status)
 
+    def _target_raised(self) -> bool:
+        """The percentage target lies above the car's current charge level."""
+        control = self._runtime.control
+        goal = control.soc_goal
+        # A reached kWh target would end the trip again at once.
+        if (
+            goal.status != "active" or self._reached_target is None
+            or goal.target_percent <= self._reached_target
+            or control.energy_goal.status == "reached"
+        ):
+            return False
+        observer = self._runtime.vehicle_soc
+        soc_entity = self._options.get(CONF_VEHICLE_SOC_ENTITY)
+        soc = observer.latest_soc if observer is not None else vehicle_percentage(
+            self._hass.states.get(soc_entity) if isinstance(soc_entity, str) else None
+        )
+        return soc is not None and soc < goal.target_percent
+
     def _set_status(self, status: str) -> None:
+        if status not in _PLANNED:
+            self.planned_start = None
         if status != self.status:
             self.status = status
             self._notify()
