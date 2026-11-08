@@ -614,6 +614,24 @@
           "authorized": "Voertuig toegestaan",
           "blocked": "Laden geblokkeerd",
           "disabled": "Uitgeschakeld"
+        },
+        "state_attributes": {
+          "blocked_reason": {
+            "name": "Reden van blokkering",
+            "state": {
+              "connection_lost": "Verbinding verloren",
+              "gate_inactive": "Vrijgavepoort niet actief",
+              "read_only": "Alleen-lezen-modus",
+              "departure_plan": "Vertrekplanning bereidt de laadstroom voor",
+              "pause_requested": "Laden gepauzeerd",
+              "release_off": "Laadvrijgave uitgeschakeld",
+              "energy_goal_stop": "Energiedoel bereikt",
+              "wallbox_locked": "Wallbox vergrendeld",
+              "error_code": "Wallboxfout",
+              "authorization_required": "Autorisatie op de wallbox ingeschakeld",
+              "register_unavailable": "Registerwaarde niet beschikbaar"
+            }
+          }
         }
       }
     },
@@ -629,6 +647,9 @@
       },
       "virtual_plug_charge": {
         "name": "Virtuele Plug & Charge"
+      },
+      "release_off_on_unplug": {
+        "name": "Laadvrijgave uitschakelen bij loskoppelen"
       }
     },
     "event": {

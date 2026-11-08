@@ -614,6 +614,24 @@
           "authorized": "Veicolo autorizzato",
           "blocked": "Ricarica bloccata",
           "disabled": "Disattivato"
+        },
+        "state_attributes": {
+          "blocked_reason": {
+            "name": "Motivo del blocco",
+            "state": {
+              "connection_lost": "Connessione persa",
+              "gate_inactive": "Blocco di abilitazione non attivo",
+              "read_only": "Modalità sola lettura",
+              "departure_plan": "La pianificazione della partenza prepara la corrente",
+              "pause_requested": "Ricarica in pausa",
+              "release_off": "Abilitazione alla ricarica disattivata",
+              "energy_goal_stop": "Obiettivo di energia raggiunto",
+              "wallbox_locked": "Wallbox bloccata",
+              "error_code": "Errore della wallbox",
+              "authorization_required": "Autorizzazione attiva sulla wallbox",
+              "register_unavailable": "Valore del registro non disponibile"
+            }
+          }
         }
       }
     },
@@ -629,6 +647,9 @@
       },
       "virtual_plug_charge": {
         "name": "Plug & Charge virtuale"
+      },
+      "release_off_on_unplug": {
+        "name": "Disattiva l'abilitazione alla ricarica allo scollegamento"
       }
     },
     "event": {

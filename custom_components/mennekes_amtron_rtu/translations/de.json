@@ -614,6 +614,24 @@
           "authorized": "Fahrzeug freigegeben",
           "blocked": "Laden gesperrt",
           "disabled": "Deaktiviert"
+        },
+        "state_attributes": {
+          "blocked_reason": {
+            "name": "Sperrgrund",
+            "state": {
+              "connection_lost": "Verbindung verloren",
+              "gate_inactive": "Freigabesperre nicht aktiv",
+              "read_only": "Nur-Lese-Modus",
+              "departure_plan": "Abfahrtsplanung bereitet den Ladestrom vor",
+              "pause_requested": "Laden pausiert",
+              "release_off": "Ladefreigabe ausgeschaltet",
+              "energy_goal_stop": "Energieziel erreicht",
+              "wallbox_locked": "Wallbox gesperrt",
+              "error_code": "Wallbox-Fehler",
+              "authorization_required": "Autorisierung an der Wallbox aktiv",
+              "register_unavailable": "Registerwert nicht verfügbar"
+            }
+          }
         }
       }
     },
@@ -629,6 +647,9 @@
       },
       "virtual_plug_charge": {
         "name": "Virtuelles Plug & Charge"
+      },
+      "release_off_on_unplug": {
+        "name": "Ladefreigabe beim Abstecken ausschalten"
       }
     },
     "event": {

@@ -125,6 +125,15 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
             return control.pending_action or "none"
         return control.pending_until
 
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        """Explain a blocked virtual release without exposing session data."""
+        if self.entity_description.key != "virtual_plug_charge_status":
+            return None
+        plug_charge = self.runtime_data.plug_charge
+        reason = plug_charge.blocked_reason if plug_charge is not None else None
+        return {"blocked_reason": reason} if reason is not None else None
+
 
 class AmtronSensor(MennekesAmtronEntity, SensorEntity):
     """A sensor reading one register."""

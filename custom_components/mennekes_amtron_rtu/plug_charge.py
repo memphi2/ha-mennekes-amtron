@@ -33,6 +33,12 @@ from .vehicle_profiles import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# An armed departure plan owns the current. The grant waits until the plan has
+# applied its decision, so a release never starts a charge it must then stop.
+_PLAN_DECIDING = frozenset({"waiting_for_device", "queued", "write_pending"})
+_PLAN_CHARGING = frozenset({"paced", "early_at_minimum", "unreachable", "late"})
+_PLAN_PAUSED = "paused_until_start"
+
 
 def plug_charge_policy(options: Mapping[str, Any]) -> str:
     """Revoke grants when permissions/identity/evidence change, not on reload."""
@@ -66,17 +72,25 @@ class PlugChargeObserver:
         self._candidate: tuple[str, str] | None = None
         self._timer: CALLBACK_TYPE | None = None
         self._task: asyncio.Task[None] | None = None
+        self._target_task: asyncio.Task[None] | None = None
+        self._target_session: str | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
         self._evidence_unsubscribe: CALLBACK_TYPE | None = None
         self._stopped = False
         self._retry_at = 0.0
         self._generation = 0
         self._status = "waiting_vehicle"
+        self._blocked_reason: str | None = None
 
     @property
     def status(self) -> str:
         """A stable enum, without session tokens or ticking age attributes."""
         return self._status
+
+    @property
+    def blocked_reason(self) -> str | None:
+        """The first failed release condition while the status is blocked."""
+        return self._blocked_reason
 
     @callback
     def start(self) -> None:
@@ -135,8 +149,11 @@ class PlugChargeObserver:
         ):
             self._set_status("disabled")
             return None
-        if not self._coordinator.last_update_success or not gate.get("enabled"):
-            self._set_status("blocked")
+        if not self._coordinator.last_update_success:
+            self._set_status("blocked", "connection_lost")
+            return None
+        if not gate.get("enabled"):
+            self._set_status("blocked", "gate_inactive")
             return None
         session = gate.get("session")
         session = session if isinstance(session, str) else None
@@ -171,22 +188,91 @@ class PlugChargeObserver:
         ):
             self._set_status("waiting_detection")
             return None
-        values = self._coordinator.current_data().values
-        if (
-            self._control.read_only or self._control.pause_requested is True
-            or self._control.charging_release_requested is False
-            or self._control.energy_goal_stop_requested
-            or values.get("lock_evse") != 0 or values.get("error_code") != 0
-            or values.get("authorization_enabled") != 0
-        ):
-            self._set_status("blocked")
+        self._adopt_vehicle_target(session)
+        reason = self._release_blocker()
+        if reason is not None:
+            self._set_status("blocked", reason)
             return None
         self._set_status("waiting_release")
         return selected, session
 
-    def _set_status(self, status: str) -> None:
-        if self._status != status:
+    def _release_blocker(self) -> str | None:
+        """Name the first condition that keeps the release closed."""
+        values = self._coordinator.current_data().values
+        checks = (
+            ("read_only", self._control.read_only),
+            ("departure_plan", not self._plan_applied()),
+            ("pause_requested", self._control.pause_requested is True and not self._pause_allows_grant()),
+            ("release_off", self._control.charging_release_requested is False),
+            ("energy_goal_stop", bool(self._control.energy_goal_stop_requested)),
+        )
+        for reason, failed in checks:
+            if failed:
+                return reason
+        for key, reason in (
+            ("lock_evse", "wallbox_locked"), ("error_code", "error_code"),
+            ("authorization_enabled", "authorization_required"),
+        ):
+            value = values.get(key)
+            if value is None:
+                return "register_unavailable"
+            if value != 0:
+                return reason
+        return None
+
+    def _plan_status(self) -> str | None:
+        """The status of an armed departure plan that controls the current."""
+        timed = self._entry.runtime_data.timed_goal
+        if timed is None or timed.goal.deadline is None or timed.goal.finished is not None:
+            return None
+        status = timed.status
+        return status if status in _PLAN_DECIDING | _PLAN_CHARGING | {_PLAN_PAUSED} else None
+
+    def _plan_applied(self) -> bool:
+        plan = self._plan_status()
+        if plan is None:
+            return True
+        if plan == _PLAN_PAUSED:
+            return self._control.pause_requested is True
+        return plan in _PLAN_CHARGING and self._control.pause_requested is not True
+
+    def _pause_allows_grant(self) -> bool:
+        """A permitted plug-in ends a manual pause, never an automatic one.
+
+        Goal stops are refused separately. An applied departure plan keeps its
+        pause and resumes on schedule. A queued command other than a resume is
+        newer intent.
+        """
+        return self._plan_status() is not None or self._control.pending_action in (None, "resume")
+
+    def _adopt_vehicle_target(self, session: str) -> None:
+        """Start each recognized connection at the car's own charge limit.
+
+        An explicit new target also ends a reached latch left over from the
+        previous connection. It never starts charging by itself.
+        """
+        if session == self._target_session:
+            return
+        self._target_session = session
+        observer = self._entry.runtime_data.vehicle_soc
+        if observer is None or self._control.read_only or not self._control.supports_soc_goal:
+            return
+        limit, goal = observer.maximum, self._control.soc_goal
+        if limit is None or (limit == goal.target_percent and not goal.stop_requested):
+            return
+
+        async def adopt() -> None:
+            try:
+                await observer.async_set_target(limit)
+            except (HomeAssistantError, DeviceError, OSError) as err:
+                _LOGGER.debug("Vehicle charge limit not adopted: %s", err)
+
+        self._target_task = self._hass.async_create_task(adopt())
+
+    def _set_status(self, status: str, reason: str | None = None) -> None:
+        if (self._status, self._blocked_reason) != (status, reason):
             self._status = status
+            self._blocked_reason = reason
             # Defer listeners to avoid recursion through our own subscription.
             self._hass.loop.call_soon(self._notify)
 
@@ -237,6 +323,13 @@ class PlugChargeObserver:
     async def _authorize(self, candidate: tuple[str, str]) -> None:
         try:
             if self._selection() == candidate:
+                if (
+                    self._control.pause_requested is True and self._control.pending_action is None
+                    and self._plan_status() is None
+                ):
+                    # The gate keeps the release off until the grant below, so
+                    # this resume switches no charge and starts no long guard.
+                    await self._control.async_resume_charging()
                 await self._control.async_authorize_plug_charge(
                     candidate[1], deadline=dt_util.utcnow() + timedelta(seconds=10),
                 )
@@ -265,7 +358,8 @@ class PlugChargeObserver:
         for unsubscribe in self._unsubs:
             unsubscribe()
         self._unsubs.clear()
-        if self._task is not None:
-            self._task.cancel()
-            with suppress(asyncio.CancelledError):
-                await self._task
+        for task in (self._task, self._target_task):
+            if task is not None:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task

@@ -93,8 +93,9 @@ def test_remote_vehicle_observations_need_no_extra_wallbox_poll_and_old_service_
                 assert wrapper.soc_goal.status == "active"
                 await wrapper.async_observe_soc(30, 70, source=SOURCE)
                 assert wrapper.soc_goal.target_percent == 70
+                # Clamped to the car's limit, the target now follows that limit.
                 await wrapper.async_observe_soc(40, 90, source=SOURCE)
-                assert wrapper.soc_goal.target_percent == 70
+                assert wrapper.soc_goal.target_percent == 90
                 assert wrapper.soc_goal.maximum_percent == 90
                 assert current_writes(transport) == before_writes
                 assert transport.reads == before_reads
