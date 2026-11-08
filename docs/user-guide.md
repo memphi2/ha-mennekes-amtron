@@ -15,7 +15,7 @@ targets and schedules only when you want them:
 - [Losses and costs](charging-estimates.md)
 
 Vehicle profiles, optional automatic selection, Virtual Plug & Charge and app
-live debugging are available in **beta 0.8.0b2**. **0.6.1 remains stable**; see
+live debugging are available in **beta 0.8.0b3**. **0.6.1 remains stable**; see
 [version availability](README.md#versions-and-feature-availability).
 
 ## Optional charging losses and costs

@@ -5,7 +5,7 @@ Use **Charging current limit** and **Charging paused** for everyday charging.
 energy and connection health. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
 
-This reference follows **beta 0.8.0b2**, including vehicle profiles and the
+This reference follows **beta 0.8.0b3**, including vehicle profiles and the
 optional Virtual Plug & Charge status. **0.6.1 remains stable.** Ordinary service
 connections require **app/service 0.6.1 or newer with API 2**; Virtual Plug & Charge
 in service mode needs the capability in **app 0.8.0b1 or newer**.
@@ -112,6 +112,7 @@ These controls configure charging permission, display behavior or maintenance.
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
 | `switch.*_virtual_plug_charge` | Virtual Plug & Charge | integration 0.8.0b2; supported direct control or service capability | Enables the wallbox-wide permission check. Configure each vehicle's permission separately in the vehicle options. Enabling can stop a charge while recognition is pending; disabling never resumes charging. |
+| `switch.*_release_off_on_unplug` | Switch off charging release when unplugged | integration 0.8.0b3; write access | Off by default. After a confirmed disconnect, Home Assistant switches **Charging release** off so the next car needs an explicit release. Ignored while Virtual Plug & Charge is enabled, which already closes the release. Not enforced while HA is not running. |
 | `select.*_solar_display_mode` | Solar display mode | always | The solar mode shown on the wallbox display. Drives the HMI only, and needs DIP 7 on. |
 | `button.*_recover_from_error` | Recover from error | always | Manually retries heartbeat-error recovery when automatic recovery cannot complete. Preserves a deliberate pause, lock, disabled release and current setting. |
 | `button.*_restart` | Restart | layout v01.03 | Restarts the wallbox. Refused unless the wallbox is idle. |
@@ -136,7 +137,7 @@ remembered resume target while paused, which may be the pending target. See
 |---|---|---|---|---|---|
 | `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. |
 | `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure. |
-| `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability; beta 0.8.0b1 requires the feature enabled | Shows recognition, permission and release status, or Disabled from integration 0.8.0b2. No session tokens or ticking timestamps are recorded. |
+| `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability; beta 0.8.0b1 requires the feature enabled | Shows recognition, permission and release status, or Disabled from integration 0.8.0b2. From 0.8.0b3, **Charging blocked** carries a `blocked_reason` attribute (for example `release_off`, `wallbox_locked`, `authorization_required`, `pause_requested`, `energy_goal_stop` or `register_unavailable`). No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
 | `sensor.*_pending_change` | Pending change |  | enum | since 0.5.2b2; supporting service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |

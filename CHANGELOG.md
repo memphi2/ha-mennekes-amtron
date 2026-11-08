@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0b3 — 2026-11-08
+
+Beta update of the integration and app; **0.6.1 remains stable**. Update the app
+through **#apps-beta** before the integration when updating both components.
+
+- Virtual Plug & Charge ends a manual pause when a permitted car is plugged in.
+  An armed departure plan decides instead: the release waits until the plan has
+  paused until its start or set its current. Reached targets, a lock, a
+  switched-off charging release and newer queued commands still keep charging
+  stopped.
+- App: a current change while the charging release is off or no car is connected
+  no longer waits for or starts the state-change interval, so the release follows
+  immediately instead of after several minutes.
+- Each recognized Plug & Charge connection starts with the car's own charge
+  limit as the percentage target, which also ends a target reached during the
+  previous connection.
+- A percentage target at the car's limit follows every later change of that
+  limit. A raised limit can end a reached target but never resumes charging.
+- New **Switch off charging release when unplugged** configuration switch: without
+  Virtual Plug & Charge, HA closes the release after each confirmed disconnect so
+  the next car needs an explicit release.
+- The Plug & Charge status sensor names why charging is blocked
+  (`blocked_reason`), and diagnostics include the pause, release and goal-stop
+  intents plus the gate state without session tokens.
+
 ## 0.8.0b2 — 2026-11-08
 
 Beta update of the integration and app; **0.6.1 remains stable**. Update the app
