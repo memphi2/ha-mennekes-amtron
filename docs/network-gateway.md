@@ -60,9 +60,8 @@ Configuration tab described below.
 1. Follow the [service installation](modbus-service.md) and prepare any existing
    connection for handover before starting a second bus owner.
 2. If the app offers **Open Web UI**, start it and open that page. It requires an
-   administrator. Published apps through 0.7.0b4 request Supervisor 2026.11.0;
-   support for stable **2026.10.4+** is an unreleased correction. If blocked, use
-   the native Configuration tab in step 3. Select **LAN: Modbus RTU
+   administrator. App **0.8.0b1** supports **Supervisor 2026.10.4+**; update an
+   older beta app if it incorrectly asks for 2026.11.0. Select **LAN: Modbus RTU
    (TCP)** or **LAN: Modbus TCP**, matching the gateway. Enter the adapter's host/IP
    without `http://` or a URL path, and its TCP port. The page shows the LAN fields
    and removes any saved USB path when you save.

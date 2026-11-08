@@ -9,11 +9,10 @@ suitable vehicle integration; BavarianData
 can also supply supported data from one selected BMW vehicle.
 
 **Availability:** manual vehicle entities and percentage targets are available in
-stable 0.6.1. The central vehicle profiles, optional automatic selection and
-Virtual Plug & Charge below are **unreleased changes in this branch**, not
-features of published 0.7.0b4.
-Menu names below follow this branch; older releases can group the same manual
-source settings differently. See [versions and feature availability](README.md#versions-and-feature-availability).
+stable 0.6.1. Central vehicle profiles, optional automatic selection and
+Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
+below; existing manual sources continue to work after updating.
+See [versions and feature availability](README.md#versions-and-feature-availability).
 
 ## Choose the setup that fits
 
@@ -132,7 +131,7 @@ new profile. Saved loss results and averages remain separate for each car.
 
 ## Optional Virtual Plug & Charge
 
-**Unreleased and off by default.** Virtual Plug & Charge keeps charging disabled
+**New in beta 0.8.0b1 and off by default.** Virtual Plug & Charge keeps charging disabled
 until the active vehicle is recognized and its profile is permitted.
 It uses your existing vehicle data; it does not send a vehicle-cloud request.
 Automatic profile selection is a separate option: you can choose the profile
@@ -144,7 +143,8 @@ manually, but that choice alone never proves which car is connected.
    and enable **Allow this vehicle to charge automatically**. Repeat for any
    other profiles you want to permit.
 3. Turn on **Enable Virtual Plug & Charge** in the same section. The feature requires
-   write access and a compatible service app when using service mode.
+   write access. In service mode, update the app to **0.8.0b1** first: older
+   compatible services do not provide this charging-permission capability.
 4. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 

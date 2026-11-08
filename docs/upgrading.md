@@ -9,21 +9,23 @@ then the integration. Keep existing app data and your HA entry. The **#apps**
 catalog carries stable updates; **#apps-beta** follows the beta channel below.
 Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Trying 0.7.0b4
+## Trying 0.8.0b1
 
-**0.7.0b4 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
-prereleases in your integration installer and select **v0.7.0b4**. Keep the
+**0.8.0b1 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
+prereleases in your integration installer and select **v0.8.0b1**. Keep the
 existing HA entry. The beta app is offered through
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
 catalog can use **Check for updates** and update their app in place.
 
 Moving from **#apps** to **#apps-beta** creates a separate app installation.
 Follow the [channel handover](modbus-service.md#updates), preserving its data
-and ensuring only one service owns the wallbox connection. The beta includes
-shared control fixes and optional Waveshare adapter setup/TCP login, so update
-the app as well when using those features.
-The integration's minimum compatible service remains **0.6.1**; matching
-version numbers are not generally required.
+and ensuring only one service owns the wallbox connection. In service mode,
+update the app to **0.8.0b1 first**, wait for initialization, then update the
+integration. The new app supplies Virtual Plug & Charge, the optional live
+Modbus view, Supervisor 2026.10.4+ guided setup and shared control fixes.
+The integration's general minimum remains **service 0.6.1 with API 2**; ordinary
+connections can keep using a compatible older service. Virtual Plug & Charge
+needs the new app capability. Matching version numbers are not generally required.
 
 Adapter configuration and TCP login remain optional. An update does not change
 the LAN adapter or enable its authentication. Use [LAN adapter setup](lan-adapters.md)
@@ -32,9 +34,9 @@ service-connection failures now show Repairs notices that clear after recovery.
 
 ## Feature settings after an update
 
-The following profile, automatic-selection, Virtual Plug & Charge and dialog improvements are
-**unreleased changes in this branch**. Published beta 0.7.0b4 does not contain
-them. Existing sources remain usable until you deliberately adopt new setup.
+**Beta 0.8.0b1** adds the following profile, automatic-selection,
+Virtual Plug & Charge and configuration improvements. Existing sources remain
+usable until you deliberately adopt the new setup.
 
 The integration's **Configure** menu separates **Wallbox**, **Vehicle**,
 **Next departure**, **Charging costs** and **Charging losses**. Each section
@@ -58,7 +60,7 @@ independently of a provider.
 Virtual Plug & Charge is separately optional and remains off after an update.
 It needs detection sources and permission for each participating profile;
 automatic profile selection alone does not enable it. Service mode also needs
-an app that supports the gate. Follow the [setup steps](vehicle-setup.md#optional-virtual-plug--charge)
+app/service **0.8.0b1** with the new charging-permission capability. Follow the [setup steps](vehicle-setup.md#optional-virtual-plug--charge)
 before enabling it; enabling may stop an existing charge while detection is
 pending. Disabling the feature does not resume charging.
 
@@ -152,15 +154,12 @@ LAN shows the gateway host/IP and TCP port. Saving LAN also clears any old USB
 path, so an unplugged adapter cannot block the change. A missing USB adapter is
 never replaced automatically.
 
-The **unreleased correction in this branch** accepts stable **Supervisor
-2026.10.4 or newer** for the administrator access check. Published app releases
-through 0.7.0b4 still require 2026.11.0. Until a release includes the correction,
-use the native Configuration tab if the guided page rejects your Supervisor. This is a requirement of
-the page, not a new minimum Home Assistant
-version for the integration. On older Supervisor versions, the native app
-**Configuration** tab remains available; its serial path is a text field in
-0.6.0b1. Follow the release notes for the guided-page correction rather than
-reinstalling the integration.
+App **0.8.0b1** accepts **Supervisor 2026.10.4 or newer** for the administrator
+access check. Older apps through 0.7.0b4 had an overly strict 2026.11.0 requirement;
+update the beta app to receive the correction. The integration's minimum Home
+Assistant version is unchanged. On Supervisor versions older than 2026.10.4,
+the native app **Configuration** tab remains available for manual setup.
+Keep your existing integration entry.
 
 Save, then restart the app from its **Info** tab. Saving does not change a running
 connection. **Read-only**, current limits and polling intervals remain in the

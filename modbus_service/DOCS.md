@@ -6,26 +6,22 @@ the last charging state, including a deliberate pause, while HA is offline.
 
 **amd64 and aarch64 · separate integration required**
 
-This branch documents **unreleased improvements**, including live Modbus
-debugging and guided-page support for Supervisor 2026.10.4+. Published beta
-0.7.0b4 does not include them; its guided page still requires Supervisor
-2026.11.0. Use native Configuration if that page rejects your current Supervisor.
-
-Published beta **0.7.0b4** is available through **#apps-beta**; **#apps** keeps
-stable **0.6.1**. Changes marked unreleased above are not in either published
-channel yet. Existing beta-catalog installations update in place. Keep the app data and HA
-entry. For all beta fixes, update this app before integration **0.7.0b4**.
-Switching catalogs creates a separate app and requires a handover.
+Beta **0.8.0b1** is available through **#apps-beta**; **#apps** keeps stable
+**0.6.1**. Existing beta-catalog installations update in place. Keep the app data
+and HA entry. For all beta features and fixes, update this app before integration
+**0.8.0b1**. Switching catalogs creates a separate app and requires a handover.
 See [Updates](#updates).
 
-**Improved in 0.7.0b4:** Waveshare setup retains selected values and passwords,
-checks settings before stopping the old connection, and explains progress in
-the app log. Existing connections keep their settings until you change them.
+**New in 0.8.0b1:** optional Virtual Plug & Charge, a live panel for decoded
+Modbus communication, and connection-page support for Supervisor **2026.10.4+**.
+This beta also improves charging-target saves and keeps TCP-login/password fields
+visible in native Configuration. Existing connections keep their settings until
+you change them.
 
 LAN-to-RS-485 adapters are supported without local USB.
-See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.7.0b4/docs/network-gateway.md)
+See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/network-gateway.md)
 for transparent RTU over TCP versus translating Modbus TCP. Supported Waveshare
-models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/lan-adapters.md#service-app).
+models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/lan-adapters.md#service-app).
 
 [First setup](#first-setup) · [Daily use](#daily-use) ·
 [Updates](#updates) · [Help](#help)
@@ -33,8 +29,8 @@ models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-men
 ## First setup
 
 For a new beta setup, enable beta versions in HACS and select **Mennekes Amtron
-RTU integration 0.7.0b4**. Complete any requested Home Assistant Core restart.
-See [Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.7.0b4/docs/installation.md).
+RTU integration 0.8.0b1**. Complete any requested Home Assistant Core restart.
+See [Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/installation.md).
 The integration and this app are
 separate installations. Already using the app? Follow [Updates](#updates)
 instead: the app and integration can be updated independently.
@@ -107,7 +103,7 @@ TCP-server mode and disables storage polling, autonomous preambles and old
 serial-buffer replay. Unknown custom payloads are refused. Applying these settings
 restarts the adapter and stops the app's old Modbus connection immediately.
 After successful saving, restart the app to connect using the new settings.
-Detection alone changes nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/main/docs/lan-adapters.md).
+Detection alone changes nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/lan-adapters.md).
 
 The native **Configuration** tab contains manual connection fields; it does
 not have an adapter detection button. To detect and configure a compatible
@@ -118,13 +114,12 @@ only the entered host. Applying changes the adapter immediately; restart the
 app afterwards to resume the connection. The native TCP-login switch changes
 the app connection only; it does not enable login on the adapter.
 
-The page requires a Home Assistant administrator. The unreleased correction
-in this branch supports stable **Supervisor 2026.10.4+**; published releases
-through 0.7.0b4 require 2026.11.0. You can still save LAN settings in the
-native **Configuration** tab, including when an old USB adapter is absent. For
-the USB dropdown, use a release compatible with your Supervisor version. Read-only, current limits and polling
-intervals remain in the native Configuration tab. Avoid editing both forms at
-once; reload the connection page after changing native options.
+The page requires a Home Assistant administrator and **Supervisor 2026.10.4+**.
+You can also save LAN settings in the native **Configuration** tab, including
+when an old USB adapter is absent. Use **Open Web UI** for the USB dropdown.
+Read-only, current limits and polling intervals remain in the native Configuration
+tab. Avoid editing both forms at once; reload the connection page after changing
+native options.
 
 The native Configuration form cannot show fields conditionally or require a
 dropdown for its device selector; see the [Supervisor option schema](https://contributors.home-assistant.io/apps/guides/options/).
@@ -165,15 +160,16 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
   health changes rather than every beat.
 - **Charging targets:** set an **Energy target** in kWh, or configure an optional
   vehicle percentage target through the integration. Targets only limit charging.
-  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.7.0b4/docs/user-guide.md#energy-target).
+  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/user-guide.md#energy-target).
 - **Next departure:** select a one-trip charging deadline in HA. This optional
   plan may resume a pause to meet the time; ordinary kWh/percentage limits alone
   never do. The service discards queued timed-plan commands after their deadline.
-  In integration 0.7.0b4, set up **Vehicle charge target**, then enable
-  **Next departure → Configure departure planning** and choose its battery-capacity source.
-  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.7.0b4/docs/user-guide.md#charge-for-the-next-departure).
+  Configure the vehicle's charge level under **Configure → Vehicle**, then
+  enable **Next departure → Configure departure planning** and choose its
+  battery-capacity source.
+  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/departure-planning.md).
 - **Loss and cost estimates:** choose optional vehicle and price sources in the
-  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.7.0b4/docs/charging-estimates.md).
+  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/charging-estimates.md).
 
 Early pause/resume, phase, release and lock changes are queued.
 HA's **Pending change** and **Pending change due** show the request and its
@@ -213,18 +209,47 @@ or selecting read-only does not release it. Include app data in backups; it
 contains the saved charging intent and private access token. Saved settings
 replace a small file rather than accumulating a history.
 
+### Virtual Plug & Charge
+
+This feature is **optional and off by default**. Configure vehicle profiles and
+fresh cable/home detection in HA, then enable **Configure → Vehicle → Virtual
+Plug & Charge** and permit each vehicle that may receive automatic charging
+permission. Automatic profile selection is a separate option; selecting a profile
+manually does not replace the detection check. See the
+[vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/vehicle-setup.md#optional-virtual-plug--charge).
+
+The app initially withholds charging release until HA recognizes the active,
+permitted vehicle unambiguously. A grant is valid only for the current physical
+connection. The app keeps it through HA Core restarts, even if cloud vehicle
+signals later become unavailable. Unplugging, losing wallbox communication or
+restarting the app clears it; a new grant needs fresh recognition from HA.
+Changing the vehicle's permission, identity or detection sources also invalidates
+its grant. Deliberate pauses, locks and reached targets remain effective. Local
+RFID authorization must be disabled for this EMS-based feature.
+
+Enabling the feature can stop an ongoing charge while it waits for recognition.
+Disabling it does not resume charging: explicitly enable **Charging release**
+afterwards if you want to allow charging. HA's **Virtual Plug & Charge** sensor
+shows whether recognition, permission or release is still missing.
+
+This is a convenience check based on vehicle-integration signals, not ISO 15118
+or cryptographic vehicle authentication. It needs app **0.8.0b1 or newer**;
+ordinary service connections keep their lower minimum version.
+
 ## Updates
 
 **The app does not need an update whenever the integration changes.** Their
-version numbers may differ. Integrations 0.6.1 and 0.7.0b4 need **service 0.6.1
+version numbers may differ. Integrations 0.6.1 and 0.8.0b1 need **service 0.6.1
 or newer with API 2** so timed commands expire in the service even while HA is offline.
 Update older apps first, including 0.6.0b1. Future integration-only updates can
 reuse a compatible service without restarting its heartbeat.
 
-For optional adapter setup, TCP login and the shared control fixes, update the
-app to **0.7.0b4** too.
-The compatible minimum has not changed; it does not imply that an older app
-already contains those fixes.
+For Virtual Plug & Charge, live Modbus debugging and all shared control fixes,
+update the app to **0.8.0b1** too. Changing a vehicle percentage target also needs
+the confirmed-update capability included in this beta; HA requests an app update
+if that capability is missing. Other controls remain available with an older
+compatible service. The general minimum has not changed; it does not imply
+that an older app already contains the new features or fixes.
 
 Update the app when its own update is offered or the integration's release notes
 require a newer service. Use **Check for updates** in the app store. **If both
@@ -232,7 +257,7 @@ components need updating, update the app first**, wait for initialization, then
 update the integration and restart Core. **Updating the app itself briefly
 interrupts the heartbeat.** Keep its data and the existing HA entry.
 
-**From an older version:** update this app to **0.7.0b4 first**, then the
+**From an older version:** update this app to **0.8.0b1 first**, then the
 beta integration. The API 2 minimum introduced in 0.6.1 still applies; no
 intermediate installation of 0.6.1 is needed. The old beta integration may show unavailable controls between
 updates because its API differs. Keep the existing beta app and its data; no
@@ -241,7 +266,7 @@ select its matching readable name as described above before starting the app.
 The token, saved charging state and USB settings are retained; switching to LAN
 is optional.
 
-Stable **0.6.1** is offered through `#apps`; beta **0.7.0b4** is offered through
+Stable **0.6.1** is offered through `#apps`; beta **0.8.0b1** is offered through
 `#apps-beta`. Keep an existing beta app and update normally. Switching catalogs is optional and
 creates a different app in Supervisor. For that change, back up the data, note
 the charging settings and disconnect the vehicle. Copy the options, set the new
@@ -275,12 +300,12 @@ uses HA's own security policy and does not automatically use this service profil
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
 | Not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
-| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.7.0b4/docs/troubleshooting.md#renew-service-access). |
+| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/troubleshooting.md#renew-service-access). |
 | Service API or minimum version is incompatible | Check the API and minimum service version required in the integration’s release notes. Version numbers do not need to match. Follow [Updates](#updates) if needed; changing the token does not fix this. |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
 | Connection setup required | Open **Web UI**, configure USB or LAN, save and restart the app. Setup mode is running but does not advertise ready wallbox data. |
-| Web UI asks for Supervisor 2026.11.0 | Published apps through 0.7.0b4 have this stricter check. The 2026.10.4+ correction is unreleased; use native Configuration in the meantime. The integration's HA minimum version is unchanged. |
+| Web UI asks for Supervisor 2026.11.0 | Update the app to **0.8.0b1** and reopen the page. This beta accepts Supervisor **2026.10.4+**; the integration's HA minimum version is unchanged. |
 | Serial adapter marked missing | Reconnect the saved adapter or choose its replacement from the dropdown. For LAN, change the connection type and save; the old serial path is removed. |
 | Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. A managed heartbeat or HA-to-app link failing continuously for 60 seconds raises a repair that clears on recovery; a connection fault has no Fix button. |
 
@@ -289,8 +314,7 @@ Diagnostics include the last 20 failed write/recovery records in RAM, with timin
 information and no packet contents or credentials. They add no Recorder rows and
 are lost when the app restarts.
 
-**Unreleased feature:** for optional live troubleshooting, open
-**Web UI → Live Modbus communication**
+For optional live troubleshooting, open **Web UI → Live Modbus communication**
 and enable capture. Existing reads, writes, retries and heartbeats appear with
 register addresses, decoded values, duration and outcome. A failed write shows
 the requested value, not proof that it was applied. Capture is off by default,
@@ -306,4 +330,4 @@ Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Error-200 recovery while paused and particular LAN gateways still need
 confirmation on the actual hardware; automated tests do not establish that.
 
-[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.7.0b4/docs/modbus-service.md)
+[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/modbus-service.md)

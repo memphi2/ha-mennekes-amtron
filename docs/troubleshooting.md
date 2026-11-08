@@ -29,9 +29,11 @@ For installation, downloads and updates, see [Installation and updates](installa
 ## A documented feature is missing
 
 Check [versions and feature availability](README.md#versions-and-feature-availability).
-Central vehicle profiles, automatic profile selection, Virtual Plug & Charge and the app live-debug
-panel are currently **unreleased**, so installing published beta 0.7.0b4 does
-not add them. Do not delete and recreate the wallbox to reveal a new feature.
+Central vehicle profiles, optional automatic selection and Virtual Plug & Charge
+are new in **integration beta 0.8.0b1**. In service mode, Virtual Plug & Charge
+also needs **app 0.8.0b1**; the live-debug panel belongs to that app release.
+Older betas do not include them. Do not delete and recreate the wallbox to reveal
+a new feature.
 
 For a released optional feature, enable it in its own configuration section.
 A percentage target needs a vehicle SoC source; departure planning also needs
@@ -103,7 +105,7 @@ itself, or configure those fields in the app when the service owns it.
 | App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
 | Older app **0.5.2b2** rejects LAN settings because an old USB device no longer exists | Update to **0.6.1**, which includes the fix for this validation conflict. Before updating, clear the saved **Serial adapter** selection in the native Configuration tab, then save LAN settings and restart. LAN needs no local USB device. |
 | **Connection setup required** | Open the app's **Web UI**, choose USB or LAN, save and restart. Until then, the app runs only setup and health checks, without Modbus, heartbeat or discovery. |
-| Web UI requests Supervisor 2026.11.0 while stable Supervisor is 2026.10.x | Published app releases through 0.7.0b4 have an overly strict version check. The 2026.10.4+ correction is currently unreleased. Use the native Configuration tab in the meantime; see [connection setup](upgrading.md#app-connection-page). The integration's HA minimum version is unchanged. |
+| Web UI requests Supervisor 2026.11.0 while Supervisor is 2026.10.x | Update the beta app to **0.8.0b1**, which supports **Supervisor 2026.10.4+**. Older apps through 0.7.0b4 had an overly strict version check. See [connection setup](upgrading.md#app-connection-page); the integration's HA minimum version is unchanged. |
 
 An app that starts successfully can still be waiting for the wallbox. The log
 separates API startup, USB/LAN connection, heartbeat start/stop and shutdown.
@@ -324,8 +326,8 @@ and that extra wait.
 
 ## Vehicle profiles and automatic selection
 
-These functions are **unreleased in this branch**. If your installed build
-includes them, check the following before changing unrelated wallbox settings:
+These optional functions are new in **beta 0.8.0b1**. Check the installed
+integration version, then review the following before changing wallbox settings:
 
 | Symptom | What to do |
 |---|---|
@@ -344,7 +346,8 @@ complete signal and freshness rules.
 
 ## Virtual Plug & Charge is waiting
 
-**Unreleased in this branch.** Check its status on the wallbox device.
+This optional feature is new in **beta 0.8.0b1** and off by default. In service
+mode it also requires the new app. Check its status on the wallbox device.
 
 | Symptom | What to check |
 |---|---|
@@ -426,8 +429,7 @@ full serial-port path.
 
 ### Watch app Modbus communication live
 
-**Unreleased in this branch.** In an app build containing this feature, select
-**Open Web UI → Live Modbus communication**, then enable
+In **app 0.8.0b1**, select **Open Web UI → Live Modbus communication**, then enable
 **Capture communication for 10 minutes**. This is optional and off after every
 app restart. It shows existing reads, writes and heartbeats, register addresses,
 decoded values, transaction durations and confirmed or failed responses. Each

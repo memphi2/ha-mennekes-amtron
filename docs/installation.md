@@ -63,8 +63,10 @@ release and restart Home Assistant. If needed, add
 `https://github.com/memphi2/ha-mennekes-amtron` in **HACS → ⋮ → Custom
 repositories**, category **Integration**.
 
-Stable **0.6.1** and published beta **0.7.0b4** are separate from the unreleased
-changes described on this branch. [Check feature availability](README.md#versions-and-feature-availability)
+**0.6.1 remains stable.** For vehicle profiles, optional automatic selection and
+Virtual Plug & Charge, choose **beta 0.8.0b1** and follow the
+[beta update guide](upgrading.md#trying-080b1).
+[Check feature availability](README.md#versions-and-feature-availability)
 before looking for a new option in an installed release.
 
 ## 3. Connect the wallbox
@@ -81,10 +83,10 @@ TCP port** point to the LAN-to-RS-485 hardware. They are different fields for
 different connections. On HA OS, you normally type neither a service URL nor a
 token for the app.
 
-The app's **Open Web UI** provides guided connection setup. Published apps
-through 0.7.0b4 still request Supervisor 2026.11.0; on an older stable Supervisor,
-use the app's native **Configuration** tab. The correction for stable Supervisor
-2026.10.4+ is currently unreleased. [Connection-page details](upgrading.md#app-connection-page).
+The app's **Open Web UI** provides guided connection setup. App **0.8.0b1**
+supports **Supervisor 2026.10.4+**; update an older beta app if it incorrectly asks
+for 2026.11.0. Native **Configuration** remains available for manual setup.
+[Connection-page details](upgrading.md#app-connection-page).
 
 ## 4. Check readings and try a charge
 
@@ -108,10 +110,11 @@ required just to use the wallbox.
    follow the required HA Core restart.
 4. Check current readings, heartbeat, pause/release and the intended current.
 
-The app and integration may have different version numbers. Published
-integration 0.6.1 and beta 0.7.0b4 require **service 0.6.1+ with API 2**. A compatible
-app can keep running during an integration-only update. New features can have
-additional service requirements; follow the specific release notes.
+The app and integration may have different version numbers. Stable 0.6.1 and
+beta 0.8.0b1 require **service 0.6.1+ with API 2** for ordinary service connections.
+A compatible app can keep running during an integration-only update. To use
+Virtual Plug & Charge in service mode, update the app to **0.8.0b1** first; the
+live Modbus view and guided-page correction also belong to that app release.
 
 Use **Check for updates** in the app store if an offered app update is missing.
 Moving between stable and beta app catalogs creates a separate app and requires

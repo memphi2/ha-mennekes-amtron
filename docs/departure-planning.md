@@ -12,10 +12,9 @@ when you want the vehicle to stay paused. A percentage target on its own never
 resumes charging.
 
 Departure planning, calendar import and BavarianData timer import are available
-in stable 0.6.1. References below to a shared vehicle profile describe the
-[unreleased profile setup](vehicle-setup.md); existing separate vehicle sources
-continue to work. Menu names follow this branch; older releases can group the
-settings differently. In service mode, use app/service 0.6.1 or newer.
+in stable 0.6.1. Shared [vehicle profiles](vehicle-setup.md) and the menu layout
+below are new in **beta 0.8.0b1**; existing separate vehicle sources continue to
+work. In service mode, use app/service 0.6.1 or newer.
 
 ## Example: ready tomorrow at 07:30
 

@@ -5,7 +5,10 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.8.0b1 — 2026-11-08
+
+Beta update of the integration and app; **0.6.1 remains stable**. Update the app
+through **#apps-beta** before the integration to use the new service features.
 
 - Add optional Virtual Plug & Charge: permit individual vehicle profiles and
   release a connection only after matching fresh cable/home evidence. Keep
@@ -14,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Reorganize setup and everyday documentation around user tasks, with dedicated
   vehicle/departure guides, examples, missing-data help and clear distinctions
-  between published features and development changes.
+  between stable and beta features.
 
 - Add optional live Modbus debugging in the app Web UI: decoded reads, writes,
   retries and heartbeats in a redacted 200-entry RAM buffer that expires after

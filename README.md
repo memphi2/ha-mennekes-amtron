@@ -74,11 +74,13 @@ setting belongs and why a requested change may wait.
 
 ## Development and releases
 
-**This branch includes unreleased changes.** Central vehicle profiles, optional
-automatic vehicle selection, Virtual Plug & Charge, live app Modbus debugging and the corrected
-Supervisor 2026.10.4 compatibility are not in published beta 0.7.0b4. The published
-stable version is 0.6.1. See [feature availability](docs/README.md#versions-and-feature-availability)
-and [release notes](CHANGELOG.md) before following a feature-specific guide.
+**Stable: 0.6.1 · Beta: 0.8.0b1.** The beta adds vehicle profiles, optional
+automatic selection and Virtual Plug & Charge, live app Modbus debugging and
+guided app setup on Supervisor 2026.10.4+. These optional features stay off until
+you configure them. In service mode, update the beta app first through
+**#apps-beta**. See [the beta update guide](docs/upgrading.md#trying-080b1),
+[feature availability](docs/README.md#versions-and-feature-availability) and
+[release notes](CHANGELOG.md).
 
 [All documentation](docs/README.md) · [Compatibility](docs/compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)
 

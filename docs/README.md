@@ -21,7 +21,7 @@ Already installed? Keep your device and entity IDs. Use
 | Install the recommended service app | [Modbus service](modbus-service.md) |
 | Use a LAN-to-RS-485 adapter | [LAN connection](network-gateway.md) |
 | Select one car, several cars or optional automatic detection | [Vehicle setup](vehicle-setup.md) |
-| Automatically release charging for a recognized, permitted profile | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — unreleased |
+| Automatically release charging for a recognized, permitted profile | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — beta 0.8.0b1 |
 | Reach a charge target for the next trip | [Departure planning](departure-planning.md) |
 | Use a calendar, climate action or PV surplus | [Blueprints](blueprints.md) |
 | Estimate charging costs or losses | [Charging estimates](charging-estimates.md) |
@@ -32,19 +32,20 @@ Already installed? Keep your device and entity IDs. Use
 
 ## Versions and feature availability
 
-These pages follow the current development branch. A feature described here may
-not yet be present in the release installed in Home Assistant.
+These pages cover **beta 0.8.0b1** and identify features already available in
+**stable 0.6.1**. Check your installed integration and app versions before looking
+for a new option.
 
 | Version | Available functionality |
 |---|---|
 | **Stable 0.6.1** | USB/LAN, optional service app, normal controls, kWh/percentage targets, next-trip planning, calendar/BavarianData timer import, costs and losses. |
-| **Published beta 0.7.0b4** | Separate feature menus, optional supported Waveshare setup/TCP login and additional control/recovery fixes. |
-| **Unreleased changes in this branch** | Central vehicle profiles, manual or optional automatic profile selection, optional Virtual Plug & Charge, shared BavarianData telemetry, live app Modbus debugging, improved configuration dialogs and corrected guided-page support for Supervisor 2026.10.4+. |
+| **Beta 0.8.0b1** | Central vehicle profiles, manual or optional automatic selection, optional Virtual Plug & Charge, shared BavarianData telemetry, live app Modbus debugging, clearer feature settings, supported Waveshare setup/TCP login and further control/recovery fixes. |
 
-Published app releases through 0.7.0b4 still require Supervisor 2026.11.0 to open
-the guided page. If that page rejects your current stable Supervisor, use the
-app's native **Configuration** tab; see [the version-specific explanation](upgrading.md#app-connection-page).
-Installing an existing beta does not include changes marked **unreleased**.
+App **0.8.0b1** supports its guided page on **Supervisor 2026.10.4+**. Update an
+older beta app if it incorrectly asks for Supervisor 2026.11.0. The live Modbus
+view is part of the new app; Virtual Plug & Charge also needs its new service
+capability when using service mode. Both features are optional and off by default.
+See [the beta update guide](upgrading.md#trying-080b1).
 
 The integration and app do not need matching version numbers. Follow the
 release's minimum-service requirement and [update instructions](installation.md#updates).

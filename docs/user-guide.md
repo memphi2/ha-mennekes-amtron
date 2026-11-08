@@ -14,8 +14,8 @@ targets and schedules only when you want them:
 - [Charge for the next departure](departure-planning.md)
 - [Losses and costs](charging-estimates.md)
 
-This branch also documents unreleased improvements. Vehicle profiles, automatic
-vehicle selection, Virtual Plug & Charge and app live debugging are marked separately; see
+Vehicle profiles, optional automatic selection, Virtual Plug & Charge and app
+live debugging are available in **beta 0.8.0b1**. **0.6.1 remains stable**; see
 [version availability](README.md#versions-and-feature-availability).
 
 ## Optional charging losses and costs
@@ -326,7 +326,7 @@ state. Set the intended goal with that owner before continuing the charge.
 
 ## Vehicle profiles
 
-**Unreleased in this branch.** Keep each car's sources, optional features and
+**New in beta 0.8.0b1.** Keep each car's sources, optional features and
 loss averages together. Select the connected car manually, or opt into the
 separate automatic-selection feature. A profile does not enable charging
 features by itself. Switching cars clears the former percentage target and trip
@@ -336,7 +336,7 @@ without starting a charge.
 
 ### Optional automatic vehicle selection
 
-**Unreleased and off by default.** Use the selected vehicle integration or
+**New in beta 0.8.0b1 and off by default.** Use the selected vehicle integration or
 explicit cable/home entities. Exactly one sufficiently clear candidate can be
 selected; uncertain matches leave no active vehicle. Choosing a car manually
 turns the automatic mode off. These signals are a selection aid, not vehicle
@@ -346,7 +346,7 @@ identity supplied by the wallbox.
 
 ### Optional Virtual Plug & Charge
 
-**Unreleased and off by default.** Separately enable this feature and permit the
+**New in beta 0.8.0b1 and off by default.** Separately enable this feature and permit the
 profiles that may receive automatic charging release. It needs an unambiguous
 cable/home match for the active car and a fresh cable report for the current
 connection cycle. Manual profile selection alone does not grant permission.
