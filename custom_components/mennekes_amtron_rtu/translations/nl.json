@@ -1347,7 +1347,7 @@
       },
       "vehicle_detection_entities": {
         "title": "Kabel- en thuissignalen",
-        "description": "Actief voertuig: **{vehicle}**.\n\nKies aparte signalen voor deze auto. De kabel vereist een binaire sensor met on = aangesloten. Thuis vereist een binaire sensor met on = thuis, of een persoon/apparaattracker met home = thuis. De signalen moeten binnen 30 minuten aan Home Assistant worden gemeld. Een melding bewijst niet wanneer de auto zijn locatie heeft gemeten.",
+        "description": "Actief voertuig: **{vehicle}**.\n\nKies aparte signalen voor deze auto. De kabel vereist een binaire sensor met on = aangesloten. Voor de kabel kan ook een sensor waarvan je in de volgende stap de statussen ‘aangesloten’ kiest. Thuis vereist een binaire sensor met on = thuis, of een persoon/apparaattracker met home = thuis. De signalen moeten binnen 30 minuten aan Home Assistant worden gemeld. Een melding bewijst niet wanneer de auto zijn locatie heeft gemeten.",
         "data": {
           "vehicle_connected_entity": "Laadkabel aangesloten",
           "vehicle_home_entity": "Voertuig thuis"
@@ -1355,6 +1355,16 @@
         "data_description": {
           "vehicle_connected_entity": "Gebruik het signaal ‘laadkabel aangesloten’ van deze auto, niet ‘bezig met laden’: de auto moet ook tijdens een pauze of met volle accu herkenbaar blijven.",
           "vehicle_home_entity": "Gebruik bij voorkeur de locatie van de auto zelf. De aanwezigheid van een persoon is alleen geschikt als deze betrouwbaar aangeeft dat de auto thuis is. Twee passende auto’s of onzekere signalen verhinderen automatische selectie."
+        }
+      },
+      "vehicle_detection_connected_states": {
+        "title": "Statussen ‘kabel aangesloten’",
+        "description": "Actief voertuig: **{vehicle}**.\n\nKies welke statussen van `{entity}` betekenen dat de laadkabel op deze auto is aangesloten. Elke andere gemelde status telt als losgekoppeld; onbekend of niet beschikbaar voorkomt automatische selectie.",
+        "data": {
+          "vehicle_connected_states": "Statussen aangesloten"
+        },
+        "data_description": {
+          "vehicle_connected_states": "Kies de statussen die de sensor bij een aangesloten kabel meldt, of typ er een precies zoals de sensor hem toont."
         }
       },
       "vehicle_plug_charge": {
@@ -1401,6 +1411,7 @@
       "vehicle_detection_source_invalid": "Kies een van de beschikbare herkenningsbronnen.",
       "vehicle_detection_entity_invalid": "Kies een bestaande binaire kabelsensor en een ondersteunde entiteit voor aanwezigheid thuis.",
       "vehicle_detection_entities_distinct": "Kies verschillende entiteiten voor de kabelverbinding en aanwezigheid thuis.",
+      "vehicle_connected_states_invalid": "Kies één tot acht statussen voor aangesloten, elk precies zoals de sensor ze meldt.",
       "plug_charge_invalid": "Kies aan of uit voor deze instelling.",
       "plug_charge_detection_required": "Selecteer een voertuigprofiel en stel de kabel-/thuisdetectie in voordat je automatisch toestemming geeft."
     }

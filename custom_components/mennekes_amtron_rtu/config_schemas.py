@@ -532,10 +532,23 @@ def vehicle_detection_entities_schema(current: dict[str, Any]) -> probatio.Schem
     return probatio.Schema({
         probatio.Required("vehicle_connected_entity", description={
             "suggested_value": current.get("vehicle_connected_entity"),
-        }): EntitySelector(EntitySelectorConfig(domain="binary_sensor")),
+        }): EntitySelector(EntitySelectorConfig(domain=["binary_sensor", "sensor"])),
         probatio.Required("vehicle_home_entity", description={
             "suggested_value": current.get("vehicle_home_entity"),
         }): EntitySelector(EntitySelectorConfig(domain=["device_tracker", "person", "binary_sensor"])),
+    })
+
+
+def vehicle_detection_connected_states_schema(
+    choices: list[str], current: list[str],
+) -> probatio.Schema:
+    return probatio.Schema({
+        probatio.Required("vehicle_connected_states", description={
+            "suggested_value": current,
+        }): SelectSelector(SelectSelectorConfig(
+            options=choices, multiple=True, custom_value=True,
+            mode=SelectSelectorMode.DROPDOWN,
+        )),
     })
 
 

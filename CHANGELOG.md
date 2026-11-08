@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Automatic vehicle selection accepts a text sensor as the cable signal, for
+  example a charging-port status. Choose which of its states mean connected.
+- The departure planning guide explains how to make BMW stream the climate
+  timers that BavarianData needs for the departure import.
+
 ## 0.8.0b4 — 2026-11-08
 
 Beta update of the integration and app; **0.6.1 remains stable**. Update the app

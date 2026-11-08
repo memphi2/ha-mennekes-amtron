@@ -17,6 +17,7 @@ CONF_VEHICLE_PLUG_CHARGE: Final = "vehicle_plug_charge"
 CONF_VEHICLE_DETECTION_SOURCE: Final = "vehicle_detection_source"
 CONF_VEHICLE_CONNECTED_ENTITY: Final = "vehicle_connected_entity"
 CONF_VEHICLE_HOME_ENTITY: Final = "vehicle_home_entity"
+CONF_VEHICLE_CONNECTED_STATES: Final = "vehicle_connected_states"
 CONF_VEHICLE_PROFILE_ID: Final = "vehicle_profile_id"
 CONF_VEHICLE_PROFILE_SELECTED_AT: Final = "vehicle_profile_selected_at"
 CONF_VEHICLE_PROVIDER: Final = "vehicle_provider"
@@ -27,6 +28,7 @@ CONF_VEHICLE_LIMIT_USE_PROFILE: Final = "vehicle_limit_use_profile"
 CONF_TIMED_USE_VEHICLE_CAPACITY: Final = "timed_use_vehicle_capacity"
 LEGACY_PROFILE_ID: Final = "00000000000000000000000000000000"
 MAX_VEHICLE_PROFILES: Final = 8
+MAX_CONNECTED_STATES: Final = 8
 RESET_PENDING: Final = "timed_goal_reset_pending"
 PROFILE_OPTION_KEYS: Final = frozenset(
     {
@@ -63,7 +65,7 @@ _IDENTITY_KEYS = {
     CONF_VEHICLE_SOURCE_IDENTITY,
 }
 _PROFILE_ID = re.compile(r"[0-9a-f]{32}")
-_DETECTION_ENTITY = re.compile(r"(binary_sensor|device_tracker|person)\.[a-z0-9_]+")
+_DETECTION_ENTITY = re.compile(r"(binary_sensor|sensor|device_tracker|person)\.[a-z0-9_]+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,23 +75,46 @@ class VehicleDetectionConfig:
     source: str
     connected_entity: str = ""
     home_entity: str = ""
+    # A text sensor reports a plugged-in cable with one of these states.
+    connected_states: tuple[str, ...] = ()
 
-    def as_dict(self) -> dict[str, str]:
-        result = {"source": self.source}
+    def as_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"source": self.source}
         if self.source == "entities":
             result.update(
                 connected_entity=self.connected_entity, home_entity=self.home_entity
             )
+            if self.connected_states:
+                result["connected_states"] = list(self.connected_states)
         return result
 
 
 def valid_detection_entity(value: Any, *, home: bool = False) -> bool:
-    """Accept only bounded HA identifiers with the required binary semantics."""
+    """Accept only bounded HA identifiers with the required semantics."""
     return (
         isinstance(value, str)
         and len(value) <= 255
         and _DETECTION_ENTITY.fullmatch(value) is not None
-        and (home or value.startswith("binary_sensor."))
+        and (
+            value.startswith(("binary_sensor.", "device_tracker.", "person."))
+            if home else value.startswith(("binary_sensor.", "sensor."))
+        )
+    )
+
+
+def valid_connected_states(entity: str, value: Any) -> bool:
+    """A text sensor needs its connected states; a binary sensor has none."""
+    if not entity.startswith("sensor."):
+        return value in (None, (), [])
+    return (
+        isinstance(value, (list, tuple))
+        and 0 < len(value) <= MAX_CONNECTED_STATES
+        and len(set(value)) == len(value)
+        and all(
+            isinstance(item, str) and item.strip() == item and 0 < len(item) <= 255
+            and item not in ("unknown", "unavailable")
+            for item in value
+        )
     )
 
 
@@ -99,15 +124,18 @@ def _detection_config(value: Any) -> VehicleDetectionConfig | None:
     if value == {"source": "profile"}:
         return VehicleDetectionConfig("profile")
     if (
-        value.keys() != {"source", "connected_entity", "home_entity"}
+        not {"source", "connected_entity", "home_entity"} <= value.keys()
+        <= {"source", "connected_entity", "home_entity", "connected_states"}
         or value["source"] != "entities"
         or not valid_detection_entity(value["connected_entity"])
         or not valid_detection_entity(value["home_entity"], home=True)
         or value["connected_entity"] == value["home_entity"]
+        or not valid_connected_states(value["connected_entity"], value.get("connected_states"))
     ):
         return None
     return VehicleDetectionConfig(
-        "entities", value["connected_entity"], value["home_entity"]
+        "entities", value["connected_entity"], value["home_entity"],
+        tuple(value.get("connected_states", ())),
     )
 
 

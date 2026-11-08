@@ -1347,7 +1347,7 @@
       },
       "vehicle_detection_entities": {
         "title": "Câble et présence à domicile",
-        "description": "Véhicule actif : **{vehicle}**.\n\nChoisissez des signaux distincts pour cette voiture. Le câble exige un capteur binaire dont on signifie branché. La présence exige un capteur binaire dont on signifie à domicile, ou une personne/un traceur dont home signifie à domicile. Les signaux doivent être signalés à Home Assistant dans les 30 minutes. Cela ne prouve pas la date de mesure de la position.",
+        "description": "Véhicule actif : **{vehicle}**.\n\nChoisissez des signaux distincts pour cette voiture. Le câble exige un capteur binaire dont on signifie branché. Un capteur dont vous choisissez les états « branché » à l’étape suivante convient aussi pour le câble. La présence exige un capteur binaire dont on signifie à domicile, ou une personne/un traceur dont home signifie à domicile. Les signaux doivent être signalés à Home Assistant dans les 30 minutes. Cela ne prouve pas la date de mesure de la position.",
         "data": {
           "vehicle_connected_entity": "Câble de charge branché",
           "vehicle_home_entity": "Véhicule à domicile"
@@ -1355,6 +1355,16 @@
         "data_description": {
           "vehicle_connected_entity": "Utilisez le signal « câble branché » de ce véhicule, pas « charge en cours » : il doit rester identifiable en pause ou avec une batterie pleine.",
           "vehicle_home_entity": "Préférez la localisation du véhicule. La présence d’une personne ne convient que si elle indique de façon fiable que ce véhicule est au domicile. Deux véhicules correspondants ou des signaux incertains empêchent la sélection automatique."
+        }
+      },
+      "vehicle_detection_connected_states": {
+        "title": "États « câble branché »",
+        "description": "Véhicule actif : **{vehicle}**.\n\nChoisissez quels états de `{entity}` signifient que le câble de recharge est branché sur ce véhicule. Tout autre état signalé compte comme débranché ; inconnu ou indisponible empêche la sélection automatique.",
+        "data": {
+          "vehicle_connected_states": "États branché"
+        },
+        "data_description": {
+          "vehicle_connected_states": "Choisissez les états que le capteur signale lorsque le câble est branché, ou saisissez-en un exactement comme le capteur l’affiche."
         }
       },
       "vehicle_plug_charge": {
@@ -1401,6 +1411,7 @@
       "vehicle_detection_source_invalid": "Choisissez une source de détection proposée.",
       "vehicle_detection_entity_invalid": "Choisissez un capteur binaire de câble existant et une entité de présence à domicile compatible.",
       "vehicle_detection_entities_distinct": "Choisissez des entités différentes pour le câble et la présence à domicile.",
+      "vehicle_connected_states_invalid": "Choisissez entre un et huit états branché, chacun exactement comme le capteur le signale.",
       "plug_charge_invalid": "Choisissez activé ou désactivé.",
       "plug_charge_detection_required": "Sélectionnez un profil et configurez ses signaux câble/domicile avant de l’autoriser automatiquement."
     }

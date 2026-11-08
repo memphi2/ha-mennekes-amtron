@@ -105,7 +105,10 @@ profile. Open **Configure → Vehicle → Automatic vehicle selection**. Under
   zone. Existing enabled entities are used; no extra cloud requests or vehicle
   commands are sent.
 - **Select Home Assistant entities**: choose two separate signals for this car.
-  The cable source must be a binary sensor with `on` meaning connected. The home
+  The cable source can be a binary sensor with `on` meaning connected, or a
+  sensor with text states: the next step asks which of its states mean
+  connected, for example `connected`. Every other state counts as unplugged,
+  and `unknown` or `unavailable` prevents selection. The home
   source may be a binary sensor with `on` meaning at home, or a `person`/
   `device_tracker` with state `home`. Prefer a signal that follows the vehicle;
   a person's presence alone does not establish where the car is.

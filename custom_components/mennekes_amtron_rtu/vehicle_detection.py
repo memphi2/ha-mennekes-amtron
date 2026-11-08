@@ -38,7 +38,9 @@ from .vehicle_sources import (
 SETTLE_SECONDS = 3
 
 
-def entity_signal(state: State | None, *, home: bool) -> bool | None:
+def entity_signal(
+    state: State | None, *, home: bool, connected_states: tuple[str, ...] = (),
+) -> bool | None:
     """Only current, explicit HA presence/connection states can identify a car."""
     if state is None or state.attributes.get("restored") is True:
         return None
@@ -47,6 +49,10 @@ def entity_signal(state: State | None, *, home: bool) -> bool | None:
         return None
     if state.domain == "binary_sensor":
         return {"on": True, "off": False}.get(state.state)
+    if not home and state.domain == "sensor" and connected_states:
+        if state.state in ("unknown", "unavailable", ""):
+            return None
+        return state.state in connected_states
     if home and state.domain in ("person", "device_tracker"):
         if state.state in ("unknown", "unavailable", ""):
             return None
@@ -76,7 +82,9 @@ class VehicleEvidence:
             return source.snapshot if source is not None else VehicleDetection()
         connected = self._hass.states.get(detection.connected_entity)
         return VehicleDetection(
-            connected=entity_signal(connected, home=False),
+            connected=entity_signal(
+                connected, home=False, connected_states=detection.connected_states,
+            ),
             home=entity_signal(self._hass.states.get(detection.home_entity), home=True),
             connected_at=connected.last_reported if connected is not None else None,
         )
@@ -107,8 +115,8 @@ class VehicleEvidence:
     def effective(self, active: str | None, *, wallbox_connected: bool | None = None) -> str | None:
         """Keep the active car until another one is identified or unknown.
 
-        Unplugging or stale reports do not deselect it: switching profiles
-        reloads every entity. Another car reporting itself plugged in, or a
+        Unplugging or stale reports do not deselect it, so a briefly missing
+        signal does not switch the car's goals off. Another car reporting itself plugged in, or a
         car at the wallbox while the active one reports itself elsewhere,
         ends the selection, so its goals never apply to another vehicle.
         """

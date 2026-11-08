@@ -1347,7 +1347,7 @@
       },
       "vehicle_detection_entities": {
         "title": "Kabel- und Zuhause-Signale",
-        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle getrennte Signale für dieses Auto. Für das Kabel ist ein Binärsensor mit Ein = angeschlossen erforderlich. Für zu Hause nutze einen Binärsensor mit Ein = zu Hause oder eine Person/Geräteverfolgung mit home = zu Hause. Die Signale müssen innerhalb von 30 Minuten an Home Assistant gemeldet werden. Eine Meldung belegt nicht, wann das Auto seinen Standort ermittelt hat.",
+        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle getrennte Signale für dieses Auto. Für das Kabel nutze einen Binärsensor mit Ein = angeschlossen oder einen Sensor, dessen Zustände für „angeschlossen“ du im nächsten Schritt auswählst. Für zu Hause nutze einen Binärsensor mit Ein = zu Hause oder eine Person/Geräteverfolgung mit home = zu Hause. Die Signale müssen innerhalb von 30 Minuten an Home Assistant gemeldet werden. Eine Meldung belegt nicht, wann das Auto seinen Standort ermittelt hat.",
         "data": {
           "vehicle_connected_entity": "Ladekabel angeschlossen",
           "vehicle_home_entity": "Fahrzeug zu Hause"
@@ -1355,6 +1355,16 @@
         "data_description": {
           "vehicle_connected_entity": "Verwende das Signal „Ladekabel verbunden“ dieses Autos, nicht „lädt gerade“: Das Auto muss auch bei Ladepause oder vollem Akku zuordenbar bleiben.",
           "vehicle_home_entity": "Bevorzuge den Standort des Autos selbst. Die Anwesenheit einer Person ist nur dann ein sinnvoller Ersatz, wenn sie zuverlässig bedeutet, dass dieses Auto zu Hause ist. Zwei passende Autos oder unsichere Signale verhindern die automatische Auswahl."
+        }
+      },
+      "vehicle_detection_connected_states": {
+        "title": "Zustände für „Kabel angeschlossen“",
+        "description": "Aktives Fahrzeug: **{vehicle}**.\n\nWähle, welche Zustände von `{entity}` bedeuten, dass das Ladekabel an diesem Auto steckt. Jeder andere gemeldete Zustand gilt als nicht angeschlossen; unbekannt oder nicht verfügbar verhindert die automatische Auswahl.",
+        "data": {
+          "vehicle_connected_states": "Zustände für angeschlossen"
+        },
+        "data_description": {
+          "vehicle_connected_states": "Wähle die Zustände, die der Sensor bei eingestecktem Kabel meldet, oder gib einen genau so ein, wie der Sensor ihn anzeigt."
         }
       },
       "vehicle_plug_charge": {
@@ -1401,6 +1411,7 @@
       "vehicle_detection_source_invalid": "Wähle eine der angebotenen Erkennungsquellen.",
       "vehicle_detection_entity_invalid": "Wähle einen vorhandenen Kabel-Binärsensor und eine unterstützte Entität für die Anwesenheit zu Hause.",
       "vehicle_detection_entities_distinct": "Wähle unterschiedliche Entitäten für Kabelverbindung und Anwesenheit zu Hause.",
+      "vehicle_connected_states_invalid": "Wähle einen bis acht Zustände für angeschlossen, jeweils genau so, wie der Sensor sie meldet.",
       "plug_charge_invalid": "Wähle für diese Einstellung Ein oder Aus.",
       "plug_charge_detection_required": "Wähle ein Fahrzeugprofil und richte seine Kabel-/Zuhause-Erkennung ein, bevor du es automatisch freigibst."
     }
