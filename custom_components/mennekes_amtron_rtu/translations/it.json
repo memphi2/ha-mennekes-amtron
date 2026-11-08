@@ -1258,7 +1258,7 @@
         "data": {
           "vehicle_profile_id": "Profilo veicolo"
         },
-        "description": "Seleziona il veicolo collegato a questa wallbox. Il cambio cancella l’obiettivo percentuale e il piano di partenza precedenti senza avviare la ricarica. Ogni profilo conserva impostazioni e perdite medie.",
+        "description": "Seleziona il veicolo collegato a questa wallbox. Il cambio non avvia la ricarica. Ogni auto conserva il proprio obiettivo percentuale e la propria partenza prevista; un’auto senza partenza salvata parte senza partenza. Ogni profilo conserva impostazioni e perdite medie.",
         "data_description": {
           "vehicle_profile_id": "Seleziona l’auto effettivamente collegata prima della ricarica, soprattutto per confrontare le perdite. Questa scelta manuale disattiva la selezione automatica."
         }
@@ -1347,7 +1347,7 @@
       },
       "vehicle_detection_entities": {
         "title": "Cavo e presenza a casa",
-        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli segnali distinti per questa auto. Per il cavo serve un sensore binario con on = collegato. Per la presenza serve un sensore binario con on = a casa, oppure una persona/un localizzatore con home = a casa. I segnali devono essere segnalati a Home Assistant entro 30 minuti. La segnalazione non prova quando l’auto ha rilevato la posizione.",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli segnali distinti per questa auto. Per il cavo usa un sensore binario con on = collegato, oppure un sensore di cui scegli gli stati « collegato » nel passaggio successivo. Per la presenza serve un sensore binario con on = a casa, oppure una persona/un localizzatore con home = a casa. I segnali devono essere segnalati a Home Assistant entro 30 minuti. La segnalazione non prova quando l’auto ha rilevato la posizione.",
         "data": {
           "vehicle_connected_entity": "Cavo di ricarica collegato",
           "vehicle_home_entity": "Veicolo a casa"
@@ -1355,6 +1355,16 @@
         "data_description": {
           "vehicle_connected_entity": "Usa il segnale «cavo collegato» di questa auto, non «ricarica in corso»: deve restare identificabile anche in pausa o a batteria piena.",
           "vehicle_home_entity": "Preferisci la posizione dell’auto. La presenza di una persona va bene solo se indica in modo affidabile che questa auto è a casa. Due auto compatibili o segnali incerti impediscono la selezione automatica."
+        }
+      },
+      "vehicle_detection_connected_states": {
+        "title": "Stati « cavo collegato »",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli quali stati di `{entity}` indicano che il cavo di ricarica è collegato a questa auto. Ogni altro stato segnalato conta come scollegato; sconosciuto o non disponibile impedisce la selezione automatica.",
+        "data": {
+          "vehicle_connected_states": "Stati collegato"
+        },
+        "data_description": {
+          "vehicle_connected_states": "Scegli gli stati che il sensore segnala con il cavo collegato, oppure inseriscine uno esattamente come lo mostra il sensore."
         }
       },
       "vehicle_plug_charge": {
@@ -1401,6 +1411,7 @@
       "vehicle_detection_source_invalid": "Seleziona una delle fonti di rilevamento disponibili.",
       "vehicle_detection_entity_invalid": "Seleziona un sensore binario del cavo esistente e un’entità di presenza a casa supportata.",
       "vehicle_detection_entities_distinct": "Seleziona entità diverse per il cavo e la presenza a casa.",
+      "vehicle_connected_states_invalid": "Scegli da uno a otto stati collegato, ciascuno esattamente come lo segnala il sensore.",
       "plug_charge_invalid": "Scegli attivato o disattivato.",
       "plug_charge_detection_required": "Seleziona un profilo e configura i segnali cavo/casa prima di autorizzarlo automaticamente."
     }

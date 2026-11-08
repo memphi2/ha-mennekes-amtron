@@ -44,6 +44,16 @@ def test_only_explicit_connection_and_presence_states_qualify(entity, value, hom
     assert m.entity_signal(State(entity, value), home=home) is expected
 
 
+@pytest.mark.parametrize(("value", "expected"), [
+    ("CONNECTED", True), ("LOCKED", True), ("DISCONNECTED", False),
+    ("unknown", None), ("unavailable", None), ("", None),
+])
+def test_a_text_sensor_is_connected_only_in_its_chosen_states(value, expected):
+    state = State("sensor.port", value)
+    assert m.entity_signal(state, home=False, connected_states=("CONNECTED", "LOCKED")) is expected
+    assert m.entity_signal(state, home=True, connected_states=("CONNECTED",)) is None
+
+
 def test_restored_stale_and_future_signals_are_unknown():
     assert m.entity_signal(None, home=True) is None
     assert m.entity_signal(State("binary_sensor.plug", "on", {"restored": True}), home=False) is None

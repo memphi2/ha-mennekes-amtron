@@ -1258,7 +1258,7 @@
         "data": {
           "vehicle_profile_id": "Vehicle profile"
         },
-        "description": "Select the vehicle connected to this wallbox. Switching clears the previous percentage target and departure plan without starting charging. Each profile keeps its settings and loss average.",
+        "description": "Select the vehicle connected to this wallbox. Switching does not start charging. Each car keeps its own percentage target and its own upcoming departure; a car without one starts without a departure. Each profile keeps its settings and loss average.",
         "data_description": {
           "vehicle_profile_id": "Select the actual car before starting a charge, especially when comparing charging losses. This manual choice disables automatic vehicle selection."
         }
@@ -1347,7 +1347,7 @@
       },
       "vehicle_detection_entities": {
         "title": "Cable and home signals",
-        "description": "Active vehicle: **{vehicle}**.\n\nChoose separate signals for this car. Cable connection must be a binary sensor with on = connected. Home presence must be a binary sensor with on = at home, or a person/device tracker with home = at home. Use signals reported to Home Assistant within 30 minutes. Reports do not prove when the car measured its location.",
+        "description": "Active vehicle: **{vehicle}**.\n\nChoose separate signals for this car. Cable connection must be a binary sensor with on = connected, or a sensor whose connected states you choose in the next step. Home presence must be a binary sensor with on = at home, or a person/device tracker with home = at home. Use signals reported to Home Assistant within 30 minutes. Reports do not prove when the car measured its location.",
         "data": {
           "vehicle_connected_entity": "Charging cable connected",
           "vehicle_home_entity": "Vehicle at home"
@@ -1355,6 +1355,16 @@
         "data_description": {
           "vehicle_connected_entity": "Use this car’s cable-connected signal, not “currently charging”: the car must remain identifiable while paused or fully charged.",
           "vehicle_home_entity": "Prefer the car’s own location signal. A person’s presence is only a useful substitute if it reliably indicates that this car is at home. Two matching cars or uncertain signals prevent automatic selection."
+        }
+      },
+      "vehicle_detection_connected_states": {
+        "title": "Cable connected states",
+        "description": "Active vehicle: **{vehicle}**.\n\nChoose which states of `{entity}` mean that the charging cable is plugged into this car. Every other reported state counts as unplugged; unknown or unavailable prevents automatic selection.",
+        "data": {
+          "vehicle_connected_states": "Connected states"
+        },
+        "data_description": {
+          "vehicle_connected_states": "Pick the states the sensor reports for a plugged-in cable, or type one in exactly as the sensor shows it."
         }
       },
       "vehicle_plug_charge": {
@@ -1401,6 +1411,7 @@
       "vehicle_detection_source_invalid": "Select one of the available detection sources.",
       "vehicle_detection_entity_invalid": "Select an existing cable binary sensor and a supported home-presence entity.",
       "vehicle_detection_entities_distinct": "Select separate entities for cable connection and home presence.",
+      "vehicle_connected_states_invalid": "Choose between one and eight connected states, each exactly as the sensor reports it.",
       "plug_charge_invalid": "Choose on or off for this setting.",
       "plug_charge_detection_required": "Select a vehicle profile and configure its cable/home detection signals before allowing it to charge automatically."
     }

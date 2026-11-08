@@ -2,6 +2,7 @@
 
 import asyncio
 from copy import deepcopy
+from types import SimpleNamespace
 
 import pytest
 
@@ -127,7 +128,7 @@ def test_each_manual_signal_pair_is_saved_only_to_its_profile_without_enabling_a
         )
         assert set(fields(form)) == {"vehicle_connected_entity", "vehicle_home_entity"}
         assert fields(form)["vehicle_connected_entity"].config["domain"] == [
-            "binary_sensor"
+            "binary_sensor", "sensor",
         ]
         saved = (
             await flow.async_step_vehicle_detection_entities(
@@ -349,7 +350,7 @@ def test_existing_entity_sources_can_be_edited_and_disabled_without_changing_oth
             "vehicle_detection_entity_invalid",
         ),
         (
-            "sensor.plug",
+            "switch.plug",
             "person.driver",
             "vehicle_connected_entity",
             "vehicle_detection_entity_invalid",
@@ -387,6 +388,86 @@ def test_detector_entity_inputs_require_two_distinct_semantically_supported_sign
         assert profiles(flow.config_entry.options)[A].detection is None
 
     asyncio.run(run())
+
+
+def test_a_text_sensor_cable_signal_needs_its_connected_states():
+    async def run():
+        entry = FakeConfigEntry(options=profile_options())
+        flow = Flow(entry)
+        reported = {"sensor.port": SimpleNamespace(
+            state="DISCONNECTED", attributes={"options": ["CONNECTED", "DISCONNECTED", 3]},
+        )}
+        flow.hass.states = SimpleNamespace(get=reported.get)
+        await select_detector(flow)
+        await flow.async_step_vehicle_detection_source({"vehicle_detection_source": "entities"})
+        form = await flow.async_step_vehicle_detection_entities({
+            "vehicle_connected_entity": "sensor.port", "vehicle_home_entity": "person.owner",
+        })
+        assert form["step_id"] == "vehicle_detection_connected_states"
+        assert form["description_placeholders"]["entity"] == "sensor.port"
+        selector = fields(form)["vehicle_connected_states"]
+        assert selector.config["options"] == ["CONNECTED", "DISCONNECTED"]
+        assert selector.config["multiple"]
+        assert selector.config["custom_value"]
+        for value in ([], ["unknown"], ["a", "a"], [str(n) for n in range(9)], "CONNECTED"):
+            form = await flow.async_step_vehicle_detection_connected_states(
+                {"vehicle_connected_states": value}
+            )
+            assert form["errors"] == {"vehicle_connected_states": "vehicle_connected_states_invalid"}
+        saved = (await flow.async_step_vehicle_detection_connected_states(
+            {"vehicle_connected_states": [" CONNECTED", "LOCKED"]}
+        ))["data"]
+        detection = profiles(saved)[A].detection
+        assert detection == VehicleDetectionConfig(
+            "entities", "sensor.port", "person.owner", ("CONNECTED", "LOCKED"),
+        )
+        assert saved["vehicle_profiles"][A]["detection"]["connected_states"] == ["CONNECTED", "LOCKED"]
+
+        # Editing keeps the chosen states, even ones the sensor does not list.
+        entry.options = saved
+        flow = Flow(entry)
+        flow.hass.states = SimpleNamespace(get={}.get)
+        await select_detector(flow)
+        await flow.async_step_vehicle_detection_source({"vehicle_detection_source": "entities"})
+        form = await flow.async_step_vehicle_detection_entities({
+            "vehicle_connected_entity": "sensor.port", "vehicle_home_entity": "person.owner",
+        })
+        assert fields(form)["vehicle_connected_states"].config["options"] == ["CONNECTED", "LOCKED"]
+
+    asyncio.run(run())
+
+
+def test_connected_states_step_requires_a_chosen_sensor():
+    async def run():
+        flow = Flow(FakeConfigEntry(options=profile_options()))
+        assert (await flow.async_step_vehicle_detection_connected_states())["step_id"] == "init"
+
+    asyncio.run(run())
+
+
+def test_a_binary_cable_signal_tolerates_empty_stored_states():
+    raw = profile_options()
+    raw["vehicle_profiles"][A]["detection"] = {
+        "source": "entities", "connected_entity": "binary_sensor.plug",
+        "home_entity": "person.owner", "connected_states": None,
+    }
+    assert profiles(raw)[A].detection == VehicleDetectionConfig(
+        "entities", "binary_sensor.plug", "person.owner",
+    )
+
+
+@pytest.mark.parametrize("detection", [
+    {"source": "entities", "connected_entity": "sensor.port", "home_entity": "person.owner"},
+    {"source": "entities", "connected_entity": "sensor.port", "home_entity": "person.owner",
+     "connected_states": ["unavailable"]},
+    {"source": "entities", "connected_entity": "binary_sensor.plug", "home_entity": "person.owner",
+     "connected_states": ["on"]},
+    {"source": "entities", "connected_entity": "binary_sensor.plug", "home_entity": "sensor.home"},
+])
+def test_stored_cable_states_must_match_the_signal_type(detection):
+    raw = profile_options()
+    raw["vehicle_profiles"][A]["detection"] = detection
+    assert A not in profiles(raw)
 
 
 def test_detector_profile_choice_and_stale_draft_cannot_configure_the_wrong_car():

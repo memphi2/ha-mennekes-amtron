@@ -12,7 +12,7 @@ can also supply supported data from one selected BMW vehicle.
 stable 0.6.1. Central vehicle profiles, optional automatic selection and
 Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
 below; existing manual sources continue to work after updating.
-The steps below follow **beta 0.8.0b4**, which adds the wallbox **Virtual Plug &
+The steps below follow **beta 0.8.0b5**, which adds the wallbox **Virtual Plug &
 Charge** switch, guided detection setup and clearer **Stop using vehicle charge
 level** action. Existing activation settings and profile permissions are kept.
 See [versions and feature availability](README.md#versions-and-feature-availability).
@@ -77,8 +77,10 @@ battery-health percentage. If that value is missing, choose a suitable manual
 capacity source instead.
 
 Check the selected profile **before charging**, whether you chose it manually or
-enabled automatic selection. Changing the active profile clears the previous
-car's departure plan without starting charging. From **0.8.0b4**, each profile
+enabled automatic selection. Changing the active profile does not start
+charging. Each car keeps its own upcoming departure: switching away remembers
+it, and returning to the car restores it if it still lies ahead. A car without
+a saved departure, or no vehicle at all, starts without one. From **0.8.0b4**, each profile
 keeps its own percentage target: returning to a car restores its last target,
 capped at its current limit, instead of no target. With no vehicle selected, no
 percentage target applies. Charging-loss averages are kept separately for
@@ -105,7 +107,10 @@ profile. Open **Configure → Vehicle → Automatic vehicle selection**. Under
   zone. Existing enabled entities are used; no extra cloud requests or vehicle
   commands are sent.
 - **Select Home Assistant entities**: choose two separate signals for this car.
-  The cable source must be a binary sensor with `on` meaning connected. The home
+  The cable source can be a binary sensor with `on` meaning connected, or a
+  sensor with text states: the next step asks which of its states mean
+  connected, for example `connected`. Every other state counts as unplugged,
+  and `unknown` or `unavailable` prevents selection. The home
   source may be a binary sensor with `on` meaning at home, or a `person`/
   `device_tracker` with state `home`. Prefer a signal that follows the vehicle;
   a person's presence alone does not establish where the car is.

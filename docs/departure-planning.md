@@ -77,6 +77,15 @@ published Home Assistant states; it does not fetch BMW cloud data or change the
 vehicle's timers. Those states may be cached, so check **Next departure** after
 importing, especially after changing the timer in your car or the BMW app.
 
+- BMW streams the timers only when they are ticked in the car's data selection.
+  BavarianData's **Choose streamed data** does not tick them, even with the
+  *Metadata* cluster selected. In the BMW portal, open the car's **BMW CarData**
+  page, choose **Change data selection** under **CarData Stream**, and tick the
+  action, hour and minute fields of each climate timer you want to use (German
+  portal: *Aktion/Stunde/Minute für Überschreiben der Klimazeitautomatik* for
+  the one-off timer, *… Zeitautomatik 1/2 an Wochentagen* for the weekly ones).
+  Save, then change the timer once in the car or the MyBMW app: the sensors
+  only appear after the car has sent their values.
 - Enable the **action**, **hour** and **minute** sensor for each timer you want
   to use in the BavarianData device's entity list. These diagnostic entities
   start disabled. The timer's action must report `activate`; missing or
