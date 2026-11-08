@@ -132,9 +132,10 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                 await hass.async_block_till_done()
                 assert hass.states.get(target).state == "70.0"
                 assert hass.states.get(target).attributes["max"] == 70
+                # Clamped to the car's limit, the target now follows that limit.
                 hass.states.async_set(LIMIT, "90", {"unit_of_measurement": "%"})
                 await hass.async_block_till_done()
-                assert hass.states.get(target).state == "70.0"
+                assert hass.states.get(target).state == "90.0"
                 assert hass.states.get(target).attributes["max"] == 90
                 for missing in ("unavailable", "0"):
                     hass.states.async_set(LIMIT, missing, {"unit_of_measurement": "%"})

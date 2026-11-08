@@ -9,10 +9,10 @@ then the integration. Keep existing app data and your HA entry. The **#apps**
 catalog carries stable updates; **#apps-beta** follows the beta channel below.
 Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Trying 0.8.0b2
+## Trying 0.8.0b3
 
-**0.8.0b2 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
-prereleases in your integration installer and select **v0.8.0b2**. Keep the
+**0.8.0b3 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
+prereleases in your integration installer and select **v0.8.0b3**. Keep the
 existing HA entry. The beta app is offered through
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
 catalog can use **Check for updates** and update their app in place.
@@ -20,10 +20,13 @@ catalog can use **Check for updates** and update their app in place.
 Moving from **#apps** to **#apps-beta** creates a separate app installation.
 Follow the [channel handover](modbus-service.md#updates), preserving its data
 and ensuring only one service owns the wallbox connection. In service mode,
-update the app to **0.8.0b2 first**, wait for initialization, then update the
-integration. The app now gives the live Modbus view its own **Debug log** tab
-beside **Connection**. The integration adds a wallbox Plug & Charge switch and guided
-vehicle setup while preserving existing settings. Supervisor **2026.10.4+**
+update the app to **0.8.0b3 first**, wait for initialization, then update the
+integration. Beta 3 lets Virtual Plug & Charge end a manual pause when a permitted
+car is plugged in. App **0.8.0b3** lifts that pause while the charging release is
+still off, so the release follows without the state-change interval; with an
+older app the release can wait for that interval. The status sensor names the
+reason when charging stays blocked. Beta 2's separate **Debug log** tab, wallbox
+Plug & Charge switch and guided vehicle setup remain. Supervisor **2026.10.4+**
 remains supported.
 The integration's general minimum remains **service 0.6.1 with API 2**; ordinary
 connections can keep using a compatible older service. Virtual Plug & Charge

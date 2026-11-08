@@ -86,7 +86,7 @@ def test_unproven_absence_keeps_guard_even_when_cache_says_idle(failure):
 
 
 @pytest.mark.parametrize("phases", [False, True])
-def test_unplugged_write_floor_remains_and_replug_restores_long_guard(phases):
+def test_unplugged_write_floor_remains_and_only_phase_switching_keeps_long_guard(phases):
     async def run():
         harness = Harness(state_change_interval_seconds=300)
         control = await harness.connect()
@@ -101,10 +101,10 @@ def test_unplugged_write_floor_remains_and_replug_restores_long_guard(phases):
         assert control.pending_action is not None
         put(harness.transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)
         put(harness.transport.bank, R.CP_STATE, CpState.B1)
-        # Keep the car connected until the interval ends; phase switching then
-        # still needs its separate pause and grace time.
+        # An unplugged current change switched no charge, so a fresh plug-in
+        # waits only for the write floor. Phase switching keeps its guard.
         await asyncio.wait_for(control._flush_task, 1)
-        assert harness.clock[0] == (1305 if phases else 1300)
+        assert harness.clock[0] == (1305 if phases else 1005)
         assert control.pending_action is None
 
     asyncio.run(run())
@@ -201,5 +201,31 @@ def test_idle_with_conflicting_cp_never_skips_phase_preparation(cp):
         with pytest.raises(ServiceValidationError):
             await control.async_set_requested_phases(1)
         assert harness.transport.writes == []
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("release", [0, 1])
+def test_release_off_current_changes_skip_and_keep_the_long_guard(release):
+    async def run():
+        harness = Harness(state_change_interval_seconds=300)
+        control = await harness.connect()
+        put(harness.transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)
+        put(harness.transport.bank, R.CP_STATE, CpState.B1)
+        put(harness.transport.bank, R.CHARGING_RELEASE, release)
+        control._write_state.confirmed_current = 1
+        control.pause_requested = True
+        armed = harness.clock[0] - 100
+        control._write_state.mode_change_at = armed
+        await control.async_resume_charging()
+        if release:
+            # A closed relay would start a charge: the guard still applies.
+            assert control.pending_action == "resume"
+            assert harness.transport.writes == []
+        else:
+            assert len(harness.transport.writes) == 1
+            assert control.pause_requested is False
+            assert control._write_state.mode_change_at == armed
+        await control.async_shutdown()
 
     asyncio.run(run())

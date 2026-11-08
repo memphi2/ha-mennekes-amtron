@@ -21,7 +21,7 @@ Already installed? Keep your device and entity IDs. Use
 | Install the recommended service app | [Modbus service](modbus-service.md) |
 | Use a LAN-to-RS-485 adapter | [LAN connection](network-gateway.md) |
 | Select one car, several cars or optional automatic detection | [Vehicle setup](vehicle-setup.md) |
-| Automatically release charging for a recognized, permitted profile | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — beta 0.8.0b2 |
+| Automatically release charging for a recognized, permitted profile | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — beta 0.8.0b3 |
 | Reach a charge target for the next trip | [Departure planning](departure-planning.md) |
 | Use a calendar, climate action or PV surplus | [Blueprints](blueprints.md) |
 | Estimate charging costs or losses | [Charging estimates](charging-estimates.md) |
@@ -32,22 +32,24 @@ Already installed? Keep your device and entity IDs. Use
 
 ## Versions and feature availability
 
-These pages cover **beta 0.8.0b2** and identify features already available in
+These pages cover **beta 0.8.0b3** and identify features already available in
 **stable 0.6.1**. Check your installed integration and app versions before looking
 for a new option.
 Beta 2 adds a separate app **Debug log** tab, a wallbox **Virtual Plug & Charge**
-activation switch and guided vehicle setup.
+activation switch and guided vehicle setup. Beta 3 lets Virtual Plug & Charge end
+a manual pause for a permitted car, releases charging without the state-change
+delay and shows why charging stays blocked.
 
 | Version | Available functionality |
 |---|---|
 | **Stable 0.6.1** | USB/LAN, optional service app, normal controls, kWh/percentage targets, next-trip planning, calendar/BavarianData timer import, costs and losses. |
-| **Beta 0.8.0b2** | Central vehicle profiles, manual or optional automatic selection, optional Virtual Plug & Charge, shared BavarianData telemetry, live app Modbus debugging, a wallbox Plug & Charge switch, guided vehicle settings, supported Waveshare setup/TCP login and further control/recovery fixes. |
+| **Beta 0.8.0b3** | Central vehicle profiles, manual or optional automatic selection, optional Virtual Plug & Charge, shared BavarianData telemetry, live app Modbus debugging, a wallbox Plug & Charge switch, guided vehicle settings, supported Waveshare setup/TCP login and further control/recovery fixes. |
 
 App **0.8.0b2** supports its guided page on **Supervisor 2026.10.4+**. Update an
 older beta app if it incorrectly asks for Supervisor 2026.11.0. The separate
 live Modbus tab needs app **0.8.0b2**; Virtual Plug & Charge needs the service
 capability in **app 0.8.0b1 or newer**. Both features are optional and off by default.
-See [the beta update guide](upgrading.md#trying-080b2).
+See [the beta update guide](upgrading.md#trying-080b3).
 
 The integration and app do not need matching version numbers. Follow the
 release's minimum-service requirement and [update instructions](installation.md#updates).

@@ -350,7 +350,7 @@ def test_terminal_evidence_during_guarded_reads_is_rechecked_before_start(action
         harness, control, runner, _saved = await _runner(paused=True)
         await runner.async_set_target(12)
 
-        async def wait_then_notice_goal():
+        async def wait_then_notice_goal(**_kwargs):
             runner.observe(_snapshot(harness, 1247))
 
         control._async_check_transition_interval = wait_then_notice_goal

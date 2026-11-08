@@ -15,6 +15,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from ._flow_serial import port_category
+from .data import MennekesAmtronRuntimeData
 from .device.capabilities import supported_blocks, supported_register_keys
 from .device.client_errors import AmtronBusError
 from .device.connection import NetworkConfig
@@ -100,6 +101,9 @@ async def async_get_config_entry_diagnostics(
             "max_charging_current": runtime_data.control.max_charging_current,
             "charging_setpoint": runtime_data.control.charging_setpoint,
             "is_paused": runtime_data.control.is_paused,
+            "pause_requested": runtime_data.control.pause_requested,
+            "charging_release_requested": runtime_data.control.charging_release_requested,
+            "energy_goal_stop_requested": runtime_data.control.energy_goal_stop_requested,
             "heartbeat_running": bool(
                 runtime_data.heartbeat is not None and runtime_data.heartbeat.running
             ),
@@ -108,6 +112,7 @@ async def async_get_config_entry_diagnostics(
                 if runtime_data.heartbeat is not None else None
             ),
         },
+        "plug_charge": _plug_charge_diagnostics(runtime_data),
         "write_diagnostics": {
             "heartbeats_sent": runtime_data.diagnostics.heartbeats_sent,
             "heartbeats_failed": runtime_data.diagnostics.heartbeats_failed,
@@ -206,3 +211,19 @@ def fnv1a64(value: str | None) -> str | None:
     for byte in value.encode("utf-8"):
         digest = ((digest ^ byte) * FNV1A64_PRIME) & FNV1A64_MASK
     return f"{digest:016x}"
+
+
+def _plug_charge_diagnostics(runtime_data: MennekesAmtronRuntimeData) -> dict[str, Any] | None:
+    """Gate state without the session token or vehicle policy hash."""
+    observer = runtime_data.plug_charge
+    if observer is None:
+        return None
+    gate = runtime_data.control.plug_charge
+    return {
+        "status": observer.status,
+        "blocked_reason": observer.blocked_reason,
+        "gate_enabled": gate.get("enabled"),
+        "gate_authorized": gate.get("authorized"),
+        "session_active": isinstance(gate.get("session"), str),
+        "session_since": gate.get("since"),
+    }

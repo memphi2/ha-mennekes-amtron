@@ -132,8 +132,11 @@ class _Observations:
         # Preserve a temporary cap reduction without comparing it against an
         # earlier SoC that was never current with that cap. Only the pure model
         # may tell us that an actually observed combination reached the goal.
+        # A target following a raised car limit can end that reach again; then
+        # the stale reaching SoC must not latch the newer target.
         current = _Observation(
-            self.reached_soc if self.reached_soc is not None else self.latest.soc,
+            self.reached_soc if self.reached_soc is not None and self.model.stop_requested
+            else self.latest.soc,
             self.maximum,
         )
         if self.minimum is not None and self.minimum != self.maximum:

@@ -236,6 +236,9 @@
       },
       "virtual_plug_charge": {
         "default": "mdi:ev-plug-type2"
+      },
+      "release_off_on_unplug": {
+        "default": "mdi:power-plug-off-outline"
       }
     },
     "event": {

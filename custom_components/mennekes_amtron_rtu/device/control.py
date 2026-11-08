@@ -771,9 +771,20 @@ class AmtronControl:
             return False
         return type(cp) is int and cp in (CpState.A1, CpState.A2)
 
-    async def _async_check_transition_interval(self) -> None:
+    async def _async_release_off(self) -> bool:
+        """With 0x0D05 off, a current change switches no charge."""
+        try:
+            value = await self._client.async_read_register(CHARGING_RELEASE)
+        except AmtronBusError:
+            return False
+        return type(value) is int and value == 0
+
+    async def _async_check_transition_interval(self, *, current_change: bool = False) -> None:
         remaining = self._mode_change_remaining()
-        if remaining > 0 and await self._async_vehicle_absent():
+        if remaining > 0 and (
+            await self._async_vehicle_absent()
+            or (current_change and await self._async_release_off())
+        ):
             return
         remaining = self._mode_change_remaining()
         if remaining > 0:
@@ -796,7 +807,7 @@ class AmtronControl:
         paused = 0 < value < CHARGING_CURRENT_MINIMUM
         previous = self._write_state.confirmed_current
         if transition and not phase_preparation and not energy_goal_stop:
-            await self._async_check_transition_interval()
+            await self._async_check_transition_interval(current_change=True)
         if not paused and self.energy_goal_stop_requested:
             raise validation_error("energy_goal_stop_active")
         try:
@@ -822,7 +833,12 @@ class AmtronControl:
             self.charging_setpoint = value
         else:
             self._remember_pause_setpoint(previous, preserve_setpoint)
-        if transition:
+        # Without a vehicle or with the release off no charge was switched, so
+        # e.g. Plug & Charge can end a pause before its grant without delay.
+        if transition and (
+            phase_preparation
+            or not (await self._async_vehicle_absent() or await self._async_release_off())
+        ):
             self._write_state.mode_change_at = self._monotonic()
         if not recovery and not phase_preparation:
             # The command reached the device. A failed visibility/persistence

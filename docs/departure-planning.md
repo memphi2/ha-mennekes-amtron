@@ -122,6 +122,11 @@ manually set charging pause** to meet the selected time. To prevent that,
 clear **Next departure**. The ordinary percentage target without a departure
 time still only limits charging and never resumes a pause.
 
+With [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge)
+(from **0.8.0b3**), plugging in a permitted car does not start charging ahead of
+an armed plan. The release waits until the plan has paused until its start or
+set its current.
+
 ## Climate before departure
 
 The optional [calendar and preconditioning blueprints](blueprints.md) select

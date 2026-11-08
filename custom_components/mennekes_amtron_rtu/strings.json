@@ -614,6 +614,24 @@
           "authorized": "Vehicle authorized",
           "blocked": "Charging blocked",
           "disabled": "Disabled"
+        },
+        "state_attributes": {
+          "blocked_reason": {
+            "name": "Blocking reason",
+            "state": {
+              "connection_lost": "Connection lost",
+              "gate_inactive": "Release gate not active",
+              "read_only": "Read-only mode",
+              "departure_plan": "Departure plan is preparing the current",
+              "pause_requested": "Charging paused",
+              "release_off": "Charging release switched off",
+              "energy_goal_stop": "Energy target reached",
+              "wallbox_locked": "Wallbox locked",
+              "error_code": "Wallbox error",
+              "authorization_required": "Wallbox authorization enabled",
+              "register_unavailable": "Register value unavailable"
+            }
+          }
         }
       }
     },
@@ -629,6 +647,9 @@
       },
       "virtual_plug_charge": {
         "name": "Virtual Plug & Charge"
+      },
+      "release_off_on_unplug": {
+        "name": "Switch off charging release when unplugged"
       }
     },
     "event": {

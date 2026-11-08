@@ -34,18 +34,47 @@ def test_initial_soc_at_or_above_target_stops_immediately():
     assert goal.stop_requested
 
 
-def test_maximum_is_optional_and_never_raises_a_target():
+def test_a_target_at_the_car_limit_follows_it_both_ways():
     goal = configured()
     goal.set_target(100, 0)
     assert goal.maximum_percent is None
     assert goal.observe(70, 80)
     assert goal.target_percent == 80
     assert goal.observe(70, 95)
-    assert goal.maximum_percent == 95
-    assert goal.target_percent == 80
+    assert (goal.maximum_percent, goal.target_percent) == (95, 95)
     assert goal.observe(70, 65)
     assert goal.target_percent == 65
     assert goal.stop_requested
+
+
+def test_a_target_below_the_car_limit_never_rises():
+    goal = configured()
+    goal.set_target(70, 50, 90)
+    assert goal.observe(50, 100)
+    assert (goal.maximum_percent, goal.target_percent) == (100, 70)
+
+
+def test_following_a_raised_limit_lifts_only_the_reached_latch():
+    goal = configured()
+    goal.set_target(80, 50, 80)
+    assert goal.observe(80)
+    assert goal.stop_requested
+    assert goal.observe(82, 95)
+    assert (goal.target_percent, goal.status) == (95, "active")
+    assert not goal.stop_requested
+    # An unknown charge level ends the latch too; the next report decides.
+    assert goal.observe(95)
+    assert goal.stop_requested
+    assert goal.observe(None, 100)
+    assert (goal.target_percent, goal.status) == (100, "active")
+
+
+def test_a_raised_limit_below_the_charge_level_keeps_the_latch():
+    goal = configured()
+    goal.set_target(80, 50, 80)
+    assert goal.observe(85)
+    assert goal.observe(90, 88)
+    assert (goal.target_percent, goal.status) == (88, "reached")
 
 
 @pytest.mark.parametrize("value", [None, "unavailable", True, -1, 101, float("nan"), float("inf"), 10**1000])

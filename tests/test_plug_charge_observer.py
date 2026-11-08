@@ -49,7 +49,9 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, permitted=True)
     coordinator, timers = Coordinator(), []
     control = SimpleNamespace(
         read_only=False, pause_requested=False, charging_release_requested=None,
-        energy_goal_stop_requested=False,
+        energy_goal_stop_requested=False, pending_action=None, supports_soc_goal=True,
+        soc_goal=SimpleNamespace(target_percent=0.0, stop_requested=False),
+        async_resume_charging=AsyncMock(),
         plug_charge={"enabled": True, "policy": m.plug_charge_policy(options),
                      "session": "first-session", "authorized": False},
     )
@@ -62,7 +64,7 @@ async def observer_harness(tmp_path, monkeypatch, *, selected=A, permitted=True)
 
     control.async_authorize_plug_charge = AsyncMock(side_effect=authorize)
     entry = SimpleNamespace(options=options, runtime_data=SimpleNamespace(
-        control=control, coordinator=coordinator,
+        control=control, coordinator=coordinator, timed_goal=None, vehicle_soc=None,
     ))
 
     def schedule(_hass, seconds, callback):
@@ -101,6 +103,7 @@ def test_cached_match_waits_for_a_post_connection_report_and_never_resumes(tmp_p
             h.control.async_authorize_plug_charge.assert_not_awaited()
             await report(h)
             assert h.observer.status == "waiting_release"
+            assert h.observer.blocked_reason is None
             assert len(h.timers) == 1
             h.timers[-1].callback(None)
             await h.hass.async_block_till_done()
@@ -159,17 +162,19 @@ def test_manual_selection_and_profile_permission_are_not_detection(tmp_path, mon
     asyncio.run(run())
 
 
-@pytest.mark.parametrize(("owner", "key", "value"), [
-    ("control", "read_only", True), ("control", "pause_requested", True),
-    ("control", "charging_release_requested", False),
-    ("control", "energy_goal_stop_requested", True),
-    ("values", "lock_evse", 1), ("values", "lock_evse", None),
-    ("values", "error_code", 200), ("values", "error_code", None),
-    ("values", "authorization_enabled", 1),
-    ("values", "authorization_enabled", None),
-    ("coordinator", "last_update_success", False),
+@pytest.mark.parametrize(("owner", "key", "value", "reason"), [
+    ("control", "read_only", True, "read_only"),
+    ("control", "charging_release_requested", False, "release_off"),
+    ("control", "energy_goal_stop_requested", True, "energy_goal_stop"),
+    ("values", "lock_evse", 1, "wallbox_locked"),
+    ("values", "lock_evse", None, "register_unavailable"),
+    ("values", "error_code", 200, "error_code"),
+    ("values", "error_code", None, "register_unavailable"),
+    ("values", "authorization_enabled", 1, "authorization_required"),
+    ("values", "authorization_enabled", None, "register_unavailable"),
+    ("coordinator", "last_update_success", False, "connection_lost"),
 ])
-def test_existing_pause_lock_goals_rfid_and_unknown_state_block_release(tmp_path, monkeypatch, owner, key, value):
+def test_existing_pause_lock_goals_rfid_and_unknown_state_block_release(tmp_path, monkeypatch, owner, key, value, reason):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:
             if owner == "values":
@@ -178,6 +183,7 @@ def test_existing_pause_lock_goals_rfid_and_unknown_state_block_release(tmp_path
                 setattr(getattr(h, owner), key, value)
             await report(h)
             assert h.observer.status == "blocked"
+            assert h.observer.blocked_reason == reason
             assert not h.timers
             h.control.async_authorize_plug_charge.assert_not_awaited()
     asyncio.run(run())
@@ -328,3 +334,179 @@ def test_policy_tracks_permissions_and_identity_without_binding_cosmetic_or_sele
         assert m.plug_charge_policy(changed) != original
     modified["vehicle_profiles"][A]["options"]["vehicle_plug_charge"] = True
     assert m.plug_charge_policy(modified) != original
+
+
+def arm_plan(h, status):
+    h.entry.runtime_data.timed_goal = SimpleNamespace(status=status, goal=SimpleNamespace(
+        deadline=dt_util.utcnow() + timedelta(hours=8), finished=None,
+    ))
+
+
+async def plug_in_paused(h, *, pending=None, plan=None, goal_stop=False, paused=True):
+    h.control.pause_requested = paused
+    h.control.pending_action = pending
+    h.control.energy_goal_stop_requested = goal_stop
+    if plan is not None:
+        arm_plan(h, plan)
+
+    async def resume():
+        h.control.pause_requested = False
+        h.control.pending_action = None
+
+    h.control.async_resume_charging.side_effect = resume
+    await report(h)
+
+
+def test_permitted_plug_in_ends_a_manual_pause_before_the_grant(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            order = []
+            h.control.async_resume_charging.side_effect = None
+            await plug_in_paused(h)
+            assert h.observer.status == "waiting_release"
+            assert h.observer.blocked_reason is None
+            h.control.async_resume_charging.side_effect = lambda: order.append("resume")
+            h.control.async_authorize_plug_charge.side_effect = (
+                lambda session, *, deadline: order.append("authorize")
+            )
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            assert order == ["resume", "authorize"]
+    asyncio.run(run())
+
+
+def test_a_finished_departure_plan_does_not_keep_the_pause(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            h.entry.runtime_data.timed_goal = SimpleNamespace(status="reached", goal=SimpleNamespace(
+                deadline=dt_util.utcnow(), finished="reached",
+            ))
+            await plug_in_paused(h)
+            assert h.observer.status == "waiting_release"
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("change", "reason"), [
+    ({"plan": "waiting_for_device"}, "departure_plan"),
+    ({"plan": "queued"}, "departure_plan"),
+    ({"plan": "paced"}, "departure_plan"),
+    ({"plan": "paused_until_start", "paused": False}, "departure_plan"),
+    ({"pending": "pause"}, "pause_requested"),
+    ({"pending": "set_current"}, "pause_requested"),
+    ({"goal_stop": True}, "energy_goal_stop"),
+])
+def test_automatic_or_newer_pauses_keep_blocking(tmp_path, monkeypatch, change, reason):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            await plug_in_paused(h, **change)
+            assert h.observer.status == "blocked"
+            assert h.observer.blocked_reason == reason
+            assert not h.timers
+            h.control.async_resume_charging.assert_not_awaited()
+            h.control.async_authorize_plug_charge.assert_not_awaited()
+    asyncio.run(run())
+
+
+def test_a_queued_resume_is_awaited_instead_of_repeated(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            await plug_in_paused(h, pending="resume")
+            assert h.observer.status == "waiting_release"
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            h.control.async_resume_charging.assert_not_awaited()
+            h.control.async_authorize_plug_charge.assert_awaited_once()
+    asyncio.run(run())
+
+
+def test_a_failed_resume_defers_the_grant(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            await plug_in_paused(h)
+            h.control.async_resume_charging.side_effect = DeviceValidationError("write_rate_limited")
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            h.control.async_resume_charging.assert_awaited_once()
+            h.control.async_authorize_plug_charge.assert_not_awaited()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("plan", "paused"), [("paused_until_start", True), ("paced", False), ("late", False)])
+def test_an_applied_departure_plan_keeps_the_current_and_is_released(tmp_path, monkeypatch, plan, paused):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            await plug_in_paused(h, plan=plan, paused=paused)
+            assert h.observer.status == "waiting_release"
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            h.control.async_resume_charging.assert_not_awaited()
+            h.control.async_authorize_plug_charge.assert_awaited_once()
+            assert h.control.pause_requested is paused
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("plan", ["waiting_for_soc", "waiting_for_target", "waiting_for_capacity"])
+def test_a_plan_without_inputs_does_not_hold_the_manual_pause(tmp_path, monkeypatch, plan):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            await plug_in_paused(h, plan=plan)
+            assert h.observer.status == "waiting_release"
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            h.control.async_resume_charging.assert_awaited_once()
+            h.control.async_authorize_plug_charge.assert_awaited_once()
+    asyncio.run(run())
+
+
+def vehicle_limit(h, limit):
+    observer = SimpleNamespace(maximum=limit, async_set_target=AsyncMock())
+    h.entry.runtime_data.vehicle_soc = observer
+    return observer
+
+
+def test_each_recognized_connection_starts_at_the_car_limit(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            observer = vehicle_limit(h, 80)
+            await report(h)
+            observer.async_set_target.assert_awaited_once_with(80)
+            h.coordinator.async_update_listeners()
+            await h.hass.async_block_till_done()
+            observer.async_set_target.assert_awaited_once()
+            h.control.plug_charge["session"] = "second-session"
+            h.coordinator.async_update_listeners()
+            await h.hass.async_block_till_done()
+            assert observer.async_set_target.await_count == 2
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("limit", "target", "reached", "read_only", "adopted"), [
+    (None, 0.0, False, False, False),
+    (80, 80.0, False, False, False),
+    (80, 80.0, True, False, True),
+    (80, 0.0, False, True, False),
+])
+def test_car_limit_adoption_skips_missing_unchanged_or_read_only(
+    tmp_path, monkeypatch, limit, target, reached, read_only, adopted,
+):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            observer = vehicle_limit(h, limit)
+            h.control.soc_goal = SimpleNamespace(target_percent=target, stop_requested=reached)
+            h.control.read_only = read_only
+            await report(h)
+            assert observer.async_set_target.await_count == int(adopted)
+    asyncio.run(run())
+
+
+def test_a_refused_car_limit_does_not_affect_the_grant(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            observer = vehicle_limit(h, 80)
+            observer.async_set_target.side_effect = DeviceValidationError("soc_goal_invalid")
+            await report(h)
+            assert h.observer.status == "waiting_release"
+            h.timers[-1].callback(None)
+            await h.hass.async_block_till_done()
+            h.control.async_authorize_plug_charge.assert_awaited_once()
+    asyncio.run(run())

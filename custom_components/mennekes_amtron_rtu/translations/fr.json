@@ -614,6 +614,24 @@
           "authorized": "Véhicule autorisé",
           "blocked": "Charge bloquée",
           "disabled": "Désactivé"
+        },
+        "state_attributes": {
+          "blocked_reason": {
+            "name": "Motif du blocage",
+            "state": {
+              "connection_lost": "Connexion perdue",
+              "gate_inactive": "Verrou d'autorisation inactif",
+              "read_only": "Mode lecture seule",
+              "departure_plan": "La planification du départ prépare le courant",
+              "pause_requested": "Charge en pause",
+              "release_off": "Autorisation de charge désactivée",
+              "energy_goal_stop": "Objectif d'énergie atteint",
+              "wallbox_locked": "Borne verrouillée",
+              "error_code": "Erreur de la borne",
+              "authorization_required": "Authentification activée sur la borne",
+              "register_unavailable": "Valeur de registre indisponible"
+            }
+          }
         }
       }
     },
@@ -629,6 +647,9 @@
       },
       "virtual_plug_charge": {
         "name": "Plug & Charge virtuel"
+      },
+      "release_off_on_unplug": {
+        "name": "Désactiver l'autorisation de charge au débranchement"
       }
     },
     "event": {

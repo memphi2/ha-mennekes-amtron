@@ -121,14 +121,26 @@ def test_gate_closes_without_changing_manual_intent_and_grants_only_release():
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("reason", ["pause", "release", "lock", "rfid", "error", "unsupported", "goal"])
+def test_a_grant_keeps_an_existing_pause_without_starting_a_charge():
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        c.pause_requested = True
+        await authorize(c)
+        assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
+        assert c.plug_charge["authorized"]
+        assert c.pause_requested is True
+        assert not h.written(R.CHARGING_CURRENT_EMS)
+        await c.async_shutdown()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("reason", ["release", "lock", "rfid", "error", "unsupported", "goal"])
 def test_independent_stops_prevent_automatic_release(reason):
     async def run():
         h = Harness()
         c = await armed(h)
-        if reason == "pause":
-            c.pause_requested = True
-        elif reason == "release":
+        if reason == "release":
             c.charging_release_requested = False
         elif reason == "lock":
             h.transport.bank[R.LOCK_EVSE.address] = 1
@@ -255,7 +267,7 @@ def test_invalid_automatic_authorization_never_writes(invalid):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("race", ["unplug", "pause", "deadline", "goal"])
+@pytest.mark.parametrize("race", ["unplug", "deadline", "goal"])
 def test_final_live_reads_cannot_cross_a_stop_or_expired_request(monkeypatch, race):
     async def run():
         h = Harness()
@@ -270,8 +282,6 @@ def test_final_live_reads_cannot_cross_a_stop_or_expired_request(monkeypatch, ra
                 if count == 2:  # The actual bus-write precondition, not the early check.
                     if race == "unplug":
                         c.observe_plug_charge(None)
-                    elif race == "pause":
-                        c.pause_requested = True
                     elif race == "goal":
                         c.energy_goal._status = "reached"
                     else:

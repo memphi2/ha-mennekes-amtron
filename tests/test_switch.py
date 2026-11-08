@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError
@@ -209,5 +210,64 @@ def test_failed_release_commands_cannot_erase_a_block(released, failure):
         }
         await control.async_shutdown()
         await entry.runtime_data.client.async_close()
+
+    asyncio.run(run())
+
+
+def _plug(entry, connected: bool) -> None:
+    values = entry.runtime_data.coordinator.data.values
+    values["evse_state"] = 2 if connected else 1
+    values["cp_state"] = 11 if connected else 10
+
+
+@pytest.mark.parametrize(("enabled", "plug_charge", "release", "expected"), [
+    (True, False, 1, True), (False, False, 1, False),
+    (True, True, 1, False), (True, False, 0, False),
+])
+def test_release_is_switched_off_after_a_confirmed_unplug(enabled, plug_charge, release, expected) -> None:
+    async def run() -> None:
+        switches, entry, _transport = await _switches()
+        switch = switches["release_off_on_unplug"]
+        tasks: list[object] = []
+        switch.hass = SimpleNamespace(async_create_task=lambda coro: tasks.append(asyncio.ensure_future(coro)))
+        switch.async_write_ha_state = lambda: None
+        control = entry.runtime_data.control
+        control.async_set_charging_release = AsyncMock()
+        if plug_charge:
+            control._plug_charge.state.enabled = True
+        await (switch.async_turn_on() if enabled else switch.async_turn_off())
+        entry.runtime_data.coordinator.data.values["charging_release"] = release
+        _plug(entry, True)
+        switch._handle_coordinator_update()
+        # Unknown readings neither count as a disconnect nor forget the plug.
+        entry.runtime_data.coordinator.data.values["evse_state"] = None
+        switch._handle_coordinator_update()
+        _plug(entry, False)
+        switch._handle_coordinator_update()
+        switch._handle_coordinator_update()
+        await asyncio.gather(*tasks)
+        if expected:
+            control.async_set_charging_release.assert_awaited_once_with(False)
+        else:
+            control.async_set_charging_release.assert_not_awaited()
+
+    asyncio.run(run())
+
+
+def test_a_failed_release_off_is_logged_not_raised(caplog) -> None:
+    async def run() -> None:
+        switches, entry, _transport = await _switches()
+        switch = switches["release_off_on_unplug"]
+        tasks: list[object] = []
+        switch.hass = SimpleNamespace(async_create_task=lambda coro: tasks.append(asyncio.ensure_future(coro)))
+        switch.async_write_ha_state = lambda: None
+        entry.runtime_data.control.async_set_charging_release = AsyncMock(side_effect=HomeAssistantError("busy"))
+        await switch.async_turn_on()
+        _plug(entry, True)
+        switch._handle_coordinator_update()
+        _plug(entry, False)
+        switch._handle_coordinator_update()
+        await asyncio.gather(*tasks)
+        assert "Cannot switch off the charging release" in caplog.text
 
     asyncio.run(run())

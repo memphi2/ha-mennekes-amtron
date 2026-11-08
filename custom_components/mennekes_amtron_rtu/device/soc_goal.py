@@ -25,9 +25,11 @@ class SocGoal:
     """Keep an optional ceiling bound to the selected vehicle sources.
 
     Missing vehicle data deliberately leaves charging unchanged. A reached
-    ceiling stays reached until an explicit new goal, disable or source change.
-    The last valid car cap remains in force when its entity becomes unavailable.
-    None of these operations authorizes starting or resuming charging.
+    ceiling stays reached until an explicit new goal, disable or source change,
+    or until a target at the car's limit follows a raised limit that the
+    current charge level has not reached. The last valid car cap remains in force when its
+    entity becomes unavailable. None of these operations authorizes starting
+    or resuming charging.
     """
 
     def __init__(self) -> None:
@@ -85,15 +87,24 @@ class SocGoal:
             cap = percentage(maximum, maximum=True)
         except ValueError:
             cap = None
-        if cap is not None and self.source is not None:
-            self.maximum_percent = cap
-            if self.target_percent:
-                # A later increase in the car's cap never increases our goal.
-                self.target_percent = min(self.target_percent, cap)
         try:
             current = percentage(soc)
         except ValueError:
             current = None
+        if cap is not None and self.source is not None:
+            # A target at the car's limit follows that limit both ways; any
+            # other target only ever drops to a lower limit.
+            following = bool(self.target_percent) and self.target_percent == self.maximum_percent
+            self.maximum_percent = cap
+            if following:
+                if cap > self.target_percent and self.status == "reached":
+                    # Only the latch ends; a known charge level at or above
+                    # the new target latches again below, and resuming the
+                    # stop pause stays manual.
+                    self.status = "active"
+                self.target_percent = cap
+            elif self.target_percent:
+                self.target_percent = min(self.target_percent, cap)
         if self.status == "active" and current is not None and current >= self.target_percent:
             self.status = "reached"
         return previous != self.snapshot()

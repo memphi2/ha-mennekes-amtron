@@ -12,7 +12,7 @@ can also supply supported data from one selected BMW vehicle.
 stable 0.6.1. Central vehicle profiles, optional automatic selection and
 Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
 below; existing manual sources continue to work after updating.
-The steps below follow **beta 0.8.0b2**, which adds the wallbox **Virtual Plug &
+The steps below follow **beta 0.8.0b3**, which adds the wallbox **Virtual Plug &
 Charge** switch, guided detection setup and clearer **Stop using vehicle charge
 level** action. Existing activation settings and profile permissions are kept.
 See [versions and feature availability](README.md#versions-and-feature-availability).
@@ -127,7 +127,7 @@ unavailable signals block selection, as do signals not reported to Home Assistan
 within 30 minutes.
 No matching car or several matching cars means **no active vehicle**. Previous
 car-specific targets and the departure plan are cleared when the assignment
-changes; detection never starts charging or lifts a pause. If the result is
+changes; detection alone never starts charging or lifts a pause. If the result is
 unclear, choose the correct profile manually.
 
 These signals are an optional selection aid, not an identity supplied by the
@@ -164,7 +164,7 @@ manually, but that choice alone never proves which car is connected.
    **Configuration**. This switch controls the feature for the whole wallbox;
    the vehicle options only manage each profile's permission. The feature requires
    write access. Service mode needs **app 0.8.0b1 or newer** for the
-   charging-permission capability; use **0.8.0b2** for the current beta app.
+   charging-permission capability; use **0.8.0b3** for the current beta app.
 4. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 
@@ -190,9 +190,21 @@ provides the cable measurement's timestamp, that timestamp is used; otherwise
 only the HA report time is available. The next normal vehicle update may be
 needed before permission is granted.
 
-The grant belongs to that observed connection. A deliberate pause, wallbox lock,
-disabled charging release or reached target still prevents charging; the feature
-does not remove those choices. Once granted, a later missing or stale vehicle
+The grant belongs to that observed connection. From **0.8.0b3**, a manual pause
+ends when a permitted vehicle is granted: plugging it in means it should charge.
+The pause is lifted while the charging release is still off, so the release
+follows immediately without the state-change interval.
+
+With an armed [departure plan](departure-planning.md), manual or imported from
+the car, the plan decides instead. The grant waits until the plan has applied its
+decision: it keeps the car paused until the calculated start, or sets the planned
+current. Charging therefore never starts briefly before a planned pause. A plan
+that still lacks its target, charge level or capacity does not hold a manual
+pause. A wallbox lock, disabled charging release, reached target or a newer
+queued command still prevents charging; the feature does not remove those
+choices. While charging stays blocked, the status sensor's **Blocking reason**
+attribute names the condition, such as **Departure plan is preparing the
+current**. Once granted, a later missing or stale vehicle
 report does not interrupt that connection. In service mode, its existing grant
 also survives an HA Core restart because the app continues observing the wallbox.
 A disconnect, unknown wallbox connection state or app restart requires a fresh
@@ -208,6 +220,12 @@ grant. Disabling it **does not resume charging**: use **Charging release**
 explicitly afterwards, and leave a wanted pause or lock in place. Changing a
 profile's vehicle or detection sources clears its saved automatic permission;
 check the new sources before allowing it again.
+
+Without Virtual Plug & Charge, an open charging release lets any car charge.
+From **0.8.0b3**, turn on **Switch off charging release when unplugged** under
+**Configuration** on the wallbox device page: after each confirmed disconnect,
+Home Assistant switches the release off, and you switch it on for the next
+charge. This runs in Home Assistant, so it is not enforced while HA is down.
 
 If you previously switched **Charging release** off, switch it on when you want
 to allow charging again. With virtual Plug & Charge enabled this records your
@@ -242,8 +260,12 @@ Enable the separate option to use the car's maximum if you want to use the
 profile's reported charge limit or select a **Vehicle charge limit entity**.
 Only the chosen source's settings appear. Without a charge-limit source,
 you can choose a target up to **100%**. With it, the reported car limit becomes
-the maximum you can select. A falling car limit also lowers an existing target;
-a later increase never raises the target you chose. If this optional source is
+the maximum you can select. A falling car limit also lowers an existing target.
+From **0.8.0b3**, a target at the car's limit (the slider at its maximum) follows
+every later change of that limit, up or down; a lower target never rises. A
+target lowered to a falling limit is at the limit and follows it from then on.
+A raised limit can end a reached target, but it never resumes the stop pause:
+resume manually or plug in again. If this optional source is
 temporarily unavailable, the last valid maximum is kept. Before its first valid
 reading, setting a positive target is refused rather than assuming 100%.
 
@@ -251,7 +273,10 @@ For example, with a reported charge level of 45%, set a target of **80%**.
 Charging pauses when the vehicle reports at least 80%. Setting a target never
 starts charging or lifts a pause; **0%** switches this target off without
 resuming. A reached target stays reached even if the reported charge level later
-falls. Setting a new positive target establishes a new limit. The independent
+falls. Setting a new positive target establishes a new limit. With
+[Virtual Plug & Charge](#optional-virtual-plug--charge), each recognized
+connection starts with the car's current limit as its target, which also ends a
+target reached during the previous connection. The independent
 kWh target can also remain active: reaching either target stops the charge.
 
 As selected for this integration, missing or invalid vehicle data **does not
@@ -283,10 +308,11 @@ remain available with older compatible app versions.
 |---|---|
 | Current vehicle charge level | Charging continues in its present state; the percentage target resumes monitoring when a valid report returns. Use the car's own limit for protection during data outages. |
 | First valid optional vehicle maximum | A positive percentage target cannot be set yet. Disable that optional source if you want to choose your own maximum. |
-| A previously valid vehicle maximum | The last valid maximum is retained; a later increase does not raise the target you already chose. |
+| A previously valid vehicle maximum | The last valid maximum is retained; a later increase raises only a target at that maximum. |
 | Usable battery capacity | The departure planner cannot calculate a new current; see [departure planning](departure-planning.md). |
 | Detection signals are unclear | Automatic mode selects no vehicle. Choose the correct profile manually if needed. |
 | Virtual Plug & Charge is waiting for detection | Wait for a new cable report for this connection and check that the selected profile is permitted. Manually selecting it does not replace the detection check. |
+| Virtual Plug & Charge shows **Charging blocked** | Open the status sensor and check its **Blocking reason** attribute, for example a switched-off charging release, a wallbox lock or authorization, a reached target or a missing register value. |
 | Charging history cannot be matched | Loss estimates stay unknown instead of being assigned to the wrong charge. See [charging estimates](charging-estimates.md). |
 
 For absent BavarianData entities, open the vehicle's HA entity list and enable

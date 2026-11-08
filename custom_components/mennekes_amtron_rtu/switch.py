@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.const import STATE_ON, EntityCategory
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 
 from .coordinator import MennekesAmtronCoordinator
-from .device.registers import CHARGING_CURRENT_EMS, CHARGING_RELEASE, LOCK_EVSE
+from .device.errors import DeviceError
+from .device.registers import (
+    CHARGING_CURRENT_EMS,
+    CHARGING_RELEASE,
+    CP_STATE,
+    EVSE_STATE,
+    LOCK_EVSE,
+)
+from .device.vehicle import vehicle_connected
 from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
@@ -23,6 +33,7 @@ else:
     from homeassistant.components.switch import SwitchDeviceClass
 
 PARALLEL_UPDATES = 1
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -37,6 +48,7 @@ async def async_setup_entry(
         AmtronPauseSwitch(entry, coordinator),
         AmtronChargingReleaseSwitch(entry, coordinator),
         AmtronLockSwitch(entry, coordinator),
+        AmtronReleaseOffOnUnplugSwitch(entry, coordinator),
     ]
     if entry.runtime_data.plug_charge is not None:
         entities.append(AmtronPlugChargeSwitch(entry, coordinator))
@@ -75,6 +87,72 @@ class AmtronPlugChargeSwitch(MennekesAmtronControlEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self._async_set_enabled(False)
+
+
+class AmtronReleaseOffOnUnplugSwitch(MennekesAmtronControlEntity, SwitchEntity, RestoreEntity):
+    """Switch the charging release off whenever a vehicle is unplugged.
+
+    Without Virtual Plug & Charge, an open release lets any car charge. This
+    HA-side rule closes it after a confirmed disconnect, so the next car needs
+    an explicit release. With the gate enabled, the gate already owns 0x0D05.
+    """
+
+    _attr_translation_key = "release_off_on_unplug"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
+        super().__init__(entry, coordinator, "release_off_on_unplug")
+        self._attr_is_on = False
+        self._connected: bool | None = None
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and (
+            not self.runtime_data.control.read_only or self.is_on is True
+        )
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (state := await self.async_get_last_state()) is not None:
+            self._attr_is_on = state.state == STATE_ON
+        self._connected = self._vehicle_connected()
+
+    def _vehicle_connected(self) -> bool | None:
+        data = self.wallbox_data
+        return vehicle_connected(
+            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
+            cp_supported=self.runtime_data.identity.layout_version >= CP_STATE.min_layout,
+        )
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        connected = self._vehicle_connected()
+        # Unknown readings never count as a disconnect.
+        unplugged = connected is False and self._connected is True
+        if connected is not None:
+            self._connected = connected
+        control = self.runtime_data.control
+        if (
+            unplugged and self.is_on and not control.read_only
+            and control.plug_charge.get("enabled") is not True
+            and self.wallbox_data.get(CHARGING_RELEASE.key) != 0
+        ):
+            self.hass.async_create_task(self._release_off())
+        super()._handle_coordinator_update()
+
+    async def _release_off(self) -> None:
+        try:
+            await self.runtime_data.control.async_set_charging_release(False)
+        except (HomeAssistantError, DeviceError, OSError) as err:
+            _LOGGER.warning("Cannot switch off the charging release after unplugging (%s)", err)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._attr_is_on = True
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._attr_is_on = False
+        self.async_write_ha_state()
 
 
 type IntentKey = Literal["pause_requested", "charging_release_requested"]

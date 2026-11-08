@@ -169,7 +169,9 @@ class PlugChargeController:
             raise validation_error("plug_charge_session_changed")
         if datetime.now(UTC) >= deadline:
             raise validation_error("plug_charge_authorization_expired")
-        if self._control.charging_release_requested is False or self._control.pause_requested is True:
+        # A pause holds the current at the pause value, so a grant cannot start
+        # a charge. HA ends a manual pause first; a departure plan keeps its own.
+        if self._control.charging_release_requested is False:
             raise validation_error("plug_charge_blocked")
 
     async def _live_presence(self, read: LockedRegisterReader) -> None:
