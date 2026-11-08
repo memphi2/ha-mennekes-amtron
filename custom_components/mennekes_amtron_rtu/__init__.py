@@ -43,6 +43,7 @@ from .cost_observer import ChargingCostObserver, LastChargingCost
 from .data import (
     ConnectionState,
     MennekesAmtronRuntimeData,
+    RuntimeHandoff,
     WallboxData,
     WriteDiagnostics,
 )
@@ -116,7 +117,7 @@ from .remote import (
 from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
 from .services import async_setup_services
-from .session_observer import SessionObserver
+from .session_observer import SessionObserver, session_capture_enabled
 from .timed_goal_const import (
     CONF_TIMED_GOAL_ENABLED,
     CONF_TIMED_GOAL_RESET_PENDING,
@@ -194,6 +195,11 @@ async def async_setup_entry(
                 _LOGGER.warning("Deleted vehicle loss storage could not be removed; cleanup will retry on setup")
     remote = CONF_SERVER_URL in entry.data
     expected_serial = _entry_serial_binding(entry)
+    handoff: RuntimeHandoff | None = hass.data.get(f"{DOMAIN}_reload_clients", {}).get(entry.entry_id)
+    if handoff is not None and handoff.client is not None and (
+        remote or handoff.client.config != _connection_config(entry)
+    ):
+        await handoff.async_close()
     client: MennekesModbusClient
     if remote:
         # Direct-mode intent must not return after a later switch back from
@@ -211,11 +217,8 @@ async def async_setup_entry(
         )
         if entry.entry_id not in states:
             states[entry.entry_id] = WriteState.cold_start(time.monotonic())
-        handoff = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
-        if handoff is not None and handoff.config != _connection_config(entry):
-            await handoff.async_close()
-            handoff = None
-        client = handoff or MennekesModbusClient(
+        retained_client = handoff.client if handoff is not None else None
+        client = retained_client or MennekesModbusClient(
             _connection_config(entry), write_state=states[entry.entry_id]
         )
     try:
@@ -325,8 +328,15 @@ async def async_setup_entry(
         diagnostics=diagnostics,
         connection_state=connection_state,
     )
-
     try:
+        if handoff is not None:
+            # The new runtime now owns the connection, including failed-setup
+            # cleanup. Transient estimates must never cross a changed wallbox.
+            handoff.client = None
+            if handoff.identity != identity or (
+                not remote and handoff.connection_generation != client.connection_generation
+            ):
+                await handoff.async_close()
         validate_vehicle_selection()
         # Configure the gate before starting heartbeat/recovery. The app owns
         # the previous grant; an unchanged policy survives this HA reload.
@@ -363,15 +373,37 @@ async def async_setup_entry(
                 hass.config_entries.async_update_entry(entry, options=stored_options)
         loss_enabled = options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
         cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
-        if loss_enabled or cost_enabled:
+        if session_capture_enabled(entry):
             if not remote:
-                entry.runtime_data.sessions = SessionObserver(hass, entry, identity, coordinator)
+                retained_sessions = handoff.sessions if handoff is not None else None
+                entry.runtime_data.sessions = retained_sessions or SessionObserver(hass, entry, identity, coordinator)
+                if handoff is not None and retained_sessions is not None:
+                    retained_sessions.rebind(coordinator)
+                    handoff.sessions = None
                 await entry.runtime_data.sessions.async_setup()
             if cost_enabled:
-                entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry, remote=remote)
-                await entry.runtime_data.charging_cost.async_start()
+                retained_cost = handoff.charging_cost if handoff is not None else None
+                if handoff is not None and retained_cost is not None and retained_cost.retain_for_reload(entry, remote=remote):
+                    retained_cost.rebind(entry)
+                    entry.runtime_data.charging_cost = retained_cost
+                    handoff.charging_cost = None
+                else:
+                    if handoff is not None and retained_cost is not None:
+                        await retained_cost.async_stop()
+                        handoff.charging_cost = None
+                    entry.runtime_data.charging_cost = ChargingCostObserver(hass, entry, remote=remote)
+                    await entry.runtime_data.charging_cost.async_start()
+
+            estimates_generation = client.connection_generation if not remote else None
 
             async def observe_estimates(data: WallboxData | None) -> None:
+                nonlocal estimates_generation
+                if not remote and estimates_generation != client.connection_generation:
+                    estimates_generation = client.connection_generation
+                    if entry.runtime_data.sessions is not None:
+                        await entry.runtime_data.sessions.async_observe(None)
+                    if entry.runtime_data.charging_cost is not None:
+                        await entry.runtime_data.charging_cost.async_observe(None)
                 if entry.runtime_data.sessions is not None:
                     await entry.runtime_data.sessions.async_observe(data)
                 if entry.runtime_data.charging_cost is not None:
@@ -600,14 +632,18 @@ async def async_unload_entry(
     if not unloaded:
         return False
     retain_client = runtime_data.retain_client_on_unload
-    await _async_stop_runtime(runtime_data, close_client=not retain_client)
-    if retain_client:
-        hass.data.setdefault(f"{DOMAIN}_reload_clients", {})[entry.entry_id] = runtime_data.client
+    retain_cost = runtime_data.retain_cost_on_unload
+    if retain_client or retain_cost:
+        handoff = hass.data[f"{DOMAIN}_reload_clients"][entry.entry_id]
+        handoff.client = runtime_data.client if retain_client else None
+        handoff.sessions = runtime_data.sessions if retain_client else None
+        handoff.charging_cost = runtime_data.charging_cost if retain_cost else None
+    await _async_stop_runtime(runtime_data, close_client=not retain_client, retain_cost=retain_cost)
     return unloaded
 
 
 async def _async_stop_runtime(
-    runtime: MennekesAmtronRuntimeData, *, close_client: bool = True,
+    runtime: MennekesAmtronRuntimeData, *, close_client: bool = True, retain_cost: bool = False,
 ) -> None:
     """Release the same owners after partial setup and ordinary unloading.
 
@@ -623,9 +659,9 @@ async def _async_stop_runtime(
     runtime.coordinator.observe_session = None
     if runtime.charge_loss is not None:
         await runtime.charge_loss.async_stop()
-    if runtime.charging_cost is not None:
+    if runtime.charging_cost is not None and not retain_cost:
         await runtime.charging_cost.async_stop()
-    if runtime.sessions is not None:
+    if runtime.sessions is not None and close_client:
         await runtime.sessions.async_close()
     for owner in (
         runtime.timed_goal, runtime.vehicle_soc, runtime.soc_goal,
@@ -664,16 +700,30 @@ async def _async_reload_entry_locked(
     retain = (
         runtime is not None and CONF_SERVER_URL not in entry.data
         and not isinstance(runtime.client, RemoteClient)
-        and runtime.control.plug_charge.get("enabled") is True
+        and runtime.client.connected
+        and (runtime.control.plug_charge.get("enabled") is True or runtime.sessions is not None)
         and runtime.client.config == _connection_config(entry)
     )
     if runtime is not None and retain:
         runtime.retain_client_on_unload = True
+    remote = CONF_SERVER_URL in entry.data
+    retain_cost = cost is not None and (remote or retain) and cost.retain_for_reload(entry, remote=remote)
+    if runtime is not None:
+        runtime.retain_cost_on_unload = retain_cost
+    if runtime is not None and (retain or retain_cost):
+        handoff = RuntimeHandoff(
+            identity=runtime.identity,
+            connection_generation=runtime.client.connection_generation if retain else None,
+        )
+        # Store the pre-unload transport generation. Unload may await storage
+        # while a library-managed reconnect changes observation continuity.
+        hass.data.setdefault(f"{DOMAIN}_reload_clients", {})[entry.entry_id] = handoff
     try:
         await hass.config_entries.async_reload(entry.entry_id)
     finally:
-        if runtime is not None and retain:
+        if runtime is not None and (retain or retain_cost):
             runtime.retain_client_on_unload = False
+            runtime.retain_cost_on_unload = False
             unused = hass.data.get(f"{DOMAIN}_reload_clients", {}).pop(entry.entry_id, None)
             if unused is not None:
                 await unused.async_close()

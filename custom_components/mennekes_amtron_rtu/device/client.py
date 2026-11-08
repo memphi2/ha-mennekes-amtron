@@ -202,6 +202,11 @@ class MennekesModbusClient:
 
         return self._bound_serial is None or not self._identity_check_needed
 
+    @property
+    def connection_generation(self) -> int:
+        """Identify uninterrupted transport observation, including reconnects."""
+        return self._connection_generation
+
     def bind_identity(self, serial_number: str | None) -> None:
         """Bind a readable physical serial once, never silently replace it."""
 
@@ -264,8 +269,7 @@ class MennekesModbusClient:
         self._require_connection_usable()
         if client.connected:
             return
-        self.write_state.plug_charge.invalidate()
-        self._identity_check_needed = True
+        self._connection_changed(False)
         try:
             connected = await client.connect()
         except WaveshareAuthenticationRejectedError as err:
@@ -305,7 +309,7 @@ class MennekesModbusClient:
         async with self._lock:
             client = self._client
             self._client = None
-            self.write_state.plug_charge.invalidate()
+            self._connection_changed(False)
             await _async_close_transport(client)
 
     @asynccontextmanager

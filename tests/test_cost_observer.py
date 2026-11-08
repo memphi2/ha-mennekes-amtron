@@ -321,3 +321,124 @@ def test_price_expiry_uses_reports_and_missing_data_marks_interval_unknown(tmp_p
                 await observer.async_stop()
                 await hass.async_stop()
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("remote", [False, True])
+def test_profile_handoff_keeps_complete_cost_and_accepts_later_tariff_update(tmp_path, remote):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        configured = entry()
+        configured.options["active_vehicle_profile"] = "first"
+        observer = ChargingCostObserver(hass, configured, remote=remote)
+        at = time.time() + 1
+        session = completed(at)
+        try:
+            await observer.async_start()
+            for offset, energy, present in ((0, 100, False), (10, 102, True)):
+                with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + offset):
+                    await observer.async_observe(data(at + offset, energy, present=present))
+            assert observer.current.complete
+            configured.options = {**configured.options, "active_vehicle_profile": "second"}
+            assert observer.retain_for_reload(configured, remote=remote)
+            observer.rebind(configured)
+            for offset, energy, present in ((50, 105, True), (100, 110, False)):
+                with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + offset):
+                    await observer.async_observe(data(at + offset, energy, present=present, session=session if not present else None))
+            assert observer.last.result.cost == pytest.approx(3)
+            assert observer.last.result.complete
+            # The rebinding updates its configuration baseline, so a later
+            # tariff-only update does not mistake the profile for another edit.
+            configured.options = {**configured.options, "charging_network_tariff": {
+                "module": "module_2", "regular_network": 0.1, "price_includes_network": True,
+            }}
+            assert observer.apply_tariff_only_update()
+            assert observer.last.result.cost == pytest.approx(3)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("change", [
+    "closed", "corrupt", "entry", "connection", "mode", "serial", "layout",
+    "source", "price", "entity", "tariff", "scan", "measurement",
+])
+def test_handoff_rejects_changed_sources_and_connection(tmp_path, change):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        configured = entry()
+        configured.options["charging_network_tariff"] = {"module": "none"}
+        observer = ChargingCostObserver(hass, configured, remote=False)
+        candidate = entry()
+        candidate.options = {**configured.options}
+        remote = False
+        if change == "closed":
+            await observer.async_stop()
+        elif change == "corrupt":
+            observer._storage_corrupt = True
+        elif change == "entry":
+            candidate.entry_id = "different"
+        elif change == "connection":
+            candidate.data = {"host": "changed.invalid"}
+        elif change == "mode":
+            remote = True
+        elif change == "serial":
+            candidate.runtime_data.identity.serial_number = "different"
+        elif change == "layout":
+            candidate.runtime_data.identity.layout_version = 0x0102
+        else:
+            key, value = {
+                "source": ("charging_cost_source", "disabled"),
+                "price": ("charging_price", 0.4),
+                "entity": ("charging_price_entity", "sensor.changed_price"),
+                "scan": ("scan_interval_seconds", 300),
+                "measurement": ("measurement_interval_seconds", 300),
+                "tariff": ("charging_network_tariff", {
+                    "module": "module_2", "regular_network": 0.1, "price_includes_network": True,
+                }),
+            }[change]
+            candidate.options[key] = value
+        try:
+            assert not observer.retain_for_reload(candidate, remote=remote)
+            if change != "mode":
+                with pytest.raises(ValueError, match="source changed"):
+                    observer.rebind(candidate)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_dynamic_price_reports_during_handoff_are_kept_in_complete_cost(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.states.async_set("sensor.price", "0.20", {"unit_of_measurement": "EUR/kWh"})
+        configured = entry(dynamic=True)
+        observer = ChargingCostObserver(hass, configured, remote=False)
+        at = time.time() + 1
+        session = completed(at)
+        try:
+            await observer.async_start()
+            initial_subscription = observer._unsubscribe
+            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at):
+                await observer.async_observe(data(at, 100))
+            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 25):
+                await observer.async_observe(data(at + 25, 102.5, present=True))
+            configured.options = {**configured.options, "active_vehicle_profile": "second"}
+            assert observer.retain_for_reload(configured, remote=False)
+            # Polling has stopped for the logical reload. Price subscriptions
+            # stay live so the next interval still uses the observed boundary.
+            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 50):
+                hass.states.async_set("sensor.price", "0.40", {"unit_of_measurement": "EUR/kWh"})
+                await hass.async_block_till_done()
+            assert observer._price() == 0.4
+            observer.rebind(configured)
+            assert observer._unsubscribe is initial_subscription
+            with patch("custom_components.mennekes_amtron_rtu.cost_observer.time.time", return_value=at + 100):
+                await observer.async_observe(data(at + 100, 110, session=session))
+            assert observer.last.result.complete
+            assert observer.last.result.cost == pytest.approx(3)
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(run())

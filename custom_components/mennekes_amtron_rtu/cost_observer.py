@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+from copy import deepcopy
 from typing import Any
 
 from homeassistant.core import (
@@ -41,6 +42,11 @@ from .goal_store import ModelStore
 _LOGGER = logging.getLogger(__name__)
 PRICE_VALID_SECONDS = 90 * 60
 _PRICE_UNITS = {"EUR/kWh": 1.0, "€/kWh": 1.0, "ct/kWh": 0.01, "EUR/MWh": 0.001, "€/MWh": 0.001}
+_RETAINED_OPTIONS = (
+    CONF_CHARGING_COST_SOURCE, CONF_CHARGING_PRICE, CONF_CHARGING_PRICE_ENTITY,
+    CONF_CHARGING_NETWORK_TARIFF, CONF_MEASUREMENT_INTERVAL_SECONDS,
+    CONF_SCAN_INTERVAL_SECONDS,
+)
 
 
 def electricity_price(state: State | None) -> float | None:
@@ -93,8 +99,11 @@ class ChargingCostObserver:
         self._entity = str(entry.options.get(CONF_CHARGING_PRICE_ENTITY, ""))
         self._fixed = entry.options.get(CONF_CHARGING_COST_SOURCE) == COST_SOURCE_FIXED
         self._tariff = TariffConfig.parse(entry.options.get(CONF_CHARGING_NETWORK_TARIFF, {"module": "none"}))
-        self._configured_options = dict(entry.options)
+        self._configured_options = deepcopy(dict(entry.options))
         self._configured_data = dict(entry.data)
+        self._identity = (
+            entry.runtime_data.identity.serial_number, entry.runtime_data.identity.layout_version,
+        )
         max_gap = 660 if remote else max(600, float(entry.options.get(CONF_MEASUREMENT_INTERVAL_SECONDS, 30)) + float(entry.options.get(CONF_SCAN_INTERVAL_SECONDS, 5)) + 60)
         self._accumulator = CostAccumulator(self._tariff, max_gap=max_gap)
         self._store = ModelStore(
@@ -117,9 +126,37 @@ class ChargingCostObserver:
         self._dirty = False
         self._retry_at = 0.0
 
+    def retain_for_reload(self, entry: MennekesAmtronConfigEntry, *, remote: bool) -> bool:
+        """Keep observed prices and energy only across an unchanged live source.
+
+        The owner additionally proves continuity of the wallbox connection.
+        Vehicle-profile changes do not change this wallbox-wide calculation.
+        """
+        return (
+            not self._closed and not self._storage_corrupt
+            and entry.entry_id == self._entry.entry_id
+            and remote == self._remote
+            and dict(entry.data) == self._configured_data
+            and (
+                entry.runtime_data.identity.serial_number,
+                entry.runtime_data.identity.layout_version,
+            ) == self._identity
+            and all(
+                entry.options.get(key) == self._configured_options.get(key)
+                for key in _RETAINED_OPTIONS
+            )
+        )
+
+    def rebind(self, entry: MennekesAmtronConfigEntry) -> None:
+        """Hand over the live observer without resubscribing or resetting costs."""
+        if not self.retain_for_reload(entry, remote=self._remote):
+            raise ValueError("charging-cost source changed during reload")
+        self._entry = entry
+        self._configured_options = deepcopy(dict(entry.options))
+
     def apply_tariff_only_update(self) -> bool:
         """Change only the cost model without restarting the Modbus connection."""
-        current = dict(self._entry.options)
+        current = deepcopy(dict(self._entry.options))
         # The shared entry listener also runs for credential and connection
         # changes. Only an actual tariff-options delta may bypass a reload.
         if current == self._configured_options or dict(self._entry.data) != self._configured_data:

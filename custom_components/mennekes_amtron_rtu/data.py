@@ -41,6 +41,7 @@ class MennekesAmtronRuntimeData:
     diagnostics: WriteDiagnostics
     connection_state: ConnectionState
     retain_client_on_unload: bool = False
+    retain_cost_on_unload: bool = False
     # Config data/options are already replaced when an update starts unloading.
     # Retain this runtime's platform set instead of recomputing from the new mode.
     loaded_platforms: tuple[Platform, ...] = ()
@@ -59,3 +60,29 @@ class MennekesAmtronRuntimeData:
     # What the repair issues looked like last time, so an unchanged issue is
     # not written to the issue registry on every poll.
     repair_state: dict[str, dict[str, str] | None] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class RuntimeHandoff:
+    """Owners retained only for the duration of a controlled entry reload."""
+
+    identity: DeviceIdentity
+    connection_generation: int | None = None
+    client: MennekesModbusClient | None = None
+    sessions: SessionObserver | None = None
+    charging_cost: ChargingCostObserver | None = None
+
+    async def async_close(self) -> None:
+        """Release anything not claimed by the replacement runtime."""
+        sessions, cost, client = self.sessions, self.charging_cost, self.client
+        self.sessions = self.charging_cost = self.client = None
+        try:
+            if sessions is not None:
+                await sessions.async_close()
+        finally:
+            try:
+                if cost is not None:
+                    await cost.async_stop()
+            finally:
+                if client is not None:
+                    await client.async_close()
