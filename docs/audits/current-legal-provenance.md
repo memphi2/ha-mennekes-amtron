@@ -135,20 +135,18 @@ HA automation test checks replacement of an in-flight PV adjustment by the
 latest power budget. The integration remains read-only by default and exposes
 no network listener or cloud API.
 
-The settings tool migrates required checks to minimum and latest stable HA
-through GitHub's dedicated endpoint, preserving review rules, administrator
-enforcement and existing App IDs. Only the replaced current/preview contexts
-are removed; the mandatory `codex-security-review` gate remains. The local
+The settings tool keeps required checks for minimum and latest stable HA,
+preserving other review rules, administrator enforcement and existing App IDs.
+It removes the retired current/preview validation contexts and, following the
+owner's decision on 2026-11-08, the `codex-security-review` requirement. The local
 policy is applied and verified separately during release preparation.
-The owner confirmed automatic Codex security review for all PRs on every push.
 
-The security gate has 48 regression cases, including edited review requests,
-timestamp ordering and authorization. Its publisher can successfully
-deliver a blocking `pending` status without treating normal waiting as a job
-failure. Read-only checks still fail until review approval. The gate uses
-authenticated bot evidence and executes only trusted default-branch code; see
-[repository settings](../repository-settings.md#required-codex-security-review)
-for format dependencies, reporting thresholds and the initial rollout.
+Automatic Codex code and security reviews remain enabled. Their findings are
+assessed on the PR, without a separate required status, receipt verifier or
+receipt workflow. The owner confirmed automatic security review for all PRs on
+every push. See [repository settings](../repository-settings.md#automatic-codex-reviews)
+for the current policy and the distinction between review findings and required
+CI checks.
 
 Routine Dependabot PRs remain disabled; security alerts and security updates
 remain part of the repository policy. This reduces routine work, but it is

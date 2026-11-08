@@ -34,9 +34,12 @@ REQUIRED_CI_CHECKS = (
     "validate (min-ha)",
     "validate (latest-ha)",
 )
-REQUIRED_CHECKS = (*REQUIRED_CI_CHECKS, "codex-security-review")
-# Remove only the two replaced matrix jobs; unrelated/security checks survive.
-RETIRED_CI_CHECKS = {"validate (current-ha)", "validate (preview-ha)"}
+REQUIRED_CHECKS = REQUIRED_CI_CHECKS
+# Automatic Codex reviews remain enabled, without a separate merge-status gate.
+# Only these retired owned contexts are removed; unrelated checks survive.
+RETIRED_CHECKS = {
+    "validate (current-ha)", "validate (preview-ha)", "codex-security-review",
+}
 
 REPOSITORY_SETTINGS = {
     "has_issues": True,
@@ -172,16 +175,11 @@ def merged_status_checks(current: dict[str, Any]) -> dict[str, Any]:
     """Migrate owned contexts without losing custom checks or their App IDs."""
 
     checks = [dict(check) for check in current.get("checks", [])
-              if check["context"] not in RETIRED_CI_CHECKS]
+              if check["context"] not in RETIRED_CHECKS]
     known = {check["context"] for check in checks}
     for context in [*current.get("contexts", []), *REQUIRED_CHECKS]:
-        if context not in known and context not in RETIRED_CI_CHECKS:
-            check = {"context": context}
-            if context == "codex-security-review":
-                # Allow both the trusted Actions workflow and an authenticated
-                # maintainer running the verifier during initial rollout.
-                check["app_id"] = -1
-            checks.append(check)
+        if context not in known and context not in RETIRED_CHECKS:
+            checks.append({"context": context})
             known.add(context)
     return {"strict": True, "checks": checks}
 
@@ -211,7 +209,7 @@ def _check_required_checks(repository: str) -> int:
         check["context"] for check in current.get("checks", [])
     }
     missing = sorted(set(REQUIRED_CHECKS) - known)
-    retired = sorted(RETIRED_CI_CHECKS & known)
+    retired = sorted(RETIRED_CHECKS & known)
     if missing or retired or not current.get("strict"):
         _write(f"Drift: missing checks={missing}, retired checks={retired}, strict={current.get('strict')}")
         return 1

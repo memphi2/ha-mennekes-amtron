@@ -19,6 +19,8 @@ through **#apps-beta** before the integration when updating both components.
 - Move live Modbus debugging into a dedicated app Web UI tab. Preserve unsaved
   connection settings and only refresh the visible debug tab, with temporary
   memory-only capture and no additional Recorder history or bus requests.
+- Keep automatic code and security reviews while removing the extra mandatory
+  Codex receipt gate; the required CI checks remain in place.
 
 ## 0.8.0b1 — 2026-11-08
 
