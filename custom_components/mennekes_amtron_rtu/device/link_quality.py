@@ -1,4 +1,4 @@
-"""Stable communication quality without counters or per-transaction HA state."""
+"""Stable communication quality plus a failure count, never per-transaction state."""
 
 from __future__ import annotations
 
@@ -22,13 +22,16 @@ class LinkQuality:
 
     A successful transaction after the quiet period is required to recover;
     time passing without traffic never proves that communication improved.
-    Only two timestamps are retained, independent of traffic volume.
+    Two timestamps and one failure counter are retained, independent of
+    traffic volume. The counter changes only on failures, so a clean bus
+    never produces state updates.
     """
 
     def __init__(self, *, monotonic: Callable[[], float] = time.monotonic) -> None:
         self._monotonic = monotonic
         self._last_failure: float | None = None
         self._last_success: float | None = None
+        self.failures = 0
 
     @property
     def state(self) -> str | None:
@@ -50,3 +53,4 @@ class LinkQuality:
             error, (AmtronIdentityError, AmtronIllegalAddressError, AmtronWriteRejectedError)
         ):
             self._last_failure = self._monotonic()
+            self.failures += 1

@@ -518,6 +518,11 @@
         "state": {
           "good": "Stabil",
           "degraded": "Kommunikationsfehler erkannt"
+        },
+        "state_attributes": {
+          "failed_transactions": {
+            "name": "Fehlerhafte Übertragungen"
+          }
         }
       },
       "energy_goal_status": {

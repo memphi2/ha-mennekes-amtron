@@ -51,6 +51,7 @@ def test_quality_requires_real_traffic_after_a_full_quiet_period() -> None:
     clock[0] = 899
     quality.observe()
     assert quality.state == "good"
+    assert quality.failures == 3
 
 
 @pytest.mark.parametrize("error", [
@@ -115,6 +116,7 @@ def test_a_successful_read_retry_does_not_hide_an_intermittent_timeout() -> None
         await client.async_connect()
         assert await client.async_read_register(R.EVSE_STATE) == 1
         assert client.link_quality.state == "degraded"
+        assert client.link_quality.failures == 1  # The hidden retry counts.
         clock[0] = 300
         await client.async_read_words(address=R.EVSE_STATE.address, count=1)
         assert client.link_quality.state == "good"
@@ -151,12 +153,14 @@ def test_heartbeat_failure_latches_until_a_fresh_success_after_the_window() -> N
         )
         first = await poller.async_poll(WallboxData(), last_success=True)
         assert first.connection_quality == "good"
+        assert first.connection_failures == 0
         transport.write_exceptions[R.HEARTBEAT.address] = ModbusIOException("lost reply")
         with pytest.raises(AmtronProtocolError, match="lost reply"):
             await client.async_write_register(R.HEARTBEAT, 0x55AA, priority=True)
         assert client.link_quality.state == "degraded"
         later = await poller.async_poll(first, last_success=True)
         assert later.connection_quality == "degraded"
+        assert later.connection_failures == 1
         assert first.values == later.values
         assert first != later  # A quality transition must notify entities.
         del transport.write_exceptions[R.HEARTBEAT.address]
@@ -194,6 +198,7 @@ def test_energy_read_marks_fresh_and_failed_attempts_without_changing_snapshot_e
         assert failed.energy_read
         assert failed.get("energy_total") is None
         assert failed.connection_quality == "good"  # Device error, not a bad link.
+        assert failed.connection_failures == 0
         await client.async_close()
 
     asyncio.run(run())

@@ -23,6 +23,9 @@ through **#apps-beta** before the integration when updating both components.
 - Virtual Plug & Charge lifts a manual pause and adopts the car's limit only for
   a plug-in observed after unplugging. A restart, update or reconnect with the
   car still connected restores the grant but keeps the pause and target.
+- Connection quality has a **Failed transactions** attribute: timeouts and
+  malformed responses since start, including retried reads. It changes only on
+  failures (in service mode it needs app 0.8.0b4).
 
 ## 0.8.0b3 — 2026-11-08
 

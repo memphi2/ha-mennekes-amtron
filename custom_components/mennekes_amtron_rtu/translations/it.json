@@ -518,6 +518,11 @@
         "state": {
           "good": "Buona",
           "degraded": "Errori di comunicazione rilevati"
+        },
+        "state_attributes": {
+          "failed_transactions": {
+            "name": "Transazioni non riuscite"
+          }
         }
       },
       "energy_goal_status": {
