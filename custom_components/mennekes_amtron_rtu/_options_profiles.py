@@ -52,8 +52,8 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
     def _profile_providers(self) -> list[str]:
         """Offer only installed vehicle sources with a real local vehicle."""
         providers = ["none"]
-        # Iterating the device registry yields entries, not ids, from HA 2026.10.
-        # Ask for each vehicle integration entry's devices on every version.
+        # Iterating the device registry yields device entries, not ids. Ask
+        # for the devices of each vehicle integration entry instead.
         registry = dr.async_get(self.hass)
         if any(
             provider_device_is_valid(self.hass, "bavariandata", device.id)

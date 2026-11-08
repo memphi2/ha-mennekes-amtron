@@ -23,7 +23,7 @@ Follow the [channel handover](modbus-service.md#updates), preserving its data
 and ensuring only one service owns the wallbox connection. In service mode,
 update the app to **0.8.0b4 first**, wait for initialization, then update the
 integration. Beta 6 offers BavarianData again when adding or editing a vehicle
-profile on Home Assistant 2026.10 and newer. Beta 5 keeps each car's upcoming departure when you switch cars
+profile. Beta 5 keeps each car's upcoming departure when you switch cars
 and accepts a text sensor as the cable signal for automatic selection; it needs
 no app update. Beta 4 keeps entities available across a single disturbed Modbus
 read (app **0.8.0b4** for service mode), keeps the selected car after unplugging
