@@ -1258,7 +1258,7 @@
         "data": {
           "vehicle_profile_id": "Voertuigprofiel"
         },
-        "description": "Kies het voertuig dat op deze laadpaal is aangesloten. Wisselen wist het vorige percentagedoel en vertrekplan zonder het laden te starten. Elk profiel behoudt zijn instellingen en gemiddelde laadverlies.",
+        "description": "Kies het voertuig dat op deze laadpaal is aangesloten. Wisselen start het laden niet. Elke auto behoudt zijn eigen percentagedoel en zijn eigen gepland vertrek; een auto zonder eigen vertrek begint zonder vertrek. Elk profiel behoudt zijn instellingen en gemiddelde laadverlies.",
         "data_description": {
           "vehicle_profile_id": "Selecteer de daadwerkelijk aangesloten auto vóór het laden, vooral voor het vergelijken van laadverliezen. Deze handmatige keuze schakelt automatische voertuigselectie uit."
         }

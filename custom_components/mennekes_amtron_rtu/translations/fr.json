@@ -1258,7 +1258,7 @@
         "data": {
           "vehicle_profile_id": "Profil de véhicule"
         },
-        "description": "Choisissez le véhicule branché à cette borne. Le changement efface l’objectif en pourcentage et le départ précédents sans démarrer la charge. Chaque profil conserve ses réglages et sa moyenne des pertes.",
+        "description": "Choisissez le véhicule branché à cette borne. Le changement ne démarre pas la charge. Chaque véhicule conserve son propre objectif en pourcentage et son propre départ prévu ; un véhicule sans départ enregistré démarre sans départ. Chaque profil conserve ses réglages et sa moyenne des pertes.",
         "data_description": {
           "vehicle_profile_id": "Sélectionnez le véhicule réellement branché avant le début de la charge, surtout pour comparer les pertes. Ce choix manuel désactive la sélection automatique."
         }

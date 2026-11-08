@@ -1258,7 +1258,7 @@
         "data": {
           "vehicle_profile_id": "Fahrzeugprofil"
         },
-        "description": "Wähle das an dieser Wallbox angeschlossene Fahrzeug. Beim Wechsel werden das bisherige Prozentziel und der Abfahrtsplan gelöscht, ohne das Laden zu starten. Einstellungen und mittlere Ladeverluste bleiben je Profil erhalten.",
+        "description": "Wähle das an dieser Wallbox angeschlossene Fahrzeug. Der Wechsel startet kein Laden. Jedes Auto behält sein eigenes Prozentziel und seine eigene geplante Abfahrt; ein Auto ohne eigene Abfahrt startet ohne Abfahrt. Einstellungen und mittlere Ladeverluste bleiben je Profil erhalten.",
         "data_description": {
           "vehicle_profile_id": "Wähle das tatsächlich angeschlossene Auto vor Ladebeginn, besonders für den Vergleich der Ladeverluste. Diese manuelle Wahl schaltet die automatische Fahrzeugauswahl aus."
         }

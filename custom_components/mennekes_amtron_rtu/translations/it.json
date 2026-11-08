@@ -1258,7 +1258,7 @@
         "data": {
           "vehicle_profile_id": "Profilo veicolo"
         },
-        "description": "Seleziona il veicolo collegato a questa wallbox. Il cambio cancella l’obiettivo percentuale e il piano di partenza precedenti senza avviare la ricarica. Ogni profilo conserva impostazioni e perdite medie.",
+        "description": "Seleziona il veicolo collegato a questa wallbox. Il cambio non avvia la ricarica. Ogni auto conserva il proprio obiettivo percentuale e la propria partenza prevista; un’auto senza partenza salvata parte senza partenza. Ogni profilo conserva impostazioni e perdite medie.",
         "data_description": {
           "vehicle_profile_id": "Seleziona l’auto effettivamente collegata prima della ricarica, soprattutto per confrontare le perdite. Questa scelta manuale disattiva la selezione automatica."
         }

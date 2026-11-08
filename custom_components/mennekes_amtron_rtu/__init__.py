@@ -153,6 +153,7 @@ from .vehicle_soc import VehicleSocObserver
 from .vehicle_soc_const import CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_ENTITY
 from .vehicle_sources import resolve_telemetry_source
 from .vehicle_targets import VehicleTargetMemory, VehicleTargetStore
+from .vehicle_trips import VehicleTripMemory, VehicleTripStore
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _LOGGER = logging.getLogger(__name__)
@@ -367,6 +368,7 @@ async def async_setup_entry(
                 _raise_optional_setup_error(client, err, "plug_charge_unavailable")
         if control.supports_plug_charge:
             entry.runtime_data.plug_charge = PlugChargeObserver(hass, entry)
+        await _async_resume_trip(hass, entry, timed_reset_complete)
         await _async_cancel_old_trip(hass, entry, timed_reset_complete)
         cost_enabled = entry.options.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED) != COST_SOURCE_DISABLED
         if session_capture_enabled(entry):
@@ -539,6 +541,41 @@ async def async_setup_entry(
     return True
 
 
+def _trip_memory(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> VehicleTripMemory:
+    return VehicleTripMemory(hass, entry.entry_id, entry.runtime_data.identity.serial_number or "")
+
+
+async def _async_park_trip(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
+    """Remember the selected car's open trip before another car is selected."""
+    runtime = entry.runtime_data
+    if runtime.vehicle_profile_id is None or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True:
+        return
+    trip = runtime.timed_goal.goal if runtime.timed_goal is not None else None
+    await _trip_memory(hass, entry).async_swap(runtime.vehicle_profile_id, trip, None)
+
+
+async def _async_resume_trip(
+    hass: HomeAssistant, entry: MennekesAmtronConfigEntry, timed_reset_complete: bool,
+) -> None:
+    """Give a newly selected car back its own open trip, or none at all."""
+    options = vehicle_options(entry.options)
+    selected = options.get(CONF_VEHICLE_PROFILE_ID)
+    if (
+        not timed_reset_complete or selected is None
+        or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is not True
+        or not vehicle_soc_is_configured(options) or not timed_goal_is_enabled(options)
+    ):
+        return
+    identity = entry.runtime_data.identity.serial_number or ""
+    trip = await _trip_memory(hass, entry).async_swap(None, None, selected)
+    if trip is None:
+        return
+    try:
+        await TimedGoalStore(hass, entry.entry_id, identity).async_save(trip)
+    except OSError as err:
+        _LOGGER.warning("Vehicle departure not resumed: %s", err)
+
+
 async def _async_cancel_old_trip(
     hass: HomeAssistant, entry: MennekesAmtronConfigEntry, timed_reset_complete: bool,
 ) -> None:
@@ -658,12 +695,14 @@ async def _async_switch_vehicle(
     runtime.coordinator.retry_soc_goal = None
     runtime.vehicle_switching = True
     try:
+        await _async_park_trip(hass, entry)
         await _async_stop_vehicle(runtime)
         auto = entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
         if not auto and runtime.vehicle_detection is not None:
             runtime.vehicle_detection.stop()
             runtime.vehicle_detection = None
         timed_reset_complete = await _async_reset_disabled_trip(hass, entry)
+        await _async_resume_trip(hass, entry, timed_reset_complete)
         await _async_cancel_old_trip(hass, entry, timed_reset_complete)
         options = vehicle_options(entry.options)
         await _async_start_vehicle(hass, entry, options, timed_reset_complete, lambda: None)
@@ -820,6 +859,8 @@ async def _async_reload_entry_locked(
             runtime.vehicle_base_options = without_selection(entry.options)
         if await _async_switch_vehicle(hass, entry):
             return
+        # A reload that also selects another car keeps the previous car's trip.
+        await _async_park_trip(hass, entry)
     # Automatic profile changes reload optional observers. Preserve the open
     # physical connection so this logical reload does not discard the current
     # cable observation or an already granted session. Real disconnects still
@@ -875,6 +916,7 @@ async def async_remove_entry(
     await SocGoalStore(hass, entry.entry_id, "").async_remove()
     await VehicleTargetStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()
+    await VehicleTripStore(hass, entry.entry_id, "").async_remove()
     await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
     await LossStore(hass, entry.entry_id, "").async_remove()
     await async_prune_profile_losses(hass, entry.entry_id, ())

@@ -77,8 +77,10 @@ battery-health percentage. If that value is missing, choose a suitable manual
 capacity source instead.
 
 Check the selected profile **before charging**, whether you chose it manually or
-enabled automatic selection. Changing the active profile clears the previous
-car's departure plan without starting charging. From **0.8.0b4**, each profile
+enabled automatic selection. Changing the active profile does not start
+charging. Each car keeps its own upcoming departure: switching away remembers
+it, and returning to the car restores it if it still lies ahead. A car without
+a saved departure, or no vehicle at all, starts without one. From **0.8.0b4**, each profile
 keeps its own percentage target: returning to a car restores its last target,
 capped at its current limit, instead of no target. With no vehicle selected, no
 percentage target applies. Charging-loss averages are kept separately for

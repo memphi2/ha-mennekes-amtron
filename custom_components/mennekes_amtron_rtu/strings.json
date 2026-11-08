@@ -1258,7 +1258,7 @@
         "data": {
           "vehicle_profile_id": "Vehicle profile"
         },
-        "description": "Select the vehicle connected to this wallbox. Switching clears the previous percentage target and departure plan without starting charging. Each profile keeps its settings and loss average.",
+        "description": "Select the vehicle connected to this wallbox. Switching does not start charging. Each car keeps its own percentage target and its own upcoming departure; a car without one starts without a departure. Each profile keeps its settings and loss average.",
         "data_description": {
           "vehicle_profile_id": "Select the actual car before starting a charge, especially when comparing charging losses. This manual choice disables automatic vehicle selection."
         }

@@ -13,6 +13,7 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
 from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
+from custom_components.mennekes_amtron_rtu.vehicle_profiles import activate_profile
 from custom_components.mennekes_amtron_rtu.vehicle_targets import VehicleTargetMemory
 from tests.fakes import FakeModbusClient, device_bank
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
@@ -257,6 +258,91 @@ def test_vehicle_switch_runs_in_place_and_reloads_only_on_failure_or_other_chang
                 hass.config_entries.async_update_entry(entry, options={**entry.options, "scan_interval_seconds": 200})
                 await hass.async_block_till_done()
                 assert entry.runtime_data is not runtime
+            finally:
+                await hass.async_stop()
+
+    asyncio.run(asyncio.wait_for(run(), timeout=75))
+
+
+def test_each_car_keeps_its_own_departure_across_switches(tmp_path):
+    async def run():
+        transport = FakeModbusClient(device_bank(charging_current=0))
+        with patch(
+            "custom_components.mennekes_amtron_rtu.device.client.AsyncModbusSerialClient",
+            return_value=transport,
+        ):
+            hass = await _boot(tmp_path / "config")
+            try:
+                for entity in ("sensor.first_soc", "sensor.second_soc"):
+                    hass.states.async_set(entity, "20", {"unit_of_measurement": "%"})
+                entry = await _entry(hass)
+                options = catalog()
+                options.update({"control_mode": "master", "scan_interval_seconds": 300})
+                for key in (A, B):
+                    values = options["vehicle_profiles"][key]["options"]
+                    values.pop("charge_loss_source")
+                    values.pop("vehicle_last_charge_energy_entity")
+                    values.update({"timed_goal_enabled": True, "timed_capacity_kwh": 80})
+                hass.config_entries.async_update_entry(entry, options=options)
+                await hass.async_block_till_done()
+                registry = er.async_get(hass)
+                select = registry.async_get_entity_id("select", DOMAIN, f"{SERIAL_NUMBER}_active_vehicle")
+                departure = registry.async_get_entity_id("datetime", DOMAIN, f"{SERIAL_NUMBER}_timed_departure")
+                assert select is not None
+                assert departure is not None
+                runtime = entry.runtime_data
+                first = (dt_util.utcnow() + timedelta(hours=8)).replace(microsecond=0)
+                second = first + timedelta(hours=2)
+
+                async def choose(option):
+                    await hass.services.async_call("select", "select_option", {
+                        "entity_id": select, "option": option,
+                    }, blocking=True)
+                    await hass.async_block_till_done()
+                    assert entry.runtime_data is runtime
+
+                async def plan(value):
+                    await hass.services.async_call("datetime", "set_value", {
+                        "entity_id": departure, "datetime": value,
+                    }, blocking=True)
+                    await hass.async_block_till_done()
+
+                def planned():
+                    observer = entry.runtime_data.timed_goal
+                    return observer.goal.deadline if observer is not None else "no car"
+
+                await plan(first)
+                assert planned() == first
+                # Another car has no departure of its own.
+                await choose("Second car")
+                assert planned() is None
+                await plan(second)
+                # Each car gets its own departure back.
+                await choose("First car")
+                assert planned() == first
+                await choose("none")
+                assert planned() == "no car"
+                await choose("Second car")
+                assert planned() == second
+                # A departure cleared for one car stays cleared for it.
+                await hass.services.async_call("button", "press", {
+                    "entity_id": registry.async_get_entity_id(
+                        "button", DOMAIN, f"{SERIAL_NUMBER}_timed_clear_departure"),
+                }, blocking=True)
+                await choose("First car")
+                await choose("Second car")
+                assert planned() is None
+                # The trip survives a reload that also selects another car.
+                await choose("First car")
+                assert planned() == first
+                options = activate_profile(entry.options, B)
+                options["scan_interval_seconds"] = 301
+                hass.config_entries.async_update_entry(entry, options=options)
+                await hass.async_block_till_done()
+                runtime = entry.runtime_data
+                assert planned() is None
+                await choose("First car")
+                assert planned() == first
             finally:
                 await hass.async_stop()
 
