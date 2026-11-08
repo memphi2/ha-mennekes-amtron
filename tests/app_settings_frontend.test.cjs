@@ -10,11 +10,14 @@ const html = readFileSync(path.join(directory, 'app_settings.html'), 'utf8');
 const source = readFileSync(path.join(directory, 'app_settings.js'), 'utf8');
 
 class Element {
-  constructor() { this._value = ''; this.checked = false; this.disabled = false; this.hidden = false; this.required = false; this.textContent = ''; this.dataset = {}; this.listeners = {}; this.options = []; this.valid = true; this.open = false; this.children = []; }
+  constructor() { this._value = ''; this.checked = false; this.disabled = false; this.hidden = false; this.required = false; this.textContent = ''; this.dataset = {}; this.listeners = {}; this.options = []; this.valid = true; this.children = []; this.attributes = {}; this.tabIndex = 0; }
   set value(value) { this._value = String(value); }
   get value() { return this._value; }
   addEventListener(type, fn) { this.listeners[type] = fn; }
-  async emit(type) { return this.listeners[type]?.({ target: this, preventDefault() {} }); }
+  async emit(type, event = {}) { return this.listeners[type]?.({ target: this, preventDefault() {}, ...event }); }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+  getAttribute(name) { return this.attributes[name] ?? null; }
+  focus() { this.onFocus?.(); }
   replaceChildren(...options) { this.options = options; this.children = options; }
   appendChild(child) { this.children.push(child); }
   add(option) { this.options.push(option); }
@@ -39,6 +42,8 @@ async function harness(settings = baseSettings, language = 'en') {
     const id = match[0].match(/\bid="([^"]+)"/);
     const key = match[0].match(/data-i18n="([^"]+)"/);
     const element = new Element();
+    for (const attribute of match[0].matchAll(/([\w-]+)="([^"]*)"/g)) element.setAttribute(attribute[1], attribute[2]);
+    element.tabIndex = Number(element.getAttribute('tabindex') || 0);
     element.hidden = /\bhidden\b/.test(match[0]);
     element.disabled = /\bdisabled\b/.test(match[0]);
     if (id) elements.set(id[1], element);
@@ -75,6 +80,7 @@ async function harness(settings = baseSettings, language = 'en') {
       return typeof response === 'function' ? await response() : response;
     },
   });
+  for (const element of elements.values()) element.onFocus = () => { context.document.activeElement = element; };
   vm.runInContext(source, context, { filename: 'app_settings.js' });
   await tick();
   return { el: id => elements.get(id), responses, calls, context, translated, timers, documentEvents, pageEvents, evaluate: code => vm.runInContext(code, context) };
@@ -382,17 +388,24 @@ const debugRecord = sequence => ({
 });
 async function openDebug(ui, state = debugStatus()) {
   ui.responses.push(result(state));
-  ui.el('modbus_debug').open = true;
-  await ui.el('modbus_debug').emit('toggle');
+  await ui.el('debug_tab').emit('click');
 }
 
-test('live debugging is collapsed and never polls until explicitly opened and enabled', async () => {
+test('debugging has its own tab and never polls until selected and enabled', async () => {
   const ui = await harness();
   assert.equal(ui.calls.length, 1);
-  assert.equal(ui.el('modbus_debug').open, false);
+  assert.equal(ui.el('modbus_debug').hidden, true);
+  assert.equal(ui.el('connection_panel').hidden, false);
+  assert.equal(ui.el('connection_tab').getAttribute('aria-selected'), 'true');
+  assert.equal(ui.el('debug_tab').tabIndex, -1);
   assert.equal(ui.el('debug_enabled').disabled, true);
   assert.equal(ui.timers.size, 0);
   await openDebug(ui);
+  assert.equal(ui.el('modbus_debug').hidden, false);
+  assert.equal(ui.el('connection_panel').hidden, true);
+  assert.equal(ui.el('connection_tab').getAttribute('aria-selected'), 'false');
+  assert.equal(ui.el('debug_tab').getAttribute('aria-selected'), 'true');
+  assert.equal(ui.el('debug_tab').tabIndex, 0);
   assert.equal(ui.calls.at(-1).url, './api/modbus-debug');
   assert.equal(ui.el('debug_enabled').disabled, false);
   assert.equal(ui.timers.size, 0);
@@ -403,9 +416,35 @@ test('live debugging is collapsed and never polls until explicitly opened and en
   assert.equal(ui.calls.at(-1).headers['X-Amtron-CSRF'], 'csrf-proof');
   assert.equal(ui.timers.size, 1);
   assert.equal([...ui.timers.values()][0].delay, 2000);
-  ui.el('modbus_debug').open = false;
-  await ui.el('modbus_debug').emit('toggle');
+  const requestCount = ui.calls.length;
+  await ui.el('connection_tab').emit('click');
+  assert.equal(ui.calls.length, requestCount); // Leaving does not switch capture off.
   assert.equal(ui.timers.size, 0);
+});
+
+test('tab navigation supports keyboard access and retains unsaved connection settings', async () => {
+  const ui = await harness(baseSettings, 'de');
+  ui.el('host').value = '192.0.2.42';
+  ui.el('tcp_port').value = '1502';
+  ui.responses.push(result(debugStatus()));
+  await ui.el('connection_tab').emit('keydown', { key: 'ArrowRight' });
+  assert.equal(ui.context.document.activeElement, ui.el('debug_tab'));
+  assert.equal(ui.el('debug_tab').textContent, 'Debugprotokoll');
+  assert.equal(ui.el('modbus_debug').hidden, false);
+  await ui.el('debug_tab').emit('keydown', { key: 'Home' });
+  assert.equal(ui.context.document.activeElement, ui.el('connection_tab'));
+  assert.equal(ui.el('connection_panel').hidden, false);
+  assert.equal(ui.el('host').value, '192.0.2.42');
+  assert.equal(ui.el('tcp_port').value, '1502');
+  ui.responses.push(result(debugStatus()));
+  await ui.el('connection_tab').emit('keydown', { key: 'End' });
+  assert.equal(ui.context.document.activeElement, ui.el('debug_tab'));
+  await ui.el('debug_tab').emit('keydown', { key: 'ArrowLeft' });
+  assert.equal(ui.context.document.activeElement, ui.el('connection_tab'));
+  const requestCount = ui.calls.length;
+  await ui.el('connection_tab').emit('click');
+  await ui.el('connection_tab').emit('keydown', { key: 'Tab' });
+  assert.equal(ui.calls.length, requestCount);
 });
 
 test('live debug polling stops for hidden tabs, page exit and automatic capture expiry', async () => {
@@ -461,15 +500,13 @@ test('failed debug updates stop polling and do not pretend capture was disabled'
   assert.equal(ui.timers.size, 0);
 });
 
-test('closing the debug panel during a fetch prevents background polling', async () => {
+test('switching away from the debug tab during a fetch prevents background polling', async () => {
   const ui = await harness();
   let resolve;
   ui.responses.push(() => new Promise(done => { resolve = done; }));
-  ui.el('modbus_debug').open = true;
-  const pending = ui.el('modbus_debug').emit('toggle');
+  const pending = ui.el('debug_tab').emit('click');
   await tick();
-  ui.el('modbus_debug').open = false;
-  await ui.el('modbus_debug').emit('toggle');
+  await ui.el('connection_tab').emit('click');
   resolve(result(debugStatus(true)));
   await pending;
   assert.equal(ui.timers.size, 0);

@@ -103,9 +103,11 @@ integration module**, and **100% in configuration-flow modules and their shared 
 counting statements and branches together. Checks use unrounded counters and
 report the remaining gaps; see [coverage requirements](validation.md#coverage-requirements).
 Neither these percentages nor this badge mean every possible fault has been tested.
-Ruff, dependency checks, legal/provenance checks, security scanning and the
-required security-review gate complement behavior tests. Their current status
-is visible in the PR and workflow results, not inferred from this page.
+Ruff, dependency checks, legal/provenance checks, security scanning and
+automatic code and security reviews complement behavior tests. Codex reviews
+are enabled without a separate required receipt or merge status. Assess their
+findings on the PR; current check results are visible in workflows, not inferred
+from this page.
 
 Behavior tests cover unlimited-current opt-in, refusal of the invalid
 0.01–5.99 A range, pause preservation, register-write intervals, serialized bus

@@ -15,7 +15,7 @@ targets and schedules only when you want them:
 - [Losses and costs](charging-estimates.md)
 
 Vehicle profiles, optional automatic selection, Virtual Plug & Charge and app
-live debugging are available in **beta 0.8.0b1**. **0.6.1 remains stable**; see
+live debugging are available in **beta 0.8.0b2**. **0.6.1 remains stable**; see
 [version availability](README.md#versions-and-feature-availability).
 
 ## Optional charging losses and costs
@@ -346,8 +346,10 @@ identity supplied by the wallbox.
 
 ### Optional Virtual Plug & Charge
 
-**New in beta 0.8.0b1 and off by default.** Separately enable this feature and permit the
-profiles that may receive automatic charging release. It needs an unambiguous
+**New in beta 0.8.0b1 and off by default.** Permit each participating profile under
+**Configure → Vehicle → Virtual Plug & Charge**. From **0.8.0b2**, enable the
+feature using **Virtual Plug & Charge** under **Configuration** on the wallbox
+device page. Existing activation settings are preserved. It needs an unambiguous
 cable/home match for the active car and a fresh cable report for the current
 connection cycle. Manual profile selection alone does not grant permission.
 Existing pauses, locks, disabled release and reached targets remain effective.

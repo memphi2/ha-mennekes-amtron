@@ -232,12 +232,14 @@ const messages = {
 
 // Live diagnostics use the same supported interface languages.
 Object.assign(messages.en, {
+  "connection_tab": "Connection",
+  "debug_tab": "Debug log",
   "debug_title": "Live Modbus communication",
   "debug_hint": "Optional troubleshooting: observe existing reads, writes and heartbeats for up to 10 minutes. Only the latest 200 entries stay in memory; nothing is stored in the Home Assistant database or log files.",
   "debug_enable": "Capture communication for 10 minutes",
   "debug_off": "Capture is off. Switching it off erases all entries.",
   "debug_on": "Capture active — seconds remaining:",
-  "debug_privacy": "Serial numbers and text registers are hidden. Network login traffic is never captured. Closing this panel stops updates; capture continues until switched off or automatically expired.",
+  "debug_privacy": "Serial numbers and text registers are hidden. Network login traffic is never captured. Switching tabs stops updates; capture continues until switched off or automatically expired.",
   "debug_clear": "Clear entries",
   "debug_records": "Latest transactions, newest first",
   "debug_time": "Time (UTC)",
@@ -246,7 +248,7 @@ Object.assign(messages.en, {
   "debug_duration": "Duration",
   "debug_result": "Result",
   "debug_unavailable": "Configure the wallbox connection and restart the app to use live communication capture.",
-  "debug_failed": "Communication capture could not be read or changed. Close and reopen this panel to check its current state; an active capture still expires automatically.",
+  "debug_failed": "Communication capture could not be read or changed. Switch to Connection and back to Debug log to check its current state; an active capture still expires automatically.",
   "debug_read": "Read",
   "debug_write": "Write",
   "debug_heartbeat": "Heartbeat",
@@ -261,12 +263,14 @@ Object.assign(messages.en, {
   "debug_unknown": "Not decoded"
 });
 Object.assign(messages.de, {
+  "connection_tab": "Verbindung",
+  "debug_tab": "Debugprotokoll",
   "debug_title": "Modbus-Kommunikation live",
   "debug_hint": "Optional zur Fehlersuche: vorhandene Lesezugriffe, Schreibzugriffe und Heartbeats bis zu 10 Minuten mitverfolgen. Nur die letzten 200 Einträge bleiben im Arbeitsspeicher; nichts landet in der Home-Assistant-Datenbank oder in Protokolldateien.",
   "debug_enable": "Kommunikation für 10 Minuten aufzeichnen",
   "debug_off": "Aufzeichnung ausgeschaltet. Ausschalten löscht alle Einträge.",
   "debug_on": "Aufzeichnung aktiv — verbleibende Sekunden:",
-  "debug_privacy": "Seriennummern und Textregister werden ausgeblendet. Die Netzwerkanmeldung wird nie aufgezeichnet. Beim Schließen dieses Bereichs enden die Bildschirmaktualisierungen; die Aufzeichnung läuft bis zum Ausschalten oder automatischen Ablauf weiter.",
+  "debug_privacy": "Seriennummern und Textregister werden ausgeblendet. Die Netzwerkanmeldung wird nie aufgezeichnet. Beim Wechsel des Reiters enden die Bildschirmaktualisierungen; die Aufzeichnung läuft bis zum Ausschalten oder automatischen Ablauf weiter.",
   "debug_clear": "Einträge löschen",
   "debug_records": "Letzte Zugriffe, neueste zuerst",
   "debug_time": "Zeit (UTC)",
@@ -275,7 +279,7 @@ Object.assign(messages.de, {
   "debug_duration": "Dauer",
   "debug_result": "Ergebnis",
   "debug_unavailable": "Wallbox-Verbindung einrichten und die App neu starten, um die Kommunikation mitzuverfolgen.",
-  "debug_failed": "Die Aufzeichnung konnte nicht gelesen oder geändert werden. Diesen Bereich schließen und erneut öffnen, um den aktuellen Zustand zu prüfen; eine aktive Aufzeichnung endet weiterhin automatisch.",
+  "debug_failed": "Die Aufzeichnung konnte nicht gelesen oder geändert werden. Zu Verbindung und zurück zu Debugprotokoll wechseln, um den aktuellen Zustand zu prüfen; eine aktive Aufzeichnung endet weiterhin automatisch.",
   "debug_read": "Lesen",
   "debug_write": "Schreiben",
   "debug_heartbeat": "Heartbeat",
@@ -290,12 +294,14 @@ Object.assign(messages.de, {
   "debug_unknown": "Nicht dekodiert"
 });
 Object.assign(messages.fr, {
+  "connection_tab": "Connexion",
+  "debug_tab": "Journal de débogage",
   "debug_title": "Communication Modbus en direct",
   "debug_hint": "Diagnostic facultatif : observer les lectures, écritures et signaux de présence existants pendant 10 minutes au maximum. Seules les 200 dernières entrées restent en mémoire ; aucune écriture dans la base Home Assistant ni dans des fichiers journaux.",
   "debug_enable": "Capturer les échanges pendant 10 minutes",
   "debug_off": "Capture désactivée. La désactivation efface toutes les entrées.",
   "debug_on": "Capture active — secondes restantes :",
-  "debug_privacy": "Les numéros de série et registres texte sont masqués. Les échanges de connexion réseau ne sont jamais capturés. Fermer ce panneau arrête son actualisation ; la capture continue jusqu’à sa désactivation ou son expiration automatique.",
+  "debug_privacy": "Les numéros de série et registres texte sont masqués. Les échanges de connexion réseau ne sont jamais capturés. Changer d’onglet arrête l’actualisation ; la capture continue jusqu’à sa désactivation ou son expiration automatique.",
   "debug_clear": "Effacer les entrées",
   "debug_records": "Derniers échanges, les plus récents en premier",
   "debug_time": "Heure (UTC)",
@@ -304,7 +310,7 @@ Object.assign(messages.fr, {
   "debug_duration": "Durée",
   "debug_result": "Résultat",
   "debug_unavailable": "Configurez la connexion à la borne et redémarrez l’application pour observer les échanges.",
-  "debug_failed": "Impossible de lire ou modifier la capture. Fermez puis rouvrez ce panneau pour vérifier son état ; une capture active expire toujours automatiquement.",
+  "debug_failed": "Impossible de lire ou modifier la capture. Passez à Connexion puis revenez au Journal de débogage pour vérifier son état ; une capture active expire toujours automatiquement.",
   "debug_read": "Lecture",
   "debug_write": "Écriture",
   "debug_heartbeat": "Signal de présence",
@@ -319,12 +325,14 @@ Object.assign(messages.fr, {
   "debug_unknown": "Non décodé"
 });
 Object.assign(messages.it, {
+  "connection_tab": "Connessione",
+  "debug_tab": "Registro di debug",
   "debug_title": "Comunicazione Modbus in diretta",
   "debug_hint": "Diagnostica facoltativa: osserva letture, scritture e heartbeat esistenti per un massimo di 10 minuti. Solo le ultime 200 voci rimangono in memoria; nulla viene salvato nel database di Home Assistant o nei file di registro.",
   "debug_enable": "Acquisisci la comunicazione per 10 minuti",
   "debug_off": "Acquisizione disattivata. Disattivandola si eliminano tutte le voci.",
   "debug_on": "Acquisizione attiva — secondi rimanenti:",
-  "debug_privacy": "Numeri di serie e registri di testo sono nascosti. Il traffico di autenticazione di rete non viene mai acquisito. Chiudere questo pannello interrompe gli aggiornamenti; l’acquisizione continua fino alla disattivazione o alla scadenza automatica.",
+  "debug_privacy": "Numeri di serie e registri di testo sono nascosti. Il traffico di autenticazione di rete non viene mai acquisito. Cambiare scheda interrompe gli aggiornamenti; l’acquisizione continua fino alla disattivazione o alla scadenza automatica.",
   "debug_clear": "Elimina le voci",
   "debug_records": "Ultimi scambi, dal più recente",
   "debug_time": "Ora (UTC)",
@@ -333,7 +341,7 @@ Object.assign(messages.it, {
   "debug_duration": "Durata",
   "debug_result": "Risultato",
   "debug_unavailable": "Configura la connessione alla wallbox e riavvia l’app per osservare la comunicazione.",
-  "debug_failed": "Impossibile leggere o modificare l’acquisizione. Chiudi e riapri questo pannello per verificarne lo stato; un’acquisizione attiva termina comunque automaticamente.",
+  "debug_failed": "Impossibile leggere o modificare l’acquisizione. Passa a Connessione e torna a Registro di debug per verificarne lo stato; un’acquisizione attiva termina comunque automaticamente.",
   "debug_read": "Lettura",
   "debug_write": "Scrittura",
   "debug_heartbeat": "Heartbeat",
@@ -348,12 +356,14 @@ Object.assign(messages.it, {
   "debug_unknown": "Non decodificato"
 });
 Object.assign(messages.nl, {
+  "connection_tab": "Verbinding",
+  "debug_tab": "Debuglogboek",
   "debug_title": "Live Modbus-communicatie",
   "debug_hint": "Optioneel voor foutonderzoek: bekijk bestaande leesacties, schrijfacties en heartbeats maximaal 10 minuten. Alleen de laatste 200 regels blijven in het geheugen; er wordt niets opgeslagen in de Home Assistant-database of logbestanden.",
   "debug_enable": "Communicatie 10 minuten vastleggen",
   "debug_off": "Registratie uitgeschakeld. Uitschakelen wist alle regels.",
   "debug_on": "Registratie actief — resterende seconden:",
-  "debug_privacy": "Serienummers en tekstregisters zijn verborgen. Netwerkaanmeldingen worden nooit vastgelegd. Dit paneel sluiten stopt de weergave-updates; de registratie loopt door tot uitschakeling of automatisch verlopen.",
+  "debug_privacy": "Serienummers en tekstregisters zijn verborgen. Netwerkaanmeldingen worden nooit vastgelegd. Wisselen van tabblad stopt de weergave-updates; de registratie loopt door tot uitschakeling of automatisch verlopen.",
   "debug_clear": "Regels wissen",
   "debug_records": "Laatste transacties, nieuwste eerst",
   "debug_time": "Tijd (UTC)",
@@ -362,7 +372,7 @@ Object.assign(messages.nl, {
   "debug_duration": "Duur",
   "debug_result": "Resultaat",
   "debug_unavailable": "Stel de wallboxverbinding in en herstart de app om de communicatie te bekijken.",
-  "debug_failed": "De registratie kon niet worden gelezen of gewijzigd. Sluit en heropen dit paneel om de huidige status te controleren; een actieve registratie verloopt nog steeds automatisch.",
+  "debug_failed": "De registratie kon niet worden gelezen of gewijzigd. Ga naar Verbinding en terug naar Debuglogboek om de huidige status te controleren; een actieve registratie verloopt nog steeds automatisch.",
   "debug_read": "Lezen",
   "debug_write": "Schrijven",
   "debug_heartbeat": "Heartbeat",
@@ -482,7 +492,7 @@ async function readSettings() {
     if (writeBlocked) showError("options_save_uncertain");
     else if (uncertain) showError("adapter_save_uncertain");
   } catch (_) { showError("supervisor_unavailable"); }
-  finally { setBusy(false); }
+  finally { setBusy(false); updateDebugControls(); }
 }
 
 el("connection_type").addEventListener("change", () => {
@@ -609,7 +619,7 @@ let debugSequence = 0;
 let debugTimer = null;
 let debugBusy = false;
 let debugStopped = false;
-const debugVisible = () => el("modbus_debug").open && !document.hidden && !debugStopped;
+const debugVisible = () => !el("modbus_debug").hidden && !document.hidden && !debugStopped;
 
 function stopDebugPolling() {
   if (debugTimer !== null) clearTimeout(debugTimer);
@@ -677,9 +687,31 @@ async function refreshDebug(payload = null, reset = false) {
     if (success && debugVisible() && debugState.enabled) debugTimer = setTimeout(refreshDebug, 2000);
   }
 }
-el("modbus_debug").addEventListener("toggle", () => {
+const tabs = [["connection_tab", "connection_panel"], ["debug_tab", "modbus_debug"]];
+function selectTab(index) {
+  if (!el(tabs[index][1]).hidden) return;
+  tabs.forEach(([tab, panel], current) => {
+    const selected = current === index;
+    el(tab).setAttribute("aria-selected", String(selected));
+    el(tab).tabIndex = selected ? 0 : -1;
+    el(panel).hidden = !selected;
+  });
   stopDebugPolling();
   if (debugVisible()) return refreshDebug(null, true);
+}
+tabs.forEach(([tab], index) => {
+  el(tab).addEventListener("click", () => selectTab(index));
+  el(tab).addEventListener("keydown", (event) => {
+    let next;
+    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") next = (index + tabs.length - 1) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    el(tabs[next][0]).focus();
+    return selectTab(next);
+  });
 });
 el("debug_enabled").addEventListener("change", () => refreshDebug({ enabled: el("debug_enabled").checked }));
 el("debug_clear").addEventListener("click", () => refreshDebug({ clear: true }));

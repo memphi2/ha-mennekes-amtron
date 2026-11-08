@@ -626,6 +626,9 @@
       },
       "lock_evse": {
         "name": "Borne verrouillée"
+      },
+      "virtual_plug_charge": {
+        "name": "Plug & Charge virtuel"
       }
     },
     "event": {
@@ -821,7 +824,7 @@
       "message": "La sélection du véhicule a changé pendant la configuration. Celle-ci sera relancée avec la sélection actuelle."
     },
     "plug_charge_unavailable": {
-      "message": "Plug & Charge virtuel n’a pas pu être initialisé. La configuration sera réessayée ; vérifiez la connexion à la borne ou à l’application Modbus."
+      "message": "Plug & Charge virtuel est actuellement indisponible. Vérifiez la connexion à la borne ou à l’application Modbus, puis réessayez."
     },
     "plug_charge_blocked": {
       "message": "La charge automatique est bloquée. Vérifiez l’autorisation du véhicule, la pause manuelle et les objectifs."
@@ -931,14 +934,14 @@
         "title": "Véhicule",
         "menu_options": {
           "vehicle_soc": "Configurer le niveau de charge",
-          "vehicle_disable": "Désactiver l’objectif en pourcentage",
+          "vehicle_disable": "Ne plus utiliser le niveau de charge",
           "back": "Retour sans enregistrer",
           "vehicle_profiles": "Profils de véhicule",
           "vehicle_source": "Configurer le niveau de charge",
           "vehicle_detection": "Sélection automatique du véhicule",
           "vehicle_plug_charge": "Plug & Charge virtuel"
         },
-        "description": "Configurez les profils et l’objectif facultatif en pourcentage. Choisissez chaque voiture une fois, puis activez séparément sa limite, sa capacité, ses départs ou son historique."
+        "description": "Véhicule actif : **{vehicle}**.\n\nConfigurez les profils et l’objectif facultatif en pourcentage. Choisissez chaque voiture une fois, puis activez séparément sa limite, sa capacité, ses départs ou son historique.\n\nPour annuler uniquement l’objectif actuel en pourcentage, réglez Objectif de charge du véhicule sur 0. Ne plus utiliser le niveau de charge retire ici les associations de sources de ce profil, y compris le maximum facultatif, efface son objectif en pourcentage et son trajet et désactive la planification du départ. Les entités sources de l’intégration du véhicule restent intactes, tout comme son autorisation, l’objectif en kWh et l’état de charge."
       },
       "vehicle_soc": {
         "title": "Configurer le niveau de charge",
@@ -950,7 +953,7 @@
           "vehicle_soc_entity": "Choisissez le capteur du niveau réel de charge en %. En l’absence de données, la recharge reste inchangée jusqu’au retour de valeurs valides. Changer de source efface l’objectif sans démarrer la recharge. Utilisez le menu précédent pour désactiver la fonction.",
           "use_vehicle_limit": "Activez cette option pour utiliser la limite du véhicule comme maximum supplémentaire. Aucun réglage du véhicule n’est modifié."
         },
-        "description": "Activez l’objectif facultatif en pourcentage avec un capteur de charge existant. Réglez ensuite le pourcentage souhaité sur la page de la borne. Un objectif limite seulement la charge ; il n’annule pas une pause manuelle."
+        "description": "Véhicule actif : **{vehicle}**.\n\nActivez l’objectif facultatif en pourcentage avec un capteur de charge existant. Réglez ensuite le pourcentage souhaité sur la page de la borne. Un objectif limite seulement la charge ; il n’annule pas une pause manuelle."
       },
       "vehicle_limit": {
         "title": "Limite de charge du véhicule",
@@ -960,7 +963,7 @@
         "data_description": {
           "vehicle_charge_limit_entity": "Facultatif : limitez aussi cet objectif avec l’entité de limite de charge du véhicule. Sans cette entité, les objectifs peuvent atteindre 100 %. Une limite plus basse réduit l’objectif existant ; une hausse ne le relève pas. La dernière limite valide reste applicable si l’entité est indisponible. Aucun réglage du véhicule n’est modifié."
         },
-        "description": "Utilisez la limite de charge réglée dans le véhicule comme maximum supplémentaire pour l’objectif Home Assistant. Sélectionnez la limite souhaitée signalée par le véhicule, pas son niveau de charge actuel."
+        "description": "Véhicule actif : **{vehicle}**.\n\nUtilisez la limite de charge réglée dans le véhicule comme maximum supplémentaire pour l’objectif Home Assistant. Sélectionnez la limite souhaitée signalée par le véhicule, pas son niveau de charge actuel."
       },
       "departure": {
         "title": "Prochain départ",
@@ -969,7 +972,7 @@
           "departure_disable": "Désactiver la planification du départ",
           "back": "Retour sans enregistrer"
         },
-        "description": "Planifiez un seul prochain trajet avec un objectif en pourcentage, la capacité utile et l’heure de départ. Choisissez ensuite l’heure sur la page de l’appareil ou copiez-la depuis une source facultative. Ce n’est pas un programme quotidien. La désactivation efface le trajet et ses commandes en attente ; l’objectif en pourcentage reste."
+        "description": "Véhicule actif : **{vehicle}**.\n\nPlanifiez un seul prochain trajet avec un objectif en pourcentage, la capacité utile et l’heure de départ. Choisissez ensuite l’heure sur la page de l’appareil ou copiez-la depuis une source facultative. Ce n’est pas un programme quotidien. La désactivation efface le trajet et ses commandes en attente ; l’objectif en pourcentage reste."
       },
       "departure_requires_vehicle": {
         "title": "Niveau de charge requis",
@@ -987,7 +990,7 @@
           "use_departure_entity": "Utiliser une entité d’heure de départ",
           "use_vehicle_timer": "Utiliser les départs programmés du véhicule"
         },
-        "description": "La date et l’heure restent saisissables manuellement. Activez uniquement les sources supplémentaires souhaitées ; leurs réglages suivront. Un plan actif peut lever une pause manuelle pour atteindre l’objectif de départ.",
+        "description": "Véhicule actif : **{vehicle}**.\n\nLa date et l’heure restent saisissables manuellement. Activez uniquement les sources supplémentaires souhaitées ; leurs réglages suivront. Un plan actif peut lever une pause manuelle pour atteindre l’objectif de départ.",
         "data_description": {
           "capacity_source": "Utilisez la capacité utile : valeur fixe, capteur en kWh/Wh ou valeur du profil si disponible. Le plan attend si la capacité choisie ou le niveau de charge est indisponible.",
           "use_calendar": "Ajoute un bouton pour copier le prochain événement correspondant. Chaque appui choisit un trajet ; utilisez le blueprint fourni pour des imports programmés.",
@@ -1003,7 +1006,7 @@
         "data_description": {
           "timed_capacity_kwh": "Saisissez la capacité utile de la batterie, pas sa capacité nominale."
         },
-        "description": "Saisissez l’énergie réellement utilisable pour rouler. Elle sert à estimer le temps de charge nécessaire ; aucun réglage de la batterie du véhicule n’est modifié."
+        "description": "Véhicule actif : **{vehicle}**.\n\nSaisissez l’énergie réellement utilisable pour rouler. Elle sert à estimer le temps de charge nécessaire ; aucun réglage de la batterie du véhicule n’est modifié."
       },
       "departure_capacity_entity": {
         "title": "Entité de capacité de batterie",
@@ -1013,7 +1016,7 @@
         "data_description": {
           "timed_capacity_entity": "Choisissez un capteur de capacité utile en kWh ou Wh."
         },
-        "description": "Choisissez un capteur de capacité utile, pas d’énergie restante ni de pourcentage. L’unité doit être kWh ou Wh. Sans valeur valide, le plan attend la capacité au lieu de la deviner."
+        "description": "Véhicule actif : **{vehicle}**.\n\nChoisissez un capteur de capacité utile, pas d’énergie restante ni de pourcentage. L’unité doit être kWh ou Wh. Sans valeur valide, le plan attend la capacité au lieu de la deviner."
       },
       "departure_calendar": {
         "title": "Calendrier des départs",
@@ -1025,7 +1028,7 @@
           "timed_calendar_entity": "Choisissez un calendrier, puis copiez un événement avec le bouton correspondant.",
           "timed_calendar_title": "Seuls les événements portant exactement ce titre sont retenus. Les événements sur une journée entière sont ignorés."
         },
-        "description": "Choisissez un calendrier et un titre exact, par exemple « Trajet au travail ». Le début de l’événement devient l’heure de départ. Le bouton recherche sur 14 jours ; les événements sur toute la journée sont ignorés."
+        "description": "Véhicule actif : **{vehicle}**.\n\nChoisissez un calendrier et un titre exact, par exemple « Trajet au travail ». Le début de l’événement devient l’heure de départ. Le bouton recherche sur 14 jours ; les événements sur toute la journée sont ignorés."
       },
       "departure_entity": {
         "title": "Entité de l’heure de départ",
@@ -1035,7 +1038,7 @@
         "data_description": {
           "timed_departure_entity": "Choisissez un horodatage avec date et heure ou un input_datetime complet. Une heure seule ne suffit pas."
         },
-        "description": "Choisissez une source avec date et heure. Un nouvel horodatage futur valide est repris automatiquement. Configurez une seule source pour cela ; la saisie manuelle et les boutons calendrier/véhicule restent disponibles."
+        "description": "Véhicule actif : **{vehicle}**.\n\nChoisissez une source avec date et heure. Un nouvel horodatage futur valide est repris automatiquement. Configurez une seule source pour cela ; la saisie manuelle et les boutons calendrier/véhicule restent disponibles."
       },
       "departure_vehicle": {
         "title": "Intégration du véhicule",
@@ -1057,7 +1060,7 @@
           "timed_timer1_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur de climatisation 1. BavarianData ne fournit pas ces jours. Laissez vide pour ignorer ce programmateur.",
           "timed_timer2_days": "Sélectionnez les jours configurés dans le BMW pour le programmateur 2. Laissez vide pour l’ignorer."
         },
-        "description": "Utilisez le bouton de départ pour copier un programmateur actif du véhicule choisi. Avec un profil, le véhicule est déjà sélectionné. Dans BavarianData, activez les capteurs d’action, d’heure et de minute ; indiquez ici les jours récurrents car l’intégration ne les publie pas."
+        "description": "Véhicule actif : **{vehicle}**.\n\nUtilisez le bouton de départ pour copier un programmateur actif du véhicule choisi. Avec un profil, le véhicule est déjà sélectionné. Dans BavarianData, activez les capteurs d’action, d’heure et de minute ; indiquez ici les jours récurrents car l’intégration ne les publie pas."
       },
       "costs": {
         "title": "Source du prix de l’électricité",
@@ -1143,13 +1146,14 @@
           "loss_vehicle": "Historique de recharge du véhicule",
           "loss_disable": "Désactiver l’estimation des pertes",
           "back": "Retour sans enregistrer",
-          "loss_profile": "Utiliser l’historique de charge du véhicule choisi"
+          "loss_profile": "Utiliser l’historique de charge du véhicule choisi",
+          "vehicle_profiles": "Profils de véhicule"
         },
-        "description": "Comparez l’énergie mesurée à la borne avec celle ajoutée à la batterie durant la même charge terminée. La dernière perte et la moyenne sont des estimations. Sélectionnez le véhicule avant la charge ; une correspondance absente ou ambiguë reste inconnue."
+        "description": "Véhicule actif : **{vehicle}**.\n\nComparez l’énergie mesurée à la borne avec celle ajoutée à la batterie durant la même charge terminée. La dernière perte et la moyenne sont des estimations. Sélectionnez le véhicule avant la charge ; une correspondance absente ou ambiguë reste inconnue.\n\nSi aucun véhicule n’est sélectionné, choisissez d’abord un profil. Si son historique de charge est indisponible, vérifiez le profil sélectionné dans Profils de véhicule ou choisissez un capteur d’énergie."
       },
       "loss_sensor": {
         "title": "Pertes de charge avec un capteur",
-        "description": "Sélectionnez un capteur indiquant l’énergie ajoutée à la batterie du véhicule lors de sa dernière charge, en kWh ou Wh. N’utilisez ni l’énergie mesurée à la borne ni un compteur total. Sans horaires de charge, le résultat reste une estimation. Par défaut, confirmez la correspondance avec le bouton « Associer l’énergie de charge du véhicule ».",
+        "description": "Véhicule actif : **{vehicle}**.\n\nSélectionnez un capteur indiquant l’énergie ajoutée à la batterie du véhicule lors de sa dernière charge, en kWh ou Wh. N’utilisez ni l’énergie mesurée à la borne ni un compteur total. Sans horaires de charge, le résultat reste une estimation. Par défaut, confirmez la correspondance avec le bouton « Associer l’énergie de charge du véhicule ».",
         "data": {
           "vehicle_last_charge_energy_entity": "Énergie de la batterie, dernière charge",
           "charge_loss_auto_match": "Associer automatiquement une énergie modifiée"
@@ -1164,14 +1168,14 @@
         "data": {
           "charge_loss_vehicle_provider": "Intégration du véhicule"
         },
-        "description": "Choisissez une intégration installée avec un adaptateur pris en charge. Les entités HA génériques fonctionnent sans adaptateur. Seules les données locales déjà présentes sont lues."
+        "description": "Véhicule actif : **{vehicle}**.\n\nChoisissez une intégration installée avec un adaptateur pris en charge. Les entités HA génériques fonctionnent sans adaptateur. Seules les données locales déjà présentes sont lues."
       },
       "loss_vehicle_details": {
         "title": "Véhicule pour l’historique de recharge",
         "data": {
           "charge_loss_vehicle_device": "Véhicule"
         },
-        "description": "Sélectionnez le véhicule de cette borne. Seul l’historique local existant est lu ; aucune actualisation du véhicule n’est demandée. Les correspondances absentes ou ambiguës restent inconnues."
+        "description": "Véhicule actif : **{vehicle}**.\n\nSélectionnez le véhicule de cette borne. Seul l’historique local existant est lu ; aucune actualisation du véhicule n’est demandée. Les correspondances absentes ou ambiguës restent inconnues."
       },
       "options_changed": {
         "title": "Les paramètres ont changé",
@@ -1201,7 +1205,7 @@
       },
       "vehicle_profile_add": {
         "title": "Ajouter un profil",
-        "description": "Donnez au profil un nom identifiable et choisissez BavarianData ou la sélection manuelle d’entités. Les fonctions de charge facultatives sont désactivées dans les nouveaux profils.",
+        "description": "Donnez au profil un nom identifiable et choisissez BavarianData ou la sélection manuelle d’entités. Les fonctions de charge facultatives sont désactivées dans les nouveaux profils.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.",
         "data": {
           "vehicle_profile_name": "Nom du profil",
           "vehicle_provider": "Intégration du véhicule"
@@ -1213,7 +1217,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Modifier un profil",
-        "description": "Renommer conserve les réglages. Changer d’intégration ou de véhicule efface les réglages des fonctions de ce profil afin de ne pas réutiliser les données de l’ancienne voiture.",
+        "description": "Renommer conserve les réglages. Changer d’intégration ou de véhicule efface les réglages des fonctions de ce profil afin de ne pas réutiliser les données de l’ancienne voiture.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.",
         "data": {
           "vehicle_profile_name": "Nom du profil",
           "vehicle_provider": "Intégration du véhicule"
@@ -1260,7 +1264,7 @@
       },
       "vehicle_source": {
         "title": "Configurer le niveau de charge",
-        "description": "Utilisez le niveau de charge indiqué par le profil actif ou choisissez une entité manuellement. Seuls les réglages de la source choisie apparaîtront ensuite.",
+        "description": "Véhicule actif : **{vehicle}**.\n\nUtilisez le niveau de charge indiqué par le profil actif ou choisissez une entité manuellement. Seuls les réglages de la source choisie apparaîtront ensuite.",
         "data": {
           "vehicle_soc_source": "Source du niveau de charge"
         },
@@ -1270,7 +1274,7 @@
       },
       "vehicle_profile_soc": {
         "title": "Configurer le niveau de charge",
-        "description": "Utilisez le niveau de charge indiqué par le profil actif pour l’objectif facultatif en pourcentage. La limite de charge de cette voiture peut aussi servir de maximum. Aucun réglage du véhicule n’est modifié.",
+        "description": "Véhicule actif : **{vehicle}**.\n\nUtilisez le niveau de charge indiqué par le profil actif pour l’objectif facultatif en pourcentage. La limite de charge de cette voiture peut aussi servir de maximum. Aucun réglage du véhicule n’est modifié.",
         "data": {
           "use_vehicle_limit": "Utiliser aussi la limite de charge du véhicule"
         },
@@ -1298,7 +1302,7 @@
           "vehicle_auto_selection": "Sélectionner le véhicule automatiquement"
         },
         "data_description": {
-          "vehicle_auto_selection": "Activez après avoir configuré les profils participants. La sélection automatique n’identifie pas le véhicule par le câble de la borne lui-même ; elle dépend des signaux choisis. Vous pouvez toujours sélectionner un véhicule manuellement."
+          "vehicle_auto_selection": "Si aucun profil ne possède encore de signaux de détection, les étapes suivantes vous guident dans le choix du profil et de ses sources. La sélection automatique ne s’active qu’après l’enregistrement de paramètres de détection valides. Elle utilise les signaux du véhicule, sans identification par le câble de la borne. Vous pouvez toujours choisir une voiture manuellement."
         }
       },
       "vehicle_detection_profile": {
@@ -1310,14 +1314,14 @@
       },
       "vehicle_detection_source": {
         "title": "Signaux de détection",
-        "description": "Utilisez les entités locales compatibles de l’intégration du véhicule, choisissez des entités Home Assistant existantes ou désactivez la détection pour ce profil. Le branchement du câble et la présence à domicile sont tous deux nécessaires. Aucune requête cloud supplémentaire.",
+        "description": "Véhicule actif : **{vehicle}**.\n\nUtilisez les entités locales compatibles de l’intégration du véhicule, choisissez des entités Home Assistant existantes ou désactivez la détection pour ce profil. Le branchement du câble et la présence à domicile sont tous deux nécessaires. Aucune requête cloud supplémentaire.",
         "data": {
           "vehicle_detection_source": "Source de détection"
         }
       },
       "vehicle_detection_entities": {
         "title": "Câble et présence à domicile",
-        "description": "Choisissez des signaux distincts pour cette voiture. Le câble exige un capteur binaire dont on signifie branché. La présence exige un capteur binaire dont on signifie à domicile, ou une personne/un traceur dont home signifie à domicile. Les signaux doivent être signalés à Home Assistant dans les 30 minutes. Cela ne prouve pas la date de mesure de la position.",
+        "description": "Véhicule actif : **{vehicle}**.\n\nChoisissez des signaux distincts pour cette voiture. Le câble exige un capteur binaire dont on signifie branché. La présence exige un capteur binaire dont on signifie à domicile, ou une personne/un traceur dont home signifie à domicile. Les signaux doivent être signalés à Home Assistant dans les 30 minutes. Cela ne prouve pas la date de mesure de la position.",
         "data": {
           "vehicle_connected_entity": "Câble de charge branché",
           "vehicle_home_entity": "Véhicule à domicile"
@@ -1329,14 +1333,17 @@
       },
       "vehicle_plug_charge": {
         "title": "Plug & Charge virtuel",
-        "description": "Véhicule actif : **{vehicle}**.\n\nAutorisation facultative fondée sur les signaux du véhicule, sans authentification ISO 15118. La borne doit permettre la charge automatique avec l’autorisation RFID désactivée. Une nouvelle autorisation de charge nécessite un profil actif autorisé identifié sans ambiguïté. Aucun nouvel accord n’est donné aux véhicules inconnus ou ambigus.\n\nUn nouveau signal de câble correspondant au branchement actuel est nécessaire ; la prochaine mise à jour du véhicule peut prendre du temps. La sélection automatique du profil reste facultative. Les pauses manuelles et objectifs sont respectés. Pour afficher l’autorisation du véhicule, sélectionnez un profil et configurez ses signaux câble/domicile dans Sélection automatique du véhicule ; ce mode automatique peut rester désactivé.",
+        "description": "Véhicule actif : **{vehicle}**.\n\nAutorisez ici la charge automatique de ce profil. Activez ou désactivez séparément la fonction avec l’interrupteur **Plug & Charge virtuel** sous **Configuration** sur la page de l’appareil de la borne.\n\nSi le profil ou ses signaux de détection manquent, utilisez Profils de véhicule ci-dessous pour ajouter ou choisir une voiture, ou Sélection automatique du véhicule pour configurer ses signaux câble/domicile. Revenez ensuite ici pour autoriser ce profil. La sélection automatique du profil peut rester désactivée. Une nouvelle autorisation exige un profil actif autorisé reconnu sans ambiguïté et un nouveau signal de câble pour le branchement actuel. La sélection manuelle seule ne prouve pas le branchement.\n\nCette fonction facultative n’utilise pas l’authentification ISO 15118 et nécessite que l’autorisation RFID locale soit désactivée. Les pauses, verrouillages et objectifs atteints restent effectifs. L’activation peut interrompre une charge pendant l’attente de reconnaissance. La désactivation ne reprend pas la charge ; utilisez ensuite explicitement Autorisation de charge si nécessaire.",
         "data": {
-          "virtual_plug_charge": "Activer Plug & Charge virtuel",
           "vehicle_plug_charge": "Autoriser automatiquement ce véhicule"
         },
         "data_description": {
-          "virtual_plug_charge": "Une nouvelle autorisation exige un profil actif autorisé reconnu sans ambiguïté. Changer la sélection ou perdre les données du véhicule n’annule pas un accord existant. Le débranchement, la perte des données de la borne ou un changement d’identité, de permission ou de sources de détection l’annulent. Désactiver ne démarre pas la charge. L’accord survit à un redémarrage de HA tant que l’application continue de fonctionner.",
           "vehicle_plug_charge": "Autorisation pour le profil actif uniquement. Le choisir manuellement ne prouve pas que son véhicule est branché. Des signaux câble/domicile actuels et concordants restent nécessaires. Changer le véhicule ou ses sources de détection retire cette autorisation."
+        },
+        "menu_options": {
+          "vehicle_profiles": "Profils de véhicule",
+          "vehicle_detection": "Sélection automatique du véhicule",
+          "back": "Retour sans enregistrer"
         }
       }
     },

@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 from typing import Any
 
-import probatio
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import valid_entity_id
 
@@ -16,6 +15,7 @@ from .charge_loss_const import (
     CONF_LOSS_AUTO_MATCH,
     CONF_LOSS_BAVARIAN_DEVICE,
     CONF_VEHICLE_LAST_CHARGE_ENERGY,
+    LOSS_SOURCE_DISABLED,
 )
 from .charging_cost_const import (
     CONF_AUTO_TARIFF_REFRESH,
@@ -53,6 +53,7 @@ from .vehicle_profiles import (
     active_profile,
 )
 from .vehicle_sources import (
+    loss_source,
     provider_definitions,
     provider_device_is_valid,
 )
@@ -299,25 +300,32 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         draft = self._begin("losses", LOSS_KEYS)
         choices = ["loss_sensor"]
         if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none"):
-            choices.append("loss_profile")
+            choices.append(
+                "loss_profile" if "charge_history" in self._vehicle_capabilities(draft.values)
+                else "vehicle_profiles"
+            )
         elif CONF_VEHICLE_PROFILES not in self.config_entry.options or self._suggested_vehicle(draft.values, "charge_history").provider_id != "none":
             choices.append("loss_vehicle")
-        choices.append("loss_disable")
+        if loss_source(draft.values) != LOSS_SOURCE_DISABLED:
+            choices.append("loss_disable")
         if CONF_VEHICLE_PROFILES in self.config_entry.options and active_profile(self.config_entry.options) is None:
             choices = ["vehicle_profiles"]
         return self.async_show_menu(
             step_id="losses",
             menu_options=[*choices, "back"],
+            description_placeholders=self._loss_placeholders(),
         )
+
+    def _loss_placeholders(self) -> dict[str, str]:
+        draft = self._section("losses")
+        profile = active_profile(draft.original if draft is not None else self.config_entry.options)
+        return {"vehicle": profile.name if profile is not None else "—"}
 
     async def async_step_loss_profile(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if (draft := self._section("losses")) is None:
             return await self.async_step_init()
         if "charge_history" not in self._vehicle_capabilities(draft.values):
-            return self.async_show_form(
-                step_id="loss_profile", data_schema=probatio.Schema({}),
-                errors={"base": "vehicle_capability_unavailable"},
-            )
+            return await self.async_step_losses()
         draft.clear(LOSS_KEYS)
         draft.values[CONF_CHARGE_LOSS_SOURCE] = "vehicle_history"
         draft.values[CONF_LOSS_VEHICLE_PROVIDER] = "profile"
@@ -365,6 +373,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                 draft.values if user_input is None else user_input,
             ),
             errors=errors,
+            description_placeholders=self._loss_placeholders(),
             last_step=True,
         )
 
@@ -373,11 +382,15 @@ class EstimateOptionsFlow(SectionOptionsFlow):
     ) -> ConfigFlowResult:
         if (draft := self._section("losses")) is None:
             return await self.async_step_init()
-        return await self._async_vehicle_provider_step(
+        result = await self._async_vehicle_provider_step(
             values=draft.values, capability="charge_history",
             key=CONF_LOSS_VEHICLE_PROVIDER, step_id="loss_vehicle",
             user_input=user_input, next_step=self.async_step_loss_vehicle_details,
         )
+        # Both paths show a form: the provider choice or the initial device
+        # choice. Saving requires a later submission to the device step.
+        result["description_placeholders"] = self._loss_placeholders()
+        return result
 
     async def async_step_loss_vehicle_details(
         self, user_input: dict[str, Any] | None = None
@@ -419,6 +432,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                 integration=provider.integration_domain,
             ),
             errors=errors,
+            description_placeholders=self._loss_placeholders(),
             last_step=True,
         )
 

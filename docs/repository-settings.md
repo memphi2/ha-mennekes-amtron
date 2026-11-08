@@ -15,9 +15,9 @@ The script is idempotent and needs an authenticated `gh` for `--check` or
 exist; a failed read aborts the update. Review requirements, administrator
 enforcement, restrictions, force-push/deletion policy and conversation rules
 are preserved. Required checks are merged with existing checks, including
-their GitHub App IDs. Only the retired `validate (current-ha)` and
-`validate (preview-ha)` contexts are removed during migration to min/latest,
-through the targeted
+their GitHub App IDs. The retired `validate (current-ha)`,
+`validate (preview-ha)` and `codex-security-review` contexts are removed through
+the targeted
 [status-check endpoint](https://docs.github.com/en/rest/branches/branch-protection#update-status-check-protection).
 `--check` checks required-check drift only, not every repository setting.
 When deploying the min/latest workflows, apply the declared checks once the new
@@ -37,74 +37,33 @@ change GitHub branch protection.
 | Dependabot security updates | enabled |
 | Private vulnerability reporting | enabled |
 | Secret scanning and push protection | enabled |
-| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (latest-ha)`, `codex-security-review`, strict |
+| `main`: required status checks | `dependabot`, `hacs`, `hassfest`, `validate (min-ha)`, `validate (latest-ha)`, strict |
 | Other `main` protections | preserved; not overwritten by this script |
 
-`scripts/check_repo.py` checks the CI job names and requires the security-gate
-workflow and verifier. Tests keep the security status name aligned with the
-required-check policy.
+`scripts/check_repo.py` checks the required CI job names. Tests keep the
+required-check policy aligned with the workflows.
 
-## Required Codex Security Review
+## Automatic Codex reviews
 
-Every PR into `main` must have a clean `codex-security-review` status for its
-current head SHA. The status is independent of CodeQL and the ordinary Codex
-code review. The administrator-enforcement setting is preserved.
+Automatic Codex code and security reviews remain enabled for this repository.
+Review their findings on each PR and resolve actionable issues before merging.
+These reviews do not publish a required repository status: there is no separate
+`codex-security-review` merge condition, receipt verifier or receipt workflow.
+A missing receipt does not require starting a duplicate review.
 
-In [Codex settings](https://chatgpt.com/codex/cloud/settings/general), enable
-**Auto security review → All PRs → On every push** for this repository.
-The owner confirmed these settings on 2026-11-01. Codex settings are outside
-the GitHub repository API; the settings script cannot enable them. See the
-[official Security Review documentation](https://learn.chatgpt.com/docs/security/security-review)
-for scope and reporting thresholds. To retry, post exactly:
+The automatic-review settings live in
+[Codex settings](https://chatgpt.com/codex/cloud/settings/general), outside the
+GitHub repository API. The owner confirmed automatic security review for all
+PRs on every push; the repository settings script does not change these
+preferences. See the
+[Security Review documentation](https://learn.chatgpt.com/docs/security/security-review)
+for scope and reporting thresholds. A completed review is not a guarantee that
+code has no vulnerabilities.
 
-```text
-@codex security review
-```
-
-`.github/workflows/security-review.yml` reacts to Codex and maintainer comment
-updates and Validate workflow activity. A new maintainer security-review
-request invalidates an older clean receipt on the same SHA, including when an
-older comment is edited into a request. The verifier compares the request's
-edit time with the receipt's creation time; missing or ambiguous timestamps
-keep the gate pending. It does not wait for the bot to respond before revoking
-the previous status. It executes only the trusted default-branch
-verifier, never PR code, artifacts or caches. The token can read the repository
-and PR metadata and publish commit statuses. It handles fork PRs without using
-`pull_request_target`. A new commit has no successful security status and
-remains blocked until it has fresh evidence.
-
-The verifier checks the bot's numeric user ID and GitHub App ID, full head SHA,
-repository/PR identity, completion state, and the latest explicit clean
-security-review receipt. A changed/unknown bot format fails closed. If Codex
-reports findings, fix them and rerun the review. These are reported findings
-under the configured Codex threshold, not an assurance of vulnerability-free
-code. Report text remains on the PR; the gate stores only a short status and
-an evidence link.
-
-Read-only troubleshooting and an explicitly published recheck:
-
-```bash
-python scripts/check_security_review.py --repository memphi2/ha-mennekes-amtron --pr 16
-python scripts/check_security_review.py --repository memphi2/ha-mennekes-amtron --pr 16 --publish
-```
-
-Use the relevant PR number. Publishing requires authenticated `gh` with status
-write access. As with other commit statuses, repository writers are trusted
-publishers; public commenters cannot publish a status or forge the bot IDs.
-Existing App bindings on other checks are preserved.
-
-The publisher exits successfully after delivering a `pending` status; waiting
-for Codex is an expected state, not a workflow failure. The required commit
-status still blocks merging. Read-only checks exit unsuccessfully until the
-review is approved. Findings, inconsistent evidence and API errors still
-fail the publishing command.
-
-**Initial rollout:** GitHub loads comment and workflow-run handlers from the
-default branch. For the PR introducing this workflow, run the same reviewed
-verifier locally after its final security review and publish its result.
-After this PR is merged, subsequent PRs are evaluated automatically. Do not
-remove the required status to bypass a missing review. If a workflow failed,
-fix the cause and rerun the gate; absent or pending results block merging.
+Required CI checks, CodeQL, dependency security checks and the other existing
+branch protections remain in place. After changing the declared policy, use
+`--apply` and `--check` above to remove the retired status from GitHub and verify
+the live required-check settings.
 
 ## Dependency maintenance
 

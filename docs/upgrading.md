@@ -9,10 +9,10 @@ then the integration. Keep existing app data and your HA entry. The **#apps**
 catalog carries stable updates; **#apps-beta** follows the beta channel below.
 Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Trying 0.8.0b1
+## Trying 0.8.0b2
 
-**0.8.0b1 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
-prereleases in your integration installer and select **v0.8.0b1**. Keep the
+**0.8.0b2 is a beta of the integration and app; 0.6.1 remains stable.** Opt into
+prereleases in your integration installer and select **v0.8.0b2**. Keep the
 existing HA entry. The beta app is offered through
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
 catalog can use **Check for updates** and update their app in place.
@@ -20,9 +20,11 @@ catalog can use **Check for updates** and update their app in place.
 Moving from **#apps** to **#apps-beta** creates a separate app installation.
 Follow the [channel handover](modbus-service.md#updates), preserving its data
 and ensuring only one service owns the wallbox connection. In service mode,
-update the app to **0.8.0b1 first**, wait for initialization, then update the
-integration. The new app supplies Virtual Plug & Charge, the optional live
-Modbus view, Supervisor 2026.10.4+ guided setup and shared control fixes.
+update the app to **0.8.0b2 first**, wait for initialization, then update the
+integration. The app now gives the live Modbus view its own **Debug log** tab
+beside **Connection**. The integration adds a wallbox Plug & Charge switch and guided
+vehicle setup while preserving existing settings. Supervisor **2026.10.4+**
+remains supported.
 The integration's general minimum remains **service 0.6.1 with API 2**; ordinary
 connections can keep using a compatible older service. Virtual Plug & Charge
 needs the new app capability. Matching version numbers are not generally required.
@@ -57,10 +59,13 @@ first implemented vehicle adapter. Generic HA entity sources remain
 available for other vehicle integrations; manual and calendar departure work
 independently of a provider.
 
-Virtual Plug & Charge is separately optional and remains off after an update.
+Virtual Plug & Charge is separately optional and stays off until you enable it.
+An existing activation setting is preserved. From **0.8.0b2**, activation uses
+the wallbox's **Virtual Plug & Charge** switch
+under **Configuration**; profile permissions remain in the vehicle options.
 It needs detection sources and permission for each participating profile;
 automatic profile selection alone does not enable it. Service mode also needs
-app/service **0.8.0b1** with the new charging-permission capability. Follow the [setup steps](vehicle-setup.md#optional-virtual-plug--charge)
+app/service **0.8.0b1 or newer** with the charging-permission capability. Follow the [setup steps](vehicle-setup.md#optional-virtual-plug--charge)
 before enabling it; enabling may stop an existing charge while detection is
 pending. Disabling the feature does not resume charging.
 

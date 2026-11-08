@@ -43,7 +43,6 @@ def test_loss_source_is_independent_and_atomic(source):
         assert menu["menu_options"] == [
             "loss_sensor",
             "loss_vehicle",
-            "loss_disable",
             "back",
         ]
         form = await getattr(flow, f"async_step_loss_{source}")()
@@ -80,9 +79,11 @@ def test_loss_source_is_independent_and_atomic(source):
         if source == "sensor":
             assert saved["charge_loss_auto_match"] is False
         entry.options = saved
-        await flow.async_step_losses()
+        assert "loss_disable" in (await flow.async_step_losses())["menu_options"]
         cleared = (await flow.async_step_loss_disable())["data"]
         assert cleared == {"charging_price": 0.3, "scan_interval_seconds": 40}
+        entry.options = cleared
+        assert "loss_disable" not in (await flow.async_step_losses())["menu_options"]
 
     asyncio.run(run())
 
@@ -174,5 +175,62 @@ def test_loss_steps_cannot_skip_section(step):
         assert (await getattr(Flow(FakeConfigEntry()), f"async_step_{step}")())[
             "step_id"
         ] == "init"
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("source", [None, "disabled"])
+def test_unconfigured_loss_estimates_do_not_offer_a_noop_disable_action(source):
+    async def run():
+        options = {} if source is None else {"charge_loss_source": source}
+        flow = Flow(FakeConfigEntry(options=options))
+        menu = await flow.async_step_losses()
+        assert "loss_disable" not in menu["menu_options"]
+        assert menu["description_placeholders"] == {"vehicle": "—"}
+
+    asyncio.run(run())
+
+
+def test_loss_forms_identify_the_profile_bound_to_the_draft():
+    from tests.test_vehicle_profiles import A, B, profile_options
+
+    async def run():
+        entry = FakeConfigEntry(options=profile_options(provider="none"))
+        flow = Flow(entry)
+        menu = await flow.async_step_losses()
+        expected = {"vehicle": entry.options["vehicle_profiles"][A]["name"]}
+        assert menu["description_placeholders"] == expected
+        form = await flow.async_step_loss_sensor()
+        assert form["description_placeholders"] == expected
+        # A concurrent vehicle change cannot relabel the old profile's draft.
+        entry.options = {**entry.options, "active_vehicle_profile": B}
+        form = await flow.async_step_loss_sensor()
+        assert form["description_placeholders"] == expected
+        rejected = await flow.async_step_loss_sensor(
+            {"vehicle_last_charge_energy_entity": "sensor.battery_energy"}
+        )
+        assert rejected["step_id"] == "options_changed"
+
+    asyncio.run(run())
+
+
+def test_missing_profile_history_has_a_working_manual_and_profile_setup_route():
+    from tests.test_vehicle_profiles import A, profile_options
+
+    async def run():
+        options = profile_options()
+        options["vehicle_profiles"][A]["identity"] = "previous-vehicle"
+        entry = FakeConfigEntry(options=options)
+        flow = Flow(entry)
+        menu = await flow.async_step_losses()
+        assert menu["menu_options"] == ["loss_sensor", "vehicle_profiles", "back"]
+        # A stale link or a vehicle disappearing after the menu was opened
+        # returns useful choices instead of a repeatedly failing empty form.
+        fallback = await flow.async_step_loss_profile()
+        assert fallback["type"] == "menu"
+        assert fallback["menu_options"] == menu["menu_options"]
+        form = await flow.async_step_loss_sensor()
+        assert "vehicle_last_charge_energy_entity" in fields(form)
+        assert entry.options == options
 
     asyncio.run(run())

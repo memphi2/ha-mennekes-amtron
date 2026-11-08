@@ -7,7 +7,7 @@ Start with ordinary current control and pause/resume, then add one function at
 a time. Each configuration section saves independently and shows the inputs
 needed for your choice.
 
-This guide follows **beta 0.8.0b1**, which adds central vehicle profiles, optional
+This guide follows **beta 0.8.0b2**, which includes central vehicle profiles, optional
 automatic selection, Virtual Plug & Charge and live app Modbus debugging.
 **0.6.1 remains stable.** See
 [versions and availability](README.md#versions-and-feature-availability).
@@ -23,9 +23,9 @@ automatic selection, Virtual Plug & Charge and live app Modbus debugging.
 | Copy my next trip from a calendar | A HA calendar and exact event title | [Calendar departure](departure-planning.md#calendar) |
 | Use the next BMW climate timer | BavarianData and its enabled timer entities | [Vehicle departure](departure-planning.md#bavariandata-climate-timer) |
 | Start climate before departure | An existing HA vehicle action or script | [Preconditioning blueprint](blueprints.md#start-vehicle-climate-before-departure) |
-| Choose between several cars | Optional vehicle profiles | [Vehicle selection](vehicle-setup.md#example-two-cars-manual-selection) — beta 0.8.0b1 |
-| Recognize the connected car automatically | Optional profiles and cable/home signals | [Automatic selection](vehicle-setup.md#optional-automatic-vehicle-selection) — beta 0.8.0b1 |
-| Release charging for a recognized, permitted car | A permitted active profile and fresh cable/home detection | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — beta 0.8.0b1 |
+| Choose between several cars | Optional vehicle profiles | [Vehicle selection](vehicle-setup.md#example-two-cars-manual-selection) — beta 0.8.0b2 |
+| Recognize the connected car automatically | Optional profiles and cable/home signals | [Automatic selection](vehicle-setup.md#optional-automatic-vehicle-selection) — beta 0.8.0b2 |
+| Release charging for a recognized, permitted car | A permitted active profile and fresh cable/home detection | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) — beta 0.8.0b2 |
 | Charge from solar surplus | A suitable power sensor and the PV blueprint | [PV charging](blueprints.md#set-up-pv-charging) |
 | Estimate charging costs | A fixed gross price or existing dynamic price sensor | [Charging costs](charging-estimates.md#charging-costs-fixed-or-dynamic-price) |
 | Estimate losses | Battery energy from the matching vehicle charge | [Charging losses](charging-estimates.md#charging-losses-choose-the-available-data) |

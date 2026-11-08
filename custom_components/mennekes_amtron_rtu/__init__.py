@@ -360,7 +360,7 @@ async def async_setup_entry(
                 )
             except (AmtronBusError, HomeAssistantError) as err:
                 _raise_optional_setup_error(client, err, "plug_charge_unavailable")
-        if plug_enabled:
+        if control.supports_plug_charge:
             entry.runtime_data.plug_charge = PlugChargeObserver(hass, entry)
         if (
             vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is False
@@ -712,6 +712,8 @@ async def _async_reload_entry_locked(
     """Inspect the current owner only after earlier option reloads finish."""
 
     runtime = getattr(entry, "runtime_data", None)
+    if runtime is not None and runtime.plug_charge is not None and runtime.plug_charge.options_applied() is True:
+        return
     cost = runtime.charging_cost if runtime is not None else None
     if cost is not None and cost.apply_tariff_only_update():
         return

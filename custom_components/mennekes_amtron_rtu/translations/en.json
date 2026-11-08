@@ -626,6 +626,9 @@
       },
       "lock_evse": {
         "name": "Wallbox locked"
+      },
+      "virtual_plug_charge": {
+        "name": "Virtual Plug & Charge"
       }
     },
     "event": {
@@ -821,7 +824,7 @@
       "message": "The vehicle selection changed during setup. Setup will retry with the current selection."
     },
     "plug_charge_unavailable": {
-      "message": "Virtual Plug & Charge could not be initialized. Setup will retry; check the wallbox or Modbus app connection."
+      "message": "Virtual Plug & Charge is currently unavailable. Check the wallbox or Modbus app connection and try again."
     },
     "plug_charge_blocked": {
       "message": "Automatic charging is currently blocked. Check vehicle permission, manual pause and charging targets."
@@ -931,14 +934,14 @@
         "title": "Vehicle",
         "menu_options": {
           "vehicle_soc": "Configure charge level",
-          "vehicle_disable": "Disable percentage target",
+          "vehicle_disable": "Stop using vehicle charge level",
           "back": "Back without saving",
           "vehicle_profiles": "Vehicle profiles",
           "vehicle_source": "Configure charge level",
           "vehicle_detection": "Automatic vehicle selection",
           "vehicle_plug_charge": "Virtual Plug & Charge"
         },
-        "description": "Configure vehicle profiles and the optional percentage target. Select each car once, then choose independently whether to use its charge limit, capacity, departure timers or history."
+        "description": "Active vehicle: **{vehicle}**.\n\nConfigure vehicle profiles and the optional percentage target. Select each car once, then choose independently whether to use its charge limit, capacity, departure timers or history.\n\nTo cancel only the current percentage target, set Vehicle charge target to 0. Stop using vehicle charge level removes this profile’s source assignments here, including the optional maximum, clears its percentage target and departure plan, and disables departure planning. The source entities in the vehicle integration remain unchanged, as do vehicle permission, the kWh target and charging state."
       },
       "vehicle_soc": {
         "title": "Configure charge level",
@@ -950,7 +953,7 @@
           "vehicle_soc_entity": "Choose the vehicle sensor reporting its actual charge level in %. Missing data leaves charging unchanged until valid data returns. Changing the source clears the percentage target without resuming charging. To disable it, use the previous menu.",
           "use_vehicle_limit": "Enable this to select the vehicle’s own charge limit as an additional maximum. No setting is written to the vehicle."
         },
-        "description": "This enables the optional percentage target using an existing charge-level sensor. Afterwards, set the desired percentage on the wallbox device page. Setting a target only limits charging; it does not cancel a manual pause."
+        "description": "Active vehicle: **{vehicle}**.\n\nThis enables the optional percentage target using an existing charge-level sensor. Afterwards, set the desired percentage on the wallbox device page. Setting a target only limits charging; it does not cancel a manual pause."
       },
       "vehicle_limit": {
         "title": "Vehicle charge limit",
@@ -960,7 +963,7 @@
         "data_description": {
           "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle."
         },
-        "description": "Use the vehicle’s configured charging limit as an additional maximum for the Home Assistant percentage target. Select the desired limit reported by the car, not its current charge level."
+        "description": "Active vehicle: **{vehicle}**.\n\nUse the vehicle’s configured charging limit as an additional maximum for the Home Assistant percentage target. Select the desired limit reported by the car, not its current charge level."
       },
       "departure": {
         "title": "Next departure",
@@ -969,7 +972,7 @@
           "departure_disable": "Disable departure planning",
           "back": "Back without saving"
         },
-        "description": "Plan one next trip with a percentage target, usable battery capacity and departure time. Choose the actual time afterwards on the device page, or copy it from an optional source. This is not a daily schedule. Disabling planning clears the trip and queued plan commands; the percentage target remains."
+        "description": "Active vehicle: **{vehicle}**.\n\nPlan one next trip with a percentage target, usable battery capacity and departure time. Choose the actual time afterwards on the device page, or copy it from an optional source. This is not a daily schedule. Disabling planning clears the trip and queued plan commands; the percentage target remains."
       },
       "departure_requires_vehicle": {
         "title": "Charge level required",
@@ -987,7 +990,7 @@
           "use_departure_entity": "Use a departure time entity",
           "use_vehicle_timer": "Use vehicle departure timers"
         },
-        "description": "Manual date and time entry is always available. Enable only the additional sources you want; their settings appear next. An active plan can resume a manual pause to meet departure.",
+        "description": "Active vehicle: **{vehicle}**.\n\nManual date and time entry is always available. Enable only the additional sources you want; their settings appear next. An active plan can resume a manual pause to meet departure.",
         "data_description": {
           "capacity_source": "Use usable battery capacity: a fixed value, a kWh/Wh sensor, or the profile value when supported. The plan waits if its chosen capacity or charge level is unavailable.",
           "use_calendar": "Adds a button to copy the next matching calendar event. Each press chooses one trip; use the supplied blueprint if you want scheduled calendar imports.",
@@ -1003,7 +1006,7 @@
         "data_description": {
           "timed_capacity_kwh": "Enter the usable battery capacity, not the nominal capacity."
         },
-        "description": "Enter the energy the battery can actually store for driving. This value is used to estimate the required charging time; changing it does not change the car’s own battery settings."
+        "description": "Active vehicle: **{vehicle}**.\n\nEnter the energy the battery can actually store for driving. This value is used to estimate the required charging time; changing it does not change the car’s own battery settings."
       },
       "departure_capacity_entity": {
         "title": "Battery capacity entity",
@@ -1013,7 +1016,7 @@
         "data_description": {
           "timed_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh."
         },
-        "description": "Choose a sensor for usable capacity, not remaining energy or charge percentage. Its unit must be kWh or Wh. Without a valid value, the plan waits for capacity instead of guessing."
+        "description": "Active vehicle: **{vehicle}**.\n\nChoose a sensor for usable capacity, not remaining energy or charge percentage. Its unit must be kWh or Wh. Without a valid value, the plan waits for capacity instead of guessing."
       },
       "departure_calendar": {
         "title": "Departure calendar",
@@ -1025,7 +1028,7 @@
           "timed_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
           "timed_calendar_title": "Only events with this exact title are eligible. All-day events are ignored."
         },
-        "description": "Choose a calendar and an exact event title, for example “Drive to work”. The event start becomes the departure time. The button searches the next 14 days; all-day events are ignored."
+        "description": "Active vehicle: **{vehicle}**.\n\nChoose a calendar and an exact event title, for example “Drive to work”. The event start becomes the departure time. The button searches the next 14 days; all-day events are ignored."
       },
       "departure_entity": {
         "title": "Departure time entity",
@@ -1035,7 +1038,7 @@
         "data_description": {
           "timed_departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip."
         },
-        "description": "Choose a source containing both date and time. A valid new future timestamp is adopted automatically. Configure only one source for this purpose; manual entry and the calendar/vehicle buttons remain available."
+        "description": "Active vehicle: **{vehicle}**.\n\nChoose a source containing both date and time. A valid new future timestamp is adopted automatically. Configure only one source for this purpose; manual entry and the calendar/vehicle buttons remain available."
       },
       "departure_vehicle": {
         "title": "Vehicle integration",
@@ -1057,7 +1060,7 @@
           "timed_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
           "timed_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer."
         },
-        "description": "Use the departure button to copy one active timer from the selected vehicle. With a profile, the vehicle is already selected. For BavarianData, enable the timer action, hour and minute sensors; enter recurring weekdays here because the integration does not publish them."
+        "description": "Active vehicle: **{vehicle}**.\n\nUse the departure button to copy one active timer from the selected vehicle. With a profile, the vehicle is already selected. For BavarianData, enable the timer action, hour and minute sensors; enter recurring weekdays here because the integration does not publish them."
       },
       "costs": {
         "title": "Electricity price source",
@@ -1143,13 +1146,14 @@
           "loss_vehicle": "Vehicle charging history",
           "loss_disable": "Disable loss estimates",
           "back": "Back without saving",
-          "loss_profile": "Use the selected vehicle’s charging history"
+          "loss_profile": "Use the selected vehicle’s charging history",
+          "vehicle_profiles": "Vehicle profiles"
         },
-        "description": "Compare energy measured by the wallbox with energy added to the battery during the same completed charge. The last loss and average are estimates. Select the vehicle before charging; missing or ambiguous matches remain unknown instead of reusing another charge."
+        "description": "Active vehicle: **{vehicle}**.\n\nCompare energy measured by the wallbox with energy added to the battery during the same completed charge. The last loss and average are estimates. Select the vehicle before charging; missing or ambiguous matches remain unknown instead of reusing another charge.\n\nIf no vehicle is selected, choose a profile first. If its charging history is unavailable, check the selected profile under Vehicle profiles or choose an energy sensor."
       },
       "loss_sensor": {
         "title": "Charging losses from a sensor",
-        "description": "Select a sensor reporting the energy added to the vehicle battery during its last charge, in kWh or Wh. Do not select energy measured at the wallbox or a lifetime total. Without charge times, the result is an estimate. By default, confirm the matching charge with the “Assign vehicle charge energy” button.",
+        "description": "Active vehicle: **{vehicle}**.\n\nSelect a sensor reporting the energy added to the vehicle battery during its last charge, in kWh or Wh. Do not select energy measured at the wallbox or a lifetime total. Without charge times, the result is an estimate. By default, confirm the matching charge with the “Assign vehicle charge energy” button.",
         "data": {
           "vehicle_last_charge_energy_entity": "Vehicle battery energy, last charge",
           "charge_loss_auto_match": "Assign changed energy automatically"
@@ -1164,14 +1168,14 @@
         "data": {
           "charge_loss_vehicle_provider": "Vehicle integration"
         },
-        "description": "Choose an installed integration with a supported adapter. Generic HA entities can be selected without an adapter. Only existing local vehicle data is read."
+        "description": "Active vehicle: **{vehicle}**.\n\nChoose an installed integration with a supported adapter. Generic HA entities can be selected without an adapter. Only existing local vehicle data is read."
       },
       "loss_vehicle_details": {
         "title": "Vehicle for charging history",
         "data": {
           "charge_loss_vehicle_device": "Vehicle"
         },
-        "description": "Select the vehicle connected to this wallbox. Only existing local charging history is read; no vehicle refresh is requested. Missing or ambiguous matches remain unknown."
+        "description": "Active vehicle: **{vehicle}**.\n\nSelect the vehicle connected to this wallbox. Only existing local charging history is read; no vehicle refresh is requested. Missing or ambiguous matches remain unknown."
       },
       "options_changed": {
         "title": "Settings have changed",
@@ -1201,7 +1205,7 @@
       },
       "vehicle_profile_add": {
         "title": "Add profile",
-        "description": "Give the profile a recognizable name and choose BavarianData or manual entity selection. New profiles start with optional charging features disabled.",
+        "description": "Give the profile a recognizable name and choose BavarianData or manual entity selection. New profiles start with optional charging features disabled.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.",
         "data": {
           "vehicle_profile_name": "Profile name",
           "vehicle_provider": "Vehicle integration"
@@ -1213,7 +1217,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Edit profile",
-        "description": "Renaming keeps the settings. Changing the integration or vehicle clears this profile’s feature settings so data from the previous car cannot be reused.",
+        "description": "Renaming keeps the settings. Changing the integration or vehicle clears this profile’s feature settings so data from the previous car cannot be reused.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.",
         "data": {
           "vehicle_profile_name": "Profile name",
           "vehicle_provider": "Vehicle integration"
@@ -1260,7 +1264,7 @@
       },
       "vehicle_source": {
         "title": "Configure charge level",
-        "description": "Choose the active profile’s reported charge level or select an entity manually. Only the chosen source’s settings follow.",
+        "description": "Active vehicle: **{vehicle}**.\n\nChoose the active profile’s reported charge level or select an entity manually. Only the chosen source’s settings follow.",
         "data": {
           "vehicle_soc_source": "Charge level source"
         },
@@ -1270,7 +1274,7 @@
       },
       "vehicle_profile_soc": {
         "title": "Configure charge level",
-        "description": "Use the active profile’s reported charge level for the optional percentage target. You can also use that car’s charge limit as an additional maximum. No setting is written to the vehicle.",
+        "description": "Active vehicle: **{vehicle}**.\n\nUse the active profile’s reported charge level for the optional percentage target. You can also use that car’s charge limit as an additional maximum. No setting is written to the vehicle.",
         "data": {
           "use_vehicle_limit": "Also use the vehicle’s charge limit"
         },
@@ -1298,7 +1302,7 @@
           "vehicle_auto_selection": "Select the vehicle automatically"
         },
         "data_description": {
-          "vehicle_auto_selection": "Enable only after configuring the participating profiles. Automatic selection does not detect charging sessions through the wallbox cable itself; it depends on the chosen vehicle signals. You can always choose a car manually."
+          "vehicle_auto_selection": "If no profile has detection signals yet, the next steps guide you through selecting a profile and its sources. Automatic selection is enabled only after saving valid detection settings. It uses vehicle signals, not identification through the wallbox cable. You can always choose a car manually."
         }
       },
       "vehicle_detection_profile": {
@@ -1310,14 +1314,14 @@
       },
       "vehicle_detection_source": {
         "title": "Detection signals",
-        "description": "Use supported local entities from this profile’s vehicle integration, choose existing Home Assistant entities, or disable detection for this profile. Both cable connection and home presence are required. No additional cloud requests are made.",
+        "description": "Active vehicle: **{vehicle}**.\n\nUse supported local entities from this profile’s vehicle integration, choose existing Home Assistant entities, or disable detection for this profile. Both cable connection and home presence are required. No additional cloud requests are made.",
         "data": {
           "vehicle_detection_source": "Source for detection"
         }
       },
       "vehicle_detection_entities": {
         "title": "Cable and home signals",
-        "description": "Choose separate signals for this car. Cable connection must be a binary sensor with on = connected. Home presence must be a binary sensor with on = at home, or a person/device tracker with home = at home. Use signals reported to Home Assistant within 30 minutes. Reports do not prove when the car measured its location.",
+        "description": "Active vehicle: **{vehicle}**.\n\nChoose separate signals for this car. Cable connection must be a binary sensor with on = connected. Home presence must be a binary sensor with on = at home, or a person/device tracker with home = at home. Use signals reported to Home Assistant within 30 minutes. Reports do not prove when the car measured its location.",
         "data": {
           "vehicle_connected_entity": "Charging cable connected",
           "vehicle_home_entity": "Vehicle at home"
@@ -1329,14 +1333,17 @@
       },
       "vehicle_plug_charge": {
         "title": "Virtual Plug & Charge",
-        "description": "Active vehicle: **{vehicle}**.\n\nOptional charging permission based on vehicle signals, without ISO 15118 authentication. The wallbox must support automatic charging with RFID authorization disabled. A new charging grant requires one uniquely identified, permitted active profile. Unknown or ambiguous vehicles receive no new grant.\n\nA fresh cable report matching the current connection cycle is required; the next vehicle integration update may take time. Automatic profile selection remains optional. Manual pauses and charging targets are respected. To show the vehicle permission switch, select a profile and configure its cable/home signals under Automatic vehicle selection; its automatic mode can remain off.",
+        "description": "Active vehicle: **{vehicle}**.\n\nAllow this profile to charge automatically here. Activate or deactivate the feature separately with the **Virtual Plug & Charge** switch under **Configuration** on the wallbox device page.\n\nIf a profile or its detection signals are missing, use Vehicle profiles below to add or select a car, or Automatic vehicle selection to configure its cable/home signals. Return here afterwards to permit that profile. Automatic profile selection can remain off. A new charging grant needs one uniquely recognized, permitted active profile and a fresh cable report for the current connection. Manual selection alone is not proof of connection.\n\nThis optional convenience feature does not use ISO 15118 authentication and requires local RFID authorization to be disabled. Existing pauses, locks and reached targets remain effective. Enabling can stop an ongoing charge while recognition is pending. Disabling does not resume charging; use Charging release explicitly afterwards.",
         "data": {
-          "virtual_plug_charge": "Enable Virtual Plug & Charge",
           "vehicle_plug_charge": "Allow this vehicle to charge automatically"
         },
         "data_description": {
-          "virtual_plug_charge": "New permission needs one uniquely recognized, permitted active profile. Once granted, changing the selection or missing vehicle data does not revoke it. Disconnection, lost wallbox observation or changed vehicle identity, permission or detection sources revoke it. Disabling does not start charging. An existing app grant survives an HA restart while the app keeps running.",
           "vehicle_plug_charge": "Permission for the active profile only. Selecting a profile manually is not proof that its car is connected. Fresh matching cable/home signals remain required. Changing the vehicle or its detection sources removes this permission."
+        },
+        "menu_options": {
+          "vehicle_profiles": "Vehicle profiles",
+          "vehicle_detection": "Automatic vehicle selection",
+          "back": "Back without saving"
         }
       }
     },

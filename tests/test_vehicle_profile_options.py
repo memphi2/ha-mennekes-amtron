@@ -358,12 +358,30 @@ def test_manual_entity_override_and_disabled_features_do_not_delete_the_profile(
             "vehicle_soc_entity": "sensor.manual"
         }
         entry.options = saved
-        await flow.async_step_vehicle()
+        assert "vehicle_disable" in (await flow.async_step_vehicle())["menu_options"]
         disabled = (await flow.async_step_vehicle_disable())["data"]
         assert disabled["vehicle_profiles"][A]["options"] == {
             "timed_goal_enabled": False
         }
         assert disabled["active_vehicle_profile"] == A
+        assert disabled["vehicle_profiles"][B] == entry.options["vehicle_profiles"][B]
+        entry.options = disabled
+        assert "vehicle_disable" not in (await flow.async_step_vehicle())["menu_options"]
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("configured", [False, True])
+def test_profile_percentage_removal_is_offered_only_for_enabled_soc(configured):
+    async def run():
+        entry = FakeConfigEntry(options=profile_options(feature={
+            "vehicle_soc_use_profile": configured,
+            "vehicle_limit_use_profile": configured,
+        }))
+        flow = Flow(entry)
+        menu = (await flow.async_step_vehicle())["menu_options"]
+        assert "vehicle_source" in menu
+        assert ("vehicle_disable" in menu) is configured
 
     asyncio.run(run())
 
@@ -403,10 +421,9 @@ def test_missing_vehicle_capability_cannot_enable_profile_features():
         flow = Flow(entry)
         flow.hass.data[er.DATA_REGISTRY].entries.clear()
         await flow.async_step_vehicle()
-        await flow.async_step_vehicle_source({"vehicle_soc_source": "profile"})
-        assert (
-            await flow.async_step_vehicle_profile_soc({"use_vehicle_limit": False})
-        )["errors"]["base"] == "vehicle_capability_unavailable"
+        source = await flow.async_step_vehicle_source({"vehicle_soc_source": "profile"})
+        assert source["errors"]["vehicle_soc_source"] == "vehicle_capability_unavailable"
+        assert fields(source)["vehicle_soc_source"].config["options"] == ["entity"]
         await flow.async_step_departure()
         unavailable = await flow.async_step_departure_configure(
             {"capacity_source": "profile"}
@@ -431,14 +448,13 @@ def test_changed_vehicle_identity_cannot_enable_soc_or_history_on_old_profile():
         raw["vehicle_profiles"][A]["identity"] = "bavariandata:car:previous-vehicle"
         flow = Flow(FakeConfigEntry(options=raw))
         await flow.async_step_vehicle()
-        await flow.async_step_vehicle_source({"vehicle_soc_source": "profile"})
-        assert (
-            await flow.async_step_vehicle_profile_soc({"use_vehicle_limit": False})
-        )["errors"]["base"] == "vehicle_capability_unavailable"
+        source = await flow.async_step_vehicle_source({"vehicle_soc_source": "profile"})
+        assert source["errors"]["vehicle_soc_source"] == "vehicle_capability_unavailable"
+        assert fields(source)["vehicle_soc_source"].config["options"] == ["entity"]
         await flow.async_step_losses()
-        assert (await flow.async_step_loss_profile())["errors"][
-            "base"
-        ] == "vehicle_capability_unavailable"
+        fallback = await flow.async_step_loss_profile()
+        assert fallback["type"] == "menu"
+        assert fallback["menu_options"] == ["loss_sensor", "vehicle_profiles", "back"]
 
     asyncio.run(run())
 
@@ -478,7 +494,6 @@ def test_manual_profile_does_not_offer_unavailable_manufacturer_controls():
         assert fields(form)["capacity_source"].config["options"] == ["fixed", "entity"]
         assert (await flow.async_step_losses())["menu_options"] == [
             "loss_sensor",
-            "loss_disable",
             "back",
         ]
 

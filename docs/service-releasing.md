@@ -28,8 +28,9 @@ or planned service release must satisfy that requirement. For this release,
 older apps must update before the integration.
 
 PR checks run minimum/latest stable HA and native amd64/aarch64 container tests.
-Automatic bot review and the mandatory security-review status must pass before
-merging. Tag only the validated main commit.
+Automatic code and security reviews remain enabled; assess their findings and
+resolve actionable issues before merging. No separate Codex receipt or status
+is required. Required CI checks must pass. Tag only the validated main commit.
 
 ### Decide whether the app needs publication
 
