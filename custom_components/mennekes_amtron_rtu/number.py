@@ -30,7 +30,7 @@ from .device.registers import CHARGING_CURRENT_EMS, ENERGY_TOTAL, EVSE_STATE
 from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
-from .vehicle_soc_const import CONF_VEHICLE_SOC_ENTITY
+from .vehicle_profiles import vehicle_options, vehicle_soc_is_configured
 
 PARALLEL_UPDATES = 1
 
@@ -47,7 +47,7 @@ async def async_setup_entry(
     ]
     if entry.runtime_data.identity.layout_version >= ENERGY_TOTAL.min_layout:
         entities.append(AmtronEnergyGoalNumber(entry, entry.runtime_data.coordinator))
-    if entry.options.get(CONF_VEHICLE_SOC_ENTITY):
+    if vehicle_soc_is_configured(vehicle_options(entry.options)):
         entities.append(AmtronSocGoalNumber(entry, entry.runtime_data.coordinator))
     async_add_entities(entities)
 

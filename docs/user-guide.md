@@ -5,20 +5,25 @@ wallbox. This guide uses the English labels; the integration and app also
 include German, French, Dutch and Italian translations.
 New here? Follow the [Quick start](quickstart.md) first.
 
-The setup instructions below follow **beta 0.7.0b4** and its separate feature
-menus. **0.6.1 remains the stable release.** Optional charging targets,
-departure planning, loss/cost estimates and command-result events are described here. For service
-connections, [update the app first](installation.md#updating-to-061).
+Start with the current slider and pause switch. Add vehicle data, charging
+targets and schedules only when you want them:
+
+- [First charge](quickstart.md#7-first-charge)
+- [Choose optional functions](features.md)
+- [Vehicle setup and selection](vehicle-setup.md)
+- [Charge for the next departure](departure-planning.md)
+- [Losses and costs](charging-estimates.md)
+
+Vehicle profiles, optional automatic selection, Virtual Plug & Charge and app
+live debugging are available in **beta 0.8.0b1**. **0.6.1 remains stable**; see
+[version availability](README.md#versions-and-feature-availability).
 
 ## Optional charging losses and costs
 
-Choose a vehicle-energy source and a fixed or dynamic electricity price in the
-integration options. Both are independently optional and disabled by default. Tibber and other existing
-HA price sensors can be selected; §14a network components are configured
-separately. The optional current-cost entity must also be enabled explicitly;
-the last-cost sensor is sufficient if you only want completed charges in history.
-See [Charging losses and costs](charging-estimates.md) for setup,
-data-quality choices and restart behavior.
+Use an existing vehicle-energy source and a fixed or dynamic electricity price.
+Losses and costs are independent and off by default. The running cost sensor is
+also optional, so you can keep only a completed-charge result in history.
+[Choose the right data and set up estimates](charging-estimates.md).
 
 ## Everyday controls
 
@@ -51,60 +56,38 @@ state, described below.
 
 ## Waiting between charging changes
 
-**Minimum time between state changes** defaults to **300 seconds**. Enter a
-whole number from **0 to 3600 seconds**. With a direct USB or LAN connection,
-change it in the integration options. With the Modbus service, change it in
-the app configuration or standalone `state_change_interval_seconds` setting,
-then restart the service. HA does not apply a second interval on top of it.
+A requested change may be queued. **Pending change** tells you what will happen;
+**Pending change due** shows when, once the timing is known. You do not need to
+press the control again. The most recent charging request replaces the previous
+queued request; repeating the same request does not extend its wait.
 
-An early pause, resume, phase change, charging-release change or wallbox lock
-change is **queued** and runs when the applicable interval has elapsed.
-Changing the current while paused can also queue a resume. The latest charging
-request replaces an older pending request. Repeating the same requested state
-does not extend the wait.
+| Setting | Default | Where to change it |
+|---|---|---|
+| Minimum time between state changes | **300 seconds**, configurable from 0–3600 | Direct: integration options. Service: app configuration, then restart the app. |
+| Minimum interval for current-register writes | **5 seconds** | Required write guard; remains active when the longer wait is set to 0. |
+| Extra wait before a phase change | **5 seconds**, configurable from 0–30 | Same connection owner; see [phase switching](#phase-switching). |
 
-For manually requested changes with **no vehicle connected**, the longer wait is skipped when fresh wallbox
-readings agree: EVSE is Idle and CP is A1 or A2. Unplugging during a queued
-wait is checked every five seconds, so the request can run earlier than the
-displayed due time. The five-second register-write guards and heartbeat remain.
-Unknown, inconsistent or unreadable status keeps the longer wait; older register
-layouts without CP status also keep it.
+The longer interval applies to starts, pauses, resumes, phase changes, charging
+release and wallbox lock changes. **Even pause, disable-release and lock requests
+can wait**, so charging may continue until the shown time. Changing the current
+while paused can queue a resume. Goal-triggered stops use their own rules below.
 
-Timed departure commands are cancelled when unplugging is confirmed before
-their write, including commands already waiting for the bus or an interval.
-This requires integration 0.7.0b3 in direct mode or service 0.7.0b3 in service mode.
-
-**Pending change** shows what is waiting, and **Pending change due** shows
-the planned execution time when known. While a phase change waits for the
-vehicle to confirm its pause, the action stays visible but its due time is
-unknown. Once confirmed, the due time shows the end of the extra wait. Home
-Assistant can display a known timestamp relative to the current time. That
-timestamp stays fixed during a timed wait, so a countdown does not create a
-database update every second. Pause, release, lock and phase
-controls continue to show the wallbox's actual state. While paused, the current
-slider shows the remembered resume target, which can already reflect the queued
-request; it does not indicate that charging has started.
-
-Pausing, disabling charging release or locking the wallbox replaces a pending
-start with that new request. **These commands also wait for the interval:**
-charging may continue until the displayed due time. A pause within five seconds
-of the previous current write is also queued, so it does not need to be sent
-again. Error recovery can reassert the existing state and the heartbeat
-continues throughout the wait.
-Setting the interval to **0** disables the longer wait, while the technical
-write guards remain.
+With a confirmed idle wallbox and no vehicle, manual changes skip the longer
+wait. Unknown or inconsistent wallbox readings retain it. The heartbeat and
+five-second write guards continue in either case. A queued phase change first
+needs confirmation that the vehicle has paused, so its due time can temporarily
+be unknown.
 
 MENNEKES recommends **more than five minutes** between charging transitions.
-The configurable default is 300 seconds; choose **360 seconds**, for example,
-to exceed that recommendation's five-minute threshold. Keep separate PV start
-and stop thresholds and hold times too: the interval alone does not decide
-whether enough surplus is available.
+The default is 300 seconds; choose **360 seconds**, for example, to exceed that
+recommendation. PV automation still needs suitable start/stop thresholds and
+hold times; the delay alone cannot assess available surplus.
 
-A pending command is cancelled if its owner restarts: an integration reload or
-HA Core restart in direct mode, or an app/service restart in service mode.
-An HA Core restart alone leaves a running service's pending command active;
-it can therefore execute while HA is offline. After a cold start, a fresh
-guard period protects transitions whose previous timing is unknown.
+Use [Cancel pending change](#cancel-a-queued-change) to remove a queued request.
+An owner restart also cancels it: HA reload/restart in direct mode, or app/service
+restart in service mode. Restarting HA Core alone leaves the separate service's
+queue running. After a cold start, a fresh guard period protects transitions
+whose previous timing is unknown.
 
 ## Where do I enable controls?
 
@@ -148,14 +131,21 @@ Choose one of five independent sections:
 | Section | What you configure |
 |---|---|
 | **Wallbox** | Control mode, polling, current cap and transition timing, as applicable to the connection |
-| **Vehicle charge target** | An optional SoC sensor and, separately, the car's maximum-charge sensor |
+| **Vehicle** | Vehicle sources, optional profiles/selection, Virtual Plug & Charge and the percentage target and charge limit |
 | **Next departure** | Optional planning for the next trip, battery capacity and the departure sources you want |
 | **Charging costs** | A fixed price or price entity; German network tariffs when applicable |
 | **Charging losses** | A last-charge energy entity or a supported vehicle history adapter |
 
-Only the fields for your selected choices appear. Finish with **Save** to
-apply that section. **Edit** returns to it; **Back** discards its unsaved
-changes and returns to the menu. Other sections keep their settings.
+Only the fields for your selected choices appear. Confirm the last input
+form to save that section directly; there is no extra confirmation page.
+Cancel or **Back** discards an unfinished section. Other sections keep their
+settings, and a concurrent edit to the same section is reported instead of
+being overwritten.
+
+Use **Vehicle** to configure a vehicle profile once, then choose which optional
+features should use it. BavarianData is the first supported vehicle integration.
+You can also select existing HA entities manually, including entities from other
+vehicle integrations. Calendar and manual departure inputs remain available.
 
 | Setting | Direct USB or LAN connection | Modbus service connection |
 |---|---|---|
@@ -168,12 +158,10 @@ changes and returns to the menu. Other sections keep their settings.
 | Minimum time between state changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 | Extra wait before phase changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
 
-App **0.6.0b1** moves USB/LAN connection selection to
-**Open Web UI**, with an adapter dropdown and fields for the chosen mode.
-Write permission and other operating settings stay in **Configuration**.
-Save and restart the app to apply changes; see [the connection page](upgrading.md#app-connection-page)
-for its Supervisor requirement. Older app **0.5.2b2** uses the native configuration
-for all app settings.
+The app keeps connection settings under **Open Web UI** and operating settings
+under **Configuration**. Save and restart the app after changing those settings.
+If a published app refuses to open the guided page on Supervisor 2026.10.x,
+use its native Configuration tab; see [the connection-page version note](upgrading.md#app-connection-page).
 
 The default status interval is **5 seconds** and the measurement interval is
 **30 seconds**. The available range is 2–300 seconds. In service mode, changing
@@ -229,7 +217,7 @@ The [PV blueprints](blueprints.md) adjust current and pause/resume charging from
 your available power budget. [Automation examples](automations.md) include a
 tariff schedule.
 
-**Solar display mode** (called **Solar charging mode** in 0.5.2b2) changes the mode shown on the wallbox; it does not
+**Solar display mode** changes the mode shown on the wallbox; it does not
 measure PV surplus or run a surplus-charging algorithm. It requires the hardware
 configuration described in the [hardware guide](hardware.md).
 
@@ -336,149 +324,57 @@ use the new goal controls. Switching an entry between direct and service mode
 does not transfer an active goal: the new connection owner has its own stored
 state. Set the intended goal with that owner before continuing the charge.
 
+## Vehicle profiles
+
+**New in beta 0.8.0b1.** Keep each car's sources, optional features and
+loss averages together. Select the connected car manually, or opt into the
+separate automatic-selection feature. A profile does not enable charging
+features by itself. Switching cars clears the former percentage target and trip
+without starting a charge.
+
+[Set up one car or several profiles](vehicle-setup.md#vehicle-profiles).
+
+### Optional automatic vehicle selection
+
+**New in beta 0.8.0b1 and off by default.** Use the selected vehicle integration or
+explicit cable/home entities. Exactly one sufficiently clear candidate can be
+selected; uncertain matches leave no active vehicle. Choosing a car manually
+turns the automatic mode off. These signals are a selection aid, not vehicle
+identity supplied by the wallbox.
+
+[Configure automatic selection and understand its limits](vehicle-setup.md#optional-automatic-vehicle-selection).
+
+### Optional Virtual Plug & Charge
+
+**New in beta 0.8.0b1 and off by default.** Separately enable this feature and permit the
+profiles that may receive automatic charging release. It needs an unambiguous
+cable/home match for the active car and a fresh cable report for the current
+connection cycle. Manual profile selection alone does not grant permission.
+Existing pauses, locks, disabled release and reached targets remain effective.
+The status sensor explains what it is waiting for.
+
+Enabling it may stop a charge while recognition is pending. Disabling it does
+not resume charging; use **Charging release** explicitly afterwards.
+[Set up Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge).
+
 ## Optional vehicle percentage target
 
-The percentage target is **off by default**. Open **Configure → Vehicle charge
-target → Configure charge level** and select **Vehicle charge level entity** from
-your existing vehicle integration.
-This adds **Vehicle charge target** and its status sensor. The integration only
-reads that vehicle entity; it does not change the car's settings or estimate
-battery capacity from wallbox energy.
+Choose the vehicle's charge-level source, then set **Vehicle charge target**, for
+example 80%. The car's reported maximum limit is a separate optional choice.
+Setting a target only limits charging; it does not lift a pause. **0%** disables
+the target without resuming. Missing SoC data leaves charging running, so keep
+the vehicle's own limit configured when that is important to you.
 
-Enable the separate option to use the car's maximum if you want to select a
-**Vehicle charge limit entity**. Its entity picker appears only then. Without it,
-you can choose a target up to **100%**. With it, the reported car limit becomes
-the maximum you can select. A falling car limit also lowers an existing target;
-a later increase never raises the target you chose. If this optional source is
-temporarily unavailable, the last valid maximum is kept. Before its first valid
-reading, setting a positive target is refused rather than assuming 100%.
-
-For example, with a reported charge level of 45%, set a target of **80%**.
-Charging pauses when the vehicle reports at least 80%. Setting a target never
-starts charging or lifts a pause; **0%** switches this target off without
-resuming. A reached target stays reached even if the reported charge level later
-falls. Setting a new positive target establishes a new limit. The independent
-kWh target can also remain active: reaching either target stops the charge.
-
-As selected for this integration, missing or invalid vehicle data **does not
-pause charging**. Monitoring resumes when a valid value returns. The same applies
-while HA is down: the service can keep charging, but cannot evaluate an external
-percentage until HA sends vehicle data again. Delayed or unchanged reports from
-the vehicle integration can therefore allow the target to be exceeded. This is
-not a replacement for the car's own charge limit. The five-second write floor
-and wallbox response time also still apply when a stop is requested.
-
-Changing or removing either selected source clears the old percentage target
-and remembered maximum without starting charging. Disable **Vehicle charge
-target** in its section to remove this optional feature. This also disables
-departure planning and clears its trip, because that plan needs the SoC source.
-The kWh goal is independent. Service
-mode needs an app version advertising percentage-goal support; existing service
-functions remain available on older compatible versions.
+[Percentage-target setup, limits and missing data](vehicle-setup.md#optional-vehicle-percentage-target).
 
 ## Charge for the next departure
 
-Set up a vehicle charge-level entity and a positive **Vehicle charge target**
-first. Open **Configure → Next departure → Configure departure planning** and enable departure planning. Choose
-a fixed **usable battery capacity** in kWh, or an entity that reports it in kWh
-or Wh. Only the chosen capacity input appears. The integration never guesses
-it from the nominal model capacity.
+Choose one full date and time, a positive percentage target and usable battery
+capacity. The plan adjusts current and can pause or resume charging toward that
+time. **It can also lift a manually set pause**; clear **Next departure** to
+stop the plan. Manual, calendar and vehicle-timer inputs can coexist.
 
-Manual entry is available once planning is enabled. Calendar, dated entity
-and vehicle-provider inputs are separate optional choices; select only the
-ones you want to use. They do not require each other.
-
-Set **Next departure** to a full date and time. This is a one-trip target, not
-a repeating daily plan. Manual entry, calendar selection and optional vehicle timer
-selection can coexist; choose the source you want for each trip.
-
-For a calendar, enable the calendar option in **Next departure**, then select a
-**Departure calendar** and enter the **exact event title**. Press **Use next
-calendar event** to copy the first
-matching timed event within the next 14 days into **Next departure**. All-day
-events are ignored. Calendar changes after selection do not alter the copied
-time; press the button again to import the updated event. The
-[calendar blueprint](blueprints.md#plan-the-next-trip-from-a-calendar) can
-perform this selection ahead of the next trip using a Toggle helper.
-
-For the optional vehicle adapter, choose **BavarianData**, then the vehicle
-in the **Next departure** section. Use **Use vehicle departure** when you want to
-copy the next active climate timer. BavarianData is currently the only
-implemented provider for this adapter. Other vehicle integrations can supply
-the generic SoC, capacity and dated departure entities described here.
-The adapter reads the vehicle's last locally
-published Home Assistant states; it does not fetch BMW cloud data or change the
-vehicle's timers. Those states may be cached, so check **Next departure** after
-importing, especially after changing the timer in your car or the BMW app.
-
-- Enable the **action**, **hour** and **minute** sensor for each timer you want
-  to use in the BavarianData device's entity list. These diagnostic entities
-  start disabled. The timer's action must report `activate`; missing or
-  unavailable values are ignored.
-- The one-off timer (`overwriteTimer`) supplies a clock time, without a date.
-  The import uses its next occurrence within the coming 24 hours.
-- For recurring timer 1 or 2, select the timer's weekdays
-  to match the days configured in your vehicle. BavarianData does
-  not expose those days. Leave a timer's day selection empty to ignore it.
-- **Vehicle time zone** defaults to Home Assistant's time zone. Override it
-  when the vehicle's timer uses another zone, for example `Europe/Berlin`.
-  Nonexistent clock times during a daylight-saving change are skipped.
-
-The vehicle departure button selects the earliest usable upcoming occurrence once. It does
-not turn a recurring vehicle timer into a recurring HA charging plan. A copied
-vehicle or calendar time stays selected until you replace or clear it.
-
-A vehicle integration that already supplies a full dated timestamp can instead
-be selected by enabling the optional **Departure time entity** source. An `input_datetime` with both date
-and time also works. This optional source can automatically select a new future
-timestamp. A manual, calendar or vehicle selection takes priority over the source's
-current timestamp; it can be replaced when that timestamp changes to a new
-trip. A different time-zone representation of the same instant is still the
-same trip and does not reactivate a cleared plan. **Clear departure time** cancels the selected plan without changing the
-percentage ceiling or immediately changing the wallbox.
-
-Disabling **Next departure** clears its selected trip and cancels commands queued
-by that plan. It keeps the ordinary percentage target and the current pause
-state. Existing configured sources are recognized after an update; the vehicle
-departure button keeps its existing entity identity and automations.
-
-The planner uses the current vehicle SoC, remaining time, usable capacity,
-known wallbox limits and phase information to choose a charging current.
-It recalculates from later SoC reports. If 6 A would finish too early, it can
-pause and resume closer to departure. **An active timed goal can lift even a
-manually set charging pause** to meet the selected time. To prevent that,
-clear **Next departure**. The ordinary percentage target without a departure
-time still only limits charging and never resumes a pause.
-
-The optional [calendar and preconditioning blueprints](blueprints.md) select
-one trip and run your chosen vehicle action before departure. The vehicle
-determines whether preconditioning draws grid or battery power; completed
-charging targets still apply. Once the target is reached, the charging plan
-cannot resume another charge. **Next departure** remains visible until that
-time so the climate blueprint can still run, then clears automatically.
-The planner assumes 230 V per phase and initially 90% transfer efficiency.
-Until the vehicle's charging phases are detected, it plans conservatively with
-one phase. It adapts when reliable phase information becomes available.
-Car limits, missing or delayed SoC reports, unknown vehicle power, the 6 A
-minimum, the wallbox's configured transition delay and HA outages can make
-the exact target time impossible. Missing SoC or capacity data leaves the
-current charging state unchanged.
-
-The plan needs HA running to recalculate current and start climate actions.
-With the independent service, a queued timed-plan command expires at its
-deadline even if HA is offline; it cannot resume charging later as an obsolete
-request. Expiry does not undo a command already applied or stop an ongoing
-charge. The service continues its heartbeat and last applied state, subject
-to its charging limits. Service mode requires **app/service 0.6.1 or newer**
-for this behavior; update it before the integration.
-
-From **0.7.0b3**, the bus owner also checks for a disconnected vehicle before
-applying a planned command. Confirmed unplugging cancels that command, including
-while HA is offline when using service 0.7.0b3. Manual controls remain available.
-
-Current adjustments require at least 1 A difference and are spaced by at least
-five minutes; the status sensor has
-stable states and adds no per-minute history entries.
+[Set up a trip, import a calendar or BMW climate time, and add preconditioning](departure-planning.md).
 
 ## Cancel a queued change
 

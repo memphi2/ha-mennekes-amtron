@@ -18,9 +18,15 @@ from custom_components.mennekes_amtron_rtu.timed_goal_const import (
     CONF_TIMED_TIMER2_DAYS,
     CONF_TIMED_VEHICLE_TIME_ZONE,
 )
+from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
+    CONF_VEHICLE_DEVICE,
+    CONF_VEHICLE_PROVIDER,
+)
 
 from .bavariandata import BavarianChargeHistorySource, BavarianDepartureSource
-from .bavariandata.history import bavarian_vehicle_vin
+from .bavariandata.detection import BavarianDetectionSource, detection_capabilities
+from .bavariandata.identity import bavarian_vehicle_vin, vehicle_source_key
+from .bavariandata.telemetry import BavarianTelemetrySource, telemetry_capabilities
 from .const import (
     CONF_LOSS_VEHICLE_DEVICE,
     CONF_LOSS_VEHICLE_PROVIDER,
@@ -35,10 +41,12 @@ from .types import (
     DepartureSource,
     ProviderDefinition,
     ProviderSelection,
+    VehicleDetectionSource,
+    VehicleTelemetrySource,
 )
 
 _PROVIDERS = (
-    ProviderDefinition(PROVIDER_BAVARIANDATA, "bavariandata", frozenset({"departure", "charge_history"})),
+    ProviderDefinition(PROVIDER_BAVARIANDATA, "bavariandata", frozenset({"soc", "charge_limit", "capacity", "departure", "charge_history", "detection"})),
 )
 
 
@@ -49,6 +57,13 @@ def provider_definitions(capability: Capability) -> tuple[ProviderDefinition, ..
 
 def provider_selection(options: Mapping[str, Any], capability: Capability) -> ProviderSelection:
     """An explicit generic selection always wins over retained legacy options."""
+    if capability in ("soc", "charge_limit", "capacity", "detection"):
+        provider = options.get(CONF_VEHICLE_PROVIDER)
+        device = options.get(CONF_VEHICLE_DEVICE)
+        return ProviderSelection(
+            provider if isinstance(provider, str) and provider else PROVIDER_NONE,
+            device if isinstance(device, str) else "",
+        )
     provider_key, device_key, legacy_key = (
         (CONF_TIMED_VEHICLE_PROVIDER, CONF_TIMED_VEHICLE_DEVICE, CONF_TIMED_BAVARIAN_DEVICE)
         if capability == "departure" else
@@ -61,6 +76,8 @@ def provider_selection(options: Mapping[str, Any], capability: Capability) -> Pr
         return ProviderSelection(PROVIDER_NONE, "")
     provider = options.get(provider_key)
     device = options.get(device_key)
+    if provider == "profile":
+        return provider_selection(options, "soc")
     return ProviderSelection(
         provider if isinstance(provider, str) and provider else PROVIDER_NONE,
         device if isinstance(device, str) else "",
@@ -70,6 +87,41 @@ def provider_selection(options: Mapping[str, Any], capability: Capability) -> Pr
 def provider_device_is_valid(hass: HomeAssistant, provider_id: str, device_id: object) -> bool:
     """Only a concrete supported vehicle device can provide these capabilities."""
     return provider_id == PROVIDER_BAVARIANDATA and bavarian_vehicle_vin(hass, device_id) is not None
+
+
+def provider_identity(hass: HomeAssistant, provider_id: str, device_id: str) -> str | None:
+    """Pin an explicitly selected real vehicle without persisting its VIN."""
+    if provider_id != PROVIDER_BAVARIANDATA or (vin := bavarian_vehicle_vin(hass, device_id)) is None:
+        return None
+    return vehicle_source_key(device_id, vin)
+
+
+def _expected_identity(options: Mapping[str, Any]) -> str | None:
+    identity = options.get("vehicle_source_identity")
+    return identity if isinstance(identity, str) and identity else None
+
+
+def profile_capabilities(hass: HomeAssistant, provider_id: str, device_id: str) -> frozenset[Capability]:
+    """Expose implemented adapters and already enabled telemetry for this car."""
+    if not provider_device_is_valid(hass, provider_id, device_id):
+        return frozenset()
+    return telemetry_capabilities(hass, device_id) | detection_capabilities(hass, device_id) | frozenset({"departure", "charge_history"})
+
+
+def resolve_detection_source(hass: HomeAssistant, options: Mapping[str, Any]) -> VehicleDetectionSource | None:
+    """Bind optional local identification hints to the profile's chosen vehicle."""
+    selection = provider_selection(options, "detection")
+    if selection.provider_id != PROVIDER_BAVARIANDATA or not selection.device_id:
+        return None
+    return BavarianDetectionSource(hass, selection.device_id, expected_source_key=_expected_identity(options))
+
+
+def resolve_telemetry_source(hass: HomeAssistant, options: Mapping[str, Any]) -> VehicleTelemetrySource | None:
+    """One profile selection supplies local measurements to optional consumers."""
+    selection = provider_selection(options, "soc")
+    if selection.provider_id != PROVIDER_BAVARIANDATA or not selection.device_id:
+        return None
+    return BavarianTelemetrySource(hass, selection.device_id, expected_source_key=_expected_identity(options))
 
 
 def _weekdays(value: Any) -> Collection[str]:
@@ -88,6 +140,7 @@ def resolve_departure_source(hass: HomeAssistant, options: Mapping[str, Any]) ->
         hass, selection.device_id, time_zone=zone if isinstance(zone, str) else "",
         timer1_days=_weekdays(options.get(CONF_TIMED_TIMER1_DAYS, ())),
         timer2_days=_weekdays(options.get(CONF_TIMED_TIMER2_DAYS, ())),
+        expected_source_key=_expected_identity(options) if options.get(CONF_TIMED_VEHICLE_PROVIDER) == "profile" else None,
     )
 
 
@@ -96,7 +149,10 @@ def resolve_history_source(hass: HomeAssistant, options: Mapping[str, Any]) -> C
     selection = provider_selection(options, "charge_history")
     if selection.provider_id != PROVIDER_BAVARIANDATA or not selection.device_id:
         return None
-    return BavarianChargeHistorySource(hass, selection.device_id)
+    return BavarianChargeHistorySource(
+        hass, selection.device_id,
+        expected_source_key=_expected_identity(options) if options.get(CONF_LOSS_VEHICLE_PROVIDER) == "profile" else None,
+    )
 
 
 def loss_source(options: Mapping[str, Any]) -> str:

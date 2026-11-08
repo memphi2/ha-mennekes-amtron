@@ -164,6 +164,7 @@ def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, 
         async_update_listeners=lambda: None, async_add_listener=lambda _fn: lambda: None,
     )
     runtime = SimpleNamespace(control=control, coordinator=coordinator,
+                              vehicle_soc=None, vehicle_telemetry=None,
                               identity=SimpleNamespace(serial_number="SERIAL", layout_version=310))
     entry = SimpleNamespace(
         entry_id="entry", runtime_data=runtime,
@@ -176,6 +177,9 @@ def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, 
     hass.async_create_task = lambda coro, _name, **_kwargs: asyncio.create_task(coro)
     monkeypatch.setattr(observer_module, "TimedGoalStore", FakeStore)
     observer = TimedGoalObserver(hass, entry)
+    # Unit cases configure this observer's captured options. A real HA options
+    # update replaces the entry mapping and creates a new observer on reload.
+    entry.options = observer._options
     monkeypatch.setattr(observer, "request_evaluate", lambda: None)
     monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: NOW)
     monkeypatch.setattr(observer_module, "time", SimpleNamespace(monotonic=lambda: 0.0))

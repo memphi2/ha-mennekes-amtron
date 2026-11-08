@@ -5,6 +5,52 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0b1 — 2026-11-08
+
+Beta update of the integration and app; **0.6.1 remains stable**. Update the app
+through **#apps-beta** before the integration to use the new service features.
+
+- Preserve observed charging sessions and running costs across logical vehicle
+  profile reloads, including the meter baseline before a vehicle is selected.
+  Real connection interruptions still invalidate incomplete measurements.
+- Attribute delayed automatic vehicle recognition to its observed charging
+  cycle, while keeping manual selection boundaries and conflicting vehicles
+  separate. Keep the recognized loss owner through automatic deselection so
+  the completed charge can still be matched.
+
+- Add optional Virtual Plug & Charge: permit individual vehicle profiles and
+  release a connection only after matching fresh cable/home evidence. Keep
+  manual pauses, locks and reached targets effective, with service-owned
+  permission across HA Core restarts and a clear status in Home Assistant.
+
+- Reorganize setup and everyday documentation around user tasks, with dedicated
+  vehicle/departure guides, examples, missing-data help and clear distinctions
+  between stable and beta features.
+
+- Add optional live Modbus debugging in the app Web UI: decoded reads, writes,
+  retries and heartbeats in a redacted 200-entry RAM buffer that expires after
+  ten minutes, without additional bus requests, Recorder history or log files.
+
+- Add optional vehicle profiles with manual or opt-in cable/home selection
+  and shared BavarianData
+  sources for charge level, limit, usable capacity, departure and history.
+  Keep each car's settings and loss averages separate; preserve manual sources
+  and calendar use without enabling charging features automatically. Unresolved
+  or ambiguous detection signals leave no active vehicle; choosing manually
+  overrides automatic selection without starting or resuming charging.
+- Allow the app connection page on stable Supervisor 2026.10.4 and newer,
+  while retaining its administrator and trusted-ingress checks.
+- Keep TCP-login and password fields visible in the app's native configuration,
+  including after updates and connection changes.
+- Separate fixed-price or sensor selection from German network tariffs; suggest
+  0.40 EUR/kWh for a new fixed price and show all Module 3 prices and imported
+  time windows together. The last options form now saves directly.
+- Preserve briefly reached vehicle charge targets during slow target changes,
+  failed saves and lost service responses. Older apps report a specific update
+  requirement for safe percentage-target changes; other controls remain usable.
+- Retry failed energy-target persistence after meter recovery and when stopping.
+- Include app frontend files in the local secret scan and update user guidance.
+
 ## 0.7.0b4 — 2026-11-07
 
 Beta update of the integration and app; **0.6.1 remains stable**.

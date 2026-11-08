@@ -22,6 +22,7 @@ HEADERS = {"X-Remote-User-Id": USER, "X-Remote-User-Groups": "system-admin"}
 BASE = {
     "connection_type": "USB / RS-485", "serial_port": "/dev/serial/by-id/missing",
     "device_id": 50, "baudrate": "57600", "frame": "8n2", "read_only": True,
+    "tcp_authentication": False, "tcp_auth_password": "",
     "current_cap": 6, "scan_interval": 5, "measurement_interval": 30,
     "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5,
 }
@@ -34,7 +35,7 @@ class FixtureSettings(ui.AppSettings):
     def __init__(self):
         super().__init__("isolated-supervisor-token", TOKEN)
         self.options = deepcopy(BASE)
-        self.version = "2026.11.0"
+        self.version = "2026.10.5"
         self.calls = []
 
     async def _request(self, method, path, payload=None):
@@ -108,7 +109,7 @@ def test_admin_and_same_site_are_required(settings, headers):
     asyncio.run(check())
 
 
-@pytest.mark.parametrize("version", [None, 202611, "2026.10.1", "2026.11.0b1", "2026.11.0.dev0", "2026.13.0", "2027.0.0", "x" * 33])
+@pytest.mark.parametrize("version", [None, 202611, "2026.10.1", "2026.10.2", "2026.10.3", "2026.10.4b1", "2026.10.4.dev0", "2026.11.0b1", "2026.11.0.dev0", "2026.13.0", "2027.0.0", "x" * 33])
 def test_old_or_unverified_supervisor_versions_fail_closed(settings, version):
     async def check():
         assert (await invoke(settings, request())).status == 200
@@ -116,6 +117,20 @@ def test_old_or_unverified_supervisor_versions_fail_closed(settings, version):
         response = await invoke(settings, request())
         assert response.status == 503
         assert body(response) == {"error": "supervisor_update_required"}
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("version", ["2026.10.4", "2026.10.5", "2026.11.0"])
+def test_verified_supervisor_releases_accept_only_authenticated_admin(settings, version):
+    async def check():
+        settings.version = version
+        assert (await invoke(settings, request())).status == 200
+        # Missing group, non-admin group, and forged identities from non-
+        # Supervisor peers cannot access the page on any supported version.
+        for groups in ("", "system-users", "not-system-admin"):
+            headers = {**HEADERS, "X-Remote-User-Groups": groups}
+            assert (await invoke(settings, request(headers=headers))).status == 403
+        assert (await invoke(settings, request(peer="127.0.0.1"))).status == 403
     asyncio.run(check())
 
 
@@ -163,6 +178,27 @@ def test_save_changes_only_connection_and_allows_another_save(settings, transpor
         assert (await invoke(settings, request("POST", headers=headers, payload=payload))).status == 200
         assert settings.options["device_id"] == 49
         assert all(path in ("/info", "/addons/self/info", "/addons/self/options") for _method, path, _payload in settings.calls)
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("transport", ["serial", "rtu_over_tcp", "modbus_tcp"])
+def test_save_keeps_native_login_fields_visible_and_clears_old_secret(settings, transport):
+    async def check():
+        settings.options.update(
+            connection_type="LAN: Modbus RTU (TCP)", host="192.0.2.50", tcp_port=502,
+            tcp_authentication=True, tcp_auth_password="Demo123",  # noqa: S106 - synthetic fixture
+        )
+        headers, payload = await prepare(settings, transport)
+        if transport != "serial":
+            payload.update(tcp_authentication=False, tcp_auth_password="")
+        response = await invoke(settings, request("POST", headers=headers, payload=payload))
+        assert response.status == 200
+        assert settings.options["tcp_authentication"] is False
+        assert settings.options["tcp_auth_password"] == ""
+        assert "Demo123" not in response.text
+        # Supervisor merges config defaults into persisted options; a second
+        # save using the returned revision must still see the same options.
+        assert body(response)["revision"] == settings._revision(settings.options)
     asyncio.run(check())
 
 

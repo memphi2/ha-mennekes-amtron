@@ -49,8 +49,9 @@ if the wallbox has not yet been prepared.
 
 Install **Mennekes Amtron RTU** from the Marketplace on HA 2026.11+, or
 HACS on HA 2026.9/2026.10, and complete the requested Core restart.
-Install stable **0.6.1** for the features described here; see
-[Updating to 0.6.1](installation.md#updating-to-061) for existing installations.
+**0.6.1 remains stable.** Choose **beta 0.8.0b1** for vehicle profiles,
+Virtual Plug & Charge and the new app features; follow the
+[beta update guide](upgrading.md#trying-080b1) for an existing installation.
 
 Already using the service? Go to [Updates](#updates); keep your existing entry.
 
@@ -69,18 +70,19 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 The repository above provides stable **0.6.1**. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog provides beta
-**0.7.0b4**. Existing beta-catalog installations update in place. To switch
+**0.8.0b1**. Existing beta-catalog installations update in place. To switch
 catalogs, follow the [channel handover](#updates) and
-[beta update guide](upgrading.md#trying-070b4).
+[beta update guide](upgrading.md#trying-080b1).
 
 ### 3. Configure and start read-only
 
 If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
-In app **0.6.1**, start the app and choose **Open Web UI** as an
-administrator. It requires stable **Supervisor 2026.11.0 or newer**. Choose USB
-or LAN; USB provides an adapter dropdown, while LAN shows the host/IP and port.
+In the updated app, start the app and choose **Open Web UI** as an
+administrator. App **0.8.0b1** supports **Supervisor 2026.10.4+**; update an
+older beta app if it incorrectly requests 2026.11.0. Choose USB or LAN; USB
+provides an adapter dropdown, while LAN shows the host/IP and port.
 A missing USB adapter is never replaced automatically. Saving LAN removes its
 old serial path. Save and restart the app from the Info tab to apply changes.
 Without a configured connection, the app remains running for setup and does not
@@ -256,9 +258,10 @@ app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
 **Updating the app itself briefly interrupts its heartbeat.**
 
-Stable **0.6.1** is published to `#apps`; beta **0.7.0b4** is published to
-`#apps-beta`. For the shared control fixes in 0.7.0b4, update that beta app too;
-the minimum compatible service remains **0.6.1 with API 2**. An existing beta
+Stable **0.6.1** uses `#apps`; beta **0.8.0b1** uses `#apps-beta`.
+Update the beta app first for Virtual Plug & Charge, live Modbus debugging,
+Supervisor 2026.10.4+ guided setup and the shared control fixes. The general
+minimum compatible service remains **0.6.1 with API 2**. An existing beta
 app updates in place with its data intact. When updating from 0.5.1, check the
 [connection-choice change](upgrading.md#app-connection-choice).
 Switching between stable and beta catalogs creates a different app in Supervisor.
@@ -270,6 +273,9 @@ charging-release settings as in the [first handover](#move-an-existing-wallbox).
 Keep the old app and backup until the handover is verified.
 
 ## If something is wrong
+
+For optional vehicle targets, profiles or departure planning, use the
+[feature troubleshooting guide](troubleshooting.md#targets-and-departure-planning).
 
 | Symptom | First check |
 |---|---|
@@ -284,6 +290,9 @@ Keep the old app and backup until the handover is verified.
 | Error 200 or an occasional write timeout | Download integration diagnostics **before restarting the app**, then follow [heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable). |
 
 The log shows service startup, USB/LAN connection and heartbeat start/stop.
+The optional [live communication view](troubleshooting.md#watch-app-modbus-communication-live)
+is available in **app 0.8.0b1**, optional and off by default. Logs and
+downloadable integration diagnostics remain available without it.
 Connection and heartbeat failures are logged when their state changes.
 Home Assistant also shows a repair after a continuous 60-second heartbeat or
 service-connection problem in a managed, write-enabled setup. It clears

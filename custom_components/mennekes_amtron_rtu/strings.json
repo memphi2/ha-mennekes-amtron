@@ -45,7 +45,8 @@
           "server": "Connect to the Modbus service",
           "serial_reconfigure": "Change serial connection",
           "network_reconfigure": "Change LAN adapter connection"
-        }
+        },
+        "description": "Choose the new connection for this wallbox. For a connection managed by the Modbus app, change its USB or LAN settings in the app instead. Keep only one Modbus connection to the wallbox active."
       },
       "search_result": {
         "description": "A wallbox answered after {attempts} attempts:\n\n- Device address: **{device_id}**\n- Bus: **{baudrate} baud, {frame}**\n- Modbus layout: **{layout}**\n- Serial number: **{serial_number}**\n\nSubmit to set the wallbox up with these values.",
@@ -57,7 +58,8 @@
           "server": "Modbus service (survives HA restarts)",
           "serial": "Direct serial connection",
           "network": "Direct LAN adapter connection"
-        }
+        },
+        "description": "Choose how Home Assistant reaches the wallbox. The optional Modbus app is recommended: it keeps the heartbeat running during a Home Assistant restart. A running Supervisor app is discovered automatically. Direct USB or LAN connections do not require the app."
       },
       "serial": {
         "data": {
@@ -103,7 +105,8 @@
           "server_token": "Access token"
         },
         "data_description": {
-          "server_url": "HTTP address of the independent Modbus service, normally on port 8765. Do not enter the Modbus LAN adapter address here."
+          "server_url": "HTTP address of the independent Modbus service, normally on port 8765. Do not enter the Modbus LAN adapter address here.",
+          "server_token": "Use the access token configured in the separately hosted service. The Supervisor app supplies its token automatically; you do not need this form for that app."
         }
       },
       "hassio_confirm": {
@@ -281,6 +284,18 @@
           "not_active": "Not active",
           "sunshine": "Sunshine",
           "sunshine_plus": "Sunshine+"
+        }
+      },
+      "active_vehicle": {
+        "name": "Active vehicle",
+        "state": {
+          "none": "No vehicle selected",
+          "automatic": "Automatic selection"
+        },
+        "state_attributes": {
+          "active_vehicle": {
+            "name": "Selected profile"
+          }
         }
       }
     },
@@ -588,6 +603,18 @@
           "write_pending": "Write pending",
           "error": "Error"
         }
+      },
+      "virtual_plug_charge_status": {
+        "name": "Virtual Plug & Charge status",
+        "state": {
+          "waiting_vehicle": "Waiting for a vehicle",
+          "waiting_detection": "Waiting for fresh vehicle data",
+          "vehicle_not_permitted": "Vehicle not permitted",
+          "waiting_release": "Waiting for charging release",
+          "authorized": "Vehicle authorized",
+          "blocked": "Charging blocked",
+          "disabled": "Disabled"
+        }
       }
     },
     "switch": {
@@ -754,6 +781,9 @@
     "soc_goal_source_changed": {
       "message": "The vehicle sources have changed. Reload the integration before changing its percentage target."
     },
+    "soc_goal_app_update_required": {
+      "message": "Update the Mennekes Modbus service app before changing the vehicle percentage target. Other wallbox functions remain available."
+    },
     "soc_goal_not_supported": {
       "message": "The Modbus service does not support vehicle percentage targets. Update the app to use this optional feature."
     },
@@ -783,6 +813,27 @@
     },
     "gateway_authentication_failed": {
       "message": "The adapter rejected its existing web password. Check the password used for its web interface."
+    },
+    "vehicle_profile_invalid": {
+      "message": "Select an existing, unambiguous vehicle profile."
+    },
+    "vehicle_selection_changed": {
+      "message": "The vehicle selection changed during setup. Setup will retry with the current selection."
+    },
+    "plug_charge_unavailable": {
+      "message": "Virtual Plug & Charge could not be initialized. Setup will retry; check the wallbox or Modbus app connection."
+    },
+    "plug_charge_blocked": {
+      "message": "Automatic charging is currently blocked. Check vehicle permission, manual pause and charging targets."
+    },
+    "plug_charge_session_changed": {
+      "message": "The vehicle connection or permission settings changed. Charging permission was not applied; wait for the current session to be recognized again."
+    },
+    "plug_charge_authorization_expired": {
+      "message": "The vehicle authorization has expired or is no longer valid. Wait for fresh matching vehicle data before trying again."
+    },
+    "plug_charge_not_supported": {
+      "message": "The connected Modbus app or service does not support Virtual Plug & Charge. Update it to a compatible version before enabling this feature."
     }
   },
   "issues": {
@@ -832,12 +883,12 @@
         "title": "Settings",
         "menu_options": {
           "wallbox": "Wallbox",
-          "vehicle": "Vehicle charge target",
+          "vehicle": "Vehicle",
           "departure": "Next departure",
           "costs": "Charging costs",
           "losses": "Charging losses"
         },
-        "description": "Choose a section. Changes are applied only when you save that section."
+        "description": "Start with Wallbox. Vehicle data, departure planning, cost estimates and charging losses are optional. Each section is saved separately on its final form; only settings for the features you choose are shown."
       },
       "wallbox": {
         "title": "Wallbox",
@@ -846,7 +897,7 @@
           "wallbox_advanced": "Measurements and switching delays",
           "back": "Back without saving"
         },
-        "description": "For an app connection, write permission and Modbus timing are configured in the app. Change USB/LAN connection settings using Reconfigure."
+        "description": "Set the maximum current Home Assistant may request and how often it reads status. With the Modbus app, write permission and bus timing belong in the app’s Configuration tab. USB/LAN connection changes belong in Reconfigure for direct connections, or in the app for app connections."
       },
       "wallbox_basic": {
         "title": "Current limit and polling",
@@ -857,7 +908,7 @@
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
-          "current_limit": "Upper bound of the charging-current entity, in addition to the limit the wallbox itself enforces.",
+          "current_limit": "Upper limit for the charging-current control, in amperes per phase. This is not a percentage target or a pause command. The wallbox’s own limit and, when used, the app’s limit also apply.",
           "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently."
         },
         "description": "The current cap limits requests from HA; the wallbox and service limits still apply. For app connections, the polling interval only affects HA’s service requests."
@@ -873,16 +924,21 @@
           "measurement_interval_seconds": "Power, voltage, current and session values: 30 seconds reduces database load. Status changes refresh immediately. Without a vehicle, at least 60 seconds. The status interval sets the shortest possible polling time.",
           "state_change_interval_seconds": "Minimum seconds between charging starts, pauses, release changes, locking or unlocking, and phase changes (default 300). Early commands are queued; the latest command replaces the previous one. The five-second current-write interval still applies. Set 0 to disable the longer interval.",
           "phase_switch_grace_seconds": "Extra seconds to wait after the vehicle confirms its charging pause, before switching phases (default 5, range 0–30). Set 0 to skip only this extra wait; confirmation of the pause is still required."
-        }
+        },
+        "description": "The defaults balance quick status updates, fewer stored measurements and gentle switching. A queued command shows its remaining wait in Home Assistant. These intervals do not slow the independent heartbeat."
       },
       "vehicle": {
-        "title": "Vehicle charge target",
+        "title": "Vehicle",
         "menu_options": {
           "vehicle_soc": "Configure charge level",
           "vehicle_disable": "Disable percentage target",
-          "back": "Back without saving"
+          "back": "Back without saving",
+          "vehicle_profiles": "Vehicle profiles",
+          "vehicle_source": "Configure charge level",
+          "vehicle_detection": "Automatic vehicle selection",
+          "vehicle_plug_charge": "Virtual Plug & Charge"
         },
-        "description": "Optional: use an existing vehicle charge-level entity for a percentage target. The vehicle’s own charge limit can be selected separately."
+        "description": "Configure vehicle profiles and the optional percentage target. Select each car once, then choose independently whether to use its charge limit, capacity, departure timers or history."
       },
       "vehicle_soc": {
         "title": "Configure charge level",
@@ -893,7 +949,8 @@
         "data_description": {
           "vehicle_soc_entity": "Choose the vehicle sensor reporting its actual charge level in %. Missing data leaves charging unchanged until valid data returns. Changing the source clears the percentage target without resuming charging. To disable it, use the previous menu.",
           "use_vehicle_limit": "Enable this to select the vehicle’s own charge limit as an additional maximum. No setting is written to the vehicle."
-        }
+        },
+        "description": "This enables the optional percentage target using an existing charge-level sensor. Afterwards, set the desired percentage on the wallbox device page. Setting a target only limits charging; it does not cancel a manual pause."
       },
       "vehicle_limit": {
         "title": "Vehicle charge limit",
@@ -902,7 +959,8 @@
         },
         "data_description": {
           "vehicle_charge_limit_entity": "Optional: additionally cap the percentage target using the vehicle’s charge-limit entity. Without this entity, targets up to 100% are available. A lower limit reduces an existing target; a higher limit does not raise it. The last valid limit remains in force if this entity is unavailable. No setting is written to the vehicle."
-        }
+        },
+        "description": "Use the vehicle’s configured charging limit as an additional maximum for the Home Assistant percentage target. Select the desired limit reported by the car, not its current charge level."
       },
       "departure": {
         "title": "Next departure",
@@ -911,15 +969,15 @@
           "departure_disable": "Disable departure planning",
           "back": "Back without saving"
         },
-        "description": "Plan one next trip using the percentage target and usable battery capacity. Disabling planning clears the selected trip and its queued commands; the percentage target remains."
+        "description": "Plan one next trip with a percentage target, usable battery capacity and departure time. Choose the actual time afterwards on the device page, or copy it from an optional source. This is not a daily schedule. Disabling planning clears the trip and queued plan commands; the percentage target remains."
       },
       "departure_requires_vehicle": {
         "title": "Charge level required",
         "menu_options": {
-          "vehicle": "Vehicle charge target",
+          "vehicle": "Vehicle",
           "back": "Back without saving"
         },
-        "description": "Configure a vehicle charge-level entity first, then return to departure planning."
+        "description": "Configure a vehicle charge-level source first, then return to departure planning."
       },
       "departure_configure": {
         "title": "Configure departure planning",
@@ -929,7 +987,13 @@
           "use_departure_entity": "Use a departure time entity",
           "use_vehicle_timer": "Use vehicle departure timers"
         },
-        "description": "Manual date and time entry is always available. Enable only the additional sources you want; their settings appear next. An active plan can resume a manual pause to meet departure."
+        "description": "Manual date and time entry is always available. Enable only the additional sources you want; their settings appear next. An active plan can resume a manual pause to meet departure.",
+        "data_description": {
+          "capacity_source": "Use usable battery capacity: a fixed value, a kWh/Wh sensor, or the profile value when supported. The plan waits if its chosen capacity or charge level is unavailable.",
+          "use_calendar": "Adds a button to copy the next matching calendar event. Each press chooses one trip; use the supplied blueprint if you want scheduled calendar imports.",
+          "use_departure_entity": "Automatically adopts a new future date and time from the selected entity. Manual selection remains possible; a different future timestamp from this source can replace it.",
+          "use_vehicle_timer": "Adds a button to copy one active departure/climate timer from the vehicle integration. It reads the reported timer; it does not switch on the car’s climate control."
+        }
       },
       "departure_capacity_fixed": {
         "title": "Usable battery capacity",
@@ -938,7 +1002,8 @@
         },
         "data_description": {
           "timed_capacity_kwh": "Enter the usable battery capacity, not the nominal capacity."
-        }
+        },
+        "description": "Enter the energy the battery can actually store for driving. This value is used to estimate the required charging time; changing it does not change the car’s own battery settings."
       },
       "departure_capacity_entity": {
         "title": "Battery capacity entity",
@@ -947,7 +1012,8 @@
         },
         "data_description": {
           "timed_capacity_entity": "Select a sensor that reports usable battery capacity in kWh or Wh."
-        }
+        },
+        "description": "Choose a sensor for usable capacity, not remaining energy or charge percentage. Its unit must be kWh or Wh. Without a valid value, the plan waits for capacity instead of guessing."
       },
       "departure_calendar": {
         "title": "Departure calendar",
@@ -958,7 +1024,8 @@
         "data_description": {
           "timed_calendar_entity": "Select a calendar and press Use next calendar event to copy one matching event into the departure time.",
           "timed_calendar_title": "Only events with this exact title are eligible. All-day events are ignored."
-        }
+        },
+        "description": "Choose a calendar and an exact event title, for example “Drive to work”. The event start becomes the departure time. The button searches the next 14 days; all-day events are ignored."
       },
       "departure_entity": {
         "title": "Departure time entity",
@@ -967,7 +1034,8 @@
         },
         "data_description": {
           "timed_departure_entity": "Select a dated timestamp sensor or an input_datetime with date and time. A time of day alone cannot identify the next trip."
-        }
+        },
+        "description": "Choose a source containing both date and time. A valid new future timestamp is adopted automatically. Configure only one source for this purpose; manual entry and the calendar/vehicle buttons remain available."
       },
       "departure_vehicle": {
         "title": "Vehicle integration",
@@ -989,39 +1057,37 @@
           "timed_timer1_days": "Choose the days configured for recurring climate timer 1 in the BMW. BavarianData does not expose these days. Leave empty to ignore this timer.",
           "timed_timer2_days": "Choose the days configured for recurring climate timer 2 in the BMW. Leave empty to ignore this timer."
         },
-        "description": "Select the vehicle once. Use the departure button to copy one active timer. For BavarianData, enable its action, hour and minute timer sensors; enter recurring weekdays here because the integration does not publish them."
+        "description": "Use the departure button to copy one active timer from the selected vehicle. With a profile, the vehicle is already selected. For BavarianData, enable the timer action, hour and minute sensors; enter recurring weekdays here because the integration does not publish them."
       },
       "costs": {
-        "title": "Charging costs",
-        "menu_options": {
-          "cost_fixed": "Fixed electricity price",
-          "cost_sensor": "Electricity price sensor",
-          "cost_disable": "Disable cost estimates",
-          "back": "Back without saving"
+        "title": "Electricity price source",
+        "description": "Choose a fixed electricity price or an existing price sensor. Disabled turns off cost estimates. Additional network-tariff steps appear when Home Assistant’s country is Germany.",
+        "data": {
+          "charging_cost_source": "Electricity price source"
         },
-        "description": "Optional estimates from a fixed price or a price sensor. This does not control charging. Network tariff adjustments are offered only for Germany."
+        "data_description": {
+          "charging_cost_source": "Fixed price suits a constant contract price; a sensor can follow a dynamic tariff such as Tibber. This estimates charging costs only and does not choose the cheapest charging times."
+        }
       },
       "cost_fixed": {
         "title": "Fixed electricity price",
         "data": {
-          "charging_price": "Gross electricity price",
-          "charging_network_module": "Network price adjustment"
+          "charging_price": "Gross electricity price"
         },
+        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded. The initial suggestion is 0.40 EUR/kWh; use your own contract price.",
         "data_description": {
-          "charging_network_module": "Use only the module agreed with your network operator. Module 3 offers manual entry or a separate import choice."
-        },
-        "description": "Enter the price per kWh including taxes. Negative prices are supported. With no network adjustment, this must be your final price including network charges. Standing charges and annual credits are excluded."
+          "charging_price": "Enter euros per kWh, including taxes: 0.40 means 40 cents/kWh. Use the energy price from your contract; any network-price adjustment is configured separately."
+        }
       },
       "cost_sensor": {
         "title": "Electricity price sensor",
         "data": {
-          "charging_price_entity": "Electricity price sensor",
-          "charging_network_module": "Network price adjustment"
+          "charging_price_entity": "Electricity price sensor"
         },
+        "description": "Select a sensor with the current gross electricity price in EUR/kWh, ct/kWh or EUR/MWh (the € symbol is also supported). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded.",
         "data_description": {
-          "charging_network_module": "Use only the module agreed with your network operator. Module 3 offers manual entry or a separate import choice."
-        },
-        "description": "Select a sensor with the current gross electricity price in EUR/kWh, ct/kWh or EUR/MWh (the € symbol is also supported). Negative prices are allowed. Without network adjustment, the price must include network charges. A report stays valid for 90 minutes; reporting the same value renews it. Missing or expired prices leave that energy unpriced. Standing charges and annual credits are excluded."
+          "charging_price_entity": "Choose the price for electricity consumed now, not a daily average, forecast list or export price. Its unit must identify EUR/kWh, ct/kWh or EUR/MWh."
+        }
       },
       "cost_module2": {
         "title": "Module 2: reduced network price",
@@ -1030,7 +1096,8 @@
           "price_includes_network": "Electricity price already includes the regular network price"
         },
         "data_description": {
-          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice."
+          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice.",
+          "regular_network": "Regular gross network energy price from the operator’s price sheet, in EUR/kWh. Enter the unreduced amount; the integration calculates the Module 2 reduction."
         },
         "description": "Enter the gross regular network price. Module 2 applies 40% of this component, not 40% of the whole electricity price."
       },
@@ -1041,36 +1108,33 @@
           "cost_module3_import": "Import for HA Home",
           "back": "Back without saving"
         },
-        "description": "Manual entry sends no location data. Import sends HA Home coordinates once to VNBdigital, then retrieves public tariffs from Par14a-Database. Review the source, prices and time windows before saving."
+        "description": "Manual entry does not send your location unless you later enable annual refresh. Import sends HA Home coordinates to VNBdigital and retrieves public tariffs from Par14a-Database. Review the operator, prices and time windows before saving. If no unique tariff is found, enter the values manually."
       },
       "cost_module3_prices": {
-        "title": "Module 3: prices and year",
+        "title": "Module 3: prices and time windows",
         "data": {
           "regular_network": "Regular network price (standard tariff)",
           "high_network": "High network price (HT)",
           "low_network": "Low network price (NT)",
           "price_includes_network": "Electricity price already includes the regular network price",
           "tariff_year": "Price-sheet year",
-          "auto_tariff_refresh": "Refresh Module 3 tariff automatically at the new year"
-        },
-        "data_description": {
-          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice.",
-          "auto_tariff_refresh": "When enabled, the integration fetches the new year’s published tariff on 1 January and applies a valid unambiguous result. It retries daily if no valid data is available. Provisional published values may be used; review the final price sheet later."
-        },
-        "description": "Copy gross prices and year from the operator’s price sheet. Source: {source}. ⚠ marks provisional data. Check these values before saving."
-      },
-      "cost_module3_windows": {
-        "title": "Module 3: time windows",
-        "data": {
+          "auto_tariff_refresh": "Refresh Module 3 tariff automatically at the new year",
           "high_periods": "High tariff periods",
           "low_periods": "Low tariff periods",
           "active_quarters": "Quarters with time-variable network prices"
         },
         "data_description": {
+          "price_includes_network": "Enabled: subtract the regular network price before adding the selected network tariff. Disabled: the electricity source excludes network charges, so add the network tariff. Choose this carefully to avoid counting network charges twice.",
+          "auto_tariff_refresh": "From 1 January, retrieves the new year’s tariff using HA Home coordinates and applies a valid unique result. Sends coordinates to VNBdigital again; retries daily if needed. Provisional prices may be used. This can replace manually entered prices and periods; review the final price sheet later.",
           "high_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed.",
-          "low_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed."
+          "low_periods": "Enter one HH:MM-HH:MM period per line. Times must fall on 15-minute boundaries; overnight periods are allowed.",
+          "regular_network": "Standard gross network price in EUR/kWh. This applies outside the configured high/low periods and outside the selected quarters.",
+          "high_network": "Gross high-tariff network price (HT), in EUR/kWh. Enter the network component only, not the full household electricity price.",
+          "low_network": "Gross low-tariff network price (NT), in EUR/kWh. Use the same price-sheet year as the standard and high tariffs.",
+          "tariff_year": "Year covered by this price sheet. After it expires, cost estimates wait for a valid new-year tariff. Update manually or enable the optional annual refresh.",
+          "active_quarters": "Select the quarters in which the operator offers these time-dependent prices. The standard tariff applies during the other quarters. Q1 = Jan–Mar, Q2 = Apr–Jun, Q3 = Jul–Sep, Q4 = Oct–Dec."
         },
-        "description": "Use German local time (Europe/Berlin) and quarter-hour boundaries. Overnight windows are allowed; windows must not overlap and must leave time at the standard rate."
+        "description": "Review all three gross network prices and their time windows together. Standard tariff applies outside the high/low windows and outside the selected quarters. Use German local time (Europe/Berlin). Source: {source}. ⚠ marks provisional data. Confirm this form to save."
       },
       "losses": {
         "title": "Charging losses",
@@ -1078,9 +1142,10 @@
           "loss_sensor": "Charging losses from a sensor",
           "loss_vehicle": "Vehicle charging history",
           "loss_disable": "Disable loss estimates",
-          "back": "Back without saving"
+          "back": "Back without saving",
+          "loss_profile": "Use the selected vehicle’s charging history"
         },
-        "description": "Optional comparison of wallbox energy with energy added to the vehicle battery. Choose existing charging history or a last-charge energy sensor."
+        "description": "Compare energy measured by the wallbox with energy added to the battery during the same completed charge. The last loss and average are estimates. Select the vehicle before charging; missing or ambiguous matches remain unknown instead of reusing another charge."
       },
       "loss_sensor": {
         "title": "Charging losses from a sensor",
@@ -1090,7 +1155,8 @@
           "charge_loss_auto_match": "Assign changed energy automatically"
         },
         "data_description": {
-          "charge_loss_auto_match": "Optional: assign a changed sensor value received within 30 minutes after unplugging, if this integration observed the complete charge. A changed value cannot prove that both readings belong to the same charge. Leave disabled to confirm each match yourself."
+          "charge_loss_auto_match": "Optional: assign a changed sensor value received within 30 minutes after unplugging, if this integration observed the complete charge. A changed value cannot prove that both readings belong to the same charge. Leave disabled to confirm each match yourself.",
+          "vehicle_last_charge_energy_entity": "Choose battery energy for the last completed charge in kWh or Wh. A charge level in %, the wallbox meter and a lifetime total cannot measure battery charging losses."
         }
       },
       "loss_vehicle": {
@@ -1107,21 +1173,175 @@
         },
         "description": "Select the vehicle connected to this wallbox. Only existing local charging history is read; no vehicle refresh is requested. Missing or ambiguous matches remain unknown."
       },
-      "review": {
-        "title": "Save this section?",
-        "menu_options": {
-          "save": "Save",
-          "edit": "Edit this section",
-          "back": "Back without saving"
-        },
-        "description": "Save the completed settings for this section, edit them, or return without saving. Other sections keep their current settings."
-      },
       "options_changed": {
-        "title": "Settings have changed"
+        "title": "Settings have changed",
+        "description": "These settings or the active vehicle changed while this form was open. Nothing from this form was saved. Continue to reopen the section with the current settings."
+      },
+      "cost_network": {
+        "title": "Network price adjustment",
+        "description": "The electricity price has already been selected. Choose no adjustment if it is your final price; otherwise select your agreed network tariff.",
+        "data": {
+          "charging_network_module": "Network price adjustment"
+        },
+        "data_description": {
+          "charging_network_module": "These options appear when Home Assistant’s country is Germany. Choose the module agreed for this connection. The integration calculates an estimate; it does not apply for a tariff or change your electricity contract."
+        }
+      },
+      "vehicle_profiles": {
+        "title": "Vehicle profiles",
+        "description": "Keep each car’s optional data and settings in its own profile. Select the car manually or configure optional automatic selection under Vehicle. Adding a profile does not enable charging features.",
+        "menu_options": {
+          "vehicle_profile_add": "Add profile",
+          "vehicle_profile_select": "Select vehicle",
+          "vehicle_profile_edit_select": "Edit profile",
+          "vehicle_profile_remove": "Remove profile",
+          "back": "Back without saving",
+          "vehicle_profile_clear": "Select no vehicle"
+        }
+      },
+      "vehicle_profile_add": {
+        "title": "Add profile",
+        "description": "Give the profile a recognizable name and choose BavarianData or manual entity selection. New profiles start with optional charging features disabled.",
+        "data": {
+          "vehicle_profile_name": "Profile name",
+          "vehicle_provider": "Vehicle integration"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Enter a unique profile name with 1 to 80 characters.",
+          "vehicle_provider": "Choose BavarianData only if it is already installed and provides this car in Home Assistant. Manual sources work with other vehicle integrations or helpers; select their entities in each optional feature."
+        }
+      },
+      "vehicle_profile_edit": {
+        "title": "Edit profile",
+        "description": "Renaming keeps the settings. Changing the integration or vehicle clears this profile’s feature settings so data from the previous car cannot be reused.",
+        "data": {
+          "vehicle_profile_name": "Profile name",
+          "vehicle_provider": "Vehicle integration"
+        },
+        "data_description": {
+          "vehicle_profile_name": "Enter a unique profile name with 1 to 80 characters.",
+          "vehicle_provider": "Choose BavarianData only if it is already installed and provides this car in Home Assistant. Manual sources work with other vehicle integrations or helpers; select their entities in each optional feature."
+        }
+      },
+      "vehicle_profile_select": {
+        "title": "Select vehicle",
+        "data": {
+          "vehicle_profile_id": "Vehicle profile"
+        },
+        "description": "Select the vehicle connected to this wallbox. Switching clears the previous percentage target and departure plan without starting charging. Each profile keeps its settings and loss average.",
+        "data_description": {
+          "vehicle_profile_id": "Select the actual car before starting a charge, especially when comparing charging losses. This manual choice disables automatic vehicle selection."
+        }
+      },
+      "vehicle_profile_edit_select": {
+        "title": "Edit profile",
+        "data": {
+          "vehicle_profile_id": "Vehicle profile"
+        },
+        "description": "Choose the profile to edit. Editing another profile does not select that vehicle for charging."
+      },
+      "vehicle_profile_remove": {
+        "title": "Remove profile",
+        "description": "Remove the selected profile and its saved feature settings. Removing the active profile also clears its percentage target and departure plan without starting charging.",
+        "data": {
+          "vehicle_profile_id": "Vehicle profile",
+          "confirm": "Remove this profile"
+        }
+      },
+      "vehicle_profile_device": {
+        "title": "Vehicle",
+        "description": "Select the actual vehicle device in BavarianData. Charge level, charge limit, capacity, departure timers and history can then use this same car; enable each feature separately.",
+        "data": {
+          "vehicle_device": "Vehicle"
+        },
+        "data_description": {
+          "vehicle_device": "Choose the car itself, not the wallbox. Supported data comes from this device only. Unavailable fields are not replaced with data from another car."
+        }
+      },
+      "vehicle_source": {
+        "title": "Configure charge level",
+        "description": "Choose the active profile’s reported charge level or select an entity manually. Only the chosen source’s settings follow.",
+        "data": {
+          "vehicle_soc_source": "Charge level source"
+        },
+        "data_description": {
+          "vehicle_soc_source": "The profile source reuses the selected vehicle integration. Manual selection lets you use a different percentage sensor for this profile without changing its other optional data sources."
+        }
+      },
+      "vehicle_profile_soc": {
+        "title": "Configure charge level",
+        "description": "Use the active profile’s reported charge level for the optional percentage target. You can also use that car’s charge limit as an additional maximum. No setting is written to the vehicle.",
+        "data": {
+          "use_vehicle_limit": "Also use the vehicle’s charge limit"
+        },
+        "data_description": {
+          "use_vehicle_limit": "Optional and independent of the charge-level source. A lower vehicle limit reduces the target; a higher limit does not raise it. If this limit becomes unavailable, the last valid value remains in force."
+        }
+      },
+      "loss_profile": {
+        "title": "Vehicle charging history",
+        "description": "Use the active profile’s local charging history. No vehicle refresh is requested. Missing or ambiguous matches remain unknown."
+      },
+      "vehicle_detection": {
+        "title": "Automatic vehicle selection",
+        "description": "Optional: select the connected car from cable and home signals. Manual selection remains the default. Configure each participating profile, then enable automatic selection.",
+        "menu_options": {
+          "vehicle_detection_mode": "Enable or disable automatic selection",
+          "vehicle_detection_profile": "Configure a profile’s detection signals",
+          "back": "Back without saving"
+        }
+      },
+      "vehicle_detection_mode": {
+        "title": "Automatic vehicle selection",
+        "description": "Only one car with valid “cable connected” and “at home” signals recently reported to Home Assistant is selected. A definite disconnected or away signal excludes that car. Otherwise, unknown, unavailable or unreported signals for over 30 minutes block selection. If no car or several cars match, no vehicle is selected. Choosing a car manually disables automatic selection. Detection never starts or resumes charging.",
+        "data": {
+          "vehicle_auto_selection": "Select the vehicle automatically"
+        },
+        "data_description": {
+          "vehicle_auto_selection": "Enable only after configuring the participating profiles. Automatic selection does not detect charging sessions through the wallbox cable itself; it depends on the chosen vehicle signals. You can always choose a car manually."
+        }
+      },
+      "vehicle_detection_profile": {
+        "title": "Configure a profile’s detection signals",
+        "description": "Choose the profile whose cable and home signals you want to configure. Only profiles with detection enabled participate.",
+        "data": {
+          "vehicle_profile_id": "Vehicle profile"
+        }
+      },
+      "vehicle_detection_source": {
+        "title": "Detection signals",
+        "description": "Use supported local entities from this profile’s vehicle integration, choose existing Home Assistant entities, or disable detection for this profile. Both cable connection and home presence are required. No additional cloud requests are made.",
+        "data": {
+          "vehicle_detection_source": "Source for detection"
+        }
+      },
+      "vehicle_detection_entities": {
+        "title": "Cable and home signals",
+        "description": "Choose separate signals for this car. Cable connection must be a binary sensor with on = connected. Home presence must be a binary sensor with on = at home, or a person/device tracker with home = at home. Use signals reported to Home Assistant within 30 minutes. Reports do not prove when the car measured its location.",
+        "data": {
+          "vehicle_connected_entity": "Charging cable connected",
+          "vehicle_home_entity": "Vehicle at home"
+        },
+        "data_description": {
+          "vehicle_connected_entity": "Use this car’s cable-connected signal, not “currently charging”: the car must remain identifiable while paused or fully charged.",
+          "vehicle_home_entity": "Prefer the car’s own location signal. A person’s presence is only a useful substitute if it reliably indicates that this car is at home. Two matching cars or uncertain signals prevent automatic selection."
+        }
+      },
+      "vehicle_plug_charge": {
+        "title": "Virtual Plug & Charge",
+        "description": "Active vehicle: **{vehicle}**.\n\nOptional charging permission based on vehicle signals, without ISO 15118 authentication. The wallbox must support automatic charging with RFID authorization disabled. A new charging grant requires one uniquely identified, permitted active profile. Unknown or ambiguous vehicles receive no new grant.\n\nA fresh cable report matching the current connection cycle is required; the next vehicle integration update may take time. Automatic profile selection remains optional. Manual pauses and charging targets are respected. To show the vehicle permission switch, select a profile and configure its cable/home signals under Automatic vehicle selection; its automatic mode can remain off.",
+        "data": {
+          "virtual_plug_charge": "Enable Virtual Plug & Charge",
+          "vehicle_plug_charge": "Allow this vehicle to charge automatically"
+        },
+        "data_description": {
+          "virtual_plug_charge": "New permission needs one uniquely recognized, permitted active profile. Once granted, changing the selection or missing vehicle data does not revoke it. Disconnection, lost wallbox observation or changed vehicle identity, permission or detection sources revoke it. Disabling does not start charging. An existing app grant survives an HA restart while the app keeps running.",
+          "vehicle_plug_charge": "Permission for the active profile only. Selecting a profile manually is not proof that its car is connected. Fresh matching cable/home signals remain required. Changing the vehicle or its detection sources removes this permission."
+        }
       }
     },
     "error": {
-      "vehicle_soc_required": "Select a vehicle charge level entity before adding its optional charge limit.",
+      "vehicle_soc_required": "Configure a vehicle charge-level source before adding its optional charge limit.",
       "invalid_vehicle_entity": "Select an entity of the supported type.",
       "loss_source_invalid": "Select a supported charging loss source and configure its matching vehicle or sensor.",
       "cost_source_invalid": "Select a supported cost source and a sensor entity for a sensor-based price.",
@@ -1136,8 +1356,20 @@
       "options_changed": "This section changed while you were editing it. Return and reopen it to use the latest values; your draft was not saved.",
       "vehicle_provider_invalid": "Select a supported vehicle integration.",
       "vehicle_device_invalid": "Select a vehicle belonging to the chosen integration.",
-      "capacity_source_invalid": "Select a fixed capacity or a capacity entity.",
-      "tariff_lookup_failed": "No unambiguous supported tariff was found. Enter the price-sheet values manually or try importing again later."
+      "capacity_source_invalid": "Select a fixed capacity, a capacity entity or the vehicle profile.",
+      "tariff_lookup_failed": "No unambiguous supported tariff was found. Enter the price-sheet values manually or try importing again later.",
+      "vehicle_profile_invalid": "Select an existing, unambiguous vehicle profile.",
+      "vehicle_profile_limit": "A maximum of eight vehicle profiles can be configured.",
+      "vehicle_profile_required": "Select a vehicle profile first.",
+      "vehicle_capability_unavailable": "The selected vehicle does not provide the required data. Enable the corresponding entity in its integration or choose a manual source.",
+      "vehicle_profile_name_invalid": "Enter a unique profile name with 1 to 80 characters.",
+      "vehicle_profile_confirm_required": "Confirm that you want to remove this profile.",
+      "vehicle_detection_required": "First configure cable and home signals for at least one vehicle profile.",
+      "vehicle_detection_source_invalid": "Select one of the available detection sources.",
+      "vehicle_detection_entity_invalid": "Select an existing cable binary sensor and a supported home-presence entity.",
+      "vehicle_detection_entities_distinct": "Select separate entities for cable connection and home presence.",
+      "plug_charge_invalid": "Choose on or off for this setting.",
+      "plug_charge_detection_required": "Select a vehicle profile and configure its cable/home detection signals before allowing it to charge automatically."
     }
   },
   "selector": {
@@ -1203,12 +1435,34 @@
     "capacity_source": {
       "options": {
         "fixed": "Fixed capacity in kWh",
-        "entity": "Capacity from an entity"
+        "entity": "Capacity from an entity",
+        "profile": "Usable capacity from the vehicle profile"
       }
     },
     "vehicle_provider": {
       "options": {
-        "bavariandata": "BavarianData"
+        "bavariandata": "BavarianData",
+        "none": "Manual entity selection"
+      }
+    },
+    "charging_cost_source": {
+      "options": {
+        "fixed": "Fixed electricity price",
+        "sensor": "Electricity price sensor",
+        "disabled": "Disable cost estimates"
+      }
+    },
+    "vehicle_soc_source": {
+      "options": {
+        "profile": "From the active vehicle profile",
+        "entity": "Choose an entity manually"
+      }
+    },
+    "vehicle_detection_source": {
+      "options": {
+        "disabled": "Detection disabled for this profile",
+        "profile": "Use the vehicle integration",
+        "entities": "Select Home Assistant entities"
       }
     }
   },

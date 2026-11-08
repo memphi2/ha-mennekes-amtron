@@ -1,7 +1,7 @@
 """Small local-data contracts used by charging features and configuration."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, Protocol
 
@@ -11,7 +11,58 @@ from custom_components.mennekes_amtron_rtu.device.charging_session import (
     CompletedSession,
 )
 
-Capability = Literal["departure", "charge_history"]
+Capability = Literal["soc", "charge_limit", "capacity", "departure", "charge_history", "detection"]
+
+DETECTION_MAX_AGE_SECONDS = 1800
+
+
+@dataclass(frozen=True, slots=True)
+class VehicleDetection:
+    """Positive or negative local evidence; missing evidence stays unknown."""
+
+    connected: bool | None = None
+    home: bool | None = None
+    # Evidence age matters for grants, but does not change automatic selection.
+    connected_at: datetime | None = field(default=None, compare=False)
+
+
+class VehicleDetectionSource(Protocol):
+    """Observe one vehicle's cable and location without contacting the car."""
+
+    @property
+    def source_key(self) -> str: ...
+
+    @property
+    def available(self) -> bool: ...
+
+    @property
+    def snapshot(self) -> VehicleDetection: ...
+
+    def subscribe(self, on_change: Callable[[VehicleDetection], None]) -> CALLBACK_TYPE: ...
+
+
+@dataclass(frozen=True, slots=True)
+class VehicleTelemetry:
+    """Validated optional values from one locally selected vehicle."""
+
+    soc_percent: float | None = None
+    maximum_percent: float | None = None
+    capacity_kwh: float | None = None
+
+
+class VehicleTelemetrySource(Protocol):
+    """Observe already published vehicle data without polling its integration."""
+
+    @property
+    def source_key(self) -> str: ...
+
+    @property
+    def available(self) -> bool: ...
+
+    @property
+    def snapshot(self) -> VehicleTelemetry: ...
+
+    def subscribe(self, on_change: Callable[[VehicleTelemetry], None]) -> CALLBACK_TYPE: ...
 
 
 @dataclass(frozen=True, slots=True)

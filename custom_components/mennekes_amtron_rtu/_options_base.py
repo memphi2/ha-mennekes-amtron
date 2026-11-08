@@ -1,30 +1,34 @@
-"""Common draft and explicit navigation for independent options sections."""
+"""Common draft and concurrent-edit protection for options sections."""
 
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any, cast
+from typing import Any
 
 import probatio
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 
 from ._options_draft import OptionsChangedError, OptionsDraft
+from .config_schemas import vehicle_provider_schema
+from .vehicle_profiles import CONF_VEHICLE_DEVICE, CONF_VEHICLE_PROVIDER
 from .vehicle_sources import (
     Capability,
     ProviderSelection,
+    profile_capabilities,
+    provider_definitions,
     provider_device_is_valid,
+    provider_identity,
     provider_selection,
 )
 from .vehicle_sources.const import PROVIDER_NONE
 
 
 class SectionOptionsFlow(OptionsFlow):
-    """Save only a complete section, with real menu routes for edit and back."""
+    """Save only a complete section, preserving changes in other sections."""
 
     def __init__(self) -> None:
         super().__init__()
         self._draft: OptionsDraft | None = None
-        self._ready = False
         self._details: dict[str, Any] = {}
 
     async def async_step_init(
@@ -35,13 +39,21 @@ class SectionOptionsFlow(OptionsFlow):
     def _begin(self, section: str, keys: set[str]) -> OptionsDraft:
         if self._draft is None or self._draft.section != section:
             self._draft = OptionsDraft(section, self.config_entry.options, keys)
-        self._ready = False
         self._details = {}
         return self._draft
 
     def _section(self, section: str) -> OptionsDraft | None:
         draft = self._draft
         return draft if draft is not None and draft.section == section else None
+
+    def _vehicle_capabilities(self, values: dict[str, Any]) -> frozenset[Capability]:
+        provider, device = values.get(CONF_VEHICLE_PROVIDER), values.get(CONF_VEHICLE_DEVICE)
+        if not isinstance(provider, str) or not isinstance(device, str):
+            return frozenset()
+        identity = values.get("vehicle_source_identity")
+        if identity and identity != provider_identity(self.hass, provider, device):
+            return frozenset()
+        return profile_capabilities(self.hass, provider, device)
 
     def _suggested_vehicle(
         self, values: dict[str, Any], capability: Capability
@@ -58,59 +70,60 @@ class SectionOptionsFlow(OptionsFlow):
             return other
         return own
 
-    def _review(self) -> ConfigFlowResult:
-        self._ready = True
-        return self.async_show_menu(
-            step_id="review", menu_options=["save", "edit", "back"]
+    async def _async_vehicle_provider_step(
+        self, *, values: dict[str, Any], capability: Capability, key: str,
+        step_id: str, user_input: dict[str, Any] | None,
+        next_step: Callable[[], Awaitable[ConfigFlowResult]],
+    ) -> ConfigFlowResult:
+        """Share provider choice without changing each feature's device validation."""
+        providers = [item.id for item in provider_definitions(capability)]
+        selection = self._suggested_vehicle(values, capability)
+        errors = {}
+        if user_input is not None:
+            provider = user_input.get(key)
+            if provider not in set(providers):
+                errors[key] = "vehicle_provider_invalid"
+            else:
+                self._details["provider"] = provider
+                self._details["suggested_device"] = (
+                    selection.device_id if selection.provider_id == provider else None
+                )
+                return await next_step()
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=vehicle_provider_schema(key, selection.provider_id, providers),
+            errors=errors,
         )
 
-    async def async_step_review(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if self._draft is None or not self._ready:
-            return await self.async_step_init()
-        return self._review()
+    def _finish_section(self) -> ConfigFlowResult:
+        """Commit a completed section after checking concurrent edits."""
+        if self._draft is None:
+            raise RuntimeError("cannot save an incomplete options section")
+        try:
+            merged = self._draft.merge(self.config_entry.options)
+        except OptionsChangedError:
+            return self._options_changed()
+        self._draft = None
+        self._details = {}
+        return self.async_create_entry(data=merged)
 
     async def async_step_back(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         self._draft = None
-        self._ready = False
         self._details = {}
         return await self.async_step_init()
 
-    async def async_step_edit(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if self._draft is None:
-            return await self.async_step_init()
-        # Sections are named by our fixed root menu, never by user text.
-        step = cast(
-            Callable[[], Awaitable[ConfigFlowResult]],
-            getattr(self, f"async_step_{self._draft.section}"),
+    def _options_changed(self) -> ConfigFlowResult:
+        return self.async_show_form(
+            step_id="options_changed",
+            data_schema=probatio.Schema({}),
+            errors={"base": "options_changed"},
         )
-        return await step()
-
-    async def async_step_save(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if self._draft is None or not self._ready:
-            return await self.async_step_init()
-        try:
-            merged = self._draft.merge(self.config_entry.options)
-        except OptionsChangedError:
-            return await self.async_step_options_changed()
-        self._draft = None
-        self._ready = False
-        return self.async_create_entry(data=merged)
 
     async def async_step_options_changed(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
             return await self.async_step_back()
-        return self.async_show_form(
-            step_id="options_changed",
-            data_schema=probatio.Schema({}),
-            errors={"base": "options_changed"},
-        )
+        return self._options_changed()

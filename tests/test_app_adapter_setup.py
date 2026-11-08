@@ -575,7 +575,7 @@ def test_supervisor_post_may_finish_after_client_timeout_or_cancellation(setting
         completed = asyncio.Event()
 
         async def supervisor_info(_request):
-            return web.json_response({"result": "ok", "data": {"supervisor": "2026.11.0"}})
+            return web.json_response({"result": "ok", "data": {"supervisor": "2026.10.5"}})
 
         async def app_info(_request):
             return web.json_response({"result": "ok", "data": {"options": state["options"]}})

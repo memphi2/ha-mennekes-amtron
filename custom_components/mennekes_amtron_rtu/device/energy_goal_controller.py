@@ -54,6 +54,7 @@ class EnergyGoalController:
         self._stopping = False
         self._failure_logged = False
         self._storage_unknown = False
+        self._dirty = False
         control.goal_controller = self
         self.model.resume_on_recovery = False
 
@@ -88,6 +89,7 @@ class EnergyGoalController:
                 _LOGGER.error("Cannot publish cancelled goal recovery (%s)", type(err).__name__)
             raise
         self._storage_unknown = False
+        self._dirty = False
 
     async def async_set_target(self, value: object) -> None:
         """Persist a new ceiling before it can affect subsequent commands."""
@@ -138,6 +140,7 @@ class EnergyGoalController:
                 # on-disk limit can be assumed. Fence starts and schedule a
                 # pause, including when the requested candidate is disabled.
                 self._storage_unknown = True
+                self._dirty = True
                 self._pending = copy(candidate)
                 self._pending_generation = state.energy_goal_generation
                 self._ensure_task()
@@ -208,6 +211,7 @@ class EnergyGoalController:
         if (
             snapshot is not None and not snapshot.energy_read
             and not self.stop_requested and not self.model.resume_on_recovery
+            and not self._dirty
         ):
             return
         if self._pending is None or self._pending_generation != generation:
@@ -250,6 +254,7 @@ class EnergyGoalController:
                         pending.resume_on_recovery = True
                     changed = pending.snapshot() != self.model.snapshot()
                     self._client.write_state.energy_goal = pending
+                    self._dirty |= changed
                     if pending.stop_requested or self._storage_unknown:
                         # Reattempt a failed persistence before each idempotent
                         # stop retry; stores suppress unchanged disk writes.
@@ -264,7 +269,7 @@ class EnergyGoalController:
                                 self._storage_unknown = True
                         if pending.stop_requested or self._storage_unknown:
                             self._control.pause_requested = True
-                    elif changed or pending.resume_on_recovery:
+                    elif self._dirty or pending.resume_on_recovery:
                         await self._save_state()
                     if (
                         pending.status == "active" and pending.resume_on_recovery
@@ -342,6 +347,8 @@ class EnergyGoalController:
             ):
                 self._client.write_state.energy_goal = pending
                 self._control.pause_requested = True
+                self._dirty = True
+            if self._dirty:
                 try:
                     await self._save_state()
                 except (OSError, RuntimeError, ValueError) as err:

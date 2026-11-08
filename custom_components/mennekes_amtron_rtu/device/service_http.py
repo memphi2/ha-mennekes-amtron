@@ -50,7 +50,7 @@ def create_app(service: ModbusService) -> web.Application:
         return web.json_response({"status": "running"})
 
     async def state(_request: web.Request) -> web.Response:
-        return web.json_response(service.snapshot())
+        return web.json_response(await service.stable_snapshot())
 
     async def diagnostics(_request: web.Request) -> web.Response:
         # Passive RAM snapshot: no serial reads, writes or file access.
@@ -79,9 +79,28 @@ def create_app(service: ModbusService) -> web.Application:
         async with bus_requests:
             return web.json_response(await service.read(await body(request)))
 
+    async def soc_reserve(request: web.Request) -> web.Response:
+        if await body(request) != {}:
+            raise ValueError("invalid percentage-goal reservation")
+        return web.json_response({"token": service.soc_transactions.reserve()})
+
+    async def soc_commit(request: web.Request) -> web.Response:
+        if bus_requests.locked():
+            raise web.HTTPServiceUnavailable
+        return web.json_response(await service.soc_transactions.commit(await body(request), gate=bus_requests))
+
+    async def soc_resolve(request: web.Request) -> web.Response:
+        payload = await body(request)
+        if set(payload) != {"token"}:
+            raise ValueError("invalid percentage-goal resolution")
+        return web.json_response(await service.soc_transactions.resolve(payload["token"]))
+
     app.router.add_get("/health", health)
     app.router.add_get("/v2/state", state)
     app.router.add_get("/v2/diagnostics", diagnostics)
     app.router.add_post("/v2/command", command)
     app.router.add_post("/v2/read", read)
+    app.router.add_post("/v2/soc-goal/reserve", soc_reserve)
+    app.router.add_post("/v2/soc-goal/commit", soc_commit)
+    app.router.add_post("/v2/soc-goal/resolve", soc_resolve)
     return app

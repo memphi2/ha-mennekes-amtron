@@ -79,7 +79,10 @@ SECRET_PATTERNS = (
     # A real by-id path carries the adapter's serial number.
     re.compile(r"/dev/serial/by-id/usb-[A-Za-z0-9_.-]{12,}"),
 )
-TEXT_SUFFIXES = {".json", ".md", ".py", ".toml", ".txt", ".yaml", ".yml", ".in"}
+TEXT_SUFFIXES = {
+    ".cjs", ".css", ".html", ".in", ".js", ".json", ".md", ".py",
+    ".toml", ".txt", ".yaml", ".yml",
+}
 # The files that define or exercise the patterns above necessarily contain
 # them; every other file must not.
 SECRET_PATTERN_SOURCES = {

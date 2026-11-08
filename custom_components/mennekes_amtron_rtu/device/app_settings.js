@@ -10,8 +10,8 @@ const messages = {
     lan_hint: "For a compatible Waveshare adapter, read its settings below and select “Apply adapter settings when saving”. Other adapters need manual serial setup. Saving a LAN connection removes the old USB selection.", address: "Wallbox Modbus address",
     restart_hint: "Saving keeps the current connection running. Restart the app afterwards to apply the change; this briefly interrupts its heartbeat.",
     reload: "Reload settings and adapters", save: "Save connection", saving: "Saving…", saved: "Saved. Restart this app from its Info tab to apply the new connection.",
-    security: "For Home Assistant administrators with Supervisor 2026.11.0 or newer. No service token is needed here.",
-    supervisor_update_required: "Update Home Assistant Supervisor to 2026.11.0 or newer to use this configuration page. The native app Configuration tab remains available.",
+    security: "For Home Assistant administrators with Supervisor 2026.10.4 or newer. No service token is needed here.",
+    supervisor_update_required: "Update Home Assistant Supervisor to 2026.10.4 or newer to use this configuration page. The native app Configuration tab remains available.",
     admin_required: "Sign in to Home Assistant as an administrator to change this connection.", reload_required: "Reload this page before saving again.",
     settings_changed: "Settings changed elsewhere. Reload them before saving again; your changes have not been saved.", adapter_missing: "The selected USB adapter is missing. Reconnect it or reload the adapter list.",
     connection_invalid: "Check the connection settings, address and port. The existing configuration has not been changed.",
@@ -42,6 +42,10 @@ const messages = {
     gateway_rollback_failed: "The previous adapter settings could not be confirmed after a failed change. The service connection remains stopped. Check the adapter settings manually before reconnecting.",
     adapter_authentication: "Enable TCP login on the adapter",
     adapter_auth_hint: "Saving changes login on both the adapter and this app. To enable it, a web password must already be set on the adapter. Enter that existing password below; this page does not create or change it.",
+    transport_hint: "USB uses an adapter connected to the host running this app. For LAN, match the adapter mode: transparent RTU over TCP or translating Modbus TCP.",
+    serial_hint: "Speed and data format must match the wallbox; factory defaults are 57600 baud and 8N2. Changing these app settings does not reconfigure the wallbox.",
+    endpoint_hint: "Enter the LAN adapter address without http:// or a path. Use its configured TCP port, commonly 502. The Modbus service’s HTTP port 8765 does not belong here.",
+    address_hint: "This number identifies the wallbox on the RS-485 bus, including behind a LAN adapter. Factory default: 50; supported range: 10–50. It is not an IP address.",
   },
   de: {
     title: "Verbindung zur Wallbox", intro: "Wähle den Adapter für diese App. Schreibfreigabe und weitere Einstellungen bleiben im Reiter Konfiguration der App.",
@@ -52,8 +56,8 @@ const messages = {
     lan_hint: "Bei einem kompatiblen Waveshare-Adapter unten die Einstellungen auslesen und „Adaptereinstellungen beim Speichern anwenden“ auswählen. Andere Adapter manuell seriell einrichten. Beim Speichern einer LAN-Verbindung wird die alte USB-Auswahl entfernt.", address: "Modbus-Adresse der Wallbox",
     restart_hint: "Beim Speichern läuft die bisherige Verbindung weiter. Starte danach die App neu, damit die Änderung wirksam wird. Der Neustart unterbricht kurz den Heartbeat.",
     reload: "Einstellungen und Adapter neu laden", save: "Verbindung speichern", saving: "Wird gespeichert…", saved: "Gespeichert. Starte diese App im Reiter Info neu, um die neue Verbindung zu übernehmen.",
-    security: "Für Home-Assistant-Administratoren mit Supervisor ab 2026.11.0. Ein Dienst-Token ist hier nicht erforderlich.",
-    supervisor_update_required: "Aktualisiere Home Assistant Supervisor auf mindestens 2026.11.0, um diese Seite zu nutzen. Der normale Reiter Konfiguration der App bleibt verfügbar.",
+    security: "Für Home-Assistant-Administratoren mit Supervisor ab 2026.10.4. Ein Dienst-Token ist hier nicht erforderlich.",
+    supervisor_update_required: "Aktualisiere Home Assistant Supervisor auf mindestens 2026.10.4, um diese Seite zu nutzen. Der normale Reiter Konfiguration der App bleibt verfügbar.",
     admin_required: "Melde dich bei Home Assistant als Administrator an, um die Verbindung zu ändern.", reload_required: "Lade diese Seite vor dem erneuten Speichern neu.",
     settings_changed: "Die Einstellungen wurden anderswo geändert. Lade sie erneut, bevor du speicherst. Deine Änderungen wurden nicht gespeichert.", adapter_missing: "Der ausgewählte USB-Adapter fehlt. Schließe ihn wieder an oder lade die Adapterliste neu.",
     connection_invalid: "Prüfe Verbindungseinstellungen, Adresse und Port. Die bisherige Konfiguration wurde nicht geändert.",
@@ -84,6 +88,10 @@ const messages = {
     gateway_rollback_failed: "Nach der fehlgeschlagenen Änderung konnten die bisherigen Adaptereinstellungen nicht bestätigt werden. Die Dienstverbindung bleibt angehalten. Prüfe die Adaptereinstellungen manuell, bevor du die Verbindung wiederherstellst.",
     adapter_authentication: "TCP-Anmeldung am Adapter aktivieren",
     adapter_auth_hint: "Beim Speichern wird die Anmeldung am Adapter und in dieser App geändert. Zum Aktivieren muss bereits ein Webpasswort am Adapter gesetzt sein. Gib dieses vorhandene Passwort unten ein; diese Seite legt es nicht an und ändert es nicht.",
+    transport_hint: "USB nutzt einen Adapter am Rechner, auf dem diese App läuft. Bei LAN muss die Auswahl zum Adaptermodus passen: transparentes RTU über TCP oder übersetzendes Modbus TCP.",
+    serial_hint: "Geschwindigkeit und Datenformat müssen zur Wallbox passen; ab Werk sind es 57600 Baud und 8N2. Diese App-Einstellungen ändern die Konfiguration der Wallbox nicht.",
+    endpoint_hint: "Trage die Adresse des LAN-Adapters ohne http:// oder Pfad ein. Verwende dessen eingestellten TCP-Port, häufig 502. Der HTTP-Port 8765 des Modbus-Dienstes gehört nicht hierher.",
+    address_hint: "Diese Nummer kennzeichnet die Wallbox am RS-485-Bus, auch hinter einem LAN-Adapter. Werkseinstellung: 50; unterstützter Bereich: 10–50. Es ist keine IP-Adresse.",
   },
   fr: {
     title: "Connexion à la borne", intro: "Choisissez l’adaptateur de cette application. Les autorisations d’écriture et les autres réglages restent dans l’onglet Configuration.",
@@ -94,8 +102,8 @@ const messages = {
     lan_hint: "Pour un adaptateur Waveshare compatible, lisez ses réglages ci-dessous et activez leur application à l’enregistrement. Configurez manuellement la liaison série des autres adaptateurs. Enregistrer une connexion LAN supprime l’ancienne sélection USB.", address: "Adresse Modbus de la borne",
     restart_hint: "L’enregistrement laisse la connexion actuelle active. Redémarrez ensuite l’application pour appliquer le changement ; le heartbeat sera brièvement interrompu.",
     reload: "Recharger les réglages et adaptateurs", save: "Enregistrer la connexion", saving: "Enregistrement…", saved: "Enregistré. Redémarrez cette application depuis l’onglet Infos pour appliquer la connexion.",
-    security: "Pour les administrateurs Home Assistant avec Supervisor 2026.11.0 ou ultérieur. Aucun jeton de service n’est nécessaire ici.",
-    supervisor_update_required: "Mettez Supervisor à jour vers 2026.11.0 ou ultérieur. L’onglet Configuration habituel reste disponible.", admin_required: "Connectez-vous à Home Assistant en tant qu’administrateur.",
+    security: "Pour les administrateurs Home Assistant avec Supervisor 2026.10.4 ou ultérieur. Aucun jeton de service n’est nécessaire ici.",
+    supervisor_update_required: "Mettez Supervisor à jour vers 2026.10.4 ou ultérieur. L’onglet Configuration habituel reste disponible.", admin_required: "Connectez-vous à Home Assistant en tant qu’administrateur.",
     reload_required: "Rechargez cette page avant d’enregistrer.", settings_changed: "Les réglages ont changé ailleurs. Rechargez-les avant d’enregistrer ; vos changements n’ont pas été enregistrés.",
     adapter_missing: "L’adaptateur USB sélectionné est absent. Rebranchez-le ou rechargez la liste.", connection_invalid: "Vérifiez les réglages, l’adresse et le port. La configuration existante est inchangée.",
     invalid_request: "Vérifiez les réglages de connexion.", busy: "Une autre requête est en cours. Réessayez dans un instant.", supervisor_unavailable: "Impossible de charger ou d’enregistrer. Vérifiez l’application et Supervisor, puis rechargez la page.",
@@ -125,6 +133,10 @@ const messages = {
     gateway_rollback_failed: "Impossible de confirmer les anciens réglages après l’échec. La connexion du service reste arrêtée. Vérifiez manuellement l’adaptateur avant de vous reconnecter.",
     adapter_authentication: "Activer l’authentification TCP sur l’adaptateur",
     adapter_auth_hint: "L’enregistrement modifie l’authentification sur l’adaptateur et dans cette application. Pour l’activer, un mot de passe web doit déjà être défini sur l’adaptateur. Saisissez-le ci-dessous ; cette page ne le crée ni ne le modifie.",
+    transport_hint: "USB utilise un adaptateur branché à l’hôte de cette application. Pour LAN, choisissez le mode de l’adaptateur : RTU transparent sur TCP ou conversion Modbus TCP.",
+    serial_hint: "La vitesse et le format doivent correspondre à la borne ; valeurs d’usine : 57600 bauds et 8N2. Ces réglages ne reconfigurent pas la borne.",
+    endpoint_hint: "Saisissez l’adresse de l’adaptateur LAN sans http:// ni chemin. Utilisez son port TCP configuré, souvent 502. Le port HTTP 8765 du service Modbus ne convient pas ici.",
+    address_hint: "Ce numéro identifie la borne sur le bus RS-485, y compris derrière un adaptateur LAN. Valeur d’usine : 50 ; plage prise en charge : 10–50. Ce n’est pas une adresse IP.",
   },
   nl: {
     title: "Verbinding met de laadpaal", intro: "Kies de adapter voor deze app. Schrijfrechten en overige instellingen blijven op het tabblad Configuratie.",
@@ -135,8 +147,8 @@ const messages = {
     lan_hint: "Lees hieronder de instellingen van een compatibele Waveshare-adapter en kies toepassen bij opslaan. Stel andere adapters handmatig serieel in. Opslaan van een LAN-verbinding verwijdert de oude USB-selectie.", address: "Modbus-adres van de laadpaal",
     restart_hint: "Opslaan laat de huidige verbinding actief. Herstart daarna de app om de wijziging toe te passen; dit onderbreekt de heartbeat kort.",
     reload: "Instellingen en adapters herladen", save: "Verbinding opslaan", saving: "Opslaan…", saved: "Opgeslagen. Herstart deze app op het tabblad Info om de verbinding toe te passen.",
-    security: "Voor Home Assistant-beheerders met Supervisor 2026.11.0 of nieuwer. Hier is geen servicetoken nodig.",
-    supervisor_update_required: "Werk Supervisor bij naar 2026.11.0 of nieuwer. Het gewone tabblad Configuratie blijft beschikbaar.", admin_required: "Meld je aan bij Home Assistant als beheerder.",
+    security: "Voor Home Assistant-beheerders met Supervisor 2026.10.4 of nieuwer. Hier is geen servicetoken nodig.",
+    supervisor_update_required: "Werk Supervisor bij naar 2026.10.4 of nieuwer. Het gewone tabblad Configuratie blijft beschikbaar.", admin_required: "Meld je aan bij Home Assistant als beheerder.",
     reload_required: "Herlaad deze pagina voordat je opnieuw opslaat.", settings_changed: "De instellingen zijn elders gewijzigd. Herlaad ze; je wijzigingen zijn niet opgeslagen.",
     adapter_missing: "De gekozen USB-adapter ontbreekt. Sluit hem aan of herlaad de lijst.", connection_invalid: "Controleer de verbinding, het adres en de poort. De bestaande configuratie is niet gewijzigd.",
     invalid_request: "Controleer de verbindingsinstellingen.", busy: "Een ander verzoek loopt nog. Probeer het zo opnieuw.", supervisor_unavailable: "Laden of opslaan is mislukt. Controleer de app en Supervisor en herlaad deze pagina.",
@@ -166,6 +178,10 @@ const messages = {
     gateway_rollback_failed: "De vorige instellingen konden na de mislukte wijziging niet worden bevestigd. De verbinding van de dienst blijft gestopt. Controleer de adapter handmatig voordat je opnieuw verbinding maakt.",
     adapter_authentication: "TCP-aanmelding inschakelen op de adapter",
     adapter_auth_hint: "Opslaan wijzigt de aanmelding op de adapter en in deze app. Voor inschakelen moet al een webwachtwoord op de adapter zijn ingesteld. Vul dat hieronder in; deze pagina maakt of wijzigt het niet.",
+    transport_hint: "USB gebruikt een adapter op de host waarop deze app draait. Kies bij LAN de adaptermodus: transparant RTU over TCP of vertalend Modbus TCP.",
+    serial_hint: "Snelheid en gegevensformaat moeten overeenkomen met de laadpaal; fabriekswaarden zijn 57600 baud en 8N2. Deze appinstellingen wijzigen de laadpaalconfiguratie niet.",
+    endpoint_hint: "Vul het LAN-adapteradres in zonder http:// of pad. Gebruik de ingestelde TCP-poort, vaak 502. HTTP-poort 8765 van de Modbus-dienst hoort hier niet.",
+    address_hint: "Dit nummer identificeert de laadpaal op de RS-485-bus, ook achter een LAN-adapter. Fabriekswaarde: 50; ondersteund bereik: 10–50. Het is geen IP-adres.",
   },
   it: {
     title: "Collegamento alla wallbox", intro: "Scegli l’adattatore per questa app. I permessi di scrittura e le altre impostazioni rimangono nella scheda Configurazione.",
@@ -176,8 +192,8 @@ const messages = {
     lan_hint: "Per un adattatore Waveshare compatibile, leggi le impostazioni qui sotto e seleziona l’applicazione al salvataggio. Configura manualmente la seriale degli altri adattatori. Salvare una connessione LAN rimuove la precedente selezione USB.", address: "Indirizzo Modbus della wallbox",
     restart_hint: "Il salvataggio mantiene attivo il collegamento attuale. Riavvia poi l’app per applicare la modifica; l’heartbeat verrà interrotto brevemente.",
     reload: "Ricarica impostazioni e adattatori", save: "Salva collegamento", saving: "Salvataggio…", saved: "Salvato. Riavvia questa app dalla scheda Informazioni per applicare il collegamento.",
-    security: "Per amministratori Home Assistant con Supervisor 2026.11.0 o successivo. Qui non serve un token del servizio.",
-    supervisor_update_required: "Aggiorna Supervisor alla versione 2026.11.0 o successiva. La normale scheda Configurazione rimane disponibile.", admin_required: "Accedi a Home Assistant come amministratore.",
+    security: "Per amministratori Home Assistant con Supervisor 2026.10.4 o successivo. Qui non serve un token del servizio.",
+    supervisor_update_required: "Aggiorna Supervisor alla versione 2026.10.4 o successiva. La normale scheda Configurazione rimane disponibile.", admin_required: "Accedi a Home Assistant come amministratore.",
     reload_required: "Ricarica questa pagina prima di salvare nuovamente.", settings_changed: "Le impostazioni sono cambiate altrove. Ricaricale; le modifiche non sono state salvate.",
     adapter_missing: "L’adattatore USB selezionato non è presente. Ricollegalo o ricarica l’elenco.", connection_invalid: "Controlla impostazioni, indirizzo e porta. La configurazione esistente non è stata modificata.",
     invalid_request: "Controlla le impostazioni di collegamento.", busy: "Un’altra richiesta è in corso. Riprova tra poco.", supervisor_unavailable: "Impossibile caricare o salvare. Controlla l’app e Supervisor, poi ricarica la pagina.",
@@ -207,8 +223,159 @@ const messages = {
     gateway_rollback_failed: "Impossibile confermare le impostazioni precedenti dopo l’errore. La connessione del servizio resta arrestata. Controlla manualmente l’adattatore prima di riconnetterti.",
     adapter_authentication: "Attiva accesso TCP sull’adattatore",
     adapter_auth_hint: "Il salvataggio modifica l’accesso sull’adattatore e in questa app. Per attivarlo deve essere già impostata una password web sull’adattatore. Inseriscila qui sotto; questa pagina non la crea né la modifica.",
+    transport_hint: "USB usa un adattatore collegato all’host di questa app. Per LAN scegli la modalità dell’adattatore: RTU trasparente su TCP oppure conversione Modbus TCP.",
+    serial_hint: "Velocità e formato devono corrispondere alla wallbox; valori di fabbrica: 57600 baud e 8N2. Queste impostazioni dell’app non riconfigurano la wallbox.",
+    endpoint_hint: "Inserisci l’indirizzo dell’adattatore LAN senza http:// o percorso. Usa la sua porta TCP configurata, spesso 502. La porta HTTP 8765 del servizio Modbus non va inserita qui.",
+    address_hint: "Questo numero identifica la wallbox sul bus RS-485, anche dietro un adattatore LAN. Valore di fabbrica: 50; intervallo supportato: 10–50. Non è un indirizzo IP.",
   }
 };
+
+// Live diagnostics use the same supported interface languages.
+Object.assign(messages.en, {
+  "debug_title": "Live Modbus communication",
+  "debug_hint": "Optional troubleshooting: observe existing reads, writes and heartbeats for up to 10 minutes. Only the latest 200 entries stay in memory; nothing is stored in the Home Assistant database or log files.",
+  "debug_enable": "Capture communication for 10 minutes",
+  "debug_off": "Capture is off. Switching it off erases all entries.",
+  "debug_on": "Capture active — seconds remaining:",
+  "debug_privacy": "Serial numbers and text registers are hidden. Network login traffic is never captured. Closing this panel stops updates; capture continues until switched off or automatically expired.",
+  "debug_clear": "Clear entries",
+  "debug_records": "Latest transactions, newest first",
+  "debug_time": "Time (UTC)",
+  "debug_operation": "Operation",
+  "debug_registers": "Registers and decoded values",
+  "debug_duration": "Duration",
+  "debug_result": "Result",
+  "debug_unavailable": "Configure the wallbox connection and restart the app to use live communication capture.",
+  "debug_failed": "Communication capture could not be read or changed. Close and reopen this panel to check its current state; an active capture still expires automatically.",
+  "debug_read": "Read",
+  "debug_write": "Write",
+  "debug_heartbeat": "Heartbeat",
+  "debug_ok": "Confirmed",
+  "debug_connection": "Connection failed",
+  "debug_timeout": "No response",
+  "debug_protocol": "Invalid response",
+  "debug_device_exception": "Rejected by wallbox",
+  "debug_cancelled": "Cancelled",
+  "debug_unexpected": "Transaction failed",
+  "debug_redacted": "hidden",
+  "debug_unknown": "Not decoded"
+});
+Object.assign(messages.de, {
+  "debug_title": "Modbus-Kommunikation live",
+  "debug_hint": "Optional zur Fehlersuche: vorhandene Lesezugriffe, Schreibzugriffe und Heartbeats bis zu 10 Minuten mitverfolgen. Nur die letzten 200 Einträge bleiben im Arbeitsspeicher; nichts landet in der Home-Assistant-Datenbank oder in Protokolldateien.",
+  "debug_enable": "Kommunikation für 10 Minuten aufzeichnen",
+  "debug_off": "Aufzeichnung ausgeschaltet. Ausschalten löscht alle Einträge.",
+  "debug_on": "Aufzeichnung aktiv — verbleibende Sekunden:",
+  "debug_privacy": "Seriennummern und Textregister werden ausgeblendet. Die Netzwerkanmeldung wird nie aufgezeichnet. Beim Schließen dieses Bereichs enden die Bildschirmaktualisierungen; die Aufzeichnung läuft bis zum Ausschalten oder automatischen Ablauf weiter.",
+  "debug_clear": "Einträge löschen",
+  "debug_records": "Letzte Zugriffe, neueste zuerst",
+  "debug_time": "Zeit (UTC)",
+  "debug_operation": "Zugriff",
+  "debug_registers": "Register und dekodierte Werte",
+  "debug_duration": "Dauer",
+  "debug_result": "Ergebnis",
+  "debug_unavailable": "Wallbox-Verbindung einrichten und die App neu starten, um die Kommunikation mitzuverfolgen.",
+  "debug_failed": "Die Aufzeichnung konnte nicht gelesen oder geändert werden. Diesen Bereich schließen und erneut öffnen, um den aktuellen Zustand zu prüfen; eine aktive Aufzeichnung endet weiterhin automatisch.",
+  "debug_read": "Lesen",
+  "debug_write": "Schreiben",
+  "debug_heartbeat": "Heartbeat",
+  "debug_ok": "Bestätigt",
+  "debug_connection": "Verbindung fehlgeschlagen",
+  "debug_timeout": "Keine Antwort",
+  "debug_protocol": "Ungültige Antwort",
+  "debug_device_exception": "Von der Wallbox abgelehnt",
+  "debug_cancelled": "Abgebrochen",
+  "debug_unexpected": "Zugriff fehlgeschlagen",
+  "debug_redacted": "ausgeblendet",
+  "debug_unknown": "Nicht dekodiert"
+});
+Object.assign(messages.fr, {
+  "debug_title": "Communication Modbus en direct",
+  "debug_hint": "Diagnostic facultatif : observer les lectures, écritures et signaux de présence existants pendant 10 minutes au maximum. Seules les 200 dernières entrées restent en mémoire ; aucune écriture dans la base Home Assistant ni dans des fichiers journaux.",
+  "debug_enable": "Capturer les échanges pendant 10 minutes",
+  "debug_off": "Capture désactivée. La désactivation efface toutes les entrées.",
+  "debug_on": "Capture active — secondes restantes :",
+  "debug_privacy": "Les numéros de série et registres texte sont masqués. Les échanges de connexion réseau ne sont jamais capturés. Fermer ce panneau arrête son actualisation ; la capture continue jusqu’à sa désactivation ou son expiration automatique.",
+  "debug_clear": "Effacer les entrées",
+  "debug_records": "Derniers échanges, les plus récents en premier",
+  "debug_time": "Heure (UTC)",
+  "debug_operation": "Opération",
+  "debug_registers": "Registres et valeurs décodées",
+  "debug_duration": "Durée",
+  "debug_result": "Résultat",
+  "debug_unavailable": "Configurez la connexion à la borne et redémarrez l’application pour observer les échanges.",
+  "debug_failed": "Impossible de lire ou modifier la capture. Fermez puis rouvrez ce panneau pour vérifier son état ; une capture active expire toujours automatiquement.",
+  "debug_read": "Lecture",
+  "debug_write": "Écriture",
+  "debug_heartbeat": "Signal de présence",
+  "debug_ok": "Confirmé",
+  "debug_connection": "Échec de connexion",
+  "debug_timeout": "Aucune réponse",
+  "debug_protocol": "Réponse invalide",
+  "debug_device_exception": "Refus de la borne",
+  "debug_cancelled": "Annulé",
+  "debug_unexpected": "Échec de l’échange",
+  "debug_redacted": "masqué",
+  "debug_unknown": "Non décodé"
+});
+Object.assign(messages.it, {
+  "debug_title": "Comunicazione Modbus in diretta",
+  "debug_hint": "Diagnostica facoltativa: osserva letture, scritture e heartbeat esistenti per un massimo di 10 minuti. Solo le ultime 200 voci rimangono in memoria; nulla viene salvato nel database di Home Assistant o nei file di registro.",
+  "debug_enable": "Acquisisci la comunicazione per 10 minuti",
+  "debug_off": "Acquisizione disattivata. Disattivandola si eliminano tutte le voci.",
+  "debug_on": "Acquisizione attiva — secondi rimanenti:",
+  "debug_privacy": "Numeri di serie e registri di testo sono nascosti. Il traffico di autenticazione di rete non viene mai acquisito. Chiudere questo pannello interrompe gli aggiornamenti; l’acquisizione continua fino alla disattivazione o alla scadenza automatica.",
+  "debug_clear": "Elimina le voci",
+  "debug_records": "Ultimi scambi, dal più recente",
+  "debug_time": "Ora (UTC)",
+  "debug_operation": "Operazione",
+  "debug_registers": "Registri e valori decodificati",
+  "debug_duration": "Durata",
+  "debug_result": "Risultato",
+  "debug_unavailable": "Configura la connessione alla wallbox e riavvia l’app per osservare la comunicazione.",
+  "debug_failed": "Impossibile leggere o modificare l’acquisizione. Chiudi e riapri questo pannello per verificarne lo stato; un’acquisizione attiva termina comunque automaticamente.",
+  "debug_read": "Lettura",
+  "debug_write": "Scrittura",
+  "debug_heartbeat": "Heartbeat",
+  "debug_ok": "Confermato",
+  "debug_connection": "Connessione non riuscita",
+  "debug_timeout": "Nessuna risposta",
+  "debug_protocol": "Risposta non valida",
+  "debug_device_exception": "Rifiutato dalla wallbox",
+  "debug_cancelled": "Annullato",
+  "debug_unexpected": "Scambio non riuscito",
+  "debug_redacted": "nascosto",
+  "debug_unknown": "Non decodificato"
+});
+Object.assign(messages.nl, {
+  "debug_title": "Live Modbus-communicatie",
+  "debug_hint": "Optioneel voor foutonderzoek: bekijk bestaande leesacties, schrijfacties en heartbeats maximaal 10 minuten. Alleen de laatste 200 regels blijven in het geheugen; er wordt niets opgeslagen in de Home Assistant-database of logbestanden.",
+  "debug_enable": "Communicatie 10 minuten vastleggen",
+  "debug_off": "Registratie uitgeschakeld. Uitschakelen wist alle regels.",
+  "debug_on": "Registratie actief — resterende seconden:",
+  "debug_privacy": "Serienummers en tekstregisters zijn verborgen. Netwerkaanmeldingen worden nooit vastgelegd. Dit paneel sluiten stopt de weergave-updates; de registratie loopt door tot uitschakeling of automatisch verlopen.",
+  "debug_clear": "Regels wissen",
+  "debug_records": "Laatste transacties, nieuwste eerst",
+  "debug_time": "Tijd (UTC)",
+  "debug_operation": "Bewerking",
+  "debug_registers": "Registers en gedecodeerde waarden",
+  "debug_duration": "Duur",
+  "debug_result": "Resultaat",
+  "debug_unavailable": "Stel de wallboxverbinding in en herstart de app om de communicatie te bekijken.",
+  "debug_failed": "De registratie kon niet worden gelezen of gewijzigd. Sluit en heropen dit paneel om de huidige status te controleren; een actieve registratie verloopt nog steeds automatisch.",
+  "debug_read": "Lezen",
+  "debug_write": "Schrijven",
+  "debug_heartbeat": "Heartbeat",
+  "debug_ok": "Bevestigd",
+  "debug_connection": "Verbinding mislukt",
+  "debug_timeout": "Geen antwoord",
+  "debug_protocol": "Ongeldig antwoord",
+  "debug_device_exception": "Geweigerd door wallbox",
+  "debug_cancelled": "Geannuleerd",
+  "debug_unexpected": "Transactie mislukt",
+  "debug_redacted": "verborgen",
+  "debug_unknown": "Niet gedecodeerd"
+});
 
 const language = messages[document.documentElement.lang] ? document.documentElement.lang : "en";
 const text = (key) => messages[language][key] || messages.en[key] || messages.en.supervisor_unavailable;
@@ -245,6 +412,7 @@ function setBusy(value) {
   el("connection_type").disabled = value || restartPending;
   el("device_id").disabled = value || restartPending;
   showTransport();
+  updateDebugControls();
 }
 
 function showError(key) {
@@ -432,5 +600,94 @@ el("connection_form").addEventListener("submit", async (event) => {
     setBusy(false);
   }
 });
+
+// These observations are separate from saved connection settings. No debug
+// option is persisted, and UI polling never asks the wallbox for extra reads.
+let debugState = { available: false, enabled: false, expires_in: 0 };
+let debugRows = [];
+let debugSequence = 0;
+let debugTimer = null;
+let debugBusy = false;
+let debugStopped = false;
+const debugVisible = () => el("modbus_debug").open && !document.hidden && !debugStopped;
+
+function stopDebugPolling() {
+  if (debugTimer !== null) clearTimeout(debugTimer);
+  debugTimer = null;
+}
+function updateDebugControls() {
+  el("debug_enabled").disabled = debugBusy || !csrf || !debugState.available;
+  el("debug_clear").disabled = debugBusy || !csrf || !debugState.available || !debugRows.length;
+}
+function renderDebug(data, reset) {
+  reset = reset || data.generation !== debugState.generation || data.latest_sequence < debugSequence;
+  debugState = data;
+  if (reset || !data.enabled) debugRows = [];
+  for (const record of data.records) {
+    if (reset || record.sequence > debugSequence) debugRows.push(record);
+  }
+  debugRows = debugRows.slice(-200);
+  debugSequence = data.latest_sequence;
+  el("debug_enabled").checked = data.enabled;
+  el("debug_status").textContent = !data.available ? text("debug_unavailable")
+    : data.enabled ? `${text("debug_on")} ${data.expires_in}` : text("debug_off");
+  const rows = [];
+  for (const record of [...debugRows].reverse()) {
+    const row = document.createElement("tr");
+    const values = record.values.map(value => `${value.address} ${value.register.replaceAll("_", " ")}: ${value.redacted
+      ? text("debug_redacted") : `${value.value ?? text("debug_unknown")}${value.unit ? ` ${value.unit}` : ""}${value.enum ? ` (${value.enum})` : ""}`}`).join("\n");
+    const result = record.error ? text(`debug_${record.error}`) : text("debug_ok");
+    for (const value of [record.time, `${text(`debug_${record.operation}`)}\nFC ${record.function} · ID ${record.device_id}`,
+      `${record.address} (${record.count})\n${values || text("debug_unknown")}`, `${record.duration_ms} ms`,
+      `${result}${record.exception_code !== null ? ` (${record.exception_code})` : ""}`]) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    }
+    rows.push(row);
+  }
+  el("debug_records").replaceChildren(...rows);
+  updateDebugControls();
+}
+async function refreshDebug(payload = null, reset = false) {
+  stopDebugPolling();
+  if (debugBusy || !debugVisible()) return;
+  if (payload && !csrf) return;
+  debugBusy = true;
+  updateDebugControls();
+  let success = false;
+  try {
+    const response = await fetch(`./api/modbus-debug${payload || reset ? "" : `?after=${debugSequence}`}`, payload ? {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Amtron-CSRF": csrf }, body: JSON.stringify(payload)
+    } : { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) {
+      el("debug_enabled").checked = debugState.enabled;
+      el("debug_status").textContent = data.error === "debug_unavailable" ? text("debug_unavailable") : text("debug_failed");
+      return;
+    }
+    renderDebug(data, reset || Boolean(payload));
+    success = true;
+  } catch (_) {
+    el("debug_enabled").checked = debugState.enabled;
+    el("debug_status").textContent = text("debug_failed");
+  } finally {
+    debugBusy = false;
+    updateDebugControls();
+    if (success && debugVisible() && debugState.enabled) debugTimer = setTimeout(refreshDebug, 2000);
+  }
+}
+el("modbus_debug").addEventListener("toggle", () => {
+  stopDebugPolling();
+  if (debugVisible()) return refreshDebug(null, true);
+});
+el("debug_enabled").addEventListener("change", () => refreshDebug({ enabled: el("debug_enabled").checked }));
+el("debug_clear").addEventListener("click", () => refreshDebug({ clear: true }));
+document.addEventListener("visibilitychange", () => {
+  stopDebugPolling();
+  if (debugVisible()) return refreshDebug(null, true);
+});
+addEventListener("pagehide", () => { debugStopped = true; stopDebugPolling(); });
+addEventListener("pageshow", () => { debugStopped = false; if (debugVisible()) return refreshDebug(null, true); });
 
 readSettings();

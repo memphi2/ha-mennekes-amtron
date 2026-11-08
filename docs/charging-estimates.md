@@ -3,11 +3,14 @@
 These optional features are available in **stable 0.6.1**, including automatic
 tariff import and yearly refresh. For service connections,
 [update the app first](installation.md#updating-to-061).
-The setup steps below follow the separate menus in **beta 0.7.0b4**.
+The setup steps follow **beta 0.8.0b1**, which adds central vehicle profiles and
+clearer configuration dialogs. Existing separate sources continue to work.
+[Check feature availability](README.md#versions-and-feature-availability).
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure**, then **Charging costs** or **Charging losses**.
-Choose a source to see only its relevant inputs; finish with **Save**. They work with a
+Choose a source to see only its relevant inputs; confirming the last form saves
+the section directly. They work with a
 direct USB/LAN connection and with the Modbus app/service. No extra Modbus
 polling, vehicle commands or electricity-provider login is needed.
 
@@ -28,7 +31,7 @@ cycle cannot be matched; a previous result is not passed off as the new one.
 | Source | What you select | How the charge is matched |
 |---|---|---|
 | Disabled | Nothing | No charging-loss entities or vehicle subscriptions. |
-| Vehicle charging history | A supported provider, then the vehicle | Complete local charging history with matching start/end times; currently implemented for BavarianData. |
+| Vehicle charging history | The active vehicle profile, or a retained separate vehicle selection | Complete local charging history with matching start/end times; currently implemented for BavarianData. |
 | Vehicle energy sensor | An existing sensor for battery energy from the last charge | Explicit assignment, or an optional new-value heuristic. |
 
 The two sensors are **Estimated charging loss, last charge** and **Average
@@ -36,7 +39,17 @@ estimated charging loss**. The average weights each accepted charge by energy:
 `(sum of wallbox kWh − sum of battery kWh) / sum of wallbox kWh × 100`.
 For example, 10 kWh at the wallbox and 9 kWh reaching the battery gives 10%.
 Correcting the latest assignment replaces that sample instead of adding it twice.
-Changing the selected vehicle or source starts a new average.
+Vehicle profiles retain their own averages when you switch between cars.
+Changing a profile's selected vehicle or energy source starts a new average for
+that source. Existing configurations without profiles keep their original
+single-source average.
+
+For manual selection, choose the correct profile **before charging begins**.
+Automatic cable/home recognition may arrive after the wallbox detects charging;
+it can still identify that same observed cycle if no conflicting vehicle was
+selected and connection observation remained valid. After unplugging, the loss
+calculation retains the recognized owner even when automatic selection clears
+the active vehicle. Switching profiles retains each car's saved results.
 
 If a selected vehicle is temporarily missing from Home Assistant, its loss
 estimates become unavailable while the saved history is retained. They resume
@@ -50,9 +63,12 @@ creates long-term statistics.
 
 ### BavarianData
 
-In **Charging losses**, select **Vehicle charging history**, choose
-**BavarianData**, then the vehicle. This selection is independent of the
-vehicle used for departure timers. The integration reads
+Configure the BavarianData car once under **Vehicle**, select its profile, then
+choose **Use the selected vehicle's charging history** in **Charging losses**.
+This selection saves immediately and enables history matching for that profile.
+The history belongs
+to the same active car used by the profile's other features. Existing setups
+without profiles retain their separately configured history vehicle. The integration reads
 BavarianData's existing local history through its public
 [`get_charging_sessions` action](https://justchr.github.io/BavarianData/docs/services/).
 It never requests a BMW history refresh or spends the BMW API quota.
@@ -86,13 +102,17 @@ A changed value does not prove which charge it belongs to. Use manual assignment
 if the vehicle has charged elsewhere, updates arrive late, or two consecutive
 charges have the same kWh value. Without charging timestamps the result is always
 an estimate. This setting does not automatically identify which vehicle is plugged
-in; optional multiple-vehicle profiles are not part of this implementation.
+in. Choose the correct [vehicle profile](user-guide.md#vehicle-profiles) before
+charging when using manual selection. Separately optional cable/home recognition
+can associate a delayed vehicle report with the same observed charge, as described
+above. The energy sensor and its settings belong to that vehicle's profile.
 
 ## Charging costs: fixed or dynamic price
 
 Under **Charging costs**, choose **Fixed electricity price** or
 **Electricity price sensor**. For a fixed rate enter your gross
-price in **EUR/kWh**, for example `0.30` for 30 cents. With Tibber or another
+price in **EUR/kWh**. New configurations suggest **0.40 EUR/kWh**; replace this
+with your own price. Saved prices are retained. With Tibber or another
 provider, select its existing HA sensor for the **current electricity price**.
 Supported units are `EUR/kWh`, `€/kWh`, `ct/kWh`, `EUR/MWh` and `€/MWh`.
 Negative prices are supported. Other currencies or a missing unit are not guessed.
@@ -147,7 +167,9 @@ Choose one model:
 | Module 1 + 3 | Standard, high and low network prices; daily high/low windows; active quarters; tariff year | Replace the regular network component with the price for that local time. |
 
 After choosing Module 3, select **Enter or edit manually** or **Import for HA Home**.
-Manual entry opens the price and time-window forms without an external lookup.
+Manual entry opens the combined price and time-window form without an external
+lookup. If you later enable annual refresh, that separate choice permits
+background lookups even for a manually entered tariff.
 Choosing the import makes a **one-time lookup**: it sends the configured HA Home coordinates to
 [VNBdigital](https://www.vnbdigital.de/) to find the responsible low-voltage
 network operator, then reads the current year's public data from
@@ -170,7 +192,10 @@ to Par14a-Database (the78mole), [CC BY 4.0](https://creativecommons.org/licenses
 The network operator's original price sheet governs. Choose **Import for HA
 Home** again whenever you want to retrieve the current published values.
 **Automatic yearly refresh** is a separate optional switch in the Module 3
-time-window form. When enabled, the integration checks the new year's tariff
+tariff form. It can be enabled after either manual entry or an initial import.
+It uses HA Home coordinates again and can replace manually entered prices and
+time windows with the new published tariff. Keep it off if you want to manage
+those values yourself. When enabled, the integration checks the new year's tariff
 on 1 January in **Europe/Berlin** and applies it only if the operator
 and published schedule are unambiguous and valid. If no usable sheet is
 available, it retries once a day; cost estimates remain unknown for that year
@@ -191,8 +216,10 @@ Module 1 and cannot be combined with Module 2 for the same market location.
 Eligibility and the price structure are explained by the
 [Bundesnetzagentur](https://www.bundesnetzagentur.de/DE/Vportal/Energie/SteuerbareVBE/artikel.html).
 
-Module 3 asks for prices first, then daily windows and active quarters. Its
-time-window form supports multiple high-price and low-price daily windows.
+Module 3 shows all three prices, daily windows and active quarters together
+in one final form, including values supplied by the import. Confirming this
+form saves the complete tariff directly. It supports multiple high-price and
+low-price daily windows.
 Enter one period per line as `HH:MM-HH:MM`, for example `06:00-09:00` and
 `17:00-20:00` on separate lines. Windows may cross midnight; all other times
 use the standard rate. Window boundaries must fall on quarter hours, must not

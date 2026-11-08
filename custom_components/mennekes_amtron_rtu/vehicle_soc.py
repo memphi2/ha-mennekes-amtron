@@ -8,7 +8,7 @@ import math
 from contextlib import suppress
 from copy import copy
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from homeassistant.core import (
     CALLBACK_TYPE,
@@ -29,6 +29,8 @@ from .device.client_errors import AmtronBusError
 from .device.errors import DeviceError
 from .device.soc_goal import SocGoal
 from .exceptions import service_validation_error
+from .vehicle_profiles import LEGACY_PROFILE_ID
+from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
 
 if TYPE_CHECKING:
     from .coordinator import MennekesAmtronCoordinator
@@ -57,6 +59,29 @@ class SocControl(Protocol):
     ) -> None: ...
 
 
+@runtime_checkable
+class TransactionalSocControl(Protocol):
+    """Service-only transaction operations, absent from direct controllers."""
+
+    @property
+    def soc_goal_revision(self) -> str | None: ...
+
+    @property
+    def soc_goal_resolution_pending(self) -> bool: ...
+
+    @property
+    def soc_goal_resolution_fenced(self) -> bool: ...
+
+    def abandon_fenced_soc_goal(self) -> None: ...
+
+    async def async_resolve_soc_goal(self) -> str: ...
+
+    async def async_observe_soc(
+        self, soc: float | None, maximum: float | None = None, *, source: str,
+        expected_soc_revision: str | None = None,
+    ) -> None: ...
+
+
 def vehicle_percentage(state: State | None, *, limit: bool = False) -> float | None:
     """Read reported percentages; unavailable/restored data has no authority."""
     if state is None or state.attributes.get("restored") is True:
@@ -81,9 +106,10 @@ class _Observation:
 class _Observations:
     """Fold with the real model, retaining at most two outgoing observations."""
 
-    def __init__(self, model: SocGoal, source: str | None) -> None:
+    def __init__(self, model: SocGoal, source: str | None, revision: str | None = None) -> None:
         self.model = copy(model)
         self.model.configure_source(source)
+        self.revision = revision
         self.minimum: float | None = None
         self.maximum: float | None = None
         self.reached_soc: float | None = None
@@ -128,16 +154,32 @@ class VehicleSocObserver:
         self, hass: HomeAssistant, control: SocControl,
         coordinator: MennekesAmtronCoordinator,
         soc_entity: str | None, limit_entity: str | None = None,
+        *, telemetry: VehicleTelemetrySource | None = None,
+        use_vehicle_soc: bool = False, use_vehicle_limit: bool = False,
+        profile_id: str | None = None,
     ) -> None:
         self._hass = hass
         self._control = control
         self._coordinator = coordinator
         self._soc_entity = soc_entity
         self._limit_entity = limit_entity
+        self._telemetry = telemetry
+        self._use_vehicle_soc = use_vehicle_soc
+        self._use_vehicle_limit = use_vehicle_limit
         self.source = f"{soc_entity}|{limit_entity or ''}" if soc_entity else None
+        if use_vehicle_soc:
+            self.source = f"vehicle:{telemetry.source_key}" if telemetry is not None else None
+        if self.source is not None and use_vehicle_limit:
+            self.source += f"|maximum:{telemetry.source_key if telemetry is not None else 'unavailable'}"
+        if self.source is not None and profile_id and profile_id != LEGACY_PROFILE_ID:
+            self.source = f"profile:{profile_id}:{self.source}"
         self._unsubscribers: list[CALLBACK_TYPE] = []
         self._pending: _Observations | None = None
         self._inflight: _Observations | None = None
+        self._previous_target_model: SocGoal | None = None
+        self._previous_target_revision: str | None = None
+        self._target_model: SocGoal | None = None
+        self._target_pending: _Observations | None = None
         self._last_sent: _Observation | None = None
         self._task: asyncio.Task[None] | None = None
         self._command_lock = asyncio.Lock()
@@ -148,12 +190,16 @@ class VehicleSocObserver:
 
     @property
     def latest_soc(self) -> float | None:
+        if self._use_vehicle_soc:
+            return self._telemetry.snapshot.soc_percent if self._telemetry is not None else None
         return vehicle_percentage(
             self._hass.states.get(self._soc_entity) if self._soc_entity else None,
         )
 
     @property
     def maximum(self) -> float | None:
+        if self._use_vehicle_limit:
+            return self._telemetry.snapshot.maximum_percent if self._telemetry is not None else None
         return vehicle_percentage(
             self._hass.states.get(self._limit_entity) if self._limit_entity else None,
             limit=True,
@@ -164,11 +210,24 @@ class VehicleSocObserver:
         self._unsubscribers.append(
             self._coordinator.async_add_listener(self._coordinator_updated),
         )
-        if self._soc_entity:
-            entities = [self._soc_entity]
-            if self._limit_entity:
-                entities.append(self._limit_entity)
-            observed_values = _Observation(self.latest_soc, self.maximum)
+        observed_values = _Observation(self.latest_soc, self.maximum)
+        if self._telemetry is not None and (self._use_vehicle_soc or self._use_vehicle_limit):
+            @callback
+            def telemetry_changed(value: VehicleTelemetry) -> None:
+                nonlocal observed_values
+                observed_values = _Observation(
+                    value.soc_percent if self._use_vehicle_soc else observed_values.soc,
+                    value.maximum_percent if self._use_vehicle_limit else observed_values.maximum,
+                )
+                self._queue_observation(observed_values)
+
+            self._unsubscribers.append(self._telemetry.subscribe(telemetry_changed))
+        entities = []
+        if self._soc_entity and not self._use_vehicle_soc:
+            entities.append(self._soc_entity)
+        if self._limit_entity and not self._use_vehicle_limit:
+            entities.append(self._limit_entity)
+        if entities:
 
             @callback
             def observed(event: Event[EventStateChangedData] | Event[EventStateReportedData]) -> None:
@@ -218,18 +277,30 @@ class VehicleSocObserver:
     def _queue_observation(self, observation: _Observation) -> None:
         if self._stopping:
             return
+        if self._target_model is not None:
+            if self._target_pending is None:
+                self._target_pending = _Observations(self._target_model, self.source)
+            self._target_pending.add(observation)
         if self._pending is None and observation == self._last_sent:
             return
         if self._pending is None:
-            model = self._inflight.model if self._inflight is not None else self._control.soc_goal
-            self._pending = _Observations(model, self.source)
+            model = (
+                self._previous_target_model or
+                (self._inflight.model if self._inflight is not None else self._control.soc_goal)
+            )
+            revision = (
+                self._previous_target_revision if self._previous_target_model is not None else
+                self._inflight.revision if self._inflight is not None else
+                getattr(self._control, "soc_goal_revision", None)
+            )
+            self._pending = _Observations(model, self.source, revision)
         self._pending.add(observation)
         self._ensure_task()
 
     @callback
     def _ensure_task(self) -> None:
         if (
-            not self._stopping and self._pending is not None and self._task is None
+            not self._stopping and (self._pending is not None or self._resolution_pending()) and self._task is None
             and self._control.supports_soc_goal
         ):
             self._task = self._hass.async_create_task(
@@ -238,11 +309,36 @@ class VehicleSocObserver:
 
     async def _run(self) -> None:
         try:
-            while self._pending is not None and not self._stopping:
+            while (self._pending is not None or self._resolution_pending()) and not self._stopping:
                 async with self._command_lock:
+                    if self._resolution_pending():
+                        transaction = self._transaction_control()
+                        if transaction is None:
+                            return
+                        try:
+                            outcome = await transaction.async_resolve_soc_goal()
+                        except (HomeAssistantError, DeviceError, AmtronBusError, OSError):
+                            return
+                        if outcome == "unknown":
+                            return
+                        if outcome == "applied":
+                            self._pending = self._target_pending
+                            if self._pending is not None:
+                                self._pending.revision = getattr(self._control, "soc_goal_revision", None)
+                        elif outcome == "superseded":
+                            self._pending = None
+                            self._last_sent = None
+                        self._clear_target_models()
+                        if outcome == "superseded":
+                            self._queue_current()
                     observations = self._pending
                     self._pending = None
                     if observations is None:
+                        continue
+                    revision = getattr(self._control, "soc_goal_revision", None)
+                    if observations.revision is not None and revision != observations.revision:
+                        self._last_sent = None
+                        self._queue_current()
                         continue
                     self._inflight = observations
                     try:
@@ -251,9 +347,16 @@ class VehicleSocObserver:
                             self._configured = True
                         if self.source is not None:
                             for observation in observations.outgoing():
-                                await self._control.async_observe_soc(
-                                    observation.soc, observation.maximum, source=self.source,
-                                )
+                                transaction = self._transaction_control()
+                                if observations.revision is not None and transaction is not None:
+                                    await transaction.async_observe_soc(
+                                        observation.soc, observation.maximum, source=self.source,
+                                        expected_soc_revision=observations.revision,
+                                    )
+                                else:
+                                    await self._control.async_observe_soc(
+                                        observation.soc, observation.maximum, source=self.source,
+                                    )
                     except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
                         self._pending = (
                             observations.combine(self._pending)
@@ -276,26 +379,87 @@ class VehicleSocObserver:
         if self._task is not None:
             await asyncio.shield(self._task)
         async with self._command_lock:
+            if self._resolution_pending():
+                transaction = self._transaction_control()
+                if transaction is None or not transaction.soc_goal_resolution_fenced:
+                    raise service_validation_error("soc_goal_unavailable")
+                # The service has fenced the earlier request. An explicit new
+                # selection supersedes its unknown outcome and both folds.
+                transaction.abandon_fenced_soc_goal()
+                self._pending = None
+                self._last_sent = None
+                self._clear_target_models()
             if (
-                value > 0 and self._limit_entity is not None and self.maximum is None
+                value > 0 and (self._limit_entity is not None or self._use_vehicle_limit)
+                and self.maximum is None
                 and self._control.soc_goal.maximum_percent is None
             ):
                 raise service_validation_error("soc_goal_limit_unavailable")
             previous = self._pending
             self._pending = None
+            soc, maximum = self.latest_soc, self.maximum
+            self._previous_target_model = copy(self._control.soc_goal)
+            self._previous_target_revision = getattr(self._control, "soc_goal_revision", None)
+            original = self._previous_target_model.snapshot()
+            candidate_model = copy(self._previous_target_model)
+            candidate: SocGoal | None
+            try:
+                candidate_model.set_target(value, soc, maximum)
+            except ValueError:
+                # The control remains responsible for validating the request.
+                candidate = None
+            else:
+                candidate = candidate_model
+            self._target_model = candidate
+            self._target_pending = None
             try:
                 await self._control.async_set_soc_goal(
                     value, source=self.source,
-                    soc=self.latest_soc, maximum=self.maximum,
+                    soc=soc, maximum=maximum,
                 )
             except BaseException:
-                if previous is not None:
+                if self._resolution_pending():
+                    if previous is not None:
+                        self._pending = previous.combine(self._pending) if self._pending is not None else previous
+                elif (
+                    candidate is not None and candidate.snapshot() != original
+                    and self._control.soc_goal.snapshot() == candidate.snapshot()
+                ):
+                    # A cancelled or uncertain write can still publish its
+                    # candidate; preserve evidence against that live target.
+                    self._pending = self._target_pending
+                elif previous is not None:
                     self._pending = (
                         previous.combine(self._pending) if self._pending is not None else previous
                     )
                 raise
+            else:
+                # Events received while the command was in flight were also
+                # folded against the requested target. A remote snapshot can
+                # still contain the old goal until the response arrives.
+                if candidate is not None:
+                    self._pending = self._target_pending
+                    if self._pending is not None:
+                        self._pending.revision = getattr(self._control, "soc_goal_revision", None)
             finally:
+                if not self._resolution_pending():
+                    self._clear_target_models()
                 self._ensure_task()
+
+    def _resolution_pending(self) -> bool:
+        transaction = self._transaction_control()
+        return transaction is not None and transaction.soc_goal_resolution_pending
+
+    def _transaction_control(self) -> TransactionalSocControl | None:
+        if isinstance(self._control, TransactionalSocControl):
+            return self._control
+        return None
+
+    def _clear_target_models(self) -> None:
+        self._previous_target_model = None
+        self._previous_target_revision = None
+        self._target_model = None
+        self._target_pending = None
 
     async def async_stop(self) -> None:
         """Detach inputs and finish cancellation before this owner is unloaded."""

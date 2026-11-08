@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from .history import HISTORY_DOMAIN, bavarian_vehicle_vin
+from .identity import DOMAIN, bavarian_vehicle_vin
 
 _PREFIX = "vehicle.cabin.climate.timers"
 _WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
@@ -81,7 +81,7 @@ def read_bavarian_departure(
         return None
 
     def value(descriptor: str) -> str | None:
-        entity_id = registry.async_get_entity_id("sensor", HISTORY_DOMAIN, f"{vin}_{descriptor}")
+        entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{vin}_{descriptor}")
         if entity_id is None:
             return None
         entry = registry.async_get(entity_id)

@@ -41,6 +41,7 @@ from .const import (
 )
 from .decode import RegisterValue, decode_register
 from .link_quality import LinkQuality
+from .modbus_trace import ModbusTrace
 from .register_blocks import RegisterBlock
 from .registers import HEARTBEAT, SERIAL_NUMBER, RegisterSpec
 from .transport import ModbusTransport
@@ -148,6 +149,7 @@ class MennekesModbusClient:
         self._config = config
         self._monotonic = monotonic
         self.link_quality = LinkQuality(monotonic=monotonic)
+        self.modbus_trace = ModbusTrace(clock=monotonic)
         self.write_trace = WriteTrace(
             clock=monotonic, packet_trace=client_factory is create_modbus_client
         )
@@ -200,6 +202,11 @@ class MennekesModbusClient:
 
         return self._bound_serial is None or not self._identity_check_needed
 
+    @property
+    def connection_generation(self) -> int:
+        """Identify uninterrupted transport observation, including reconnects."""
+        return self._connection_generation
+
     def bind_identity(self, serial_number: str | None) -> None:
         """Bind a readable physical serial once, never silently replace it."""
 
@@ -216,6 +223,7 @@ class MennekesModbusClient:
 
         self._identity_check_needed = True
         self._connection_generation += 1
+        self.write_state.plug_charge.invalidate()
 
     async def _async_verify_identity(self, client: ModbusTransport) -> None:
         """Confirm the bound serial while holding the transaction lock."""
@@ -228,11 +236,7 @@ class MennekesModbusClient:
         for _attempt in range(2):
             generation = self._connection_generation
             try:
-                words = await _client_read.read_words(
-                    client, address=SERIAL_NUMBER.address, count=SERIAL_NUMBER.count,
-                    device_id=self._config.device_id, retries=self._config.retries,
-                    observe=self.link_quality.observe,
-                )
+                words = await self._async_read_transport(client, SERIAL_NUMBER.address, SERIAL_NUMBER.count)
             except asyncio.CancelledError as err:
                 # No write was attempted. Preserve cancellation, but distinguish
                 # this from an acknowledgement lost after an actual command.
@@ -265,7 +269,7 @@ class MennekesModbusClient:
         self._require_connection_usable()
         if client.connected:
             return
-        self._identity_check_needed = True
+        self._connection_changed(False)
         try:
             connected = await client.connect()
         except WaveshareAuthenticationRejectedError as err:
@@ -305,6 +309,7 @@ class MennekesModbusClient:
         async with self._lock:
             client = self._client
             self._client = None
+            self._connection_changed(False)
             await _async_close_transport(client)
 
     @asynccontextmanager
@@ -318,6 +323,7 @@ class MennekesModbusClient:
         async with self._lock:
             was_pending = self._configuration_pending_restart
             self._configuration_pending_restart = True
+            self.write_state.plug_charge.invalidate()
             self._identity_check_needed = True
             guard = ConnectionConfigurationGuard()
             try:
@@ -365,14 +371,7 @@ class MennekesModbusClient:
             generation = self._connection_generation
             bound_serial = self._bound_serial
             if bound_serial is None or not (checking_identity or generation != old_generation):
-                return await _client_read.read_words(
-                    client,
-                    address=address,
-                    count=count,
-                    device_id=self._config.device_id,
-                    retries=self._config.retries,
-                    observe=self.link_quality.observe,
-                )
+                return await self._async_read_transport(client, address, count)
 
         # Identity and the target are separate Modbus transactions. Keep the
         # queue, but let an already waiting heartbeat acquire the bus first.
@@ -386,14 +385,21 @@ class MennekesModbusClient:
                 or not self.identity_verified
             ):
                 raise AmtronConnectionError("connection changed during read")
-            return await _client_read.read_words(
-                client,
-                address=address,
-                count=count,
-                device_id=self._config.device_id,
-                retries=self._config.retries,
-                observe=self.link_quality.observe,
-            )
+            return await self._async_read_transport(client, address, count)
+
+    async def _async_read_transport(
+        self, client: ModbusTransport, address: int, count: int,
+    ) -> list[int]:
+        """Apply shared read policy to the caller's locked transport snapshot.
+
+        Connection generation checks and heartbeat priority belong to the
+        caller; this helper must never select or reconnect another transport.
+        """
+        return await _client_read.read_words(
+            client, address=address, count=count,
+            device_id=self._config.device_id, retries=self._config.retries,
+            observe=self.link_quality.observe, trace=self.modbus_trace,
+        )
 
     async def async_read_register(
         self, spec: RegisterSpec, *, verify_identity: bool = False,
@@ -503,14 +509,7 @@ class MennekesModbusClient:
                             or not client.connected
                         ):
                             raise AmtronConnectionError("connection changed during write precondition")
-                        words = await _client_read.read_words(
-                            client,
-                            address=register.address,
-                            count=register.count,
-                            device_id=self._config.device_id,
-                            retries=self._config.retries,
-                            observe=self.link_quality.observe,
-                        )
+                        words = await self._async_read_transport(client, register.address, register.count)
                         return decode_register(register, words)
 
                     await precondition(read_locked)
@@ -546,6 +545,7 @@ class MennekesModbusClient:
                     spec=spec,
                     value=value,
                     device_id=self._config.device_id,
+                    trace=self.modbus_trace,
                 )
             except (Exception, asyncio.CancelledError) as err:
                 error = err

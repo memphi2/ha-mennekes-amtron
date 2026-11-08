@@ -19,8 +19,17 @@ from .device.enums import (
     enum_options,
 )
 from .device.registers import REQUESTED_PHASES, SOLAR_CHARGING_MODE
-from .entity import MennekesAmtronControlEntity
+from .entity import MennekesAmtronControlEntity, MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
+from .exceptions import service_validation_error
+from .remote import CONF_SERVER_URL
+from .vehicle_detection import automatic_selection_available
+from .vehicle_profiles import (
+    CONF_VEHICLE_AUTO_SELECTION,
+    activate_profile,
+    active_profile,
+    profiles,
+)
 
 PARALLEL_UPDATES = 1
 
@@ -35,12 +44,75 @@ async def async_setup_entry(
     runtime_data = entry.runtime_data
     identity = runtime_data.identity
     coordinator = runtime_data.coordinator
-    entities: list[SelectEntity] = [AmtronSolarModeSelect(entry, coordinator)]
-    if capability_is_supported(
-        identity.layout_version, identity.phase_options_hw, REQUESTED_PHASES.key
-    ):
-        entities.append(AmtronRequestedPhasesSelect(entry, coordinator))
+    entities: list[SelectEntity] = []
+    if CONF_SERVER_URL in entry.data or not runtime_data.control.read_only:
+        entities.append(AmtronSolarModeSelect(entry, coordinator))
+        if capability_is_supported(
+            identity.layout_version, identity.phase_options_hw, REQUESTED_PHASES.key
+        ):
+            entities.append(AmtronRequestedPhasesSelect(entry, coordinator))
+    if profiles(entry.options):
+        entities.append(AmtronVehicleSelect(entry, coordinator))
     async_add_entities(entities)
+
+
+class AmtronVehicleSelect(MennekesAmtronEntity, SelectEntity):
+    """Select one configured vehicle; never start a charge or infer its presence."""
+
+    _attr_translation_key = "active_vehicle"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
+        super().__init__(entry, coordinator, "active_vehicle")
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    def _choices(self) -> dict[str, str | None]:
+        choices: dict[str, str | None] = {"none": None}
+        if automatic_selection_available(self._entry.options) or self._entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True:
+            choices["automatic"] = "automatic"
+        for profile in profiles(self._entry.options).values():
+            label = profile.name
+            # User labels are not stable identifiers. Disambiguate even a label
+            # equal to the translated empty-choice token without exposing VINs.
+            ordinal = 2
+            while label in choices:
+                label = f"{profile.name} ({ordinal})"
+                ordinal += 1
+            choices[label] = profile.id
+        return choices
+
+    @property
+    def options(self) -> list[str]:
+        return list(self._choices())
+
+    @property
+    def current_option(self) -> str:
+        if self._entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True:
+            return "automatic"
+        selected = active_profile(self._entry.options)
+        return next(
+            (label for label, key in self._choices().items() if selected is not None and key == selected.id),
+            "none",
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str | None]:
+        profile = active_profile(self._entry.options)
+        return {"active_vehicle": profile.name if profile is not None else None}
+
+    async def async_select_option(self, option: str) -> None:
+        choices = self._choices()
+        if option not in choices:
+            raise service_validation_error("vehicle_profile_invalid")
+        if choices[option] == "automatic":
+            updated = {**self._entry.options, CONF_VEHICLE_AUTO_SELECTION: True}
+        else:
+            updated = activate_profile(self._entry.options, choices[option])
+            updated[CONF_VEHICLE_AUTO_SELECTION] = False
+        self.hass.config_entries.async_update_entry(self._entry, options=updated)
 
 
 class AmtronSolarModeSelect(MennekesAmtronControlEntity, SelectEntity):

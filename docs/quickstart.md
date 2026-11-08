@@ -1,5 +1,8 @@
 # Quick start
 
+Use this checklist after [installing the integration](installation.md). First
+make ordinary charging work; add vehicle and scheduling features afterwards.
+
 Choose how Home Assistant should reach the wallbox:
 
 | Connection | When to use it |
@@ -54,11 +57,11 @@ Follow [Service setup](modbus-service.md) to install and start it in **Read-only
 mode. On Home Assistant OS, confirm the discovered wallbox under
 **Settings → Devices & services**; its URL and token are supplied automatically.
 
-In app **0.6.1**, start it and use **Open Web UI** to choose USB
-or LAN, save and restart it. The page needs an administrator and stable
-Supervisor **2026.11.0+**. Until a connection is configured, the app stays in
-setup mode without Modbus or discovery. See [the connection page](upgrading.md#app-connection-page).
-Older app **0.5.2b2** uses the native app **Configuration** tab.
+Start the app, choose USB or LAN in **Open Web UI**, save and restart it. App
+**0.8.0b1** supports the guided page on **Supervisor 2026.10.4+**. If an older beta
+app asks for 2026.11.0, update the app; native **Configuration** also remains
+available. Until a connection is configured, the app stays in setup mode without
+Modbus or discovery. [Connection-page details](upgrading.md#app-connection-page).
 
 For a standalone service, use **Add integration → Mennekes Amtron RTU →
 Connect to the Modbus service** and enter its URL and token as described in that
@@ -114,29 +117,15 @@ any repair messages and check the **Heartbeat** sensor before charging.
    check **Pending change** and **Pending change due**. **0 A removes the current limit; it does not
    stop charging.**
 
-Continue with the [user guide](user-guide.md) for everyday controls,
-[Recorder](recorder.md) for history size, and [blueprints](blueprints.md) for
-automations.
+You should now see changing power/energy readings, a healthy heartbeat with
+writes enabled, and the expected pause state. If a request is waiting, leave it
+queued or cancel it; do not repeatedly restart the app to force it.
 
-Add optional features under **Configure** when you need them: **Vehicle charge
-target**, **Next departure**, **Charging costs** and **Charging losses** each have
-their own setup. For a departure plan, configure a vehicle SoC source first,
-then enable **Next departure** and choose the usable battery-capacity source.
+Continue with [everyday use](user-guide.md), [optional functions and examples](features.md)
+or [Recorder settings](recorder.md). A car integration is optional, including
+when several cars use the wallbox.
 
 ## Optional command-line bus check
 
-Normal setup needs no shell. For troubleshooting with existing host access,
-stop the current serial owner first, then run the included read-only check:
-
-```bash
-docker exec -it homeassistant \
-  python /config/custom_components/mennekes_amtron_rtu/smoke_modbus.py \
-  /dev/serial/by-id/REPLACE_WITH_YOUR_ADAPTER
-```
-
-Adjust the container and path for your installation. `--scan` searches addresses;
-`--scan-baudrate` extends the search to bus settings. The check sends no writes or
-heartbeat, but still needs [exclusive bus access](safety.md#modbus-rtu-uses-a-single-master).
-Remove device serial numbers and adapter paths before sharing its output.
-See [Troubleshooting](troubleshooting.md) for connection problems and
-[Removal](installation.md#removal) before uninstalling.
+Normal setup needs no shell. The [read-only diagnostic check](troubleshooting.md#optional-command-line-bus-check)
+is available for connection troubleshooting after stopping the current bus owner.

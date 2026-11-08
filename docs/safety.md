@@ -79,6 +79,30 @@ heartbeat. Configure a fallback with the MENNEKES configuration tool so those
 interruptions have a defined outcome. The integration raises a repair issue when
 `0x030E` is 0.
 
+## Virtual Plug & Charge
+
+The optional feature is a convenience gate for the wallbox's energy-manager
+release, not ISO 15118 authentication or an access-control security boundary.
+It is off by default and also needs explicit permission for the selected
+profile. A manual profile choice is not evidence of the connected vehicle.
+
+The [MENNEKES register specification](https://www.mennekes.de/fileadmin/MEN-Deutschland/emobility/01_documents/04_installer/Modbus_RTU_Specification_AMTRON_4You300_Compact_2.0s_Start_2.0s-v2.5.pdf)
+defines `0x0D05` as energy-manager charging release and `0x0312` as a read-only
+authorization setting. To charge automatically without an RFID card, local RFID
+authorization must already be disabled through the supported installation
+configuration. This integration cannot change or bypass it.
+
+Fresh cable/home evidence must match the permitted active profile. Even then,
+upstream integrations can restore previously saved data, and a vehicle change
+between Modbus polls may go unseen. The gate cannot promise an immediate stop
+while the bus is unavailable. The wallbox's configured heartbeat fallback still
+governs a loss of its controller.
+
+The app retains an already granted connection through an HA Core restart.
+An observed disconnect, unknown connection state or app restart invalidates the
+grant. Enabling the feature may interrupt charging; disabling it does not start
+charging. See [setup and everyday behavior](vehicle-setup.md#optional-virtual-plug--charge).
+
 ## The 0 A trap
 
 `0x0302` is not a plain current limit:

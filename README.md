@@ -5,12 +5,11 @@
 [![Marketplace](https://img.shields.io/badge/Home_Assistant-Marketplace-41BDF5?style=flat-square)](https://contributors.home-assistant.io/marketplace/)
 [![Quality: Platinum (self-assessed)](https://img.shields.io/badge/Quality-Platinum%20%28self--assessed%29-c8cdd3?labelColor=3d4852)](docs/quality-scale.md)
 
-Your Mennekes Amtron in Home Assistant: adjust the charging current, pause
-charging, follow energy use and charge from your solar surplus. Communication
-stays local over **Modbus RTU / RS-485**, through USB or a
-[LAN-to-RS-485 adapter](docs/network-gateway.md).
+Control your Mennekes Amtron in Home Assistant: set the charging current, pause
+charging, track energy and add solar, vehicle or departure-based charging when
+you need it. Communication stays local through **USB/RS-485 or a LAN adapter**.
 
-**[Get started](docs/installation.md)** · **[Everyday use](docs/user-guide.md)** · **[Get help](docs/troubleshooting.md)**
+**[Install](docs/installation.md)** · **[Everyday use](docs/user-guide.md)** · **[Optional functions](docs/features.md)** · **[Get help](docs/troubleshooting.md)**
 
 Integration and app available in **English, German, French, Dutch and Italian**.
 
@@ -20,99 +19,70 @@ Integration and app available in **English, German, French, Dutch and Italian**.
 - **Amtron Compact 2.0s**
 - **Amtron Start 2.0s**
 
-See the [compatibility matrix](docs/compatibility.md) for individual models
-and hardware-test status.
+See the [model matrix](docs/compatibility.md) for exact variants and reported
+hardware tests. A LAN adapter changes the connection, not the supported wallbox
+families.
 
-## Choose how to connect
-
-| Connection | What you get |
-|---|---|
-| **Independent Modbus service — recommended, optional** | The app keeps the heartbeat and last charging state through Home Assistant Core restarts. HA discovers the app automatically on HA OS. |
-| **Direct Home Assistant connection** | No extra app; Home Assistant owns the connection and its heartbeat stops while HA restarts. |
-
-Both support **USB and LAN**. LAN adapters can use transparent
-RTU-over-TCP or a translating Modbus TCP-to-RTU gateway; see [LAN setup](docs/network-gateway.md).
-
-The service is our preferred setup for everyday use. Direct mode remains
-supported; existing installations are never switched automatically.
-Both offer the same charging controls.
-A host or service restart can still interrupt the heartbeat.
-
-## Install
+## Get started
 
 [![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=memphi2&repository=ha-mennekes-amtron&category=integration)
 
-1. Install **Mennekes Amtron RTU** by **memphi2**. Use the Marketplace on
-   HA **2026.11+**, or HACS on **2026.9/2026.10**.
-2. For the service, follow the
-   **[app installation guide](docs/modbus-service.md)**. The app supplies its
-   address and token automatically on HA OS. For a direct connection, follow
-   **[Quick start](docs/quickstart.md)** or **[LAN setup](docs/network-gateway.md)**.
-3. Check the readings, enable control and try your first charge.
+1. [Prepare the wallbox and adapter](docs/hardware.md), then install **Mennekes
+   Amtron RTU** by **memphi2** through the Marketplace on HA 2026.11+ or HACS on
+   HA 2026.9/2026.10.
+2. Choose the **optional, recommended [Modbus service app](docs/modbus-service.md)**
+   or a **[direct USB/LAN connection](docs/quickstart.md#5-add-the-wallbox)**.
+3. Check readings in read-only mode, enable control and try your
+   [first charge](docs/quickstart.md#7-first-charge).
+
+| Connection | Why choose it? |
+|---|---|
+| **Service app — recommended, optional** | Keeps the heartbeat and last charging state running through HA Core restarts. On HA OS, its URL and token are discovered automatically. |
+| **Direct USB or LAN** | Uses the same charging controls without an extra app. HA restarts interrupt its heartbeat. |
+
+The service app is installed separately from the integration:
 
 [![Add the Mennekes Amtron app repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmemphi2%2Fha-mennekes-amtron%23apps)
 
-The integration and service app are installed and updated independently.
-A normal integration update leaves the compatible app and its heartbeat running;
-matching version numbers are not required. See [Updates](docs/installation.md#updates).
-On HA Container, run the service as a [separate container](docs/service-standalone.md).
-Already using the integration? **Keep your existing entry** and follow
-[Updates and switching connections](docs/upgrading.md).
+On HA Container, use the [standalone service](docs/service-standalone.md) or connect
+directly. Both connection owners support USB and LAN. Only one owner may use the
+bus, including in read-only mode. An app/host restart or a connection failure can
+still interrupt the heartbeat; prepare the wallbox's [fallback](docs/safety.md).
 
-**Stable 0.6.1** adds next-trip charging by manual time, calendar or optional
-BavarianData timer, with a preconditioning blueprint and German Module 3 tariff
-import with yearly updates. In service mode, update the **app to 0.6.1 first**;
-it expires obsolete queued departure commands even while HA is offline.
-See [how to update](docs/installation.md#updating-to-061) and
-[what changes](docs/upgrading.md#updating-to-061).
+Already installed? **Keep the existing entry.** The integration and app update
+independently and can have different version numbers. A compatible app need not
+restart for an integration-only update. Follow [Updates](docs/installation.md#updates).
 
-**Beta 0.7.0b4** adds optional Waveshare adapter setup, TCP login and clearer
-connection Repairs, alongside the separate feature menus described below.
-Existing configurations are retained. Opt into prereleases to select this integration
-version; its app update is offered through **#apps-beta**. Stable **0.6.1**
-remains available. See [trying the beta](docs/upgrading.md#trying-070b4) before
-switching an app between channels.
-
-You need a compatible wallbox, a USB RS-485 adapter or supported LAN gateway,
-and exclusive access to its bus. LAN needs no USB device on the HA/service host.
-Have the [hardware and fallback settings](docs/hardware.md) prepared before
-enabling control. Read-only mode also needs exclusive bus access.
-
-## Ready for everyday use
-
-Charging targets, departure planning and estimates are optional features of **0.6.1**.
+## Everyday charging
 
 | I want to… | Use |
 |---|---|
-| Adjust the charging current | **Charging current limit** slider: 6 A up to the configured cap |
-| Remove the current limit | Set the slider to **0 A**; the wallbox's hardware limit still applies |
-| Pause or resume charging | **Charging paused** switch; 0 A does **not** pause charging |
-| See whether the heartbeat is working | **Heartbeat** diagnostic sensor |
-| Track consumption | **Total energy** in the Energy dashboard |
-| Limit charging | **Energy target**, or an optional **Vehicle charge target** from your car's SoC sensor |
-| Estimate losses and costs | [Optional charging estimates](docs/charging-estimates.md) using existing vehicle and price data |
-| Charge from solar surplus | [Ready-made PV blueprints](docs/blueprints.md) |
-| Charge for the next trip | [Next departure](docs/user-guide.md#charge-for-the-next-departure), with optional calendar, vehicle departure and climate automation |
-| Keep history manageable | [Recorder settings](docs/recorder.md); the heartbeat records status changes, not a timestamp every five seconds |
+| Set the charging current | **Charging current limit** slider |
+| Remove the current limit | **0 A**; this does not pause charging |
+| Pause or resume | **Charging paused** switch |
+| Check the heartbeat | **Heartbeat** diagnostic sensor |
+| Track energy | **Total energy** in the Energy dashboard |
+| Add targets, a trip time or vehicle data | [Optional functions and examples](docs/features.md) |
+| Estimate costs or charging losses | [Charging estimates](docs/charging-estimates.md) |
+| Charge from solar surplus | [PV blueprints](docs/blueprints.md) |
+| Keep history manageable | [Recorder settings](docs/recorder.md) |
 
-**Where do I enable control?** With the service, turn off **Read-only** in the
-app configuration, save and restart the app. HA controls follow automatically. With
-direct USB or LAN mode, select **Wallbox → Current limit and polling → Control mode → Modbus master** in
-the integration options.
+Write permission has one owner: disable **Read-only** in the service app, or
+select **Modbus master** in the integration's direct-connection options.
+[The user guide](docs/user-guide.md#where-do-i-enable-controls) explains where each
+setting belongs and why a requested change may wait.
 
-**Choose only the extras you need.** Under **Configure**, separate sections
-cover **Wallbox**, **Vehicle charge target**, **Next departure**, **Charging costs**
-and **Charging losses**. Each feature asks for its own sources and settings.
-Vehicle SoC, capacity, price and energy sensors can come from other HA
-integrations. The optional vehicle adapter currently supports BavarianData's
-local departure timers and charging history.
+## Development and releases
 
-## Find your way
+**Stable: 0.6.1 · Beta: 0.8.0b1.** The beta adds vehicle profiles, optional
+automatic selection and Virtual Plug & Charge, live app Modbus debugging and
+guided app setup on Supervisor 2026.10.4+. These optional features stay off until
+you configure them. In service mode, update the beta app first through
+**#apps-beta**. See [the beta update guide](docs/upgrading.md#trying-080b1),
+[feature availability](docs/README.md#versions-and-feature-availability) and
+[release notes](CHANGELOG.md).
 
-- [Installation](docs/installation.md) · [User guide](docs/user-guide.md) · [All entities](docs/entities.md)
-- [Troubleshooting](docs/troubleshooting.md) · [Safety and limitations](docs/safety.md)
-- [Optional charging losses and costs](docs/charging-estimates.md)
-- [All documentation](docs/README.md) · [Release notes](CHANGELOG.md) · [Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)
+[All documentation](docs/README.md) · [Compatibility](docs/compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)
 
 Unofficial community project, not affiliated with MENNEKES.
 [Apache 2.0 license](LICENSE) · [Notices](NOTICE) · [Legal information](docs/legal.md)

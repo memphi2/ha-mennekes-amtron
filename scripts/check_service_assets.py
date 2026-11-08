@@ -1,7 +1,7 @@
 """Serve installed app assets on loopback without Supervisor or hardware access.
 
 The image smoke injects this probe into a separate process in the running test
-container. Only this probe's settings object trusts loopback; the real service's
+container. Only this probe's asset-only middleware trusts loopback; the real service's
 Supervisor-peer check and its processes remain unchanged.
 """
 
@@ -12,7 +12,7 @@ import hashlib
 import importlib
 import json
 import sys
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 from aiohttp import ClientSession, ClientTimeout, web
 
@@ -23,26 +23,15 @@ ASSETS = {
 }
 
 
-class ProbeSettings:
-    """Permit only local static reads; never contact Supervisor or serial ports."""
-
-    async def lifecycle(self, _app: web.Application) -> AsyncIterator[None]:
-        yield
-
-    @web.middleware
-    async def guard(
-        self, request: web.Request,
-        handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
-    ) -> web.StreamResponse:
-        if request.remote != "127.0.0.1" or request.path not in ASSETS or request.method != "GET":
-            raise web.HTTPForbidden
-        return await handler(request)
-
-    async def read(self, _request: web.Request) -> web.Response:
+@web.middleware
+async def local_assets_only(
+    request: web.Request,
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+) -> web.StreamResponse:
+    """Permit only local static reads, without any settings API or lifecycle."""
+    if request.remote != "127.0.0.1" or request.path not in ASSETS or request.method != "GET":
         raise web.HTTPForbidden
-
-    save = read
-    inspect_adapter = read
+    return await handler(request)
 
 
 async def check_assets(expected: dict[str, str]) -> None:
@@ -50,7 +39,9 @@ async def check_assets(expected: dict[str, str]) -> None:
     if expected.keys() != ASSETS.keys():
         raise ValueError("expected hashes for all three app assets")
     settings_module = importlib.import_module("amtron_device.app_settings")
-    runner = web.AppRunner(settings_module.create_settings_app(ProbeSettings()), access_log=None)
+    app = web.Application(middlewares=[local_assets_only])
+    settings_module.add_settings_asset_routes(app)
+    runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     try:
         await web.TCPSite(runner, "127.0.0.1", 0).start()

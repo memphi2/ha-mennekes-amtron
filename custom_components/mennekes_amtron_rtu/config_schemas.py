@@ -32,7 +32,9 @@ from .charge_loss_const import (
 from .charging_cost_const import (
     CONF_ACTIVE_QUARTERS,
     CONF_AUTO_TARIFF_REFRESH,
+    CONF_CHARGING_COST_SOURCE,
     CONF_CHARGING_NETWORK_MODULE,
+    CONF_CHARGING_NETWORK_TARIFF,
     CONF_CHARGING_PRICE,
     CONF_CHARGING_PRICE_ENTITY,
     CONF_HIGH_NETWORK,
@@ -42,7 +44,9 @@ from .charging_cost_const import (
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
+    COST_SOURCE_DISABLED,
     COST_SOURCE_FIXED,
+    COST_SOURCE_SENSOR,
     NETWORK_MODULE_3,
     NETWORK_MODULE_NONE,
     NETWORK_MODULES,
@@ -343,19 +347,21 @@ def vehicle_limit_schema(current: dict[str, Any]) -> probatio.Schema:
 
 
 def departure_configure_schema(
-    current: dict[str, Any], *, vehicle_timer: bool
+    current: dict[str, Any], *, vehicle_timer: bool, profile_capacity: bool = False,
 ) -> probatio.Schema:
-    return probatio.Schema(
-        {
+    profile = current.get("vehicle_provider") not in (None, "none")
+    capacity_sources = ["fixed", "entity", "profile"] if profile_capacity else ["fixed", "entity"]
+    default_source = "profile" if profile_capacity and current.get("timed_use_vehicle_capacity") is True else "entity" if current.get(CONF_TIMED_CAPACITY_ENTITY) else "fixed"
+    selected_source = current.get("capacity_source", default_source)
+    if selected_source not in capacity_sources:
+        selected_source = default_source
+    fields = {
             probatio.Required(
                 "capacity_source",
-                default=current.get(
-                    "capacity_source",
-                    "entity" if current.get(CONF_TIMED_CAPACITY_ENTITY) else "fixed",
-                ),
+                default=selected_source,
             ): SelectSelector(
                 SelectSelectorConfig(
-                    options=["fixed", "entity"],
+                    options=capacity_sources,
                     translation_key="capacity_source",
                     mode=SelectSelectorMode.DROPDOWN,
                 )
@@ -373,12 +379,15 @@ def departure_configure_schema(
                     bool(current.get(CONF_TIMED_DEPARTURE_ENTITY)),
                 ),
             ): BooleanSelector(),
+    }
+    if profile or "vehicle_profile_id" not in current or vehicle_timer:
+        fields[
             probatio.Required(
                 "use_vehicle_timer",
                 default=current.get("use_vehicle_timer", vehicle_timer),
-            ): BooleanSelector(),
-        }
-    )
+            )
+        ] = BooleanSelector()
+    return probatio.Schema(fields)
 
 
 def departure_capacity_schema(
@@ -457,18 +466,112 @@ def vehicle_provider_schema(
     )
 
 
+def vehicle_profile_details_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Name a profile and choose its optional manufacturer integration."""
+    return probatio.Schema({
+        probatio.Required("vehicle_profile_name", description={
+            "suggested_value": current.get("vehicle_profile_name"),
+        }): TextSelector(),
+        probatio.Required("vehicle_provider", default=(
+            current.get("vehicle_provider") if current.get("vehicle_provider") in ("none", "bavariandata") else "none"
+        )):
+            SelectSelector(SelectSelectorConfig(
+                options=["none", "bavariandata"], translation_key="vehicle_provider",
+                mode=SelectSelectorMode.DROPDOWN,
+            )),
+    })
+
+
+def vehicle_profile_choice_schema(
+    choices: list[SelectOptionDict], current: str | None, *, remove: bool = False,
+) -> probatio.Schema:
+    fields: dict[Any, Any] = {
+        probatio.Required("vehicle_profile_id", description={"suggested_value": current}):
+            SelectSelector(SelectSelectorConfig(options=choices, mode=SelectSelectorMode.DROPDOWN)),
+    }
+    if remove:
+        fields[probatio.Required("confirm", default=False)] = BooleanSelector()
+    return probatio.Schema(fields)
+
+
+def vehicle_detection_mode_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema({
+        probatio.Required("vehicle_auto_selection", default=current.get("vehicle_auto_selection") is True):
+            BooleanSelector(),
+    })
+
+
+def vehicle_plug_charge_schema(
+    current: dict[str, Any], *, permission: bool,
+) -> probatio.Schema:
+    """Keep the global gate editable even without a selected, detectable car."""
+    fields: dict[Any, Any] = {
+        probatio.Required(
+            "virtual_plug_charge", default=current.get("virtual_plug_charge") is True
+        ): BooleanSelector(),
+    }
+    if permission:
+        fields[probatio.Required(
+            "vehicle_plug_charge", default=current.get("vehicle_plug_charge") is True,
+        )] = BooleanSelector()
+    return probatio.Schema(fields)
+
+
+def vehicle_detection_source_schema(current: str, *, profile: bool) -> probatio.Schema:
+    choices = ["disabled", "entities"]
+    if profile:
+        choices.insert(1, "profile")
+    return probatio.Schema({
+        probatio.Required("vehicle_detection_source", default=current if current in choices else "disabled"):
+            SelectSelector(SelectSelectorConfig(
+                options=choices, translation_key="vehicle_detection_source", mode=SelectSelectorMode.DROPDOWN,
+            )),
+    })
+
+
+def vehicle_detection_entities_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema({
+        probatio.Required("vehicle_connected_entity", description={
+            "suggested_value": current.get("vehicle_connected_entity"),
+        }): EntitySelector(EntitySelectorConfig(domain="binary_sensor")),
+        probatio.Required("vehicle_home_entity", description={
+            "suggested_value": current.get("vehicle_home_entity"),
+        }): EntitySelector(EntitySelectorConfig(domain=["device_tracker", "person", "binary_sensor"])),
+    })
+
+
+def vehicle_source_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema({
+        probatio.Required("vehicle_soc_source", default=(
+            "profile" if current.get("vehicle_soc_use_profile") is True else "entity"
+        )): SelectSelector(SelectSelectorConfig(
+            options=["profile", "entity"], translation_key="vehicle_soc_source",
+            mode=SelectSelectorMode.DROPDOWN,
+        )),
+    })
+
+
+def vehicle_profile_soc_schema(current: dict[str, Any]) -> probatio.Schema:
+    return probatio.Schema({
+        probatio.Required("use_vehicle_limit", default=bool(
+            current.get("vehicle_limit_use_profile") or current.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY)
+        )): BooleanSelector(),
+    })
+
+
 def vehicle_device_schema(
     current: dict[str, Any],
     *,
     key: str,
     integration: str,
     timer_options: bool = False,
+    include_device: bool = True,
 ) -> probatio.Schema:
     fields: dict[Any, Any] = {
         probatio.Required(
             key, description={"suggested_value": current.get(key)}
         ): DeviceSelector(DeviceSelectorConfig(integration=integration)),
-    }
+    } if include_device else {}
     if timer_options:
         fields[
             probatio.Optional(
@@ -510,11 +613,24 @@ def loss_sensor_schema(current: dict[str, Any]) -> probatio.Schema:
     )
 
 
+def cost_kind_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Select the price source before showing its own inputs."""
+    return probatio.Schema({
+        probatio.Required(
+            CONF_CHARGING_COST_SOURCE,
+            default=current.get(CONF_CHARGING_COST_SOURCE, COST_SOURCE_DISABLED),
+        ): SelectSelector(SelectSelectorConfig(
+            options=[COST_SOURCE_FIXED, COST_SOURCE_SENSOR, COST_SOURCE_DISABLED],
+            translation_key="charging_cost_source",
+            mode=SelectSelectorMode.DROPDOWN,
+        )),
+    })
+
+
 def cost_source_schema(
     current: dict[str, Any],
     *,
     source: str,
-    allow_network: bool = True,
 ) -> probatio.Schema:
     fields: dict[Any, Any] = {}
     if source == COST_SOURCE_FIXED:
@@ -522,7 +638,7 @@ def cost_source_schema(
             probatio.Required(
                 CONF_CHARGING_PRICE,
                 description={
-                    "suggested_value": current.get(CONF_CHARGING_PRICE),
+                    "suggested_value": current.get(CONF_CHARGING_PRICE, 0.40),
                 },
             )
         ] = _price_selector(allow_negative=True)
@@ -535,27 +651,26 @@ def cost_source_schema(
                 },
             )
         ] = _entity_selector(("sensor",))
-    if allow_network:
-        fields[
-            probatio.Required(
-                CONF_CHARGING_NETWORK_MODULE,
-                default=current.get(
-                    CONF_CHARGING_NETWORK_MODULE,
-                    NETWORK_MODULE_NONE,
-                ),
-            )
-        ] = SelectSelector(
+    return probatio.Schema(fields)
+
+
+def cost_module_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Keep the optional German adjustment separate from the energy price."""
+    tariff = current.get(CONF_CHARGING_NETWORK_TARIFF)
+    module = tariff.get("module", NETWORK_MODULE_NONE) if isinstance(tariff, dict) else NETWORK_MODULE_NONE
+    return probatio.Schema({
+        probatio.Required(CONF_CHARGING_NETWORK_MODULE, default=module): SelectSelector(
             SelectSelectorConfig(
                 options=list(NETWORK_MODULES),
                 translation_key="charging_network_module",
                 mode=SelectSelectorMode.DROPDOWN,
-            )
-        )
-    return probatio.Schema(fields)
+            ),
+        ),
+    })
 
 
 def cost_network_schema(current: dict[str, Any], *, module: str) -> probatio.Schema:
-    """Published prices only; Module 3 time windows have their own next step."""
+    """Published network prices, shared by Module 2 and the full Module 3 form."""
     fields: dict[Any, Any] = {
         probatio.Required(
             CONF_REGULAR_NETWORK,
@@ -618,6 +733,14 @@ def cost_windows_schema(current: dict[str, Any]) -> probatio.Schema:
         )
     )
     return probatio.Schema(fields)
+
+
+def cost_module_three_schema(current: dict[str, Any]) -> probatio.Schema:
+    """Review all imported prices and periods together before saving."""
+    return probatio.Schema({
+        **cost_network_schema(current, module=NETWORK_MODULE_3).schema,
+        **cost_windows_schema(current).schema,
+    })
 
 
 def _price_selector(*, allow_negative: bool = False) -> NumberSelector:

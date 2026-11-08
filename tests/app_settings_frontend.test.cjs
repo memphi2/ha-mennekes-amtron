@@ -10,12 +10,13 @@ const html = readFileSync(path.join(directory, 'app_settings.html'), 'utf8');
 const source = readFileSync(path.join(directory, 'app_settings.js'), 'utf8');
 
 class Element {
-  constructor() { this._value = ''; this.checked = false; this.disabled = false; this.hidden = false; this.required = false; this.textContent = ''; this.dataset = {}; this.listeners = {}; this.options = []; this.valid = true; }
+  constructor() { this._value = ''; this.checked = false; this.disabled = false; this.hidden = false; this.required = false; this.textContent = ''; this.dataset = {}; this.listeners = {}; this.options = []; this.valid = true; this.open = false; this.children = []; }
   set value(value) { this._value = String(value); }
   get value() { return this._value; }
   addEventListener(type, fn) { this.listeners[type] = fn; }
   async emit(type) { return this.listeners[type]?.({ target: this, preventDefault() {} }); }
-  replaceChildren(...options) { this.options = options; }
+  replaceChildren(...options) { this.options = options; this.children = options; }
+  appendChild(child) { this.children.push(child); }
   add(option) { this.options.push(option); }
   reportValidity() { return this.valid; }
 }
@@ -50,12 +51,21 @@ async function harness(settings = baseSettings, language = 'en') {
   }
   const responses = [settingsResponse(settings)];
   const calls = [];
+  const timers = new Map();
+  let timerId = 0;
+  const documentEvents = {};
+  const pageEvents = {};
   const context = vm.createContext({
     document: {
-      documentElement: { lang: language },
+      documentElement: { lang: language }, hidden: false,
+      createElement() { return new Element(); },
+      addEventListener(type, fn) { documentEvents[type] = fn; },
       getElementById(id) { assert.ok(elements.has(id), `Unknown HTML element: ${id}`); return elements.get(id); },
       querySelectorAll() { return translated; },
     },
+    addEventListener(type, fn) { pageEvents[type] = fn; },
+    setTimeout(fn, delay) { const id = ++timerId; timers.set(id, { fn, delay }); return id; },
+    clearTimeout(id) { timers.delete(id); },
     Option: class { constructor(label, value) { this.text = label; this.value = value; } },
     fetch: async (url, options = {}) => {
       calls.push({ url, ...options, payload: options.body ? JSON.parse(options.body) : undefined });
@@ -67,7 +77,7 @@ async function harness(settings = baseSettings, language = 'en') {
   });
   vm.runInContext(source, context, { filename: 'app_settings.js' });
   await tick();
-  return { el: id => elements.get(id), responses, calls, context, translated, evaluate: code => vm.runInContext(code, context) };
+  return { el: id => elements.get(id), responses, calls, context, translated, timers, documentEvents, pageEvents, evaluate: code => vm.runInContext(code, context) };
 }
 
 async function detect(ui, values = detected) {
@@ -93,6 +103,23 @@ test('transport dropdown retains precisely three choices', () => {
   const select = html.match(/<select id="connection_type"[^>]*>([\s\S]*?)<\/select>/)[1];
   assert.deepEqual([...select.matchAll(/value="([^"]+)"/g)].map(match => match[1]), ['serial', 'rtu_over_tcp', 'modbus_tcp']);
 });
+
+for (const transport of ['rtu_over_tcp', 'modbus_tcp']) {
+  test(`TCP login exposes a usable password field for ${transport}`, async () => {
+    const ui = await harness({ ...baseSettings, connection_type: transport });
+    assert.equal(ui.el('password_fields').hidden, true);
+    ui.el('tcp_authentication').checked = true;
+    await ui.el('tcp_authentication').emit('change');
+    assert.equal(ui.el('network_fields').hidden, false);
+    assert.equal(ui.el('password_fields').hidden, false);
+    assert.equal(ui.el('tcp_auth_password').disabled, false);
+    assert.equal(ui.el('tcp_auth_password').required, true);
+    ui.el('tcp_auth_password').value = 'Demo123';
+    ui.responses.push(result({ revision: 'revision-2' }));
+    await ui.el('connection_form').emit('submit');
+    assert.equal(ui.calls.at(-1).payload.tcp_auth_password, 'Demo123');
+  });
+}
 
 test('manual login keeps a saved password only for the same endpoint and never pre-fills it', async () => {
   const ui = await harness({ ...baseSettings, tcp_authentication: true, tcp_auth_password_set: true });
@@ -340,4 +367,128 @@ test('USB saves exclude every LAN credential and adapter setup field', async () 
   ui.responses.push(result({ revision: 'revision-2' }));
   await ui.el('connection_form').emit('submit');
   assert.deepEqual(Object.keys(ui.calls.at(-1).payload).sort(), ['baudrate', 'connection_type', 'device_id', 'frame', 'revision', 'serial_port']);
+});
+
+
+const debugStatus = (enabled = false, records = []) => ({
+  available: true, enabled, expires_in: enabled ? 600 : 0,
+  latest_sequence: records.at(-1)?.sequence || 0, generation: 1, records,
+});
+const debugRecord = sequence => ({
+  sequence, time: "2026-11-07T10:11:12.000+00:00", operation: "read", function: "0x03",
+  address: "0x0100", count: 1, device_id: 50, duration_ms: 12.4,
+  error: null, exception_code: null,
+  values: [{ address: "0x0100", register: "evse_state", value: 1, unit: null, enum: "charging" }],
+});
+async function openDebug(ui, state = debugStatus()) {
+  ui.responses.push(result(state));
+  ui.el('modbus_debug').open = true;
+  await ui.el('modbus_debug').emit('toggle');
+}
+
+test('live debugging is collapsed and never polls until explicitly opened and enabled', async () => {
+  const ui = await harness();
+  assert.equal(ui.calls.length, 1);
+  assert.equal(ui.el('modbus_debug').open, false);
+  assert.equal(ui.el('debug_enabled').disabled, true);
+  assert.equal(ui.timers.size, 0);
+  await openDebug(ui);
+  assert.equal(ui.calls.at(-1).url, './api/modbus-debug');
+  assert.equal(ui.el('debug_enabled').disabled, false);
+  assert.equal(ui.timers.size, 0);
+  ui.el('debug_enabled').checked = true;
+  ui.responses.push(result(debugStatus(true)));
+  await ui.el('debug_enabled').emit('change');
+  assert.deepEqual(ui.calls.at(-1).payload, { enabled: true });
+  assert.equal(ui.calls.at(-1).headers['X-Amtron-CSRF'], 'csrf-proof');
+  assert.equal(ui.timers.size, 1);
+  assert.equal([...ui.timers.values()][0].delay, 2000);
+  ui.el('modbus_debug').open = false;
+  await ui.el('modbus_debug').emit('toggle');
+  assert.equal(ui.timers.size, 0);
+});
+
+test('live debug polling stops for hidden tabs, page exit and automatic capture expiry', async () => {
+  const ui = await harness();
+  await openDebug(ui, debugStatus(true));
+  assert.equal(ui.timers.size, 1);
+  ui.evaluate('document.hidden = true');
+  await ui.documentEvents.visibilitychange();
+  assert.equal(ui.timers.size, 0);
+  ui.evaluate('document.hidden = false');
+  ui.responses.push(result(debugStatus(true)));
+  await ui.documentEvents.visibilitychange();
+  assert.equal(ui.timers.size, 1);
+  ui.pageEvents.pagehide();
+  assert.equal(ui.timers.size, 0);
+  ui.responses.push(result(debugStatus(true)));
+  await ui.pageEvents.pageshow();
+  ui.responses.push(result(debugStatus(false)));
+  await [...ui.timers.values()][0].fn();
+  assert.equal(ui.timers.size, 0);
+  assert.equal(ui.el('debug_enabled').checked, false);
+});
+
+test('live debug rendering is bounded, incremental and uses text nodes for device data', async () => {
+  const ui = await harness();
+  const records = Array.from({length: 200}, (_, i) => debugRecord(i + 1));
+  records[199].values[0].value = '<img src=x onerror=alert(1)>';
+  await openDebug(ui, debugStatus(true, records));
+  assert.equal(ui.el('debug_records').children.length, 200);
+  assert.match(ui.el('debug_records').children[0].children[2].textContent, /<img src=x/);
+  assert.equal(ui.el('debug_records').children[0].children[2].children.length, 0);
+  ui.responses.push(result(debugStatus(true, [debugRecord(201)])));
+  await [...ui.timers.values()][0].fn();
+  assert.equal(ui.calls.at(-1).url, './api/modbus-debug?after=200');
+  assert.equal(ui.el('debug_records').children.length, 200);
+  assert.equal(ui.evaluate('debugRows[0].sequence'), 2);
+  ui.responses.push(result(debugStatus(true)));
+  await ui.el('debug_clear').emit('click');
+  assert.deepEqual(ui.calls.at(-1).payload, { clear: true });
+  assert.equal(ui.el('debug_records').children.length, 0);
+  assert.equal(ui.el('debug_clear').disabled, true);
+  assert.equal(ui.el('debug_enabled').checked, true);
+});
+
+test('failed debug updates stop polling and do not pretend capture was disabled', async () => {
+  const ui = await harness();
+  await openDebug(ui, debugStatus(true));
+  ui.responses.push(new Error('offline'));
+  ui.el('debug_enabled').checked = false;
+  await ui.el('debug_enabled').emit('change');
+  assert.equal(ui.el('debug_enabled').checked, true);
+  assert.match(ui.el('debug_status').textContent, /could not/);
+  assert.equal(ui.timers.size, 0);
+});
+
+test('closing the debug panel during a fetch prevents background polling', async () => {
+  const ui = await harness();
+  let resolve;
+  ui.responses.push(() => new Promise(done => { resolve = done; }));
+  ui.el('modbus_debug').open = true;
+  const pending = ui.el('modbus_debug').emit('toggle');
+  await tick();
+  ui.el('modbus_debug').open = false;
+  await ui.el('modbus_debug').emit('toggle');
+  resolve(result(debugStatus(true)));
+  await pending;
+  assert.equal(ui.timers.size, 0);
+});
+
+test('setup mode explains unavailable capture and leaves its switch disabled', async () => {
+  const ui = await harness();
+  await openDebug(ui, { ...debugStatus(), available: false });
+  assert.equal(ui.el('debug_enabled').disabled, true);
+  assert.match(ui.el('debug_status').textContent, /Configure.*restart/);
+  assert.equal(ui.timers.size, 0);
+});
+
+
+test('another browser clearing capture removes stale local rows on the next update', async () => {
+  const ui = await harness();
+  await openDebug(ui, debugStatus(true, [debugRecord(1)]));
+  assert.equal(ui.el('debug_records').children.length, 1);
+  ui.responses.push(result({ ...debugStatus(true), generation: 2, latest_sequence: 1 }));
+  await [...ui.timers.values()][0].fn();
+  assert.equal(ui.el('debug_records').children.length, 0);
 });

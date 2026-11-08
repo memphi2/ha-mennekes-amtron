@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import asyncio
 import math
+import re
 from collections.abc import Awaitable, Callable
+from copy import copy
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -310,6 +312,14 @@ class RemoteClient(MennekesModbusClient):
             soc_goal = SocGoal.restore(soc_raw) if soc_raw is not None else SocGoal()
             if soc_supported and soc_raw is None:
                 raise ValueError("missing percentage goal state")
+            transactions = control.get("soc_transactions_supported", False)
+            if type(transactions) is not bool:
+                raise ValueError("invalid percentage transaction capability")
+            revision = control.get("soc_goal_revision")
+            if transactions and (
+                not isinstance(revision, str) or re.fullmatch(r"[0-9a-f]{32}", revision) is None
+            ):
+                raise ValueError("invalid percentage goal revision")
             section = "control.state_change_interval_seconds"
             interval = control.get("state_change_interval_seconds")
             if interval is not None and (
@@ -391,6 +401,40 @@ class RemoteClient(MennekesModbusClient):
                 isinstance(value, str) for value in errors
             ):
                 raise ValueError("invalid write errors")
+            section = "control.intent"
+            supports_plug_charge = control.get("supports_plug_charge", False)
+            if type(supports_plug_charge) is not bool:
+                raise ValueError("invalid plug charge capability")
+            if supports_plug_charge:
+                section = "control.plug_charge"
+                gate = control.get("plug_charge")
+                if (
+                    not isinstance(gate, dict)
+                    or gate.keys() != {"enabled", "policy", "session", "since", "authorized"}
+                    or type(gate["enabled"]) is not bool
+                    or type(gate["authorized"]) is not bool
+                    or not isinstance(gate["policy"], str)
+                    or (gate["policy"] != "" and (
+                        len(gate["policy"]) != 64
+                        or any(character not in "0123456789abcdef" for character in gate["policy"])
+                    ))
+                    or (gate["session"] is not None and (
+                        not isinstance(gate["session"], str) or len(gate["session"]) != 32
+                        or any(character not in "0123456789abcdef" for character in gate["session"])
+                    ))
+                    or (gate["authorized"] and (not gate["enabled"] or gate["session"] is None))
+                ):
+                    raise ValueError("invalid plug charge state")
+                since = gate["since"]
+                if gate["session"] is None:
+                    if since is not None:
+                        raise ValueError("unexpected plug charge start")
+                elif (
+                    not isinstance(since, str) or len(since) > 64
+                    or (started := datetime.fromisoformat(since)).tzinfo is None
+                    or started.utcoffset() is None
+                ):
+                    raise ValueError("invalid plug charge start")
             section = "control.intent"
             for key in ("pause_requested", "charging_release_requested"):
                 value = control.get(key)
@@ -486,7 +530,10 @@ class RemoteClient(MennekesModbusClient):
                 # poll. In particular, a mismatched identity must block an
                 # already queued command before it reaches the service.
                 cancelling = command in {"cancel_pending", "cancel_timed_current"}
-                metadata = command in {"soc_source", "soc_observation"}
+                soc_metadata = command in {"soc_source", "soc_observation"}
+                metadata = soc_metadata or (
+                    command == "plug_charge_config" and values.get("value") is False
+                )
                 if not self._connected or (
                     not cancelling and not metadata and self.snapshot.get("available") is not True
                 ):
@@ -495,7 +542,7 @@ class RemoteClient(MennekesModbusClient):
                     raise DeviceValidationError("cancel_pending_not_supported")
                 if command == "cancel_pending" and self.snapshot.get("control", {}).get("read_only") is not False:
                     raise DeviceValidationError("read_only_mode")
-                if metadata and self.snapshot.get("control", {}).get("supports_soc_goal") is not True:
+                if soc_metadata and self.snapshot.get("control", {}).get("supports_soc_goal") is not True:
                     raise DeviceValidationError("soc_goal_not_supported")
                 self.apply_snapshot(
                     await self.request(
@@ -655,6 +702,67 @@ class RemoteControl(AmtronControl):
             notify_pending=notify_pending,
         )
         self._remote = client
+        self._soc_transaction: tuple[str, str | None] | None = None
+        self._soc_transaction_fenced = False
+
+    @property
+    def soc_goal_revision(self) -> str | None:
+        """Identify the service goal used when folding vehicle events."""
+        control = self._remote.snapshot.get("control", {})
+        return control.get("soc_goal_revision") if control.get("soc_transactions_supported") is True else None
+
+    @property
+    def soc_goal_resolution_pending(self) -> bool:
+        return self._soc_transaction is not None
+
+    @property
+    def soc_goal_resolution_fenced(self) -> bool:
+        return self._soc_transaction is not None and self._soc_transaction_fenced
+
+    def abandon_fenced_soc_goal(self) -> None:
+        """Let a user's later explicit target supersede an unresolved request."""
+        if not self.soc_goal_resolution_fenced:
+            raise DeviceError("service_unavailable")
+        self._soc_transaction = None
+        self._soc_transaction_fenced = False
+
+    async def _soc_transaction_request(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return await self._remote.request("POST", path, payload)
+        except AmtronConnectionError as err:
+            raise DeviceError("service_unavailable") from err
+
+    def _apply_soc_transaction_result(self, result: dict[str, Any], previous_revision: str | None) -> str:
+        outcome, snapshot, revision = result.get("outcome"), result.get("snapshot"), result.get("revision")
+        if (
+            not isinstance(outcome, str)
+            or outcome not in ("applied", "rejected", "cancelled", "unknown")
+            or not isinstance(snapshot, dict)
+        ):
+            raise DeviceError("service_unavailable")
+        self._remote.apply_snapshot(snapshot, require_available=False, consume_energy=False)
+        if outcome == "unknown":
+            return outcome
+        current = self.soc_goal_revision
+        expected = revision if outcome == "applied" else previous_revision
+        if not isinstance(expected, str) or current != expected:
+            outcome = "superseded"
+        self._soc_transaction = None
+        self._soc_transaction_fenced = False
+        return outcome
+
+    @ha_command
+    async def async_resolve_soc_goal(self) -> str:
+        """Fence a possibly accepted request before choosing its event fold."""
+        if self._soc_transaction is None:
+            return "superseded"
+        token, previous_revision = self._soc_transaction
+        async with self._remote._snapshot_lock:  # noqa: SLF001 - shared publication fence
+            result = await self._soc_transaction_request("/v2/soc-goal/resolve", {"token": token})
+            outcome = self._apply_soc_transaction_result(result, previous_revision)
+            if outcome == "unknown":
+                self._soc_transaction_fenced = True
+            return outcome
 
     @property
     def events(self) -> CommandEvents:
@@ -664,6 +772,37 @@ class RemoteControl(AmtronControl):
     @property
     def supports_energy_goal(self) -> bool:
         return self._remote.snapshot.get("control", {}).get("supports_energy_goal") is True
+
+    @property
+    def supports_plug_charge(self) -> bool:
+        return self._remote.snapshot.get("control", {}).get("supports_plug_charge") is True
+
+    @property
+    def plug_charge(self) -> dict[str, Any]:
+        if not self.supports_plug_charge:
+            return {"enabled": False, "policy": "", "session": None, "since": None, "authorized": False}
+        return dict(self._remote.snapshot["control"]["plug_charge"])
+
+    @ha_command
+    async def async_configure_plug_charge(self, enabled: bool, *, policy: str = "") -> None:
+        if not self.supports_plug_charge:
+            raise DeviceValidationError("plug_charge_not_supported")
+        if enabled is not False:
+            await self._command("plug_charge_config", value=enabled, policy=policy)
+            return
+        # Disabling only removes this optional policy. The bus owner keeps its
+        # release hold, so this is allowed even after switching to read-only.
+        await self._remote.execute("plug_charge_config", value=False, policy=policy)
+        if self._notify_pending is not None:
+            self._notify_pending()
+
+    @ha_command
+    async def async_authorize_plug_charge(self, session: str, *, deadline: datetime) -> None:
+        if not self.supports_plug_charge:
+            raise DeviceValidationError("plug_charge_not_supported")
+        await self._command(
+            "plug_charge_authorize", session=session, deadline=deadline.isoformat(),
+        )
 
     @ha_command
     async def async_set_energy_goal(self, value: float) -> None:
@@ -702,13 +841,45 @@ class RemoteControl(AmtronControl):
         self, value: float, *, source: str, soc: float | None = None,
         maximum: float | None = None,
     ) -> None:
-        await self._soc_command("soc_goal", value=value, source=source, soc=soc, maximum=maximum)
+        if not self.supports_soc_goal:
+            raise DeviceValidationError("soc_goal_not_supported")
+        if self._soc_transaction is not None:
+            raise DeviceError("service_unavailable")
+        self._require_write_access()
+        if self.soc_goal_revision is None:
+            raise DeviceValidationError("soc_goal_app_update_required")
+        candidate = copy(self.soc_goal)
+        try:
+            candidate.set_target(value, soc, maximum)
+        except ValueError as err:
+            raise DeviceValidationError("soc_goal_invalid") from err
+        async with self._remote._snapshot_lock:  # noqa: SLF001 - shared publication fence
+            previous_revision = self.soc_goal_revision
+            reservation = await self._soc_transaction_request("/v2/soc-goal/reserve", {})
+            token = reservation.get("token")
+            if not isinstance(token, str) or re.fullmatch(r"[0-9a-f]{32}", token) is None:
+                raise DeviceError("service_unavailable")
+            self._soc_transaction = (token, previous_revision)
+            self._soc_transaction_fenced = False
+            result = await self._soc_transaction_request("/v2/soc-goal/commit", {
+                "token": token, "expected_serial_number": self._remote._bound_serial or self._remote.identity.serial_number,  # noqa: SLF001
+                "value": value, "source": source, "soc": soc, "maximum": maximum,
+            })
+            outcome = self._apply_soc_transaction_result(result, previous_revision)
+            if outcome != "applied":
+                raise DeviceError("service_unavailable")
+        if self._notify_pending is not None:
+            self._notify_pending()
 
     @ha_command
     async def async_observe_soc(
         self, soc: float | None, maximum: float | None = None, *, source: str,
+        expected_soc_revision: str | None = None,
     ) -> None:
-        await self._soc_command("soc_observation", source=source, soc=soc, maximum=maximum)
+        values: dict[str, Any] = {"source": source, "soc": soc, "maximum": maximum}
+        if expected_soc_revision is not None:
+            values["expected_soc_revision"] = expected_soc_revision
+        await self._soc_command("soc_observation", **values)
 
     @property
     def pending_action(self) -> str | None:

@@ -55,9 +55,10 @@ def test_real_ha_network_setup_read_only_master_pause_and_unload(tmp_path, proto
                 await async_options(
                     hass, entry, "wallbox", "wallbox_basic",
                     {"control_mode": "master", "current_limit": 16, "scan_interval_seconds": 5},
-                    "edit", "wallbox_advanced",
+                )
+                await async_options(
+                    hass, entry, "wallbox", "wallbox_advanced",
                     {"measurement_interval_seconds": 30, "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5},
-                    "save",
                 )
                 await hass.async_block_till_done()
                 assert not entry.runtime_data.control.read_only

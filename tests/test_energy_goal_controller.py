@@ -535,6 +535,25 @@ def test_unknown_worker_save_fences_until_a_later_poll_saves():
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("retry_fails", [False, True])
+def test_shutdown_retries_unknown_disabled_target_save(retry_fails):
+    async def run():
+        _harness, control, runner, _saved = await _runner()
+        await runner.async_set_target(12)
+        retry = StorageStateUnknownError("still unreadable") if retry_fails else None
+        persist = AsyncMock(side_effect=[StorageStateUnknownError("readback failed"), retry])
+        runner._persist = persist
+        with pytest.raises(StorageStateUnknownError):
+            await runner.async_set_target(0)
+        assert runner.stop_requested
+        await runner.async_stop()
+        assert persist.await_count == 2
+        assert control.energy_goal.status == "disabled"
+        assert runner.stop_requested is retry_fails
+
+    asyncio.run(run())
+
+
 def test_unknown_recovery_save_never_resumes_before_storage_recovers():
     async def run():
         harness, control, runner, _saved = await _runner()
@@ -859,6 +878,40 @@ def test_meter_recovery_resumes_only_the_goal_owned_pause(paused):
         assert all(row["target_kwh"] == 12 for row in saved)
         await runner.async_stop()
         await control.async_shutdown()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("retry", ["poll", "shutdown"])
+def test_meter_recovery_retries_failed_persistence_without_auto_resume(retry):
+    async def run():
+        harness, control, runner, saved = await _runner(paused=True)
+        await runner.async_set_target(12)
+        runner.observe(None)
+        await _settle(runner)
+        assert saved[-1]["status"] == "meter_unavailable"
+
+        async def fail_once():
+            runner._persist = save
+            raise OSError("disk full")
+
+        async def save():
+            saved.append(control.energy_goal.snapshot())
+
+        runner._persist = fail_once
+        runner.observe(_snapshot(harness, 1235))
+        await _settle(runner)
+        assert control.energy_goal.status == "active"
+        assert saved[-1]["status"] == "meter_unavailable"
+
+        if retry == "poll":
+            runner.observe(_snapshot(harness, 1235, energy_read=False))
+            await _settle(runner)
+        else:
+            await runner.async_stop()
+        assert saved[-1]["status"] == "active"
+        assert current_writes(harness.transport) == []
+        await runner.async_stop()
+
     asyncio.run(run())
 
 

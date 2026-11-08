@@ -12,6 +12,7 @@ from typing import Any
 from .charging_session import SessionHistory
 from .energy_goal import EnergyGoal
 from .persistence import StorageCommitUncertainError
+from .plug_charge import PlugChargeState
 from .service_config import number
 from .soc_goal import SocGoal
 from .write_state import WriteState
@@ -47,6 +48,7 @@ class IntentStore:
                 raise ValueError("invalid saved resume current")
         goal = EnergyGoal.restore(payload["energy_goal"]) if "energy_goal" in payload else EnergyGoal()
         soc_goal = SocGoal.restore(payload["soc_goal"]) if "soc_goal" in payload else SocGoal()
+        plug_charge = PlugChargeState.restore(payload["plug_charge"]) if "plug_charge" in payload else PlugChargeState()
         history = SessionHistory()
         if "charging_session_history" in payload:
             try:
@@ -61,6 +63,7 @@ class IntentStore:
         state.energy_goal = goal
         state.soc_goal = soc_goal
         state.session_history = history
+        state.plug_charge = plug_charge
         self._last = payload
 
     def save(self, state: WriteState) -> None:
@@ -73,6 +76,7 @@ class IntentStore:
             "energy_goal": state.energy_goal.snapshot(),
             "soc_goal": state.soc_goal.snapshot(),
             "charging_session_history": state.session_history.snapshot(),
+            "plug_charge": state.plug_charge.durable(),
         }
         if payload == self._last:
             return

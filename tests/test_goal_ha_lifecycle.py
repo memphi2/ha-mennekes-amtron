@@ -47,9 +47,10 @@ def test_energy_goal_services_stop_and_restore_without_resuming(tmp_path: Path) 
                 await async_options(
                     hass, entry, "wallbox", "wallbox_basic",
                     {"control_mode": CONTROL_MODE_MASTER, "scan_interval_seconds": 300, "current_limit": 16},
-                    "edit", "wallbox_advanced",
+                )
+                await async_options(
+                    hass, entry, "wallbox", "wallbox_advanced",
                     {"measurement_interval_seconds": 300, "state_change_interval_seconds": 0, "phase_switch_grace_seconds": 0},
-                    "save",
                 )
                 await hass.async_block_till_done()
                 runtime = entry.runtime_data

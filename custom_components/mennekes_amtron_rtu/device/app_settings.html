@@ -23,6 +23,7 @@
         <option value="rtu_over_tcp" data-i18n="rtu">LAN: Modbus RTU over TCP</option>
         <option value="modbus_tcp" data-i18n="tcp">LAN: Modbus TCP</option>
       </select>
+      <p class="hint" data-i18n="transport_hint">USB uses an adapter connected to the host running this app. For LAN, match the adapter mode: transparent RTU over TCP or translating Modbus TCP.</p>
       <fieldset id="serial_fields">
         <legend data-i18n="usb_settings">USB adapter</legend>
         <label for="serial_port" data-i18n="adapter">Serial adapter</label>
@@ -43,6 +44,7 @@
             </select>
           </div>
         </div>
+        <p class="hint" data-i18n="serial_hint">Speed and data format must match the wallbox; factory defaults are 57600 baud and 8N2. Changing these app settings does not reconfigure the wallbox.</p>
       </fieldset>
       <fieldset id="network_fields" hidden disabled>
         <legend data-i18n="lan_settings">LAN adapter</legend>
@@ -50,6 +52,7 @@
         <input id="host" name="host" type="text" maxlength="253" autocomplete="off" spellcheck="false" required>
         <label for="tcp_port" data-i18n="port">Adapter TCP port</label>
         <input id="tcp_port" name="tcp_port" type="number" min="1" max="65535" step="1" value="502" required>
+        <p class="hint" data-i18n="endpoint_hint">Enter the LAN adapter address without http:// or a path. Use its configured TCP port, commonly 502. The Modbus service’s HTTP port 8765 does not belong here.</p>
         <p class="hint" data-i18n="lan_hint">Set the serial baud rate and format on the LAN adapter. Saving LAN settings removes any old USB adapter selection.</p>
         <button id="detect_adapter" type="button" class="secondary" data-i18n="detect_adapter">Set up LAN adapter</button>
         <section id="adapter_preview" class="adapter-preview" hidden aria-live="polite">
@@ -95,13 +98,38 @@
       </fieldset>
       <label for="device_id" data-i18n="address">Wallbox Modbus address</label>
       <input id="device_id" name="device_id" type="number" min="10" max="50" step="1" value="50" required>
+      <p class="hint" data-i18n="address_hint">This number identifies the wallbox on the RS-485 bus, including behind a LAN adapter. Factory default: 50; supported range: 10–50. It is not an IP address.</p>
       <p id="restart_hint" class="hint" data-i18n="restart_hint">Saving keeps the current connection running. Restart the app afterwards to apply the change; this briefly interrupts its heartbeat.</p>
       <div class="actions">
         <button id="reload" type="button" class="secondary" data-i18n="reload">Reload settings and adapters</button>
         <button id="save" type="submit" data-i18n="save">Save connection</button>
       </div>
     </form>
-    <footer data-i18n="security">Available to Home Assistant administrators with Supervisor 2026.11.0 or newer. No service token is needed here.</footer>
+    <details id="modbus_debug" class="modbus-debug">
+      <summary data-i18n="debug_title">Live Modbus communication</summary>
+      <p class="hint" data-i18n="debug_hint">Optional troubleshooting: observe existing reads, writes and heartbeats for up to 10 minutes. Only the latest 200 entries stay in memory; nothing is stored in the Home Assistant database or log files.</p>
+      <label class="check" for="debug_enabled">
+        <input id="debug_enabled" type="checkbox" disabled>
+        <span data-i18n="debug_enable">Capture communication for 10 minutes</span>
+      </label>
+      <p id="debug_status" role="status" aria-live="polite" data-i18n="debug_off">Capture is off.</p>
+      <p class="hint" data-i18n="debug_privacy">Serial numbers and text registers are hidden. Network login traffic is never captured. Closing this panel stops updates; capture continues until switched off or automatically expired.</p>
+      <button id="debug_clear" type="button" class="secondary" data-i18n="debug_clear" disabled>Clear entries</button>
+      <div class="debug-scroll" tabindex="0" role="region" aria-labelledby="debug_table_title">
+        <table>
+          <caption id="debug_table_title" data-i18n="debug_records">Latest transactions, newest first</caption>
+          <thead><tr>
+            <th scope="col" data-i18n="debug_time">Time (UTC)</th>
+            <th scope="col" data-i18n="debug_operation">Operation</th>
+            <th scope="col" data-i18n="debug_registers">Registers and decoded values</th>
+            <th scope="col" data-i18n="debug_duration">Duration</th>
+            <th scope="col" data-i18n="debug_result">Result</th>
+          </tr></thead>
+          <tbody id="debug_records"></tbody>
+        </table>
+      </div>
+    </details>
+    <footer data-i18n="security">Available to Home Assistant administrators with Supervisor 2026.10.4 or newer. No service token is needed here.</footer>
   </main>
 </body>
 </html>

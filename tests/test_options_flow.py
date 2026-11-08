@@ -60,6 +60,12 @@ def test_control_mode_and_hardware_current():
     assert _max_current(entry) == 16
 
 
+def test_obsolete_review_and_save_routes_are_not_available():
+    flow = Flow(FakeConfigEntry())
+    for step in ("review", "edit", "save"):
+        assert not hasattr(flow, f"async_step_{step}")
+
+
 @pytest.mark.parametrize("service", [False, True])
 def test_five_independent_sections_and_scoped_wallbox_save(service):
     async def run():
@@ -89,10 +95,10 @@ def test_five_independent_sections_and_scoped_wallbox_save(service):
         values = form["data_schema"](
             {"scan_interval_seconds": 7, "current_limit": 11.5}
         )
-        assert (await flow.async_step_wallbox_basic(values))["step_id"] == "review"
+        assert form["last_step"] is True
+        result = await flow.async_step_wallbox_basic(values)
+        assert result["type"] == "create_entry"
         assert entry.options["charging_price"] == 0.3
-        assert (await flow.async_step_review())["step_id"] == "review"
-        result = await flow.async_step_save()
         assert result["data"]["scan_interval_seconds"] == 7
         assert result["data"]["state_change_interval_seconds"] == 175
         assert result["data"]["timed_capacity_kwh"] == 80
@@ -101,7 +107,7 @@ def test_five_independent_sections_and_scoped_wallbox_save(service):
     asyncio.run(run())
 
 
-def test_wallbox_edit_advanced_and_back_discard():
+def test_wallbox_independent_basic_advanced_and_back_discard():
     async def run():
         entry = FakeConfigEntry()
         entry.runtime_data = SimpleNamespace(
@@ -110,20 +116,20 @@ def test_wallbox_edit_advanced_and_back_discard():
         flow = Flow(entry)
         await flow.async_step_wallbox()
         basic = await flow.async_step_wallbox_basic()
-        await flow.async_step_wallbox_basic(basic["data_schema"]({"current_limit": 10}))
-        assert (await flow.async_step_edit())["step_id"] == "wallbox"
+        saved = await flow.async_step_wallbox_basic(basic["data_schema"]({"current_limit": 10}))
+        entry.options = saved["data"]
+        await flow.async_step_wallbox()
         advanced = await flow.async_step_wallbox_advanced()
-        await flow.async_step_wallbox_advanced(
+        assert advanced["last_step"] is True
+        result = await flow.async_step_wallbox_advanced(
             advanced["data_schema"]({"state_change_interval_seconds": 175})
         )
-        result = await flow.async_step_save()
         assert result["data"]["current_limit"] == 10
         assert result["data"]["state_change_interval_seconds"] == 175
         await flow.async_step_wallbox()
-        await flow.async_step_wallbox_basic(basic["data_schema"]({"current_limit": 8}))
+        await flow.async_step_wallbox_basic()
         assert (await flow.async_step_back())["step_id"] == "init"
-        assert (await flow.async_step_save())["step_id"] == "init"
-        assert not entry.options
+        assert entry.options["current_limit"] == 10
 
     asyncio.run(run())
 
@@ -134,16 +140,32 @@ def test_live_unrelated_changes_merge_but_section_changes_conflict():
         flow = Flow(entry)
         await flow.async_step_wallbox()
         form = await flow.async_step_wallbox_basic()
-        await flow.async_step_wallbox_basic(form["data_schema"]({"current_limit": 10}))
         entry.options["charging_price"] = 0.4
-        assert (await flow.async_step_save())["data"]["charging_price"] == 0.4
+        assert (await flow.async_step_wallbox_basic(form["data_schema"]({"current_limit": 10})))["data"]["charging_price"] == 0.4
         await flow.async_step_wallbox()
-        await flow.async_step_wallbox_basic(form["data_schema"]({"current_limit": 8}))
+        form = await flow.async_step_wallbox_basic()
         entry.options["current_limit"] = 12
-        conflict = await flow.async_step_save()
+        conflict = await flow.async_step_wallbox_basic(form["data_schema"]({"current_limit": 8}))
         assert conflict["step_id"] == "options_changed"
+        repeated = await flow.async_step_options_changed()
+        assert repeated["step_id"] == "options_changed"
+        assert repeated["errors"] == {"base": "options_changed"}
         assert (await flow.async_step_options_changed({}))["step_id"] == "init"
         assert entry.options["current_limit"] == 12
+
+    asyncio.run(run())
+
+
+def test_cannot_commit_after_abandoning_the_section():
+    async def run():
+        entry = FakeConfigEntry(options={"current_limit": 16, "charging_price": 0.3})
+        flow = Flow(entry)
+        await flow.async_step_wallbox()
+        await flow.async_step_wallbox_basic()
+        await flow.async_step_back()
+        with pytest.raises(RuntimeError, match="incomplete options section"):
+            flow._finish_section()
+        assert entry.options == {"current_limit": 16, "charging_price": 0.3}
 
     asyncio.run(run())
 
@@ -151,9 +173,6 @@ def test_live_unrelated_changes_merge_but_section_changes_conflict():
 @pytest.mark.parametrize(
     "step",
     [
-        "review",
-        "edit",
-        "save",
         "wallbox_basic",
         "wallbox_advanced",
         "vehicle_disable",
@@ -206,13 +225,12 @@ def test_vehicle_source_limit_is_conditional_and_disable_resets_departure(limit)
             result = await flow.async_step_vehicle_limit(
                 {"vehicle_charge_limit_entity": "number.car_limit"}
             )
-        assert result["step_id"] == "review"
-        stored = (await flow.async_step_save())["data"]
+        assert result["type"] == "create_entry"
+        stored = result["data"]
         assert ("vehicle_charge_limit_entity" in stored) is limit
         entry.options = stored
         await flow.async_step_vehicle()
-        await flow.async_step_vehicle_disable()
-        disabled = (await flow.async_step_save())["data"]
+        disabled = (await flow.async_step_vehicle_disable())["data"]
         assert "vehicle_soc_entity" not in disabled
         assert disabled["timed_goal_enabled"] is False
         assert disabled["timed_goal_reset_pending"] is True
@@ -239,7 +257,7 @@ def test_vehicle_validation_and_correction(value):
             await flow.async_step_vehicle_limit(
                 {"vehicle_charge_limit_entity": "number.limit"}
             )
-        )["step_id"] == "review"
+        )["type"] == "create_entry"
 
     asyncio.run(run())
 

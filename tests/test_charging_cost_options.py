@@ -28,6 +28,7 @@ from custom_components.mennekes_amtron_rtu.charging_cost_const import (
     CONF_PRICE_INCLUDES_NETWORK,
     CONF_REGULAR_NETWORK,
     CONF_TARIFF_YEAR,
+    COST_SOURCE_DISABLED,
     COST_SOURCE_FIXED,
     COST_SOURCE_SENSOR,
     NETWORK_MODULE_2,
@@ -74,11 +75,19 @@ def _flow(*, options=None, service=False, country="DE"):
     return flow
 
 
-async def _module_three(flow, *, imported=False):
+async def _choose_source(flow, source=COST_SOURCE_FIXED):
     await flow.async_step_costs()
-    source = await flow.async_step_cost_fixed({
-        CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
-    })
+    return await flow.async_step_costs({CONF_CHARGING_COST_SOURCE: source})
+
+
+async def _choose_module(flow, module):
+    return await flow.async_step_cost_network({CONF_CHARGING_NETWORK_MODULE: module})
+
+
+async def _module_three(flow, *, imported=False):
+    await _choose_source(flow)
+    await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3})
+    source = await _choose_module(flow, NETWORK_MODULE_3)
     assert source["step_id"] == "cost_module3_source"
     step = flow.async_step_cost_module3_import if imported else flow.async_step_cost_module3_manual
     return await step()
@@ -86,29 +95,46 @@ async def _module_three(flow, *, imported=False):
 
 async def _save_three(flow, values=None):
     values = NETWORK if values is None else values
-    price_form = await flow.async_step_cost_module3_prices()
-    form = await flow.async_step_cost_module3_prices(price_form["data_schema"](prices(values)))
-    assert form["step_id"] == "cost_module3_windows"
-    review = await flow.async_step_cost_module3_windows(form["data_schema"](windows(values)))
-    assert review["step_id"] == "review"
-    return await flow.async_step_save()
+    form = await flow.async_step_cost_module3_prices()
+    assert form["last_step"] is True
+    return await flow.async_step_cost_module3_prices(form["data_schema"](values))
 
 
 def test_network_module_is_hidden_outside_germany():
     async def run():
         flow = _flow(country="FR")
-        await flow.async_step_costs()
+        await _choose_source(flow)
         form = await flow.async_step_cost_fixed()
         fields = {key.schema for key in form["data_schema"].schema}
         assert CONF_CHARGING_PRICE in fields
         assert CONF_CHARGING_NETWORK_MODULE not in fields
-        rejected = await flow.async_step_cost_fixed({
-            CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_3,
-        })
-        assert rejected["errors"] == {CONF_CHARGING_NETWORK_MODULE: "network_tariff_invalid"}
-        assert (await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3}))["step_id"] == "review"
+        assert form["last_step"] is True
+        assert (await _choose_module(flow, NETWORK_MODULE_3))["step_id"] == "init"
+        await _choose_source(flow)
+        result = await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3})
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_CHARGING_NETWORK_TARIFF] == {"module": NETWORK_MODULE_NONE}
         assert not flow.config_entry.options
-        assert (await flow.async_step_save())["type"] == "create_entry"
+    asyncio.run(run())
+
+
+def test_source_dialog_requires_a_valid_choice_before_showing_its_inputs():
+    async def run():
+        flow = _flow()
+        result = await flow.async_step_costs({CONF_CHARGING_COST_SOURCE: "unsupported"})
+        assert result["errors"] == {CONF_CHARGING_COST_SOURCE: "cost_source_invalid"}
+        assert not flow.config_entry.options
+        form = await _choose_source(flow)
+        assert form["step_id"] == "cost_fixed"
+        marker = next(iter(form["data_schema"].schema))
+        assert marker.description["suggested_value"] == 0.40
+        assert (await flow.async_step_cost_sensor())["step_id"] == "init"
+        assert (await flow.async_step_cost_network())["step_id"] == "init"
+
+        flow = _flow(options={CONF_CHARGING_PRICE: 0})
+        form = await _choose_source(flow)
+        marker = next(iter(form["data_schema"].schema))
+        assert marker.description["suggested_value"] == 0
     asyncio.run(run())
 
 
@@ -176,14 +202,17 @@ def test_import_failure_or_provisional_source_requires_confirmation(monkeypatch,
 
 
 @pytest.mark.parametrize("service", [False, True])
-def test_costs_disabled_by_default_and_the_section_menu_exposes_explicit_choices(service):
+def test_costs_disabled_by_default_and_source_dialog_exposes_explicit_choices(service):
     async def run():
         flow = _flow(service=service)
         root = await flow.async_step_init()
         assert root["type"] == "menu"
         assert "costs" in root["menu_options"]
-        menu = await flow.async_step_costs()
-        assert menu["menu_options"] == ["cost_fixed", "cost_sensor", "cost_disable", "back"]
+        form = await flow.async_step_costs()
+        marker = next(iter(form["data_schema"].schema))
+        assert marker.schema == CONF_CHARGING_COST_SOURCE
+        assert marker.default() == COST_SOURCE_DISABLED
+        assert form["data_schema"].schema[marker].config["options"] == [COST_SOURCE_FIXED, COST_SOURCE_SENSOR, COST_SOURCE_DISABLED]
         assert (await flow.async_step_back())["step_id"] == "init"
         assert flow.config_entry.options == {}
     asyncio.run(run())
@@ -191,7 +220,7 @@ def test_costs_disabled_by_default_and_the_section_menu_exposes_explicit_choices
 
 @pytest.mark.parametrize("service", [False, True])
 @pytest.mark.parametrize("source", [COST_SOURCE_FIXED, COST_SOURCE_SENSOR])
-def test_source_saves_only_on_confirmation_and_keeps_unrelated_sections(service, source):
+def test_source_saves_after_network_choice_and_keeps_unrelated_sections(service, source):
     async def run():
         previous = {
             CONF_CHARGING_COST_SOURCE: COST_SOURCE_SENSOR,
@@ -201,17 +230,18 @@ def test_source_saves_only_on_confirmation_and_keeps_unrelated_sections(service,
             CONF_VEHICLE_LAST_CHARGE_ENERGY: "sensor.car_energy",
         }
         flow = _flow(service=service, options=previous.copy())
-        await flow.async_step_costs()
+        await _choose_source(flow, source)
         step = flow.async_step_cost_fixed if source == COST_SOURCE_FIXED else flow.async_step_cost_sensor
         form = await step()
         markers = {key.schema: key for key in form["data_schema"].schema}
         key = CONF_CHARGING_PRICE if source == COST_SOURCE_FIXED else CONF_CHARGING_PRICE_ENTITY
         assert markers[key].description["suggested_value"] == previous[key]
-        assert markers[CONF_CHARGING_NETWORK_MODULE].default() == NETWORK_MODULE_2
+        assert CONF_CHARGING_NETWORK_MODULE not in markers
         review = await step({key: -0.05 if source == COST_SOURCE_FIXED else "sensor.price"})
-        assert review["step_id"] == "review"
+        assert review["step_id"] == "cost_network"
+        assert next(iter(review["data_schema"].schema)).default() == NETWORK_MODULE_2
         assert flow.config_entry.options == previous
-        result = await flow.async_step_save()
+        result = await _choose_module(flow, NETWORK_MODULE_NONE)
         assert result["data"][CONF_CHARGING_COST_SOURCE] == source
         assert result["data"][CONF_CHARGING_NETWORK_TARIFF] == {"module": NETWORK_MODULE_NONE}
         for unrelated in (CONF_CURRENT_LIMIT, CONF_CHARGE_LOSS_SOURCE, CONF_VEHICLE_LAST_CHARGE_ENERGY):
@@ -230,12 +260,11 @@ def test_disabling_costs_can_be_cancelled_and_never_removes_other_sections():
                     CONF_AUTO_TARIFF_REFRESH: True, CONF_CURRENT_LIMIT: 12}
         flow = _flow(options=previous.copy())
         await flow.async_step_costs()
-        assert (await flow.async_step_cost_disable())["step_id"] == "review"
         await flow.async_step_back()
         assert flow.config_entry.options == previous
         await flow.async_step_costs()
-        await flow.async_step_cost_disable()
-        assert (await flow.async_step_save())["data"] == {CONF_CURRENT_LIMIT: 12}
+        result = await flow.async_step_costs({CONF_CHARGING_COST_SOURCE: COST_SOURCE_DISABLED})
+        assert result["data"] == {CONF_CURRENT_LIMIT: 12}
     asyncio.run(run())
 
 
@@ -243,11 +272,11 @@ def test_disabling_costs_can_be_cancelled_and_never_removes_other_sections():
 def test_fixed_price_rejects_malformed_values_then_allows_correction(price):
     async def run():
         flow = _flow()
-        await flow.async_step_costs()
+        await _choose_source(flow)
         failed = await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: price})
         assert failed["errors"] == {CONF_CHARGING_PRICE: "cost_price_invalid"}
         await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0})
-        assert (await flow.async_step_save())["data"][CONF_CHARGING_PRICE] == 0
+        assert (await _choose_module(flow, NETWORK_MODULE_NONE))["data"][CONF_CHARGING_PRICE] == 0
     asyncio.run(run())
 
 
@@ -255,7 +284,7 @@ def test_fixed_price_rejects_malformed_values_then_allows_correction(price):
 def test_price_sensor_requires_sensor_entity(entity):
     async def run():
         flow = _flow()
-        await flow.async_step_costs()
+        await _choose_source(flow, COST_SOURCE_SENSOR)
         failed = await flow.async_step_cost_sensor({CONF_CHARGING_PRICE_ENTITY: entity})
         assert failed["errors"] == {CONF_CHARGING_PRICE_ENTITY: "cost_source_invalid"}
     asyncio.run(run())
@@ -264,26 +293,27 @@ def test_price_sensor_requires_sensor_entity(entity):
 def test_network_module_must_be_known():
     async def run():
         flow = _flow()
-        await flow.async_step_costs()
-        failed = await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: "module_4"})
+        await _choose_source(flow)
+        await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3})
+        failed = await _choose_module(flow, "module_4")
         assert failed["errors"] == {CONF_CHARGING_NETWORK_MODULE: "network_tariff_invalid"}
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("module", [NETWORK_MODULE_2, NETWORK_MODULE_3])
-def test_tariff_saves_only_after_all_prices_windows_and_confirmation(module):
+def test_tariff_saves_directly_after_all_prices_and_windows(module):
     async def run():
         flow = _flow()
         if module == NETWORK_MODULE_3:
             await _module_three(flow)
             saved = await _save_three(flow)
         else:
-            await flow.async_step_costs()
-            form = await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: module})
+            await _choose_source(flow)
+            await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3})
+            form = await _choose_module(flow, module)
             assert form["step_id"] == "cost_module2"
-            review = await flow.async_step_cost_module2({CONF_REGULAR_NETWORK: 0.1, CONF_PRICE_INCLUDES_NETWORK: False})
-            assert review["step_id"] == "review"
-            saved = await flow.async_step_save()
+            assert form["last_step"] is True
+            saved = await flow.async_step_cost_module2({CONF_REGULAR_NETWORK: 0.1, CONF_PRICE_INCLUDES_NETWORK: False})
         assert not flow.config_entry.options
         tariff = TariffConfig.parse(saved["data"][CONF_CHARGING_NETWORK_TARIFF])
         assert tariff.module == module
@@ -299,7 +329,7 @@ def test_tariff_saves_only_after_all_prices_windows_and_confirmation(module):
     asyncio.run(run())
 
 
-def test_editing_existing_tariff_populates_both_price_and_window_forms():
+def test_editing_existing_tariff_populates_prices_and_windows_together():
     async def run():
         flow = _flow()
         await _module_three(flow)
@@ -308,7 +338,6 @@ def test_editing_existing_tariff_populates_both_price_and_window_forms():
         form = await _module_three(flow)
         marker = next(key for key in form["data_schema"].schema if key.schema == CONF_REGULAR_NETWORK)
         assert marker.description["suggested_value"] == 0.1
-        form = await flow.async_step_cost_module3_prices(prices())
         markers = {key.schema: key for key in form["data_schema"].schema}
         for key in WINDOW_KEYS:
             assert markers[key].description["suggested_value"] == NETWORK[key]
@@ -336,13 +365,14 @@ def test_back_from_module_three_discards_partial_changes_before_selecting_anothe
         await flow.async_step_cost_module3_prices(prices())
         assert (await flow.async_step_back())["step_id"] == "init"
         assert flow.config_entry.options == {CONF_CURRENT_LIMIT: 12}
-        await flow.async_step_costs()
-        review = await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: replacement})
+        await _choose_source(flow)
+        await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3})
+        review = await _choose_module(flow, replacement)
         if replacement == NETWORK_MODULE_2:
             assert review["step_id"] == "cost_module2"
             review = await flow.async_step_cost_module2({CONF_REGULAR_NETWORK: 0.1, CONF_PRICE_INCLUDES_NETWORK: True})
-        assert review["step_id"] == "review"
-        saved = await flow.async_step_save()
+        assert review["type"] == "create_entry"
+        saved = review
         assert saved["data"][CONF_CHARGING_NETWORK_TARIFF]["module"] == replacement
         assert CONF_AUTO_TARIFF_REFRESH not in saved["data"]
     asyncio.run(run())
@@ -373,11 +403,7 @@ def test_invalid_tariffs_keep_draft_without_committing_and_allow_correction(chan
     async def run():
         flow = _flow()
         await _module_three(flow)
-        if set(changes) & WINDOW_KEYS:
-            await flow.async_step_cost_module3_prices(prices())
-            result = await flow.async_step_cost_module3_windows({**windows(), **changes})
-        else:
-            result = await flow.async_step_cost_module3_prices({**prices(), **changes})
+        result = await flow.async_step_cost_module3_prices({**NETWORK, **changes})
         assert result["type"] == "form"
         assert result["errors"] == {"base": "network_tariff_invalid"}
         assert not flow.config_entry.options
@@ -388,14 +414,15 @@ def test_invalid_tariffs_keep_draft_without_committing_and_allow_correction(chan
 def test_missing_network_price_is_recoverable():
     async def run():
         flow = _flow()
-        await flow.async_step_costs()
-        await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3, CONF_CHARGING_NETWORK_MODULE: NETWORK_MODULE_2})
+        await _choose_source(flow)
+        await flow.async_step_cost_fixed({CONF_CHARGING_PRICE: 0.3})
+        await _choose_module(flow, NETWORK_MODULE_2)
         assert (await flow.async_step_cost_module2({}))["errors"] == {"base": "network_tariff_invalid"}
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("step_name", ["cost_disable", "cost_fixed", "cost_sensor", "cost_module2", "cost_module3_source",
-                                       "cost_module3_prices", "cost_module3_windows", "cost_module3_import", "cost_module3_manual"])
+@pytest.mark.parametrize("step_name", ["cost_fixed", "cost_sensor", "cost_network", "cost_module2", "cost_module3_source",
+                                       "cost_module3_prices", "cost_module3_import", "cost_module3_manual"])
 def test_cost_steps_cannot_skip_required_prior_steps(step_name):
     async def run():
         flow = _flow()
@@ -446,10 +473,7 @@ def test_german_network_windows_keep_local_time_when_ha_uses_utc(monkeypatch, im
                         if marker.description and "suggested_value" in marker.description}
             supplied[CONF_PRICE_INCLUDES_NETWORK] = True
             supplied[CONF_AUTO_TARIFF_REFRESH] = True
-            form = await flow.async_step_cost_module3_prices(form["data_schema"](supplied))
-            supplied = {marker.schema: marker.description["suggested_value"] for marker in form["data_schema"].schema}
-            await flow.async_step_cost_module3_windows(form["data_schema"](supplied))
-            saved = await flow.async_step_save()
+            saved = await flow.async_step_cost_module3_prices(form["data_schema"](supplied))
         else:
             saved = await _save_three(flow, values)
         tariff = TariffConfig.parse(saved["data"][CONF_CHARGING_NETWORK_TARIFF])

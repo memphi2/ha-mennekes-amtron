@@ -45,6 +45,33 @@ def test_app_shows_host_even_before_a_network_address_has_been_entered(app_confi
     assert config.connection == SerialConfig("/dev/fake")
 
 
+def test_native_app_form_exposes_tcp_login_and_password_by_default(app_config):
+    # Supervisor merges defaults into existing installations, and its form
+    # hides optional schema entries that have no option value by default.
+    assert app_config["options"]["tcp_authentication"] is False
+    assert app_config["options"]["tcp_auth_password"] == ""
+    assert app_config["schema"]["tcp_authentication"] == "bool?"
+    assert app_config["schema"]["tcp_auth_password"] == "password?"  # noqa: S105 - schema type
+    for connection_type in ("LAN: Modbus RTU (TCP)", "LAN: Modbus TCP"):
+        config = ServerConfig.from_dict({
+            **app_config["options"], "token": TOKEN,
+            "connection_type": connection_type, "host": "gateway.local",
+        })
+        assert config.connection.tcp_authentication is False
+        assert config.connection.tcp_auth_password == ""
+
+
+def test_added_tcp_defaults_preserve_existing_login_on_supervisor_upgrade(app_config):
+    # Supervisor merges user options over new app defaults.
+    existing = {
+        "connection_type": "LAN: Modbus TCP", "host": "gateway.local",
+        "tcp_authentication": True, "tcp_auth_password": "Demo123",
+    }
+    config = ServerConfig.from_dict({**app_config["options"], **existing, "token": TOKEN})
+    assert config.connection.tcp_authentication is True
+    assert config.connection.tcp_auth_password == "Demo123"  # noqa: S105 - fixture
+
+
 def test_app_and_standalone_default_to_300_seconds_between_state_changes(app_config):
     key = "state_change_interval_seconds"
     assert app_config["options"][key] == 300

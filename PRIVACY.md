@@ -43,6 +43,14 @@ protection; restrict gateway access to a trusted private LAN. See
   A selected preconditioning action uses its vehicle integration, which may
   contact that vehicle's cloud service under its own privacy policy.
 
+Optional vehicle profiles store up to eight local names, provider/device bindings,
+selected entity IDs and independent feature settings. Automatic selection, when
+explicitly enabled, reads configured local cable and home/location entities;
+it does not request vehicle-cloud updates. The active profile and its selection
+time are saved so charging-loss history cannot be reassigned to another car.
+Loss totals remain bounded and separate per profile. Other vehicle integrations
+may restore or cache values under their own policies.
+
 ## What the independent service stores
 
 Standalone service configuration contains its USB or LAN connection settings and
@@ -66,6 +74,13 @@ or saved adapter password to the browser. It reports only whether a password
 is present; a blank password field reuses it only for the same gateway host
 and TCP port. A newly entered password is sent locally to the app for the
 explicitly requested configuration.
+
+The optional live Modbus view in this branch retains at most 200 decoded
+transaction records in RAM for ten minutes. It is off by default, adds no
+Recorder entries or log files, and erases records when disabled or expired.
+Serial numbers, text registers, network-login traffic and exception-message
+contents are excluded. Only an authenticated administrator through Supervisor
+Ingress can read or change this capture.
 
 Optional adapter detection queries only the entered endpoint and shows its
 model, firmware, native identifier and connection settings. A small temporary
@@ -130,4 +145,7 @@ performed cannot be undone by leaving that draft.
 Optional yearly refresh repeats the lookup after the tariff year expires, with
 one scheduled attempt per day, using the German tariff time zone, until a valid tariff is found, plus a retry after
 an HA restart. Values are saved locally without a growing download history.
-Disable yearly refresh to stop background imports.
+Annual refresh may be enabled after manual tariff entry as well as after an
+initial import. It can replace saved manual prices and time windows. Disable
+yearly refresh to stop background imports; manually choosing Import for HA Home
+still performs that one requested lookup.

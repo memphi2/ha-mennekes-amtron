@@ -1,8 +1,8 @@
 """Connection setup through authenticated Supervisor ingress, without extra roles.
 
-Only the Supervisor's real network peer is trusted. Supervisor 2026.11.0 is the
-first verified release that enforces panel_admin and replaces every user/group
-header; older releases cannot authorize this configuration page safely.
+Only the Supervisor's real network peer is trusted. Supervisor 2026.10.4 is the
+first stable release verified to enforce panel_admin and replace every
+user/group header; older releases cannot authorize this page safely.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout, web
 
 from .app_adapter_setup import AdapterSetup
 from .connection import validate_network_host
+from .modbus_trace import ModbusTrace
 from .service_config import ServerConfig
 from .waveshare_gateway import (
     GatewayError,
@@ -169,11 +170,13 @@ class AppSettings:
 
     def __init__(
         self, supervisor_token: str, service_token: str,
-        *, configuration_guard: Callable[[], AbstractAsyncContextManager[ConnectionConfigurationGuard]] | None = None,
+        *, modbus_trace: ModbusTrace | None = None,
+        configuration_guard: Callable[[], AbstractAsyncContextManager[ConnectionConfigurationGuard]] | None = None,
     ) -> None:
         self._supervisor_token = supervisor_token
         self._service_token = service_token
         self._secret = secrets.token_bytes(32)
+        self._modbus_trace = modbus_trace
         self._session: ClientSession | None = None
         self._lock = asyncio.Lock()
         self._slots = asyncio.Semaphore(2)
@@ -188,6 +191,8 @@ class AppSettings:
                 yield
             finally:
                 self._session = None
+                if self._modbus_trace is not None:
+                    self._modbus_trace.close()
 
     async def _request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         if self._session is None:
@@ -219,7 +224,7 @@ class AppSettings:
         info = await self._request("GET", "/info")
         version = info.get("supervisor")
         match = _VERSION.fullmatch(version) if isinstance(version, str) and len(version) <= 32 else None
-        if match is None or not 1 <= int(match[2]) <= 12 or tuple(int(part) for part in match.groups()) < (2026, 11, 0):
+        if match is None or not 1 <= int(match[2]) <= 12 or tuple(int(part) for part in match.groups()) < (2026, 10, 4):
             raise SettingsError("supervisor_update_required", 503)
         user = request.headers.get("X-Remote-User-Id", "")
         groups = request.headers.get("X-Remote-User-Groups", "").split(",")
@@ -278,6 +283,30 @@ class AppSettings:
             raise SettingsError("invalid_request")
         return user, payload
 
+    async def read_modbus_debug(self, request: web.Request) -> web.Response:
+        """Read passive, redacted observations only through authorized ingress."""
+        await self._authorize(request)
+        after = request.query.get("after", "0")
+        if not re.fullmatch(r"[0-9]{1,18}", after) or set(request.query) - {"after"}:
+            raise SettingsError("invalid_request")
+        if self._modbus_trace is None:
+            return web.json_response({"available": False, "enabled": False,
+                                      "expires_in": 0, "latest_sequence": 0, "generation": 0, "records": []})
+        return web.json_response(self._modbus_trace.snapshot(after=int(after)))
+
+    async def set_modbus_debug(self, request: web.Request) -> web.Response:
+        """Change RAM-only capture settings, using the same admin and CSRF gate."""
+        _, payload = await self._edit_request(request)
+        if self._modbus_trace is None:
+            raise SettingsError("debug_unavailable", 409)
+        if set(payload) == {"enabled"} and type(payload["enabled"]) is bool:
+            self._modbus_trace.set_enabled(payload["enabled"])
+        elif payload == {"clear": True} and type(payload["clear"]) is bool:
+            self._modbus_trace.clear()
+        else:
+            raise SettingsError("invalid_request")
+        return web.json_response(self._modbus_trace.snapshot())
+
     def _check_revision(self, revision: Any, options: dict[str, Any]) -> str:
         if not isinstance(revision, str) or not _DIGEST.fullmatch(revision) or not hmac.compare_digest(revision, self._revision(options)):
             raise SettingsError("settings_changed", 409)
@@ -322,8 +351,10 @@ class AppSettings:
             updated["connection_type"] = _TRANSPORT_LABELS[transport]
             password = ""
             if transport == "serial":
-                updated.pop("tcp_authentication", None)
-                updated.pop("tcp_auth_password", None)
+                # Keep the native Supervisor form fields visible while
+                # removing any old LAN credential from the saved options.
+                updated["tcp_authentication"] = False
+                updated["tcp_auth_password"] = ""
                 adapters = await asyncio.to_thread(serial_adapters)
                 if not isinstance(payload["serial_port"], str) or payload["serial_port"] not in {adapter.value for adapter in adapters}:
                     raise SettingsError("adapter_missing")
@@ -348,9 +379,7 @@ class AppSettings:
                     raise SettingsError("connection_invalid")
                 updated["host"] = host
                 updated["tcp_authentication"] = auth
-                updated.pop("tcp_auth_password", None)
-                if auth:
-                    updated["tcp_auth_password"] = password
+                updated["tcp_auth_password"] = password if auth else ""
                 if "adapter_token" in payload:
                     updated["baudrate"] = str(payload["adapter_baudrate"])
                     updated["frame"] = payload["adapter_frame"]
@@ -501,11 +530,8 @@ class AppSettings:
         return response
 
 
-def create_settings_app(settings: AppSettings) -> web.Application:
-    """Expose fixed assets and bounded, administrator-only setup routes."""
-    app = web.Application(middlewares=[settings.guard], client_max_size=4096)
-    app.cleanup_ctx.append(settings.lifecycle)
-
+def add_settings_asset_routes(app: web.Application) -> None:
+    """Register packaged assets within the caller's existing access boundary."""
     async def asset(request: web.Request) -> web.Response:
         filename, content_type = _ASSETS[request.path]
         resource = files(__package__).joinpath(filename)
@@ -517,9 +543,18 @@ def create_settings_app(settings: AppSettings) -> web.Application:
 
     for path in _ASSETS:
         app.router.add_get(path, asset)
+
+
+def create_settings_app(settings: AppSettings) -> web.Application:
+    """Expose fixed assets and bounded, administrator-only setup routes."""
+    app = web.Application(middlewares=[settings.guard], client_max_size=4096)
+    app.cleanup_ctx.append(settings.lifecycle)
+    add_settings_asset_routes(app)
     app.router.add_get("/api/config", settings.read)
     app.router.add_post("/api/config", settings.save)
     app.router.add_post("/api/adapter", settings.inspect_adapter)
+    app.router.add_get("/api/modbus-debug", settings.read_modbus_debug)
+    app.router.add_post("/api/modbus-debug", settings.set_modbus_debug)
     return app
 
 

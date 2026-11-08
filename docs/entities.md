@@ -5,10 +5,10 @@ Use **Charging current limit** and **Charging paused** for everyday charging.
 energy and connection health. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
 
-This reference follows **beta 0.7.0b4**, including optional targets,
-estimates, departure planning and command-result events. **0.6.1 remains the
-stable release.** Service connections
-require **app/service 0.6.1 or newer**.
+This reference follows **beta 0.8.0b1**, including vehicle profiles and the
+optional Virtual Plug & Charge status. **0.6.1 remains stable.** Ordinary service
+connections require **app/service 0.6.1 or newer with API 2**; Virtual Plug & Charge
+in service mode needs the new capability in **app 0.8.0b1**.
 
 The first column shows default **English** entity-ID patterns. `*` stands
 for the device prefix; it is not part of a literal entity ID. For example,
@@ -70,13 +70,23 @@ a communication error and a new confirmed response. Before the first response
 it is unknown; loss of the connection is still handled by normal availability.
 It exposes no frequently changing counters or timestamps.
 
+The **Virtual Plug & Charge** status sensor is new in **beta 0.8.0b1** and optional.
+When the feature is enabled, it shows whether vehicle detection, profile
+permission or charging release is still pending, whether another control blocks
+release, or whether the observed connection is authorized. Authorization does
+not mean that the vehicle is drawing power. The sensor has no per-poll timestamps
+or session-token attributes. See [setup and status help](vehicle-setup.md#optional-virtual-plug--charge).
+
 ## Controls
 
 For availability, use the connection table above. Service controls follow the
 app's **Read-only** setting; direct controls require **Modbus master**.
+**Active vehicle** changes the integration's selected profile and remains usable
+in read-only mode; it does not send a charging command.
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
+| `select.*_active_vehicle` | Active vehicle | optional vehicle profiles configured | Choose a car or no vehicle manually; either choice disables automatic selection. With detection sources configured, Automatic selection uses cable and home signals. Switching clears the previous percentage target and departure plan without resuming; settings and loss averages remain separate. |
 | `number.*_vehicle_charge_target` | Vehicle charge target | optional configured vehicle SoC source; compatible service in service mode | Percentage ceiling, 0 = off. Only limits charging. Up to 100%, or the separately optional vehicle charge-limit source. Neither setting nor disabling resumes charging. |
 | `datetime.*_next_departure` | Next departure | Departure planning enabled, vehicle SoC source and usable battery capacity | One dated target for the next trip. A timed goal may resume a pause to meet this time; the ordinary percentage goal alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
 | `button.*_use_next_calendar_event` | Use next calendar event | optional calendar and exact event title | Copies one matching timed event from the next 14 days into Next departure. Later events are not selected automatically. |
@@ -120,6 +130,7 @@ remembered resume target while paused, which may be the pending target. See
 |---|---|---|---|---|---|
 | `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. |
 | `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure. |
+| `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | Virtual Plug & Charge enabled | Shows recognition, permission and release status. No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
 | `sensor.*_pending_change` | Pending change |  | enum | since 0.5.2b2; supporting service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |

@@ -10,48 +10,24 @@ from __future__ import annotations
 
 import asyncio
 import math
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from itertools import pairwise
 
 from homeassistant.core import HomeAssistant, SupportsResponse
-from homeassistant.helpers import device_registry as dr
 
 from custom_components.mennekes_amtron_rtu.device.charging_session import (
     CompletedSession,
 )
 from custom_components.mennekes_amtron_rtu.vehicle_sources.types import HistoryMatch
 
-HISTORY_DOMAIN = "bavariandata"
+from .identity import DOMAIN, bavarian_vehicle_vin
+
 HISTORY_SERVICE = "get_charging_sessions"
 HISTORY_LIMIT = 50
 HISTORY_TIMEOUT_SECONDS = 10.0
 MATCH_TOLERANCE_SECONDS = 60.0
 _MAX_EPOCH = 253402300799.0
-
-
-def bavarian_vehicle_vin(hass: HomeAssistant, device_id: object) -> str | None:
-    """Resolve a real vehicle, never BavarianData's account-wide debug device.
-
-    BavarianData identifies vehicle devices as (domain, VIN), while its debug
-    device uses the config-entry ID. Its history service permits account-wide
-    queries, so the integration must establish a single vehicle before calling.
-    """
-    if not isinstance(device_id, str) or not device_id.strip() or len(device_id) > 256:
-        return None
-    try:
-        device = dr.async_get(hass).async_get(device_id)
-    except RuntimeError:  # The registry is not ready yet.
-        return None
-    if device is None:
-        return None
-    candidates = {
-        value.strip().upper() for domain, value in device.identifiers
-        if domain == HISTORY_DOMAIN and value != device.config_entry_id
-        and re.fullmatch(r"[A-HJ-NPR-Z0-9]{17}", value.strip().upper())
-    }
-    return next(iter(candidates)) if len(candidates) == 1 else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,13 +166,13 @@ async def async_read_history(
         return None
     session = CompletedSession.parse(session.as_dict())
     if (
-        not hass.services.has_service(HISTORY_DOMAIN, HISTORY_SERVICE)
-        or hass.services.supports_response(HISTORY_DOMAIN, HISTORY_SERVICE) is SupportsResponse.NONE
+        not hass.services.has_service(DOMAIN, HISTORY_SERVICE)
+        or hass.services.supports_response(DOMAIN, HISTORY_SERVICE) is SupportsResponse.NONE
     ):
         return None
     async with asyncio.timeout(HISTORY_TIMEOUT_SECONDS):
         response = await hass.services.async_call(
-            HISTORY_DOMAIN, HISTORY_SERVICE,
+            DOMAIN, HISTORY_SERVICE,
             {
                 "device_id": device_id,
                 "vin": selected_vin,

@@ -63,9 +63,10 @@ def test_direct_mode_changes_unload_previous_controls_without_platform_warnings(
                             "current_limit": 16,
                             "scan_interval_seconds": 300,
                         },
-                        "edit", "wallbox_advanced",
+                    )
+                    await async_options(
+                        hass, entry, "wallbox", "wallbox_advanced",
                         {"measurement_interval_seconds": 300, "state_change_interval_seconds": 300, "phase_switch_grace_seconds": 5},
-                        "save",
                     )
                     await hass.async_block_till_done()
                     assert entry.state is ConfigEntryState.LOADED

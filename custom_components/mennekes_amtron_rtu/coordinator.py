@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -60,6 +60,7 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
         self.control_status: Callable[[], tuple[str | None, datetime | None]] | None = None
         self.observe_recovery: Callable[[object, int], None] | None = None
         self.observe_goal: Callable[[WallboxData | None], None] | None = None
+        self.observe_plug_charge: Callable[[WallboxData | None, datetime | None], None] | None = None
         self.retry_soc_goal: Callable[[], None] | None = None
         self.observe_session: Callable[[WallboxData | None], Awaitable[None]] | None = None
         self._poller = DevicePoller(
@@ -84,10 +85,13 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
 
     async def _async_update_data(self) -> WallboxData:
         goal_generation = self._client.write_state.energy_goal_generation
+        observed_at = datetime.now(UTC)
         try:
             data = await self._poller.async_poll(
                 self.current_data(), last_success=self.last_update_success
             )
+            if self.observe_plug_charge is not None:
+                self.observe_plug_charge(data, observed_at)
             if self.control_status is not None:
                 data.pending_change, data.pending_change_until = self.control_status()
             if self.observe_recovery is not None:
@@ -102,6 +106,8 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
                 await self.observe_session(data)
             return data
         except AmtronBusError as err:
+            if self.observe_plug_charge is not None:
+                self.observe_plug_charge(None, None)
             if self.observe_session is not None:
                 await self.observe_session(None)
             if self.observe_goal is not None:

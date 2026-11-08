@@ -33,6 +33,17 @@ progress. Named commands retain device guards; the API has no raw
 register-write endpoint. Current telemetry retains its existing cadence and
 rounding; heartbeat counters remain diagnostics rather than Recorder attributes.
 
+Percentage-target updates reserve a bounded, short-lived service token before
+submission. After a lost reply, resolution either confirms completion or prevents
+an unstarted request from executing later. The HA observer keeps evidence against
+both the old and requested goal until the outcome is known. A service-owned goal
+revision prevents buffered reports from stopping a subsequently replaced target.
+At most 64 reservations are retained in RAM, with a five-minute lifetime; tokens
+do not survive a service restart and are not Recorder attributes. A restarted
+service or an unknown storage outcome is never inferred to be a successful save.
+Older API 2 services remain usable for other controls; setting a percentage goal
+requires this capability and otherwise reports that the app needs an update.
+
 Explicit target saves finish before propagating cancellation, including time
 spent waiting for a storage lock. The corresponding in-memory model and command
 invalidation must finish with that save. This keeps a cancelled request from
@@ -78,14 +89,20 @@ Cancellation runs a bounded, shielded restoration. A failed restoration leaves
 the old owner stopped. See [adapter setup and limitations](lan-adapters.md).
 
 Since **0.6.0b1**, an administrator connection page runs on a separate
-internal Ingress listener. It requires stable Supervisor 2026.11.0+, enumerates
-only locally mapped serial adapters and saves connection fields through the
+internal Ingress listener. The updated page requires stable Supervisor
+2026.10.4+; earlier app releases required 2026.11.0+. It enumerates only locally
+mapped serial adapters and saves connection fields through the
 Supervisor API for this app. It does not expose the service token to the browser.
 Ordinary connection saves take effect after an app restart. Explicit LAN-adapter
 setup stops the old connection before changing the adapter; local validation
 errors leave the existing connection running. The user restarts the app after
 a successful adapter change to resume Modbus with the saved settings.
 Other app settings remain in the native Configuration tab.
+
+The [Supervisor 2026.10.4 ingress implementation](https://github.com/home-assistant/supervisor/blob/2026.10.4/supervisor/api/ingress.py)
+enforces `panel_admin`, removes incoming user and group headers regardless of
+case, and sets the groups from the authenticated user. Earlier Supervisor
+releases do not provide all of these checks and headers together.
 
 An app with missing connection fields starts only its setup interface and health
 endpoint, with no Modbus owner, heartbeat or discovery. A configured but missing
@@ -114,12 +131,20 @@ The other service tests cover migration identity, API validation, bounded queues
 recovery and atomic state persistence. These simulations do not validate the
 physical wallbox's firmware or the Supervisor/container runtime. CI separately
 builds the standalone wheel and app container and checks their entrypoints.
+The installed-asset probe reuses the app's static route registration with its
+own loopback-only guard. It does not construct the settings API or its Supervisor
+lifecycle, so API additions do not require placeholder handlers in the probe.
 
 ## Shape
 
 Small, single-purpose modules; a leading `_` marks a module that only its
 sibling may import. `__init__.py` is a facade that assembles runtime data and
 tears it down again — no device rule lives there.
+
+Failed setup and normal entry unloading share one ordered cleanup path. Source
+listeners and estimates stop first, followed by goal owners, recovery and the
+heartbeat; control shutdown and connection close come last. Failed platform
+unloading leaves the active runtime intact.
 
 ```text
 device/registers.py          the register map, single source of truth
@@ -148,8 +173,10 @@ entity.py             entity base: unique id, device info, availability
 config_flow.py        + _flow_serial.py, _flow_connect.py, config_schemas.py
 options_flow.py       options menu and section routing
 _options_*.py         independent draft, vehicle, departure and estimate steps
+vehicle_profiles.py  bounded profiles and effective vehicle options
 vehicle_sources/     optional provider capabilities and selection compatibility
-vehicle_sources/bavariandata/  local timer and charging-history adapters
+vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapters
+vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure plan from generic HA sources or a provider
 charge_loss_observer.py  bounded matching and durable loss aggregate
 sensor.py             + sensor_descriptions.py
@@ -165,33 +192,135 @@ repairs.py            + repair_issues.py
 
 ### Vehicle integrations provide data through narrow capabilities
 
-Generic Home Assistant entities are the baseline for SoC, usable capacity,
+Generic Home Assistant entities remain available for SoC, usable capacity,
 dated departure, price and last-charge energy. Manual departure and calendar
 selection work without a manufacturer adapter. The optional `vehicle_sources`
-package exposes only the implemented `departure` and `charge_history`
-capabilities. Its provider metadata also supplies the configuration's device
-filter. BavarianData is currently the only adapter; this structure does not
-claim support for other manufacturers' proprietary timer or history formats.
+package translates supported vehicle telemetry, departure timers and charging
+history into small provider-independent contracts. Its metadata also supplies
+the configuration's device filter. BavarianData is the first adapter; this does
+not claim support for other manufacturers' proprietary timer or history formats.
 
-The scheduling observer requests a next departure instant. The loss observer
+The SoC observer consumes bounded telemetry updates. The scheduling observer
+requests usable capacity and a next departure instant. The loss observer
 requests a bounded match and subscribes to local history changes. VIN parsing,
 entity descriptors, provider event names and the local public history service
 remain inside the adapter. Neither observer calls a vehicle cloud API or
 interprets manufacturer identities, and the Modbus control layer has no
 vehicle-provider dependency.
 
-Departure and loss history retain independent vehicle selections. Generic
-provider/device keys take precedence over saved legacy keys, including an
-explicitly disabled provider. Existing BavarianData settings are read without
-resetting the stored hashed source identity or loss average. History adapters
-bind that identity for their lifetime and reject a device rebound to another
-vehicle before and after an asynchronous read.
+All BavarianData sources use the same vehicle-identity binding. Registry lookup,
+the persisted identity hash and late initial binding live outside the history
+adapter. Each source retains its own value validation and event cache because
+telemetry, location and timer freshness have different contracts.
 
-Options edits are held in a section-local draft until **Save**. Saving merges
-only that section's keys into the latest options and rejects an edit to the
-same section made concurrently. Returning to the main menu discards the draft.
+BavarianData telemetry is resolved by the selected device and its registered
+`VIN_descriptor` identities, with matching descriptor attributes. Charge level
+uses `vehicle.drivetrain.batteryManagement.header`, the optional maximum uses
+`vehicle.powertrain.electric.battery.stateOfCharge.target`, and usable capacity
+uses `vehicle.drivetrain.batteryManagement.maxEnergy`. Installed battery size
+and formatted battery-health estimates are not capacity fallbacks. Only already
+enabled local entities are read; missing or invalid values remain unavailable.
+
+Profiles hold a stable ID, name, provider/device selection and independent
+feature settings. One explicitly selected profile supplies effective vehicle
+options; wallbox and cost settings remain shared. Creating or selecting a
+profile does not enable optional features. Automatic selection is separately
+opt-in; manual selection disables it. Profile changes invalidate the previous
+target and trip, while loss aggregates are retained separately per profile. Provider adapters bind the
+vehicle identity and reject a device rebound to another car.
+
+Optional detection resolves two independent signals per participating profile:
+cable connection and home presence. Provider-backed BavarianData detection uses
+its registered cable entity and GPS tracker against HA's Home zone; generic
+profiles can use explicit binary sensors and person/device-tracker entities.
+A definite disconnected or away signal excludes that profile. Only one positive
+candidate with no unresolved remaining candidates can be selected, after a
+three-second settling interval. Missing, unavailable, restored or HA reports
+older than 30 minutes invalidate the affected signal. The
+observer reevaluates expiry even without new state changes. It never issues a
+vehicle cloud request or a charging command. Removing an assignment or changing
+cars invalidates the previous targets before activating new profile sources.
+
+The timestamp bound covers HA reports, not necessarily the original measurement
+age. Upstream BavarianData can restore cable state and tracker coordinates;
+available cable descriptor timestamps are checked, but missing timestamps and
+tracker coordinates without restore provenance cannot prove measurement
+freshness. A GPS accuracy circle crossing the Home-zone boundary is unknown. Detection remains a heuristic; manually selecting a
+profile is always possible. Manual loss matching requires the profile to have
+been selected before charging. Automatic selection can arrive later: a bounded
+transient attribution records the uniquely confirmed vehicle within the observed
+physical cycle, then binds it to the completed session ID. A conflicting profile
+or observation loss prevents attribution. This record supplies only loss
+settings after automatic deselection; it cannot reactivate SoC or departure goals.
+
+Direct-mode session capture starts when any configured profile needs loss
+estimates or wallbox costs are enabled, before an active vehicle is selected.
+Controlled reloads on the same physical connection hand over the live session
+observer and compatible cost observer, including their meter baseline and price
+observations. Transport generation changes discard incomplete measurements;
+full unload and failed setup close all retained owners. Only completed summaries
+are stored, so retaining these bounded in-memory models adds no Recorder writes.
+
+Without profile configuration, existing flat options retain their behavior,
+including independently selected departure and history vehicles. Explicit
+profile setup preserves those settings as a manual profile instead of guessing
+that two old selections describe the same car. Provider/device keys still take
+precedence over older keys, including an explicitly disabled provider.
+
+Options edits are held in a section-local draft until the final form is
+submitted. Completing it merges only that section's keys into the latest
+options and rejects a concurrent edit to the same section. Vehicle sections
+also retain the active profile identity, so an open form cannot modify another
+car after a profile switch. Returning to the main menu discards an unfinished
+draft.
 Departure activation is independent of merely configuring an SoC sensor;
 disabling it clears the trip and cancels only its owned queued commands.
+
+### Virtual Plug & Charge separates evidence from physical permission
+
+This optional feature has two independent decisions: HA evaluates the active
+profile's permission and local cable/home evidence; the bus owner enforces a
+gate for one observed physical connection. Automatic profile selection remains
+optional. Manually choosing a profile never supplies identity evidence.
+
+HA requires a unique candidate matching the active permitted profile and a
+cable report since the last confirmed physical absence before this cycle.
+If observation begins with a car already connected, startup is the lower bound.
+The adapter uses an upstream cable timestamp when available, otherwise HA's report time. It does
+not trigger a cloud update. The observation remains heuristic: upstream restore
+behavior cannot always be detected, and Modbus polling cannot prove that no
+unobserved vehicle change occurred between reads.
+
+The gate's enabled setting is durable; connection tokens and grants stay in RAM.
+A token belongs to the current observation cycle and cannot authorize a later
+one. A disconnect or unknown physical connection invalidates it. The service
+continues enforcing the gate and retains an existing grant while HA restarts;
+the service itself restarting loses that grant. Direct mode loses the grant
+when its physical client closes. A controlled options/profile reload hands over
+the same open client when connection settings match; normal unload, failed
+setup and a changed connection close it. Transport disconnect callbacks still
+invalidate the token immediately.
+The policy digest includes vehicle identities, detection sources and profile
+permissions, but not the active-profile label. Changing those permissions or
+sources invalidates grants. A manual selection change or an automatic selection
+cleared by stale cloud data leaves an established physical-session grant intact.
+The vehicle decision is taken when HA sends the request. A submitted request
+expires after ten seconds and is checked again against the physical token at
+the bus write. Cancelling its HA HTTP task is not a remote revocation of a
+request already accepted by the service.
+
+Charging permission composes with existing current, pause, lock and goal
+guards. It does not erase a manual pause or an already reached target, and error
+recovery does not provide another path around it. A cloud-data interruption
+alone does not revoke an already granted physical connection. Enabling the gate
+requests release closure; disabling it does not restore charging release.
+Configuration and the hold until an explicit manual release are durable;
+connection grants are not. Ordinary evidence reports and cycle tokens create
+neither per-poll storage writes nor Recorder attributes.
+
+The gate uses the documented EMS release register, not an RFID write or a
+vehicle authentication protocol. Local RFID authorization remains independent;
+see [limits and prerequisites](safety.md#virtual-plug--charge).
 
 ### One lock, because Modbus RTU has one master
 

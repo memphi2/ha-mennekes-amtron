@@ -34,7 +34,12 @@ from .device.registers import CP_STATE, EVSE_STATE
 from .device.vehicle import vehicle_connected
 from .exceptions import service_validation_error
 from .goal_store import _finish_atomic
+from .loss_attribution import attributed_session, loss_vehicle_options
 from .loss_store import LossStore
+from .vehicle_profiles import (
+    CONF_VEHICLE_PROFILE_ID,
+    CONF_VEHICLE_PROFILE_SELECTED_AT,
+)
 from .vehicle_sources import loss_source, resolve_history_source
 
 if TYPE_CHECKING:
@@ -65,10 +70,19 @@ class ChargeLossObserver:
         self._hass = hass
         self._entry = entry
         self._coordinator = entry.runtime_data.coordinator
-        self.mode = loss_source(entry.options)
-        self._entity = str(entry.options.get(CONF_VEHICLE_LAST_CHARGE_ENERGY, ""))
-        self._auto = entry.options.get(CONF_LOSS_AUTO_MATCH, False)
-        self._history_source = resolve_history_source(hass, entry.options) if self.mode == LOSS_SOURCE_VEHICLE_HISTORY else None
+        options = loss_vehicle_options(hass, entry)
+        self._profile_id: str | None = options.get(CONF_VEHICLE_PROFILE_ID)
+        self._profiled = self._profile_id is not None
+        selected_at = options.get(CONF_VEHICLE_PROFILE_SELECTED_AT, 0)
+        self._selected_at = (
+            float(selected_at)
+            if type(selected_at) in (int, float) and math.isfinite(selected_at) and selected_at >= 0
+            else float("inf")
+        )
+        self.mode = loss_source(options)
+        self._entity = str(options.get(CONF_VEHICLE_LAST_CHARGE_ENERGY, ""))
+        self._auto = options.get(CONF_LOSS_AUTO_MATCH, False)
+        self._history_source = resolve_history_source(hass, options) if self.mode == LOSS_SOURCE_VEHICLE_HISTORY else None
         self._source = self._history_source.source_key if self._history_source is not None else f"{self.mode}:{self._entity}"
         self._source_ready = self.mode != LOSS_SOURCE_VEHICLE_HISTORY or (
             self._history_source is not None and self._history_source.available
@@ -77,7 +91,9 @@ class ChargeLossObserver:
             self._history_source is not None and self._history_source.available
         )
         identity = entry.runtime_data.identity.serial_number or entry.entry_id
-        self._store = LossStore(hass, entry.entry_id, identity)
+        self._store = LossStore(
+            hass, entry.entry_id, identity, profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
+        )
         self.statistics = LossStatistics()
         self._session: CompletedSession | None = None
         self._started_at = time.time()
@@ -185,6 +201,22 @@ class ChargeLossObserver:
             initial = True
         data = self._coordinator.current_data()
         session = CompletedSession.parse(data.charging_session) if data.charging_session else None
+        ownership = (
+            attributed_session(self._hass, self._entry, self._profile_id, session)
+            if self._profile_id is not None and session is not None else None
+        )
+        if self._profiled and (
+            session is None or ownership is False
+            or (ownership is None and session.started_after < self._selected_at)
+        ):
+            # A newly selected vehicle does not own an earlier wallbox session.
+            # Retain this profile's saved last match and weighted average.
+            self._session = None
+            self._pending = False
+            if self._retry is not None:
+                self._retry()
+                self._retry = None
+            return
         if session != self._session or initial:
             self._session = session
             self._attempt = 0
@@ -202,7 +234,10 @@ class ChargeLossObserver:
 
     @callback
     def _queue(self) -> None:
-        if self._stopping or self._storage_corrupt or not self._source_ready:
+        if (
+            self._stopping or self._storage_corrupt or not self._source_ready
+            or (self._profiled and self._session is None)
+        ):
             return
         self._pending = True
         if self._task is None or self._task.done():
