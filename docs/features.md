@@ -7,7 +7,7 @@ Start with ordinary current control and pause/resume, then add one function at
 a time. Each configuration section saves independently and shows the inputs
 needed for your choice.
 
-This guide follows **beta 0.8.0b5**, which includes central vehicle profiles, optional
+This guide follows **beta 0.8.0b6**, which includes central vehicle profiles, optional
 automatic selection, Virtual Plug & Charge and live app Modbus debugging.
 **0.6.1 remains stable.** See
 [versions and availability](README.md#versions-and-feature-availability).

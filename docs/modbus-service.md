@@ -51,7 +51,7 @@ Install **Mennekes Amtron RTU** from the Marketplace on HA 2026.11+, or
 HACS on HA 2026.9/2026.10, and complete the requested Core restart.
 **0.6.1 remains stable.** Choose **beta 0.8.0b4** for vehicle profiles,
 Virtual Plug & Charge and the new app features; follow the
-[beta update guide](upgrading.md#trying-080b5) for an existing installation.
+[beta update guide](upgrading.md#trying-080b6) for an existing installation.
 
 Already using the service? Go to [Updates](#updates); keep your existing entry.
 
@@ -72,7 +72,7 @@ The repository above provides stable **0.6.1**. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog provides beta
 **0.8.0b4**. Existing beta-catalog installations update in place. To switch
 catalogs, follow the [channel handover](#updates) and
-[beta update guide](upgrading.md#trying-080b5).
+[beta update guide](upgrading.md#trying-080b6).
 
 ### 3. Configure and start read-only
 

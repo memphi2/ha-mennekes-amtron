@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0b6 — 2026-11-08
+
+Beta update of the integration only; **0.6.1 remains stable**. The app stays at
+**0.8.0b4**.
+
+- BavarianData is offered again as a vehicle source when adding or editing a
+  vehicle profile. Since Home Assistant 2026.10 the integration no longer found
+  the registered car, so only **None** was offered and editing an existing
+  BavarianData profile skipped choosing the car and its vehicle entities.
+
 ## 0.8.0b5 — 2026-11-08
 
 Beta update of the integration only; **0.6.1 remains stable**. The app stays at

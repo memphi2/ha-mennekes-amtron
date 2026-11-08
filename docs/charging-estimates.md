@@ -3,7 +3,7 @@
 These optional features are available in **stable 0.6.1**, including automatic
 tariff import and yearly refresh. For service connections,
 [update the app first](installation.md#updating-to-061).
-The setup steps follow **beta 0.8.0b5**, which includes central vehicle profiles and
+The setup steps follow **beta 0.8.0b6**, which includes central vehicle profiles and
 clearer configuration dialogs. Existing separate sources continue to work.
 [Check feature availability](README.md#versions-and-feature-availability).
 

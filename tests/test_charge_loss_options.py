@@ -22,8 +22,17 @@ class Flow(BaseFlow):
         registry.async_get.side_effect = lambda key: (
             device if key in {"car", "own"} else None
         )
+        # The registered car belongs to one BavarianData account entry.
+        registry._devices = SimpleNamespace(
+            get_devices_for_config_entry_id=lambda entry_id: (
+                [SimpleNamespace(id="car")] if entry_id == "account-entry" else []
+            )
+        )
         self.hass = SimpleNamespace(
-            data={dr.DATA_REGISTRY: registry}, config=SimpleNamespace(country="DE")
+            data={dr.DATA_REGISTRY: registry}, config=SimpleNamespace(country="DE"),
+            config_entries=SimpleNamespace(async_entries=lambda domain: (
+                [SimpleNamespace(entry_id="account-entry")] if domain == "bavariandata" else []
+            )),
         )
 
 

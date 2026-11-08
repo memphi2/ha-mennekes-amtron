@@ -12,7 +12,7 @@ can also supply supported data from one selected BMW vehicle.
 stable 0.6.1. Central vehicle profiles, optional automatic selection and
 Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
 below; existing manual sources continue to work after updating.
-The steps below follow **beta 0.8.0b5**, which adds the wallbox **Virtual Plug &
+The steps below follow **beta 0.8.0b6**, which adds the wallbox **Virtual Plug &
 Charge** switch, guided detection setup and clearer **Stop using vehicle charge
 level** action. Existing activation settings and profile permissions are kept.
 See [versions and feature availability](README.md#versions-and-feature-availability).
