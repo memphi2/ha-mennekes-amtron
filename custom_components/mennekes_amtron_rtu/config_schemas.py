@@ -466,17 +466,20 @@ def vehicle_provider_schema(
     )
 
 
-def vehicle_profile_details_schema(current: dict[str, Any]) -> probatio.Schema:
+def vehicle_profile_details_schema(
+    current: dict[str, Any], *, providers: list[str] | None = None,
+) -> probatio.Schema:
     """Name a profile and choose its optional manufacturer integration."""
+    providers = ["none", "bavariandata"] if providers is None else providers
     return probatio.Schema({
         probatio.Required("vehicle_profile_name", description={
             "suggested_value": current.get("vehicle_profile_name"),
         }): TextSelector(),
         probatio.Required("vehicle_provider", default=(
-            current.get("vehicle_provider") if current.get("vehicle_provider") in ("none", "bavariandata") else "none"
+            current.get("vehicle_provider") if current.get("vehicle_provider") in providers else "none"
         )):
             SelectSelector(SelectSelectorConfig(
-                options=["none", "bavariandata"], translation_key="vehicle_provider",
+                options=providers, translation_key="vehicle_provider",
                 mode=SelectSelectorMode.DROPDOWN,
             )),
     })
@@ -504,12 +507,8 @@ def vehicle_detection_mode_schema(current: dict[str, Any]) -> probatio.Schema:
 def vehicle_plug_charge_schema(
     current: dict[str, Any], *, permission: bool,
 ) -> probatio.Schema:
-    """Keep the global gate editable even without a selected, detectable car."""
-    fields: dict[Any, Any] = {
-        probatio.Required(
-            "virtual_plug_charge", default=current.get("virtual_plug_charge") is True
-        ): BooleanSelector(),
-    }
+    """Edit only the selected vehicle's permission; activation is an entity."""
+    fields: dict[Any, Any] = {}
     if permission:
         fields[probatio.Required(
             "vehicle_plug_charge", default=current.get("vehicle_plug_charge") is True,
@@ -540,12 +539,12 @@ def vehicle_detection_entities_schema(current: dict[str, Any]) -> probatio.Schem
     })
 
 
-def vehicle_source_schema(current: dict[str, Any]) -> probatio.Schema:
+def vehicle_source_schema(current: dict[str, Any], *, profile: bool = True) -> probatio.Schema:
     return probatio.Schema({
         probatio.Required("vehicle_soc_source", default=(
-            "profile" if current.get("vehicle_soc_use_profile") is True else "entity"
+            "profile" if profile and current.get("vehicle_soc_use_profile") is True else "entity"
         )): SelectSelector(SelectSelectorConfig(
-            options=["profile", "entity"], translation_key="vehicle_soc_source",
+            options=["profile", "entity"] if profile else ["entity"], translation_key="vehicle_soc_source",
             mode=SelectSelectorMode.DROPDOWN,
         )),
     })

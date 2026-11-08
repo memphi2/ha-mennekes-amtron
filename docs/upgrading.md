@@ -57,7 +57,10 @@ first implemented vehicle adapter. Generic HA entity sources remain
 available for other vehicle integrations; manual and calendar departure work
 independently of a provider.
 
-Virtual Plug & Charge is separately optional and remains off after an update.
+Virtual Plug & Charge is separately optional and stays off until you enable it.
+An existing activation setting is preserved. In the unreleased development
+version, its activation moves to the wallbox's **Virtual Plug & Charge** switch
+under **Configuration**; profile permissions remain in the vehicle options.
 It needs detection sources and permission for each participating profile;
 automatic profile selection alone does not enable it. Service mode also needs
 app/service **0.8.0b1** with the new charging-permission capability. Follow the [setup steps](vehicle-setup.md#optional-virtual-plug--charge)

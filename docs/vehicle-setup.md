@@ -12,6 +12,10 @@ can also supply supported data from one selected BMW vehicle.
 stable 0.6.1. Central vehicle profiles, optional automatic selection and
 Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
 below; existing manual sources continue to work after updating.
+The wallbox **Virtual Plug & Charge** switch, guided detection setup and the
+**Stop using vehicle charge level** wording below are unreleased usability improvements.
+Published beta 0.8.0b1 still enables Plug & Charge in the vehicle options and
+calls SoC removal **Disable percentage target**.
 See [versions and feature availability](README.md#versions-and-feature-availability).
 
 ## Choose the setup that fits
@@ -53,6 +57,12 @@ profile menu. The integration finds that vehicle's supported data through Home
 Assistant's entity registry, so renamed entities do not require guessed entity
 names. Each optional feature uses the same selected car. No BMW credentials or
 additional cloud requests are needed.
+
+In the unreleased development version, BavarianData appears in this choice only
+when Home Assistant has a supported vehicle device from that integration.
+Manual entity sources remain available for other cars. If a saved integration
+is temporarily absent, you can still rename its existing profile without losing
+its vehicle binding or settings.
 
 The charge level, the car's maximum charge limit, usable battery capacity,
 departure timers and charging history are separate choices. A missing value
@@ -101,7 +111,11 @@ profile. Open **Configure → Vehicle → Automatic vehicle selection**. Under
   selection while keeping its manual selection and optional features.
 
 After configuring the participating profiles, enable **Select the vehicle
-automatically**. The **Active vehicle** selector also offers **Automatic
+automatically**. In the unreleased development version, you can also enable it
+before any detection sources exist: the next steps select a profile and configure
+its sources. Automatic selection starts only after those settings are saved;
+cancelling the setup leaves the previous settings unchanged.
+The **Active vehicle** selector also offers **Automatic
 selection** when detection sources are configured. Open the selector’s details
 to see the currently selected profile. Selecting a particular car or no vehicle
 manually turns the automatic mode off.
@@ -147,11 +161,20 @@ manually, but that choice alone never proves which car is connected.
 2. Select that profile. Open **Configure → Vehicle → Virtual Plug & Charge**
    and enable **Allow this vehicle to charge automatically**. Repeat for any
    other profiles you want to permit.
-3. Turn on **Enable Virtual Plug & Charge** in the same section. The feature requires
+3. Open the wallbox's device page and turn on **Virtual Plug & Charge** under
+   **Configuration**. This switch controls the feature for the whole wallbox;
+   the vehicle options only manage each profile's permission. The feature requires
    write access. In service mode, update the app to **0.8.0b1** first: older
    compatible services do not provide this charging-permission capability.
 4. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
+
+If a profile or its detection signals are missing, the permission page offers
+**Vehicle profiles** to create or select a car and, when profiles exist,
+**Automatic vehicle selection** to configure its cable/home signals. Return to
+the permission page afterwards to allow that car. You can still switch the feature off on the wallbox
+device page without a selected vehicle. The switch preserves an existing
+activation setting when updating; it does not enable the feature by itself.
 
 The wallbox must expose CP state and its local authorization setting (Modbus
 register layout 01.02 or newer). For automatic charging without presenting an RFID card, local RFID
@@ -241,10 +264,16 @@ not a replacement for the car's own charge limit. The five-second write floor
 and wallbox response time also still apply when a stop is requested.
 
 Changing or removing either selected source clears the old percentage target
-and remembered maximum without starting charging. Choose **Disable percentage
-target** under **Vehicle** to remove this optional feature. This also disables
+and remembered maximum without starting charging. To cancel only the current
+target while keeping its sources, set **Vehicle charge target** to **0%**.
+Choose **Stop using vehicle charge level** under **Vehicle** to remove the selected
+profile's charge-level and optional maximum assignments here, along with its
+percentage target. The source entities in the vehicle integration are kept.
+This also disables
 departure planning and clears its trip, because that plan needs the SoC source.
-The kWh goal is independent. In service mode, changing a percentage target
+The action is shown only when a vehicle charge-level source is configured. Vehicle profiles,
+detection and Plug & Charge permission remain; the kWh goal and charging state
+are unchanged. In service mode, changing a percentage target
 requires an app version that supports confirmed target updates. Update the
 Modbus service app if Home Assistant asks you to do so. Other service functions
 remain available with older compatible app versions.

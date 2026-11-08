@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
@@ -14,6 +15,7 @@ from .coordinator import MennekesAmtronCoordinator
 from .device.registers import CHARGING_CURRENT_EMS, CHARGING_RELEASE, LOCK_EVSE
 from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
+from .exceptions import service_validation_error
 
 if TYPE_CHECKING:
     from homeassistant.components.switch.const import SwitchDeviceClass
@@ -31,13 +33,48 @@ async def async_setup_entry(
     """Add the command switches this device supports."""
 
     coordinator = entry.runtime_data.coordinator
-    async_add_entities(
-        [
-            AmtronPauseSwitch(entry, coordinator),
-            AmtronChargingReleaseSwitch(entry, coordinator),
-            AmtronLockSwitch(entry, coordinator),
-        ]
-    )
+    entities: list[SwitchEntity] = [
+        AmtronPauseSwitch(entry, coordinator),
+        AmtronChargingReleaseSwitch(entry, coordinator),
+        AmtronLockSwitch(entry, coordinator),
+    ]
+    if entry.runtime_data.plug_charge is not None:
+        entities.append(AmtronPlugChargeSwitch(entry, coordinator))
+    async_add_entities(entities)
+
+
+class AmtronPlugChargeSwitch(MennekesAmtronControlEntity, SwitchEntity):
+    """Configure automatic charging permission directly on the HA device."""
+
+    _attr_translation_key = "virtual_plug_charge"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator) -> None:
+        super().__init__(entry, coordinator, "virtual_plug_charge")
+
+    @property
+    def available(self) -> bool:
+        return (
+            self.coordinator.last_update_success
+            and self.runtime_data.control.supports_plug_charge
+            and (not self.runtime_data.control.read_only or self.is_on)
+        )
+
+    @property
+    def is_on(self) -> bool:
+        return self.runtime_data.control.plug_charge.get("enabled") is True
+
+    async def _async_set_enabled(self, enabled: bool) -> None:
+        observer = self.runtime_data.plug_charge
+        if observer is None:
+            raise service_validation_error("plug_charge_unavailable")
+        await observer.async_set_enabled(enabled)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._async_set_enabled(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._async_set_enabled(False)
 
 
 type IntentKey = Literal["pause_requested", "charging_release_requested"]

@@ -233,6 +233,9 @@
           "on": "mdi:lock",
           "off": "mdi:lock-open-variant"
         }
+      },
+      "virtual_plug_charge": {
+        "default": "mdi:ev-plug-type2"
       }
     },
     "event": {

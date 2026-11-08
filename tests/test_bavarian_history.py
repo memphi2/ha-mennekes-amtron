@@ -37,7 +37,9 @@ def vehicle_registry(*, identifiers=None, entries=None):
         identifiers={("bavariandata", VIN)} if identifiers is None else identifiers,
         config_entry_id="account-entry" if entries is None else next(iter(entries)),
     )
-    return SimpleNamespace(async_get=Mock(return_value=device))
+    return SimpleNamespace(
+        async_get=Mock(return_value=device), devices={"car": device, "own": device},
+    )
 
 
 def session() -> CompletedSession:

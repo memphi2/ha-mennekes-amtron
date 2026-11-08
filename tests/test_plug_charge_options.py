@@ -27,7 +27,7 @@ def allowed_options():
 
 
 @pytest.mark.parametrize("raw", [{}, profile_options(), profile_options(active=None)])
-def test_gate_is_available_without_permission_or_active_profile(raw):
+def test_missing_detectable_profile_links_to_setup_without_changing_options(raw):
     async def run():
         entry = FakeConfigEntry(options=raw)
         flow = Flow(entry)
@@ -35,35 +35,41 @@ def test_gate_is_available_without_permission_or_active_profile(raw):
             "vehicle_plug_charge" in (await flow.async_step_vehicle())["menu_options"]
         )
         form = await flow.async_step_vehicle_plug_charge()
-        assert set(fields(form)) == {CONF_VIRTUAL_PLUG_CHARGE}
+        assert form["type"] == "menu"
+        assert form["menu_options"] == (
+            ["vehicle_profiles", "vehicle_detection", "back"]
+            if raw.get("vehicle_profiles") else ["vehicle_profiles", "back"]
+        )
+        assert not form.get("errors")
+        assert "data_schema" not in form
         assert form["description_placeholders"]["vehicle"] == (
             "Car A" if raw.get("active_vehicle_profile") == A else "—"
         )
-        saved = (
-            await flow.async_step_vehicle_plug_charge({CONF_VIRTUAL_PLUG_CHARGE: True})
-        )["data"]
-        assert saved == {**raw, CONF_VIRTUAL_PLUG_CHARGE: True}
+        result = await flow.async_step_back()
+        assert result["type"] == "menu"
         assert entry.options == raw
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("automatic", [False, True])
-def test_gate_and_active_permission_save_without_selecting_a_car_or_enabling_other_features(
-    automatic,
+@pytest.mark.parametrize("enabled", [None, False, True])
+def test_permission_save_preserves_global_activation_and_other_features(
+    automatic, enabled,
 ):
     async def run():
         raw = detected_options()
         raw["vehicle_auto_selection"] = automatic
+        if enabled is not None:
+            raw[CONF_VIRTUAL_PLUG_CHARGE] = enabled
         flow = Flow(FakeConfigEntry(options=raw))
         form = await flow.async_step_vehicle_plug_charge()
-        assert set(fields(form)) == {CONF_VIRTUAL_PLUG_CHARGE, CONF_VEHICLE_PLUG_CHARGE}
+        assert set(fields(form)) == {CONF_VEHICLE_PLUG_CHARGE}
         saved = (
-            await flow.async_step_vehicle_plug_charge(
-                {CONF_VIRTUAL_PLUG_CHARGE: True, CONF_VEHICLE_PLUG_CHARGE: True}
-            )
+            await flow.async_step_vehicle_plug_charge({CONF_VEHICLE_PLUG_CHARGE: True})
         )["data"]
-        assert saved[CONF_VIRTUAL_PLUG_CHARGE] is True
+        assert saved.get(CONF_VIRTUAL_PLUG_CHARGE) is enabled
+        assert (CONF_VIRTUAL_PLUG_CHARGE in saved) is (enabled is not None)
         assert profiles(saved)[A].options == {CONF_VEHICLE_PLUG_CHARGE: True}
         assert profiles(saved)[B] == profiles(raw)[B]
         assert saved["active_vehicle_profile"] == A
@@ -75,39 +81,32 @@ def test_gate_and_active_permission_save_without_selecting_a_car_or_enabling_oth
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("key", [CONF_VIRTUAL_PLUG_CHARGE, CONF_VEHICLE_PLUG_CHARGE])
 @pytest.mark.parametrize("value", [None, 0, 1, "true", [], {}])
-def test_both_switches_accept_only_actual_booleans(key, value):
+def test_permission_accepts_only_actual_booleans(value):
     async def run():
         raw = detected_options()
         flow = Flow(FakeConfigEntry(options=raw))
-        form = await flow.async_step_vehicle_plug_charge(
-            {CONF_VIRTUAL_PLUG_CHARGE: True, CONF_VEHICLE_PLUG_CHARGE: True, key: value}
-        )
-        assert form["errors"][key] == "plug_charge_invalid"
+        form = await flow.async_step_vehicle_plug_charge({CONF_VEHICLE_PLUG_CHARGE: value})
+        assert form["errors"][CONF_VEHICLE_PLUG_CHARGE] == "plug_charge_invalid"
         assert flow.config_entry.options == raw
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("raw", [{}, profile_options(), profile_options(active=None)])
-def test_permission_cannot_be_enabled_without_an_active_profile_and_evidence(raw):
+def test_injected_permission_cannot_be_enabled_without_active_profile_and_evidence(raw):
     async def run():
         flow = Flow(FakeConfigEntry(options=raw))
-        result = await flow.async_step_vehicle_plug_charge(
-            {CONF_VIRTUAL_PLUG_CHARGE: True, CONF_VEHICLE_PLUG_CHARGE: True}
-        )
-        assert (
-            result["errors"][CONF_VEHICLE_PLUG_CHARGE]
-            == "plug_charge_detection_required"
-        )
+        result = await flow.async_step_vehicle_plug_charge({CONF_VEHICLE_PLUG_CHARGE: True})
+        assert result["type"] == "menu"
+        assert "data" not in result
         assert flow.config_entry.options == raw
 
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("missing", ["active", "detection", "catalog"])
-def test_gate_can_always_be_disabled_even_after_profile_or_source_disappears(missing):
+def test_setup_menu_preserves_global_state_and_existing_profile_permission(missing):
     async def run():
         raw = allowed_options()
         if missing == "active":
@@ -117,34 +116,22 @@ def test_gate_can_always_be_disabled_even_after_profile_or_source_disappears(mis
         else:
             raw["vehicle_profiles"] = {}
         flow = Flow(FakeConfigEntry(options=raw))
-        assert set(fields(await flow.async_step_vehicle_plug_charge())) == {
-            CONF_VIRTUAL_PLUG_CHARGE
-        }
-        saved = (
-            await flow.async_step_vehicle_plug_charge({CONF_VIRTUAL_PLUG_CHARGE: False})
-        )["data"]
-        assert saved[CONF_VIRTUAL_PLUG_CHARGE] is False
-        if missing == "detection":
-            assert CONF_VEHICLE_PLUG_CHARGE not in profiles(saved)[A].options
-        elif missing == "active":
-            assert profiles(saved)[A].options[CONF_VEHICLE_PLUG_CHARGE] is True
+        form = await flow.async_step_vehicle_plug_charge()
+        assert form["type"] == "menu"
+        assert "data_schema" not in form
+        assert not form.get("errors")
+        await flow.async_step_back()
+        assert flow.config_entry.options == raw
 
     asyncio.run(run())
 
 
-def test_global_disable_and_profile_revoke_are_separate_actions():
+def test_profile_revoke_preserves_global_activation():
     async def run():
         entry = FakeConfigEntry(options=allowed_options())
         flow = Flow(entry)
-        saved = (
-            await flow.async_step_vehicle_plug_charge({CONF_VIRTUAL_PLUG_CHARGE: False})
-        )["data"]
-        assert profiles(saved)[A].options[CONF_VEHICLE_PLUG_CHARGE] is True
-        entry.options = saved
         revoked = (
-            await flow.async_step_vehicle_plug_charge(
-                {CONF_VIRTUAL_PLUG_CHARGE: True, CONF_VEHICLE_PLUG_CHARGE: False}
-            )
+            await flow.async_step_vehicle_plug_charge({CONF_VEHICLE_PLUG_CHARGE: False})
         )["data"]
         assert revoked[CONF_VIRTUAL_PLUG_CHARGE] is True
         assert CONF_VEHICLE_PLUG_CHARGE not in profiles(revoked)[A].options
@@ -154,16 +141,14 @@ def test_global_disable_and_profile_revoke_are_separate_actions():
 
 @pytest.mark.parametrize(
     "changed",
-    ["gate", "identity", "source", "permission", "selection", "roundtrip", "removed"],
+    ["identity", "source", "permission", "selection", "roundtrip", "removed"],
 )
 def test_open_permission_form_cannot_overwrite_newer_configuration(changed):
     async def run():
         entry = FakeConfigEntry(options=detected_options())
         flow = Flow(entry)
         await flow.async_step_vehicle_plug_charge()
-        if changed == "gate":
-            entry.options[CONF_VIRTUAL_PLUG_CHARGE] = False
-        elif changed == "selection":
+        if changed == "selection":
             entry.options["active_vehicle_profile"] = B
         elif changed == "roundtrip":
             entry.options["vehicle_profile_selected_at"] = 1234
@@ -180,28 +165,29 @@ def test_open_permission_form_cannot_overwrite_newer_configuration(changed):
                 CONF_VEHICLE_PLUG_CHARGE
             ] = False
         live = deepcopy(entry.options)
-        result = await flow.async_step_vehicle_plug_charge(
-            {CONF_VIRTUAL_PLUG_CHARGE: True, CONF_VEHICLE_PLUG_CHARGE: True}
-        )
+        result = await flow.async_step_vehicle_plug_charge({CONF_VEHICLE_PLUG_CHARGE: True})
         assert result["step_id"] == "options_changed"
         assert entry.options == live
 
     asyncio.run(run())
 
 
-def test_unrelated_price_or_automatic_selection_edits_are_preserved():
+@pytest.mark.parametrize("enabled", [False, True])
+def test_concurrent_global_switch_price_and_selection_edits_are_preserved(enabled):
     async def run():
         entry = FakeConfigEntry(options=detected_options())
         flow = Flow(entry)
         await flow.async_step_vehicle_plug_charge()
-        entry.options.update(charging_price=0.6, vehicle_auto_selection=True)
+        entry.options.update(
+            charging_price=0.6, vehicle_auto_selection=True, virtual_plug_charge=enabled,
+        )
         saved = (
-            await flow.async_step_vehicle_plug_charge(
-                {CONF_VIRTUAL_PLUG_CHARGE: True, CONF_VEHICLE_PLUG_CHARGE: True}
-            )
+            await flow.async_step_vehicle_plug_charge({CONF_VEHICLE_PLUG_CHARGE: True})
         )["data"]
         assert saved["charging_price"] == 0.6
         assert saved["vehicle_auto_selection"] is True
+        assert saved[CONF_VIRTUAL_PLUG_CHARGE] is enabled
+        assert profiles(saved)[A].options[CONF_VEHICLE_PLUG_CHARGE] is True
 
     asyncio.run(run())
 

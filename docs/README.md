@@ -37,6 +37,8 @@ These pages cover **beta 0.8.0b1** and identify features already available in
 for a new option.
 The separate app **Debug log** tab described in troubleshooting is an unreleased
 navigation improvement; beta 0.8.0b1 uses the **Live Modbus communication** section.
+The wallbox **Virtual Plug & Charge** activation switch and guided vehicle setup
+are also unreleased; their guides identify the differences from beta 0.8.0b1.
 
 | Version | Available functionality |
 |---|---|

@@ -346,8 +346,11 @@ identity supplied by the wallbox.
 
 ### Optional Virtual Plug & Charge
 
-**New in beta 0.8.0b1 and off by default.** Separately enable this feature and permit the
-profiles that may receive automatic charging release. It needs an unambiguous
+**New in beta 0.8.0b1 and off by default.** Permit each participating profile under
+**Configure → Vehicle → Virtual Plug & Charge**. In the unreleased development
+version, enable the feature using **Virtual Plug & Charge** under
+**Configuration** on the wallbox device page; published beta 0.8.0b1 still has
+its activation checkbox in the vehicle options. It needs an unambiguous
 cable/home match for the active car and a fresh cable report for the current
 connection cycle. Manual profile selection alone does not grant permission.
 Existing pauses, locks, disabled release and reached targets remain effective.

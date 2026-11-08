@@ -212,9 +212,11 @@ replace a small file rather than accumulating a history.
 ### Virtual Plug & Charge
 
 This feature is **optional and off by default**. Configure vehicle profiles and
-fresh cable/home detection in HA, then enable **Configure → Vehicle → Virtual
-Plug & Charge** and permit each vehicle that may receive automatic charging
-permission. Automatic profile selection is a separate option; selecting a profile
+fresh cable/home detection in HA, then permit each vehicle under **Configure →
+Vehicle → Virtual Plug & Charge**. The unreleased integration version activates
+the feature with **Virtual Plug & Charge** under **Configuration** on the wallbox
+device page; published integration beta 0.8.0b1 has its activation checkbox in
+the vehicle options. Automatic profile selection is a separate option; selecting a profile
 manually does not replace the detection check. See the
 [vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b1/docs/vehicle-setup.md#optional-virtual-plug--charge).
 

@@ -29,6 +29,7 @@ from .vehicle_profiles import (
     CONF_VEHICLE_SOURCE_IDENTITY,
     VehicleDetectionConfig,
     VehicleProfile,
+    active_profile,
     profiles,
     valid_detection_entity,
 )
@@ -62,16 +63,21 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
     ) -> ConfigFlowResult:
         if (draft := self._section("detection")) is None:
             return await self.async_step_init()
+        configured = any(
+            profile.detection is not None
+            for profile in profiles(draft.values).values()
+        )
         errors = {}
         if user_input is not None:
             enabled = user_input.get(CONF_VEHICLE_AUTO_SELECTION)
             if type(enabled) is not bool:
                 errors[CONF_VEHICLE_AUTO_SELECTION] = "vehicle_detection_source_invalid"
-            elif enabled and not any(
-                profile.detection is not None
-                for profile in profiles(draft.values).values()
-            ):
-                errors[CONF_VEHICLE_AUTO_SELECTION] = "vehicle_detection_required"
+            elif enabled and not configured:
+                self._details["enable_detection"] = True
+                if (profile := active_profile(draft.values)) is not None:
+                    self._details["detection_profile"] = profile.id
+                    return await self.async_step_vehicle_detection_source()
+                return await self.async_step_vehicle_detection_profile()
             else:
                 draft.values[CONF_VEHICLE_AUTO_SELECTION] = enabled
                 return self._finish_section()
@@ -79,7 +85,7 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
             step_id="vehicle_detection_mode",
             data_schema=vehicle_detection_mode_schema(draft.values),
             errors=errors,
-            last_step=True,
+            last_step=configured,
         )
 
     async def async_step_vehicle_detection_profile(
@@ -147,9 +153,11 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
             data_schema=vehicle_detection_source_schema(
                 profile.detection.source
                 if profile.detection is not None
-                else "disabled",
+                else ("profile" if capable else "entities")
+                if self._details.get("enable_detection") else "disabled",
                 profile=capable,
             ),
+            description_placeholders={"vehicle": profile.name},
             errors=errors,
         )
 
@@ -192,6 +200,7 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
                     )
         return self.async_show_form(
             step_id="vehicle_detection_entities",
+            description_placeholders={"vehicle": profile.name},
             data_schema=vehicle_detection_entities_schema(current),
             errors=errors,
             last_step=True,
@@ -211,4 +220,6 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
             raw_profile.pop("detection", None)
         else:
             raw_profile["detection"] = config.as_dict()
+        if self._details.get("enable_detection"):
+            draft.values[CONF_VEHICLE_AUTO_SELECTION] = config is not None
         return self._finish_section()

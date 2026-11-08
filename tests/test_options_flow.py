@@ -229,12 +229,24 @@ def test_vehicle_source_limit_is_conditional_and_disable_resets_departure(limit)
         stored = result["data"]
         assert ("vehicle_charge_limit_entity" in stored) is limit
         entry.options = stored
-        await flow.async_step_vehicle()
+        assert "vehicle_disable" in (await flow.async_step_vehicle())["menu_options"]
         disabled = (await flow.async_step_vehicle_disable())["data"]
         assert "vehicle_soc_entity" not in disabled
         assert disabled["timed_goal_enabled"] is False
         assert disabled["timed_goal_reset_pending"] is True
         assert disabled["timed_capacity_kwh"] == 80
+        entry.options = disabled
+        assert "vehicle_disable" not in (await flow.async_step_vehicle())["menu_options"]
+
+    asyncio.run(run())
+
+
+def test_no_percentage_feature_has_no_remove_action():
+    async def run():
+        flow = Flow(FakeConfigEntry())
+        menu = (await flow.async_step_vehicle())["menu_options"]
+        assert "vehicle_soc" in menu
+        assert "vehicle_disable" not in menu
 
     asyncio.run(run())
 

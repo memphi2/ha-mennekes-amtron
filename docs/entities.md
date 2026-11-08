@@ -32,7 +32,8 @@ failed read makes an existing entity unavailable until communication recovers.
 ## Device-page grouping
 
 Daily charging controls stay in **Controls**. The display-only solar selector,
-recovery and restart buttons belong to **Configuration**. Technical CP status
+recovery and restart buttons belong to **Configuration**, as does the new
+**Virtual Plug & Charge** activation switch (unreleased). Technical CP status
 and detailed error codes belong to **Diagnostic**, alongside heartbeat health,
 internal temperature, installation limits and fallback settings. The general
 **Error** sensor stays in the main status section.
@@ -71,7 +72,11 @@ it is unknown; loss of the connection is still handled by normal availability.
 It exposes no frequently changing counters or timestamps.
 
 The **Virtual Plug & Charge** status sensor is new in **beta 0.8.0b1** and optional.
-When the feature is enabled, it shows whether vehicle detection, profile
+In the unreleased development version, supported direct connections and services
+provide the switch and status sensor even while the feature is off; the sensor
+then shows **Disabled**. Enabling requires write access. An already enabled gate
+can still be switched off in read-only mode; this does not resume charging. When the feature is
+enabled, the sensor shows whether vehicle detection, profile
 permission or charging release is still pending, whether another control blocks
 release, or whether the observed connection is authorized. Authorization does
 not mean that the vehicle is drawing power. The sensor has no per-poll timestamps
@@ -102,10 +107,11 @@ in read-only mode; it does not send a charging command.
 
 ## Configuration
 
-These controls change display behavior or perform maintenance.
+These controls configure charging permission, display behavior or maintenance.
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
+| `switch.*_virtual_plug_charge` | Virtual Plug & Charge | unreleased; supported direct control or service capability | Enables the wallbox-wide permission check. Configure each vehicle's permission separately in the vehicle options. Enabling can stop a charge while recognition is pending; disabling never resumes charging. |
 | `select.*_solar_display_mode` | Solar display mode | always | The solar mode shown on the wallbox display. Drives the HMI only, and needs DIP 7 on. |
 | `button.*_recover_from_error` | Recover from error | always | Manually retries heartbeat-error recovery when automatic recovery cannot complete. Preserves a deliberate pause, lock, disabled release and current setting. |
 | `button.*_restart` | Restart | layout v01.03 | Restarts the wallbox. Refused unless the wallbox is idle. |
@@ -130,7 +136,7 @@ remembered resume target while paused, which may be the pending target. See
 |---|---|---|---|---|---|
 | `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. |
 | `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure. |
-| `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | Virtual Plug & Charge enabled | Shows recognition, permission and release status. No session tokens or ticking timestamps are recorded. |
+| `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability; beta 0.8.0b1 requires the feature enabled | Shows recognition, permission and release status, or Disabled in the unreleased version. No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
 | `sensor.*_pending_change` | Pending change |  | enum | since 0.5.2b2; supporting service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |

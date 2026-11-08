@@ -626,6 +626,9 @@
       },
       "lock_evse": {
         "name": "Wallbox bloccata"
+      },
+      "virtual_plug_charge": {
+        "name": "Plug & Charge virtuale"
       }
     },
     "event": {
@@ -821,7 +824,7 @@
       "message": "La selezione del veicolo è cambiata durante la configurazione. La configurazione verrà ripetuta con la selezione attuale."
     },
     "plug_charge_unavailable": {
-      "message": "Impossibile inizializzare Plug & Charge virtuale. La configurazione verrà riprovata; verifica la connessione alla wallbox o all’app Modbus."
+      "message": "Plug & Charge virtuale non è attualmente disponibile. Controlla la connessione alla wallbox o all’app Modbus e riprova."
     },
     "plug_charge_blocked": {
       "message": "La ricarica automatica è bloccata. Verifica consenso del veicolo, pausa manuale e obiettivi."
@@ -931,14 +934,14 @@
         "title": "Veicolo",
         "menu_options": {
           "vehicle_soc": "Configura il livello di carica",
-          "vehicle_disable": "Disattiva l’obiettivo percentuale",
+          "vehicle_disable": "Non usare più il livello di carica",
           "back": "Indietro senza salvare",
           "vehicle_profiles": "Profili veicolo",
           "vehicle_source": "Configura livello di carica",
           "vehicle_detection": "Selezione automatica del veicolo",
           "vehicle_plug_charge": "Plug & Charge virtuale"
         },
-        "description": "Configura i profili e l’obiettivo percentuale facoltativo. Seleziona ogni auto una volta, poi scegli separatamente se usarne limite, capacità, partenze o cronologia."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nConfigura i profili e l’obiettivo percentuale facoltativo. Seleziona ogni auto una volta, poi scegli separatamente se usarne limite, capacità, partenze o cronologia.\n\nPer annullare solo l’obiettivo percentuale attuale, imposta Obiettivo di carica del veicolo su 0. Non usare più il livello di carica rimuove qui le associazioni alle fonti di questo profilo, compreso il massimo facoltativo, cancella l’obiettivo percentuale e il viaggio e disattiva la pianificazione della partenza. Le entità sorgente dell’integrazione del veicolo restano intatte, come il consenso del veicolo, l’obiettivo in kWh e lo stato di ricarica."
       },
       "vehicle_soc": {
         "title": "Configura il livello di carica",
@@ -950,7 +953,7 @@
           "vehicle_soc_entity": "Scegli il sensore del livello reale di carica in %. In assenza di dati, la ricarica prosegue invariata finché tornano valori validi. Cambiare fonte cancella l’obiettivo senza avviare la carica. Per disattivarlo usa il menu precedente.",
           "use_vehicle_limit": "Attiva questa opzione per usare il limite del veicolo come massimo aggiuntivo. Non vengono modificate le impostazioni del veicolo."
         },
-        "description": "Abilita l’obiettivo percentuale facoltativo tramite un sensore di carica esistente. Imposta poi la percentuale desiderata nella pagina del dispositivo wallbox. Un obiettivo limita la carica; non annulla una pausa manuale."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nAbilita l’obiettivo percentuale facoltativo tramite un sensore di carica esistente. Imposta poi la percentuale desiderata nella pagina del dispositivo wallbox. Un obiettivo limita la carica; non annulla una pausa manuale."
       },
       "vehicle_limit": {
         "title": "Limite di carica del veicolo",
@@ -960,7 +963,7 @@
         "data_description": {
           "vehicle_charge_limit_entity": "Facoltativo: limita ulteriormente l’obiettivo con l’entità del limite di carica del veicolo. Senza questa entità sono possibili obiettivi fino al 100%. Un limite inferiore riduce l’obiettivo esistente; un aumento non lo alza. Se l’entità non è disponibile rimane valido l’ultimo limite noto. Nessuna impostazione del veicolo viene modificata."
         },
-        "description": "Usa il limite di ricarica impostato nel veicolo come massimo aggiuntivo per l’obiettivo di Home Assistant. Seleziona il limite desiderato riportato dall’auto, non il suo livello di carica attuale."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nUsa il limite di ricarica impostato nel veicolo come massimo aggiuntivo per l’obiettivo di Home Assistant. Seleziona il limite desiderato riportato dall’auto, non il suo livello di carica attuale."
       },
       "departure": {
         "title": "Prossima partenza",
@@ -969,7 +972,7 @@
           "departure_disable": "Disattiva la pianificazione della partenza",
           "back": "Indietro senza salvare"
         },
-        "description": "Pianifica il prossimo singolo viaggio con obiettivo percentuale, capacità utile e ora di partenza. Scegli poi l’orario nella pagina del dispositivo o copialo da una fonte facoltativa. Non è un programma giornaliero. La disattivazione cancella il viaggio e i comandi in attesa; l’obiettivo percentuale rimane."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nPianifica il prossimo singolo viaggio con obiettivo percentuale, capacità utile e ora di partenza. Scegli poi l’orario nella pagina del dispositivo o copialo da una fonte facoltativa. Non è un programma giornaliero. La disattivazione cancella il viaggio e i comandi in attesa; l’obiettivo percentuale rimane."
       },
       "departure_requires_vehicle": {
         "title": "Livello di carica necessario",
@@ -987,7 +990,7 @@
           "use_departure_entity": "Usa un’entità per l’orario di partenza",
           "use_vehicle_timer": "Usa gli orari di partenza del veicolo"
         },
-        "description": "Data e ora restano sempre inseribili manualmente. Attiva solo le fonti aggiuntive desiderate; seguiranno le relative impostazioni. Un piano attivo può annullare una pausa manuale per raggiungere l’obiettivo di partenza.",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nData e ora restano sempre inseribili manualmente. Attiva solo le fonti aggiuntive desiderate; seguiranno le relative impostazioni. Un piano attivo può annullare una pausa manuale per raggiungere l’obiettivo di partenza.",
         "data_description": {
           "capacity_source": "Usa la capacità utile: valore fisso, sensore in kWh/Wh o valore del profilo se supportato. Il piano attende se la capacità scelta o il livello di carica non sono disponibili.",
           "use_calendar": "Aggiunge un pulsante per copiare il prossimo evento corrispondente. Ogni pressione sceglie un viaggio; usa il blueprint fornito per importazioni pianificate.",
@@ -1003,7 +1006,7 @@
         "data_description": {
           "timed_capacity_kwh": "Inserisci la capacità utile della batteria, non quella nominale."
         },
-        "description": "Inserisci l’energia effettivamente utilizzabile per guidare. Serve a stimare il tempo di ricarica necessario; non cambia le impostazioni della batteria dell’auto."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nInserisci l’energia effettivamente utilizzabile per guidare. Serve a stimare il tempo di ricarica necessario; non cambia le impostazioni della batteria dell’auto."
       },
       "departure_capacity_entity": {
         "title": "Entità della capacità della batteria",
@@ -1013,7 +1016,7 @@
         "data_description": {
           "timed_capacity_entity": "Seleziona un sensore di capacità utile in kWh o Wh."
         },
-        "description": "Scegli un sensore della capacità utile, non dell’energia residua o della percentuale. L’unità deve essere kWh o Wh. Senza un valore valido, il piano attende la capacità senza stimarla."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli un sensore della capacità utile, non dell’energia residua o della percentuale. L’unità deve essere kWh o Wh. Senza un valore valido, il piano attende la capacità senza stimarla."
       },
       "departure_calendar": {
         "title": "Calendario delle partenze",
@@ -1025,7 +1028,7 @@
           "timed_calendar_entity": "Seleziona un calendario, poi copia un evento con il pulsante dedicato.",
           "timed_calendar_title": "Sono validi solo gli eventi con questo titolo esatto. Gli eventi di tutto il giorno sono ignorati."
         },
-        "description": "Scegli un calendario e un titolo esatto, ad esempio «Viaggio al lavoro». L’inizio dell’evento diventa l’ora di partenza. Il pulsante cerca nei prossimi 14 giorni; ignora gli eventi di giornata intera."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli un calendario e un titolo esatto, ad esempio «Viaggio al lavoro». L’inizio dell’evento diventa l’ora di partenza. Il pulsante cerca nei prossimi 14 giorni; ignora gli eventi di giornata intera."
       },
       "departure_entity": {
         "title": "Entità dell’orario di partenza",
@@ -1035,7 +1038,7 @@
         "data_description": {
           "timed_departure_entity": "Seleziona un timestamp con data e ora o un input_datetime completo. La sola ora non basta."
         },
-        "description": "Scegli una fonte con data e ora. Un nuovo orario futuro valido viene adottato automaticamente. Configura una sola fonte per questo scopo; inserimento manuale e pulsanti calendario/veicolo restano disponibili."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli una fonte con data e ora. Un nuovo orario futuro valido viene adottato automaticamente. Configura una sola fonte per questo scopo; inserimento manuale e pulsanti calendario/veicolo restano disponibili."
       },
       "departure_vehicle": {
         "title": "Integrazione del veicolo",
@@ -1057,7 +1060,7 @@
           "timed_timer1_days": "Seleziona i giorni impostati nel BMW per il timer climatizzazione 1. BavarianData non fornisce questi giorni. Lascia vuoto per ignorare il timer.",
           "timed_timer2_days": "Seleziona i giorni impostati nel BMW per il timer 2. Lascia vuoto per ignorarlo."
         },
-        "description": "Usa il pulsante di partenza per copiare un timer attivo del veicolo selezionato. Con un profilo il veicolo è già scelto. In BavarianData attiva i sensori di azione, ora e minuto; inserisci qui i giorni ricorrenti perché l’integrazione non li pubblica."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nUsa il pulsante di partenza per copiare un timer attivo del veicolo selezionato. Con un profilo il veicolo è già scelto. In BavarianData attiva i sensori di azione, ora e minuto; inserisci qui i giorni ricorrenti perché l’integrazione non li pubblica."
       },
       "costs": {
         "title": "Fonte del prezzo dell’energia",
@@ -1143,13 +1146,14 @@
           "loss_vehicle": "Cronologia di ricarica del veicolo",
           "loss_disable": "Disattiva la stima delle perdite",
           "back": "Indietro senza salvare",
-          "loss_profile": "Usa la cronologia di ricarica del veicolo selezionato"
+          "loss_profile": "Usa la cronologia di ricarica del veicolo selezionato",
+          "vehicle_profiles": "Profili veicolo"
         },
-        "description": "Confronta l’energia misurata dalla wallbox con quella aggiunta alla batteria nella stessa ricarica completata. Ultima perdita e media sono stime. Seleziona il veicolo prima della ricarica; corrispondenze mancanti o ambigue restano sconosciute."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nConfronta l’energia misurata dalla wallbox con quella aggiunta alla batteria nella stessa ricarica completata. Ultima perdita e media sono stime. Seleziona il veicolo prima della ricarica; corrispondenze mancanti o ambigue restano sconosciute.\n\nSe non è selezionato alcun veicolo, scegli prima un profilo. Se la sua cronologia di ricarica non è disponibile, verifica il profilo selezionato in Profili veicolo oppure scegli un sensore di energia."
       },
       "loss_sensor": {
         "title": "Perdite di ricarica da un sensore",
-        "description": "Seleziona un sensore che riporti l’energia aggiunta alla batteria del veicolo durante l’ultima ricarica, in kWh o Wh. Non usare l’energia misurata dalla wallbox né un contatore totale. Senza gli orari di ricarica, il risultato è una stima. Per impostazione predefinita, conferma la corrispondenza con il pulsante « Abbina l’energia di ricarica del veicolo ».",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nSeleziona un sensore che riporti l’energia aggiunta alla batteria del veicolo durante l’ultima ricarica, in kWh o Wh. Non usare l’energia misurata dalla wallbox né un contatore totale. Senza gli orari di ricarica, il risultato è una stima. Per impostazione predefinita, conferma la corrispondenza con il pulsante « Abbina l’energia di ricarica del veicolo ».",
         "data": {
           "vehicle_last_charge_energy_entity": "Energia della batteria, ultima ricarica",
           "charge_loss_auto_match": "Abbinare automaticamente il valore di energia modificato"
@@ -1164,14 +1168,14 @@
         "data": {
           "charge_loss_vehicle_provider": "Integrazione del veicolo"
         },
-        "description": "Scegli un’integrazione installata con un adattatore supportato. Le entità HA generiche funzionano senza adattatore. Vengono letti solo dati locali già disponibili."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli un’integrazione installata con un adattatore supportato. Le entità HA generiche funzionano senza adattatore. Vengono letti solo dati locali già disponibili."
       },
       "loss_vehicle_details": {
         "title": "Veicolo per la cronologia di ricarica",
         "data": {
           "charge_loss_vehicle_device": "Veicolo"
         },
-        "description": "Seleziona il veicolo collegato a questa wallbox. Viene letta solo la cronologia locale esistente, senza aggiornare il veicolo. Le corrispondenze mancanti o ambigue restano sconosciute."
+        "description": "Veicolo attivo: **{vehicle}**.\n\nSeleziona il veicolo collegato a questa wallbox. Viene letta solo la cronologia locale esistente, senza aggiornare il veicolo. Le corrispondenze mancanti o ambigue restano sconosciute."
       },
       "options_changed": {
         "title": "Le impostazioni sono cambiate",
@@ -1201,7 +1205,7 @@
       },
       "vehicle_profile_add": {
         "title": "Aggiungi profilo",
-        "description": "Assegna al profilo un nome riconoscibile e scegli BavarianData o la selezione manuale delle entità. Nei nuovi profili le funzioni di ricarica facoltative sono disattivate.",
+        "description": "Assegna al profilo un nome riconoscibile e scegli BavarianData o la selezione manuale delle entità. Nei nuovi profili le funzioni di ricarica facoltative sono disattivate.\n\nSono proposte solo integrazioni installate con un veicolo supportato. Le entità scelte manualmente restano sempre disponibili. Se un’integrazione salvata manca temporaneamente, rinominare il profilo conserva il veicolo e le sue impostazioni.",
         "data": {
           "vehicle_profile_name": "Nome del profilo",
           "vehicle_provider": "Integrazione del veicolo"
@@ -1213,7 +1217,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Modifica profilo",
-        "description": "Rinominare conserva le impostazioni. Cambiare integrazione o veicolo cancella le impostazioni delle funzioni del profilo, per evitare di riutilizzare i dati dell’auto precedente.",
+        "description": "Rinominare conserva le impostazioni. Cambiare integrazione o veicolo cancella le impostazioni delle funzioni del profilo, per evitare di riutilizzare i dati dell’auto precedente.\n\nSono proposte solo integrazioni installate con un veicolo supportato. Le entità scelte manualmente restano sempre disponibili. Se un’integrazione salvata manca temporaneamente, rinominare il profilo conserva il veicolo e le sue impostazioni.",
         "data": {
           "vehicle_profile_name": "Nome del profilo",
           "vehicle_provider": "Integrazione del veicolo"
@@ -1260,7 +1264,7 @@
       },
       "vehicle_source": {
         "title": "Configura livello di carica",
-        "description": "Usa il livello di carica riportato dal profilo attivo oppure scegli manualmente un’entità. Seguono solo le impostazioni della fonte scelta.",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nUsa il livello di carica riportato dal profilo attivo oppure scegli manualmente un’entità. Seguono solo le impostazioni della fonte scelta.",
         "data": {
           "vehicle_soc_source": "Fonte del livello di carica"
         },
@@ -1270,7 +1274,7 @@
       },
       "vehicle_profile_soc": {
         "title": "Configura livello di carica",
-        "description": "Usa il livello di carica riportato dal profilo attivo per l’obiettivo percentuale facoltativo. Il limite di carica della stessa auto può anche fungere da massimo. Nessuna impostazione viene scritta nel veicolo.",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nUsa il livello di carica riportato dal profilo attivo per l’obiettivo percentuale facoltativo. Il limite di carica della stessa auto può anche fungere da massimo. Nessuna impostazione viene scritta nel veicolo.",
         "data": {
           "use_vehicle_limit": "Usa anche il limite di carica del veicolo"
         },
@@ -1298,7 +1302,7 @@
           "vehicle_auto_selection": "Seleziona il veicolo automaticamente"
         },
         "data_description": {
-          "vehicle_auto_selection": "Attiva dopo aver configurato i profili partecipanti. La selezione automatica non identifica l’auto dal cavo della wallbox; dipende dai segnali scelti. Puoi sempre selezionare manualmente un’auto."
+          "vehicle_auto_selection": "Se nessun profilo ha ancora segnali di rilevamento, i passaggi successivi guidano nella scelta del profilo e delle fonti. La selezione automatica si attiva solo dopo aver salvato impostazioni di rilevamento valide. Usa segnali del veicolo, senza identificazione attraverso il cavo della wallbox. Puoi sempre scegliere un’auto manualmente."
         }
       },
       "vehicle_detection_profile": {
@@ -1310,14 +1314,14 @@
       },
       "vehicle_detection_source": {
         "title": "Segnali di rilevamento",
-        "description": "Usa le entità locali supportate dell’integrazione del veicolo, scegli entità Home Assistant esistenti o disattiva il rilevamento per questo profilo. Servono sia il cavo collegato sia la presenza a casa. Nessuna richiesta cloud aggiuntiva.",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nUsa le entità locali supportate dell’integrazione del veicolo, scegli entità Home Assistant esistenti o disattiva il rilevamento per questo profilo. Servono sia il cavo collegato sia la presenza a casa. Nessuna richiesta cloud aggiuntiva.",
         "data": {
           "vehicle_detection_source": "Fonte di rilevamento"
         }
       },
       "vehicle_detection_entities": {
         "title": "Cavo e presenza a casa",
-        "description": "Scegli segnali distinti per questa auto. Per il cavo serve un sensore binario con on = collegato. Per la presenza serve un sensore binario con on = a casa, oppure una persona/un localizzatore con home = a casa. I segnali devono essere segnalati a Home Assistant entro 30 minuti. La segnalazione non prova quando l’auto ha rilevato la posizione.",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nScegli segnali distinti per questa auto. Per il cavo serve un sensore binario con on = collegato. Per la presenza serve un sensore binario con on = a casa, oppure una persona/un localizzatore con home = a casa. I segnali devono essere segnalati a Home Assistant entro 30 minuti. La segnalazione non prova quando l’auto ha rilevato la posizione.",
         "data": {
           "vehicle_connected_entity": "Cavo di ricarica collegato",
           "vehicle_home_entity": "Veicolo a casa"
@@ -1329,14 +1333,17 @@
       },
       "vehicle_plug_charge": {
         "title": "Plug & Charge virtuale",
-        "description": "Veicolo attivo: **{vehicle}**.\n\nAutorizzazione facoltativa basata sui segnali del veicolo, senza autenticazione ISO 15118. La wallbox deve consentire la ricarica automatica con autorizzazione RFID disattivata. Una nuova autorizzazione alla ricarica richiede un profilo attivo consentito e identificato univocamente. Veicoli sconosciuti o ambigui non ricevono una nuova autorizzazione.\n\nServe un nuovo segnale del cavo corrispondente al collegamento attuale; il prossimo aggiornamento dell’integrazione può richiedere tempo. La selezione automatica del profilo resta facoltativa. Pause manuali e obiettivi vengono rispettati. Per mostrare il consenso del veicolo, seleziona un profilo e configura i segnali cavo/casa in Selezione automatica del veicolo; la modalità automatica può restare disattivata.",
+        "description": "Veicolo attivo: **{vehicle}**.\n\nConsenti qui la ricarica automatica per questo profilo. Attiva o disattiva separatamente la funzione con l’interruttore **Plug & Charge virtuale** sotto **Configurazione** nella pagina del dispositivo wallbox.\n\nSe mancano il profilo o i suoi segnali di rilevamento, usa Profili veicolo qui sotto per aggiungere o scegliere un’auto, oppure Selezione automatica del veicolo per configurare i segnali cavo/casa. Torna poi qui per autorizzare il profilo. La selezione automatica del profilo può restare disattivata. Una nuova autorizzazione richiede un profilo attivo consentito riconosciuto univocamente e un nuovo segnale del cavo per il collegamento attuale. La sola selezione manuale non dimostra il collegamento.\n\nQuesta funzione facoltativa non usa l’autenticazione ISO 15118 e richiede l’autorizzazione RFID locale disattivata. Pause, blocchi e obiettivi raggiunti restano validi. L’attivazione può interrompere una ricarica in attesa del riconoscimento. La disattivazione non riprende la ricarica; usa poi esplicitamente Autorizzazione alla ricarica se necessario.",
         "data": {
-          "virtual_plug_charge": "Attiva Plug & Charge virtuale",
           "vehicle_plug_charge": "Autorizza automaticamente questo veicolo"
         },
         "data_description": {
-          "virtual_plug_charge": "Una nuova autorizzazione richiede un profilo attivo consentito e riconosciuto univocamente. Cambiare selezione o perdere i dati del veicolo non revoca un consenso esistente. Lo scollegamento, la perdita dei dati della wallbox o modifiche a identità, permesso o fonti di rilevamento lo revocano. Disattivare non avvia la ricarica. Il consenso sopravvive a un riavvio di HA finché l’app rimane attiva.",
           "vehicle_plug_charge": "Consenso solo per il profilo attivo. Selezionarlo manualmente non prova che la sua auto sia collegata. Servono comunque segnali cavo/casa recenti e coerenti. Cambiare veicolo o fonti di rilevamento rimuove questo consenso."
+        },
+        "menu_options": {
+          "vehicle_profiles": "Profili veicolo",
+          "vehicle_detection": "Selezione automatica del veicolo",
+          "back": "Indietro senza salvare"
         }
       }
     },

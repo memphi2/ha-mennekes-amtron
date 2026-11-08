@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.selector import SelectOptionDict
 
 from ._options_detection import DetectionOptionsFlow
@@ -25,7 +26,6 @@ from .vehicle_profiles import (
     CONF_VEHICLE_PROFILE_SELECTED_AT,
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
-    CONF_VIRTUAL_PLUG_CHARGE,
     LEGACY_PROFILE_ID,
     MAX_VEHICLE_PROFILES,
     PROFILE_OPTION_KEYS,
@@ -49,54 +49,62 @@ _PROFILE_KEYS = {
 class ProfileOptionsFlow(DetectionOptionsFlow):
     """Keep a small explicit catalog and never select another car implicitly."""
 
+    def _profile_providers(self) -> list[str]:
+        """Offer only installed vehicle sources with a real local vehicle."""
+        providers = ["none"]
+        if any(
+            provider_device_is_valid(self.hass, "bavariandata", device_id)
+            for device_id in dr.async_get(self.hass).devices
+        ):
+            providers.append("bavariandata")
+        return providers
+
     async def async_step_vehicle_plug_charge(
         self, user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         draft = self._begin(
             "plug_charge",
             {
-                CONF_VIRTUAL_PLUG_CHARGE,
                 CONF_VEHICLE_PROFILES,
                 CONF_ACTIVE_VEHICLE_PROFILE,
                 CONF_VEHICLE_PROFILE_SELECTED_AT,
             },
         )
         profile = active_profile(draft.values)
-        available = profile is not None and profile.detection is not None
+        if profile is None or profile.detection is None:
+            choices = ["vehicle_profiles"]
+            if profiles(draft.values):
+                choices.append("vehicle_detection")
+            return self.async_show_menu(
+                step_id="vehicle_plug_charge",
+                menu_options=[*choices, "back"],
+                description_placeholders={
+                    "vehicle": profile.name if profile is not None else "—",
+                },
+            )
         current = {
-            CONF_VIRTUAL_PLUG_CHARGE: draft.values.get(CONF_VIRTUAL_PLUG_CHARGE) is True,
-            CONF_VEHICLE_PLUG_CHARGE: available and profile is not None
-            and profile.options.get(CONF_VEHICLE_PLUG_CHARGE) is True,
+            CONF_VEHICLE_PLUG_CHARGE: profile.options.get(CONF_VEHICLE_PLUG_CHARGE) is True,
         }
         errors = {}
         if user_input is not None:
-            enabled = user_input.get(CONF_VIRTUAL_PLUG_CHARGE)
             allowed = user_input.get(
                 CONF_VEHICLE_PLUG_CHARGE, current[CONF_VEHICLE_PLUG_CHARGE]
             )
-            for key, value in (
-                (CONF_VIRTUAL_PLUG_CHARGE, enabled),
-                (CONF_VEHICLE_PLUG_CHARGE, allowed),
-            ):
-                if type(value) is not bool:
-                    errors[key] = "plug_charge_invalid"
-            if allowed is True and not available:
-                errors[CONF_VEHICLE_PLUG_CHARGE] = "plug_charge_detection_required"
+            if type(allowed) is not bool:
+                errors[CONF_VEHICLE_PLUG_CHARGE] = "plug_charge_invalid"
             if not errors:
-                draft.values[CONF_VIRTUAL_PLUG_CHARGE] = enabled
-                if profile is not None:
-                    options = draft.values[CONF_VEHICLE_PROFILES][profile.id]["options"]
-                    if allowed is True:
-                        options[CONF_VEHICLE_PLUG_CHARGE] = True
-                    else:
-                        options.pop(CONF_VEHICLE_PLUG_CHARGE, None)
+                options = draft.values[CONF_VEHICLE_PROFILES][profile.id]["options"]
+                if allowed is True:
+                    options[CONF_VEHICLE_PLUG_CHARGE] = True
+                else:
+                    options.pop(CONF_VEHICLE_PLUG_CHARGE, None)
                 return self._finish_section()
             current.update(user_input)
         return self.async_show_form(
             step_id="vehicle_plug_charge",
-            data_schema=vehicle_plug_charge_schema(current, permission=available),
+            data_schema=vehicle_plug_charge_schema(current, permission=True),
             description_placeholders={
-                "vehicle": profile.name if profile is not None else "—"
+                "vehicle": profile.name,
             },
             errors=errors,
             last_step=True,
@@ -201,6 +209,10 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
         existing = catalog.get(key) if isinstance(key, str) else None
         if edit and existing is None:
             return await self.async_step_vehicle_profiles()
+        available_providers = self._profile_providers()
+        selectable_providers = available_providers.copy()
+        if existing is not None and existing.provider_id not in selectable_providers:
+            selectable_providers.append(existing.provider_id)
         errors = {}
         current: dict[str, Any] = {
             "vehicle_profile_name": existing.name if existing else "",
@@ -226,7 +238,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                 )
             ):
                 errors["vehicle_profile_name"] = "vehicle_profile_name_invalid"
-            if provider not in ("none", "bavariandata"):
+            if provider not in selectable_providers:
                 errors[CONF_VEHICLE_PROVIDER] = "vehicle_provider_invalid"
             if not errors:
                 self._details.update(
@@ -236,10 +248,12 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                 )
                 if provider == "none":
                     return self._save_profile("")
+                if existing is not None and provider not in available_providers:
+                    return self._save_profile(existing.device_id, existing.identity)
                 return await self.async_step_vehicle_profile_device()
         return self.async_show_form(
             step_id=f"vehicle_profile_{'edit' if edit else 'add'}",
-            data_schema=vehicle_profile_details_schema(current),
+            data_schema=vehicle_profile_details_schema(current, providers=selectable_providers),
             errors=errors,
         )
 

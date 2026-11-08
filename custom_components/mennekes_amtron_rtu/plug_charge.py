@@ -9,6 +9,7 @@ import logging
 import time
 from collections.abc import Mapping
 from contextlib import suppress
+from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
@@ -18,8 +19,10 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
 from .device.client_errors import AmtronBusError
+from .device.const import DOMAIN
 from .device.errors import DeviceError
 from .entry_types import MennekesAmtronConfigEntry
+from .exceptions import service_validation_error
 from .vehicle_detection import SETTLE_SECONDS, VehicleEvidence
 from .vehicle_profiles import (
     CONF_VEHICLE_PLUG_CHARGE,
@@ -56,11 +59,15 @@ class PlugChargeObserver:
         self._coordinator = entry.runtime_data.coordinator
         self._evidence = VehicleEvidence(hass, entry)
         self._policy = plug_charge_policy(entry.options)
+        self._configured_options = deepcopy(dict(entry.options))
+        self._switch_applied = False
+        self._pending_enabled: bool | None = None
         self._session: str | None = None
         self._candidate: tuple[str, str] | None = None
         self._timer: CALLBACK_TYPE | None = None
         self._task: asyncio.Task[None] | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
+        self._evidence_unsubscribe: CALLBACK_TYPE | None = None
         self._stopped = False
         self._retry_at = 0.0
         self._generation = 0
@@ -74,10 +81,50 @@ class PlugChargeObserver:
     @callback
     def start(self) -> None:
         self._unsubs = [
-            self._evidence.subscribe(self._changed),
             self._coordinator.async_add_listener(self._changed),
         ]
         self._changed()
+
+    def options_applied(self) -> bool:
+        """Skip only the option notification for an already applied switch."""
+        return (
+            self._switch_applied
+            and self._configured_options == dict(self._entry.options)
+            and self._entry.runtime_data.entry_data == dict(self._entry.data)
+        )
+
+    async def async_set_enabled(self, enabled: bool) -> None:
+        """Apply and remember the gate without restarting its connection owner."""
+        locks: dict[str, asyncio.Lock] = self._hass.data.setdefault(f"{DOMAIN}_reload_locks", {})
+        async with locks.setdefault(self._entry.entry_id, asyncio.Lock()):
+            if self._stopped or self._entry.runtime_data.plug_charge is not self:
+                raise service_validation_error("plug_charge_unavailable")
+            if not self._evidence.current() or plug_charge_policy(self._entry.options) != self._policy:
+                raise service_validation_error("plug_charge_session_changed")
+            self._pending_enabled = None
+            try:
+                await self._control.async_configure_plug_charge(enabled, policy=self._policy)
+            finally:
+                # A deny write may fail after the owner has applied the policy.
+                # A lost HTTP reply may reveal that change only on a later poll.
+                # Preserve the original error, but follow confirmed owner state.
+                self._pending_enabled = enabled
+                self._changed()
+                self._coordinator.async_update_listeners()
+
+    def _commit_switch_if_applied(self) -> None:
+        enabled = self._pending_enabled
+        gate = self._control.plug_charge
+        if self._stopped or enabled is None or gate.get("enabled") is not enabled or gate.get("policy") != self._policy:
+            return
+        self._pending_enabled = None
+        # Merge into current options so an unrelated save during the command is
+        # preserved. Only our bound snapshot may skip the resulting reload.
+        self._configured_options[CONF_VIRTUAL_PLUG_CHARGE] = enabled
+        self._switch_applied = True
+        self._hass.config_entries.async_update_entry(
+            self._entry, options={**self._entry.options, CONF_VIRTUAL_PLUG_CHARGE: enabled},
+        )
 
     def _selection(self) -> tuple[str, str] | None:
         gate = self._control.plug_charge
@@ -150,6 +197,13 @@ class PlugChargeObserver:
 
     @callback
     def _changed(self, _event: object = None) -> None:
+        self._commit_switch_if_applied()
+        enabled = not self._stopped and self._entry.options.get(CONF_VIRTUAL_PLUG_CHARGE) is True
+        if enabled and self._evidence_unsubscribe is None:
+            self._evidence_unsubscribe = self._evidence.subscribe(self._changed)
+        elif not enabled and self._evidence_unsubscribe is not None:
+            self._evidence_unsubscribe()
+            self._evidence_unsubscribe = None
         selected = self._selection()
         if selected != self._candidate:
             self._cancel_timer()
@@ -203,7 +257,11 @@ class PlugChargeObserver:
     async def async_stop(self) -> None:
         """Detach observers; a confirmed app grant survives an HA restart."""
         self._stopped = True
+        self._pending_enabled = None
         self._cancel_timer()
+        if self._evidence_unsubscribe is not None:
+            self._evidence_unsubscribe()
+            self._evidence_unsubscribe = None
         for unsubscribe in self._unsubs:
             unsubscribe()
         self._unsubs.clear()

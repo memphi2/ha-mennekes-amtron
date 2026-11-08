@@ -114,6 +114,12 @@ DEPARTURE_KEYS = {
 class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
     """Configure only the chosen feature, leaving all other options intact."""
 
+    def _vehicle_placeholders(self) -> dict[str, str]:
+        profile = active_profile(
+            self._draft.original if self._draft is not None else self.config_entry.options
+        )
+        return {"vehicle": profile.name if profile is not None else "—"}
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -193,39 +199,54 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         if profiles(self.config_entry.options):
             choices.append("vehicle_detection")
         if CONF_VEHICLE_PROFILES not in self.config_entry.options or active_profile(self.config_entry.options) is not None:
-            choices += [
-                "vehicle_source" if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none") else "vehicle_soc",
-                "vehicle_disable",
-            ]
+            choices.append(
+                "vehicle_source" if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none") else "vehicle_soc"
+            )
+            if vehicle_soc_is_configured(draft.values):
+                choices.append("vehicle_disable")
         return self.async_show_menu(
-            step_id="vehicle", menu_options=[*choices, "back"]
+            step_id="vehicle", menu_options=[*choices, "back"],
+            description_placeholders=self._vehicle_placeholders(),
         )
 
     async def async_step_vehicle_source(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if (draft := self._section("vehicle")) is None or draft.values.get(CONF_VEHICLE_PROVIDER) in (None, "none"):
             return await self.async_step_init()
+        capabilities = self._vehicle_capabilities(draft.values)
         errors = {}
         if user_input is not None:
             source = user_input.get("vehicle_soc_source")
             if source == "profile":
-                self._details["soc_profile"] = True
-                return await self.async_step_vehicle_profile_soc()
-            if source == "entity":
+                if "soc" not in capabilities:
+                    errors["vehicle_soc_source"] = "vehicle_capability_unavailable"
+                else:
+                    self._details["soc_profile"] = True
+                    return await self.async_step_vehicle_profile_soc(
+                        None if "charge_limit" in capabilities else {}
+                    )
+            elif source == "entity":
                 return await self.async_step_vehicle_soc()
-            errors["vehicle_soc_source"] = "vehicle_profile_invalid"
+            else:
+                errors["vehicle_soc_source"] = "vehicle_profile_invalid"
         return self.async_show_form(
-            step_id="vehicle_source", data_schema=vehicle_source_schema(draft.values), errors=errors,
+            step_id="vehicle_source", data_schema=vehicle_source_schema(
+                draft.values, profile="soc" in capabilities,
+            ), errors=errors, description_placeholders=self._vehicle_placeholders(),
         )
 
     async def async_step_vehicle_profile_soc(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if (draft := self._section("vehicle")) is None or not self._details.get("soc_profile"):
             return await self.async_step_init()
+        capabilities = self._vehicle_capabilities(draft.values)
+        if "soc" not in capabilities or (
+            "charge_limit" not in capabilities and (
+                user_input is None or user_input.get("use_vehicle_limit", False) is not False
+            )
+        ):
+            return await self.async_step_vehicle_source()
         errors = {}
         if user_input is not None:
-            capabilities = self._vehicle_capabilities(draft.values)
-            if "soc" not in capabilities or (user_input.get("use_vehicle_limit") is True and "charge_limit" not in capabilities):
-                errors["base"] = "vehicle_capability_unavailable"
-            elif type(user_input.get("use_vehicle_limit", False)) is not bool:
+            if type(user_input.get("use_vehicle_limit", False)) is not bool:
                 errors["use_vehicle_limit"] = "vehicle_profile_invalid"
             else:
                 draft.clear({CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY})
@@ -234,6 +255,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 return self._finish_section()
         return self.async_show_form(
             step_id="vehicle_profile_soc", data_schema=vehicle_profile_soc_schema(draft.values),
+            description_placeholders=self._vehicle_placeholders(),
             errors=errors, last_step=True,
         )
 
@@ -269,6 +291,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 return self._finish_section()
         return self.async_show_form(
             step_id="vehicle_soc",
+            description_placeholders=self._vehicle_placeholders(),
             data_schema=vehicle_soc_schema(
                 draft.values if user_input is None else user_input,
             ),
@@ -299,6 +322,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 return self._finish_section()
         return self.async_show_form(
             step_id="vehicle_limit",
+            description_placeholders=self._vehicle_placeholders(),
             data_schema=vehicle_limit_schema(
                 draft.values if user_input is None else user_input,
             ),
@@ -309,12 +333,15 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
     async def async_step_departure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        self._begin("departure", DEPARTURE_KEYS)
+        draft = self._begin("departure", DEPARTURE_KEYS)
         if not vehicle_soc_is_configured(vehicle_options(self.config_entry.options)):
             return await self.async_step_departure_requires_vehicle()
+        choices = ["departure_configure"]
+        if draft.values.get(CONF_TIMED_GOAL_ENABLED) is True:
+            choices.append("departure_disable")
         return self.async_show_menu(
-            step_id="departure",
-            menu_options=["departure_configure", "departure_disable", "back"],
+            step_id="departure", menu_options=[*choices, "back"],
+            description_placeholders=self._vehicle_placeholders(),
         )
 
     async def async_step_departure_requires_vehicle(
@@ -387,6 +414,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         selection = provider_selection(draft.values, "departure")
         return self.async_show_form(
             step_id="departure_configure",
+            description_placeholders=self._vehicle_placeholders(),
             data_schema=departure_configure_schema(
                 draft.values if user_input is None else {**draft.values, **user_input},
                 vehicle_timer=selection.provider_id != PROVIDER_NONE,
@@ -425,6 +453,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 return await self._next_departure()
         return self.async_show_form(
             step_id=f"departure_capacity_{'entity' if entity else 'fixed'}",
+            description_placeholders=self._vehicle_placeholders(),
             data_schema=departure_capacity_schema(
                 draft.values if user_input is None else user_input,
                 entity=entity,
@@ -480,6 +509,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         schema = departure_calendar_schema if calendar else departure_entity_schema
         return self.async_show_form(
             step_id=step,
+            description_placeholders=self._vehicle_placeholders(),
             data_schema=schema(draft.values if user_input is None else user_input),
             errors=errors,
             last_step=not self._details["remaining"],
@@ -557,6 +587,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         )
         return self.async_show_form(
             step_id="departure_vehicle_details",
+            description_placeholders=self._vehicle_placeholders(),
             data_schema=vehicle_device_schema(
                 current,
                 key=CONF_TIMED_VEHICLE_DEVICE,
