@@ -250,6 +250,10 @@ class AmtronControl:
             if not self.energy_goal_stop_requested:
                 return
             self._require_write_access()
+            if await self._async_vehicle_absent():
+                # Nothing charges without a car; a later poll pauses once one
+                # is plugged in.
+                return
             self._clear_pending(outcome="cancelled", reason="energy_goal")
             if self.is_paused is not False:
                 try:

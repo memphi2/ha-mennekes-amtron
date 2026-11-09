@@ -85,6 +85,14 @@ mode, update the app to **0.8.0b7** first.
   BMW CarData does not send the climate timers' times for every car, e.g. not
   for an i4 or i5, so the option previously led nowhere. A setup that already
   reads them keeps the option.
+- **BavarianData detection works for cars without a plug boolean.** An i4 or
+  i5 streams only **Charging port status** (connected/disconnected); it now
+  counts as the plug signal, so such a car offers detection from the vehicle
+  and, with it, automatic vehicle selection. Previously only manual entities
+  were offered.
+- **A reached target pauses only with a car at the wallbox.** Lowering the
+  percentage target below the car's charge level while it is not plugged in
+  no longer switches the pause on; the pause follows once a car is plugged in.
 - **Each settings area names the entities it uses,** e.g. charge level, charge
   limit, departure and capacity, losses, plug and location.
 
