@@ -49,7 +49,7 @@ if the wallbox has not yet been prepared.
 
 Install **Mennekes Amtron RTU** from the Marketplace on HA 2026.11+, or
 HACS on HA 2026.9/2026.10, and complete the requested Core restart.
-**0.6.1 remains stable.** Choose **beta 0.8.0b7** for vehicle profiles,
+**0.6.1 remains stable.** Choose **beta 0.8.0b8** for vehicle profiles,
 Virtual Plug & Charge and the new app features; follow the
 [beta update guide](upgrading.md#trying-080b6) for an existing installation.
 
@@ -70,7 +70,7 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 The repository above provides stable **0.6.1**. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog provides beta
-**0.8.0b7**. Existing beta-catalog installations update in place. To switch
+**0.8.0b8**. Existing beta-catalog installations update in place. To switch
 catalogs, follow the [channel handover](#updates) and
 [beta update guide](upgrading.md#trying-080b6).
 
@@ -258,7 +258,7 @@ app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
 **Updating the app itself briefly interrupts its heartbeat.**
 
-Stable **0.6.1** uses `#apps`; beta **0.8.0b7** uses `#apps-beta`.
+Stable **0.6.1** uses `#apps`; beta **0.8.0b8** uses `#apps-beta`.
 Update the beta app first for Virtual Plug & Charge, live Modbus debugging,
 Supervisor 2026.10.4+ guided setup and the shared control fixes. The general
 minimum compatible service remains **0.6.1 with API 2**. An existing beta
