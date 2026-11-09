@@ -12,7 +12,11 @@ and HA entry. For all beta features and fixes, update this app before integratio
 **0.8.0b6**. Switching catalogs creates a separate app and requires a handover.
 See [Updates](#updates).
 
-**New in 0.8.0b7:** a single lost Modbus reply that a resend made good is
+**New in 0.8.0b8:** a reached charge target pauses the wallbox only with a car
+plugged in. Lowering the target while no car is plugged in no longer switches
+the pause on; it follows once a car is plugged in.
+
+**Since 0.8.0b7:** a single lost Modbus reply that a resend made good is
 counted as a retry instead of being logged as an error, and no longer marks the
 connection quality as degraded. Only transactions that finally fail count as
 failures. With Virtual Plug & Charge, switching **Charging release** on

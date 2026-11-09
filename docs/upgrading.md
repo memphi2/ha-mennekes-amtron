@@ -9,10 +9,10 @@ then the integration. Keep existing app data and your HA entry. The **#apps**
 catalog carries stable updates; **#apps-beta** follows the beta channel below.
 Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Trying 0.8.0b7
+## Trying 0.8.0b8
 
-**0.8.0b7 is a beta of the integration and app; 0.6.1 remains stable.** Opt into prereleases in your integration installer and select
-**v0.8.0b7**. Keep the
+**0.8.0b8 is a beta of the integration and app; 0.6.1 remains stable.** Opt into prereleases in your integration installer and select
+**v0.8.0b8**. Keep the
 existing HA entry. The beta app is offered through
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
 catalog can use **Check for updates** and update their app in place.
@@ -20,8 +20,10 @@ catalog can use **Check for updates** and update their app in place.
 Moving from **#apps** to **#apps-beta** creates a separate app installation.
 Follow the [channel handover](modbus-service.md#updates), preserving its data
 and ensuring only one service owns the wallbox connection. In service mode,
-update the app to **0.8.0b7 first**, wait for initialization, then update the
-integration. Beta 7 starts a planned departure late at full current and
+update the app to **0.8.0b8 first**, wait for initialization, then update the
+integration. Beta 8 detects a BMW i4 or i5 by its charging port status, so
+detection from the vehicle and automatic selection work for these cars, and a
+reached percentage target pauses only with a car at the wallbox. Beta 7 starts a planned departure late at full current and
 finishes at 6 A to reach the target at departure, instead of charging slowly
 from many hours before; each vehicle profile remembers its charging phases for
 that plan. With **Switch off charging release when unplugged**, unplugging now

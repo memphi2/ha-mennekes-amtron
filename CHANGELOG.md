@@ -5,7 +5,10 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.8.0b8 — unreleased
+## 0.8.0b8 — 2026-11-09
+
+Beta update of the integration and app; **0.6.1 remains stable**. In service
+mode, update the app to **0.8.0b8** first.
 
 - **BavarianData detection works for cars without a plug boolean.** An i4 or
   i5 streams only **Charging port status** (connected/disconnected); it now
