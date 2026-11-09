@@ -25,7 +25,8 @@ integration. Beta 7 starts a planned departure late at full current and
 finishes at 6 A to reach the target at departure, instead of charging slowly
 from many hours before; each vehicle profile remembers its charging phases for
 that plan. With **Switch off charging release when unplugged**, unplugging now
-also ends a manual pause. It also logs a single lost Modbus reply no longer as an error and
+also ends a manual pause, and switching the release during a pause no longer
+waits for the state-change interval. It also logs a single lost Modbus reply no longer as an error and
 counts it as a retry (app **0.8.0b7** for service mode). Beta 6 offers BavarianData again when adding or editing a vehicle
 profile and moves every vehicle setting into the car's profile under
 **Configure → Vehicles**; automatic selection is switched on in the **Active

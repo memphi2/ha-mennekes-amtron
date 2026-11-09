@@ -15,7 +15,9 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
+from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .control import AmtronControl, ControlOptions, ha_command
@@ -642,6 +644,10 @@ class RemoteHeartbeat(HeartbeatTask):
         )
 
 
+# The service stamps the due time without fractions of a second.
+_PENDING_GRACE_SECONDS = 1.0
+
+
 class RemoteCoordinator(MennekesAmtronCoordinator):
     """Poll the service's cache; the service independently schedules bus reads."""
 
@@ -649,6 +655,32 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
         super().__init__(*args, **kwargs)
         if isinstance(self._client, RemoteClient):
             self._client.on_auth_error = self._publish_auth_error
+        self._pending_refresh: CALLBACK_TYPE | None = None
+
+    def _follow_pending(self, until: datetime | None) -> None:
+        """Read a queued command's outcome when it is due, not a poll later.
+
+        The service runs the command on its own; without this, HA learned of
+        it up to one poll interval later, together with whatever came next.
+        """
+        if self._pending_refresh is not None:
+            self._pending_refresh()
+            self._pending_refresh = None
+        if until is None or self.update_interval is None:
+            return
+        delay = (until - datetime.now(UTC)).total_seconds() + _PENDING_GRACE_SECONDS
+        # A later due time is followed by an ordinary poll before it.
+        if 0 < delay < self.update_interval.total_seconds():
+            self._pending_refresh = async_call_later(self.hass, delay, self._pending_due)
+
+    @callback
+    def _pending_due(self, _now: datetime) -> None:
+        self._pending_refresh = None
+        self.hass.async_create_task(self.async_request_refresh())
+
+    async def async_shutdown(self) -> None:
+        self._follow_pending(None)
+        await super().async_shutdown()
 
     def _publish_auth_error(self, new_failure: bool) -> None:
         """Expose a changed failure reason even when already unavailable."""
@@ -685,6 +717,7 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
             raise UpdateFailed(str(err)) from err
         if self.observe_session is not None:
             await self.observe_session(data)
+        self._follow_pending(data.pending_change_until)
         return data
 
 

@@ -257,7 +257,8 @@ class PlugChargeController:
             await self._live_presence(self._control._client.async_read_register)
             self._check_request(session, deadline)
             current = await self._control._async_read_switch(CHARGING_RELEASE)
-            if current != 1:
+            switches = current != 1 and await self._control._async_release_switches_charge()
+            if switches:
                 try:
                     await self._control._async_check_transition_interval()
                 except AmtronRateLimitedError as err:
@@ -271,7 +272,7 @@ class PlugChargeController:
                 self._check_request(session, deadline)
                 self.state.authorized = True
                 self.state.hold = False
-                if current != 1:
+                if switches:
                     self._control.write_state.mode_change_at = self._control._monotonic()
             except (DeviceError, AmtronBusError, OSError, asyncio.CancelledError) as err:
                 if not isinstance(err, DeviceValidationError) and self.state.session == session:

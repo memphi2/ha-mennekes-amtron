@@ -29,6 +29,13 @@ mode, update the app to **0.8.0b7** first.
   Previously the pause stayed after unplugging and the wallbox kept showing it.
   Without a car and with the release off, this switches nothing and waits for
   no state-change interval. A stop from a reached energy target stays.
+- **Switching the charging release during a confirmed pause no longer waits**
+  for the state-change interval, and does not restart it. The pause holds the
+  car at 0 A either way; the later resume is the real start and keeps the
+  interval. This also applies to the Virtual Plug & Charge grant.
+- In service mode, HA reads a queued command's outcome when it is due instead
+  of up to one poll later. The log no longer shows such a command together
+  with the next action, as if both had happened at the same time.
 - **Retries and failures are counted separately.** A lost reply that a resend
   made good — a read retry or a heartbeat resent after one second — counts in
   the new **Connection quality** attribute `retried_transactions` and no longer

@@ -779,6 +779,23 @@ class AmtronControl:
             return False
         return type(value) is int and value == 0
 
+    async def _async_release_switches_charge(self) -> bool:
+        """With no vehicle or a confirmed pause, 0x0D05 switches no charge.
+
+        The pause holds the EV at 0 A whichever way the relay goes. The later
+        resume is the real start and keeps the state-change interval.
+        """
+        if await self._async_vehicle_absent():
+            return False
+        try:
+            current = await self._client.async_read_register(CHARGING_CURRENT_EMS)
+        except AmtronBusError:
+            return True
+        return not (
+            not isinstance(current, bool) and isinstance(current, (int, float))
+            and CHARGING_CURRENT_UNLIMITED < current < CHARGING_CURRENT_MINIMUM
+        )
+
     async def _async_check_transition_interval(self, *, current_change: bool = False) -> None:
         remaining = self._mode_change_remaining()
         if remaining > 0 and (
@@ -903,6 +920,9 @@ class AmtronControl:
             self._plug_charge.check_release()
         current = await self._async_read_switch(CHARGING_RELEASE, stopping=not released)
         changed = current != int(released)
+        # Only a change that can switch a charge waits for, and restarts,
+        # the state-change interval.
+        changed = changed and await self._async_release_switches_charge()
         if changed:
             await self._async_check_transition_interval()
         previous = self.charging_release_requested

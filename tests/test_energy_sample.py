@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from aiohttp import ClientSession
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
+import custom_components.mennekes_amtron_rtu.remote as remote_module
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
@@ -194,5 +196,43 @@ def test_remote_coordinator_observes_success_and_failed_poll(tmp_path):
                     await coordinator._async_update_data()
         finally:
             await service.stop()
+
+    asyncio.run(run())
+
+
+def test_remote_coordinator_reads_a_queued_command_when_it_is_due(tmp_path, monkeypatch):
+    async def run():
+        scheduled: list[tuple[float, object]] = []
+        cancelled: list[int] = []
+
+        def call_later(_hass, delay, action):
+            scheduled.append((delay, action))
+            index = len(scheduled) - 1
+            return lambda: cancelled.append(index)
+
+        monkeypatch.setattr(remote_module, "async_call_later", call_later)
+        async with ClientSession() as session:
+            client = RemoteClient(session, "http://service:8765", TOKEN)
+            coordinator = RemoteCoordinator(
+                FakeHass(str(tmp_path)), FakeConfigEntry(), client=client,
+                identity=client.identity, connection_state=ConnectionState(), scan_interval=5,
+            )
+            coordinator.async_request_refresh = AsyncMock()
+            now = datetime.now(UTC)
+            coordinator._follow_pending(now + timedelta(seconds=2))
+            assert len(scheduled) == 1
+            assert 2.5 < scheduled[0][0] <= 3.0
+            # A due time beyond the next poll is left to that poll.
+            coordinator._follow_pending(now + timedelta(seconds=30))
+            assert (len(scheduled), cancelled) == (1, [0])
+            coordinator._follow_pending(now - timedelta(seconds=5))
+            coordinator._follow_pending(now + timedelta(seconds=1))
+            scheduled[-1][1](now)
+            await asyncio.sleep(0)
+            coordinator.async_request_refresh.assert_awaited_once()
+            assert coordinator._pending_refresh is None
+            coordinator._follow_pending(now + timedelta(seconds=1))
+            await coordinator.async_shutdown()
+            assert cancelled[-1] == len(scheduled) - 1
 
     asyncio.run(run())
