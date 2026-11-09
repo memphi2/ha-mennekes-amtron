@@ -12,7 +12,7 @@ can also supply supported data from one selected BMW vehicle.
 stable 0.6.1. Central vehicle profiles, optional automatic selection and
 Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
 below; existing manual sources continue to work after updating.
-The steps below follow **beta 0.8.0b6**, which keeps every setting of a car in
+The steps below follow **beta 0.8.0b7**, which keeps every setting of a car in
 its profile: open **Configure → Vehicles**, then the profile. Existing activation
 settings are kept.
 See [versions and feature availability](README.md#versions-and-feature-availability).
@@ -196,7 +196,7 @@ manually, but that choice alone never proves which car is connected.
    **Configuration**. This switch controls the feature for the whole wallbox.
    The feature requires
    write access. Service mode needs **app 0.8.0b1 or newer** for the
-   charging-permission capability; use **0.8.0b6** for the current beta app.
+   charging-permission capability; use **0.8.0b7** for the current beta app.
 3. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 

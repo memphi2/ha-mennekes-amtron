@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0b7 — 2026-11-09
+
+Beta update of the integration and app; **0.6.1 remains stable**. In service
+mode, update the app to **0.8.0b7** first.
+
+- **Departure planning starts late and finishes on time.** Charging stays
+  paused until the energy still needed takes the remaining time at full current
+  plus a 30-minute reserve. It then charges at full current and reduces to 6 A
+  once the rest fits the remaining time at 6 A, so the car reaches the target at
+  departure rather than early. Previously the plan spread charging at a reduced
+  current and often started many hours before departure. A charge that has
+  started never pauses again for being faster than estimated.
+- **Each vehicle profile remembers its charging phases.** The wallbox reports
+  a car's phases only while it draws current, so the plan previously assumed
+  one phase before every start and started about three times too early for a
+  three-phase car. The phases of each profile's last charge now plan the next
+  start; a car never seen charging is planned with three phases.
+- The departure plan status has the new states **Charging at full current** and
+  **Finishing at minimum current**; **Adjusting current** and **May finish
+  early at minimum current** are gone.
+- **Retries and failures are counted separately.** A lost reply that a resend
+  made good — a read retry or a heartbeat resent after one second — counts in
+  the new **Connection quality** attribute `retried_transactions` and no longer
+  degrades the quality. `failed_transactions` counts only transactions that
+  finally failed, now including a heartbeat that missed its 10-second deadline.
+  pymodbus no longer logs each lost reply as an error with a frame dump; it
+  remains visible in debug logging. Service mode needs app **0.8.0b7**.
+
 ## 0.8.0b6 — 2026-11-09
 
 Beta update of the integration and app; **0.6.1 remains stable**. In service

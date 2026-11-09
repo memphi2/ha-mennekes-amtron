@@ -20,7 +20,12 @@ from homeassistant.util import dt as dt_util
 
 from .charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
-from .device.enums import DetectedEvPhases, GridPhasesConnected, SwitchedPhases
+from .device.enums import (
+    DetectedEvPhases,
+    EvseState,
+    GridPhasesConnected,
+    SwitchedPhases,
+)
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.registers import CP_STATE, EVSE_STATE
 from .device.vehicle import vehicle_connected
@@ -34,8 +39,10 @@ from .timed_goal_const import (
     CONF_TIMED_CAPACITY_KWH,
     CONF_TIMED_DEPARTURE_ENTITY,
 )
+from .vehicle_phases import VehiclePhaseMemory
 from .vehicle_profiles import (
     CONF_TIMED_USE_VEHICLE_CAPACITY,
+    CONF_VEHICLE_PROFILE_ID,
     CONF_VEHICLE_SOC_USE_PROFILE,
     vehicle_options,
 )
@@ -88,8 +95,8 @@ def capacity_from_state(state: State | None) -> float | None:
 
 # Statuses of a computed plan; a pending command keeps its start time.
 _PLANNED = frozenset({
-    "queued", "write_pending", "paused_until_start", "paced",
-    "early_at_minimum", "unreachable", "late",
+    "queued", "write_pending", "paused_until_start", "charging",
+    "finishing", "unreachable", "late",
 })
 
 
@@ -120,6 +127,8 @@ class TimedGoalObserver:
         self._command_owner = f"timed:{entry.entry_id}"
         self._command_submitted = False
         self._command_current: float | None = None
+        # The selected car's phases from its last charge, if it had one.
+        self._known_phases: int | None = None
 
     async def async_start(self) -> None:
         # The service may retain a queued command after an unreachable unload
@@ -127,6 +136,8 @@ class TimedGoalObserver:
         self._command_submitted = True
         await self._cancel_command()
         self.goal = await self._store.async_load()
+        if (profile := self._options.get(CONF_VEHICLE_PROFILE_ID)) is not None:
+            self._known_phases = await self._phase_memory().async_phases(profile)
         options = self._options
         sources = [
             options.get(CONF_VEHICLE_SOC_ENTITY),
@@ -378,12 +389,29 @@ class TimedGoalObserver:
                 DetectedEvPhases.ONE_PHASE, DetectedEvPhases.TWO_PHASES,
                 DetectedEvPhases.THREE_PHASES,
             ):
+                if data.get(EVSE_STATE.key) == EvseState.CHARGING:
+                    # Only a drawing car proves the reading is its own.
+                    self._remember_phases(int(detected))
                 return int(detected)
-        # Grid/switch capability does not establish the vehicle's capability.
-        # Before its first charge, detection can be zero or unavailable. An
-        # optimistic three-phase estimate can postpone a one-phase car until
-        # even its maximum current cannot meet a formerly reachable deadline.
-        return 1
+        # Detection is zero while the car draws no current, i.e. all the time
+        # before a late start. The car's last detected phases then decide, and
+        # a car never seen charging is assumed three-phase. A one-phase car
+        # corrects that on its first charge, from the reserve the start keeps.
+        return self._known_phases or 3
+
+    def _remember_phases(self, phases: int) -> None:
+        profile = self._options.get(CONF_VEHICLE_PROFILE_ID)
+        if profile is None or phases == self._known_phases:
+            return
+        self._known_phases = phases
+        self._hass.async_create_task(
+            self._phase_memory().async_remember(profile, phases), "amtron_vehicle_phases",
+        )
+
+    def _phase_memory(self) -> VehiclePhaseMemory:
+        return VehiclePhaseMemory(
+            self._hass, self._entry.entry_id, self._runtime.identity.serial_number or "",
+        )
 
     async def _evaluate(self) -> None:
         if self._save_unknown:
@@ -464,12 +492,16 @@ class TimedGoalObserver:
             await self._wait_for_input("waiting_for_device")
             return
         now = dt_util.utcnow()
+        # A started charge keeps going: a faster charge than estimated moves
+        # the computed start later, and pausing for it would only cost relay
+        # switching. The minimum current at the end absorbs the lead instead.
+        started = self.planned_start is not None and self.planned_start <= now
         pause_until_start = (
-            plan.start_at is not None and plan.start_at - now > _PAUSE_MARGIN
+            not started and plan.start_at is not None and plan.start_at - now > _PAUSE_MARGIN
         )
-        if plan.start_at is not None:
+        if pause_until_start:
             self.planned_start = plan.start_at
-        elif self.planned_start is None or self.planned_start > now:
+        elif not started:
             # The plan charges now; keep when it began.
             self.planned_start = now
         desired_current = None if pause_until_start else plan.current_a

@@ -9,10 +9,10 @@ then the integration. Keep existing app data and your HA entry. The **#apps**
 catalog carries stable updates; **#apps-beta** follows the beta channel below.
 Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Trying 0.8.0b6
+## Trying 0.8.0b7
 
-**0.8.0b6 is a beta of the integration and app; 0.6.1 remains stable.** Opt into prereleases in your integration installer and select
-**v0.8.0b6**. Keep the
+**0.8.0b7 is a beta of the integration and app; 0.6.1 remains stable.** Opt into prereleases in your integration installer and select
+**v0.8.0b7**. Keep the
 existing HA entry. The beta app is offered through
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
 catalog can use **Check for updates** and update their app in place.
@@ -20,8 +20,12 @@ catalog can use **Check for updates** and update their app in place.
 Moving from **#apps** to **#apps-beta** creates a separate app installation.
 Follow the [channel handover](modbus-service.md#updates), preserving its data
 and ensuring only one service owns the wallbox connection. In service mode,
-update the app to **0.8.0b6 first**, wait for initialization, then update the
-integration. Beta 6 offers BavarianData again when adding or editing a vehicle
+update the app to **0.8.0b7 first**, wait for initialization, then update the
+integration. Beta 7 starts a planned departure late at full current and
+finishes at 6 A to reach the target at departure, instead of charging slowly
+from many hours before; each vehicle profile remembers its charging phases for
+that plan. It also logs a single lost Modbus reply no longer as an error and
+counts it as a retry (app **0.8.0b7** for service mode). Beta 6 offers BavarianData again when adding or editing a vehicle
 profile and moves every vehicle setting into the car's profile under
 **Configure → Vehicles**; automatic selection is switched on in the **Active
 vehicle** entity. A percentage target at the car's own limit no longer pauses

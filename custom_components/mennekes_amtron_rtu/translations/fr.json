@@ -522,6 +522,9 @@
         "state_attributes": {
           "failed_transactions": {
             "name": "Transactions échouées"
+          },
+          "retried_transactions": {
+            "name": "Transactions répétées"
           }
         }
       },
@@ -600,8 +603,8 @@
           "read_only": "Lecture seule",
           "queued": "Modification en attente",
           "paused_until_start": "En pause jusqu’au démarrage",
-          "paced": "Courant ajusté",
-          "early_at_minimum": "Fin potentiellement anticipée",
+          "charging": "Charge au courant maximal",
+          "finishing": "Termine au courant minimal",
           "unreachable": "Cible peut-être inaccessible",
           "late": "Heure cible dépassée",
           "reached": "Cible atteinte",

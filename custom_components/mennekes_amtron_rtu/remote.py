@@ -245,6 +245,9 @@ class RemoteClient(MennekesModbusClient):
             failures = payload.get("connection_failures")
             if failures is not None and (type(failures) is not int or failures < 0):
                 raise ValueError("invalid connection failure count")
+            retried = payload.get("connection_retries")
+            if retried is not None and (type(retried) is not int or retried < 0):
+                raise ValueError("invalid connection retry count")
             section = "charging_session"
             session_supported = False
             completed_session = None
@@ -517,6 +520,7 @@ class RemoteClient(MennekesModbusClient):
             pending_change_until=pending_until,
             connection_quality=quality,
             connection_failures=failures,
+            connection_retries=retried,
             energy_goal=goal.snapshot() if goal_supported else None,
             soc_goal=soc_goal.snapshot() if soc_supported else None,
             charging_session=completed_session.as_dict() if completed_session is not None else None,

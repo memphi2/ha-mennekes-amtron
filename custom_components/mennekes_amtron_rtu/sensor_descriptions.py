@@ -63,7 +63,7 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         options=[
             "disabled", "waiting_for_target", "waiting_for_capacity",
             "waiting_for_soc", "waiting_for_device", "read_only", "queued",
-            "paused_until_start", "paced", "early_at_minimum", "unreachable",
+            "paused_until_start", "charging", "finishing", "unreachable",
             "late", "reached", "write_pending", "error",
         ],
     ),

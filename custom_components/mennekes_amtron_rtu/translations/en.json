@@ -522,6 +522,9 @@
         "state_attributes": {
           "failed_transactions": {
             "name": "Failed transactions"
+          },
+          "retried_transactions": {
+            "name": "Retried transactions"
           }
         }
       },
@@ -600,8 +603,8 @@
           "read_only": "Read only",
           "queued": "Change queued",
           "paused_until_start": "Paused until start",
-          "paced": "Adjusting current",
-          "early_at_minimum": "May finish early at minimum current",
+          "charging": "Charging at full current",
+          "finishing": "Finishing at minimum current",
           "unreachable": "Target may be unreachable",
           "late": "Deadline passed",
           "reached": "Target reached",

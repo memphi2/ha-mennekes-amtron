@@ -5,7 +5,7 @@ Use **Charging current limit** and **Charging paused** for everyday charging.
 energy and connection health. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
 
-This reference follows **beta 0.8.0b6**, including vehicle profiles and the
+This reference follows **beta 0.8.0b7**, including vehicle profiles and the
 optional Virtual Plug & Charge status. **0.6.1 remains stable.** Ordinary service
 connections require **app/service 0.6.1 or newer with API 2**; Virtual Plug & Charge
 in service mode needs the capability in **app 0.8.0b1 or newer**.
@@ -175,7 +175,7 @@ These sit under *Diagnostic* on the device page.
 |---|---|---|---|---|
 | `sensor.*_cp_state` | CP state |  | layout v01.02 | The control-pilot state between wallbox and vehicle. Use the current and power sensors to check actual consumption. |
 | `sensor.*_error_code` | Error code |  | always | The active error, as a documented category. The raw number is in the `code` attribute. |
-| `sensor.*_connection_quality` | Connection quality |  | direct connection or supporting service | `good` or `degraded`; a stable communication-health summary. Attribute `failed_transactions` counts broken transactions since start and changes only on failures. |
+| `sensor.*_connection_quality` | Connection quality |  | direct connection or supporting service | `good` or `degraded`; a stable communication-health summary. Attribute `failed_transactions` counts transactions that finally failed since start, including a heartbeat that missed its 10-second deadline; only these degrade the quality. From **0.8.0b7**, `retried_transactions` counts lost replies that a resend made good: a read retry or a heartbeat resent after one second. Both change only on those events. |
 | `sensor.*_temperature` | Temperature | °C | layout v01.02 | Temperature inside the wallbox. |
 | `sensor.*_modbus_layout_version` | Modbus layout version |  | always | The register layout the firmware implements. Decides which entities exist. Disabled by default. |
 | `sensor.*_downgrade_current` | Downgrade current | A | always | The current limit the wallbox applies while a grid-operator downgrade is active. |

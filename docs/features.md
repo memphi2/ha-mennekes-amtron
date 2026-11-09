@@ -7,7 +7,7 @@ Start with ordinary current control and pause/resume, then add one function at
 a time. Each configuration section saves independently and shows the inputs
 needed for your choice.
 
-This guide follows **beta 0.8.0b6**, which includes central vehicle profiles, optional
+This guide follows **beta 0.8.0b7**, which includes central vehicle profiles, optional
 automatic selection, Virtual Plug & Charge and live app Modbus debugging.
 **0.6.1 remains stable.** See
 [versions and availability](README.md#versions-and-feature-availability).
@@ -80,7 +80,7 @@ that plan; the ordinary percentage limit remains independent.
 | Pause switch | Off requests resume | On requests pause; a configured wait can still apply |
 | kWh target | Setting it does not start; a pause caused by a temporary meter outage has [specific recovery rules](user-guide.md#energy-target) | Pauses at the energy target or when the meter cannot be trusted |
 | Percentage target | Never starts by itself | Pauses at the reported percentage; at the car's own limit the car stops by itself; missing SoC does not pause |
-| Timed departure plan | May resume, including a manual pause | May pause to spread charging toward the trip; completed targets still apply |
+| Timed departure plan | May resume, including a manual pause | May pause until its late start, then charges at full current and finishes at 6 A; completed targets still apply |
 | Vehicle selection/detection | Never starts or resumes | Changes the data used by optional features and clears the previous car's percentage target/trip |
 | Virtual Plug & Charge | Can release charging for a freshly recognized car; does not lift an existing pause, lock or reached target | Keeps charging disabled until permission is granted; disabling the feature does not resume |
 | Cost/loss estimates | No | No; these are estimates, not charging controls |

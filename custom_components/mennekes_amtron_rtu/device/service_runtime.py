@@ -424,6 +424,7 @@ class ModbusService:
             "current_write_generation": self.data.current_write_generation,
             "connection_quality": self.data.connection_quality,
             "connection_failures": self.data.connection_failures,
+            "connection_retries": self.data.connection_retries,
             "energy_sample": dict(self._energy_sample) if self._energy_sample is not None else None,
             "charging_session": {
                 "supported": self.identity.layout_version >= ENERGY_TOTAL.min_layout,

@@ -36,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 # An armed departure plan owns the current. The grant waits until the plan has
 # applied its decision, so a release never starts a charge it must then stop.
 _PLAN_DECIDING = frozenset({"waiting_for_device", "queued", "write_pending"})
-_PLAN_CHARGING = frozenset({"paced", "early_at_minimum", "unreachable", "late"})
+_PLAN_CHARGING = frozenset({"charging", "finishing", "unreachable", "late"})
 _PLAN_PAUSED = "paused_until_start"
 
 

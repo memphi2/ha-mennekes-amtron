@@ -31,7 +31,7 @@ from tests.test_timed_goal import NOW, setup_observer, state
 
 
 @pytest.mark.parametrize("detected", ["missing", None, 0])
-def test_unknown_vehicle_phases_do_not_postpone_a_reachable_one_phase_trip(monkeypatch, detected):
+def test_unknown_vehicle_phases_plan_three_until_the_car_charged(monkeypatch, detected):
     async def run():
         observer, control, _hass = setup_observer(monkeypatch)
         control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
@@ -41,19 +41,20 @@ def test_unknown_vehicle_phases_do_not_postpone_a_reachable_one_phase_trip(monke
             control.data.values["detected_ev_phases"] = detected
         observer.goal.set(NOW + timedelta(hours=16))
 
-        # 48 kWh is reachable on one phase at 14.5 A. Assuming three phases
-        # while detection is uninitialised previously inserted a three-hour
-        # pause, leaving under 43 kWh available even at the eventual 16 A max.
+        # Detection reads zero until the car draws current. Three phases put
+        # the start 5.3 h before departure instead of a whole day.
         await observer._evaluate()
-        assert observer.status == "paced"
-        assert control.commands == [("current", 14.5)]
-        assert control.commands[0][1] * 230 * 0.9 * 16 / 1000 >= 48
+        assert observer.status == "paused_until_start"
+        assert observer.planned_start == pytest.approx(
+            NOW + timedelta(hours=16 - 48 / (16 * 0.621) - 0.5), abs=timedelta(seconds=1),
+        )
 
-        # Confirming one phase does not suddenly turn the plan unreachable.
-        control.data.values["detected_ev_phases"] = 1
+        # The car's phases from its last charge decide once it had one.
+        observer._known_phases = 1
         await observer._evaluate()
-        assert observer.status == "paced"
-        assert control.commands == [("current", 14.5)]
+        assert observer.planned_start == pytest.approx(
+            NOW + timedelta(hours=16 - 48 / (16 * 0.207) - 0.5), abs=timedelta(seconds=1),
+        )
 
     asyncio.run(run())
 
@@ -216,11 +217,12 @@ def test_planned_start_follows_the_plan_and_clears_without_one(monkeypatch: pyte
 def test_safety_stop_retains_trip_and_recovery_resumes_pacing(monkeypatch: pytest.MonkeyPatch, stop: str) -> None:
     async def run() -> None:
         observer, control, _hass = setup_observer(monkeypatch)
-        deadline = NOW + timedelta(hours=8)
+        deadline = NOW + timedelta(hours=5)
         observer.goal.set(deadline)
         control.energy_goal.set_target(10, 100)
+        control.data.values["charging_current_ems"] = 10.0
         await observer._evaluate()
-        assert control.commands == [("current", 9.7)]
+        assert control.commands == [("current", 16.0)]
         original = observer.goal
         if stop != "pending_soc":
             control.energy_goal.observe(None if stop == "meter_unavailable" else 99)
@@ -236,7 +238,7 @@ def test_safety_stop_retains_trip_and_recovery_resumes_pacing(monkeypatch: pytes
         assert observer.goal is original
         assert observer.goal.deadline == deadline
         assert observer.goal.finished is None
-        assert control.commands == [("current", 9.7)]
+        assert control.commands == [("current", 16.0)]
         assert observer._store.saved == []
         if stop == "meter_unavailable":
             control.energy_goal.observe(101)
@@ -248,9 +250,9 @@ def test_safety_stop_retains_trip_and_recovery_resumes_pacing(monkeypatch: pytes
         control.energy_goal_stop_requested = False
         monkeypatch.setattr(observer_module.time, "monotonic", lambda: 301.0)
         await observer._evaluate()
-        assert observer.status == "paced"
+        assert observer.status == "charging"
         assert observer.goal is original
-        assert control.commands == [("current", 9.7), ("current", 9.7)]
+        assert control.commands == [("current", 16.0), ("current", 16.0)]
 
     asyncio.run(run())
 
@@ -516,10 +518,13 @@ def test_unknown_trip_storage_blocks_commands_until_cancelled_retry_succeeds(tmp
 def test_detected_vehicle_phases_bound_the_plan(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, control, _hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=8))
+        # 48 kWh take 4.8 h at 16 A on three phases but 7.2 h on two.
+        observer.goal.set(NOW + timedelta(hours=7))
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
         control.data.values["detected_ev_phases"] = 2
         await observer._evaluate()
-        assert control.commands == [("current", 14.5)]
+        assert observer.status == "unreachable"
         control.data.values["detected_ev_phases"] = 1
         assert observer._phases() == 1
         control.data.values["switched_phases"] = 1
@@ -603,7 +608,7 @@ def test_disabling_soc_target_cancels_only_owned_real_queue(monkeypatch: pytest.
         control.soc_goal.configure_source("sensor.soc|")
         control.soc_goal.set_target(80, soc=20)
         observer._runtime.control = control
-        observer.goal.set(now + timedelta(hours=8))
+        observer.goal.set(now + timedelta(hours=5))
         try:
             await control.async_pause_charging()
             await observer._evaluate()
@@ -650,7 +655,7 @@ def test_disabling_target_cancels_service_queue_without_removing_manual_work(tmp
                     state=lambda: WallboxData(), request_refresh=None,
                 )
                 observer._runtime.control = control
-                observer.goal.set(now + timedelta(hours=8))
+                observer.goal.set(now + timedelta(hours=5))
                 await control.async_pause_charging()
                 await observer._evaluate()
                 assert service.control.pending_action == "set_current"
@@ -683,7 +688,8 @@ def test_disabling_target_cancels_service_queue_without_removing_manual_work(tmp
 def test_missing_planning_input_cancels_future_work_without_stopping_charge(monkeypatch: pytest.MonkeyPatch, missing: str, status: str) -> None:
     async def run() -> None:
         observer, control, hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=8))
+        observer.goal.set(NOW + timedelta(hours=5))
+        control.data.values["charging_current_ems"] = 10.0
         await observer._evaluate()
         control.async_cancel_timed_current = AsyncMock()
         original = observer.goal
@@ -703,7 +709,7 @@ def test_missing_planning_input_cancels_future_work_without_stopping_charge(monk
         assert observer.status == status
         control.async_cancel_timed_current.assert_awaited_once_with(observer._command_owner)
         assert observer.goal is original
-        assert control.commands == [("current", 9.7)]
+        assert control.commands == [("current", 16.0)]
 
     asyncio.run(run())
 
@@ -732,7 +738,7 @@ def test_reloaded_observer_reclaims_service_queue_after_offline_unload(tmp_path,
                     state=lambda: WallboxData(), request_refresh=None,
                 )
                 observer._runtime.control = control
-                observer.goal.set(now + timedelta(hours=8))
+                observer.goal.set(now + timedelta(hours=5))
                 saved = observer.goal.snapshot()
                 await control.async_pause_charging()
                 await observer._evaluate()

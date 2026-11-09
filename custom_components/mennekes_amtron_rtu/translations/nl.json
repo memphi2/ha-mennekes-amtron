@@ -522,6 +522,9 @@
         "state_attributes": {
           "failed_transactions": {
             "name": "Mislukte transacties"
+          },
+          "retried_transactions": {
+            "name": "Herhaalde transacties"
           }
         }
       },
@@ -600,8 +603,8 @@
           "read_only": "Alleen lezen",
           "queued": "Wijziging in wachtrij",
           "paused_until_start": "Gepauzeerd tot start",
-          "paced": "Laadstroom aangepast",
-          "early_at_minimum": "Mogelijk te vroeg klaar",
+          "charging": "Laadt met volle stroom",
+          "finishing": "Rondt af met minimale stroom",
           "unreachable": "Doel mogelijk onhaalbaar",
           "late": "Streeftijd verstreken",
           "reached": "Doel bereikt",

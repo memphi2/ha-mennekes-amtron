@@ -25,7 +25,7 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 
 from .client import MennekesModbusClient
-from .client_errors import AmtronBusError
+from .client_errors import AmtronBusError, AmtronConnectionError
 from .const import (
     HEARTBEAT_DEADLINE_SECONDS,
     HEARTBEAT_INTERVAL_SECONDS,
@@ -101,6 +101,7 @@ class HeartbeatTask:
 
     def _deadline_expired(self) -> None:
         self._deadline_handle = None
+        self._client.link_quality.observe(AmtronConnectionError("heartbeat deadline missed"))
         self._set_healthy(False)
 
     @property

@@ -211,7 +211,8 @@ def test_calendar_and_timed_command_cancellation_preserve_new_trip_intent(monkey
         await observer.async_set_deadline(None)
         await observer._write_current(16, None)
         await observer._write_current(16, NOW)
-        assert control.commands == [("current", 9.7)]
+        # The calendar trip waits for its late start; nothing after the clear.
+        assert control.commands == [("pause", None)]
         await observer.async_stop()
         control.async_cancel_timed_current.assert_awaited_once_with(observer._command_owner)
 

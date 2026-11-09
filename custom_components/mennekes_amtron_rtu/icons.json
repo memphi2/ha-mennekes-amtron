@@ -201,10 +201,11 @@
         "default": "mdi:ev-station",
         "state": {
           "paused_until_start": "mdi:timer-pause-outline",
-          "paced": "mdi:current-ac",
+          "charging": "mdi:lightning-bolt",
           "reached": "mdi:battery-check-outline",
           "unreachable": "mdi:timer-alert-outline",
-          "error": "mdi:alert-circle-outline"
+          "error": "mdi:alert-circle-outline",
+          "finishing": "mdi:current-ac"
         }
       },
       "virtual_plug_charge_status": {

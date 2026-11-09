@@ -37,6 +37,7 @@ async def read_words(
     device_id: int,
     retries: int = 0,
     observe: Callable[[BaseException | None], None] | None = None,
+    retry: Callable[[], None] | None = None,
     trace: ModbusTrace | None = None,
 ) -> list[int]:
     """Read words, retrying unanswered reads without retrying any writes."""
@@ -44,7 +45,7 @@ async def read_words(
     try:
         words = await _read_words(
             client, address=address, count=count, device_id=device_id,
-            retries=retries, observe=observe, trace=trace,
+            retries=retries, retry=retry, trace=trace,
         )
     except AmtronBusError as err:
         if observe is not None:
@@ -62,7 +63,7 @@ async def _read_words(
     count: int,
     device_id: int,
     retries: int,
-    observe: Callable[[BaseException | None], None] | None,
+    retry: Callable[[], None] | None,
     trace: ModbusTrace | None,
 ) -> list[int]:
     """Validate each response, retaining failures hidden by successful retries."""
@@ -79,8 +80,8 @@ async def _read_words(
             error = err
             if not isinstance(err.__cause__, ModbusIOException) or remaining <= 0:
                 raise
-            if observe is not None:
-                observe(AmtronProtocolError("modbus read retry"))
+            if retry is not None:
+                retry()
             remaining -= 1
         except (Exception, asyncio.CancelledError) as err:
             error = err

@@ -139,8 +139,11 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, str | int] | None:
         """Explain a blocked virtual release without exposing session data."""
         if self.entity_description.key == "connection_quality":
-            failures = self.wallbox_data.connection_failures
-            return {"failed_transactions": failures} if failures is not None else None
+            counts = {
+                "failed_transactions": self.wallbox_data.connection_failures,
+                "retried_transactions": self.wallbox_data.connection_retries,
+            }
+            return {key: value for key, value in counts.items() if value is not None} or None
         if self.entity_description.key != "virtual_plug_charge_status":
             return None
         plug_charge = self.runtime_data.plug_charge

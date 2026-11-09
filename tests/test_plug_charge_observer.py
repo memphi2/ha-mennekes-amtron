@@ -410,7 +410,7 @@ def test_a_finished_departure_plan_does_not_keep_the_pause(tmp_path, monkeypatch
 @pytest.mark.parametrize(("change", "reason"), [
     ({"plan": "waiting_for_device"}, "departure_plan"),
     ({"plan": "queued"}, "departure_plan"),
-    ({"plan": "paced"}, "departure_plan"),
+    ({"plan": "charging"}, "departure_plan"),
     ({"plan": "paused_until_start", "paused": False}, "departure_plan"),
     ({"pending": "pause"}, "pause_requested"),
     ({"pending": "set_current"}, "pause_requested"),
@@ -452,7 +452,7 @@ def test_a_failed_resume_defers_the_grant(tmp_path, monkeypatch):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize(("plan", "paused"), [("paused_until_start", True), ("paced", False), ("late", False)])
+@pytest.mark.parametrize(("plan", "paused"), [("paused_until_start", True), ("finishing", False), ("late", False)])
 def test_an_applied_departure_plan_keeps_the_current_and_is_released(tmp_path, monkeypatch, plan, paused):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:

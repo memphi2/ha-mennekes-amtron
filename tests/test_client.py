@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import gc
+import logging
 import weakref
 
 import pytest
@@ -493,3 +494,16 @@ def test_the_current_register_enforces_its_floor_without_caller_opt_in() -> None
         await client.async_close()
 
     asyncio.run(run())
+
+
+def test_a_lost_reply_is_demoted_but_other_pymodbus_errors_stay(caplog) -> None:
+    from pymodbus.logging import Log
+
+    with caplog.at_level(logging.INFO, logger="pymodbus.logging"):
+        Log.error("No response received after 0 retries, continue with next request")
+        Log.error("ERROR: request uses device id=1 but received 2.")
+    assert [record.getMessage()[:22] for record in caplog.records] == ["ERROR: request uses de"]
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG, logger="pymodbus.logging"):
+        Log.error("No response received after 0 retries, continue with next request")
+    assert [record.levelname for record in caplog.records] == ["DEBUG"]

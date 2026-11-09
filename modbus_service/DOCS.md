@@ -12,7 +12,12 @@ and HA entry. For all beta features and fixes, update this app before integratio
 **0.8.0b6**. Switching catalogs creates a separate app and requires a handover.
 See [Updates](#updates).
 
-**New in 0.8.0b6:** a percentage target at the car's own charge limit no
+**New in 0.8.0b7:** a single lost Modbus reply that a resend made good is
+counted as a retry instead of being logged as an error, and no longer marks the
+connection quality as degraded. Only transactions that finally fail count as
+failures.
+
+**Since 0.8.0b6:** a percentage target at the car's own charge limit no
 longer pauses the wallbox when reached. The car ends that charge itself, and
 the session stays as it is until you unplug. A lower target still pauses.
 Virtual Plug & Charge keeps its grant through a briefly unreadable or

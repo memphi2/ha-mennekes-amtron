@@ -1,5 +1,16 @@
 # Changes
 
+## 0.8.0b7
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**.
+
+- A lost Modbus reply that a resend made good is counted as a retry and no
+  longer logged as an error with a frame dump, nor shown as degraded connection
+  quality. Read retries and heartbeats resent after one second count as
+  retries; transactions that finally fail and a heartbeat that misses its
+  10-second deadline count as failures. HA shows both counts on **Connection
+  quality**.
+
 ## 0.8.0b6
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**.

@@ -135,6 +135,7 @@ from .vehicle_detection import (
     prepare_vehicle_selection,
     vehicle_selection_matches,
 )
+from .vehicle_phases import VehiclePhaseStore
 from .vehicle_profiles import (
     CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_LIMIT_USE_PROFILE,
@@ -930,6 +931,7 @@ async def async_remove_entry(
     await VehicleTargetStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()
     await VehicleTripStore(hass, entry.entry_id, "").async_remove()
+    await VehiclePhaseStore(hass, entry.entry_id, "").async_remove()
     await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
     await LossStore(hass, entry.entry_id, "").async_remove()
     await async_prune_profile_losses(hass, entry.entry_id, ())

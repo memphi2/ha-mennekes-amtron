@@ -522,6 +522,9 @@
         "state_attributes": {
           "failed_transactions": {
             "name": "Fehlerhafte Übertragungen"
+          },
+          "retried_transactions": {
+            "name": "Wiederholte Übertragungen"
           }
         }
       },
@@ -600,8 +603,8 @@
           "read_only": "Nur lesen",
           "queued": "Änderung vorgemerkt",
           "paused_until_start": "Pausiert bis zum Start",
-          "paced": "Ladestrom wird angepasst",
-          "early_at_minimum": "Bei Mindeststrom eventuell zu früh fertig",
+          "charging": "Lädt mit vollem Strom",
+          "finishing": "Lädt mit Mindeststrom bis zur Abfahrt",
           "unreachable": "Ziel eventuell nicht erreichbar",
           "late": "Zielzeit überschritten",
           "reached": "Ziel erreicht",

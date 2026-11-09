@@ -65,7 +65,10 @@ def test_lost_heartbeat_acknowledgement_is_recorded_then_recovers(caplog):
                 assert diagnostics.heartbeats_failed == 1
                 assert port not in repr(rows)
                 assert "55aa" not in repr(rows).lower()
-                assert "No response received after 0 retries" in caplog.text
+                # The lost reply is retried and counted, not logged as an error.
+                assert "No response received after 0 retries" not in caplog.text
+                assert client.link_quality.retries == 1
+                assert client.link_quality.failures == 0
             finally:
                 await client.async_close()
 

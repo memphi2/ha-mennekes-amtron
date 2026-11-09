@@ -51,6 +51,25 @@ from .write_state import WriteState
 from .write_trace import WriteTrace
 
 _LOGGER = logging.getLogger(__name__)
+_PYMODBUS_LOGGER = logging.getLogger("pymodbus.logging")
+
+
+def _demote_lost_reply(record: logging.LogRecord) -> bool:
+    """Keep one lost reply out of the error log; the callers retry and count it.
+
+    pymodbus logs every unanswered request as an error, with a frame dump.
+    Here that is routine: the heartbeat retries within its deadline, a poll
+    holds the last values, and link quality counts the failure. A command
+    that really failed is logged by its own caller.
+    """
+    if record.levelno >= logging.ERROR and record.getMessage().startswith("No response received after"):
+        record.levelno, record.levelname = logging.DEBUG, "DEBUG"
+        return _PYMODBUS_LOGGER.isEnabledFor(logging.DEBUG)
+    return True
+
+
+if _demote_lost_reply not in _PYMODBUS_LOGGER.filters:
+    _PYMODBUS_LOGGER.addFilter(_demote_lost_reply)
 
 type ClientFactory = Callable[[ConnectionConfig], ModbusTransport]
 type LockedRegisterReader = Callable[[RegisterSpec], Awaitable[RegisterValue]]
@@ -404,7 +423,8 @@ class MennekesModbusClient:
         return await _client_read.read_words(
             client, address=address, count=count,
             device_id=self._config.device_id, retries=self._config.retries,
-            observe=self.link_quality.observe, trace=self.modbus_trace,
+            observe=self.link_quality.observe, retry=self.link_quality.observe_retry,
+            trace=self.modbus_trace,
         )
 
     async def async_read_register(
@@ -567,7 +587,9 @@ class MennekesModbusClient:
                 raise
             finally:
                 self.write_trace.finish(error=error, connected=self.connected)
-                self.link_quality.observe(error)
+                # The heartbeat resends within a second; only its missed
+                # deadline is a failure.
+                self.link_quality.observe(error, retried=spec == HEARTBEAT)
                 if not rejected:
                     if spec.key == "charging_current_ems":
                         self.write_state.current_write_generation += 1
