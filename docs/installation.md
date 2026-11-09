@@ -64,7 +64,7 @@ release and restart Home Assistant. If needed, add
 repositories**, category **Integration**.
 
 **0.6.1 remains stable.** For vehicle profiles, optional automatic selection and
-Virtual Plug & Charge, choose **beta 0.8.0b7** and follow the
+Virtual Plug & Charge, choose **beta 0.8.0b8** and follow the
 [beta update guide](upgrading.md#trying-080b6).
 [Check feature availability](README.md#versions-and-feature-availability)
 before looking for a new option in an installed release.
@@ -83,7 +83,7 @@ TCP port** point to the LAN-to-RS-485 hardware. They are different fields for
 different connections. On HA OS, you normally type neither a service URL nor a
 token for the app.
 
-The app's **Open Web UI** provides guided connection setup. App **0.8.0b7**
+The app's **Open Web UI** provides guided connection setup. App **0.8.0b8**
 supports **Supervisor 2026.10.4+**; update an older beta app if it incorrectly asks
 for 2026.11.0. Native **Configuration** remains available for manual setup.
 [Connection-page details](upgrading.md#app-connection-page).
@@ -111,7 +111,7 @@ required just to use the wallbox.
 4. Check current readings, heartbeat, pause/release and the intended current.
 
 The app and integration may have different version numbers. Stable 0.6.1 and
-beta 0.8.0b7 require **service 0.6.1+ with API 2** for ordinary service connections.
+beta 0.8.0b8 require **service 0.6.1+ with API 2** for ordinary service connections.
 A compatible app can keep running during an integration-only update. To use
 Virtual Plug & Charge in service mode, use **app 0.8.0b1 or newer**. Update to
 **app 0.8.0b2** for the separate **Debug log** tab. When updating both components,

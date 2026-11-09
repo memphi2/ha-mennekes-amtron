@@ -151,6 +151,47 @@ def test_untrustworthy_cable_evidence_is_unknown(tmp_path, attrs):
     asyncio.run(run())
 
 
+def port(hass, value="connected", *, descriptor="vehicle.body.chargingPort.status", entity_id="sensor.car_port"):
+    hass.data[er.DATA_REGISTRY].entities[entity_id] = SimpleNamespace(
+        unique_id=f"{VIN}_{descriptor}", entity_id=entity_id, device_id="car", disabled_by=None,
+    )
+    hass.states.async_set(entity_id, value, {"descriptor": descriptor})
+    return entity_id
+
+
+@pytest.mark.parametrize(("value", "expected"), [
+    ("connected", True), ("DISCONNECTED", False), ("invalid", None),
+])
+def test_a_car_streaming_only_its_port_status_is_detected(tmp_path, value, expected):
+    async def run():
+        hass = local_hass(tmp_path)
+        try:
+            # An i4 or i5 sends no plug boolean, only the port status.
+            port(hass, value)
+            tracker(hass)
+            assert detection_capabilities(hass, "car") == frozenset({"detection"})
+            assert detection_entities(hass, "car") == ("sensor.car_port", "device_tracker.car")
+            assert BavarianDetectionSource(hass, "car").snapshot.connected is expected
+            # The plug boolean is preferred when a car streams it too.
+            plug(hass)
+            assert detection_entities(hass, "car")[0] == "binary_sensor.car_plug"
+        finally:
+            await hass.async_stop()
+    asyncio.run(run())
+
+
+def test_the_port_status_text_counts_too(tmp_path):
+    async def run():
+        hass = local_hass(tmp_path)
+        try:
+            port(hass, "Connected", descriptor="vehicle.body.chargingPort.statusClearText", entity_id="sensor.car_text")
+            tracker(hass)
+            assert BavarianDetectionSource(hass, "car").snapshot.connected is True
+        finally:
+            await hass.async_stop()
+    asyncio.run(run())
+
+
 def test_cable_source_timestamp_cannot_be_refreshed_by_unrelated_ha_reports(tmp_path, monkeypatch):
     async def run():
         hass = local_hass(tmp_path)

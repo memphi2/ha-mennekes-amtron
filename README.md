@@ -74,7 +74,7 @@ setting belongs and why a requested change may wait.
 
 ## Development and releases
 
-**Stable: 0.6.1 · Beta: 0.8.0b7.** The beta includes vehicle profiles, optional
+**Stable: 0.6.1 · Beta: 0.8.0b8.** The beta includes vehicle profiles, optional
 automatic selection and Virtual Plug & Charge, live app Modbus debugging and
 guided app setup on Supervisor 2026.10.4+. Beta 2 adds a wallbox Plug & Charge
 switch, guided vehicle setup and a separate app **Debug log** tab. Beta 3 lets

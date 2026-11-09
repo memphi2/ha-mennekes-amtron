@@ -42,8 +42,18 @@ from .identity import (
 )
 
 PLUG_DESCRIPTOR = "vehicle.powertrain.tractionBattery.charging.port.anyPosition.isPlugged"
+# Cars differ in which plug field they stream, so the most direct one wins: an
+# i4 or i5 streams only the port status. BavarianData's evcc bridge reads the
+# same fields; the DC-only and non-streamed port fields say nothing here.
+PLUG_SOURCES = (
+    ("binary_sensor", PLUG_DESCRIPTOR),
+    ("sensor", "vehicle.body.chargingPort.status"),
+    ("sensor", "vehicle.body.chargingPort.statusClearText"),
+)
+_PLUG_DESCRIPTORS = frozenset(descriptor for _domain, descriptor in PLUG_SOURCES)
+_PLUG_STATES = {"on": True, "off": False, "connected": True, "disconnected": False}
 HOME_ENTITY = "zone.home"
-_ENTITY_KEYS = (("binary_sensor", PLUG_DESCRIPTOR), ("device_tracker", "tracker"))
+_TRACKER = ("device_tracker", "tracker")
 
 
 def _entity(hass: HomeAssistant, device_id: str, vin: str, domain: str, suffix: str) -> str | None:
@@ -55,19 +65,25 @@ def _entity(hass: HomeAssistant, device_id: str, vin: str, domain: str, suffix: 
     return entity_id
 
 
+def _entities(hass: HomeAssistant, device_id: str, vin: str) -> tuple[str | None, str | None]:
+    plug = next(
+        (entity for key in PLUG_SOURCES if (entity := _entity(hass, device_id, vin, *key)) is not None), None,
+    )
+    return plug, _entity(hass, device_id, vin, *_TRACKER)
+
+
 def detection_entities(hass: HomeAssistant, device_id: str) -> tuple[str | None, str | None]:
     """The enabled plug and location entities, for display."""
     vin = bavarian_vehicle_vin(hass, device_id)
     if vin is None:
         return None, None
-    plug, tracker = (_entity(hass, device_id, vin, *key) for key in _ENTITY_KEYS)
-    return plug, tracker
+    return _entities(hass, device_id, vin)
 
 
 def detection_capabilities(hass: HomeAssistant, device_id: str) -> frozenset[Capability]:
     """Offer the optional source only when both enabled vehicle entities exist."""
     vin = bavarian_vehicle_vin(hass, device_id)
-    if vin is None or not all(_entity(hass, device_id, vin, *key) for key in _ENTITY_KEYS):
+    if vin is None or not all(_entities(hass, device_id, vin)):
         return frozenset()
     return frozenset({"detection"})
 
@@ -96,7 +112,7 @@ def _fresh(observation: _Observation, now: datetime) -> State | None:
 
 def _connected(observation: _Observation, now: datetime) -> bool | None:
     state = _fresh(observation, now)
-    if state is None or state.attributes.get("descriptor") != PLUG_DESCRIPTOR:
+    if state is None or state.attributes.get("descriptor") not in _PLUG_DESCRIPTORS:
         return None
     # The actual BMW descriptor timestamp, when exposed, can be older than the
     # HA report. Do not let an unrelated entity write renew this cable evidence.
@@ -105,7 +121,8 @@ def _connected(observation: _Observation, now: datetime) -> bool | None:
         stamp = dt_util.parse_datetime(timestamp) if isinstance(timestamp, str) else None
         if stamp is None or stamp.tzinfo is None or not 0 <= (now - stamp).total_seconds() <= DETECTION_MAX_AGE_SECONDS:
             return None
-    return {"on": True, "off": False}.get(state.state)
+    # A restored port status may come back in lower or upper case.
+    return _PLUG_STATES.get(state.state.strip().lower())
 
 
 def _number(value: object, minimum: float, maximum: float = math.inf) -> float | None:
@@ -149,7 +166,7 @@ class BavarianDetectionSource(BavarianVehicleBinding):
     def _bindings(self) -> tuple[str | None, ...]:
         if not self.available or self._vin is None:
             return (None, None)
-        return tuple(_entity(self._hass, self._device_id, self._vin, *key) for key in _ENTITY_KEYS)
+        return _entities(self._hass, self._device_id, self._vin)
 
     def _snapshot(self, states: list[_Observation], zone: State | None) -> VehicleDetection:
         if not self.available:
