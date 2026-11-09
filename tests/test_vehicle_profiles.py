@@ -14,7 +14,6 @@ from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
     VehicleProfile,
     activate_profile,
     active_profile,
-    profile_list,
     profiles,
     vehicle_options,
     vehicle_soc_is_configured,
@@ -49,7 +48,7 @@ def test_vehicle_profile_projection_preserves_global_settings_and_does_not_enabl
         "vehicle_source_identity": "",
     }
     assert not vehicle_soc_is_configured(effective)
-    assert [profile.id for profile in profile_list(raw)] == [A, B]
+    assert [profile.id for profile in profiles(raw).values()] == [A, B]
     assert active_profile(raw).id == A
     copied = profiles(raw)[B].as_dict()
     copied["options"]["vehicle_soc_entity"] = "sensor.changed"

@@ -1452,12 +1452,10 @@
       "vehicle_capability_unavailable": "Il veicolo selezionato non fornisce i dati necessari. Attiva l’entità corrispondente nella sua integrazione oppure scegli una fonte manuale.",
       "vehicle_profile_name_invalid": "Inserisci un nome di profilo univoco da 1 a 80 caratteri.",
       "vehicle_profile_confirm_required": "Conferma di voler rimuovere questo profilo.",
-      "vehicle_detection_required": "Configura prima i segnali del cavo e della presenza a casa per almeno un profilo.",
       "vehicle_detection_source_invalid": "Seleziona una delle fonti di rilevamento disponibili.",
       "vehicle_detection_entity_invalid": "Seleziona un sensore binario del cavo esistente e un’entità di presenza a casa supportata.",
       "vehicle_detection_entities_distinct": "Seleziona entità diverse per il cavo e la presenza a casa.",
-      "vehicle_connected_states_invalid": "Scegli da uno a otto stati collegato, ciascuno esattamente come lo segnala il sensore.",
-      "plug_charge_detection_required": "Seleziona un profilo e configura i segnali cavo/casa prima di autorizzarlo automaticamente."
+      "vehicle_connected_states_invalid": "Scegli da uno a otto stati collegato, ciascuno esattamente come lo segnala il sensore."
     }
   },
   "selector": {

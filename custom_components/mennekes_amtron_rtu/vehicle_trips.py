@@ -87,10 +87,6 @@ class VehicleTripMemory:
             await self._async_save(trips)
         return resumed if _open(resumed) else None
 
-    async def async_forget(self, profile_id: str) -> None:
-        """Drop a car's parked trip, for example when it no longer plans trips."""
-        await self.async_swap(profile_id, None, None)
-
     async def async_retain(self, planning: set[str]) -> None:
         """Drop the parked trips of cars that no longer plan departures."""
         trips = await self._async_load()

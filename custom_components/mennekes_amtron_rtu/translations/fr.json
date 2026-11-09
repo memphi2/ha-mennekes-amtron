@@ -1452,12 +1452,10 @@
       "vehicle_capability_unavailable": "Le véhicule choisi ne fournit pas les données nécessaires. Activez l’entité correspondante dans son intégration ou choisissez une source manuelle.",
       "vehicle_profile_name_invalid": "Saisissez un nom de profil unique de 1 à 80 caractères.",
       "vehicle_profile_confirm_required": "Confirmez la suppression de ce profil.",
-      "vehicle_detection_required": "Configurez d’abord les signaux de câble et de présence à domicile d’au moins un profil.",
       "vehicle_detection_source_invalid": "Choisissez une source de détection proposée.",
       "vehicle_detection_entity_invalid": "Choisissez un capteur binaire de câble existant et une entité de présence à domicile compatible.",
       "vehicle_detection_entities_distinct": "Choisissez des entités différentes pour le câble et la présence à domicile.",
-      "vehicle_connected_states_invalid": "Choisissez entre un et huit états branché, chacun exactement comme le capteur le signale.",
-      "plug_charge_detection_required": "Sélectionnez un profil et configurez ses signaux câble/domicile avant de l’autoriser automatiquement."
+      "vehicle_connected_states_invalid": "Choisissez entre un et huit états branché, chacun exactement comme le capteur le signale."
     }
   },
   "selector": {

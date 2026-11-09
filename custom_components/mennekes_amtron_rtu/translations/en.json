@@ -1452,12 +1452,10 @@
       "vehicle_capability_unavailable": "The selected vehicle does not provide the required data. Enable the corresponding entity in its integration or choose a manual source.",
       "vehicle_profile_name_invalid": "Enter a unique profile name with 1 to 80 characters.",
       "vehicle_profile_confirm_required": "Confirm that you want to remove this profile.",
-      "vehicle_detection_required": "First configure cable and home signals for at least one vehicle profile.",
       "vehicle_detection_source_invalid": "Select one of the available detection sources.",
       "vehicle_detection_entity_invalid": "Select an existing cable binary sensor and a supported home-presence entity.",
       "vehicle_detection_entities_distinct": "Select separate entities for cable connection and home presence.",
-      "vehicle_connected_states_invalid": "Choose between one and eight connected states, each exactly as the sensor reports it.",
-      "plug_charge_detection_required": "Select a vehicle profile and configure its cable/home detection signals before allowing it to charge automatically."
+      "vehicle_connected_states_invalid": "Choose between one and eight connected states, each exactly as the sensor reports it."
     }
   },
   "selector": {

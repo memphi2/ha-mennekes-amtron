@@ -1452,12 +1452,10 @@
       "vehicle_capability_unavailable": "Het gekozen voertuig levert de vereiste gegevens niet. Schakel de bijbehorende entiteit in zijn integratie in of kies een handmatige bron.",
       "vehicle_profile_name_invalid": "Voer een unieke profielnaam van 1 tot 80 tekens in.",
       "vehicle_profile_confirm_required": "Bevestig dat u dit profiel wilt verwijderen.",
-      "vehicle_detection_required": "Stel eerst kabel- en thuissignalen in voor minstens één voertuigprofiel.",
       "vehicle_detection_source_invalid": "Kies een van de beschikbare herkenningsbronnen.",
       "vehicle_detection_entity_invalid": "Kies een bestaande binaire kabelsensor en een ondersteunde entiteit voor aanwezigheid thuis.",
       "vehicle_detection_entities_distinct": "Kies verschillende entiteiten voor de kabelverbinding en aanwezigheid thuis.",
-      "vehicle_connected_states_invalid": "Kies één tot acht statussen voor aangesloten, elk precies zoals de sensor ze meldt.",
-      "plug_charge_detection_required": "Selecteer een voertuigprofiel en stel de kabel-/thuisdetectie in voordat je automatisch toestemming geeft."
+      "vehicle_connected_states_invalid": "Kies één tot acht statussen voor aangesloten, elk precies zoals de sensor ze meldt."
     }
   },
   "selector": {

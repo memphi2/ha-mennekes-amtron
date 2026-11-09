@@ -1452,12 +1452,10 @@
       "vehicle_capability_unavailable": "Das ausgewählte Fahrzeug stellt die benötigten Daten nicht bereit. Aktiviere die passende Entität in seiner Integration oder wähle eine manuelle Quelle.",
       "vehicle_profile_name_invalid": "Gib einen eindeutigen Profilnamen mit 1 bis 80 Zeichen ein.",
       "vehicle_profile_confirm_required": "Bestätige, dass du dieses Profil entfernen möchtest.",
-      "vehicle_detection_required": "Richte zuerst für mindestens ein Fahrzeugprofil Kabel- und Zuhause-Signale ein.",
       "vehicle_detection_source_invalid": "Wähle eine der angebotenen Erkennungsquellen.",
       "vehicle_detection_entity_invalid": "Wähle einen vorhandenen Kabel-Binärsensor und eine unterstützte Entität für die Anwesenheit zu Hause.",
       "vehicle_detection_entities_distinct": "Wähle unterschiedliche Entitäten für Kabelverbindung und Anwesenheit zu Hause.",
-      "vehicle_connected_states_invalid": "Wähle einen bis acht Zustände für angeschlossen, jeweils genau so, wie der Sensor sie meldet.",
-      "plug_charge_detection_required": "Wähle ein Fahrzeugprofil und richte seine Kabel-/Zuhause-Erkennung ein, bevor du es automatisch freigibst."
+      "vehicle_connected_states_invalid": "Wähle einen bis acht Zustände für angeschlossen, jeweils genau so, wie der Sensor sie meldet."
     }
   },
   "selector": {
