@@ -35,7 +35,9 @@ def test_profile_detection_setup_saves_complete_signals_and_can_be_cancelled(tmp
                 original = deepcopy(dict(entry.options))
                 form = await async_options(
                     hass, entry, "vehicle", "vehicle_profile_open", {"vehicle_profile_id": A},
-                    "vehicle_detection_signals",
+                    # The guided setup passes the other areas on its way.
+                    {"vehicle_profile_name": "Car A", "vehicle_provider": "none"},
+                    "wizard_next", "wizard_next", "wizard_next",
                 )
                 manager = hass.config_entries.options
                 assert form["step_id"] == "vehicle_detection_source"

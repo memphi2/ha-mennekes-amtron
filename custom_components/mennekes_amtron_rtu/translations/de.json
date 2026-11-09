@@ -1002,7 +1002,9 @@
         "menu_options": {
           "departure_configure": "Abfahrtsplanung einrichten",
           "departure_disable": "Abfahrtsplanung deaktivieren",
-          "vehicle_profile": "Zurück zum Profil"
+          "vehicle_profile": "Zurück zum Profil",
+          "wizard_next": "Weiter",
+          "wizard_finish": "Speichern und beenden"
         },
         "description": "Profil: **{vehicle}**.\n\nMit der Abfahrtsplanung startet Home Assistant das Laden so rechtzeitig, dass das Prozentziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n\nPlane die nächste einzelne Fahrt mit Prozent-Ladeziel, nutzbarer Akkukapazität und Abfahrtszeit. Den konkreten Zeitpunkt wählst du anschließend auf der Geräteseite oder übernimmst ihn aus einer optionalen Quelle. Dies ist kein täglicher Zeitplan. Deaktivieren löscht die Fahrt und vorgemerkte Planbefehle; das Prozent-Ladeziel bleibt bestehen."
       },
@@ -1010,7 +1012,9 @@
         "title": "Ladestand erforderlich",
         "menu_options": {
           "vehicle_battery": "Ladestand und Ladegrenze",
-          "vehicle_profile": "Zurück zum Profil"
+          "vehicle_profile": "Zurück zum Profil",
+          "wizard_next": "Weiter",
+          "wizard_finish": "Speichern und beenden"
         },
         "description": "Profil: **{vehicle}**.\n\nDie Abfahrtsplanung muss wissen, wie voll der Akku dieses Autos ist. Richte zuerst seinen Ladestand ein und kehre dann zu Nächste Abfahrt zurück."
       },
@@ -1178,7 +1182,9 @@
           "loss_vehicle": "Ladehistorie des Fahrzeugs",
           "loss_profile": "Ladehistorie dieses Profils verwenden",
           "loss_disable": "Verlustschätzung deaktivieren",
-          "vehicle_profile": "Zurück zum Profil"
+          "vehicle_profile": "Zurück zum Profil",
+          "wizard_next": "Weiter",
+          "wizard_finish": "Speichern und beenden"
         },
         "description": "Profil: **{vehicle}**.\n\nDie Ladeverluste zeigen, wie viel der von der Wallbox gemessenen Energie tatsächlich im Akku dieses Autos angekommen ist.\n\nVergleiche die an der Wallbox gemessene Energie mit der im Akku angekommenen Energie derselben abgeschlossenen Ladung. Letzter Verlust und Durchschnitt sind Schätzwerte. Wähle das Fahrzeug vor Ladebeginn; fehlende oder mehrdeutige Zuordnungen bleiben unbekannt, statt eine andere Ladung zu verwenden.\n\nFehlt die Ladehistorie dieses Autos, prüfe seine Fahrzeugquelle unter Name und Fahrzeugquelle oder wähle einen Energiesensor."
       },
@@ -1224,7 +1230,7 @@
       },
       "vehicle_profile_add": {
         "title": "Profil hinzufügen",
-        "description": "Gib dem Profil einen eindeutigen Namen und wähle BavarianData oder die manuelle Entitätsauswahl. Optionale Ladefunktionen sind bei neuen Profilen zunächst ausgeschaltet.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.",
+        "description": "Gib dem Profil einen eindeutigen Namen und wähle BavarianData oder die manuelle Entitätsauswahl. Optionale Ladefunktionen sind bei neuen Profilen zunächst ausgeschaltet.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.\n\nDanach führt die Einrichtung nacheinander durch Ladestand und Ladelimit, nächste Abfahrt, Ladeverluste und Erkennungssignale. Mit **Weiter** überspringst du einen Bereich. Gespeichert wird erst mit **Speichern und beenden** oder nach dem letzten Schritt.",
         "data": {
           "vehicle_profile_name": "Profilname",
           "vehicle_provider": "Fahrzeugintegration"
@@ -1236,7 +1242,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Profil bearbeiten",
-        "description": "Beim Umbenennen bleiben die Einstellungen erhalten. Ein Wechsel der Integration oder des Fahrzeugs löscht die Funktionseinstellungen dieses Profils, damit keine Daten des bisherigen Autos weiterverwendet werden.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.",
+        "description": "Beim Umbenennen bleiben die Einstellungen erhalten. Ein Wechsel der Integration oder des Fahrzeugs löscht die Funktionseinstellungen dieses Profils, damit keine Daten des bisherigen Autos weiterverwendet werden.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.\n\nDanach führt die Einrichtung nacheinander durch Ladestand und Ladelimit, nächste Abfahrt, Ladeverluste und Erkennungssignale. Mit **Weiter** überspringst du einen Bereich. Gespeichert wird erst mit **Speichern und beenden** oder nach dem letzten Schritt.",
         "data": {
           "vehicle_profile_name": "Profilname",
           "vehicle_provider": "Fahrzeugintegration"
@@ -1363,7 +1369,9 @@
           "vehicle_soc": "Ladestand einrichten",
           "vehicle_source": "Ladestand einrichten",
           "vehicle_disable": "Ladestand nicht mehr verwenden",
-          "vehicle_profile": "Zurück zum Profil"
+          "vehicle_profile": "Zurück zum Profil",
+          "wizard_next": "Weiter",
+          "wizard_finish": "Speichern und beenden"
         }
       }
     },

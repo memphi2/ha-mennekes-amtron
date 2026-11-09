@@ -90,7 +90,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
             source = user_input.get(CONF_CHARGING_COST_SOURCE)
             if source == COST_SOURCE_DISABLED:
                 draft.clear(COST_KEYS)
-                return self._finish_section()
+                return await self._finish_section()
             if source in (COST_SOURCE_FIXED, COST_SOURCE_SENSOR):
                 self._details["cost_source"] = source
                 return await self._cost_source(source, None)
@@ -144,7 +144,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                     "module": NETWORK_MODULE_NONE
                 }
                 draft.clear({CONF_AUTO_TARIFF_REFRESH})
-                return self._finish_section()
+                return await self._finish_section()
             return await self.async_step_cost_network()
         current = dict(draft.values) if user_input is None else user_input
         return self.async_show_form(
@@ -173,7 +173,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                 if module == NETWORK_MODULE_NONE:
                     draft.values[CONF_CHARGING_NETWORK_TARIFF] = {"module": NETWORK_MODULE_NONE}
                     draft.clear({CONF_AUTO_TARIFF_REFRESH})
-                    return self._finish_section()
+                    return await self._finish_section()
                 if module == NETWORK_MODULE_3:
                     return await self.async_step_cost_module3_source()
                 return await self.async_step_cost_module2()
@@ -199,7 +199,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
             except KeyError, TypeError, ValueError:
                 errors["base"] = "network_tariff_invalid"
             else:
-                return self._finish_tariff(draft, tariff)
+                return await self._finish_tariff(draft, tariff)
         return self.async_show_form(
             step_id="cost_module2",
             data_schema=cost_network_schema(
@@ -270,7 +270,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                 except KeyError, TypeError, ValueError:
                     errors["base"] = "network_tariff_invalid"
                 else:
-                    return self._finish_tariff(
+                    return await self._finish_tariff(
                         draft, tariff,
                         automatic=user_input.get(CONF_AUTO_TARIFF_REFRESH, False),
                     )
@@ -284,14 +284,14 @@ class EstimateOptionsFlow(SectionOptionsFlow):
             last_step=True,
         )
 
-    def _finish_tariff(
+    async def _finish_tariff(
         self, draft: OptionsDraft, tariff: dict[str, Any], *, automatic: bool = False
     ) -> ConfigFlowResult:
         draft.values[CONF_CHARGING_NETWORK_TARIFF] = tariff
         draft.clear({CONF_AUTO_TARIFF_REFRESH})
         if tariff["module"] == NETWORK_MODULE_3:
             draft.values[CONF_AUTO_TARIFF_REFRESH] = automatic
-        return self._finish_section()
+        return await self._finish_section()
 
     async def async_step_losses(
         self, user_input: dict[str, Any] | None = None
@@ -303,13 +303,13 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none"):
             if "charge_history" in self._vehicle_capabilities(draft.values):
                 choices.append("loss_profile")
-        elif CONF_VEHICLE_PROFILES not in self.config_entry.options or self._suggested_vehicle(draft.values, "charge_history").provider_id != "none":
+        elif CONF_VEHICLE_PROFILES not in self._options or self._suggested_vehicle(draft.values, "charge_history").provider_id != "none":
             choices.append("loss_vehicle")
         if loss_source(draft.values) != LOSS_SOURCE_DISABLED:
             choices.append("loss_disable")
         return self.async_show_menu(
             step_id="losses",
-            menu_options=[*choices, "vehicle_profile"],
+            menu_options=self._area_menu(choices),
             description_placeholders=self._loss_placeholders(),
         )
 
@@ -324,7 +324,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         draft.clear(LOSS_KEYS)
         draft.values[CONF_CHARGE_LOSS_SOURCE] = "vehicle_history"
         draft.values[CONF_LOSS_VEHICLE_PROVIDER] = "profile"
-        return self._finish_section()
+        return await self._finish_section()
 
     async def async_step_loss_disable(
         self, user_input: dict[str, Any] | None = None
@@ -332,7 +332,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         if (draft := self._section("losses")) is None:
             return await self.async_step_init()
         draft.clear(LOSS_KEYS)
-        return self._finish_section()
+        return await self._finish_section()
 
     async def async_step_loss_sensor(
         self, user_input: dict[str, Any] | None = None
@@ -361,7 +361,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                         ),
                     }
                 )
-                return self._finish_section()
+                return await self._finish_section()
         return self.async_show_form(
             step_id="loss_sensor",
             data_schema=loss_sensor_schema(
@@ -413,7 +413,7 @@ class EstimateOptionsFlow(SectionOptionsFlow):
                         CONF_LOSS_VEHICLE_DEVICE: device,
                     }
                 )
-                return self._finish_section()
+                return await self._finish_section()
         current = (
             {CONF_LOSS_VEHICLE_DEVICE: self._details["suggested_device"]}
             if user_input is None

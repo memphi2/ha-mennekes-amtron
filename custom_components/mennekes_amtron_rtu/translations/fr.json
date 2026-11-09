@@ -1002,7 +1002,9 @@
         "menu_options": {
           "departure_configure": "Configurer la planification du départ",
           "departure_disable": "Désactiver la planification du départ",
-          "vehicle_profile": "Retour au profil"
+          "vehicle_profile": "Retour au profil",
+          "wizard_next": "Suivant",
+          "wizard_finish": "Enregistrer et terminer"
         },
         "description": "Profil : **{vehicle}**.\n\nAvec la planification du départ, Home Assistant démarre la charge assez tôt pour atteindre l’objectif en pourcentage à l’heure de départ au lieu de charger immédiatement.\n\nPlanifiez un seul prochain trajet avec un objectif en pourcentage, la capacité utile et l’heure de départ. Choisissez ensuite l’heure sur la page de l’appareil ou copiez-la depuis une source facultative. Ce n’est pas un programme quotidien. La désactivation efface le trajet et ses commandes en attente ; l’objectif en pourcentage reste."
       },
@@ -1010,7 +1012,9 @@
         "title": "Niveau de charge requis",
         "menu_options": {
           "vehicle_battery": "Niveau et limite de charge",
-          "vehicle_profile": "Retour au profil"
+          "vehicle_profile": "Retour au profil",
+          "wizard_next": "Suivant",
+          "wizard_finish": "Enregistrer et terminer"
         },
         "description": "Profil : **{vehicle}**.\n\nLa planification du départ doit connaître le niveau de la batterie de cette voiture. Configurez d’abord son niveau de charge, puis revenez à Prochain départ."
       },
@@ -1178,7 +1182,9 @@
           "loss_vehicle": "Historique de recharge du véhicule",
           "loss_profile": "Utiliser l’historique de charge de ce profil",
           "loss_disable": "Désactiver l’estimation des pertes",
-          "vehicle_profile": "Retour au profil"
+          "vehicle_profile": "Retour au profil",
+          "wizard_next": "Suivant",
+          "wizard_finish": "Enregistrer et terminer"
         },
         "description": "Profil : **{vehicle}**.\n\nLes pertes de charge indiquent quelle part de l’énergie mesurée par la wallbox est réellement arrivée dans la batterie de cette voiture.\n\nComparez l’énergie mesurée à la borne avec celle ajoutée à la batterie durant la même charge terminée. La dernière perte et la moyenne sont des estimations. Sélectionnez le véhicule avant la charge ; une correspondance absente ou ambiguë reste inconnue.\n\nSi l’historique de charge de cette voiture n’est pas disponible, vérifiez sa source sous Nom et source du véhicule ou choisissez un capteur d’énergie."
       },
@@ -1224,7 +1230,7 @@
       },
       "vehicle_profile_add": {
         "title": "Ajouter un profil",
-        "description": "Donnez au profil un nom identifiable et choisissez BavarianData ou la sélection manuelle d’entités. Les fonctions de charge facultatives sont désactivées dans les nouveaux profils.\n\nLa source du véhicule lie ce profil à la voiture dans une intégration de véhicule, afin d’y lire le niveau et la limite de charge, la capacité, les minuteries de départ, l’historique de charge et les signaux de détection. Choisissez Aucune pour sélectionner manuellement des entités Home Assistant.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.",
+        "description": "Donnez au profil un nom identifiable et choisissez BavarianData ou la sélection manuelle d’entités. Les fonctions de charge facultatives sont désactivées dans les nouveaux profils.\n\nLa source du véhicule lie ce profil à la voiture dans une intégration de véhicule, afin d’y lire le niveau et la limite de charge, la capacité, les minuteries de départ, l’historique de charge et les signaux de détection. Choisissez Aucune pour sélectionner manuellement des entités Home Assistant.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.\n\nEnsuite, la configuration vous guide à travers le niveau et la limite de charge, le prochain départ, les pertes de charge et les signaux de détection. Choisissez **Suivant** pour passer une partie. Rien n’est enregistré avant **Enregistrer et terminer** ou la dernière étape.",
         "data": {
           "vehicle_profile_name": "Nom du profil",
           "vehicle_provider": "Intégration du véhicule"
@@ -1236,7 +1242,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Modifier un profil",
-        "description": "Renommer conserve les réglages. Changer d’intégration ou de véhicule efface les réglages des fonctions de ce profil afin de ne pas réutiliser les données de l’ancienne voiture.\n\nLa source du véhicule lie ce profil à la voiture dans une intégration de véhicule, afin d’y lire le niveau et la limite de charge, la capacité, les minuteries de départ, l’historique de charge et les signaux de détection. Choisissez Aucune pour sélectionner manuellement des entités Home Assistant.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.",
+        "description": "Renommer conserve les réglages. Changer d’intégration ou de véhicule efface les réglages des fonctions de ce profil afin de ne pas réutiliser les données de l’ancienne voiture.\n\nLa source du véhicule lie ce profil à la voiture dans une intégration de véhicule, afin d’y lire le niveau et la limite de charge, la capacité, les minuteries de départ, l’historique de charge et les signaux de détection. Choisissez Aucune pour sélectionner manuellement des entités Home Assistant.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.\n\nEnsuite, la configuration vous guide à travers le niveau et la limite de charge, le prochain départ, les pertes de charge et les signaux de détection. Choisissez **Suivant** pour passer une partie. Rien n’est enregistré avant **Enregistrer et terminer** ou la dernière étape.",
         "data": {
           "vehicle_profile_name": "Nom du profil",
           "vehicle_provider": "Intégration du véhicule"
@@ -1363,7 +1369,9 @@
           "vehicle_soc": "Configurer le niveau de charge",
           "vehicle_source": "Configurer le niveau de charge",
           "vehicle_disable": "Ne plus utiliser le niveau de charge",
-          "vehicle_profile": "Retour au profil"
+          "vehicle_profile": "Retour au profil",
+          "wizard_next": "Suivant",
+          "wizard_finish": "Enregistrer et terminer"
         }
       }
     },

@@ -63,6 +63,11 @@ mode, update the app to **0.8.0b7** first.
   shows the new state **Released by hand**. Guests can charge without switching
   Virtual Plug & Charge off. Previously the switch only recorded the request.
   Service mode needs app **0.8.0b7**.
+- **Adding or opening a vehicle profile guides through all its settings:**
+  name and vehicle source, charge level and charge limit, next departure,
+  charging losses and detection signals, one after another instead of a
+  separate menu for each. **Next** skips an area; nothing is saved before
+  **Save and finish** or the last area, so the integration reloads only once.
 
 ## 0.8.0b6 — 2026-11-09
 

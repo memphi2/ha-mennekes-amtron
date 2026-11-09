@@ -38,7 +38,7 @@ creates only one HA departure plan.
 ## Enable planning
 
 Set up a vehicle charge-level source and a positive **Vehicle charge target**
-first. Open the profile under **Configure → Vehicles**, then **Next departure → Configure departure planning** and enable departure planning. Choose
+first. Open the profile under **Configure → Vehicles**; after its name and charge level, the setup reaches **Next departure**. Choose **Configure departure planning** and enable departure planning. Choose
 a fixed **usable battery capacity** in kWh, a suitable value from the active
 vehicle profile, or an entity that reports it in kWh or Wh. Only the chosen
 capacity input appears. The integration never guesses

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
+from copy import deepcopy
 from typing import Any
 
 import probatio
@@ -29,6 +30,10 @@ from .vehicle_sources import (
 )
 from .vehicle_sources.const import PROVIDER_NONE
 
+# A profile's settings, in the order the guided profile setup visits them.
+WIZARD_AREAS = ("vehicle_battery", "departure", "losses", "vehicle_detection_signals")
+_MISSING = object()
+
 
 class SectionOptionsFlow(OptionsFlow):
     """Save only a complete section, preserving changes in other sections."""
@@ -39,6 +44,72 @@ class SectionOptionsFlow(OptionsFlow):
         self._details: dict[str, Any] = {}
         # The profile whose settings are being edited; None without profiles.
         self._profile_target: str | None = None
+        # The guided profile setup: the areas still to come, and the options
+        # it collects. Nothing is saved before its end.
+        self._wizard: list[str] | None = None
+        self._wizard_start: dict[str, Any] | None = None
+        self._wizard_options: dict[str, Any] | None = None
+
+    @property
+    def _options(self) -> Mapping[str, Any]:
+        """The options as the guided setup has changed them so far."""
+        return self._wizard_options if self._wizard_options is not None else self.config_entry.options
+
+    def _start_wizard(self) -> None:
+        self._wizard_start = deepcopy(dict(self.config_entry.options))
+        self._wizard_options = deepcopy(self._wizard_start)
+        self._wizard = list(WIZARD_AREAS)
+
+    def _end_wizard(self) -> None:
+        self._wizard = self._wizard_start = self._wizard_options = None
+
+    def _area_menu(self, choices: list[str]) -> list[str]:
+        """Return to the profile, or move on through the guided setup."""
+        if self._wizard is None:
+            return [*choices, "vehicle_profile"]
+        return [*choices, "wizard_next", "wizard_finish"]
+
+    async def async_step_wizard_next(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if self._wizard is None:
+            return await self.async_step_init()
+        return await self._wizard_advance()
+
+    async def async_step_wizard_finish(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if self._wizard is None:
+            return await self.async_step_init()
+        return self._wizard_complete()
+
+    async def _wizard_advance(self) -> ConfigFlowResult:
+        self._draft = None
+        self._details = {}
+        if not self._wizard:
+            return self._wizard_complete()
+        area = self._wizard.pop(0)
+        step: Callable[[], Awaitable[ConfigFlowResult]] = getattr(self, f"async_step_{area}")
+        return await step()
+
+    def _wizard_complete(self) -> ConfigFlowResult:
+        """Save every change at once, keeping changes made elsewhere meanwhile."""
+        # Only the wizard steps call this, and only while it runs.
+        start, ours = self._wizard_start or {}, self._wizard_options or {}
+        self._end_wizard()
+        live = dict(self.config_entry.options)
+        result = deepcopy(live)
+        for key in start.keys() | ours.keys():
+            before, after = start.get(key, _MISSING), ours.get(key, _MISSING)
+            if before == after:
+                continue
+            if live.get(key, _MISSING) not in (before, after):
+                return self._options_changed()
+            if after is _MISSING:
+                result.pop(key, None)
+            else:
+                result[key] = deepcopy(after)
+        return self.async_create_entry(data=result)
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -53,24 +124,24 @@ class SectionOptionsFlow(OptionsFlow):
     def _begin(self, section: str, keys: set[str]) -> OptionsDraft:
         if self._draft is None or self._draft.section != section:
             self._draft = OptionsDraft(
-                section, self.config_entry.options, keys, self._profile_target
+                section, self._options, keys, self._profile_target
             )
         self._details = {}
         return self._draft
 
     def _target_profile(self) -> VehicleProfile | None:
         key = self._profile_target
-        return profiles(self.config_entry.options).get(key) if key is not None else None
+        return profiles(self._options).get(key) if key is not None else None
 
     def _target_ready(self) -> bool:
         """A profile was chosen, or there are no profiles and settings are shared."""
-        if CONF_VEHICLE_PROFILES in self.config_entry.options:
+        if CONF_VEHICLE_PROFILES in self._options:
             return self._target_profile() is not None
         return self._profile_target is None
 
     def _target_options(self) -> dict[str, Any]:
         """The chosen profile's current settings, selected or not."""
-        return profile_options(self.config_entry.options, self._profile_target)
+        return profile_options(self._options, self._profile_target)
 
     def _vehicle_placeholders(self) -> dict[str, str]:
         profile = self._target_profile()
@@ -129,16 +200,20 @@ class SectionOptionsFlow(OptionsFlow):
             errors=errors,
         )
 
-    def _finish_section(self) -> ConfigFlowResult:
+    async def _finish_section(self) -> ConfigFlowResult:
         """Commit a completed section after checking concurrent edits."""
         if self._draft is None:
             raise RuntimeError("cannot save an incomplete options section")
         try:
-            merged = self._draft.merge(self.config_entry.options)
+            merged = self._draft.merge(self._options)
         except OptionsChangedError:
+            self._end_wizard()
             return self._options_changed()
         self._draft = None
         self._details = {}
+        if self._wizard is not None:
+            self._wizard_options = merged
+            return await self._wizard_advance()
         return self.async_create_entry(data=merged)
 
     async def async_step_back(
@@ -147,6 +222,7 @@ class SectionOptionsFlow(OptionsFlow):
         self._draft = None
         self._details = {}
         self._profile_target = None
+        self._end_wizard()
         return await self.async_step_init()
 
     def _options_changed(self) -> ConfigFlowResult:

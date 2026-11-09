@@ -92,9 +92,13 @@ to it.
 
 ### Everything for one car in its profile
 
-From **0.8.0b6**, **Configure → Vehicles → Open a profile’s settings** shows
-everything that belongs to that car. Each item explains what it is for, and
-each is optional:
+**Configure → Vehicles → Open a profile’s settings** covers everything that
+belongs to that car. From **0.8.0b7**, adding or opening a profile guides you
+through these areas one after another instead of a menu for each. Each area
+explains what it is for and is optional: **Next** skips it, and an area you set
+up moves on to the next one. Nothing is saved before **Save and finish** or the
+last area, the detection signals. Changes made meanwhile elsewhere, such as
+another selected car, are kept:
 
 | Item | What it is for |
 |---|---|
@@ -117,8 +121,8 @@ settings are retained as a manual profile.
 ### Optional automatic vehicle selection
 
 Automatic selection is **off by default** and separately configurable for each
-profile. Open **Configure → Vehicles → Open a profile’s settings → Detection
-signals** and choose:
+profile. Open **Configure → Vehicles → Open a profile’s settings**, choose
+**Next** up to **Detection signals** and choose:
 
 - **Use the vehicle integration**: BavarianData supplies the vehicle's cable
   sensor and GPS tracker. Its position is compared with Home Assistant's Home

@@ -397,7 +397,7 @@ def test_detector_steps_cannot_skip_their_section_or_profile(step):
             await open_profile(flow)
             assert (await getattr(flow, "async_step_" + step)())["step_id"] == "init"
         with pytest.raises(RuntimeError, match="incomplete vehicle detection"):
-            flow._save_detection(None)
+            await flow._save_detection(None)
 
     asyncio.run(run())
 

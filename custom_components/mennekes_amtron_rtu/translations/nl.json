@@ -1002,7 +1002,9 @@
         "menu_options": {
           "departure_configure": "Vertrekplanning instellen",
           "departure_disable": "Vertrekplanning uitschakelen",
-          "vehicle_profile": "Terug naar profiel"
+          "vehicle_profile": "Terug naar profiel",
+          "wizard_next": "Volgende",
+          "wizard_finish": "Opslaan en afsluiten"
         },
         "description": "Profiel: **{vehicle}**.\n\nMet vertrekplanning start Home Assistant het laden vroeg genoeg om het percentagedoel bij de vertrektijd te halen in plaats van meteen te laden.\n\nPlan één volgende rit met een procentueel doel, bruikbare accucapaciteit en vertrektijd. Kies daarna het tijdstip op de apparaatpagina of neem het over uit een optionele bron. Dit is geen dagelijks schema. Uitschakelen wist de rit en geplande opdrachten; het procentuele doel blijft behouden."
       },
@@ -1010,7 +1012,9 @@
         "title": "Laadniveau vereist",
         "menu_options": {
           "vehicle_battery": "Laadniveau en laadlimiet",
-          "vehicle_profile": "Terug naar profiel"
+          "vehicle_profile": "Terug naar profiel",
+          "wizard_next": "Volgende",
+          "wizard_finish": "Opslaan en afsluiten"
         },
         "description": "Profiel: **{vehicle}**.\n\nDe vertrekplanning moet weten hoe vol de accu van deze auto is. Stel eerst het laadniveau in en ga daarna terug naar Volgend vertrek."
       },
@@ -1178,7 +1182,9 @@
           "loss_vehicle": "Laadgeschiedenis van het voertuig",
           "loss_profile": "Laadgeschiedenis van dit profiel gebruiken",
           "loss_disable": "Verliesraming uitschakelen",
-          "vehicle_profile": "Terug naar profiel"
+          "vehicle_profile": "Terug naar profiel",
+          "wizard_next": "Volgende",
+          "wizard_finish": "Opslaan en afsluiten"
         },
         "description": "Profiel: **{vehicle}**.\n\nLaadverliezen tonen hoeveel van de door de wallbox gemeten energie echt in de accu van deze auto is aangekomen.\n\nVergelijk de door de laadpaal gemeten energie met de energie die tijdens dezelfde voltooide laadsessie in de accu is gekomen. Het laatste verlies en gemiddelde zijn schattingen. Kies het voertuig vóór het laden; ontbrekende of onduidelijke koppelingen blijven onbekend.\n\nIs de laadgeschiedenis van deze auto niet beschikbaar, controleer dan de voertuigbron onder Naam en voertuigbron of kies een energiesensor."
       },
@@ -1224,7 +1230,7 @@
       },
       "vehicle_profile_add": {
         "title": "Profiel toevoegen",
-        "description": "Geef het profiel een herkenbare naam en kies BavarianData of handmatige entiteitskeuze. Optionele laadfuncties staan bij nieuwe profielen uit.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.",
+        "description": "Geef het profiel een herkenbare naam en kies BavarianData of handmatige entiteitskeuze. Optionele laadfuncties staan bij nieuwe profielen uit.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.\n\nDaarna leidt de configuratie je door laadniveau en laadlimiet, volgend vertrek, laadverliezen en detectiesignalen. Kies **Volgende** om een onderdeel over te slaan. Er wordt niets opgeslagen vóór **Opslaan en afsluiten** of de laatste stap.",
         "data": {
           "vehicle_profile_name": "Profielnaam",
           "vehicle_provider": "Voertuigintegratie"
@@ -1236,7 +1242,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Profiel bewerken",
-        "description": "Bij hernoemen blijven instellingen behouden. Een andere integratie of ander voertuig kiezen wist de functie-instellingen van dit profiel, zodat gegevens van de vorige auto niet worden hergebruikt.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.",
+        "description": "Bij hernoemen blijven instellingen behouden. Een andere integratie of ander voertuig kiezen wist de functie-instellingen van dit profiel, zodat gegevens van de vorige auto niet worden hergebruikt.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.\n\nDaarna leidt de configuratie je door laadniveau en laadlimiet, volgend vertrek, laadverliezen en detectiesignalen. Kies **Volgende** om een onderdeel over te slaan. Er wordt niets opgeslagen vóór **Opslaan en afsluiten** of de laatste stap.",
         "data": {
           "vehicle_profile_name": "Profielnaam",
           "vehicle_provider": "Voertuigintegratie"
@@ -1363,7 +1369,9 @@
           "vehicle_soc": "Laadniveau instellen",
           "vehicle_source": "Laadniveau instellen",
           "vehicle_disable": "Laadniveau niet meer gebruiken",
-          "vehicle_profile": "Terug naar profiel"
+          "vehicle_profile": "Terug naar profiel",
+          "wizard_next": "Volgende",
+          "wizard_finish": "Opslaan en afsluiten"
         }
       }
     },

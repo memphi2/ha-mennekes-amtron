@@ -116,6 +116,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         self._draft = None
         self._details = {}
         self._profile_target = None
+        self._end_wizard()
         # Departure planning and charging losses belong to a car's profile.
         return self.async_show_menu(
             step_id="init", menu_options=["wallbox", "vehicle", "costs"],
@@ -138,7 +139,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         service = CONF_SERVER_URL in self.config_entry.data
         if user_input is not None:
             draft.values.update(_normalized(user_input, service_mode=service))
-            return self._finish_section()
+            return await self._finish_section()
         return self.async_show_form(
             step_id="wallbox_basic",
             data_schema=options_schema(
@@ -168,7 +169,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                     if key in user_input
                 }
             )
-            return self._finish_section()
+            return await self._finish_section()
         identity = getattr(
             getattr(self.config_entry, "runtime_data", None), "identity", None
         )
@@ -194,7 +195,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         if vehicle_soc_is_configured(draft.values):
             choices.append("vehicle_disable")
         return self.async_show_menu(
-            step_id="vehicle_battery", menu_options=[*choices, "vehicle_profile"],
+            step_id="vehicle_battery", menu_options=self._area_menu(choices),
             description_placeholders=self._vehicle_placeholders(),
         )
 
@@ -241,7 +242,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 draft.clear({CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY})
                 draft.values[CONF_VEHICLE_SOC_USE_PROFILE] = True
                 draft.values[CONF_VEHICLE_LIMIT_USE_PROFILE] = user_input.get("use_vehicle_limit", False)
-                return self._finish_section()
+                return await self._finish_section()
         return self.async_show_form(
             step_id="vehicle_profile_soc", data_schema=vehicle_profile_soc_schema(draft.values),
             description_placeholders=self._vehicle_placeholders(),
@@ -256,7 +257,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         draft.clear({CONF_VEHICLE_SOC_ENTITY, CONF_VEHICLE_CHARGE_LIMIT_ENTITY, CONF_VEHICLE_SOC_USE_PROFILE, CONF_VEHICLE_LIMIT_USE_PROFILE})
         draft.values[CONF_TIMED_GOAL_ENABLED] = False
         draft.values[CONF_TIMED_GOAL_RESET_PENDING] = True
-        return self._finish_section()
+        return await self._finish_section()
 
     async def async_step_vehicle_soc(
         self, user_input: dict[str, Any] | None = None
@@ -277,7 +278,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                     self._details["limit"] = True
                     return await self.async_step_vehicle_limit()
                 draft.clear({CONF_VEHICLE_CHARGE_LIMIT_ENTITY})
-                return self._finish_section()
+                return await self._finish_section()
         return self.async_show_form(
             step_id="vehicle_soc",
             description_placeholders=self._vehicle_placeholders(),
@@ -308,7 +309,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 draft.values[CONF_VEHICLE_CHARGE_LIMIT_ENTITY] = user_input[
                     CONF_VEHICLE_CHARGE_LIMIT_ENTITY
                 ]
-                return self._finish_section()
+                return await self._finish_section()
         return self.async_show_form(
             step_id="vehicle_limit",
             description_placeholders=self._vehicle_placeholders(),
@@ -331,7 +332,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         if draft.values.get(CONF_TIMED_GOAL_ENABLED) is True:
             choices.append("departure_disable")
         return self.async_show_menu(
-            step_id="departure", menu_options=[*choices, "vehicle_profile"],
+            step_id="departure", menu_options=self._area_menu(choices),
             description_placeholders=self._vehicle_placeholders(),
         )
 
@@ -340,7 +341,9 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
     ) -> ConfigFlowResult:
         return self.async_show_menu(
             step_id="departure_requires_vehicle",
-            menu_options=["vehicle_battery", "vehicle_profile"],
+            # The guided setup has visited the charge level just before.
+            menu_options=self._area_menu([]) if self._wizard is not None
+            else ["vehicle_battery", "vehicle_profile"],
             description_placeholders=self._vehicle_placeholders(),
         )
 
@@ -351,7 +354,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             return await self.async_step_init()
         draft.values[CONF_TIMED_GOAL_ENABLED] = False
         draft.values[CONF_TIMED_GOAL_RESET_PENDING] = True
-        return self._finish_section()
+        return await self._finish_section()
 
     async def async_step_departure_configure(
         self, user_input: dict[str, Any] | None = None
@@ -465,7 +468,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             if step == "departure_entity":
                 return await self.async_step_departure_entity()
             return await self.async_step_departure_vehicle()
-        return self._finish_section()
+        return await self._finish_section()
 
     async def async_step_departure_calendar(
         self, user_input: dict[str, Any] | None = None
@@ -592,7 +595,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             last_step=True,
         )
 
-    def _finish_section(self) -> ConfigFlowResult:
+    async def _finish_section(self) -> ConfigFlowResult:
         """Recheck the vehicle requirement immediately before committing."""
         if (
             (draft := self._section("departure")) is not None
@@ -600,7 +603,7 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
             and not vehicle_soc_is_configured(self._target_options())
         ):
             return self._options_changed()
-        return super()._finish_section()
+        return await super()._finish_section()
 
 
 def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, Any]:

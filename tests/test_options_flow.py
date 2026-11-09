@@ -164,7 +164,7 @@ def test_cannot_commit_after_abandoning_the_section():
         await flow.async_step_wallbox_basic()
         await flow.async_step_back()
         with pytest.raises(RuntimeError, match="incomplete options section"):
-            flow._finish_section()
+            await flow._finish_section()
         assert entry.options == {"current_limit": 16, "charging_price": 0.3}
 
     asyncio.run(run())

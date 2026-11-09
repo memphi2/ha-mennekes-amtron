@@ -1002,7 +1002,9 @@
         "menu_options": {
           "departure_configure": "Configure departure planning",
           "departure_disable": "Disable departure planning",
-          "vehicle_profile": "Back to profile"
+          "vehicle_profile": "Back to profile",
+          "wizard_next": "Next",
+          "wizard_finish": "Save and finish"
         },
         "description": "Profile: **{vehicle}**.\n\nWith departure planning, Home Assistant starts charging early enough to reach the percentage target by the departure time instead of charging at once.\n\nPlan one next trip with a percentage target, usable battery capacity and departure time. Choose the actual time afterwards on the device page, or copy it from an optional source. This is not a daily schedule. Disabling planning clears the trip and queued plan commands; the percentage target remains."
       },
@@ -1010,7 +1012,9 @@
         "title": "Charge level required",
         "menu_options": {
           "vehicle_battery": "Charge level and charge limit",
-          "vehicle_profile": "Back to profile"
+          "vehicle_profile": "Back to profile",
+          "wizard_next": "Next",
+          "wizard_finish": "Save and finish"
         },
         "description": "Profile: **{vehicle}**.\n\nDeparture planning needs to know how full this car’s battery is. Configure its charge level first, then return to Next departure."
       },
@@ -1178,7 +1182,9 @@
           "loss_vehicle": "Vehicle charging history",
           "loss_profile": "Use this profile’s charging history",
           "loss_disable": "Disable loss estimates",
-          "vehicle_profile": "Back to profile"
+          "vehicle_profile": "Back to profile",
+          "wizard_next": "Next",
+          "wizard_finish": "Save and finish"
         },
         "description": "Profile: **{vehicle}**.\n\nCharging losses show how much of the energy measured by the wallbox actually reached this car’s battery.\n\nCompare energy measured by the wallbox with energy added to the battery during the same completed charge. The last loss and average are estimates. Select the vehicle before charging; missing or ambiguous matches remain unknown instead of reusing another charge.\n\nIf this car’s charging history is unavailable, check its vehicle source under Name and vehicle source, or choose an energy sensor."
       },
@@ -1224,7 +1230,7 @@
       },
       "vehicle_profile_add": {
         "title": "Add profile",
-        "description": "Give the profile a recognizable name and choose BavarianData or manual entity selection. New profiles start with optional charging features disabled.\n\nThe vehicle source links this profile to the car in a vehicle integration, so charge level, charge limit, capacity, departure timers, charging history and detection signals can be read from it. Choose None to select Home Assistant entities manually.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.",
+        "description": "Give the profile a recognizable name and choose BavarianData or manual entity selection. New profiles start with optional charging features disabled.\n\nThe vehicle source links this profile to the car in a vehicle integration, so charge level, charge limit, capacity, departure timers, charging history and detection signals can be read from it. Choose None to select Home Assistant entities manually.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.\n\nNext, the setup guides you through charge level and charge limit, next departure, charging losses and detection signals. Choose **Next** to skip an area. Nothing is saved before **Save and finish** or the last step.",
         "data": {
           "vehicle_profile_name": "Profile name",
           "vehicle_provider": "Vehicle integration"
@@ -1236,7 +1242,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Edit profile",
-        "description": "Renaming keeps the settings. Changing the integration or vehicle clears this profile’s feature settings so data from the previous car cannot be reused.\n\nThe vehicle source links this profile to the car in a vehicle integration, so charge level, charge limit, capacity, departure timers, charging history and detection signals can be read from it. Choose None to select Home Assistant entities manually.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.",
+        "description": "Renaming keeps the settings. Changing the integration or vehicle clears this profile’s feature settings so data from the previous car cannot be reused.\n\nThe vehicle source links this profile to the car in a vehicle integration, so charge level, charge limit, capacity, departure timers, charging history and detection signals can be read from it. Choose None to select Home Assistant entities manually.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.\n\nNext, the setup guides you through charge level and charge limit, next departure, charging losses and detection signals. Choose **Next** to skip an area. Nothing is saved before **Save and finish** or the last step.",
         "data": {
           "vehicle_profile_name": "Profile name",
           "vehicle_provider": "Vehicle integration"
@@ -1363,7 +1369,9 @@
           "vehicle_soc": "Configure charge level",
           "vehicle_source": "Configure charge level",
           "vehicle_disable": "Stop using vehicle charge level",
-          "vehicle_profile": "Back to profile"
+          "vehicle_profile": "Back to profile",
+          "wizard_next": "Next",
+          "wizard_finish": "Save and finish"
         }
       }
     },
