@@ -585,12 +585,26 @@ def test_a_manual_release_is_shown_and_never_granted_again(tmp_path, monkeypatch
         async with observer_harness(tmp_path, monkeypatch, plugged_in=False) as h:
             # Armed without a car, then any car: the gate is already open.
             h.control.plug_charge.update(session=None, manual=True)
+            h.control.pending_action = "enable_charging"
             h.coordinator.async_update_listeners()
             await h.hass.async_block_till_done()
             assert h.observer.status == "manual_release"
+            h.control.pending_action = None
+            h.coordinator.values["charging_release"] = 1
             h.control.plug_charge["session"] = "second-session"
             await report(h, "second")
             assert h.observer.status == "manual_release"
             assert not h.timers
             h.control.async_authorize_plug_charge.assert_not_awaited()
+    asyncio.run(run())
+
+
+def test_a_manual_release_that_never_opened_the_gate_leaves_the_grant_to_the_car(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            # The queued release was replaced; the wallbox stayed closed.
+            h.control.plug_charge["manual"] = True
+            h.coordinator.values["charging_release"] = 0
+            await report(h)
+            assert h.observer.status == "waiting_release"
     asyncio.run(run())

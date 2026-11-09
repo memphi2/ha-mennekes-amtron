@@ -172,8 +172,13 @@ class PlugChargeObserver:
             self._session = session
             self._retry_at = 0.0
         self._unplugged = session is None
-        if gate.get("manual") is True:
-            # Released by hand for this or the next connection, any car.
+        if gate.get("manual") is True and (
+            self._coordinator.current_data().values.get("charging_release") == 1
+            or self._control.pending_action == "enable_charging"
+        ):
+            # Released by hand for this or the next connection, any car. A
+            # manual release whose command was replaced never opened the
+            # gate; the car's own grant then still applies.
             self._set_status("manual_release")
             return None
         if not isinstance(session, str):

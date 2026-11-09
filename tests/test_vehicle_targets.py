@@ -249,3 +249,31 @@ def test_an_unconfirmed_car_neither_reaches_nor_keeps_a_reached_target(tmp_path,
             await hass.async_stop()
 
     asyncio.run(run())
+
+
+def test_a_start_with_an_unconfirmed_car_releases_a_reached_target(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.config.config_dir = str(tmp_path)
+        control, coordinator, binding = Control(), Coordinator(), Binding()
+        control.pause_requested = True
+        control.async_resume_charging = AsyncMock()
+        source = "sensor.first|number.limit"
+        control.soc_goal.configure_source(source)
+        control.soc_goal.set_target(80, 85, 90)
+        binding.resting = True
+        hass.states.async_set("sensor.first", "85", {"unit_of_measurement": "%"})
+        hass.states.async_set("number.limit", "90", {"unit_of_measurement": "%"})
+        observer = VehicleSocObserver(
+            hass, control, coordinator, "sensor.first", "number.limit", binding=binding,
+        )
+        try:
+            await observer.async_start()
+            await hass.async_block_till_done()
+            assert control.soc_goal.status == "active"
+            control.async_resume_charging.assert_awaited_once()
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+
+    asyncio.run(run())

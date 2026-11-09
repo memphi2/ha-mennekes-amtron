@@ -285,6 +285,9 @@ class VehicleSocObserver:
         except BaseException:
             await self.async_stop()
             raise
+        if self._resting():
+            # The binding announced an unconfirmed car before this start.
+            self._binding_changed()
 
     @callback
     def _coordinator_updated(self) -> None:
