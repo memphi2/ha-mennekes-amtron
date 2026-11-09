@@ -2,10 +2,10 @@
 
 [Documentation](README.md) › Departure planning
 
-Choose a target percentage and one departure time. The integration adjusts the
-current to spread charging toward that time and can schedule a pause when
-6 A would finish too early. This is optional; ordinary percentage and kWh targets
-work without a departure plan.
+Choose a target percentage and one departure time. The integration starts
+charging as late as it safely can, charges at full current and reduces to 6 A
+toward the end, so the car reaches the target at departure. This is optional;
+ordinary percentage and kWh targets work without a departure plan.
 
 **A departure plan may lift a manual charging pause.** Clear **Next departure**
 when you want the vehicle to stay paused. A percentage target on its own never
@@ -38,7 +38,7 @@ creates only one HA departure plan.
 ## Enable planning
 
 Set up a vehicle charge-level source and a positive **Vehicle charge target**
-first. Open the profile under **Configure → Vehicles**, then **Next departure → Configure departure planning** and enable departure planning. Choose
+first. Open the profile under **Configure → Vehicles**; after its name and charge level, the setup reaches **Next departure**. Choose **Configure departure planning** and enable departure planning. Choose
 a fixed **usable battery capacity** in kWh, a suitable value from the active
 vehicle profile, or an entity that reports it in kWh or Wh. Only the chosen
 capacity input appears. The integration never guesses
@@ -77,6 +77,14 @@ The adapter reads the vehicle's last locally
 published Home Assistant states; it does not fetch BMW cloud data or change the
 vehicle's timers. Those states may be cached, so check **Next departure** after
 importing, especially after changing the timer in your car or the BMW app.
+
+**Not every car sends its timers.** On an i4 and an i5, BMW CarData reported
+only that a departure timer is set, not its time, even with the timer fields
+ticked in the data selection ([BavarianData #308](https://github.com/JustChr/BavarianData/issues/308)).
+From **0.8.0b7**, **Use vehicle departure timers** is offered only when
+BavarianData has enabled action, hour and minute sensors of at least one timer;
+**Next departure** names the timer entities in use. Otherwise, take the
+departure from a calendar or a date/time entity instead.
 
 - BMW streams the timers only when they are ticked in the car's data selection.
   BavarianData's **Choose streamed data** does not tick them, even with the
@@ -125,9 +133,20 @@ departure button keeps its existing entity identity and automations.
 ## What the plan changes while charging
 
 The planner uses the current vehicle SoC, remaining time, usable capacity,
-known wallbox limits and phase information to choose a charging current.
-It recalculates from later SoC reports. If 6 A would finish too early, it can
-pause and resume closer to departure. **An active timed goal can lift even a
+known wallbox limits and phase information. From **0.8.0b7** it works in
+three steps:
+
+1. **Wait.** Charging stays paused until the energy still needed takes the
+   remaining time at full current, plus a **30-minute reserve** for a charge
+   slower than estimated. **Planned charging start** shows that time.
+2. **Full current.** Charging runs at the wallbox's maximum current.
+3. **Finish at 6 A.** Once the rest fits the remaining time at 6 A, the plan
+   reduces to 6 A and lands on the target at departure instead of early.
+
+Each SoC report recalculates this. A charge that is faster than estimated never
+pauses again once it has started; it reaches the 6 A step sooner. A slower one
+returns to full current. Before 0.8.0b7 the plan spread charging at a reduced
+current and often started many hours earlier. **An active timed goal can lift even a
 manually set charging pause** to meet the selected time. To prevent that,
 clear **Next departure**. The ordinary percentage target without a departure
 time still only limits charging and never resumes a pause.
@@ -136,6 +155,11 @@ With [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge)
 (from **0.8.0b3**), plugging in a recognized car does not start charging ahead of
 an armed plan. The release waits until the plan has paused until its start or
 set its current.
+
+From **0.8.0b7**, the plan applies only after the selected car confirms the
+plug-in. Another car shows **Car not confirmed** and gets no plan; a pause the
+plan set earlier ends. See
+[the car's rules apply only to that car](vehicle-setup.md#the-cars-rules-apply-only-to-that-car).
 
 ## Climate before departure
 
@@ -150,8 +174,11 @@ time so the climate blueprint can still run, then clears automatically.
 ## Limits and missing data
 
 The planner assumes 230 V per phase and initially 90% transfer efficiency.
-Until the vehicle's charging phases are detected, it plans conservatively with
-one phase. It adapts when reliable phase information becomes available.
+The wallbox reports the car's phases only while it draws current. From
+**0.8.0b7** the plan therefore remembers each vehicle profile's phases from its
+last charge. A car never seen charging is planned with three phases. A one-phase
+car then starts later than it should; its first charge corrects that from the
+reserve, and every later trip plans with one phase.
 Car limits, missing or delayed SoC reports, unknown vehicle power, the 6 A
 minimum, the wallbox's configured transition delay and HA outages can make
 the exact target time impossible. Missing SoC or capacity data leaves the

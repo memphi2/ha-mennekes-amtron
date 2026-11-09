@@ -34,6 +34,7 @@ from .vehicle_sources import VehicleTelemetry, VehicleTelemetrySource
 
 if TYPE_CHECKING:
     from .coordinator import MennekesAmtronCoordinator
+    from .vehicle_binding import VehicleBinding
     from .vehicle_targets import VehicleTargetMemory
 
 _LOGGER = logging.getLogger(__name__)
@@ -162,9 +163,13 @@ class VehicleSocObserver:
         use_vehicle_soc: bool = False, use_vehicle_limit: bool = False,
         profile_id: str | None = None,
         memory: VehicleTargetMemory | None = None,
+        binding: VehicleBinding | None = None,
     ) -> None:
         self._hass = hass
         self._memory = memory
+        # While another car may be plugged in, this car's data has no say.
+        self._binding = binding
+        self._rest_task: asyncio.Task[None] | None = None
         # Record targets only after a remembered one had its chance: binding
         # a new vehicle source resets the goal before it can be restored.
         self._remembering = False
@@ -181,8 +186,12 @@ class VehicleSocObserver:
             self.source = f"vehicle:{telemetry.source_key}" if telemetry is not None else None
         if self.source is not None and use_vehicle_limit:
             self.source += f"|maximum:{telemetry.source_key if telemetry is not None else 'unavailable'}"
+        # A profile keeps its target even if its source description changes,
+        # for example once a vehicle's identity resolves after a restart.
+        self._memory_key = self.source
         if self.source is not None and profile_id and profile_id != LEGACY_PROFILE_ID:
             self.source = f"profile:{profile_id}:{self.source}"
+            self._memory_key = f"profile:{profile_id}"
         self._unsubscribers: list[CALLBACK_TYPE] = []
         self._pending: _Observations | None = None
         self._inflight: _Observations | None = None
@@ -198,8 +207,13 @@ class VehicleSocObserver:
         self._failure_logged = False
         self._was_available = coordinator.last_update_success
 
+    def _resting(self) -> bool:
+        return self._binding is not None and self._binding.resting
+
     @property
     def latest_soc(self) -> float | None:
+        if self._resting():
+            return None
         if self._use_vehicle_soc:
             return self._telemetry.snapshot.soc_percent if self._telemetry is not None else None
         return vehicle_percentage(
@@ -220,6 +234,8 @@ class VehicleSocObserver:
         self._unsubscribers.append(
             self._coordinator.async_add_listener(self._coordinator_updated),
         )
+        if self._binding is not None:
+            self._unsubscribers.append(self._binding.subscribe(self._binding_changed))
         observed_values = _Observation(self.latest_soc, self.maximum)
         if self._telemetry is not None and (self._use_vehicle_soc or self._use_vehicle_limit):
             @callback
@@ -269,6 +285,9 @@ class VehicleSocObserver:
         except BaseException:
             await self.async_stop()
             raise
+        if self._resting():
+            # The binding announced an unconfirmed car before this start.
+            self._binding_changed()
 
     @callback
     def _coordinator_updated(self) -> None:
@@ -283,6 +302,40 @@ class VehicleSocObserver:
         self._remember_target()
 
     @callback
+    def _binding_changed(self) -> None:
+        if self._stopping:
+            return
+        if not self._resting():
+            # The car confirmed: its current data applies again.
+            self._last_sent = None
+            self._queue_current()
+        elif self._rest_task is None or self._rest_task.done():
+            self._rest_task = self._hass.async_create_task(
+                self._async_release_reached(), "amtron_vehicle_rest", eager_start=False,
+            )
+
+    async def _async_release_reached(self) -> None:
+        """Let a reached target not stop a car that may be another one.
+
+        Setting the same target again without a charge level ends the reach;
+        the stop pause it caused ends too. The target is reached again once
+        the confirmed car reports its charge level.
+        """
+        goal = self._control.soc_goal
+        if self.source is None or goal.source != self.source or goal.status != "reached":
+            return
+        stopped = goal.stop_requested
+        try:
+            await self.async_set_target(goal.target_percent)
+            resume = getattr(self._control, "async_resume_charging", None)
+            if stopped and resume is not None and getattr(self._control, "pause_requested", None) is True:
+                await resume()
+        except (HomeAssistantError, DeviceError, AmtronBusError, OSError) as err:
+            _LOGGER.debug("Reached charge target not released: %s", err)
+            return
+        _LOGGER.info("Reached charge target released: the car at the wallbox is not confirmed")
+
+    @callback
     def _source_configured(self) -> None:
         self._configured = True
         self._remember_target()
@@ -291,7 +344,12 @@ class VehicleSocObserver:
         """Give a reselected vehicle its own target instead of none."""
         try:
             goal = self._control.soc_goal
-            remembered = self._memory.recall(self.source) if self._memory and self.source else None
+            remembered = None
+            if self._memory and self.source and self._memory_key:
+                remembered = self._memory.recall(self._memory_key)
+                if remembered is None:
+                    # Targets saved before 0.8.0b7 are keyed by the source.
+                    remembered = self._memory.recall(self.source)
             # A read-only owner refuses the command; nothing is restored then.
             if remembered and not self._stopping and goal.status == "disabled":
                 maximum = self.maximum or goal.maximum_percent
@@ -317,7 +375,7 @@ class VehicleSocObserver:
                     self._async_restore_target(), "amtron_vehicle_target", eager_start=False,
                 )
             return
-        if self._memory.remember(self.source, goal.target_percent):
+        if self._memory_key is not None and self._memory.remember(self._memory_key, goal.target_percent):
             self._hass.async_create_task(self._memory.async_save(), eager_start=False)
 
     @callback
@@ -326,7 +384,7 @@ class VehicleSocObserver:
 
     @callback
     def _queue_observation(self, observation: _Observation) -> None:
-        if self._stopping:
+        if self._stopping or self._resting():
             return
         if self._target_model is not None:
             if self._target_pending is None:
@@ -521,7 +579,7 @@ class VehicleSocObserver:
             unsubscribe()
         self._unsubscribers.clear()
         self._pending = None
-        for task in (self._task, self._restore_task):
+        for task in (self._task, self._restore_task, self._rest_task):
             if task is not None and not task.done():
                 task.cancel()
                 with suppress(asyncio.CancelledError):

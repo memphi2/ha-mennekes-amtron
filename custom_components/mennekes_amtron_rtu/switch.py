@@ -95,6 +95,8 @@ class AmtronReleaseOffOnUnplugSwitch(MennekesAmtronControlEntity, SwitchEntity, 
     Without Virtual Plug & Charge, an open release lets any car charge. This
     HA-side rule closes it after a confirmed disconnect, so the next car needs
     an explicit release. With the gate enabled, the gate already owns 0x0D05.
+    A manual pause ends with it: the release now holds the next car, and a
+    left-over pause would keep the wallbox showing it. A goal stop stays.
     """
 
     _attr_translation_key = "release_off_on_unplug"
@@ -135,14 +137,19 @@ class AmtronReleaseOffOnUnplugSwitch(MennekesAmtronControlEntity, SwitchEntity, 
         if (
             unplugged and self.is_on and not control.read_only
             and control.plug_charge.get("enabled") is not True
-            and self.wallbox_data.get(CHARGING_RELEASE.key) != 0
         ):
-            self.hass.async_create_task(self._release_off())
+            self.hass.async_create_task(self._after_unplug())
         super()._handle_coordinator_update()
 
-    async def _release_off(self) -> None:
+    async def _after_unplug(self) -> None:
+        control = self.runtime_data.control
         try:
-            await self.runtime_data.control.async_set_charging_release(False)
+            if self.wallbox_data.get(CHARGING_RELEASE.key) != 0:
+                await control.async_set_charging_release(False)
+            # Without a vehicle and with the release off, ending the pause
+            # switches nothing and waits for no state-change interval.
+            if control.pause_requested is True and not control.energy_goal_stop_requested:
+                await control.async_resume_charging()
         except (HomeAssistantError, DeviceError, OSError) as err:
             _LOGGER.warning("Cannot switch off the charging release after unplugging (%s)", err)
 

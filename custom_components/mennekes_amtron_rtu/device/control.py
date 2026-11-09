@@ -193,7 +193,7 @@ class AmtronControl:
 
     @property
     def plug_charge(self) -> dict[str, object]:
-        return self._plug_charge.state.snapshot()
+        return {**self._plug_charge.state.snapshot(), "manual": self._plug_charge.state.manual}
 
     def observe_plug_charge(self, data: WallboxData | None, *, observed_at: datetime | None = None) -> None:
         self._plug_charge.observe(data, observed_at=observed_at)
@@ -573,22 +573,21 @@ class AmtronControl:
 
         self._require_write_access()
         async with self._current_lock:
-            if released and self._plug_charge.state.enabled and not self._plug_charge.state.authorized:
-                # An explicit request may clear a previous manual refusal, but
-                # only the vehicle observer can grant this physical session.
-                if self.energy_goal_stop_requested:
+            gate = self._plug_charge.state
+            manual = gate.manual
+            if gate.enabled:
+                if released and self.energy_goal_stop_requested:
                     raise validation_error("energy_goal_stop_active")
-                self._write_state.command_intent_generation += 1
-                if self.goal_controller is not None:
-                    await self.goal_controller.async_cancel_recovery_locked()
-                self.charging_release_requested = True
-                self._clear_pending(outcome="replaced", reason="replaced")
-                await self._plug_charge.async_sync_locked()
-                await self._async_publish_pending()
-                return
-            await self._async_submit_locked(_PendingCommand(
-                "enable_charging" if released else "disable_charging", int(released),
-            ))
+                # With Plug & Charge, a manual release opens the gate for the
+                # current or the next connection, for any car.
+                self._plug_charge.set_manual(released)
+            try:
+                await self._async_submit_locked(_PendingCommand(
+                    "enable_charging" if released else "disable_charging", int(released),
+                ))
+            except BaseException:
+                gate.manual = manual
+                raise
 
     async def async_set_lock_evse(self, locked: bool) -> None:
         """Lock or unlock the wallbox through 0x0D06."""
@@ -779,6 +778,23 @@ class AmtronControl:
             return False
         return type(value) is int and value == 0
 
+    async def _async_release_switches_charge(self) -> bool:
+        """With no vehicle or a confirmed pause, 0x0D05 switches no charge.
+
+        The pause holds the EV at 0 A whichever way the relay goes. The later
+        resume is the real start and keeps the state-change interval.
+        """
+        if await self._async_vehicle_absent():
+            return False
+        try:
+            current = await self._client.async_read_register(CHARGING_CURRENT_EMS)
+        except AmtronBusError:
+            return True
+        return not (
+            not isinstance(current, bool) and isinstance(current, (int, float))
+            and CHARGING_CURRENT_UNLIMITED < current < CHARGING_CURRENT_MINIMUM
+        )
+
     async def _async_check_transition_interval(self, *, current_change: bool = False) -> None:
         remaining = self._mode_change_remaining()
         if remaining > 0 and (
@@ -903,6 +919,9 @@ class AmtronControl:
             self._plug_charge.check_release()
         current = await self._async_read_switch(CHARGING_RELEASE, stopping=not released)
         changed = current != int(released)
+        # Only a change that can switch a charge waits for, and restarts,
+        # the state-change interval.
+        changed = changed and await self._async_release_switches_charge()
         if changed:
             await self._async_check_transition_interval()
         previous = self.charging_release_requested

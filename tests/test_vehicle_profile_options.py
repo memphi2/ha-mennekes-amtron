@@ -28,6 +28,7 @@ class Flow(BaseFlow):
             "vehicle.drivetrain.batteryManagement.header",
             "vehicle.powertrain.electric.battery.stateOfCharge.target",
             "vehicle.drivetrain.batteryManagement.maxEnergy",
+            *(f"vehicle.cabin.climate.timers.overwriteTimer.{part}" for part in ("action", "hour", "minute")),
         )
         entries = {
             f"{VIN}_{descriptor}": SimpleNamespace(
@@ -46,13 +47,15 @@ class Flow(BaseFlow):
 
 
 async def open_profile(flow, key=A):
-    """Open one car's settings the way the Vehicles menu does."""
-    menu = await flow.async_step_vehicle_profile_open({"vehicle_profile_id": key})
+    """Open one car's settings area by area, outside the guided setup."""
+    await flow.async_step_vehicle()
+    flow._profile_target = key
+    menu = await flow.async_step_vehicle_profile()
     assert menu["step_id"] == "vehicle_profile"
     return menu
 
 
-def test_profile_add_preserves_legacy_mixed_sources_and_enables_no_new_features():
+def test_profile_add_preserves_legacy_mixed_sources_and_uses_what_the_car_reports():
     async def run():
         old = {
             "vehicle_soc_entity": "sensor.manual",
@@ -73,8 +76,10 @@ def test_profile_add_preserves_legacy_mixed_sources_and_enables_no_new_features(
         assert (
             await flow.async_step_vehicle_profile_device({"vehicle_device": "invalid"})
         )["errors"]
-        result = await flow.async_step_vehicle_profile_device({"vehicle_device": "car"})
-        saved = result["data"]
+        menu = await flow.async_step_vehicle_profile_device({"vehicle_device": "car"})
+        # The guided setup continues with the new car's charge level.
+        assert menu["step_id"] == "vehicle_battery"
+        saved = (await flow.async_step_wizard_finish())["data"]
         assert saved["active_vehicle_profile"] == LEGACY_PROFILE_ID
         assert "vehicle_profile_selected_at" not in saved
         assert vehicle_options(saved)["vehicle_soc_entity"] == "sensor.manual"
@@ -84,7 +89,12 @@ def test_profile_add_preserves_legacy_mixed_sources_and_enables_no_new_features(
             item for item in profiles(saved).values() if item.id != LEGACY_PROFILE_ID
         ]
         assert len(added) == 1
-        assert added[0].options == {}
+        # A newly linked car uses everything it reports.
+        assert added[0].options == {
+            "vehicle_soc_use_profile": True, "vehicle_limit_use_profile": True,
+            "timed_use_vehicle_capacity": True, "charge_loss_source": "vehicle_history", "charge_loss_vehicle_provider": "profile",
+        }
+        assert added[0].detection is None
         assert added[0].provider_id == "bavariandata"
         assert not {"vehicle_soc_entity", "timed_bavarian_device"} & saved.keys()
         assert saved["charging_price"] == 0.4
@@ -96,10 +106,10 @@ def test_first_manual_profile_is_active_but_all_vehicle_features_stay_off():
     async def run():
         flow = Flow(FakeConfigEntry())
         await flow.async_step_vehicle()
-        result = await flow.async_step_vehicle_profile_add(
+        await flow.async_step_vehicle_profile_add(
             {"vehicle_profile_name": "Other EV", "vehicle_provider": "none"}
         )
-        saved = result["data"]
+        saved = (await flow.async_step_wizard_finish())["data"]
         assert len(profiles(saved)) == 1
         assert profiles(saved)[saved["active_vehicle_profile"]].options == {}
         assert saved["timed_goal_reset_pending"] is True
@@ -185,7 +195,10 @@ def test_profile_edit_rename_keeps_features_but_changed_vehicle_resets_them():
         changed = (
             await flow.async_step_vehicle_profile_device({"vehicle_device": "own"})
         )["data"]
-        assert changed["vehicle_profiles"][A]["options"] == {}
+        # The other car starts over with only what it reports.
+        assert changed["vehicle_profiles"][A]["options"] == {
+            "charge_loss_source": "vehicle_history", "charge_loss_vehicle_provider": "profile",
+        }
         assert changed["timed_goal_reset_pending"] is True
         assert changed["vehicle_profile_selected_at"] > 0
 
@@ -243,9 +256,11 @@ def test_profile_management_conflicts_with_concurrent_feature_edit_and_back_disc
         entry.options["vehicle_profiles"][A]["options"]["vehicle_soc_use_profile"] = (
             True
         )
+        # The guided setup saves at its end and then sees the other edit.
         assert (
             await flow.async_step_vehicle_profile_device({"vehicle_device": "car"})
-        )["step_id"] == "options_changed"
+        )["step_id"] == "vehicle_battery"
+        assert (await flow.async_step_wizard_finish())["step_id"] == "options_changed"
         await flow.async_step_back()
         assert len(profiles(entry.options)) == 2
 
@@ -256,11 +271,10 @@ def test_existing_sources_name_cannot_collide_with_preserved_legacy_profile():
     async def run():
         flow = Flow(FakeConfigEntry(options={"vehicle_soc_entity": "sensor.old"}))
         await flow.async_step_vehicle()
-        saved = (
-            await flow.async_step_vehicle_profile_add(
-                {"vehicle_profile_name": "Existing sources", "vehicle_provider": "none"}
-            )
-        )["data"]
+        await flow.async_step_vehicle_profile_add(
+            {"vehicle_profile_name": "Existing sources", "vehicle_provider": "none"}
+        )
+        saved = (await flow.async_step_wizard_finish())["data"]
         assert len(profiles(saved)) == 2
         assert profiles(saved)[LEGACY_PROFILE_ID].name == "Existing sources (1)"
 
@@ -420,7 +434,7 @@ def test_vehicle_features_need_an_opened_profile_but_not_a_selected_car():
         assert (await flow.async_step_losses())["menu_options"][-1] == "vehicle_profile"
         await flow.async_step_back()
         with pytest.raises(RuntimeError, match="incomplete profile"):
-            flow._save_profile("car")
+            await flow._save_profile("car")
 
     asyncio.run(run())
 

@@ -92,6 +92,9 @@ authorization setting. To charge automatically without an RFID card, local RFID
 authorization must already be disabled through the supported installation
 configuration. This integration cannot change or bypass it.
 
+Switching **Charging release** on by hand opens the gate for any car until the
+next unplug (from 0.8.0b7). A long unknown wallbox state also ends that release.
+
 Fresh cable/home evidence must match the active profile. Even then,
 upstream integrations can restore previously saved data, and a vehicle change
 between Modbus polls may go unseen. The gate cannot promise an immediate stop
@@ -141,7 +144,10 @@ the integration's extra current cap, while hardware limits remain in force.
   another current write. An early pause is queued and does not need to be
   requested again. Zero disables the longer interval, not these technical
   write guards. Fresh, consistent EVSE Idle and CP A1/A2 readings bypass the
-  longer interval when no vehicle is connected. Failed reads, inconsistent
+  longer interval when no vehicle is connected. From **0.8.0b7**, a release
+  change while the live current register holds the pause value also skips
+  and does not restart it, because the pause keeps the car at 0 A; the resume
+  that starts the charge keeps the interval. Failed reads, inconsistent
   status or layouts without CP keep the interval. Register-write guards and
   heartbeat remain active; pending waits check for unplugging every five seconds.
 - From 0.7.0b3, departure-plan commands are cancelled on freshly confirmed

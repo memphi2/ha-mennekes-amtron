@@ -15,7 +15,9 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
+from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .control import AmtronControl, ControlOptions, ha_command
@@ -245,6 +247,9 @@ class RemoteClient(MennekesModbusClient):
             failures = payload.get("connection_failures")
             if failures is not None and (type(failures) is not int or failures < 0):
                 raise ValueError("invalid connection failure count")
+            retried = payload.get("connection_retries")
+            if retried is not None and (type(retried) is not int or retried < 0):
+                raise ValueError("invalid connection retry count")
             section = "charging_session"
             session_supported = False
             completed_session = None
@@ -439,6 +444,10 @@ class RemoteClient(MennekesModbusClient):
                     or started.utcoffset() is None
                 ):
                     raise ValueError("invalid plug charge start")
+                # Services before 0.8.0b7 have no manual release.
+                manual = control.get("plug_charge_manual", False)
+                if type(manual) is not bool or (manual and not gate["enabled"]):
+                    raise ValueError("invalid plug charge release")
             section = "control.intent"
             for key in ("pause_requested", "charging_release_requested"):
                 value = control.get(key)
@@ -517,6 +526,7 @@ class RemoteClient(MennekesModbusClient):
             pending_change_until=pending_until,
             connection_quality=quality,
             connection_failures=failures,
+            connection_retries=retried,
             energy_goal=goal.snapshot() if goal_supported else None,
             soc_goal=soc_goal.snapshot() if soc_supported else None,
             charging_session=completed_session.as_dict() if completed_session is not None else None,
@@ -638,6 +648,10 @@ class RemoteHeartbeat(HeartbeatTask):
         )
 
 
+# The service stamps the due time without fractions of a second.
+_PENDING_GRACE_SECONDS = 1.0
+
+
 class RemoteCoordinator(MennekesAmtronCoordinator):
     """Poll the service's cache; the service independently schedules bus reads."""
 
@@ -645,6 +659,32 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
         super().__init__(*args, **kwargs)
         if isinstance(self._client, RemoteClient):
             self._client.on_auth_error = self._publish_auth_error
+        self._pending_refresh: CALLBACK_TYPE | None = None
+
+    def _follow_pending(self, until: datetime | None) -> None:
+        """Read a queued command's outcome when it is due, not a poll later.
+
+        The service runs the command on its own; without this, HA learned of
+        it up to one poll interval later, together with whatever came next.
+        """
+        if self._pending_refresh is not None:
+            self._pending_refresh()
+            self._pending_refresh = None
+        if until is None or self.update_interval is None:
+            return
+        delay = (until - datetime.now(UTC)).total_seconds() + _PENDING_GRACE_SECONDS
+        # A later due time is followed by an ordinary poll before it.
+        if 0 < delay < self.update_interval.total_seconds():
+            self._pending_refresh = async_call_later(self.hass, delay, self._pending_due)
+
+    @callback
+    def _pending_due(self, _now: datetime) -> None:
+        self._pending_refresh = None
+        self.hass.async_create_task(self.async_request_refresh())
+
+    async def async_shutdown(self) -> None:
+        self._follow_pending(None)
+        await super().async_shutdown()
 
     def _publish_auth_error(self, new_failure: bool) -> None:
         """Expose a changed failure reason even when already unavailable."""
@@ -681,6 +721,7 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
             raise UpdateFailed(str(err)) from err
         if self.observe_session is not None:
             await self.observe_session(data)
+        self._follow_pending(data.pending_change_until)
         return data
 
 
@@ -785,8 +826,9 @@ class RemoteControl(AmtronControl):
     @property
     def plug_charge(self) -> dict[str, Any]:
         if not self.supports_plug_charge:
-            return {"enabled": False, "policy": "", "session": None, "since": None, "authorized": False}
-        return dict(self._remote.snapshot["control"]["plug_charge"])
+            return {"enabled": False, "policy": "", "session": None, "since": None, "authorized": False, "manual": False}
+        control = self._remote.snapshot["control"]
+        return {**control["plug_charge"], "manual": control.get("plug_charge_manual", False)}
 
     @ha_command
     async def async_configure_plug_charge(self, enabled: bool, *, policy: str = "") -> None:

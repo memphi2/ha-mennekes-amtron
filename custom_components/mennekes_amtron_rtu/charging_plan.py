@@ -12,6 +12,9 @@ MAX_CAPACITY_KWH = 250.0
 NOMINAL_VOLTAGE_V = 230.0
 # Replanning from each fresh SoC report compensates for this initial estimate.
 DEFAULT_BATTERY_EFFICIENCY = 0.9
+# Time a late start keeps for a charge slower than estimated; the minimum
+# current at the end uses up what is left of it.
+START_RESERVE = timedelta(minutes=30)
 
 
 def usable_capacity(value: object, unit: str = "kWh") -> float | None:
@@ -31,7 +34,7 @@ def usable_capacity(value: object, unit: str = "kWh") -> float | None:
 
 @dataclass(frozen=True, slots=True)
 class ChargePlan:
-    """One proposed current and whether the target can fit the remaining time."""
+    """One proposed current and when charging should begin."""
 
     current_a: float | None
     status: str
@@ -43,7 +46,13 @@ def plan_current(
     target_percent: float, capacity_kwh: float, phases: int,
     max_current_a: float, efficiency: float = DEFAULT_BATTERY_EFFICIENCY,
 ) -> ChargePlan:
-    """Recalculate a bounded current; never issue a bus command here."""
+    """Start late at full current and land on the target at departure.
+
+    The start leaves a reserve for a slower charge than estimated. Charging
+    stays at full current until the remaining energy just fits the rest of the
+    time at the minimum current, and then finishes at that minimum instead of
+    early. Each fresh SoC report recalculates this; never issue a bus command.
+    """
     if now.tzinfo is None or deadline.tzinfo is None or now.utcoffset() is None or deadline.utcoffset() is None:
         raise ValueError("charge deadline needs an aware timestamp")
     if (
@@ -66,15 +75,12 @@ def plan_current(
     hours = (deadline - now).total_seconds() / 3600
     if hours <= 0:
         return ChargePlan(max_current_a, "late")
-    amps = required * 1000 / (hours * NOMINAL_VOLTAGE_V * phases * efficiency)
-    if amps > max_current_a:
+    kw_per_amp = NOMINAL_VOLTAGE_V * phases * efficiency / 1000
+    full_hours = required / (max_current_a * kw_per_amp)
+    if full_hours > hours:
         return ChargePlan(max_current_a, "unreachable")
-    if amps < CHARGING_CURRENT_MINIMUM:
-        minimum_hours = required * 1000 / (
-            CHARGING_CURRENT_MINIMUM * NOMINAL_VOLTAGE_V * phases * efficiency
-        )
-        return ChargePlan(
-            CHARGING_CURRENT_MINIMUM, "early_at_minimum",
-            deadline - timedelta(hours=minimum_hours),
-        )
-    return ChargePlan(min(max_current_a, math.ceil(amps * 10) / 10), "paced")
+    minimum_hours = required / (CHARGING_CURRENT_MINIMUM * kw_per_amp)
+    start_at = deadline - min(timedelta(hours=minimum_hours), timedelta(hours=full_hours) + START_RESERVE)
+    if minimum_hours >= hours:
+        return ChargePlan(max_current_a, "charging", start_at)
+    return ChargePlan(CHARGING_CURRENT_MINIMUM, "finishing", start_at)

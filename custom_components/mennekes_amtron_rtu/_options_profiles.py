@@ -12,6 +12,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.selector import SelectOptionDict
 
 from ._options_detection import DetectionOptionsFlow
+from .charge_loss_const import CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_VEHICLE_HISTORY
 from .config_schemas import (
     vehicle_device_schema,
     vehicle_profile_choice_schema,
@@ -19,21 +20,30 @@ from .config_schemas import (
 )
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
+    CONF_TIMED_USE_VEHICLE_CAPACITY,
     CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_DEVICE,
+    CONF_VEHICLE_LIMIT_USE_PROFILE,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
+    CONF_VEHICLE_SOC_USE_PROFILE,
     LEGACY_PROFILE_ID,
     MAX_VEHICLE_PROFILES,
     PROFILE_OPTION_KEYS,
     RESET_PENDING,
+    VehicleDetectionConfig,
     VehicleProfile,
     activate_profile,
     active_profile,
     profiles,
 )
-from .vehicle_sources import provider_device_is_valid, provider_identity
+from .vehicle_sources import (
+    profile_capabilities,
+    provider_device_is_valid,
+    provider_identity,
+)
+from .vehicle_sources.const import CONF_LOSS_VEHICLE_PROVIDER
 
 _PROFILE_KEYS = {
     CONF_VEHICLE_PROFILES,
@@ -68,7 +78,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
         draft = self._begin("profiles", _PROFILE_KEYS)
         self._profile_target = None
         choices = ["vehicle_profile_add"]
-        if CONF_VEHICLE_PROFILES not in self.config_entry.options:
+        if CONF_VEHICLE_PROFILES not in self._options:
             choices.append("vehicle_settings")
         elif profiles(draft.values):
             choices += [
@@ -89,7 +99,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
     async def async_step_vehicle_profile_open(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        catalog = profiles(self.config_entry.options)
+        catalog = profiles(self._options)
         if not catalog:
             return await self.async_step_vehicle()
         key = next(iter(catalog)) if len(catalog) == 1 else None
@@ -100,8 +110,10 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                 key = None
                 errors["vehicle_profile_id"] = "vehicle_profile_required"
         if key is not None:
+            # Opening a car guides through all of its settings.
             self._profile_target = key
-            return await self.async_step_vehicle_profile()
+            self._start_wizard()
+            return await self.async_step_vehicle_profile_edit()
         choices: list[SelectOptionDict] = [
             {"value": item.id, "label": item.name} for item in catalog.values()
         ]
@@ -109,7 +121,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             step_id="vehicle_profile_open",
             errors=errors,
             data_schema=vehicle_profile_choice_schema(
-                choices, self.config_entry.options.get(CONF_ACTIVE_VEHICLE_PROFILE)
+                choices, self._options.get(CONF_ACTIVE_VEHICLE_PROFILE)
             ),
         )
 
@@ -145,6 +157,9 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
     async def async_step_vehicle_profile_add(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        # A new car is guided through all of its settings.
+        if self._wizard is None:
+            self._start_wizard()
         return await self._profile_details(False, user_input)
 
     async def async_step_vehicle_profile_edit(
@@ -174,7 +189,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             return await self.async_step_init()
         draft.values = activate_profile(draft.values, None)
         draft.values[CONF_VEHICLE_AUTO_SELECTION] = False
-        return self._finish_section()
+        return await self._finish_section()
 
     async def _profile_choice(
         self, action: str, user_input: dict[str, Any] | None
@@ -197,7 +212,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                     draft.values[CONF_VEHICLE_PROFILES].pop(key)
                     if draft.values.get(CONF_ACTIVE_VEHICLE_PROFILE) == key:
                         draft.values = activate_profile(draft.values, None)
-                return self._finish_section()
+                return await self._finish_section()
         choices: list[SelectOptionDict] = [
             {"value": item.id, "label": item.name} for item in catalog.values()
         ]
@@ -260,9 +275,9 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                     profile_key=key,
                 )
                 if provider == "none":
-                    return self._save_profile("")
+                    return await self._save_profile("")
                 if existing is not None and provider not in available_providers:
-                    return self._save_profile(existing.device_id, existing.identity)
+                    return await self._save_profile(existing.device_id, existing.identity)
                 return await self.async_step_vehicle_profile_device()
         return self.async_show_form(
             step_id=f"vehicle_profile_{'edit' if edit else 'add'}",
@@ -289,7 +304,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                 if identity is None:
                     errors[CONF_VEHICLE_DEVICE] = "vehicle_device_invalid"
                 else:
-                    return self._save_profile(device, identity)
+                    return await self._save_profile(device, identity)
         key = self._details.get("profile_key")
         existing = profiles(draft.values).get(key) if isinstance(key, str) else None
         return self.async_show_form(
@@ -307,7 +322,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             ),
         )
 
-    def _save_profile(self, device: str, identity: str = "") -> ConfigFlowResult:
+    async def _save_profile(self, device: str, identity: str = "") -> ConfigFlowResult:
         draft = self._section("profiles")
         if draft is None:
             raise RuntimeError("cannot save an incomplete profile")
@@ -331,6 +346,8 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
                 ).as_dict()
                 draft.values[CONF_ACTIVE_VEHICLE_PROFILE] = LEGACY_PROFILE_ID
         key = self._details["profile_key"] or uuid4().hex
+        # The guided setup continues with this car's settings.
+        self._profile_target = key
         existing = profiles(draft.values).get(key)
         provider = self._details["profile_provider"]
         same_identity = existing is not None and (
@@ -338,7 +355,10 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             existing.device_id,
             existing.identity,
         ) == (provider, device, identity)
-        options = existing.options if existing is not None and same_identity else {}
+        if existing is not None and same_identity:
+            options, detection = existing.options, existing.detection
+        else:
+            options, detection = self._vehicle_defaults(provider, device)
         draft.values[CONF_VEHICLE_PROFILES][key] = VehicleProfile(
             key,
             self._details["profile_name"],
@@ -346,11 +366,30 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             device,
             options,
             identity,
-            existing.detection if existing is not None and same_identity else None,
+            detection,
         ).as_dict()
         if CONF_ACTIVE_VEHICLE_PROFILE not in draft.values:
             draft.values = activate_profile(draft.values, key)
         elif not same_identity and draft.values.get(CONF_ACTIVE_VEHICLE_PROFILE) == key:
             draft.values[RESET_PENDING] = True
             draft.values[CONF_VEHICLE_PROFILE_SELECTED_AT] = time.time()
-        return self._finish_section()
+        return await self._finish_section()
+
+    def _vehicle_defaults(
+        self, provider: str, device: str
+    ) -> tuple[dict[str, Any], VehicleDetectionConfig | None]:
+        """A newly linked car uses everything it reports; the guided setup shows it."""
+        if provider == "none" or not device:
+            return {}, None
+        capabilities = profile_capabilities(self.hass, provider, device)
+        options: dict[str, Any] = {}
+        if "soc" in capabilities:
+            options[CONF_VEHICLE_SOC_USE_PROFILE] = True
+            options[CONF_VEHICLE_LIMIT_USE_PROFILE] = "charge_limit" in capabilities
+        if "capacity" in capabilities:
+            options[CONF_TIMED_USE_VEHICLE_CAPACITY] = True
+        if "charge_history" in capabilities:
+            options[CONF_CHARGE_LOSS_SOURCE] = LOSS_SOURCE_VEHICLE_HISTORY
+            options[CONF_LOSS_VEHICLE_PROVIDER] = "profile"
+        detection = VehicleDetectionConfig("profile") if "detection" in capabilities else None
+        return options, detection

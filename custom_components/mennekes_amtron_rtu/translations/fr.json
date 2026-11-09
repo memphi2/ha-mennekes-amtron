@@ -522,6 +522,9 @@
         "state_attributes": {
           "failed_transactions": {
             "name": "Transactions échouées"
+          },
+          "retried_transactions": {
+            "name": "Transactions répétées"
           }
         }
       },
@@ -597,11 +600,12 @@
           "waiting_for_capacity": "En attente de la capacité",
           "waiting_for_soc": "En attente du niveau de charge",
           "waiting_for_device": "En attente de la borne",
+          "vehicle_unconfirmed": "Véhicule non confirmé",
           "read_only": "Lecture seule",
           "queued": "Modification en attente",
           "paused_until_start": "En pause jusqu’au démarrage",
-          "paced": "Courant ajusté",
-          "early_at_minimum": "Fin potentiellement anticipée",
+          "charging": "Charge au courant maximal",
+          "finishing": "Termine au courant minimal",
           "unreachable": "Cible peut-être inaccessible",
           "late": "Heure cible dépassée",
           "reached": "Cible atteinte",
@@ -620,6 +624,7 @@
           "vehicle_not_selected": "Véhicule reconnu non sélectionné",
           "waiting_release": "En attente de l’autorisation de charge",
           "authorized": "Véhicule autorisé",
+          "manual_release": "Autorisé manuellement",
           "blocked": "Charge bloquée",
           "disabled": "Désactivé"
         },
@@ -997,15 +1002,19 @@
         "menu_options": {
           "departure_configure": "Configurer la planification du départ",
           "departure_disable": "Désactiver la planification du départ",
-          "vehicle_profile": "Retour au profil"
+          "vehicle_profile": "Retour au profil",
+          "wizard_next": "Suivant",
+          "wizard_finish": "Enregistrer et terminer"
         },
-        "description": "Profil : **{vehicle}**.\n\nAvec la planification du départ, Home Assistant démarre la charge assez tôt pour atteindre l’objectif en pourcentage à l’heure de départ au lieu de charger immédiatement.\n\nPlanifiez un seul prochain trajet avec un objectif en pourcentage, la capacité utile et l’heure de départ. Choisissez ensuite l’heure sur la page de l’appareil ou copiez-la depuis une source facultative. Ce n’est pas un programme quotidien. La désactivation efface le trajet et ses commandes en attente ; l’objectif en pourcentage reste."
+        "description": "Profil : **{vehicle}**.\n\nUtilisé : départ **{departure_entity}**, capacité de la batterie **{capacity_entity}**.\n\nAvec la planification du départ, Home Assistant démarre la charge assez tôt pour atteindre l’objectif en pourcentage à l’heure de départ au lieu de charger immédiatement.\n\nPlanifiez un seul prochain trajet avec un objectif en pourcentage, la capacité utile et l’heure de départ. Choisissez ensuite l’heure sur la page de l’appareil ou copiez-la depuis une source facultative. Ce n’est pas un programme quotidien. La désactivation efface le trajet et ses commandes en attente ; l’objectif en pourcentage reste."
       },
       "departure_requires_vehicle": {
         "title": "Niveau de charge requis",
         "menu_options": {
           "vehicle_battery": "Niveau et limite de charge",
-          "vehicle_profile": "Retour au profil"
+          "vehicle_profile": "Retour au profil",
+          "wizard_next": "Suivant",
+          "wizard_finish": "Enregistrer et terminer"
         },
         "description": "Profil : **{vehicle}**.\n\nLa planification du départ doit connaître le niveau de la batterie de cette voiture. Configurez d’abord son niveau de charge, puis revenez à Prochain départ."
       },
@@ -1173,9 +1182,11 @@
           "loss_vehicle": "Historique de recharge du véhicule",
           "loss_profile": "Utiliser l’historique de charge de ce profil",
           "loss_disable": "Désactiver l’estimation des pertes",
-          "vehicle_profile": "Retour au profil"
+          "vehicle_profile": "Retour au profil",
+          "wizard_next": "Suivant",
+          "wizard_finish": "Enregistrer et terminer"
         },
-        "description": "Profil : **{vehicle}**.\n\nLes pertes de charge indiquent quelle part de l’énergie mesurée par la wallbox est réellement arrivée dans la batterie de cette voiture.\n\nComparez l’énergie mesurée à la borne avec celle ajoutée à la batterie durant la même charge terminée. La dernière perte et la moyenne sont des estimations. Sélectionnez le véhicule avant la charge ; une correspondance absente ou ambiguë reste inconnue.\n\nSi l’historique de charge de cette voiture n’est pas disponible, vérifiez sa source sous Nom et source du véhicule ou choisissez un capteur d’énergie."
+        "description": "Profil : **{vehicle}**.\n\nUtilisé : **{loss_entity}**.\n\nLes pertes de charge indiquent quelle part de l’énergie mesurée par la wallbox est réellement arrivée dans la batterie de cette voiture.\n\nComparez l’énergie mesurée à la borne avec celle ajoutée à la batterie durant la même charge terminée. La dernière perte et la moyenne sont des estimations. Sélectionnez le véhicule avant la charge ; une correspondance absente ou ambiguë reste inconnue.\n\nSi l’historique de charge de cette voiture n’est pas disponible, vérifiez sa source sous Nom et source du véhicule ou choisissez un capteur d’énergie."
       },
       "loss_sensor": {
         "title": "Pertes de charge avec un capteur",
@@ -1219,7 +1230,7 @@
       },
       "vehicle_profile_add": {
         "title": "Ajouter un profil",
-        "description": "Donnez au profil un nom identifiable et choisissez BavarianData ou la sélection manuelle d’entités. Les fonctions de charge facultatives sont désactivées dans les nouveaux profils.\n\nLa source du véhicule lie ce profil à la voiture dans une intégration de véhicule, afin d’y lire le niveau et la limite de charge, la capacité, les minuteries de départ, l’historique de charge et les signaux de détection. Choisissez Aucune pour sélectionner manuellement des entités Home Assistant.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.",
+        "description": "Donnez au profil un nom identifiable et choisissez BavarianData ou la sélection manuelle d’entités. Le niveau de charge, la limite de charge, la capacité de la batterie, l’historique de charge et les signaux de détection d’une voiture liée sont utilisés immédiatement ; la planification du départ reste désactivée.\n\nLa source du véhicule lie ce profil à la voiture dans une intégration de véhicule, afin d’y lire le niveau et la limite de charge, la capacité, les minuteries de départ, l’historique de charge et les signaux de détection. Choisissez Aucune pour sélectionner manuellement des entités Home Assistant.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.\n\nEnsuite, la configuration vous guide à travers le niveau et la limite de charge, le prochain départ, les pertes de charge et les signaux de détection. Choisissez **Suivant** pour passer une partie. Rien n’est enregistré avant **Enregistrer et terminer** ou la dernière étape.",
         "data": {
           "vehicle_profile_name": "Nom du profil",
           "vehicle_provider": "Intégration du véhicule"
@@ -1231,7 +1242,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Modifier un profil",
-        "description": "Renommer conserve les réglages. Changer d’intégration ou de véhicule efface les réglages des fonctions de ce profil afin de ne pas réutiliser les données de l’ancienne voiture.\n\nLa source du véhicule lie ce profil à la voiture dans une intégration de véhicule, afin d’y lire le niveau et la limite de charge, la capacité, les minuteries de départ, l’historique de charge et les signaux de détection. Choisissez Aucune pour sélectionner manuellement des entités Home Assistant.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.",
+        "description": "Renommer conserve les réglages. Changer d’intégration ou de véhicule efface les réglages des fonctions de ce profil afin de ne pas réutiliser les données de l’ancienne voiture ; les données de la nouvelle voiture sont utilisées immédiatement.\n\nLa source du véhicule lie ce profil à la voiture dans une intégration de véhicule, afin d’y lire le niveau et la limite de charge, la capacité, les minuteries de départ, l’historique de charge et les signaux de détection. Choisissez Aucune pour sélectionner manuellement des entités Home Assistant.\n\nSeules les intégrations installées avec un véhicule pris en charge sont proposées. Les entités choisies manuellement restent toujours possibles. Si une intégration enregistrée est temporairement absente, renommer le profil conserve le véhicule et ses réglages.\n\nEnsuite, la configuration vous guide à travers le niveau et la limite de charge, le prochain départ, les pertes de charge et les signaux de détection. Choisissez **Suivant** pour passer une partie. Rien n’est enregistré avant **Enregistrer et terminer** ou la dernière étape.",
         "data": {
           "vehicle_profile_name": "Nom du profil",
           "vehicle_provider": "Intégration du véhicule"
@@ -1295,7 +1306,7 @@
       },
       "vehicle_detection_source": {
         "title": "Signaux de détection",
-        "description": "Profil : **{vehicle}**.\n\nLes signaux de détection indiquent que cette voiture est branchée et à domicile. La sélection automatique et le Plug & Charge virtuel les utilisent.\n\nUtilisez les entités locales compatibles de l’intégration du véhicule, choisissez des entités Home Assistant existantes ou désactivez la détection pour ce profil. Le branchement du câble et la présence à domicile sont tous deux nécessaires. Aucune requête cloud supplémentaire.",
+        "description": "Profil : **{vehicle}**.\n\nUtilisé : prise **{plug_entity}**, position **{location_entity}**.\n\nLes signaux de détection indiquent que cette voiture est branchée et à domicile. La sélection automatique et le Plug & Charge virtuel les utilisent.\n\nUtilisez les entités locales compatibles de l’intégration du véhicule, choisissez des entités Home Assistant existantes ou désactivez la détection pour ce profil. Le branchement du câble et la présence à domicile sont tous deux nécessaires. Aucune requête cloud supplémentaire.",
         "data": {
           "vehicle_detection_source": "Source de détection"
         }
@@ -1353,12 +1364,14 @@
       },
       "vehicle_battery": {
         "title": "Niveau et limite de charge",
-        "description": "Profil : **{vehicle}**.\n\nLe niveau de charge permet à Home Assistant d’arrêter la charge à un objectif en pourcentage, par exemple 80 %, et la planification du départ en a besoin pour calculer la durée de charge. La limite de charge de la voiture peut servir de maximum supplémentaire. Réglez ensuite le pourcentage souhaité sur la page de l’appareil de la wallbox.\n\nPour annuler uniquement l’objectif actuel en pourcentage, réglez Objectif de charge du véhicule sur 0. Ne plus utiliser le niveau de charge retire ici les associations de sources de ce profil, y compris le maximum facultatif, et désactive sa planification du départ ; pour la voiture sélectionnée, l’objectif en pourcentage et le trajet sont aussi effacés. Les entités sources de l’intégration du véhicule restent intactes, tout comme son autorisation, l’objectif en kWh et l’état de charge.",
+        "description": "Profil : **{vehicle}**.\n\nUtilisé : niveau de charge **{soc_entity}**, limite de charge **{limit_entity}**.\n\nLe niveau de charge permet à Home Assistant d’arrêter la charge à un objectif en pourcentage, par exemple 80 %, et la planification du départ en a besoin pour calculer la durée de charge. La limite de charge de la voiture peut servir de maximum supplémentaire. Réglez ensuite le pourcentage souhaité sur la page de l’appareil de la wallbox.\n\nPour annuler uniquement l’objectif actuel en pourcentage, réglez Objectif de charge du véhicule sur 0. Ne plus utiliser le niveau de charge retire ici les associations de sources de ce profil, y compris le maximum facultatif, et désactive sa planification du départ ; pour la voiture sélectionnée, l’objectif en pourcentage et le trajet sont aussi effacés. Les entités sources de l’intégration du véhicule restent intactes, tout comme son autorisation, l’objectif en kWh et l’état de charge.",
         "menu_options": {
           "vehicle_soc": "Configurer le niveau de charge",
           "vehicle_source": "Configurer le niveau de charge",
           "vehicle_disable": "Ne plus utiliser le niveau de charge",
-          "vehicle_profile": "Retour au profil"
+          "vehicle_profile": "Retour au profil",
+          "wizard_next": "Suivant",
+          "wizard_finish": "Enregistrer et terminer"
         }
       }
     },

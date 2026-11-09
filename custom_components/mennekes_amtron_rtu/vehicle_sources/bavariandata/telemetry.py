@@ -41,9 +41,11 @@ SOC_DESCRIPTORS = (
     "vehicle.drivetrain.batteryManagement.header",
     "vehicle.powertrain.electric.battery.stateOfCharge.displayed",
 )
+# BavarianData's own prediction continues between the car's rare reports.
+ESTIMATE_DESCRIPTOR = "soc_estimate"
 LIMIT_DESCRIPTOR = "vehicle.powertrain.electric.battery.stateOfCharge.target"
 CAPACITY_DESCRIPTOR = "vehicle.drivetrain.batteryManagement.maxEnergy"
-_DESCRIPTORS = (SOC_DESCRIPTORS, (LIMIT_DESCRIPTOR,), (CAPACITY_DESCRIPTOR,))
+_DESCRIPTORS = ((ESTIMATE_DESCRIPTOR, *SOC_DESCRIPTORS), (LIMIT_DESCRIPTOR,), (CAPACITY_DESCRIPTOR,))
 _CAPABILITIES: tuple[Capability, ...] = ("soc", "charge_limit", "capacity")
 
 
@@ -57,6 +59,18 @@ def _entity(hass: HomeAssistant, device_id: str, vin: str, descriptors: tuple[st
         if entry is not None and entry.device_id == device_id and entry.disabled_by is None:
             return entity_id, descriptor
     return None
+
+
+def telemetry_entities(hass: HomeAssistant, device_id: str) -> dict[Capability, str]:
+    """The enabled entity each capability reads, for display."""
+    vin = bavarian_vehicle_vin(hass, device_id)
+    if vin is None:
+        return {}
+    return {
+        capability: found[0]
+        for capability, descriptors in zip(_CAPABILITIES, _DESCRIPTORS, strict=True)
+        if (found := _entity(hass, device_id, vin, descriptors)) is not None
+    }
 
 
 def telemetry_capabilities(hass: HomeAssistant, device_id: str) -> frozenset[Capability]:

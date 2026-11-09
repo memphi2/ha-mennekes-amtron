@@ -21,9 +21,10 @@ from tests.test_modbus_service import TOKEN, current_writes, service_fixture
 from tests.test_timed_goal import setup_observer, state
 
 
+# 48 kWh in five hours start at once at 16 A. Each change makes the
+# remainder fit at the minimum current, so the queued 16 A is outdated.
 @pytest.mark.parametrize(("change", "expected"), [
-    ("soc_near_target", None), ("capacity", None),
-    ("soc_progress", 6.5), ("phases", 16),
+    ("soc_near_target", 6), ("capacity", 6), ("soc_progress", 6),
 ])
 @pytest.mark.parametrize("manual", [False, True])
 def test_valid_new_inputs_revoke_old_owned_resume(monkeypatch, change, expected, manual):
@@ -42,7 +43,7 @@ def test_valid_new_inputs_revoke_old_owned_resume(monkeypatch, change, expected,
         control.soc_goal.configure_source("sensor.soc|")
         control.soc_goal.set_target(80, soc=20)
         observer._runtime.control = control
-        observer.goal.set(now + timedelta(hours=8))
+        observer.goal.set(now + timedelta(hours=5))
         try:
             await control.async_pause_charging()
             await observer._evaluate()
@@ -52,13 +53,11 @@ def test_valid_new_inputs_revoke_old_owned_resume(monkeypatch, change, expected,
                 await control.async_set_charging_current(12)
             if change.startswith("soc_"):
                 hass.states["sensor.soc"] = state(
-                    "sensor.soc", "79" if change == "soc_near_target" else "40", unit_of_measurement="%",
+                    "sensor.soc", "79" if change == "soc_near_target" else "70", unit_of_measurement="%",
                 )
-            elif change == "capacity":
+            else:
                 observer._entry.options["timed_capacity_entity"] = "sensor.capacity"
                 hass.states["sensor.capacity"] = state("sensor.capacity", "1", unit_of_measurement="kWh")
-            else:
-                observer._runtime.coordinator.current_data().values["switched_phases"] = 1
             await observer._evaluate()
             assert (control.pending_action is not None) is manual
             assert current_writes(harness.transport) == [1]
@@ -68,7 +67,7 @@ def test_valid_new_inputs_revoke_old_owned_resume(monkeypatch, change, expected,
             assert current_writes(harness.transport) == ([1, 12] if manual else [1])
             if not manual:
                 await observer._evaluate()
-                assert current_writes(harness.transport) == ([1] if expected is None else [1, expected])
+                assert current_writes(harness.transport) == [1, expected]
         finally:
             release.set()
             await observer.async_stop()
@@ -90,7 +89,7 @@ def test_unchanged_or_minor_plan_update_retains_its_queued_resume(monkeypatch, u
         control.soc_goal.configure_source("sensor.soc|")
         control.soc_goal.set_target(80, soc=20)
         observer._runtime.control = control
-        observer.goal.set(now + timedelta(hours=8))
+        observer.goal.set(now + timedelta(hours=5))
         try:
             await control.async_pause_charging()
             await observer._evaluate()
@@ -102,7 +101,7 @@ def test_unchanged_or_minor_plan_update_retains_its_queued_resume(monkeypatch, u
             harness.clock[0] += 301
             release.set()
             await asyncio.wait_for(task, 2)
-            assert current_writes(harness.transport) == pytest.approx([1, 9.7])
+            assert current_writes(harness.transport) == [1, 16]
         finally:
             release.set()
             await observer.async_stop()
@@ -128,7 +127,7 @@ def test_valid_new_soc_revokes_queued_pause_before_it_stops_charge(monkeypatch):
         control.soc_goal.configure_source("sensor.soc|")
         control.soc_goal.set_target(80, soc=79)
         observer._runtime.control = control
-        observer.goal.set(now + timedelta(hours=8))
+        observer.goal.set(now + timedelta(hours=5))
         hass.states["sensor.soc"] = state("sensor.soc", "79", unit_of_measurement="%")
         try:
             await observer._evaluate()
@@ -141,8 +140,10 @@ def test_valid_new_soc_revokes_queued_pause_before_it_stops_charge(monkeypatch):
             release.set()
             await asyncio.wait_for(task, 2)
             assert current_writes(harness.transport) == []
+            # The charge never paused and keeps its full current.
             await observer._evaluate()
-            assert current_writes(harness.transport) == pytest.approx([9.7])
+            assert current_writes(harness.transport) == []
+            assert observer.status == "charging"
         finally:
             release.set()
             await observer.async_stop()
@@ -172,7 +173,7 @@ def test_service_cancels_outdated_owned_resume_but_retains_manual_command(tmp_pa
                     state=lambda: WallboxData(), request_refresh=None,
                 )
                 observer._runtime.control = control
-                observer.goal.set(now + timedelta(hours=8))
+                observer.goal.set(now + timedelta(hours=5))
                 await control.async_pause_charging()
                 await observer._evaluate()
                 assert service.control.pending_action == "set_current"

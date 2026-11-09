@@ -410,7 +410,7 @@ def test_a_finished_departure_plan_does_not_keep_the_pause(tmp_path, monkeypatch
 @pytest.mark.parametrize(("change", "reason"), [
     ({"plan": "waiting_for_device"}, "departure_plan"),
     ({"plan": "queued"}, "departure_plan"),
-    ({"plan": "paced"}, "departure_plan"),
+    ({"plan": "charging"}, "departure_plan"),
     ({"plan": "paused_until_start", "paused": False}, "departure_plan"),
     ({"pending": "pause"}, "pause_requested"),
     ({"pending": "set_current"}, "pause_requested"),
@@ -452,7 +452,7 @@ def test_a_failed_resume_defers_the_grant(tmp_path, monkeypatch):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize(("plan", "paused"), [("paused_until_start", True), ("paced", False), ("late", False)])
+@pytest.mark.parametrize(("plan", "paused"), [("paused_until_start", True), ("finishing", False), ("late", False)])
 def test_an_applied_departure_plan_keeps_the_current_and_is_released(tmp_path, monkeypatch, plan, paused):
     async def run():
         async with observer_harness(tmp_path, monkeypatch) as h:
@@ -564,4 +564,47 @@ def test_a_session_replaced_without_an_unplug_is_not_a_new_plug_in(tmp_path, mon
             await h.hass.async_block_till_done()
             observer.async_set_target.assert_awaited_once()
             h.control.async_resume_charging.assert_not_awaited()
+    asyncio.run(run())
+
+
+def test_no_grant_until_the_selected_car_confirmed_this_plug_in(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            h.entry.runtime_data.vehicle_binding = SimpleNamespace(resting=True)
+            await report(h)
+            assert h.observer.status == "waiting_detection"
+            assert not h.timers
+            h.entry.runtime_data.vehicle_binding.resting = False
+            h.coordinator.async_update_listeners()
+            assert h.observer.status == "waiting_release"
+    asyncio.run(run())
+
+
+def test_a_manual_release_is_shown_and_never_granted_again(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch, plugged_in=False) as h:
+            # Armed without a car, then any car: the gate is already open.
+            h.control.plug_charge.update(session=None, manual=True)
+            h.control.pending_action = "enable_charging"
+            h.coordinator.async_update_listeners()
+            await h.hass.async_block_till_done()
+            assert h.observer.status == "manual_release"
+            h.control.pending_action = None
+            h.coordinator.values["charging_release"] = 1
+            h.control.plug_charge["session"] = "second-session"
+            await report(h, "second")
+            assert h.observer.status == "manual_release"
+            assert not h.timers
+            h.control.async_authorize_plug_charge.assert_not_awaited()
+    asyncio.run(run())
+
+
+def test_a_manual_release_that_never_opened_the_gate_leaves_the_grant_to_the_car(tmp_path, monkeypatch):
+    async def run():
+        async with observer_harness(tmp_path, monkeypatch) as h:
+            # The queued release was replaced; the wallbox stayed closed.
+            h.control.plug_charge["manual"] = True
+            h.coordinator.values["charging_release"] = 0
+            await report(h)
+            assert h.observer.status == "waiting_release"
     asyncio.run(run())

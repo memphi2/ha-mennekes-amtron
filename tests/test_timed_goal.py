@@ -221,13 +221,13 @@ def test_timed_plan_pauses_then_resumes_even_a_manual_pause(monkeypatch: pytest.
         assert control.commands == [("pause", None)]
         # The user deliberately leaves Pause on; this timed plan is allowed to
         # lift it for the selected trip. The plain SoC target does not.
-        later = NOW + timedelta(hours=12)
+        # 48 kWh need 4.8 h at 16 A; the start keeps another 30 minutes.
+        later = NOW + timedelta(hours=19)
         monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: later)
-        monkeypatch.setattr(observer_module.time, "monotonic", lambda: 12 * 3600.0)
+        monkeypatch.setattr(observer_module.time, "monotonic", lambda: 19 * 3600.0)
         await observer._evaluate()
-        assert control.commands[-1][0] == "current"
-        assert 6.0 <= (control.commands[-1][1] or 0) <= 7.0
-        assert observer.status == "paced"
+        assert control.commands[-1] == ("current", 16.0)
+        assert observer.status == "charging"
 
     asyncio.run(run())
 
@@ -299,7 +299,7 @@ def test_expired_plan_is_consumed_without_resuming_another_charge(monkeypatch: p
         await observer._evaluate()
         assert control.commands == []
         assert observer.goal.finished == "late"
-        await observer.async_set_deadline(NOW + timedelta(hours=8))
+        await observer.async_set_deadline(NOW + timedelta(hours=5))
         await observer._evaluate()
         assert control.commands[-1][0] == "current"
 
@@ -309,15 +309,16 @@ def test_expired_plan_is_consumed_without_resuming_another_charge(monkeypatch: p
 def test_current_write_guard_does_not_spam_the_bus(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, control, _hass = setup_observer(monkeypatch)
-        observer.goal.set(NOW + timedelta(hours=8))
+        observer.goal.set(NOW + timedelta(hours=5))
+        control.data.values["charging_current_ems"] = 10.0
         await observer._evaluate()
-        assert control.commands == [("current", 9.7)]
+        assert control.commands == [("current", 16.0)]
         control.data.values["charging_current_ems"] = 7.0
         await observer._evaluate()
-        assert control.commands == [("current", 9.7)]
+        assert control.commands == [("current", 16.0)]
         monkeypatch.setattr(observer_module.time, "monotonic", lambda: 301.0)
         await observer._evaluate()
-        assert control.commands[-1] == ("current", 9.7)
+        assert control.commands[-1] == ("current", 16.0)
         assert len(control.commands) == 2
 
     asyncio.run(run())
@@ -332,6 +333,10 @@ def test_observer_lifecycle_and_write_failure_status(monkeypatch: pytest.MonkeyP
         monkeypatch.setattr(observer_module, "async_track_time_interval",
                             lambda *_args: lambda: unsubs.append("time"))
         observer.request_evaluate = observer_module.TimedGoalObserver.request_evaluate.__get__(observer)
+        # The binding re-evaluates the plan when a car confirms or rests.
+        observer._runtime.vehicle_binding = SimpleNamespace(
+            resting=False, subscribe=lambda _listener: lambda: unsubs.append("binding"),
+        )
         await observer.async_start()
         await observer._task
         assert observer.status == "disabled"
@@ -371,7 +376,8 @@ def test_phase_fallback_and_short_pause_window(monkeypatch: pytest.MonkeyPatch) 
         assert observer._phases() == 1
         control.data.values["switched_phases"] = None
         control.data.values["grid_phases_connected"] = None
-        assert observer._phases() == 1
+        # A car never seen charging is planned with three phases.
+        assert observer._phases() == 3
         control.data.values["switched_phases"] = 0
         control.data.values["grid_phases_connected"] = 2
         assert observer._phases() == 3
@@ -469,5 +475,70 @@ def test_departure_controls_show_saved_trip_and_delegate_actions() -> None:
         await next_event.async_press()
         await buttons["timed_clear_departure"].async_press()
         await entry.runtime_data.control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_a_started_charge_finishes_at_the_minimum_instead_of_pausing(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=5))
+        control.data.values["charging_current_ems"] = 10.0
+        await observer._evaluate()
+        assert (observer.status, control.commands) == ("charging", [("current", 16.0)])
+        assert observer.planned_start == NOW
+        # Faster than estimated: a fresh plan would start 2.2 h from now.
+        later = NOW + timedelta(hours=1)
+        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: later)
+        monkeypatch.setattr(observer_module.time, "monotonic", lambda: 3600.0)
+        control.data.values["charging_current_ems"] = 16.0
+        hass.states["sensor.soc"] = state("sensor.soc", "70", unit_of_measurement="%")
+        await observer._evaluate()
+        assert observer.status == "finishing"
+        assert control.commands[-1] == ("current", 6)
+        assert observer.planned_start == NOW
+
+    asyncio.run(run())
+
+
+def test_the_selected_car_remembers_its_detected_phases(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        remembered: list[tuple[str, int]] = []
+
+        class Memory:
+            def __init__(self, *_args) -> None:
+                pass
+
+            async def async_phases(self, profile: str) -> int | None:
+                return 2 if profile == "car" else None
+
+            async def async_remember(self, profile: str, phases: int) -> None:
+                remembered.append((profile, phases))
+
+        monkeypatch.setattr(observer_module, "VehiclePhaseMemory", Memory)
+        observer, control, _hass = setup_observer(monkeypatch)
+        observer._options["vehicle_profile_id"] = "car"
+        monkeypatch.setattr(observer_module, "async_track_state_change_event", lambda *_args: lambda: None)
+        monkeypatch.setattr(observer_module, "async_track_time_interval", lambda *_args: lambda: None)
+        await observer.async_start()
+        await observer.async_stop()
+        assert observer._known_phases == 2
+        control.data.values["detected_ev_phases"] = 0
+        assert observer._phases() == 2
+        control.data.values["detected_ev_phases"] = 1
+        control.data.values["evse_state"] = EvseState.READY_TO_CHARGE
+        # A reading without current may still be the previous car's.
+        assert observer._phases() == 1
+        await asyncio.sleep(0)
+        assert remembered == []
+        control.data.values["evse_state"] = EvseState.CHARGING
+        assert observer._phases() == 1
+        assert observer._phases() == 1
+        await asyncio.sleep(0)
+        assert remembered == [("car", 1)]
+        observer._options.pop("vehicle_profile_id")
+        control.data.values["detected_ev_phases"] = 3
+        assert observer._phases() == 3
+        assert remembered == [("car", 1)]
 
     asyncio.run(run())

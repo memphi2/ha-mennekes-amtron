@@ -63,8 +63,12 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 await store.async_save(trip)
                 before = current_writes(transport)
 
-                battery = ("vehicle", "vehicle_profile_open", {"vehicle_profile_id": A}, "vehicle_battery")
-                result = await async_options(hass, entry, *battery, "vehicle_disable")
+                # Opening the car guides through its settings, name first.
+                battery = (
+                    "vehicle", "vehicle_profile_open", {"vehicle_profile_id": A},
+                    {"vehicle_profile_name": "Car A", "vehicle_provider": "none"},
+                )
+                result = await async_options(hass, entry, *battery, "vehicle_disable", "wizard_finish")
 
                 assert result["type"] == "create_entry"
                 assert entry.options["active_vehicle_profile"] == A

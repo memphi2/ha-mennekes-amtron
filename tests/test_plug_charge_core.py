@@ -110,16 +110,13 @@ def test_gate_closes_without_changing_manual_intent_and_grants_only_release():
         assert h.written(R.CHARGING_RELEASE) == [[0]]
         assert control.charging_release_requested is None
         assert control.pause_requested is None
-        await control.async_set_charging_release(True)
-        assert control.charging_release_requested is True
-        assert h.written(R.CHARGING_RELEASE) == [[0]]
-        assert control.events.snapshot()["events"] == []
         await authorize(control)
         assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
         assert control.plug_charge["authorized"]
+        assert not control.plug_charge["manual"]
         assert h.written(R.CHARGING_CURRENT_EMS) == []
         assert h.written(R.LOCK_EVSE) == []
-        assert control.charging_release_requested is True
+        assert control.charging_release_requested is None
         await control.async_configure_plug_charge(True, policy=POLICY)
         assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
         present(h)
@@ -127,6 +124,80 @@ def test_gate_closes_without_changing_manual_intent_and_grants_only_release():
         assert control.plug_charge["authorized"]
         await control.async_shutdown()
     asyncio.run(run())
+
+
+def test_a_manual_release_opens_the_gate_for_this_connection_only():
+    async def run():
+        h = Harness()
+        control = await armed(h)
+        await control.async_set_charging_release(True)
+        assert control.charging_release_requested is True
+        assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
+        assert control.plug_charge["manual"]
+        assert not control.plug_charge["authorized"]
+        # A poll of the open release is no reason to close it again.
+        present(h)
+        await asyncio.sleep(0)
+        assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
+        # The unplug ends the manual release; the gate closes again.
+        h.transport.bank[R.EVSE_STATE.address] = int(EvseState.IDLE)
+        h.transport.bank[R.CP_STATE.address] = int(CpState.A1)
+        unplugged(control)
+        await asyncio.sleep(0)
+        await control.async_sync_plug_charge()
+        assert not control.plug_charge["manual"]
+        assert h.written(R.CHARGING_RELEASE)[-1] == [0]
+        await control.async_shutdown()
+    asyncio.run(run())
+
+
+def test_a_manual_release_without_a_car_waits_for_the_next_plug_in():
+    async def run():
+        h = Harness()
+        control = await h.connect()
+        await control.async_configure_plug_charge(True, policy=POLICY)
+        h.transport.bank[R.EVSE_STATE.address] = int(EvseState.IDLE)
+        h.transport.bank[R.CP_STATE.address] = int(CpState.A1)
+        unplugged(control)
+        await control.async_sync_plug_charge()
+        await control.async_set_charging_release(True)
+        assert h.written(R.CHARGING_RELEASE)[-1] == [1]
+        # Repeated empty polls and an unknown state keep it armed.
+        unplugged(control)
+        control.observe_plug_charge(None)
+        await asyncio.sleep(0)
+        assert control.plug_charge["manual"]
+        assert h.written(R.CHARGING_RELEASE)[-1] == [1]
+        present(h)
+        assert control.plug_charge["manual"]
+        assert control.plug_charge["session"]
+        # Switching the release off withdraws it.
+        await control.async_set_charging_release(False)
+        assert not control.plug_charge["manual"]
+        assert h.written(R.CHARGING_RELEASE)[-1] == [0]
+        await control.async_shutdown()
+    asyncio.run(run())
+
+
+def test_a_manual_release_survives_a_restart_and_ends_with_the_gate():
+    state = PlugChargeState()
+    state.configure(True, POLICY)
+    state.manual = True
+    restored = PlugChargeState.restore(state.durable())
+    assert restored.manual
+    assert not restored.blocked
+    # States saved before 0.8.0b7 have no manual release.
+    legacy = {key: value for key, value in state.durable().items() if key != "manual"}
+    assert not PlugChargeState.restore(legacy).manual
+    with pytest.raises(ValueError, match="saved"):
+        PlugChargeState.restore({**state.durable(), "manual": 1})
+    # A long unknown state or switching the gate off withdraws it.
+    state.observe(True)
+    state.revoke()
+    assert not state.manual
+    state.manual = True
+    state.configure(False, "")
+    assert not state.manual
 
 
 def test_a_grant_keeps_an_existing_pause_without_starting_a_charge():
@@ -309,7 +380,7 @@ def test_service_persists_policy_but_new_process_requires_new_authorization(tmp_
             assert snap["supports_plug_charge"]
             assert snap["plug_charge"]["session"]
             saved = json.loads((tmp_path / "intent.json").read_text())["plug_charge"]
-            assert saved == {"enabled": True, "policy": POLICY, "hold": True}
+            assert saved == {"enabled": True, "policy": POLICY, "hold": True, "manual": False}
             restored = WriteState()
             IntentStore(tmp_path / "intent.json", service.identity.serial_number).load(restored)
             assert restored.plug_charge.enabled
@@ -434,7 +505,7 @@ def test_service_accepts_only_current_session_authorization(tmp_path):
             result = await service.command({"command": "plug_charge_authorize", "session": session, "deadline": deadline().isoformat(), "expected_serial_number": serial})
             assert result["control"]["plug_charge"]["authorized"]
             stored = json.loads((tmp_path / "intent.json").read_text())["plug_charge"]
-            assert set(stored) == {"enabled", "policy", "hold"}
+            assert set(stored) == {"enabled", "policy", "hold", "manual"}
             assert stored["hold"] is False
             for payload in (
                 {"command": "plug_charge_config", "value": 1},
@@ -563,7 +634,7 @@ def test_control_handoff_preserves_session_only_while_transport_continues(link_l
     asyncio.run(run())
 
 
-def test_manual_release_request_clears_previous_refusal_without_bypassing_vehicle_gate():
+def test_manual_release_after_a_refusal_releases_this_connection_by_hand():
     async def run():
         h = Harness()
         c = await armed(h)
@@ -573,21 +644,24 @@ def test_manual_release_request_clears_previous_refusal_without_bypassing_vehicl
         with pytest.raises(ServiceValidationError) as exc:
             await authorize(c)
         assert exc.value.translation_key == "plug_charge_blocked"
-        before_writes = list(h.transport.writes)
-        before_events = c.events.snapshot()
-        before_generation = c.write_state.command_intent_generation
-        before_refreshes = h.refreshes
         await c.async_set_charging_release(True)
         assert c.charging_release_requested is True
-        assert c.write_state.command_intent_generation == before_generation + 1
-        assert h.transport.writes == before_writes
-        assert c.events.snapshot() == before_events
-        assert h.refreshes == before_refreshes + 1
+        assert c.plug_charge["manual"]
         assert not c.plug_charge["authorized"]
-        assert h.transport.bank[R.CHARGING_RELEASE.address] == 0
-        await authorize(c)
         assert h.transport.bank[R.CHARGING_RELEASE.address] == 1
-        assert c.plug_charge["authorized"]
+        await c.async_shutdown()
+    asyncio.run(run())
+
+
+def test_a_refused_manual_release_does_not_stay_armed():
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        h.transport.bank[R.LOCK_EVSE.address] = 1
+        c._async_submit_locked = AsyncMock(side_effect=ServiceValidationError("refused"))
+        with pytest.raises(ServiceValidationError):
+            await c.async_set_charging_release(True)
+        assert not c.plug_charge["manual"]
         await c.async_shutdown()
     asyncio.run(run())
 
@@ -609,7 +683,7 @@ def test_manual_release_request_does_not_clear_independent_goal_stop():
     asyncio.run(run())
 
 
-def test_manual_gate_intent_replaces_old_pending_command_and_goal_recovery():
+def test_manual_gate_release_replaces_old_pending_command_and_goal_recovery():
     async def run():
         h = Harness(state_change_interval_seconds=300)
         c = await armed(h)
@@ -619,7 +693,9 @@ def test_manual_gate_intent_replaces_old_pending_command_and_goal_recovery():
         goal = EnergyGoalController(c, h.client, persist)
         goal.model.resume_on_recovery = True
         await c.async_set_charging_release(True)
-        assert c.pending_action is None
+        # The manual release queues like any other release command.
+        assert c.pending_action == "enable_charging"
+        assert c.plug_charge["manual"]
         assert not goal.model.resume_on_recovery
         persist.assert_awaited_once()
         assert h.written(R.LOCK_EVSE) == []

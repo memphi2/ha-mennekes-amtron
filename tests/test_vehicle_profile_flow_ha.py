@@ -98,51 +98,54 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                     form = await manager.async_init(entry.entry_id)
                     return await submit(form, "vehicle")
 
-                async def open_profile(key):
+                async def open_profile(key, name):
+                    """Opening a car starts its guided setup with name and source."""
                     form = await submit(await begin(), "vehicle_profile_open")
-                    if form["type"] is FlowResultType.FORM:
+                    if form["type"] is FlowResultType.FORM and form["step_id"] == "vehicle_profile_open":
                         form = await submit(form, {"vehicle_profile_id": key})
-                    assert form["step_id"] == "vehicle_profile"
-                    return form
+                    assert form["step_id"] == "vehicle_profile_edit"
+                    return await submit(form, {"vehicle_profile_name": name, "vehicle_provider": "none"})
 
                 form = await begin()
                 assert form["menu_options"] == [
                     "vehicle_profile_add", "vehicle_settings", "back",
                 ]
                 form = await submit(form, "vehicle_profile_add")
-                result = await submit(
+                form = await submit(
                     form,
                     {"vehicle_profile_name": "First EV", "vehicle_provider": "none"},
                 )
+                # A new car continues with its charge level; nothing is saved yet.
+                assert form["step_id"] == "vehicle_battery"
+                assert form["menu_options"] == ["vehicle_soc", "wizard_next", "wizard_finish"]
+                assert "vehicle_profiles" not in entry.options
+                result = await submit(form, "wizard_finish")
                 assert result["type"] is FlowResultType.CREATE_ENTRY
                 first = profile_list(entry.options)[0].id
-                form = await open_profile(first)
-                assert form["menu_options"] == [
-                    "vehicle_profile_edit", "vehicle_battery", "departure", "losses",
-                    "vehicle_detection_signals", "vehicle",
-                ]
-                form = await submit(form, "vehicle_battery")
-                assert (await submit(form, "vehicle_profile"))["step_id"] == "vehicle_profile"
                 form = await submit(await begin(), "vehicle_profile_add")
-                await submit(
+                form = await submit(
                     form,
                     {"vehicle_profile_name": "Second EV", "vehicle_provider": "none"},
                 )
+                await submit(form, "wizard_finish")
                 second = profile_list(entry.options)[1].id
                 assert entry.options["active_vehicle_profile"] == first
                 form = await submit(await begin(), "vehicle_profile_select")
                 await submit(form, {"vehicle_profile_id": second})
                 assert entry.options["active_vehicle_profile"] == second
 
-                form = await submit(await open_profile(second), "vehicle_battery")
-                form = await submit(form, "vehicle_soc")
-                await submit(
+                # Each area moves on to the next one once it is set up.
+                form = await submit(await open_profile(second, "Second EV"), "vehicle_soc")
+                form = await submit(
                     form,
                     {
                         "vehicle_soc_entity": "sensor.external_soc",
                         "use_vehicle_limit": False,
                     },
                 )
+                assert form["step_id"] == "departure"
+                assert "vehicle_soc_entity" not in entry.options["vehicle_profiles"][second]["options"]
+                await submit(form, "wizard_finish")
                 assert entry.options["vehicle_profiles"][second]["options"] == {
                     "vehicle_soc_entity": "sensor.external_soc"
                 }
@@ -150,37 +153,38 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
 
                 # A car that is not selected is configured without selecting it.
                 selected_at = entry.options["vehicle_profile_selected_at"]
-                form = await submit(await open_profile(first), "vehicle_battery")
-                form = await submit(form, "vehicle_soc")
-                await submit(
+                form = await submit(await open_profile(first, "First EV"), "vehicle_soc")
+                form = await submit(
                     form,
                     {"vehicle_soc_entity": "sensor.first_soc", "use_vehicle_limit": False},
                 )
+                await submit(form, "wizard_finish")
                 assert entry.options["vehicle_profiles"][first]["options"] == {
                     "vehicle_soc_entity": "sensor.first_soc"
                 }
                 assert entry.options["active_vehicle_profile"] == second
                 assert entry.options["vehicle_profile_selected_at"] == selected_at
 
-                form = await submit(await open_profile(second), "vehicle_profile_edit")
-                await submit(
-                    form,
-                    {"vehicle_profile_name": "Renamed EV", "vehicle_provider": "none"},
-                )
+                form = await open_profile(second, "Renamed EV")
+                await submit(form, "wizard_finish")
                 assert entry.options["vehicle_profiles"][second]["name"] == "Renamed EV"
                 assert entry.options["vehicle_profiles"][second]["options"] == {
                     "vehicle_soc_entity": "sensor.external_soc"
                 }
-                form = await submit(await open_profile(first), "vehicle_detection_signals")
+                # Walking through every area ends with the detection signals.
+                form = await open_profile(first, "First EV")
+                for _area in range(3):
+                    form = await submit(form, "wizard_next")
                 assert form["step_id"] == "vehicle_detection_source"
                 form = await submit(form, {"vehicle_detection_source": "entities"})
-                await submit(
+                result = await submit(
                     form,
                     {
                         "vehicle_connected_entity": "binary_sensor.car_connected",
                         "vehicle_home_entity": "device_tracker.car",
                     },
                 )
+                assert result["type"] is FlowResultType.CREATE_ENTRY
                 assert entry.options["vehicle_profiles"][first]["detection"] == {
                     "source": "entities",
                     "connected_entity": "binary_sensor.car_connected",

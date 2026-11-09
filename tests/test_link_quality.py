@@ -24,7 +24,9 @@ from custom_components.mennekes_amtron_rtu.device.data import (
     ConnectionState,
     DeviceIdentity,
     WallboxData,
+    WriteDiagnostics,
 )
+from custom_components.mennekes_amtron_rtu.device.heartbeat import HeartbeatTask
 from custom_components.mennekes_amtron_rtu.device.link_quality import LinkQuality
 from custom_components.mennekes_amtron_rtu.device.poller import DevicePoller
 from tests.fakes import FakeModbusClient, device_bank
@@ -99,7 +101,7 @@ def test_valid_negative_responses_confirm_communication(code, write) -> None:
     asyncio.run(run())
 
 
-def test_a_successful_read_retry_does_not_hide_an_intermittent_timeout() -> None:
+def test_a_successful_read_retry_counts_as_a_retry_not_a_failure() -> None:
     async def run():
         class RetryTransport(FakeModbusClient):
             failed_once = False
@@ -115,11 +117,8 @@ def test_a_successful_read_retry_does_not_hide_an_intermittent_timeout() -> None
         client = _client(transport, clock, retries=1)
         await client.async_connect()
         assert await client.async_read_register(R.EVSE_STATE) == 1
-        assert client.link_quality.state == "degraded"
-        assert client.link_quality.failures == 1  # The hidden retry counts.
-        clock[0] = 300
-        await client.async_read_words(address=R.EVSE_STATE.address, count=1)
         assert client.link_quality.state == "good"
+        assert (client.link_quality.retries, client.link_quality.failures) == (1, 0)
         await client.async_close()
 
     asyncio.run(run())
@@ -154,11 +153,21 @@ def test_heartbeat_failure_latches_until_a_fresh_success_after_the_window() -> N
         first = await poller.async_poll(WallboxData(), last_success=True)
         assert first.connection_quality == "good"
         assert first.connection_failures == 0
+        # A lost heartbeat reply is resent within a second: a retry.
         transport.write_exceptions[R.HEARTBEAT.address] = ModbusIOException("lost reply")
         with pytest.raises(AmtronProtocolError, match="lost reply"):
             await client.async_write_register(R.HEARTBEAT, 0x55AA, priority=True)
+        assert client.link_quality.state == "good"
+        retried = await poller.async_poll(first, last_success=True)
+        assert (retried.connection_retries, retried.connection_failures) == (1, 0)
+        assert retried != first  # A new count must notify entities.
+        # Any other lost reply is a failure.
+        transport.write_exceptions[R.CHARGING_RELEASE.address] = ModbusIOException("lost reply")
+        with pytest.raises(AmtronProtocolError, match="lost reply"):
+            await client.async_write_register(R.CHARGING_RELEASE, 1)
+        del transport.write_exceptions[R.CHARGING_RELEASE.address]
         assert client.link_quality.state == "degraded"
-        later = await poller.async_poll(first, last_success=True)
+        later = await poller.async_poll(retried, last_success=True)
         assert later.connection_quality == "degraded"
         assert later.connection_failures == 1
         assert first.values == later.values
@@ -235,5 +244,17 @@ def test_poll_keeps_goal_generation_from_before_its_first_read() -> None:
         assert new.energy_goal_generation == 1
         assert old == new  # Internal ordering must not create Recorder updates.
         await client.async_close()
+
+    asyncio.run(run())
+
+
+def test_a_missed_heartbeat_deadline_is_a_failure() -> None:
+    async def run():
+        client = _client(FakeModbusClient(device_bank()), [0.0])
+        heartbeat = HeartbeatTask(client, WriteDiagnostics(), deadline=0.01)
+        heartbeat._arm_deadline()
+        await asyncio.sleep(0.05)
+        assert client.link_quality.failures == 1
+        assert heartbeat.healthy is False
 
     asyncio.run(run())

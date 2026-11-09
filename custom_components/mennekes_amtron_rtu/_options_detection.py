@@ -57,24 +57,23 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
     ) -> ConfigFlowResult:
         if (profile := self._detection_profile()) is None:
             return await self.async_step_init()
-        capable = "detection" in self._vehicle_capabilities(
-            {
-                CONF_VEHICLE_PROVIDER: profile.provider_id,
-                CONF_VEHICLE_DEVICE: profile.device_id,
-                CONF_VEHICLE_SOURCE_IDENTITY: profile.identity,
-            }
-        )
+        vehicle = {
+            CONF_VEHICLE_PROVIDER: profile.provider_id,
+            CONF_VEHICLE_DEVICE: profile.device_id,
+            CONF_VEHICLE_SOURCE_IDENTITY: profile.identity,
+        }
+        capable = "detection" in self._vehicle_capabilities(vehicle)
         errors = {}
         if user_input is not None:
             source = user_input.get(CONF_VEHICLE_DETECTION_SOURCE)
             if source == "disabled":
-                return self._save_detection(None)
+                return await self._save_detection(None)
             if source == "entities":
                 self._details["detection_entities"] = True
                 return await self.async_step_vehicle_detection_entities()
             if source == "profile":
                 if capable:
-                    return self._save_detection(VehicleDetectionConfig("profile"))
+                    return await self._save_detection(VehicleDetectionConfig("profile"))
                 errors[CONF_VEHICLE_DETECTION_SOURCE] = "vehicle_capability_unavailable"
             else:
                 errors[CONF_VEHICLE_DETECTION_SOURCE] = (
@@ -84,14 +83,28 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
             step_id="vehicle_detection_source",
             data_schema=vehicle_detection_source_schema(
                 # Opening the signals means setting them up, so suggest a source.
+                # The guided setup passes through; there entities stay optional.
                 profile.detection.source
                 if profile.detection is not None
-                else ("profile" if capable else "entities"),
+                else "profile" if capable
+                else "disabled" if self._wizard is not None else "entities",
                 profile=capable,
             ),
-            description_placeholders={"vehicle": profile.name},
+            description_placeholders={"vehicle": profile.name, **self._detection_entities(profile, vehicle)},
             errors=errors,
         )
+
+    def _detection_entities(self, profile: VehicleProfile, vehicle: dict[str, Any]) -> dict[str, str]:
+        """The plug and location entities detection reads, for display."""
+        detection = profile.detection
+        if detection is None:
+            plug = location = None
+        elif detection.source == "entities":
+            plug, location = detection.connected_entity, detection.home_entity
+        else:
+            car = self._car_entities(vehicle)
+            plug, location = car.get("plug"), car.get("location")
+        return {"plug_entity": plug or "—", "location_entity": location or "—"}
 
     async def async_step_vehicle_detection_entities(
         self, user_input: dict[str, Any] | None = None
@@ -128,7 +141,7 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
                     self._details["detection_entities_chosen"] = (connected, home)
                     return await self.async_step_vehicle_detection_connected_states()
                 else:
-                    return self._save_detection(
+                    return await self._save_detection(
                         VehicleDetectionConfig(
                             "entities", cast(str, connected), cast(str, home)
                         )
@@ -163,7 +176,7 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
             if isinstance(states, list):
                 current = states
             if valid_connected_states(connected, states):
-                return self._save_detection(
+                return await self._save_detection(
                     VehicleDetectionConfig("entities", connected, home, tuple(cast(list[str], states)))
                 )
             errors[CONF_VEHICLE_CONNECTED_STATES] = "vehicle_connected_states_invalid"
@@ -186,7 +199,7 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
             last_step=True,
         )
 
-    def _save_detection(
+    async def _save_detection(
         self, config: VehicleDetectionConfig | None
     ) -> ConfigFlowResult:
         draft = self._section("detection")
@@ -198,4 +211,4 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
             raw_profile.pop("detection", None)
         else:
             raw_profile["detection"] = config.as_dict()
-        return self._finish_section()
+        return await self._finish_section()

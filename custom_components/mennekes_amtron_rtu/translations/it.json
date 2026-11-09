@@ -522,6 +522,9 @@
         "state_attributes": {
           "failed_transactions": {
             "name": "Transazioni non riuscite"
+          },
+          "retried_transactions": {
+            "name": "Transazioni ripetute"
           }
         }
       },
@@ -597,11 +600,12 @@
           "waiting_for_capacity": "In attesa capacità",
           "waiting_for_soc": "In attesa livello di carica",
           "waiting_for_device": "In attesa wallbox",
+          "vehicle_unconfirmed": "Veicolo non confermato",
           "read_only": "Sola lettura",
           "queued": "Modifica in coda",
           "paused_until_start": "In pausa fino all’avvio",
-          "paced": "Corrente regolata",
-          "early_at_minimum": "Possibile fine anticipata",
+          "charging": "Ricarica alla corrente massima",
+          "finishing": "Completa alla corrente minima",
           "unreachable": "Obiettivo forse irraggiungibile",
           "late": "Scadenza superata",
           "reached": "Obiettivo raggiunto",
@@ -620,6 +624,7 @@
           "vehicle_not_selected": "Veicolo riconosciuto non selezionato",
           "waiting_release": "In attesa del consenso alla ricarica",
           "authorized": "Veicolo autorizzato",
+          "manual_release": "Abilitato manualmente",
           "blocked": "Ricarica bloccata",
           "disabled": "Disattivato"
         },
@@ -997,15 +1002,19 @@
         "menu_options": {
           "departure_configure": "Configura la pianificazione della partenza",
           "departure_disable": "Disattiva la pianificazione della partenza",
-          "vehicle_profile": "Torna al profilo"
+          "vehicle_profile": "Torna al profilo",
+          "wizard_next": "Avanti",
+          "wizard_finish": "Salva e termina"
         },
-        "description": "Profilo: **{vehicle}**.\n\nCon la pianificazione della partenza, Home Assistant avvia la ricarica abbastanza presto da raggiungere l’obiettivo percentuale all’ora di partenza invece di caricare subito.\n\nPianifica il prossimo singolo viaggio con obiettivo percentuale, capacità utile e ora di partenza. Scegli poi l’orario nella pagina del dispositivo o copialo da una fonte facoltativa. Non è un programma giornaliero. La disattivazione cancella il viaggio e i comandi in attesa; l’obiettivo percentuale rimane."
+        "description": "Profilo: **{vehicle}**.\n\nIn uso: partenza **{departure_entity}**, capacità della batteria **{capacity_entity}**.\n\nCon la pianificazione della partenza, Home Assistant avvia la ricarica abbastanza presto da raggiungere l’obiettivo percentuale all’ora di partenza invece di caricare subito.\n\nPianifica il prossimo singolo viaggio con obiettivo percentuale, capacità utile e ora di partenza. Scegli poi l’orario nella pagina del dispositivo o copialo da una fonte facoltativa. Non è un programma giornaliero. La disattivazione cancella il viaggio e i comandi in attesa; l’obiettivo percentuale rimane."
       },
       "departure_requires_vehicle": {
         "title": "Livello di carica necessario",
         "menu_options": {
           "vehicle_battery": "Livello e limite di carica",
-          "vehicle_profile": "Torna al profilo"
+          "vehicle_profile": "Torna al profilo",
+          "wizard_next": "Avanti",
+          "wizard_finish": "Salva e termina"
         },
         "description": "Profilo: **{vehicle}**.\n\nLa pianificazione della partenza deve sapere quanto è carica la batteria di questa auto. Configura prima il suo livello di carica, poi torna a Prossima partenza."
       },
@@ -1173,9 +1182,11 @@
           "loss_vehicle": "Cronologia di ricarica del veicolo",
           "loss_profile": "Usa la cronologia di ricarica di questo profilo",
           "loss_disable": "Disattiva la stima delle perdite",
-          "vehicle_profile": "Torna al profilo"
+          "vehicle_profile": "Torna al profilo",
+          "wizard_next": "Avanti",
+          "wizard_finish": "Salva e termina"
         },
-        "description": "Profilo: **{vehicle}**.\n\nLe perdite di ricarica mostrano quanta parte dell’energia misurata dalla wallbox è davvero arrivata nella batteria di questa auto.\n\nConfronta l’energia misurata dalla wallbox con quella aggiunta alla batteria nella stessa ricarica completata. Ultima perdita e media sono stime. Seleziona il veicolo prima della ricarica; corrispondenze mancanti o ambigue restano sconosciute.\n\nSe la cronologia di ricarica di questa auto non è disponibile, controlla la sua sorgente in Nome e sorgente del veicolo oppure scegli un sensore di energia."
+        "description": "Profilo: **{vehicle}**.\n\nIn uso: **{loss_entity}**.\n\nLe perdite di ricarica mostrano quanta parte dell’energia misurata dalla wallbox è davvero arrivata nella batteria di questa auto.\n\nConfronta l’energia misurata dalla wallbox con quella aggiunta alla batteria nella stessa ricarica completata. Ultima perdita e media sono stime. Seleziona il veicolo prima della ricarica; corrispondenze mancanti o ambigue restano sconosciute.\n\nSe la cronologia di ricarica di questa auto non è disponibile, controlla la sua sorgente in Nome e sorgente del veicolo oppure scegli un sensore di energia."
       },
       "loss_sensor": {
         "title": "Perdite di ricarica da un sensore",
@@ -1219,7 +1230,7 @@
       },
       "vehicle_profile_add": {
         "title": "Aggiungi profilo",
-        "description": "Assegna al profilo un nome riconoscibile e scegli BavarianData o la selezione manuale delle entità. Nei nuovi profili le funzioni di ricarica facoltative sono disattivate.\n\nLa sorgente del veicolo collega questo profilo all’auto in un’integrazione del veicolo, così livello e limite di carica, capacità, timer di partenza, cronologia di ricarica e segnali di rilevamento possono essere letti da lì. Scegli Nessuna per selezionare manualmente entità di Home Assistant.\n\nSono proposte solo integrazioni installate con un veicolo supportato. Le entità scelte manualmente restano sempre disponibili. Se un’integrazione salvata manca temporaneamente, rinominare il profilo conserva il veicolo e le sue impostazioni.",
+        "description": "Assegna al profilo un nome riconoscibile e scegli BavarianData o la selezione manuale delle entità. Livello di carica, limite di carica, capacità della batteria, cronologia di ricarica e segnali di rilevamento di un’auto collegata vengono usati subito; la pianificazione della partenza resta disattivata.\n\nLa sorgente del veicolo collega questo profilo all’auto in un’integrazione del veicolo, così livello e limite di carica, capacità, timer di partenza, cronologia di ricarica e segnali di rilevamento possono essere letti da lì. Scegli Nessuna per selezionare manualmente entità di Home Assistant.\n\nSono proposte solo integrazioni installate con un veicolo supportato. Le entità scelte manualmente restano sempre disponibili. Se un’integrazione salvata manca temporaneamente, rinominare il profilo conserva il veicolo e le sue impostazioni.\n\nPoi la configurazione ti guida attraverso livello e limite di carica, prossima partenza, perdite di ricarica e segnali di rilevamento. Scegli **Avanti** per saltare una parte. Nulla viene salvato prima di **Salva e termina** o dell’ultimo passaggio.",
         "data": {
           "vehicle_profile_name": "Nome del profilo",
           "vehicle_provider": "Integrazione del veicolo"
@@ -1231,7 +1242,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Modifica profilo",
-        "description": "Rinominare conserva le impostazioni. Cambiare integrazione o veicolo cancella le impostazioni delle funzioni del profilo, per evitare di riutilizzare i dati dell’auto precedente.\n\nLa sorgente del veicolo collega questo profilo all’auto in un’integrazione del veicolo, così livello e limite di carica, capacità, timer di partenza, cronologia di ricarica e segnali di rilevamento possono essere letti da lì. Scegli Nessuna per selezionare manualmente entità di Home Assistant.\n\nSono proposte solo integrazioni installate con un veicolo supportato. Le entità scelte manualmente restano sempre disponibili. Se un’integrazione salvata manca temporaneamente, rinominare il profilo conserva il veicolo e le sue impostazioni.",
+        "description": "Rinominare conserva le impostazioni. Cambiare integrazione o veicolo cancella le impostazioni delle funzioni del profilo, per evitare di riutilizzare i dati dell’auto precedente; i dati della nuova auto vengono usati subito.\n\nLa sorgente del veicolo collega questo profilo all’auto in un’integrazione del veicolo, così livello e limite di carica, capacità, timer di partenza, cronologia di ricarica e segnali di rilevamento possono essere letti da lì. Scegli Nessuna per selezionare manualmente entità di Home Assistant.\n\nSono proposte solo integrazioni installate con un veicolo supportato. Le entità scelte manualmente restano sempre disponibili. Se un’integrazione salvata manca temporaneamente, rinominare il profilo conserva il veicolo e le sue impostazioni.\n\nPoi la configurazione ti guida attraverso livello e limite di carica, prossima partenza, perdite di ricarica e segnali di rilevamento. Scegli **Avanti** per saltare una parte. Nulla viene salvato prima di **Salva e termina** o dell’ultimo passaggio.",
         "data": {
           "vehicle_profile_name": "Nome del profilo",
           "vehicle_provider": "Integrazione del veicolo"
@@ -1295,7 +1306,7 @@
       },
       "vehicle_detection_source": {
         "title": "Segnali di rilevamento",
-        "description": "Profilo: **{vehicle}**.\n\nI segnali di rilevamento indicano che questa auto è collegata e a casa. La selezione automatica e il Plug & Charge virtuale li usano.\n\nUsa le entità locali supportate dell’integrazione del veicolo, scegli entità Home Assistant esistenti o disattiva il rilevamento per questo profilo. Servono sia il cavo collegato sia la presenza a casa. Nessuna richiesta cloud aggiuntiva.",
+        "description": "Profilo: **{vehicle}**.\n\nIn uso: spina **{plug_entity}**, posizione **{location_entity}**.\n\nI segnali di rilevamento indicano che questa auto è collegata e a casa. La selezione automatica e il Plug & Charge virtuale li usano.\n\nUsa le entità locali supportate dell’integrazione del veicolo, scegli entità Home Assistant esistenti o disattiva il rilevamento per questo profilo. Servono sia il cavo collegato sia la presenza a casa. Nessuna richiesta cloud aggiuntiva.",
         "data": {
           "vehicle_detection_source": "Fonte di rilevamento"
         }
@@ -1353,12 +1364,14 @@
       },
       "vehicle_battery": {
         "title": "Livello e limite di carica",
-        "description": "Profilo: **{vehicle}**.\n\nIl livello di carica permette a Home Assistant di fermare la ricarica a un obiettivo percentuale, ad esempio 80 %, e la pianificazione della partenza lo usa per calcolare il tempo di ricarica. Il limite di carica dell’auto può servire come massimo aggiuntivo. Imposta poi la percentuale desiderata nella pagina del dispositivo della wallbox.\n\nPer annullare solo l’obiettivo percentuale attuale, imposta Obiettivo di carica del veicolo a 0. Non usare più il livello di carica rimuove qui le associazioni delle sorgenti di questo profilo, incluso il massimo facoltativo, e disattiva la sua pianificazione della partenza; per l’auto selezionata cancella anche l’obiettivo percentuale e il viaggio. Le entità sorgente dell’integrazione del veicolo restano invariate, così come l’autorizzazione, l’obiettivo in kWh e lo stato di ricarica.",
+        "description": "Profilo: **{vehicle}**.\n\nIn uso: livello di carica **{soc_entity}**, limite di carica **{limit_entity}**.\n\nIl livello di carica permette a Home Assistant di fermare la ricarica a un obiettivo percentuale, ad esempio 80 %, e la pianificazione della partenza lo usa per calcolare il tempo di ricarica. Il limite di carica dell’auto può servire come massimo aggiuntivo. Imposta poi la percentuale desiderata nella pagina del dispositivo della wallbox.\n\nPer annullare solo l’obiettivo percentuale attuale, imposta Obiettivo di carica del veicolo a 0. Non usare più il livello di carica rimuove qui le associazioni delle sorgenti di questo profilo, incluso il massimo facoltativo, e disattiva la sua pianificazione della partenza; per l’auto selezionata cancella anche l’obiettivo percentuale e il viaggio. Le entità sorgente dell’integrazione del veicolo restano invariate, così come l’autorizzazione, l’obiettivo in kWh e lo stato di ricarica.",
         "menu_options": {
           "vehicle_soc": "Configura livello di carica",
           "vehicle_source": "Configura livello di carica",
           "vehicle_disable": "Non usare più il livello di carica",
-          "vehicle_profile": "Torna al profilo"
+          "vehicle_profile": "Torna al profilo",
+          "wizard_next": "Avanti",
+          "wizard_finish": "Salva e termina"
         }
       }
     },

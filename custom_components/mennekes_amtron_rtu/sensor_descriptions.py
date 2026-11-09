@@ -53,7 +53,7 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=[
             "disabled", "waiting_vehicle", "waiting_detection", "vehicle_not_selected",
-            "waiting_release", "authorized", "blocked",
+            "waiting_release", "authorized", "manual_release", "blocked",
         ],
     ),
     SensorEntityDescription(
@@ -62,8 +62,8 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=[
             "disabled", "waiting_for_target", "waiting_for_capacity",
-            "waiting_for_soc", "waiting_for_device", "read_only", "queued",
-            "paused_until_start", "paced", "early_at_minimum", "unreachable",
+            "waiting_for_soc", "waiting_for_device", "vehicle_unconfirmed", "read_only", "queued",
+            "paused_until_start", "charging", "finishing", "unreachable",
             "late", "reached", "write_pending", "error",
         ],
     ),

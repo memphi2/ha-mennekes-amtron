@@ -271,3 +271,32 @@ def test_a_failed_release_off_is_logged_not_raised(caplog) -> None:
         assert "Cannot switch off the charging release" in caplog.text
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(("release", "paused", "goal_stop", "resumed"), [
+    (1, True, False, True), (0, True, False, True),
+    (1, True, True, False), (1, False, False, False),
+])
+def test_unplugging_also_ends_a_manual_pause(monkeypatch, release, paused, goal_stop, resumed) -> None:
+    async def run() -> None:
+        switches, entry, _transport = await _switches()
+        switch = switches["release_off_on_unplug"]
+        tasks: list[object] = []
+        switch.hass = SimpleNamespace(async_create_task=lambda coro: tasks.append(asyncio.ensure_future(coro)))
+        switch.async_write_ha_state = lambda: None
+        control = entry.runtime_data.control
+        control.async_set_charging_release = AsyncMock()
+        control.async_resume_charging = AsyncMock()
+        control.pause_requested = paused
+        monkeypatch.setattr(type(control), "energy_goal_stop_requested", property(lambda _self: goal_stop))
+        await switch.async_turn_on()
+        entry.runtime_data.coordinator.data.values["charging_release"] = release
+        _plug(entry, True)
+        switch._handle_coordinator_update()
+        _plug(entry, False)
+        switch._handle_coordinator_update()
+        await asyncio.gather(*tasks)
+        assert control.async_set_charging_release.await_count == release
+        assert control.async_resume_charging.await_count == int(resumed)
+
+    asyncio.run(run())

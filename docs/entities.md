@@ -5,7 +5,7 @@ Use **Charging current limit** and **Charging paused** for everyday charging.
 energy and connection health. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
 
-This reference follows **beta 0.8.0b6**, including vehicle profiles and the
+This reference follows **beta 0.8.0b7**, including vehicle profiles and the
 optional Virtual Plug & Charge status. **0.6.1 remains stable.** Ordinary service
 connections require **app/service 0.6.1 or newer with API 2**; Virtual Plug & Charge
 in service mode needs the capability in **app 0.8.0b1 or newer**.
@@ -104,7 +104,7 @@ in read-only mode; it does not send a charging command.
 | `button.*_cancel_pending_change` | Cancel pending change | new direct controller or supporting service | Removes the queued action without a wallbox write. Already executed preparation, such as a phase-change pause, remains. Available only while an action is pending. |
 | `number.*_charging_current_limit` | Charging current limit | always | Slider: 0 A removes the energy-manager limit and bypasses extra current caps; 6 A or more sets a limit. Hardware limits still apply. While paused it shows the remembered setpoint; changing it can resume charging. |
 | `switch.*_charging_paused` | Charging paused | always | On pauses charging by signalling 0 A; off resumes the stored setpoint. Uses the current command rather than the release relay command. |
-| `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. |
+| `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. From **0.8.0b7**, with Virtual Plug & Charge enabled, switching it on releases the current or next connection by hand for any car until the next unplug. |
 | `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
 | `select.*_requested_phases` | Requested phases | hardware that can switch phases | Single-phase or all-phase charging. A change while charging first pauses; resume separately after the waiting interval. Only exists on capable hardware. |
 
@@ -115,7 +115,7 @@ These controls configure charging permission, display behavior or maintenance.
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
 | `switch.*_virtual_plug_charge` | Virtual Plug & Charge | integration 0.8.0b2; supported direct control or service capability | Enables the wallbox-wide permission check for every profile with detection signals. Before 0.8.0b6, each vehicle also needed its own permission in the vehicle options. Enabling can stop a charge while recognition is pending; disabling never resumes charging. |
-| `switch.*_release_off_on_unplug` | Switch off charging release when unplugged | integration 0.8.0b3; write access | Off by default. After a confirmed disconnect, Home Assistant switches **Charging release** off so the next car needs an explicit release. Ignored while Virtual Plug & Charge is enabled, which already closes the release. Not enforced while HA is not running. |
+| `switch.*_release_off_on_unplug` | Switch off charging release when unplugged | integration 0.8.0b3; write access | Off by default. After a confirmed disconnect, Home Assistant switches **Charging release** off so the next car needs an explicit release. From **0.8.0b7** it also ends a manual **Charging paused**, so the wallbox no longer shows a pause without a car; a stop from a reached energy target stays. Ignored while Virtual Plug & Charge is enabled, which already closes the release; switching both on adds nothing. Not enforced while HA is not running. |
 | `select.*_solar_display_mode` | Solar display mode | always | The solar mode shown on the wallbox display. Drives the HMI only, and needs DIP 7 on. |
 | `button.*_recover_from_error` | Recover from error | always | Manually retries heartbeat-error recovery when automatic recovery cannot complete. Preserves a deliberate pause, lock, disabled release and current setting. |
 | `button.*_restart` | Restart | layout v01.03 | Restarts the wallbox. Refused unless the wallbox is idle. |
@@ -141,7 +141,7 @@ remembered resume target while paused, which may be the pending target. See
 | `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. |
 | `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure. |
 | `sensor.*_planned_charging_start` | Planned charging start | — | timestamp | Departure planning enabled; integration 0.8.0b6 | When the plan starts charging for the next trip, or when it started. Unknown while the plan lacks its inputs or the trip is done. |
-| `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability; beta 0.8.0b1 requires the feature enabled | Shows recognition, permission and release status, or Disabled from integration 0.8.0b2. From 0.8.0b3, **Charging blocked** carries a `blocked_reason` attribute (for example `release_off`, `wallbox_locked`, `authorization_required`, `pause_requested`, `energy_goal_stop` or `register_unavailable`). No session tokens or ticking timestamps are recorded. |
+| `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability; beta 0.8.0b1 requires the feature enabled | Shows recognition, permission and release status, or Disabled from integration 0.8.0b2. From 0.8.0b3, **Charging blocked** carries a `blocked_reason` attribute (for example `release_off`, `wallbox_locked`, `authorization_required`, `pause_requested`, `energy_goal_stop` or `register_unavailable`). From 0.8.0b7, **Released by hand** shows a manual release for the current or next connection. No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
 | `sensor.*_pending_change` | Pending change |  | enum | since 0.5.2b2; supporting service for service-owned queues | The queued action, or `none` when no action is reported. Enabled by default. Older services do not report this feature. |
@@ -175,7 +175,7 @@ These sit under *Diagnostic* on the device page.
 |---|---|---|---|---|
 | `sensor.*_cp_state` | CP state |  | layout v01.02 | The control-pilot state between wallbox and vehicle. Use the current and power sensors to check actual consumption. |
 | `sensor.*_error_code` | Error code |  | always | The active error, as a documented category. The raw number is in the `code` attribute. |
-| `sensor.*_connection_quality` | Connection quality |  | direct connection or supporting service | `good` or `degraded`; a stable communication-health summary. Attribute `failed_transactions` counts broken transactions since start and changes only on failures. |
+| `sensor.*_connection_quality` | Connection quality |  | direct connection or supporting service | `good` or `degraded`; a stable communication-health summary. Attribute `failed_transactions` counts transactions that finally failed since start, including a heartbeat that missed its 10-second deadline; only these degrade the quality. From **0.8.0b7**, `retried_transactions` counts lost replies that a resend made good: a read retry or a heartbeat resent after one second. Both change only on those events. |
 | `sensor.*_temperature` | Temperature | °C | layout v01.02 | Temperature inside the wallbox. |
 | `sensor.*_modbus_layout_version` | Modbus layout version |  | always | The register layout the firmware implements. Decides which entities exist. Disabled by default. |
 | `sensor.*_downgrade_current` | Downgrade current | A | always | The current limit the wallbox applies while a grid-operator downgrade is active. |

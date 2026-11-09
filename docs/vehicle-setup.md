@@ -12,7 +12,7 @@ can also supply supported data from one selected BMW vehicle.
 stable 0.6.1. Central vehicle profiles, optional automatic selection and
 Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
 below; existing manual sources continue to work after updating.
-The steps below follow **beta 0.8.0b6**, which keeps every setting of a car in
+The steps below follow **beta 0.8.0b7**, which keeps every setting of a car in
 its profile: open **Configure → Vehicles**, then the profile. Existing activation
 settings are kept.
 See [versions and feature availability](README.md#versions-and-feature-availability).
@@ -35,7 +35,7 @@ A profile does not enable every feature at once:
 | Charge level | A percentage charging target |
 | Vehicle charge limit | A maximum selectable percentage based on the car's own limit |
 | Usable battery capacity | Planning current for a selected departure time |
-| Vehicle departure timers | A button to copy the next supported vehicle climate timer |
+| Vehicle departure timers | A button to copy the next supported vehicle climate timer; only when the car sends its timers |
 | Vehicle charging history | Better matching for estimated charging losses |
 | Cable and home signals | Optional selection of the active profile, and recognition for Virtual Plug & Charge |
 
@@ -68,8 +68,10 @@ does not cause the integration to select another car. Unsupported or unavailable
 data stays unavailable; manual sources remain an alternative.
 
 Enable the corresponding vehicle entities in BavarianData if they are disabled.
-The adapter reads the reported high-voltage battery charge level, target charge
-level and maximum usable battery energy. It does not enable entities itself.
+The adapter reads the charge level, target charge level and maximum usable
+battery energy. For the charge level it prefers BavarianData's **predicted**
+charge level, which continues between the car's rare reports, and otherwise the
+reported high-voltage battery charge level. It does not enable entities itself.
 For capacity, it uses the car's reported usable energy when full, accounting for
 its current battery condition; it does not substitute nominal battery size or a
 battery-health percentage. If that value is missing, choose a suitable manual
@@ -92,9 +94,21 @@ to it.
 
 ### Everything for one car in its profile
 
-From **0.8.0b6**, **Configure → Vehicles → Open a profile’s settings** shows
-everything that belongs to that car. Each item explains what it is for, and
-each is optional:
+**Configure → Vehicles → Open a profile’s settings** covers everything that
+belongs to that car. From **0.8.0b7**, adding or opening a profile guides you
+through these areas one after another instead of a menu for each. Each area
+explains what it is for and is optional: **Next** skips it, and an area you set
+up moves on to the next one. Nothing is saved before **Save and finish** or the
+last area, the detection signals. Changes made meanwhile elsewhere, such as
+another selected car, are kept. Each area names the entities it currently uses,
+for example **In use: charge level sensor.i4_soc**.
+
+When a profile is linked to a car in a vehicle integration, or its car changes,
+it uses everything that car reports right away: charge level, charge limit,
+usable battery capacity, charging history for losses and detection signals.
+You do not choose those entities yourself; the guided setup shows them, and
+you can switch any area to a manual entity. Departure planning stays off until
+you set it up:
 
 | Item | What it is for |
 |---|---|
@@ -117,8 +131,8 @@ settings are retained as a manual profile.
 ### Optional automatic vehicle selection
 
 Automatic selection is **off by default** and separately configurable for each
-profile. Open **Configure → Vehicles → Open a profile’s settings → Detection
-signals** and choose:
+profile. Open **Configure → Vehicles → Open a profile’s settings**, choose
+**Next** up to **Detection signals** and choose:
 
 - **Use the vehicle integration**: BavarianData supplies the vehicle's cable
   sensor and GPS tracker. Its position is compared with Home Assistant's Home
@@ -180,6 +194,44 @@ in connection observation prevents this association. With Virtual Plug & Charge
 enabled, charging release waits for recognition. Saved loss results and averages
 remain separate for each car.
 
+### The car's rules apply only to that car
+
+**From 0.8.0b7.** A profile with detection signals stays selected, manually or
+automatically, while the car is away: you can set its charge target and
+departure in advance. Its rules, i.e. the **Vehicle charge target**, the
+departure plan and the learned phases, apply only after the car confirms the
+plug-in. The car confirms it by reporting itself **plugged in at home after the
+wallbox was last seen empty**. Until then:
+
+- The departure plan shows **Car not confirmed**. A pause the plan set earlier
+  ends, so another car is not held until a late start.
+- The percentage target is not reached from this car's charge level. A target
+  already reached is set again without a charge level, and the stop pause it
+  caused ends.
+- Virtual Plug & Charge grants nothing.
+
+Nothing is deselected, neither at plug-in nor at unplug. A car that confirms a
+few minutes after plug-in gets its rules then; without Virtual Plug & Charge
+and with the charging release on, it charges without its plan until that
+moment. A car that keeps reporting itself plugged in at home ten minutes after
+the wallbox became empty has a stale plug signal; the log warns once.
+
+A confirmed car must stay consistent while it charges. Its rules rest again,
+with a warning in the log, when the car afterwards reports itself **unplugged**
+while the wallbox still has a car two minutes later, or when the wallbox delivered **4 kWh** since charging started and the profile's
+charge level reported since then has not risen. With BavarianData this is its
+predicted charge level, which follows the car's charging between the car's rare
+reports. The check skips a battery at 95 % or more, which may draw energy for
+climate or balancing, and does nothing while there is no charge level. Only a
+new plug-in report confirms the car again.
+This catches a car that keeps reporting itself plugged in after it left.
+
+The confirmation survives an HA restart. A car swapped while HA is not running
+is not noticed. A car that only reports changes may not report again after a
+quick unplug and replug; its rules then rest until its next report. Your car
+charging at a second wallbox at home while another car is plugged in here
+cannot be told apart from your car being plugged in here.
+
 ## Optional Virtual Plug & Charge
 
 **New in beta 0.8.0b1 and off by default.** Virtual Plug & Charge keeps charging disabled
@@ -196,7 +248,7 @@ manually, but that choice alone never proves which car is connected.
    **Configuration**. This switch controls the feature for the whole wallbox.
    The feature requires
    write access. Service mode needs **app 0.8.0b1 or newer** for the
-   charging-permission capability; use **0.8.0b6** for the current beta app.
+   charging-permission capability; use **0.8.0b7** for the current beta app.
 3. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 
@@ -262,9 +314,16 @@ From **0.8.0b3**, turn on **Switch off charging release when unplugged** under
 Home Assistant switches the release off, and you switch it on for the next
 charge. This runs in Home Assistant, so it is not enforced while HA is down.
 
-If you previously switched **Charging release** off, switch it on when you want
-to allow charging again. With virtual Plug & Charge enabled this records your
-request; it still waits for the recognized vehicle and cannot bypass recognition.
+**From 0.8.0b7**, switching **Charging release** on while Virtual Plug & Charge
+is enabled releases charging by hand, for any car, for the current connection.
+Without a car plugged in, it releases the next plug-in. The Virtual Plug &
+Charge status shows **Released by hand**. The next unplug ends this release and
+Virtual Plug & Charge decides again; switching **Charging release** off ends it
+earlier. This is how a guest charges without switching the feature off. The
+guest car gets none of the selected car's rules, see
+[the car's rules apply only to that car](#the-cars-rules-apply-only-to-that-car).
+The release survives an HA or app restart. Before 0.8.0b7, switching the release
+on only recorded the request and charging still waited for a recognized car.
 
 Cable and home signals provide a convenience check, not cryptographic vehicle
 identification or ISO 15118 Plug & Charge. Restored upstream values and a vehicle

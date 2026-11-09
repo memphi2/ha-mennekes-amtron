@@ -58,7 +58,7 @@ mode. On Home Assistant OS, confirm the discovered wallbox under
 **Settings → Devices & services**; its URL and token are supplied automatically.
 
 Start the app, choose USB or LAN in **Open Web UI**, save and restart it. App
-**0.8.0b6** supports the guided page on **Supervisor 2026.10.4+**. If an older beta
+**0.8.0b7** supports the guided page on **Supervisor 2026.10.4+**. If an older beta
 app asks for 2026.11.0, update the app; native **Configuration** also remains
 available. Until a connection is configured, the app stays in setup mode without
 Modbus or discovery. [Connection-page details](upgrading.md#app-connection-page).

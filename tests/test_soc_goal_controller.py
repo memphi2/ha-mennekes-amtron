@@ -722,3 +722,21 @@ def test_explicit_disable_before_the_stop_worker_runs_does_not_pause():
         await soc.async_stop()
         await energy.async_stop()
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(("source", "reason"), [
+    (None, "no vehicle source is selected"), ("sensor.other|", "the vehicle source changed"),
+])
+def test_a_cleared_target_names_its_reason(caplog, source, reason):
+    async def run():
+        _harness, control, energy, _soc, _ = await _soc_runner()
+        await control.async_configure_soc(None)
+        assert "cleared" not in caplog.text
+        await control.async_configure_soc(SOURCE)
+        await control.async_set_soc_goal(70, source=SOURCE, soc=20)
+        with caplog.at_level("INFO"):
+            await control.async_configure_soc(source)
+        assert f"Vehicle charge target 70% cleared: {reason}" in caplog.text
+        await energy.async_stop()
+
+    asyncio.run(run())

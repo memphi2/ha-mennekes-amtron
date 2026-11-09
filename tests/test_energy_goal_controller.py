@@ -354,6 +354,13 @@ def test_terminal_evidence_during_guarded_reads_is_rechecked_before_start(action
             runner.observe(_snapshot(harness, 1247))
 
         control._async_check_transition_interval = wait_then_notice_goal
+
+        async def notice_goal_while_checking_release():
+            runner.observe(_snapshot(harness, 1247))
+            return True
+
+        # A paused release change skips the interval but rechecks the goal.
+        control._async_release_switches_charge = notice_goal_while_checking_release
         method = {
             "resume": control.async_resume_charging,
             "release": lambda: control.async_set_charging_release(True),

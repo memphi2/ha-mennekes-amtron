@@ -23,6 +23,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.detectio
     PLUG_DESCRIPTOR,
     BavarianDetectionSource,
     detection_capabilities,
+    detection_entities,
 )
 from tests.test_bavarian_history import VIN, vehicle_registry
 
@@ -71,6 +72,11 @@ def test_registered_cable_and_tracker_enable_detection_without_guessing_other_fi
             assert "detection" not in profile_capabilities(hass, "bavariandata", "car")
             tracker(hass, "unknown")
             assert "detection" in profile_capabilities(hass, "bavariandata", "car")
+            assert detection_entities(hass, "car") == ("binary_sensor.car_plug", "device_tracker.car")
+            device = hass.data[dr.DATA_REGISTRY].async_get.return_value
+            hass.data[dr.DATA_REGISTRY].async_get.return_value = None
+            assert detection_entities(hass, "car") == (None, None)
+            hass.data[dr.DATA_REGISTRY].async_get.return_value = device
             source = resolve_detection_source(hass, {"vehicle_provider": "bavariandata", "vehicle_device": "car", "vehicle_source_identity": ""})
             assert source.available
             assert source.snapshot == VehicleDetection()

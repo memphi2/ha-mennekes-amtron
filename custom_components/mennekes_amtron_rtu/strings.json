@@ -522,6 +522,9 @@
         "state_attributes": {
           "failed_transactions": {
             "name": "Failed transactions"
+          },
+          "retried_transactions": {
+            "name": "Retried transactions"
           }
         }
       },
@@ -597,11 +600,12 @@
           "waiting_for_capacity": "Waiting for battery capacity",
           "waiting_for_soc": "Waiting for vehicle charge level",
           "waiting_for_device": "Waiting for wallbox",
+          "vehicle_unconfirmed": "Car not confirmed",
           "read_only": "Read only",
           "queued": "Change queued",
           "paused_until_start": "Paused until start",
-          "paced": "Adjusting current",
-          "early_at_minimum": "May finish early at minimum current",
+          "charging": "Charging at full current",
+          "finishing": "Finishing at minimum current",
           "unreachable": "Target may be unreachable",
           "late": "Deadline passed",
           "reached": "Target reached",
@@ -620,6 +624,7 @@
           "vehicle_not_selected": "Recognized vehicle not selected",
           "waiting_release": "Waiting for charging release",
           "authorized": "Vehicle authorized",
+          "manual_release": "Released by hand",
           "blocked": "Charging blocked",
           "disabled": "Disabled"
         },
@@ -997,15 +1002,19 @@
         "menu_options": {
           "departure_configure": "Configure departure planning",
           "departure_disable": "Disable departure planning",
-          "vehicle_profile": "Back to profile"
+          "vehicle_profile": "Back to profile",
+          "wizard_next": "Next",
+          "wizard_finish": "Save and finish"
         },
-        "description": "Profile: **{vehicle}**.\n\nWith departure planning, Home Assistant starts charging early enough to reach the percentage target by the departure time instead of charging at once.\n\nPlan one next trip with a percentage target, usable battery capacity and departure time. Choose the actual time afterwards on the device page, or copy it from an optional source. This is not a daily schedule. Disabling planning clears the trip and queued plan commands; the percentage target remains."
+        "description": "Profile: **{vehicle}**.\n\nIn use: departure **{departure_entity}**, battery capacity **{capacity_entity}**.\n\nWith departure planning, Home Assistant starts charging early enough to reach the percentage target by the departure time instead of charging at once.\n\nPlan one next trip with a percentage target, usable battery capacity and departure time. Choose the actual time afterwards on the device page, or copy it from an optional source. This is not a daily schedule. Disabling planning clears the trip and queued plan commands; the percentage target remains."
       },
       "departure_requires_vehicle": {
         "title": "Charge level required",
         "menu_options": {
           "vehicle_battery": "Charge level and charge limit",
-          "vehicle_profile": "Back to profile"
+          "vehicle_profile": "Back to profile",
+          "wizard_next": "Next",
+          "wizard_finish": "Save and finish"
         },
         "description": "Profile: **{vehicle}**.\n\nDeparture planning needs to know how full this car’s battery is. Configure its charge level first, then return to Next departure."
       },
@@ -1173,9 +1182,11 @@
           "loss_vehicle": "Vehicle charging history",
           "loss_profile": "Use this profile’s charging history",
           "loss_disable": "Disable loss estimates",
-          "vehicle_profile": "Back to profile"
+          "vehicle_profile": "Back to profile",
+          "wizard_next": "Next",
+          "wizard_finish": "Save and finish"
         },
-        "description": "Profile: **{vehicle}**.\n\nCharging losses show how much of the energy measured by the wallbox actually reached this car’s battery.\n\nCompare energy measured by the wallbox with energy added to the battery during the same completed charge. The last loss and average are estimates. Select the vehicle before charging; missing or ambiguous matches remain unknown instead of reusing another charge.\n\nIf this car’s charging history is unavailable, check its vehicle source under Name and vehicle source, or choose an energy sensor."
+        "description": "Profile: **{vehicle}**.\n\nIn use: **{loss_entity}**.\n\nCharging losses show how much of the energy measured by the wallbox actually reached this car’s battery.\n\nCompare energy measured by the wallbox with energy added to the battery during the same completed charge. The last loss and average are estimates. Select the vehicle before charging; missing or ambiguous matches remain unknown instead of reusing another charge.\n\nIf this car’s charging history is unavailable, check its vehicle source under Name and vehicle source, or choose an energy sensor."
       },
       "loss_sensor": {
         "title": "Charging losses from a sensor",
@@ -1219,7 +1230,7 @@
       },
       "vehicle_profile_add": {
         "title": "Add profile",
-        "description": "Give the profile a recognizable name and choose BavarianData or manual entity selection. New profiles start with optional charging features disabled.\n\nThe vehicle source links this profile to the car in a vehicle integration, so charge level, charge limit, capacity, departure timers, charging history and detection signals can be read from it. Choose None to select Home Assistant entities manually.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.",
+        "description": "Give the profile a recognizable name and choose BavarianData or manual entity selection. A linked car's charge level, charge limit, battery capacity, charging history and detection signals are used right away; departure planning stays off.\n\nThe vehicle source links this profile to the car in a vehicle integration, so charge level, charge limit, capacity, departure timers, charging history and detection signals can be read from it. Choose None to select Home Assistant entities manually.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.\n\nNext, the setup guides you through charge level and charge limit, next departure, charging losses and detection signals. Choose **Next** to skip an area. Nothing is saved before **Save and finish** or the last step.",
         "data": {
           "vehicle_profile_name": "Profile name",
           "vehicle_provider": "Vehicle integration"
@@ -1231,7 +1242,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Edit profile",
-        "description": "Renaming keeps the settings. Changing the integration or vehicle clears this profile’s feature settings so data from the previous car cannot be reused.\n\nThe vehicle source links this profile to the car in a vehicle integration, so charge level, charge limit, capacity, departure timers, charging history and detection signals can be read from it. Choose None to select Home Assistant entities manually.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.",
+        "description": "Renaming keeps the settings. Changing the integration or vehicle clears this profile’s feature settings so data from the previous car cannot be reused; the new car's data is used right away.\n\nThe vehicle source links this profile to the car in a vehicle integration, so charge level, charge limit, capacity, departure timers, charging history and detection signals can be read from it. Choose None to select Home Assistant entities manually.\n\nOnly installed integrations with a supported vehicle are offered. Manual entity sources always remain available. If a saved vehicle integration is temporarily missing, renaming the profile keeps its existing vehicle and settings.\n\nNext, the setup guides you through charge level and charge limit, next departure, charging losses and detection signals. Choose **Next** to skip an area. Nothing is saved before **Save and finish** or the last step.",
         "data": {
           "vehicle_profile_name": "Profile name",
           "vehicle_provider": "Vehicle integration"
@@ -1295,7 +1306,7 @@
       },
       "vehicle_detection_source": {
         "title": "Detection signals",
-        "description": "Profile: **{vehicle}**.\n\nDetection signals report that this car is plugged in and at home. Automatic vehicle selection and Virtual Plug & Charge use them.\n\nUse supported local entities from this profile’s vehicle integration, choose existing Home Assistant entities, or disable detection for this profile. Both cable connection and home presence are required. No additional cloud requests are made.",
+        "description": "Profile: **{vehicle}**.\n\nIn use: plug **{plug_entity}**, location **{location_entity}**.\n\nDetection signals report that this car is plugged in and at home. Automatic vehicle selection and Virtual Plug & Charge use them.\n\nUse supported local entities from this profile’s vehicle integration, choose existing Home Assistant entities, or disable detection for this profile. Both cable connection and home presence are required. No additional cloud requests are made.",
         "data": {
           "vehicle_detection_source": "Source for detection"
         }
@@ -1353,12 +1364,14 @@
       },
       "vehicle_battery": {
         "title": "Charge level and charge limit",
-        "description": "Profile: **{vehicle}**.\n\nThe charge level lets Home Assistant stop charging at a percentage target, for example 80 %, and departure planning needs it to calculate the charging time. The car’s own charge limit can be used as an additional maximum. Set the target percentage afterwards on the wallbox device page.\n\nTo cancel only the current percentage target, set Vehicle charge target to 0. Stop using vehicle charge level removes this profile’s source assignments here, including the optional maximum, and disables its departure planning; for the selected car it also clears the percentage target and departure plan. The source entities in the vehicle integration remain unchanged, as do vehicle permission, the kWh target and charging state.",
+        "description": "Profile: **{vehicle}**.\n\nIn use: charge level **{soc_entity}**, charge limit **{limit_entity}**.\n\nThe charge level lets Home Assistant stop charging at a percentage target, for example 80 %, and departure planning needs it to calculate the charging time. The car’s own charge limit can be used as an additional maximum. Set the target percentage afterwards on the wallbox device page.\n\nTo cancel only the current percentage target, set Vehicle charge target to 0. Stop using vehicle charge level removes this profile’s source assignments here, including the optional maximum, and disables its departure planning; for the selected car it also clears the percentage target and departure plan. The source entities in the vehicle integration remain unchanged, as do vehicle permission, the kWh target and charging state.",
         "menu_options": {
           "vehicle_soc": "Configure charge level",
           "vehicle_source": "Configure charge level",
           "vehicle_disable": "Stop using vehicle charge level",
-          "vehicle_profile": "Back to profile"
+          "vehicle_profile": "Back to profile",
+          "wizard_next": "Next",
+          "wizard_finish": "Save and finish"
         }
       }
     },

@@ -5,6 +5,89 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0b7 — 2026-11-09
+
+Beta update of the integration and app; **0.6.1 remains stable**. In service
+mode, update the app to **0.8.0b7** first.
+
+- **Departure planning starts late and finishes on time.** Charging stays
+  paused until the energy still needed takes the remaining time at full current
+  plus a 30-minute reserve. It then charges at full current and reduces to 6 A
+  once the rest fits the remaining time at 6 A, so the car reaches the target at
+  departure rather than early. Previously the plan spread charging at a reduced
+  current and often started many hours before departure. A charge that has
+  started never pauses again for being faster than estimated.
+- **Each vehicle profile remembers its charging phases.** The wallbox reports
+  a car's phases only while it draws current, so the plan previously assumed
+  one phase before every start and started about three times too early for a
+  three-phase car. The phases of each profile's last charge now plan the next
+  start; a car never seen charging is planned with three phases.
+- The departure plan status has the new states **Charging at full current** and
+  **Finishing at minimum current**; **Adjusting current** and **May finish
+  early at minimum current** are gone.
+- **Switch off charging release when unplugged** now also ends a manual pause.
+  Previously the pause stayed after unplugging and the wallbox kept showing it.
+  Without a car and with the release off, this switches nothing and waits for
+  no state-change interval. A stop from a reached energy target stays.
+- **Switching the charging release during a confirmed pause no longer waits**
+  for the state-change interval, and does not restart it. The pause holds the
+  car at 0 A either way; the later resume is the real start and keeps the
+  interval. This also applies to the Virtual Plug & Charge grant.
+- In service mode, HA reads a queued command's outcome when it is due instead
+  of up to one poll later. The log no longer shows such a command together
+  with the next action, as if both had happened at the same time.
+- **Each vehicle profile keeps its charge target** even when the description
+  of its vehicle source changes, for example once BavarianData resolves the
+  car after a restart. Previously the target could fall back to 0 and the
+  remembered one was not found. When the integration clears a target because
+  no vehicle source is selected or the source changed, the log now says so.
+- **Retries and failures are counted separately.** A lost reply that a resend
+  made good — a read retry or a heartbeat resent after one second — counts in
+  the new **Connection quality** attribute `retried_transactions` and no longer
+  degrades the quality. `failed_transactions` counts only transactions that
+  finally failed, now including a heartbeat that missed its 10-second deadline.
+  pymodbus no longer logs each lost reply as an error with a frame dump; it
+  remains visible in debug logging. Service mode needs app **0.8.0b7**.
+- **A car's rules apply only to that car.** A profile with detection signals
+  stays selected while the car is away, but its charge target, departure plan
+  and learned phases apply only once the car reports itself plugged in at home
+  after the wallbox was last seen empty. Another car plugged in meanwhile gets
+  none of them: the plan shows the new state **Car not confirmed** and ends a
+  pause it set, and a reached target is released together with its stop pause.
+  Nothing is deselected. Virtual Plug & Charge also waits for this
+  confirmation. The log warns when a car still reports itself plugged in at
+  home ten minutes after unplugging.
+- **A confirmed car must stay consistent while charging.** If it afterwards
+  reports itself unplugged while the wallbox still has a car two minutes
+  later, or its charge level (with BavarianData the
+  predicted one) has not risen after the wallbox delivered 4 kWh, its rules rest again with a warning. This
+  catches a car that keeps reporting itself plugged in after it left. A full
+  battery (95 % or more) and missing charge levels are not checked.
+- **BavarianData's predicted charge level is used** for a profile that reads
+  the charge level from the car, when that entity is enabled. It continues
+  between the car's rare reports; the measured level remains the fallback.
+- **Charging release by hand with Virtual Plug & Charge.** Switching
+  **Charging release** on now releases the current connection for any car, or
+  the next one without a car plugged in, until the next unplug. The status
+  shows the new state **Released by hand**. Guests can charge without switching
+  Virtual Plug & Charge off. Previously the switch only recorded the request.
+  Service mode needs app **0.8.0b7**.
+- **Adding or opening a vehicle profile guides through all its settings:**
+  name and vehicle source, charge level and charge limit, next departure,
+  charging losses and detection signals, one after another instead of a
+  separate menu for each. **Next** skips an area; nothing is saved before
+  **Save and finish** or the last area, so the integration reloads only once.
+- **A profile linked to a car uses its data right away.** Charge level, charge
+  limit, battery capacity, charging history and detection signals no longer
+  have to be set up area by area after adding the profile or changing its car;
+  departure planning stays off until set up.
+- **Departure timers from the car are offered only when the car sends them.**
+  BMW CarData does not send the climate timers' times for every car, e.g. not
+  for an i4 or i5, so the option previously led nowhere. A setup that already
+  reads them keeps the option.
+- **Each settings area names the entities it uses,** e.g. charge level, charge
+  limit, departure and capacity, losses, plug and location.
+
 ## 0.8.0b6 — 2026-11-09
 
 Beta update of the integration and app; **0.6.1 remains stable**. In service

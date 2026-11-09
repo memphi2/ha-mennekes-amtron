@@ -229,3 +229,28 @@ def test_release_off_current_changes_skip_and_keep_the_long_guard(release):
         await control.async_shutdown()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("current", [1.0, 16.0])
+@pytest.mark.parametrize("released", [False, True])
+def test_paused_release_changes_skip_and_keep_the_long_guard(current, released):
+    async def run():
+        harness = Harness(state_change_interval_seconds=300)
+        control = await harness.connect()
+        put(harness.transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)
+        put(harness.transport.bank, R.CP_STATE, CpState.B1)
+        put(harness.transport.bank, R.CHARGING_RELEASE, int(not released))
+        put(harness.transport.bank, R.CHARGING_CURRENT_EMS, current)
+        armed = harness.clock[0] - 100
+        control._write_state.mode_change_at = armed
+        await control.async_set_charging_release(released)
+        if current == 1.0:
+            # The pause holds the car at 0 A; the later resume is the start.
+            assert harness.transport.bank[R.CHARGING_RELEASE.address] == int(released)
+            assert control._write_state.mode_change_at == armed
+        else:
+            assert control.pending_action == ("enable_charging" if released else "disable_charging")
+            assert harness.transport.writes == []
+        await control.async_shutdown()
+
+    asyncio.run(run())

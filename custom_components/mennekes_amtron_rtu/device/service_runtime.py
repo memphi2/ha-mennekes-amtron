@@ -424,6 +424,7 @@ class ModbusService:
             "current_write_generation": self.data.current_write_generation,
             "connection_quality": self.data.connection_quality,
             "connection_failures": self.data.connection_failures,
+            "connection_retries": self.data.connection_retries,
             "energy_sample": dict(self._energy_sample) if self._energy_sample is not None else None,
             "charging_session": {
                 "supported": self.identity.layout_version >= ENERGY_TOTAL.min_layout,
@@ -438,6 +439,8 @@ class ModbusService:
             "control": {
                 "supports_plug_charge": True,
                 "plug_charge": self.client.write_state.plug_charge.snapshot(),
+                # A separate key: older integrations reject unknown gate fields.
+                "plug_charge_manual": self.client.write_state.plug_charge.manual,
                 "supports_energy_goal": control.supports_energy_goal if control else False,
                 "supports_soc_goal": control.supports_soc_goal if control else False,
                 "soc_transactions_supported": True,

@@ -32,14 +32,33 @@ def test_capacity_requires_real_energy_units_and_a_bounded_usable_value() -> Non
     assert usable_capacity(10**1000) is None
 
 
-def test_plan_paces_current_within_physical_limits() -> None:
+def test_plan_starts_late_at_full_current_and_keeps_a_reserve() -> None:
+    # 48 kWh need 4.8 h at 16 A on three phases; the start keeps 30 minutes.
     result = plan(8)
-    assert result.status == "paced"
-    assert result.current_a == 9.7
-    assert plan(24).status == "early_at_minimum"
-    assert plan(24).current_a == 6
+    assert result.status == "charging"
+    assert result.current_a == 16
+    assert result.start_at == pytest.approx(
+        NOW + timedelta(hours=8) - timedelta(hours=48 / (16 * 0.621)) - timedelta(minutes=30),
+        abs=timedelta(seconds=1),
+    )
     assert plan(1).status == "unreachable"
     assert plan(1).current_a == 16
+
+
+def test_plan_finishes_at_the_minimum_current_once_it_fits() -> None:
+    # 48 kWh fit 12.9 h at 6 A: the rest of the time then runs at the minimum.
+    assert plan(13).status == "finishing"
+    assert plan(13).current_a == 6
+    assert plan(12.8).status == "charging"
+
+
+def test_a_small_charge_starts_when_the_minimum_current_just_fits() -> None:
+    result = plan(8, soc_percent=78)
+    assert result.status == "finishing"
+    assert result.start_at == pytest.approx(
+        NOW + timedelta(hours=8) - timedelta(hours=1.6 / (6 * 0.621)),
+        abs=timedelta(seconds=1),
+    )
 
 
 def test_plan_reports_reached_and_late_without_inventing_a_pause() -> None:
@@ -68,8 +87,10 @@ def test_dst_transition_uses_elapsed_hours_instead_of_wall_clock() -> None:
         now=start, deadline=finish, soc_percent=20, target_percent=80,
         capacity_kwh=80, phases=3, max_current_a=16,
     )
-    assert result == plan(5)
+    reference = plan(5)
+    assert (result.current_a, result.status) == (reference.current_a, reference.status)
+    assert finish - result.start_at == NOW + timedelta(hours=5) - reference.start_at
 
 
-def test_two_phase_vehicle_receives_enough_current() -> None:
-    assert plan(8, phases=2).current_a == 14.5
+def test_two_phase_vehicle_starts_earlier() -> None:
+    assert plan(8, phases=2).start_at < plan(8).start_at

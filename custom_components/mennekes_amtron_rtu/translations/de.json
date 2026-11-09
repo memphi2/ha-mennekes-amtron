@@ -522,6 +522,9 @@
         "state_attributes": {
           "failed_transactions": {
             "name": "Fehlerhafte Übertragungen"
+          },
+          "retried_transactions": {
+            "name": "Wiederholte Übertragungen"
           }
         }
       },
@@ -597,11 +600,12 @@
           "waiting_for_capacity": "Wartet auf Akkukapazität",
           "waiting_for_soc": "Wartet auf Fahrzeugladestand",
           "waiting_for_device": "Wartet auf Wallbox",
+          "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
           "read_only": "Nur lesen",
           "queued": "Änderung vorgemerkt",
           "paused_until_start": "Pausiert bis zum Start",
-          "paced": "Ladestrom wird angepasst",
-          "early_at_minimum": "Bei Mindeststrom eventuell zu früh fertig",
+          "charging": "Lädt mit vollem Strom",
+          "finishing": "Lädt mit Mindeststrom bis zur Abfahrt",
           "unreachable": "Ziel eventuell nicht erreichbar",
           "late": "Zielzeit überschritten",
           "reached": "Ziel erreicht",
@@ -620,6 +624,7 @@
           "vehicle_not_selected": "Erkanntes Fahrzeug nicht ausgewählt",
           "waiting_release": "Wartet auf Ladefreigabe",
           "authorized": "Fahrzeug freigegeben",
+          "manual_release": "Von Hand freigegeben",
           "blocked": "Laden gesperrt",
           "disabled": "Deaktiviert"
         },
@@ -997,15 +1002,19 @@
         "menu_options": {
           "departure_configure": "Abfahrtsplanung einrichten",
           "departure_disable": "Abfahrtsplanung deaktivieren",
-          "vehicle_profile": "Zurück zum Profil"
+          "vehicle_profile": "Zurück zum Profil",
+          "wizard_next": "Weiter",
+          "wizard_finish": "Speichern und beenden"
         },
-        "description": "Profil: **{vehicle}**.\n\nMit der Abfahrtsplanung startet Home Assistant das Laden so rechtzeitig, dass das Prozentziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n\nPlane die nächste einzelne Fahrt mit Prozent-Ladeziel, nutzbarer Akkukapazität und Abfahrtszeit. Den konkreten Zeitpunkt wählst du anschließend auf der Geräteseite oder übernimmst ihn aus einer optionalen Quelle. Dies ist kein täglicher Zeitplan. Deaktivieren löscht die Fahrt und vorgemerkte Planbefehle; das Prozent-Ladeziel bleibt bestehen."
+        "description": "Profil: **{vehicle}**.\n\nGenutzt: Abfahrt **{departure_entity}**, Akkukapazität **{capacity_entity}**.\n\nMit der Abfahrtsplanung startet Home Assistant das Laden so rechtzeitig, dass das Prozentziel zur Abfahrtszeit erreicht ist, statt sofort zu laden.\n\nPlane die nächste einzelne Fahrt mit Prozent-Ladeziel, nutzbarer Akkukapazität und Abfahrtszeit. Den konkreten Zeitpunkt wählst du anschließend auf der Geräteseite oder übernimmst ihn aus einer optionalen Quelle. Dies ist kein täglicher Zeitplan. Deaktivieren löscht die Fahrt und vorgemerkte Planbefehle; das Prozent-Ladeziel bleibt bestehen."
       },
       "departure_requires_vehicle": {
         "title": "Ladestand erforderlich",
         "menu_options": {
           "vehicle_battery": "Ladestand und Ladegrenze",
-          "vehicle_profile": "Zurück zum Profil"
+          "vehicle_profile": "Zurück zum Profil",
+          "wizard_next": "Weiter",
+          "wizard_finish": "Speichern und beenden"
         },
         "description": "Profil: **{vehicle}**.\n\nDie Abfahrtsplanung muss wissen, wie voll der Akku dieses Autos ist. Richte zuerst seinen Ladestand ein und kehre dann zu Nächste Abfahrt zurück."
       },
@@ -1173,9 +1182,11 @@
           "loss_vehicle": "Ladehistorie des Fahrzeugs",
           "loss_profile": "Ladehistorie dieses Profils verwenden",
           "loss_disable": "Verlustschätzung deaktivieren",
-          "vehicle_profile": "Zurück zum Profil"
+          "vehicle_profile": "Zurück zum Profil",
+          "wizard_next": "Weiter",
+          "wizard_finish": "Speichern und beenden"
         },
-        "description": "Profil: **{vehicle}**.\n\nDie Ladeverluste zeigen, wie viel der von der Wallbox gemessenen Energie tatsächlich im Akku dieses Autos angekommen ist.\n\nVergleiche die an der Wallbox gemessene Energie mit der im Akku angekommenen Energie derselben abgeschlossenen Ladung. Letzter Verlust und Durchschnitt sind Schätzwerte. Wähle das Fahrzeug vor Ladebeginn; fehlende oder mehrdeutige Zuordnungen bleiben unbekannt, statt eine andere Ladung zu verwenden.\n\nFehlt die Ladehistorie dieses Autos, prüfe seine Fahrzeugquelle unter Name und Fahrzeugquelle oder wähle einen Energiesensor."
+        "description": "Profil: **{vehicle}**.\n\nGenutzt: **{loss_entity}**.\n\nDie Ladeverluste zeigen, wie viel der von der Wallbox gemessenen Energie tatsächlich im Akku dieses Autos angekommen ist.\n\nVergleiche die an der Wallbox gemessene Energie mit der im Akku angekommenen Energie derselben abgeschlossenen Ladung. Letzter Verlust und Durchschnitt sind Schätzwerte. Wähle das Fahrzeug vor Ladebeginn; fehlende oder mehrdeutige Zuordnungen bleiben unbekannt, statt eine andere Ladung zu verwenden.\n\nFehlt die Ladehistorie dieses Autos, prüfe seine Fahrzeugquelle unter Name und Fahrzeugquelle oder wähle einen Energiesensor."
       },
       "loss_sensor": {
         "title": "Ladeverluste aus einem Sensor",
@@ -1219,7 +1230,7 @@
       },
       "vehicle_profile_add": {
         "title": "Profil hinzufügen",
-        "description": "Gib dem Profil einen eindeutigen Namen und wähle BavarianData oder die manuelle Entitätsauswahl. Optionale Ladefunktionen sind bei neuen Profilen zunächst ausgeschaltet.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.",
+        "description": "Gib dem Profil einen eindeutigen Namen und wähle BavarianData oder die manuelle Entitätsauswahl. Ladestand, Ladegrenze, Akkukapazität, Ladehistorie und Erkennungssignale eines verknüpften Autos werden sofort genutzt; die Abfahrtsplanung bleibt aus.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.\n\nDanach führt die Einrichtung nacheinander durch Ladestand und Ladelimit, nächste Abfahrt, Ladeverluste und Erkennungssignale. Mit **Weiter** überspringst du einen Bereich. Gespeichert wird erst mit **Speichern und beenden** oder nach dem letzten Schritt.",
         "data": {
           "vehicle_profile_name": "Profilname",
           "vehicle_provider": "Fahrzeugintegration"
@@ -1231,7 +1242,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Profil bearbeiten",
-        "description": "Beim Umbenennen bleiben die Einstellungen erhalten. Ein Wechsel der Integration oder des Fahrzeugs löscht die Funktionseinstellungen dieses Profils, damit keine Daten des bisherigen Autos weiterverwendet werden.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.",
+        "description": "Beim Umbenennen bleiben die Einstellungen erhalten. Ein Wechsel der Integration oder des Fahrzeugs löscht die Funktionseinstellungen dieses Profils, damit keine Daten des bisherigen Autos weiterverwendet werden; die Daten des neuen Autos werden sofort genutzt.\n\nDie Fahrzeugquelle verknüpft dieses Profil mit dem Auto in einer Fahrzeugintegration. Dann lassen sich Ladestand, Ladegrenze, Kapazität, Abfahrtszeiten, Ladehistorie und Erkennungssignale direkt daraus lesen. Mit Keine wählst du Home-Assistant-Entitäten manuell aus.\n\nAngeboten werden nur installierte Integrationen mit einem unterstützten Fahrzeug. Manuelle Entitätsquellen bleiben immer möglich. Fehlt eine gespeicherte Fahrzeugintegration vorübergehend, bleiben beim Umbenennen des Profils das bisherige Fahrzeug und seine Einstellungen erhalten.\n\nDanach führt die Einrichtung nacheinander durch Ladestand und Ladelimit, nächste Abfahrt, Ladeverluste und Erkennungssignale. Mit **Weiter** überspringst du einen Bereich. Gespeichert wird erst mit **Speichern und beenden** oder nach dem letzten Schritt.",
         "data": {
           "vehicle_profile_name": "Profilname",
           "vehicle_provider": "Fahrzeugintegration"
@@ -1295,7 +1306,7 @@
       },
       "vehicle_detection_source": {
         "title": "Signale zur Fahrzeugerkennung",
-        "description": "Profil: **{vehicle}**.\n\nErkennungssignale melden, dass dieses Auto eingesteckt und zu Hause ist. Die automatische Fahrzeugauswahl und das virtuelle Plug & Charge verwenden sie.\n\nNutze unterstützte lokale Entitäten der Fahrzeugintegration dieses Profils, wähle vorhandene Home-Assistant-Entitäten oder schalte die Erkennung für dieses Profil aus. Kabelverbindung und Anwesenheit zu Hause werden beide benötigt. Es gibt keine zusätzlichen Cloud-Abfragen.",
+        "description": "Profil: **{vehicle}**.\n\nGenutzt: Stecker **{plug_entity}**, Standort **{location_entity}**.\n\nErkennungssignale melden, dass dieses Auto eingesteckt und zu Hause ist. Die automatische Fahrzeugauswahl und das virtuelle Plug & Charge verwenden sie.\n\nNutze unterstützte lokale Entitäten der Fahrzeugintegration dieses Profils, wähle vorhandene Home-Assistant-Entitäten oder schalte die Erkennung für dieses Profil aus. Kabelverbindung und Anwesenheit zu Hause werden beide benötigt. Es gibt keine zusätzlichen Cloud-Abfragen.",
         "data": {
           "vehicle_detection_source": "Quelle für die Erkennung"
         }
@@ -1353,12 +1364,14 @@
       },
       "vehicle_battery": {
         "title": "Ladestand und Ladegrenze",
-        "description": "Profil: **{vehicle}**.\n\nMit dem Ladestand stoppt Home Assistant bei einem Prozentziel, zum Beispiel 80 %, und die Abfahrtsplanung berechnet damit die nötige Ladezeit. Die Ladegrenze im Auto lässt sich zusätzlich als Obergrenze verwenden. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein.\n\nUm nur das aktuelle Prozentziel aufzuheben, stelle Fahrzeug-Ladeziel auf 0. Ladestand nicht mehr verwenden entfernt hier die Quellenzuordnung dieses Profils einschließlich des optionalen Maximums und deaktiviert seine Abfahrtsplanung; beim ausgewählten Auto werden außerdem Prozentziel und geplante Fahrt gelöscht. Die Quellentitäten der Fahrzeugintegration bleiben erhalten, ebenso Fahrzeugberechtigung, kWh-Ziel und Ladezustand.",
+        "description": "Profil: **{vehicle}**.\n\nGenutzt: Ladestand **{soc_entity}**, Ladegrenze **{limit_entity}**.\n\nMit dem Ladestand stoppt Home Assistant bei einem Prozentziel, zum Beispiel 80 %, und die Abfahrtsplanung berechnet damit die nötige Ladezeit. Die Ladegrenze im Auto lässt sich zusätzlich als Obergrenze verwenden. Den gewünschten Prozentwert stellst du anschließend auf der Geräteseite der Wallbox ein.\n\nUm nur das aktuelle Prozentziel aufzuheben, stelle Fahrzeug-Ladeziel auf 0. Ladestand nicht mehr verwenden entfernt hier die Quellenzuordnung dieses Profils einschließlich des optionalen Maximums und deaktiviert seine Abfahrtsplanung; beim ausgewählten Auto werden außerdem Prozentziel und geplante Fahrt gelöscht. Die Quellentitäten der Fahrzeugintegration bleiben erhalten, ebenso Fahrzeugberechtigung, kWh-Ziel und Ladezustand.",
         "menu_options": {
           "vehicle_soc": "Ladestand einrichten",
           "vehicle_source": "Ladestand einrichten",
           "vehicle_disable": "Ladestand nicht mehr verwenden",
-          "vehicle_profile": "Zurück zum Profil"
+          "vehicle_profile": "Zurück zum Profil",
+          "wizard_next": "Weiter",
+          "wizard_finish": "Speichern und beenden"
         }
       }
     },

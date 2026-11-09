@@ -36,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 # An armed departure plan owns the current. The grant waits until the plan has
 # applied its decision, so a release never starts a charge it must then stop.
 _PLAN_DECIDING = frozenset({"waiting_for_device", "queued", "write_pending"})
-_PLAN_CHARGING = frozenset({"paced", "early_at_minimum", "unreachable", "late"})
+_PLAN_CHARGING = frozenset({"charging", "finishing", "unreachable", "late"})
 _PLAN_PAUSED = "paused_until_start"
 
 
@@ -172,6 +172,15 @@ class PlugChargeObserver:
             self._session = session
             self._retry_at = 0.0
         self._unplugged = session is None
+        if gate.get("manual") is True and (
+            self._coordinator.current_data().values.get("charging_release") == 1
+            or self._control.pending_action == "enable_charging"
+        ):
+            # Released by hand for this or the next connection, any car. A
+            # manual release whose command was replaced never opened the
+            # gate; the car's own grant then still applies.
+            self._set_status("manual_release")
+            return None
         if not isinstance(session, str):
             self._set_status("waiting_vehicle")
             return None
@@ -189,8 +198,12 @@ class PlugChargeObserver:
             # Another car, or none, is selected manually.
             self._set_status("vehicle_not_selected")
             return None
-        if self._entry.runtime_data.vehicle_profile_id != profile.id:
-            # The car's target and departure plan are still being started.
+        binding = getattr(self._entry.runtime_data, "vehicle_binding", None)
+        if self._entry.runtime_data.vehicle_profile_id != profile.id or (
+            binding is not None and binding.resting
+        ):
+            # The car's target and departure plan are still being started,
+            # or wait for the car to confirm this plug-in.
             # Grant nothing before they apply; the switch ends with an update.
             self._set_status("waiting_detection")
             return None
