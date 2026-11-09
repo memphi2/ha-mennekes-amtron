@@ -180,6 +180,34 @@ in connection observation prevents this association. With Virtual Plug & Charge
 enabled, charging release waits for recognition. Saved loss results and averages
 remain separate for each car.
 
+### The car's rules apply only to that car
+
+**From 0.8.0b7.** A profile with detection signals stays selected, manually or
+automatically, while the car is away: you can set its charge target and
+departure in advance. Its rules, i.e. the **Vehicle charge target**, the
+departure plan and the learned phases, apply only after the car confirms the
+plug-in. The car confirms it by reporting itself **plugged in at home after the
+wallbox was last seen empty**. Until then:
+
+- The departure plan shows **Car not confirmed**. A pause the plan set earlier
+  ends, so another car is not held until a late start.
+- The percentage target is not reached from this car's charge level. A target
+  already reached is set again without a charge level, and the stop pause it
+  caused ends.
+- Virtual Plug & Charge grants nothing.
+
+Nothing is deselected, neither at plug-in nor at unplug. A car that confirms a
+few minutes after plug-in gets its rules then; without Virtual Plug & Charge
+and with the charging release on, it charges without its plan until that
+moment. A car that keeps reporting itself plugged in at home ten minutes after
+the wallbox became empty has a stale plug signal; the log warns once.
+
+The confirmation survives an HA restart. A car swapped while HA is not running
+is not noticed. A car that only reports changes may not report again after a
+quick unplug and replug; its rules then rest until its next report. Your car
+charging at a second wallbox at home while another car is plugged in here
+cannot be told apart from your car being plugged in here.
+
 ## Optional Virtual Plug & Charge
 
 **New in beta 0.8.0b1 and off by default.** Virtual Plug & Charge keeps charging disabled
@@ -262,9 +290,16 @@ From **0.8.0b3**, turn on **Switch off charging release when unplugged** under
 Home Assistant switches the release off, and you switch it on for the next
 charge. This runs in Home Assistant, so it is not enforced while HA is down.
 
-If you previously switched **Charging release** off, switch it on when you want
-to allow charging again. With virtual Plug & Charge enabled this records your
-request; it still waits for the recognized vehicle and cannot bypass recognition.
+**From 0.8.0b7**, switching **Charging release** on while Virtual Plug & Charge
+is enabled releases charging by hand, for any car, for the current connection.
+Without a car plugged in, it releases the next plug-in. The Virtual Plug &
+Charge status shows **Released by hand**. The next unplug ends this release and
+Virtual Plug & Charge decides again; switching **Charging release** off ends it
+earlier. This is how a guest charges without switching the feature off. The
+guest car gets none of the selected car's rules, see
+[the car's rules apply only to that car](#the-cars-rules-apply-only-to-that-car).
+The release survives an HA or app restart. Before 0.8.0b7, switching the release
+on only recorded the request and charging still waited for a recognized car.
 
 Cable and home signals provide a convenience check, not cryptographic vehicle
 identification or ISO 15118 Plug & Charge. Restored upstream values and a vehicle

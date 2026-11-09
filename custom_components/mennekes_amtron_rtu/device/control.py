@@ -193,7 +193,7 @@ class AmtronControl:
 
     @property
     def plug_charge(self) -> dict[str, object]:
-        return self._plug_charge.state.snapshot()
+        return {**self._plug_charge.state.snapshot(), "manual": self._plug_charge.state.manual}
 
     def observe_plug_charge(self, data: WallboxData | None, *, observed_at: datetime | None = None) -> None:
         self._plug_charge.observe(data, observed_at=observed_at)
@@ -573,22 +573,21 @@ class AmtronControl:
 
         self._require_write_access()
         async with self._current_lock:
-            if released and self._plug_charge.state.enabled and not self._plug_charge.state.authorized:
-                # An explicit request may clear a previous manual refusal, but
-                # only the vehicle observer can grant this physical session.
-                if self.energy_goal_stop_requested:
+            gate = self._plug_charge.state
+            manual = gate.manual
+            if gate.enabled:
+                if released and self.energy_goal_stop_requested:
                     raise validation_error("energy_goal_stop_active")
-                self._write_state.command_intent_generation += 1
-                if self.goal_controller is not None:
-                    await self.goal_controller.async_cancel_recovery_locked()
-                self.charging_release_requested = True
-                self._clear_pending(outcome="replaced", reason="replaced")
-                await self._plug_charge.async_sync_locked()
-                await self._async_publish_pending()
-                return
-            await self._async_submit_locked(_PendingCommand(
-                "enable_charging" if released else "disable_charging", int(released),
-            ))
+                # With Plug & Charge, a manual release opens the gate for the
+                # current or the next connection, for any car.
+                self._plug_charge.set_manual(released)
+            try:
+                await self._async_submit_locked(_PendingCommand(
+                    "enable_charging" if released else "disable_charging", int(released),
+                ))
+            except BaseException:
+                gate.manual = manual
+                raise
 
     async def async_set_lock_evse(self, locked: bool) -> None:
         """Lock or unlock the wallbox through 0x0D06."""

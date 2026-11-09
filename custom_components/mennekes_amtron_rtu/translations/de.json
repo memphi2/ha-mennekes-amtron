@@ -600,6 +600,7 @@
           "waiting_for_capacity": "Wartet auf Akkukapazität",
           "waiting_for_soc": "Wartet auf Fahrzeugladestand",
           "waiting_for_device": "Wartet auf Wallbox",
+          "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
           "read_only": "Nur lesen",
           "queued": "Änderung vorgemerkt",
           "paused_until_start": "Pausiert bis zum Start",
@@ -623,6 +624,7 @@
           "vehicle_not_selected": "Erkanntes Fahrzeug nicht ausgewählt",
           "waiting_release": "Wartet auf Ladefreigabe",
           "authorized": "Fahrzeug freigegeben",
+          "manual_release": "Von Hand freigegeben",
           "blocked": "Laden gesperrt",
           "disabled": "Deaktiviert"
         },

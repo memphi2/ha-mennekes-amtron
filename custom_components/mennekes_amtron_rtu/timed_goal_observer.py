@@ -129,6 +129,8 @@ class TimedGoalObserver:
         self._command_current: float | None = None
         # The selected car's phases from its last charge, if it had one.
         self._known_phases: int | None = None
+        # This plan paused the wallbox until its late start.
+        self._plan_paused = False
 
     async def async_start(self) -> None:
         # The service may retain a queued command after an unreachable unload
@@ -158,6 +160,8 @@ class TimedGoalObserver:
             self._hass, self._timer, timedelta(minutes=1),
         ))
         self._unsubs.append(self._runtime.coordinator.async_add_listener(self.request_evaluate))
+        if (binding := getattr(self._runtime, "vehicle_binding", None)) is not None:
+            self._unsubs.append(binding.subscribe(self.request_evaluate))
         self.request_evaluate()
 
     async def async_stop(self) -> None:
@@ -433,6 +437,10 @@ class TimedGoalObserver:
         if deadline <= dt_util.utcnow():
             await self._finish(trip.finished or "late", trip, clear_deadline=True)
             return
+        binding = getattr(self._runtime, "vehicle_binding", None)
+        if binding is not None and binding.resting:
+            await self._rest()
+            return
         control = self._runtime.control
         goal = control.soc_goal
         if trip.finished == "reached":
@@ -556,6 +564,7 @@ class TimedGoalObserver:
         self._last_write_at = now
         self._command_submitted = True
         self._command_current = current
+        self._plan_paused = current is None
         await self._runtime.control.async_set_timed_current(
             current, deadline=deadline, owner=self._command_owner,
         )
@@ -565,6 +574,16 @@ class TimedGoalObserver:
         if self._command_submitted:
             await self._runtime.control.async_cancel_timed_current(self._command_owner)
             self._command_submitted = False
+
+    async def _rest(self) -> None:
+        """Another car may be plugged in: withdraw this car's plan, pause included."""
+        await self._cancel_command()
+        control = self._runtime.control
+        if self._plan_paused and control.pause_requested is True and not control.read_only:
+            await control.async_resume_charging()
+            _LOGGER.info("Departure plan pause ended: the car at the wallbox is not confirmed")
+        self._plan_paused = False
+        self._set_status("vehicle_unconfirmed")
 
     async def _wait_for_input(self, status: str) -> None:
         # Keep an already applied charge unchanged, but do not let an older

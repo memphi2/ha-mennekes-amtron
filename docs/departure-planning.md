@@ -148,6 +148,11 @@ With [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge)
 an armed plan. The release waits until the plan has paused until its start or
 set its current.
 
+From **0.8.0b7**, the plan applies only after the selected car confirms the
+plug-in. Another car shows **Car not confirmed** and gets no plan; a pause the
+plan set earlier ends. See
+[the car's rules apply only to that car](vehicle-setup.md#the-cars-rules-apply-only-to-that-car).
+
 ## Climate before departure
 
 The optional [calendar and preconditioning blueprints](blueprints.md) select

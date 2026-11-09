@@ -439,6 +439,8 @@ class ModbusService:
             "control": {
                 "supports_plug_charge": True,
                 "plug_charge": self.client.write_state.plug_charge.snapshot(),
+                # A separate key: older integrations reject unknown gate fields.
+                "plug_charge_manual": self.client.write_state.plug_charge.manual,
                 "supports_energy_goal": control.supports_energy_goal if control else False,
                 "supports_soc_goal": control.supports_soc_goal if control else False,
                 "soc_transactions_supported": True,

@@ -15,7 +15,9 @@ See [Updates](#updates).
 **New in 0.8.0b7:** a single lost Modbus reply that a resend made good is
 counted as a retry instead of being logged as an error, and no longer marks the
 connection quality as degraded. Only transactions that finally fail count as
-failures.
+failures. With Virtual Plug & Charge, switching **Charging release** on
+releases the current or next connection by hand, for any car, until the next
+unplug.
 
 **Since 0.8.0b6:** a percentage target at the car's own charge limit no
 longer pauses the wallbox when reached. The car ends that charge itself, and

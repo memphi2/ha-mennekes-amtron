@@ -444,6 +444,10 @@ class RemoteClient(MennekesModbusClient):
                     or started.utcoffset() is None
                 ):
                     raise ValueError("invalid plug charge start")
+                # Services before 0.8.0b7 have no manual release.
+                manual = control.get("plug_charge_manual", False)
+                if type(manual) is not bool or (manual and not gate["enabled"]):
+                    raise ValueError("invalid plug charge release")
             section = "control.intent"
             for key in ("pause_requested", "charging_release_requested"):
                 value = control.get(key)
@@ -822,8 +826,9 @@ class RemoteControl(AmtronControl):
     @property
     def plug_charge(self) -> dict[str, Any]:
         if not self.supports_plug_charge:
-            return {"enabled": False, "policy": "", "session": None, "since": None, "authorized": False}
-        return dict(self._remote.snapshot["control"]["plug_charge"])
+            return {"enabled": False, "policy": "", "session": None, "since": None, "authorized": False, "manual": False}
+        control = self._remote.snapshot["control"]
+        return {**control["plug_charge"], "manual": control.get("plug_charge_manual", False)}
 
     @ha_command
     async def async_configure_plug_charge(self, enabled: bool, *, policy: str = "") -> None:

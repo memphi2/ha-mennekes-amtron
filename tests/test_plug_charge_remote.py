@@ -132,6 +132,9 @@ def test_gate_grant_survives_ha_reconnect_but_not_unplug_and_disable_does_not_re
     ("plug_charge.session", "a" * 31),
     ("plug_charge.authorized", True),
     ("plug_charge.since", "2026-11-08T10:00:00+00:00"),
+    # A manual release needs a valid flag and an active gate.
+    ("plug_charge_manual", 1),
+    ("plug_charge_manual", True),
     *(("plug_charge", {
         "enabled": True, "policy": POLICY, "session": "b" * 32,
         "authorized": False, "since": invalid,
@@ -173,7 +176,10 @@ def test_older_app_remains_readable_but_cannot_claim_virtual_authorization(tmp_p
                 remote.apply_snapshot(old)
                 control = remote_control(remote)
                 assert not control.supports_plug_charge
-                assert control.plug_charge == {"enabled": False, "policy": "", "session": None, "since": None, "authorized": False}
+                assert control.plug_charge == {
+                    "enabled": False, "policy": "", "session": None, "since": None,
+                    "authorized": False, "manual": False,
+                }
                 for action in (
                     control.async_configure_plug_charge(True, policy=POLICY),
                     control.async_authorize_plug_charge("a" * 32, deadline=datetime.now(UTC) + timedelta(seconds=10)),
@@ -181,6 +187,28 @@ def test_older_app_remains_readable_but_cannot_claim_virtual_authorization(tmp_p
                     with pytest.raises(ServiceValidationError) as error:
                         await action
                     assert error.value.translation_key == "plug_charge_not_supported"
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
+def test_a_manual_release_crosses_the_service_boundary(tmp_path):
+    async def run():
+        service, transport, clock = await service_fixture(tmp_path)
+        try:
+            async with TestServer(create_app(service)) as server, ClientSession() as session:
+                remote = RemoteClient(session, str(server.make_url("/")), TOKEN)
+                await remote.async_connect()
+                control = remote_control(remote)
+                await control.async_configure_plug_charge(True, policy=POLICY)
+                assert not control.plug_charge["manual"]
+                clock[0] += 301
+                await control.async_set_charging_release(True)
+                await remote.update()
+                assert control.plug_charge["manual"]
+                assert transport.bank[R.CHARGING_RELEASE.address] == 1
+                await remote.async_close()
         finally:
             await service.stop()
 

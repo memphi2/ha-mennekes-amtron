@@ -600,6 +600,7 @@
           "waiting_for_capacity": "Waiting for battery capacity",
           "waiting_for_soc": "Waiting for vehicle charge level",
           "waiting_for_device": "Waiting for wallbox",
+          "vehicle_unconfirmed": "Car not confirmed",
           "read_only": "Read only",
           "queued": "Change queued",
           "paused_until_start": "Paused until start",
@@ -623,6 +624,7 @@
           "vehicle_not_selected": "Recognized vehicle not selected",
           "waiting_release": "Waiting for charging release",
           "authorized": "Vehicle authorized",
+          "manual_release": "Released by hand",
           "blocked": "Charging blocked",
           "disabled": "Disabled"
         },

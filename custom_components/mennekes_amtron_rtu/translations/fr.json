@@ -600,6 +600,7 @@
           "waiting_for_capacity": "En attente de la capacité",
           "waiting_for_soc": "En attente du niveau de charge",
           "waiting_for_device": "En attente de la borne",
+          "vehicle_unconfirmed": "Véhicule non confirmé",
           "read_only": "Lecture seule",
           "queued": "Modification en attente",
           "paused_until_start": "En pause jusqu’au démarrage",
@@ -623,6 +624,7 @@
           "vehicle_not_selected": "Véhicule reconnu non sélectionné",
           "waiting_release": "En attente de l’autorisation de charge",
           "authorized": "Véhicule autorisé",
+          "manual_release": "Autorisé manuellement",
           "blocked": "Charge bloquée",
           "disabled": "Désactivé"
         },

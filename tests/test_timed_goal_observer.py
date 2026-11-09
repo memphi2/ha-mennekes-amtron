@@ -796,3 +796,38 @@ def test_failed_queue_reclaim_cannot_start_new_observer(monkeypatch: pytest.Monk
         await observer.async_stop()
 
     asyncio.run(run())
+
+
+def test_an_unconfirmed_car_ends_the_plans_pause_and_gets_no_plan(monkeypatch):
+    async def run():
+        observer, control, _hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        control.pause_requested = None
+        resumed = []
+
+        async def resume():
+            resumed.append(True)
+            control.pause_requested = False
+
+        control.async_resume_charging = resume
+        observer.goal.set(NOW + timedelta(hours=16))
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+        control.pause_requested = True
+        # Another car plugs in after the planned car left.
+        binding = SimpleNamespace(resting=True)
+        observer._runtime.vehicle_binding = binding
+        await observer._evaluate()
+        assert observer.status == "vehicle_unconfirmed"
+        assert observer.planned_start is None
+        assert resumed == [True]
+        # Only the plan's own pause is ended, and only once.
+        control.pause_requested = True
+        await observer._evaluate()
+        assert resumed == [True]
+        # The confirmed car gets its plan back.
+        binding.resting = False
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+
+    asyncio.run(run())

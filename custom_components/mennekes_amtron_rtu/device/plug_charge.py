@@ -45,6 +45,9 @@ class PlugChargeState:
     enabled: bool = False
     policy: str = ""
     hold: bool = False
+    # A manual release for the current or, without a car, the next plug-in.
+    # It opens the gate for any car and ends with that connection.
+    manual: bool = False
     session: str | None = None
     authorized: bool = False
     since: datetime | None = None
@@ -53,9 +56,12 @@ class PlugChargeState:
 
     @property
     def blocked(self) -> bool:
-        return self.hold or (self.enabled and not self.authorized)
+        return not self.manual and (self.hold or (self.enabled and not self.authorized))
 
     def invalidate(self) -> None:
+        if self.session is not None:
+            # The manually released connection has ended.
+            self.manual = False
         self.session = None
         self.since = None
         self.last_absent_at = None
@@ -73,6 +79,9 @@ class PlugChargeState:
         if self.authorized:
             _LOGGER.info("Plug & Charge grant withdrawn; waiting for a fresh grant")
         self.authorized = False
+        # An unknown state can hide a different car; a manual release was
+        # given for the car that was plugged in.
+        self.manual = False
         self.unknown_since = None
         self.hold |= self.enabled
 
@@ -87,6 +96,7 @@ class PlugChargeState:
         if (self.enabled, self.policy) != (enabled, policy):
             self.enabled, self.policy = enabled, policy
             self.invalidate()
+            self.manual = False
 
     def observe(self, present: bool | None, *, observed_at: datetime | None = None) -> None:
         now = observed_at or datetime.now(UTC)
@@ -119,14 +129,20 @@ class PlugChargeState:
         return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}
 
     def durable(self) -> dict[str, Any]:
-        return {"enabled": self.enabled, "policy": self.policy, "hold": self.hold}
+        return {"enabled": self.enabled, "policy": self.policy, "hold": self.hold, "manual": self.manual}
 
     @classmethod
     def restore(cls, raw: object) -> PlugChargeState:
-        if not isinstance(raw, dict) or raw.keys() != {"enabled", "policy", "hold"} or type(raw["hold"]) is not bool:
+        # States saved before 0.8.0b7 have no manual release.
+        if (
+            not isinstance(raw, dict)
+            or raw.keys() - {"manual"} != {"enabled", "policy", "hold"}
+            or type(raw["hold"]) is not bool or type(raw.get("manual", False)) is not bool
+        ):
             raise ValueError("invalid saved Plug & Charge configuration")
         result = cls(hold=raw["hold"])
         result.configure(raw["enabled"], raw["policy"])
+        result.manual = raw.get("manual", False) and result.enabled
         return result
 
 
@@ -197,11 +213,22 @@ class PlugChargeController:
     def check_release(self, *, recovery: bool = False) -> None:
         if self._authorizing is not None:
             self._check_request(*self._authorizing)
-        elif (self.state.enabled and not self.state.authorized) or (recovery and self.state.hold):
+        elif not self.state.manual and (
+            (self.state.enabled and not self.state.authorized) or (recovery and self.state.hold)
+        ):
             raise validation_error("plug_charge_blocked")
 
     def release_written(self) -> None:
         self.state.hold = False
+
+    def set_manual(self, released: bool) -> None:
+        """Release the current or next connection by hand, or withdraw that."""
+        if released and self.state.enabled and not self.state.manual:
+            _LOGGER.info(
+                "Plug & Charge: charging released by hand for %s",
+                "the next plug-in" if self.state.session is None else "this connection",
+            )
+        self.state.manual = released and self.state.enabled
 
     def _check_request(self, session: str, deadline: datetime) -> None:
         if self._stopping or not self.state.enabled:

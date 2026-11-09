@@ -130,8 +130,10 @@ from .timed_goal_const import (
     timed_goal_is_enabled,
 )
 from .timed_goal_observer import TimedGoalObserver
+from .vehicle_binding import VehicleBinding, VehicleBindingStore
 from .vehicle_detection import (
     VehicleDetectionObserver,
+    automatic_selection_available,
     prepare_vehicle_selection,
     vehicle_selection_matches,
 )
@@ -488,6 +490,10 @@ async def async_setup_entry(
             )
         await coordinator.async_config_entry_first_refresh()
         validate_vehicle_selection()
+        if automatic_selection_available(entry.options):
+            # Before the car's rules start: they rest for an unconfirmed car.
+            entry.runtime_data.vehicle_binding = VehicleBinding(hass, entry)
+            await entry.runtime_data.vehicle_binding.async_start()
         await _async_start_vehicle(hass, entry, options, timed_reset_complete, validate_vehicle_selection)
         if entry.runtime_data.soc_goal is not None:
             # The first poll must never retry a restored old vehicle's stop
@@ -640,6 +646,7 @@ async def _async_start_vehicle(
             use_vehicle_limit=options.get(CONF_VEHICLE_LIMIT_USE_PROFILE) is True,
             profile_id=options.get(CONF_VEHICLE_PROFILE_ID),
             memory=memory,
+            binding=runtime.vehicle_binding,
         )
         runtime.vehicle_soc = observer
         try:
@@ -823,6 +830,8 @@ async def _async_stop_runtime(
     """
     if runtime.vehicle_detection is not None:
         runtime.vehicle_detection.stop()
+    if runtime.vehicle_binding is not None:
+        runtime.vehicle_binding.stop()
     if runtime.loss_attribution_unsubscribe is not None:
         runtime.loss_attribution_unsubscribe()
         runtime.loss_attribution_unsubscribe = None
@@ -932,6 +941,7 @@ async def async_remove_entry(
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()
     await VehicleTripStore(hass, entry.entry_id, "").async_remove()
     await VehiclePhaseStore(hass, entry.entry_id, "").async_remove()
+    await VehicleBindingStore(hass, entry.entry_id, "").async_remove()
     await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
     await LossStore(hass, entry.entry_id, "").async_remove()
     await async_prune_profile_losses(hass, entry.entry_id, ())

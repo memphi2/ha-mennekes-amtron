@@ -10,6 +10,10 @@ Beta update through **#apps-beta**; **0.6.1 remains stable**.
   retries; transactions that finally fail and a heartbeat that misses its
   10-second deadline count as failures. HA shows both counts on **Connection
   quality**.
+- With Virtual Plug & Charge enabled, switching **Charging release** on
+  releases the current connection, or the next one without a car, by hand for
+  any car until the next unplug. The release survives an app restart.
+  Integrations before 0.8.0b7 do not show it but keep working.
 
 ## 0.8.0b6
 

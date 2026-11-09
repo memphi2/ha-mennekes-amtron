@@ -172,6 +172,10 @@ class PlugChargeObserver:
             self._session = session
             self._retry_at = 0.0
         self._unplugged = session is None
+        if gate.get("manual") is True:
+            # Released by hand for this or the next connection, any car.
+            self._set_status("manual_release")
+            return None
         if not isinstance(session, str):
             self._set_status("waiting_vehicle")
             return None
@@ -189,8 +193,12 @@ class PlugChargeObserver:
             # Another car, or none, is selected manually.
             self._set_status("vehicle_not_selected")
             return None
-        if self._entry.runtime_data.vehicle_profile_id != profile.id:
-            # The car's target and departure plan are still being started.
+        binding = getattr(self._entry.runtime_data, "vehicle_binding", None)
+        if self._entry.runtime_data.vehicle_profile_id != profile.id or (
+            binding is not None and binding.resting
+        ):
+            # The car's target and departure plan are still being started,
+            # or wait for the car to confirm this plug-in.
             # Grant nothing before they apply; the switch ends with an update.
             self._set_status("waiting_detection")
             return None

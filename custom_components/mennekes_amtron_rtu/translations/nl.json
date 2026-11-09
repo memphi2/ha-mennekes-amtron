@@ -600,6 +600,7 @@
           "waiting_for_capacity": "Wacht op accucapaciteit",
           "waiting_for_soc": "Wacht op laadniveau",
           "waiting_for_device": "Wacht op laadpaal",
+          "vehicle_unconfirmed": "Voertuig niet bevestigd",
           "read_only": "Alleen lezen",
           "queued": "Wijziging in wachtrij",
           "paused_until_start": "Gepauzeerd tot start",
@@ -623,6 +624,7 @@
           "vehicle_not_selected": "Herkend voertuig niet geselecteerd",
           "waiting_release": "Wacht op laadtoestemming",
           "authorized": "Voertuig toegestaan",
+          "manual_release": "Handmatig vrijgegeven",
           "blocked": "Laden geblokkeerd",
           "disabled": "Uitgeschakeld"
         },

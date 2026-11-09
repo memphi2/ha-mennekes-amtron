@@ -201,6 +201,7 @@
         "default": "mdi:ev-station",
         "state": {
           "paused_until_start": "mdi:timer-pause-outline",
+          "vehicle_unconfirmed": "mdi:help-circle-outline",
           "charging": "mdi:lightning-bolt",
           "reached": "mdi:battery-check-outline",
           "unreachable": "mdi:timer-alert-outline",
@@ -216,6 +217,7 @@
           "vehicle_not_selected": "mdi:lock-outline",
           "waiting_release": "mdi:timer-sand",
           "authorized": "mdi:check-circle-outline",
+          "manual_release": "mdi:hand-back-right-outline",
           "blocked": "mdi:lock-outline",
           "disabled": "mdi:power-plug-off"
         }

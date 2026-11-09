@@ -333,6 +333,10 @@ def test_observer_lifecycle_and_write_failure_status(monkeypatch: pytest.MonkeyP
         monkeypatch.setattr(observer_module, "async_track_time_interval",
                             lambda *_args: lambda: unsubs.append("time"))
         observer.request_evaluate = observer_module.TimedGoalObserver.request_evaluate.__get__(observer)
+        # The binding re-evaluates the plan when a car confirms or rests.
+        observer._runtime.vehicle_binding = SimpleNamespace(
+            resting=False, subscribe=lambda _listener: lambda: unsubs.append("binding"),
+        )
         await observer.async_start()
         await observer._task
         assert observer.status == "disabled"

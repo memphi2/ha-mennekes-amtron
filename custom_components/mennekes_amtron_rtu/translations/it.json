@@ -600,6 +600,7 @@
           "waiting_for_capacity": "In attesa capacità",
           "waiting_for_soc": "In attesa livello di carica",
           "waiting_for_device": "In attesa wallbox",
+          "vehicle_unconfirmed": "Veicolo non confermato",
           "read_only": "Sola lettura",
           "queued": "Modifica in coda",
           "paused_until_start": "In pausa fino all’avvio",
@@ -623,6 +624,7 @@
           "vehicle_not_selected": "Veicolo riconosciuto non selezionato",
           "waiting_release": "In attesa del consenso alla ricarica",
           "authorized": "Veicolo autorizzato",
+          "manual_release": "Abilitato manualmente",
           "blocked": "Ricarica bloccata",
           "disabled": "Disattivato"
         },

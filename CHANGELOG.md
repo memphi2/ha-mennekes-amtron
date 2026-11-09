@@ -48,6 +48,21 @@ mode, update the app to **0.8.0b7** first.
   finally failed, now including a heartbeat that missed its 10-second deadline.
   pymodbus no longer logs each lost reply as an error with a frame dump; it
   remains visible in debug logging. Service mode needs app **0.8.0b7**.
+- **A car's rules apply only to that car.** A profile with detection signals
+  stays selected while the car is away, but its charge target, departure plan
+  and learned phases apply only once the car reports itself plugged in at home
+  after the wallbox was last seen empty. Another car plugged in meanwhile gets
+  none of them: the plan shows the new state **Car not confirmed** and ends a
+  pause it set, and a reached target is released together with its stop pause.
+  Nothing is deselected. Virtual Plug & Charge also waits for this
+  confirmation. The log warns when a car still reports itself plugged in at
+  home ten minutes after unplugging.
+- **Charging release by hand with Virtual Plug & Charge.** Switching
+  **Charging release** on now releases the current connection for any car, or
+  the next one without a car plugged in, until the next unplug. The status
+  shows the new state **Released by hand**. Guests can charge without switching
+  Virtual Plug & Charge off. Previously the switch only recorded the request.
+  Service mode needs app **0.8.0b7**.
 
 ## 0.8.0b6 — 2026-11-09
 
