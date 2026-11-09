@@ -112,8 +112,6 @@ starts and ends. The integration observes that restriction; it cannot remove it.
 
 ## React to command results
 
-This event entity is available in **stable 0.6.1** and was introduced in beta 0.6.0b1.
-
 Enable **Control result** under **Settings → Devices & services → Entities**
 first; it starts disabled to avoid history growth from frequent current commands.
 You can [exclude it from Recorder](recorder.md#recorder-defaults)

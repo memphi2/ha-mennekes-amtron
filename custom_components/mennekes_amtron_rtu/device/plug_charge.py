@@ -130,7 +130,7 @@ class PlugChargeState:
 
     def durable(self) -> dict[str, Any]:
         result = {"enabled": self.enabled, "policy": self.policy, "hold": self.hold}
-        # Only a pending release is written: services before 0.8.0b7 refuse
+        # Only a pending release is written: older services refuse
         # the whole saved state when they find the key.
         if self.manual:
             result["manual"] = True
@@ -138,7 +138,7 @@ class PlugChargeState:
 
     @classmethod
     def restore(cls, raw: object) -> PlugChargeState:
-        # States saved before 0.8.0b7 have no manual release.
+        # Older saved states have no manual release.
         if (
             not isinstance(raw, dict)
             or raw.keys() - {"manual"} != {"enabled", "policy", "hold"}

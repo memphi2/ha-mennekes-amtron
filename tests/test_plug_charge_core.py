@@ -186,7 +186,7 @@ def test_a_manual_release_survives_a_restart_and_ends_with_the_gate():
     restored = PlugChargeState.restore(state.durable())
     assert restored.manual
     assert not restored.blocked
-    # States saved before 0.8.0b7 have no manual release.
+    # Older saved states have no manual release.
     legacy = {key: value for key, value in state.durable().items() if key != "manual"}
     assert not PlugChargeState.restore(legacy).manual
     with pytest.raises(ValueError, match="saved"):

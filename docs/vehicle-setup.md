@@ -8,13 +8,10 @@ automatic charging permission. Existing Home Assistant entities work with any
 suitable vehicle integration; BavarianData
 can also supply supported data from one selected BMW vehicle.
 
-**Availability:** manual vehicle entities and percentage targets are available in
-stable 0.6.1. Central vehicle profiles, optional automatic selection and
-Virtual Plug & Charge are new in **beta 0.8.0b1**. The new menu layout is shown
-below; existing manual sources continue to work after updating.
-The steps below follow **beta 0.8.0b7**, which keeps every setting of a car in
-its profile: open **Configure → Vehicles**, then the profile. Existing activation
-settings are kept.
+**Availability:** vehicle profiles, automatic selection and Virtual Plug &
+Charge are available from **0.8.0**. Every setting of a car is in its profile:
+open **Configure → Vehicles**, then the profile. Existing manual sources
+continue to work after updating.
 See [versions and feature availability](README.md#versions-and-feature-availability).
 
 ## Choose the setup that fits
@@ -56,7 +53,7 @@ Assistant's entity registry, so renamed entities do not require guessed entity
 names. Each optional feature uses the same selected car. No BMW credentials or
 additional cloud requests are needed.
 
-From **0.8.0b2**, BavarianData appears in this choice only
+BavarianData appears in this choice only
 when Home Assistant has a supported vehicle device from that integration.
 Manual entity sources remain available for other cars. If a saved integration
 is temporarily absent, you can still rename its existing profile without losing
@@ -81,7 +78,7 @@ Check the selected profile **before charging**, whether you chose it manually or
 enabled automatic selection. Changing the active profile does not start
 charging. Each car keeps its own upcoming departure: switching away remembers
 it, and returning to the car restores it if it still lies ahead. A car without
-a saved departure, or no vehicle at all, starts without one. From **0.8.0b4**, each profile
+a saved departure, or no vehicle at all, starts without one. Each profile
 keeps its own percentage target: returning to a car restores its last target,
 capped at its current limit, instead of no target. With no vehicle selected, no
 percentage target applies. Charging-loss averages are kept separately for
@@ -95,7 +92,7 @@ to it.
 ### Everything for one car in its profile
 
 **Configure → Vehicles → Open a profile’s settings** covers everything that
-belongs to that car. From **0.8.0b7**, adding or opening a profile guides you
+belongs to that car. Adding or opening a profile guides you
 through these areas one after another instead of a menu for each. Each area
 explains what it is for and is optional: **Next** skips it, and an area you set
 up moves on to the next one. Nothing is saved before **Save and finish** or the
@@ -137,9 +134,8 @@ profile. Open **Configure → Vehicles → Open a profile’s settings**, choose
 **Next** up to **Detection signals** and choose:
 
 - **Use the vehicle integration**: BavarianData supplies the vehicle's cable
-  sensor and GPS tracker. The cable sensor is the plug boolean or, from
-  **0.8.0b8**, for cars such as an i4 or i5 that do not stream it,
-  **Charging port status**. Its position is compared with Home Assistant's Home
+  sensor and GPS tracker. The cable sensor is the plug boolean or, for
+  cars such as an i4 or i5 that do not stream it, **Charging port status**. Its position is compared with Home Assistant's Home
   zone. Existing enabled entities are used; no extra cloud requests or vehicle
   commands are sent.
 - **Select Home Assistant entities**: choose two separate signals for this car.
@@ -155,14 +151,14 @@ profile. Open **Configure → Vehicles → Open a profile’s settings**, choose
 
 After configuring the participating profiles, choose **Automatic selection**
 in the **Active vehicle** selector on the wallbox device page. It is offered once
-at least one profile has detection signals. From **0.8.0b6**, this is the only
-place to switch automatic selection on. Open the selector’s details
+at least one profile has detection signals. This is the only place to switch
+automatic selection on. Open the selector’s details
 to see the currently selected profile. Selecting a particular car or no vehicle
 manually turns the automatic mode off.
 
 The integration selects a car only when exactly one configured profile reports
 both **cable connected** and **at home**. A positive change must remain stable
-for three seconds. From **0.8.0b4**, the selected car stays selected after it is
+for three seconds. The selected car stays selected after it is
 unplugged or while its reports are stale or unknown. The selection ends when another
 configured car reports itself connected and at home, or when the wallbox sees a
 car while the selected one reports itself disconnected or away; no percentage
@@ -170,13 +166,13 @@ target then applies to the unknown car. A valid disconnected or away signal excl
 if its other signal is missing. For the remaining candidates, unknown or
 unavailable signals block selection, as do signals not reported to Home Assistant
 within 30 minutes.
-No matching car or several matching cars means **no active vehicle**. Previous
-car-specific targets and the departure plan are cleared when the assignment
-changes; detection alone never starts charging or lifts a pause. If the result is
+No matching car or several matching cars means **no active vehicle**. The
+previous car's target and departure plan stop applying when the assignment
+changes; each car keeps them for its return. Detection alone never starts charging or lifts a pause. If the result is
 unclear, choose the correct profile manually.
 
-From **0.8.0b4**, changing the vehicle, manually or automatically, no longer
-reloads the integration: the wallbox entities stay available throughout.
+Changing the vehicle, manually or automatically, does not reload the
+integration: the wallbox entities stay available throughout.
 Vehicle entities, such as the vehicle charge target, the departure time and the
 charging-loss sensors, exist as soon as any profile uses the feature. They are
 unavailable while the selected car, or no car, does not use it.
@@ -200,7 +196,7 @@ remain separate for each car.
 
 ### The car's rules apply only to that car
 
-**From 0.8.0b7.** A profile with detection signals stays selected, manually or
+A profile with detection signals stays selected, manually or
 automatically, while the car is away: you can set its charge target and
 departure in advance. Its rules, i.e. the **Vehicle charge target**, the
 departure plan and the learned phases, apply only after the car confirms the
@@ -238,7 +234,7 @@ cannot be told apart from your car being plugged in here.
 
 ## Optional Virtual Plug & Charge
 
-**New in beta 0.8.0b1 and off by default.** Virtual Plug & Charge keeps charging disabled
+**Off by default.** Virtual Plug & Charge keeps charging disabled
 until the active vehicle is recognized by its detection signals.
 It uses your existing vehicle data; it does not send a vehicle-cloud request.
 Automatic profile selection is a separate option: you can choose the profile
@@ -246,19 +242,16 @@ manually, but that choice alone never proves which car is connected.
 
 1. Create a profile and configure its [cable and home signals](#optional-automatic-vehicle-selection).
    You can leave automatic profile selection off.
-   Every profile with detection signals takes part; from **0.8.0b6** there is
-   no separate permission per profile.
+   Every profile with detection signals takes part.
 2. Open the wallbox's device page and turn on **Virtual Plug & Charge** under
    **Configuration**. This switch controls the feature for the whole wallbox.
    The feature requires
-   write access. Service mode needs **app 0.8.0b1 or newer** for the
-   charging-permission capability; use **0.8.0b7** for the current beta app.
+   write access. Service mode needs **app 0.8.0**.
 3. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 
 You can still switch the feature off on the wallbox
-device page without a selected vehicle. The switch preserves an existing
-activation setting when updating; it does not enable the feature by itself.
+device page without a selected vehicle.
 
 The wallbox must expose CP state and its local authorization setting (Modbus
 register layout 01.02 or newer). For automatic charging without presenting an RFID card, local RFID
@@ -275,10 +268,10 @@ provides the cable measurement's timestamp, that timestamp is used; otherwise
 only the HA report time is available. The next normal vehicle update may be
 needed before permission is granted.
 
-The grant belongs to that observed connection. From **0.8.0b3**, a manual pause
+The grant belongs to that observed connection. A manual pause
 ends when a recognized vehicle is granted: plugging it in means it should charge.
 The pause is lifted while the charging release is still off, so the release
-follows immediately without the state-change interval. From **0.8.0b4**, only a
+follows immediately without the state-change interval. Only a
 plug-in that HA observed after the car was unplugged counts: after an HA or app
 restart, update or reconnect with the car still connected, the grant returns
 without lifting the pause or replacing the percentage target.
@@ -296,12 +289,11 @@ current**. Once granted, a later missing or stale vehicle
 report does not interrupt that connection. In service mode, its existing grant
 also survives an HA Core restart because the app continues observing the wallbox.
 A confirmed disconnect (control pilot A with an idle wallbox) or an app restart
-requires a fresh grant. From **0.8.0b6**, a briefly unreadable or contradictory
+requires a fresh grant. A briefly unreadable or contradictory
 wallbox state is not treated as unplugging: the grant stays. Only when the
 state remains unknown for 60 seconds is the release switched off; HA then
 grants the same connection again as soon as the car is reported connected,
-without replugging and without lifting a pause. Earlier betas switched the
-release off at once and only a new plug-in brought it back. Direct mode loses
+without replugging and without lifting a pause. Direct mode loses
 its grant on a full HA restart or when its physical connection closes. Automatic profile changes preserve the open connection.
 Choosing another profile alone also leaves an existing grant with that same
 physical connection. Changing a vehicle's identity or detection sources invalidates the grant; the
@@ -313,12 +305,12 @@ explicitly afterwards, and leave a wanted pause or lock in place. Check new
 detection sources before relying on them.
 
 Without Virtual Plug & Charge, an open charging release lets any car charge.
-From **0.8.0b3**, turn on **Switch off charging release when unplugged** under
+Turn on **Switch off charging release when unplugged** under
 **Configuration** on the wallbox device page: after each confirmed disconnect,
 Home Assistant switches the release off, and you switch it on for the next
 charge. This runs in Home Assistant, so it is not enforced while HA is down.
 
-**From 0.8.0b7**, switching **Charging release** on while Virtual Plug & Charge
+Switching **Charging release** on while Virtual Plug & Charge
 is enabled releases charging by hand, for any car, for the current connection.
 Without a car plugged in, it releases the next plug-in. The Virtual Plug &
 Charge status shows **Released by hand**. The next unplug ends this release and
@@ -326,8 +318,7 @@ Virtual Plug & Charge decides again; switching **Charging release** off ends it
 earlier. This is how a guest charges without switching the feature off. The
 guest car gets none of the selected car's rules, see
 [the car's rules apply only to that car](#the-cars-rules-apply-only-to-that-car).
-The release survives an HA or app restart. Before 0.8.0b7, switching the release
-on only recorded the request and charging still waited for a recognized car.
+The release survives an HA or app restart.
 
 Cable and home signals provide a convenience check, not cryptographic vehicle
 identification or ISO 15118 Plug & Charge. Restored upstream values and a vehicle
@@ -360,7 +351,7 @@ profile's reported charge limit or select a **Vehicle charge limit entity**.
 Only the chosen source's settings appear. Without a charge-limit source,
 you can choose a target up to **100%**. With it, the reported car limit becomes
 the maximum you can select. A falling car limit also lowers an existing target.
-From **0.8.0b3**, a target at the car's limit (the slider at its maximum) follows
+A target at the car's limit (the slider at its maximum) follows
 every later change of that limit, up or down; a lower target never rises. A
 target lowered to a falling limit is at the limit and follows it from then on.
 A raised limit can end a reached target, but it never resumes the stop pause:
@@ -370,9 +361,9 @@ reading, setting a positive target is refused rather than assuming 100%.
 
 For example, with a reported charge level of 45%, set a target of **80%**
 below the car's own limit. Charging pauses when the vehicle reports at least
-80%. From **0.8.0b6**, a target at the car's own limit is only shown as reached:
+80%. A target at the car's own limit is only shown as reached:
 the car ends that charge itself, like at any other charger, and nothing is
-paused or switched off until you unplug (app **0.8.0b6** for service mode). Setting a target never
+paused or switched off until you unplug. Setting a target never
 starts charging or lifts a pause; **0%** switches this target off without
 resuming. A reached target stays reached even if the reported charge level later
 falls. Setting a new positive target establishes a new limit. With

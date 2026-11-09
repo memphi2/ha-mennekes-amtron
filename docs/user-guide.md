@@ -15,7 +15,7 @@ targets and schedules only when you want them:
 - [Losses and costs](charging-estimates.md)
 
 Vehicle profiles, optional automatic selection, Virtual Plug & Charge and app
-live debugging are available in **beta 0.8.0b8**. **0.6.1 remains stable**; see
+live debugging are available from **0.8.0**; see
 [version availability](README.md#versions-and-feature-availability).
 
 ## Optional charging losses and costs
@@ -326,17 +326,16 @@ state. Set the intended goal with that owner before continuing the charge.
 
 ## Vehicle profiles
 
-**New in beta 0.8.0b1.** Keep each car's sources, optional features and
+Keep each car's sources, optional features, percentage target, departure and
 loss averages together. Select the connected car manually, or opt into the
-separate automatic-selection feature. A profile does not enable charging
-features by itself. Switching cars clears the former percentage target and trip
-without starting a charge.
+separate automatic-selection feature. Switching cars restores the other car's
+target and upcoming departure without starting a charge.
 
 [Set up one car or several profiles](vehicle-setup.md#vehicle-profiles).
 
 ### Optional automatic vehicle selection
 
-**New in beta 0.8.0b1 and off by default.** Use the selected vehicle integration or
+**Off by default.** Use the selected vehicle integration or
 explicit cable/home entities. Exactly one sufficiently clear candidate can be
 selected; uncertain matches leave no active vehicle. Choosing a car manually
 turns the automatic mode off. These signals are a selection aid, not vehicle
@@ -346,8 +345,7 @@ identity supplied by the wallbox.
 
 ### Optional Virtual Plug & Charge
 
-**New in beta 0.8.0b1 and off by default.** Every profile with detection signals
-takes part; from **0.8.0b6** there is no separate permission per profile. From **0.8.0b2**, enable the
+**Off by default.** Every profile with detection signals takes part. Enable the
 feature using **Virtual Plug & Charge** under **Configuration** on the wallbox
 device page. Existing activation settings are preserved. It needs an unambiguous
 cable/home match for the active car and a fresh cable report for the current

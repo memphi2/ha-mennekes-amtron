@@ -301,9 +301,8 @@ the same open client when connection settings match; normal unload, failed
 setup and a changed connection close it. Transport disconnect callbacks still
 invalidate the token immediately.
 The policy digest includes vehicle identities and detection sources, but not
-the active-profile label. Changing those sources invalidates grants. From
-0.8.0b6, profiles have no separate permission; the wallbox switch is the only
-one. A manual selection change or an automatic selection
+the active-profile label. Changing those sources invalidates grants. Profiles
+have no separate permission; the wallbox switch is the only one. A manual selection change or an automatic selection
 cleared by stale cloud data leaves an established physical-session grant intact.
 The vehicle decision is taken when HA sends the request. A submitted request
 expires after ten seconds and is checked again against the physical token at

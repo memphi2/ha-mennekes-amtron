@@ -29,10 +29,9 @@ For installation, downloads and updates, see [Installation and updates](installa
 ## A documented feature is missing
 
 Check [versions and feature availability](README.md#versions-and-feature-availability).
-Central vehicle profiles, optional automatic selection and Virtual Plug & Charge
-are new in **integration beta 0.8.0b1**. In service mode, Virtual Plug & Charge
-also needs **app 0.8.0b1 or newer**. App **0.8.0b2** gives live debugging its own tab.
-Older betas do not include them. Do not delete and recreate the wallbox to reveal
+Vehicle profiles, automatic selection and Virtual Plug & Charge are new in
+**0.8.0**. In service mode, Virtual Plug & Charge and the app's **Debug log**
+tab also need **app 0.8.0**. Do not delete and recreate the wallbox to reveal
 a new feature.
 
 For a released optional feature, enable it in its own configuration section.
@@ -52,8 +51,7 @@ app. HA itself needs no restart for this switch. The app's switch is the only
 write-permission setting. After a fresh, healthy
 service status reaches HA, controls become available automatically. They keep
 their entity IDs while read-only, disconnected or not ready; no second HA switch
-is required. If you are upgrading from an old beta where they were missing,
-follow [the beta upgrade steps](installation.md#updates). A routine integration
+is required. A routine integration
 update does not require updating or restarting a compatible app.
 
 If just one feature is missing, check the [entity reference](entities.md):
@@ -99,13 +97,13 @@ itself, or configure those fields in the app when the service owns it.
 | **Token invalid / authentication failed** | During setup, confirm discovery again or check the standalone token. For an existing entry, follow [Renew service access](#renew-service-access). Do not post tokens in an issue. |
 | **Not ready** | Authentication succeeded, but usable wallbox data is not available yet. Check the app log for USB/LAN connection and initialization, then retry. Changing the token will not fix this. |
 | **No serial number yet** | The app has not read the serial number needed to match the wallbox. Check the wallbox connection and supported register layout. |
-| **Service API or minimum-version requirements are not met** | Integration 0.6.1 needs **service 0.6.1 or newer with API 2** for service-side expiry of queued timed commands, even if timed planning is unused. Check the requirements in its release notes. Different version numbers alone are fine. If both need updating, update the app/service first, then the integration and restart Core. Keep existing data and entries; changing the token will not fix this. |
+| **Service API or minimum-version requirements are not met** | The integration needs **service 0.6.1 or newer with API 2** for service-side expiry of queued timed commands, even if timed planning is unused. Check the requirements in its release notes. Different version numbers alone are fine. If both need updating, update the app/service first, then the integration and restart Core. Keep existing data and entries; changing the token will not fix this. |
 | **App responds, but its data was not accepted** / `invalid service snapshot` | Copy the field named in parentheses in the HA log, such as `identity.max_evse_current`, and download diagnostics before restarting the app. Include both component versions. This is a data-validation error; differing release numbers or a bad token are not implied. |
 | **Different wallbox / identity cannot be confirmed** | Check the Modbus address, gateway route and service configuration; see [wallbox identity](#a-different-wallbox-is-reported). |
 | App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
 | Older app **0.5.2b2** rejects LAN settings because an old USB device no longer exists | Update to **0.6.1**, which includes the fix for this validation conflict. Before updating, clear the saved **Serial adapter** selection in the native Configuration tab, then save LAN settings and restart. LAN needs no local USB device. |
 | **Connection setup required** | Open the app's **Web UI**, choose USB or LAN, save and restart. Until then, the app runs only setup and health checks, without Modbus, heartbeat or discovery. |
-| Web UI requests Supervisor 2026.11.0 while Supervisor is 2026.10.x | Update the beta app to **0.8.0b2**, which supports **Supervisor 2026.10.4+**. Older apps through 0.7.0b4 had an overly strict version check. See [connection setup](upgrading.md#app-connection-page); the integration's HA minimum version is unchanged. |
+| Web UI requests Supervisor 2026.11.0 while Supervisor is 2026.10.x | Update the app to **0.8.0**, which supports **Supervisor 2026.10.4+**. Older apps had an overly strict version check. See [connection setup](upgrading.md#app-connection-page); the integration's HA minimum version is unchanged. |
 
 An app that starts successfully can still be waiting for the wallbox. The log
 separates API startup, USB/LAN connection, heartbeat start/stop and shutdown.
@@ -326,7 +324,7 @@ and that extra wait.
 
 ## Vehicle profiles and automatic selection
 
-These optional functions are new in **beta 0.8.0b1**. Check the installed
+These optional functions are new in **0.8.0**. Check the installed
 integration version, then review the following before changing wallbox settings:
 
 | Symptom | What to do |
@@ -346,8 +344,8 @@ complete signal and freshness rules.
 
 ## Virtual Plug & Charge is waiting
 
-This optional feature is new in **beta 0.8.0b1** and off by default. In service
-mode it also requires the new app. Check its status on the wallbox device.
+This optional feature is new in **0.8.0** and off by default. In service
+mode it also requires app 0.8.0. Check its status on the wallbox device.
 
 | Symptom | What to check |
 |---|---|
@@ -430,7 +428,7 @@ full serial-port path.
 
 ### Watch app Modbus communication live
 
-In **app 0.8.0b2**, select **Open Web UI → Debug log**
+In **app 0.8.0**, select **Open Web UI → Debug log**
 (German: **Debugprotokoll**), then enable **Capture communication for 10 minutes**.
 It is a separate tab beside **Connection** (**Verbindung**), independent of the
 app's native Supervisor **Configuration** tab. Switching tabs preserves unsaved

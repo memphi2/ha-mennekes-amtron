@@ -79,8 +79,8 @@ paths to supported serial devices; the schema change grants no additional device
 access. See [connection setup](upgrading.md#app-connection-page).
 
 The new page uses a separate internal Ingress listener on port 8099 and requires
-an administrator. App **0.8.0b1** supports Supervisor **2026.10.4+**, correcting
-the overly strict 2026.11.0 check in older apps through 0.7.0b4. It accepts requests only
+an administrator. App **0.8.0** supports Supervisor **2026.10.4+**; older apps
+required 2026.11.0. It accepts requests only
 from Supervisor, validates administrator identity and protects writes against
 cross-site requests and concurrent option changes. It reads only locally mapped
 serial devices, saves through Supervisor's own-app API and never sends the
