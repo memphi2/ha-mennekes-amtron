@@ -41,9 +41,11 @@ SOC_DESCRIPTORS = (
     "vehicle.drivetrain.batteryManagement.header",
     "vehicle.powertrain.electric.battery.stateOfCharge.displayed",
 )
+# BavarianData's own prediction continues between the car's rare reports.
+ESTIMATE_DESCRIPTOR = "soc_estimate"
 LIMIT_DESCRIPTOR = "vehicle.powertrain.electric.battery.stateOfCharge.target"
 CAPACITY_DESCRIPTOR = "vehicle.drivetrain.batteryManagement.maxEnergy"
-_DESCRIPTORS = (SOC_DESCRIPTORS, (LIMIT_DESCRIPTOR,), (CAPACITY_DESCRIPTOR,))
+_DESCRIPTORS = ((ESTIMATE_DESCRIPTOR, *SOC_DESCRIPTORS), (LIMIT_DESCRIPTOR,), (CAPACITY_DESCRIPTOR,))
 _CAPABILITIES: tuple[Capability, ...] = ("soc", "charge_limit", "capacity")
 
 

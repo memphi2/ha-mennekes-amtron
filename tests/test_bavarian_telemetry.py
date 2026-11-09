@@ -21,6 +21,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources import (
 )
 from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.telemetry import (
     CAPACITY_DESCRIPTOR,
+    ESTIMATE_DESCRIPTOR,
     LIMIT_DESCRIPTOR,
     SOC_DESCRIPTORS,
     BavarianTelemetrySource,
@@ -107,6 +108,10 @@ def test_detects_registered_fields_without_values_and_never_guesses_nominal_capa
             assert profile_entities(hass, "bavariandata", "car") == {
                 "soc": "sensor.header", "charge_limit": "sensor.target", "capacity": "sensor.maxenergy",
             }
+            # BavarianData's prediction comes first.
+            publish(hass, ESTIMATE_DESCRIPTOR, 63.5, entity_id="sensor.i4_predicted")
+            assert source.snapshot.soc_percent == 63.5
+            assert profile_entities(hass, "bavariandata", "car")["soc"] == "sensor.i4_predicted"
             assert profile_entities(hass, "none", "car") == {}
             hass.data[dr.DATA_REGISTRY].async_get.return_value = None
             assert telemetry_entities(hass, "car") == {}

@@ -120,7 +120,7 @@ def profile_capabilities(hass: HomeAssistant, provider_id: str, device_id: str) 
 
 
 def profile_entities(hass: HomeAssistant, provider_id: str, device_id: str) -> dict[str, str]:
-    """The car's entities that its profile reads: soc, charge_limit, capacity, plug, location, departure."""
+    """The car's entities: soc, charge_limit, capacity, plug, location, departure."""
     if not provider_device_is_valid(hass, provider_id, device_id):
         return {}
     result: dict[str, str] = dict(telemetry_entities(hass, device_id))

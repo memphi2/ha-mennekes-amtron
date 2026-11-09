@@ -68,8 +68,10 @@ does not cause the integration to select another car. Unsupported or unavailable
 data stays unavailable; manual sources remain an alternative.
 
 Enable the corresponding vehicle entities in BavarianData if they are disabled.
-The adapter reads the reported high-voltage battery charge level, target charge
-level and maximum usable battery energy. It does not enable entities itself.
+The adapter reads the charge level, target charge level and maximum usable
+battery energy. For the charge level it prefers BavarianData's **predicted**
+charge level, which continues between the car's rare reports, and otherwise the
+reported high-voltage battery charge level. It does not enable entities itself.
 For capacity, it uses the car's reported usable energy when full, accounting for
 its current battery condition; it does not substitute nominal battery size or a
 battery-health percentage. If that value is missing, choose a suitable manual
@@ -213,6 +215,16 @@ few minutes after plug-in gets its rules then; without Virtual Plug & Charge
 and with the charging release on, it charges without its plan until that
 moment. A car that keeps reporting itself plugged in at home ten minutes after
 the wallbox became empty has a stale plug signal; the log warns once.
+
+A confirmed car must stay consistent while it charges. Its rules rest again,
+with a warning in the log, when the car afterwards reports itself **unplugged**,
+or when the wallbox delivered **4 kWh** since charging started and the profile's
+charge level reported since then has not risen. With BavarianData this is its
+predicted charge level, which follows the car's charging between the car's rare
+reports. The check skips a battery at 95 % or more, which may draw energy for
+climate or balancing, and does nothing while there is no charge level. Only a
+new plug-in report confirms the car again.
+This catches a car that keeps reporting itself plugged in after it left.
 
 The confirmation survives an HA restart. A car swapped while HA is not running
 is not noticed. A car that only reports changes may not report again after a

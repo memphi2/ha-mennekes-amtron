@@ -164,3 +164,10 @@ def test_departures_already_read_from_the_car_stay_visible():
         assert result["step_id"] == "departure_capacity_fixed"
 
     asyncio.run(run())
+
+
+def test_a_car_that_reports_nothing_starts_without_settings():
+    flow = Flow(FakeConfigEntry(options=profile_options(provider="none")))
+    # A device that is no vehicle of the integration offers nothing.
+    assert flow._vehicle_defaults("bavariandata", " ") == ({}, None)
+    assert flow._vehicle_defaults("none", "") == ({}, None)

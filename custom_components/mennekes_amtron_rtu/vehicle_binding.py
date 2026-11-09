@@ -4,6 +4,11 @@ The selection itself never changes here. A car that plugs in without the
 selected car reporting itself plugged in afterwards is not that car: the
 selected car's rules, i.e. its charge target, departure plan and learned
 phases, rest until it confirms. An empty wallbox ends every binding.
+
+A confirmation can still be wrong when a car keeps reporting itself plugged in
+after it left. While charging, the car must then contradict itself: it reports
+itself unplugged afresh, or its charge level does not rise although the
+wallbox delivered several kWh. Missing data never revokes a confirmation.
 """
 
 from __future__ import annotations
@@ -16,17 +21,40 @@ from typing import Any, Self
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
-from .device.registers import CP_STATE, EVSE_STATE
+from .device.enums import EvseState
+from .device.registers import CP_STATE, EVSE_STATE, SESSION_ENERGY
 from .device.vehicle import vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
 from .vehicle_detection import VehicleEvidence
-from .vehicle_profiles import active_profile
+from .vehicle_profiles import (
+    CONF_VEHICLE_SOC_USE_PROFILE,
+    VehicleProfile,
+    active_profile,
+    vehicle_options,
+)
+from .vehicle_soc import vehicle_percentage
+from .vehicle_soc_const import CONF_VEHICLE_SOC_ENTITY
+from .vehicle_sources import profile_entities
 
 _LOGGER = logging.getLogger(__name__)
 # A car's cloud data may lag behind the unplug. Only a report this long after
 # it that still claims a plugged-in car at home is a stale signal.
 STALE_AFTER = timedelta(minutes=10)
+# Several percent for any car battery, even with charging losses.
+PLAUSIBLE_ENERGY_KWH = 4.0
+# A full battery may draw energy for climate or balancing without rising.
+PLAUSIBLE_BELOW_PERCENT = 95.0
+
+
+class _ChargeCheck:
+    """The charge level when the confirmed car started drawing energy."""
+
+    def __init__(self, energy: float, soc: float) -> None:
+        self.energy = energy
+        self.soc = soc
+        # When the wallbox had delivered enough energy for the level to rise.
+        self.due_at: datetime | None = None
 
 
 class VehicleBindingState:
@@ -84,6 +112,10 @@ class VehicleBinding:
         self._first_empty: datetime | None = None
         self._stale_warned = False
         self._resting: bool | None = None
+        # When this process saw the binding confirmed, and its charge check.
+        self._confirmed_at: datetime | None = None
+        self._check: _ChargeCheck | None = None
+        self._plausible = False
         self._listeners: list[Callable[[], None]] = []
         self._unsubs: list[CALLBACK_TYPE] = []
 
@@ -156,6 +188,7 @@ class VehicleBinding:
                 _LOGGER.debug("Vehicle binding ended: the wallbox is empty")
                 self._state.vehicle = None
                 changed = True
+            self._confirmed_at = None
             self._warn_stale(profile, now)
         elif wallbox is True:
             self._first_empty = None
@@ -169,7 +202,23 @@ class VehicleBinding:
             ):
                 _LOGGER.info("Vehicle %s confirmed at the wallbox; its rules apply", profile.name)
                 self._state.vehicle = profile.id
+                self._reset_check(now)
                 changed = True
+            elif profile is not None and profile.detection is not None and self._state.vehicle == profile.id:
+                if self._confirmed_at is None:
+                    # Confirmed before a restart: only reports from now on count.
+                    self._reset_check(now)
+                if (reason := self._contradiction(profile, now)) is not None:
+                    _LOGGER.warning(
+                        "The car at the wallbox does not behave like %s: %s; its charge target "
+                        "and departure plan rest until it reports itself plugged in again",
+                        profile.name, reason,
+                    )
+                    self._state.vehicle = None
+                    # Only a report after this one can confirm the car again.
+                    self._state.absent_at = now
+                    self._confirmed_at = None
+                    changed = True
         if changed:
             self._hass.async_create_task(self._async_save(), "amtron_vehicle_binding", eager_start=False)
         if wallbox is None and self._resting is not None:
@@ -199,6 +248,59 @@ class VehicleBinding:
             return False
         absent_at = self._state.absent_at
         return absent_at is None or evidence.connected_at >= absent_at
+
+    def _reset_check(self, now: datetime) -> None:
+        self._confirmed_at = now
+        self._check = None
+        self._plausible = False
+
+    def _contradiction(self, profile: VehicleProfile, now: datetime) -> str | None:
+        """Name a fresh report that contradicts the confirmed car, if any."""
+        evidence = self._evidence.snapshot(profile.id)
+        confirmed_at = self._confirmed_at
+        if (
+            evidence.connected is False and evidence.connected_at is not None
+            and confirmed_at is not None and evidence.connected_at > confirmed_at
+        ):
+            return "it reports itself unplugged"
+        if self._plausible:
+            return None
+        data = self._entry.runtime_data.coordinator.current_data()
+        energy = data.get(SESSION_ENERGY.key)
+        soc = self._soc(profile)
+        if data.get(EVSE_STATE.key) != EvseState.CHARGING or not isinstance(energy, (int, float)) or soc is None:
+            return None
+        level, reported = soc
+        check = self._check
+        if check is None or energy < check.energy:
+            # A new charge, or the session counter started over.
+            if level < PLAUSIBLE_BELOW_PERCENT:
+                self._check = _ChargeCheck(float(energy), level)
+            return None
+        if level > check.soc:
+            # The car charges: this confirmation holds for the connection.
+            self._plausible = True
+            return None
+        if check.due_at is None:
+            if energy - check.energy >= PLAUSIBLE_ENERGY_KWH:
+                check.due_at = now
+            return None
+        if reported is not None and reported > check.due_at:
+            return f"its charge level stayed at {level:.0f} % while the wallbox delivered {energy - check.energy:.1f} kWh"
+        return None
+
+    def _soc(self, profile: VehicleProfile) -> tuple[float, datetime | None] | None:
+        """The selected car's charge level and when it was reported."""
+        options = vehicle_options(self._entry.options)
+        if options.get(CONF_VEHICLE_SOC_USE_PROFILE) is True:
+            entity = profile_entities(self._hass, profile.provider_id, profile.device_id).get("soc")
+        else:
+            entity = options.get(CONF_VEHICLE_SOC_ENTITY)
+        state = self._hass.states.get(entity) if isinstance(entity, str) else None
+        level = vehicle_percentage(state)
+        if state is None or level is None:
+            return None
+        return level, state.last_reported
 
     def _warn_stale(self, profile: Any, now: datetime) -> None:
         if (

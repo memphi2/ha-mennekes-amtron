@@ -32,6 +32,14 @@ class Coordinator:
         self.listeners.append(listener)
         return lambda: self.listeners.remove(listener)
 
+    def charge(self, energy):
+        self.data = WallboxData(values={
+            "evse_state": int(EvseState.CHARGING), "cp_state": int(CpState.C2),
+            "session_energy": energy,
+        })
+        for listener in list(self.listeners):
+            listener()
+
     def plug(self, connected):
         self.data = WallboxData(values={
             "evse_state": int(EvseState.EV_CONNECTED if connected else EvseState.IDLE),
@@ -241,3 +249,126 @@ def test_a_saved_binding_round_trips():
     for state in (m.VehicleBindingState(None, A), m.VehicleBindingState(dt_util.utcnow(), None)):
         restored = m.VehicleBindingState.restore(state.snapshot())
         assert (restored.absent_at, restored.vehicle) == (state.absent_at, state.vehicle)
+
+
+async def confirmed_binding(hass, caplog):
+    entry, coordinator = binding_entry()
+    report(hass, plugged=False, name="second")
+    binding = m.VehicleBinding(hass, entry)
+    await binding.async_start()
+    coordinator.plug(False)
+    await settle(hass)
+    coordinator.plug(True)
+    report(hass)
+    await settle(hass)
+    assert not binding.resting
+    return entry, coordinator, binding
+
+
+def soc(hass, value):
+    hass.states.async_set("sensor.first_soc", str(value), {"unit_of_measurement": "%"}, force_update=True)
+
+
+def test_a_fresh_unplug_report_revokes_the_confirmation(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        _entry, coordinator, binding = await confirmed_binding(hass, caplog)
+        report(hass, plugged=False)
+        await settle(hass)
+        assert binding.resting
+        assert "does not behave like First car: it reports itself unplugged" in caplog.text
+        # Only a new plug-in report confirms it again.
+        coordinator.plug(True)
+        assert binding.resting
+        report(hass)
+        await settle(hass)
+        assert not binding.resting
+        binding.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_a_charge_level_that_does_not_rise_revokes_the_confirmation(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        _entry, coordinator, binding = await confirmed_binding(hass, caplog)
+        soc(hass, 50)
+        coordinator.charge(1.0)
+        coordinator.charge(3.0)
+        # Enough energy delivered, but no report since.
+        coordinator.charge(5.5)
+        coordinator.charge(6.0)
+        assert not binding.resting
+        soc(hass, 50)
+        coordinator.charge(6.5)
+        await settle(hass)
+        assert binding.resting
+        assert "its charge level stayed at 50 % while the wallbox delivered 5.5 kWh" in caplog.text
+        binding.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_a_rising_or_full_or_missing_charge_level_keeps_the_confirmation(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        entry, coordinator, binding = await confirmed_binding(hass, caplog)
+        # Without a charge level, nothing is checked.
+        coordinator.charge(1.0)
+        coordinator.charge(9.0)
+        assert not binding.resting
+        # A rising level settles it for this connection.
+        soc(hass, 40)
+        coordinator.charge(10.0)
+        soc(hass, 41)
+        coordinator.charge(11.0)
+        soc(hass, 41)
+        coordinator.charge(20.0)
+        coordinator.charge(21.0)
+        assert not binding.resting
+        # A new connection checks again; a full battery is not checked, and a
+        # session counter that starts over starts a new check.
+        coordinator.plug(False)
+        coordinator.plug(True)
+        report(hass)
+        await settle(hass)
+        soc(hass, 97)
+        coordinator.charge(1.0)
+        coordinator.charge(9.0)
+        soc(hass, 97)
+        coordinator.charge(10.0)
+        assert not binding.resting
+        soc(hass, 60)
+        coordinator.charge(12.0)
+        coordinator.charge(0.5)
+        soc(hass, 61)
+        coordinator.charge(5.0)
+        soc(hass, 61)
+        coordinator.charge(5.1)
+        assert not binding.resting
+        # The car's own data source is read when the profile uses it.
+        entry.options["vehicle_profiles"][A]["options"]["vehicle_soc_use_profile"] = True
+        coordinator.charge(20.0)
+        assert not binding.resting
+        binding.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_a_confirmation_from_before_a_restart_is_checked_from_now_on(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        entry, _coordinator, binding = await confirmed_binding(hass, caplog)
+        binding.stop()
+        await settle(hass)
+        restarted = m.VehicleBinding(hass, entry)
+        await restarted.async_start()
+        assert not restarted.resting
+        assert restarted._confirmed_at is not None
+        restarted.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
