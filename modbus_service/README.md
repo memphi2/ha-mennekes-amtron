@@ -27,7 +27,8 @@ vehicle authentication. See [charging permission](DOCS.md#virtual-plug--charge).
 
 The live Modbus view shows decoded existing reads, writes and heartbeats when
 you enable it. **New in 0.8.0b6:** a percentage target at the car's own limit
-no longer pauses the wallbox when reached; the car ends that charge itself.
+no longer pauses the wallbox when reached; the car ends that charge itself,
+and Virtual Plug & Charge keeps its grant through a briefly unreadable status.
 Since 0.8.0b4, a single disturbed bus read no longer makes the affected values
 briefly unavailable; they are kept for up to 30 seconds.
 Since 0.8.0b3, while the charging release is off, a current

@@ -239,9 +239,14 @@ attribute names the condition, such as **Departure plan is preparing the
 current**. Once granted, a later missing or stale vehicle
 report does not interrupt that connection. In service mode, its existing grant
 also survives an HA Core restart because the app continues observing the wallbox.
-A disconnect, unknown wallbox connection state or app restart requires a fresh
-grant. Direct mode loses its grant on a full HA restart or when its physical
-connection closes. Automatic profile changes preserve the open connection.
+A confirmed disconnect (control pilot A with an idle wallbox) or an app restart
+requires a fresh grant. From **0.8.0b6**, a briefly unreadable or contradictory
+wallbox state is not treated as unplugging: the grant stays. Only when the
+state remains unknown for 60 seconds is the release switched off; HA then
+grants the same connection again as soon as the car is reported connected,
+without replugging and without lifting a pause. Earlier betas switched the
+release off at once and only a new plug-in brought it back. Direct mode loses
+its grant on a full HA restart or when its physical connection closes. Automatic profile changes preserve the open connection.
 Choosing another profile alone also leaves an existing grant with that same
 physical connection. Changing a vehicle's identity or detection sources invalidates the grant; the
 next connection always needs a fresh match for the then-active profile.

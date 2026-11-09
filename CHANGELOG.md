@@ -38,6 +38,13 @@ mode, update the app to **0.8.0b6** first.
   wallbox when reached. The car ends that charge itself, like at any other
   charger, and nothing changes until unplugging. A target below the car's limit
   still pauses. Service mode needs app **0.8.0b6**.
+- Virtual Plug & Charge no longer switches the charging release off when the
+  wallbox status is briefly unreadable or contradictory, for example while
+  pausing; before, only a new plug-in restored charging. After 60 seconds of
+  unknown state the release is withdrawn and HA grants the same connection
+  again without replugging. The log names why a grant ended and warns when the
+  status cannot be read for over 30 seconds. Service mode needs app
+  **0.8.0b6**.
 
 ## 0.8.0b5 — 2026-11-08
 

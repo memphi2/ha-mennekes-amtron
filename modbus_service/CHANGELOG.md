@@ -7,6 +7,14 @@ Beta update through **#apps-beta**; **0.6.1 remains stable**.
 - A percentage target at the car's own charge limit no longer pauses the
   wallbox when reached. The car ends that charge itself, and the session stays
   untouched until unplugging. A target below the car's limit still pauses.
+- Virtual Plug & Charge no longer switches the charging release off when the
+  wallbox status is briefly unreadable or contradictory, for example while
+  pausing. Previously the grant was lost and only a new plug-in restored it.
+  The grant is withdrawn only after 60 seconds of unknown state, and HA grants
+  the same connection again without replugging. A reconnect alone no longer
+  ends the grant.
+- The log names the reason when a grant ends and warns when the wallbox status
+  block cannot be read for over 30 seconds.
 
 ## 0.8.0b4
 

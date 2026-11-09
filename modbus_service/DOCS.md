@@ -15,6 +15,9 @@ See [Updates](#updates).
 **New in 0.8.0b6:** a percentage target at the car's own charge limit no
 longer pauses the wallbox when reached. The car ends that charge itself, and
 the session stays as it is until you unplug. A lower target still pauses.
+Virtual Plug & Charge keeps its grant through a briefly unreadable or
+contradictory wallbox status instead of switching the release off until the
+next plug-in.
 
 **Since 0.8.0b4:** a single disturbed bus read no longer makes the affected
 values briefly unavailable in Home Assistant; recently read status and
@@ -235,8 +238,13 @@ detection check. See the
 The app initially withholds charging release until HA recognizes the selected
 vehicle unambiguously. A grant is valid only for the current physical
 connection. The app keeps it through HA Core restarts, even if cloud vehicle
-signals later become unavailable. Unplugging, losing wallbox communication or
-restarting the app clears it; a new grant needs fresh recognition from HA.
+signals later become unavailable. Unplugging or restarting the app clears it;
+a new grant needs fresh recognition from HA. From **0.8.0b6**, a briefly
+unreadable or contradictory wallbox state keeps the grant. After 60 seconds of
+unknown state the release is switched off, and HA grants the same connection
+again once the car is reported connected, without replugging. The log names
+the reason whenever a grant ends, and warns when the wallbox status cannot be
+read for over 30 seconds.
 Changing the vehicle's identity or detection sources also invalidates
 its grant. Deliberate pauses, locks and reached targets remain effective. Local
 RFID authorization must be disabled for this EMS-based feature.

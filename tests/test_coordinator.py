@@ -272,6 +272,27 @@ def test_a_failing_block_drops_its_values_instead_of_freezing_them() -> None:
     asyncio.run(run())
 
 
+def test_losing_the_vehicle_status_block_is_logged_once(caplog) -> None:
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank(evse_state=EvseState.CHARGING))
+        clock = [0.0]
+        coordinator = await _coordinator(transport, monotonic=lambda: clock[0])
+        coordinator.data = await coordinator._async_update_data()
+        transport.read_exceptions[0x0100] = 0x04
+        for _ in range(3):
+            clock[0] += 31
+            coordinator.data = await coordinator._async_update_data()
+        assert not coordinator.data.has("evse_state")
+        assert caplog.text.count("Block status unreadable for over 30 seconds") == 1
+        transport.read_exceptions.clear()
+        clock[0] += 5
+        coordinator.data = await coordinator._async_update_data()
+        assert "Block status readable again" in caplog.text
+
+    caplog.set_level(logging.INFO)
+    asyncio.run(run())
+
+
 def test_a_slow_block_that_is_not_due_keeps_its_values() -> None:
     """Dropping stale values must not drop the ones carried on purpose."""
 

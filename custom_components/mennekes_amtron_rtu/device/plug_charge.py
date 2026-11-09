@@ -10,7 +10,7 @@ import re
 import secrets
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from .client_errors import AmtronBusError, AmtronRateLimitedError
@@ -33,6 +33,9 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 _POLICY = re.compile(r"(?:[0-9a-f]{64})?")
 _SESSION = re.compile(r"[0-9a-f]{32}")
+# An unknown vehicle state is not an unplug. Brief read gaps and transient
+# EVSE/CP combinations keep the grant; a longer one withdraws it.
+UNKNOWN_GRACE = timedelta(seconds=60)
 
 
 @dataclass(slots=True)
@@ -46,6 +49,7 @@ class PlugChargeState:
     authorized: bool = False
     since: datetime | None = None
     last_absent_at: datetime | None = None
+    unknown_since: datetime | None = None
 
     @property
     def blocked(self) -> bool:
@@ -55,8 +59,27 @@ class PlugChargeState:
         self.session = None
         self.since = None
         self.last_absent_at = None
+        self.unknown_since = None
         self.authorized = False
         self.hold |= self.enabled
+
+    def revoke(self) -> None:
+        """Withdraw the grant but keep the physical connection.
+
+        Only a confirmed unplug ends a connection. HA may grant the same
+        connection again after fresh evidence, without replugging and
+        without treating it as a new plug-in.
+        """
+        if self.authorized:
+            _LOGGER.info("Plug & Charge grant withdrawn; waiting for a fresh grant")
+        self.authorized = False
+        self.unknown_since = None
+        self.hold |= self.enabled
+
+    def suspect(self, now: datetime | None = None) -> None:
+        """Treat the vehicle state as unknown from now, e.g. after a reconnect."""
+        if self.session is not None and self.unknown_since is None:
+            self.unknown_since = now or datetime.now(UTC)
 
     def configure(self, enabled: bool, policy: str) -> None:
         if type(enabled) is not bool or not isinstance(policy, str) or _POLICY.fullmatch(policy) is None:
@@ -66,13 +89,31 @@ class PlugChargeState:
             self.invalidate()
 
     def observe(self, present: bool | None, *, observed_at: datetime | None = None) -> None:
-        if not self.enabled or present is not True:
+        now = observed_at or datetime.now(UTC)
+        if not self.enabled or present is False:
+            if self.enabled and self.authorized:
+                _LOGGER.info("Plug & Charge grant ended: vehicle unplugged")
             self.invalidate()
-            if self.enabled and present is False:
-                self.last_absent_at = observed_at or datetime.now(UTC)
-        elif self.session is None:
+            if self.enabled:
+                self.last_absent_at = now
+            return
+        if present is None:
+            if self.session is None:
+                self.hold = True
+                return
+            if self.unknown_since is None:
+                self.unknown_since = now
+            elif self.authorized and now - self.unknown_since >= UNKNOWN_GRACE:
+                _LOGGER.warning(
+                    "Plug & Charge grant withdrawn: vehicle state unknown for %.0f seconds",
+                    (now - self.unknown_since).total_seconds(),
+                )
+                self.revoke()
+            return
+        self.unknown_since = None
+        if self.session is None:
             self.session = secrets.token_hex(16)
-            self.since = self.last_absent_at or datetime.now(UTC)
+            self.since = self.last_absent_at or now
 
     def snapshot(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}
@@ -178,7 +219,7 @@ class PlugChargeController:
         try:
             await self._check_presence(read)
         except AmtronBusError as err:
-            self.state.invalidate()
+            self.state.revoke()
             self._schedule_deny()
             raise validation_error("control_state_unknown") from err
 
@@ -234,7 +275,7 @@ class PlugChargeController:
                     self._control.write_state.mode_change_at = self._control._monotonic()
             except (DeviceError, AmtronBusError, OSError, asyncio.CancelledError) as err:
                 if not isinstance(err, DeviceValidationError) and self.state.session == session:
-                    self.state.invalidate()
+                    self.state.revoke()
                 self._schedule_deny()
                 raise
             finally:

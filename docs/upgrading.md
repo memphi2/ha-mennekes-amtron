@@ -26,7 +26,9 @@ profile and moves every vehicle setting into the car's profile under
 **Configure → Vehicles**; automatic selection is switched on in the **Active
 vehicle** entity. A percentage target at the car's own limit no longer pauses
 the wallbox when reached (app **0.8.0b6** for service mode): the car ends that
-charge itself and nothing changes until you unplug. Beta 5 keeps each car's upcoming departure when you switch cars
+charge itself and nothing changes until you unplug. Virtual Plug & Charge no
+longer loses its grant for the rest of a connection when the wallbox status is
+briefly unreadable or contradictory. Beta 5 keeps each car's upcoming departure when you switch cars
 and accepts a text sensor as the cable signal for automatic selection; it needs
 no app update. Beta 4 keeps entities available across a single disturbed Modbus
 read (app **0.8.0b4** for service mode), keeps the selected car after unplugging

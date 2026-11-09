@@ -99,8 +99,10 @@ while the bus is unavailable. The wallbox's configured heartbeat fallback still
 governs a loss of its controller.
 
 The app retains an already granted connection through an HA Core restart.
-An observed disconnect, unknown connection state or app restart invalidates the
-grant. Enabling the feature may interrupt charging; disabling it does not start
+An observed disconnect or app restart invalidates the grant. An unknown
+connection state withdraws it after 60 seconds; the same connection can then be
+granted again with fresh evidence. A vehicle swap within such a gap is not
+detected, as between two polls. Enabling the feature may interrupt charging; disabling it does not start
 charging. See [setup and everyday behavior](vehicle-setup.md#optional-virtual-plug--charge).
 
 ## The 0 A trap

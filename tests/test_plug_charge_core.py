@@ -26,6 +26,12 @@ from tests.test_modbus_service import service_fixture
 POLICY = "a" * 64
 
 
+def unplugged(control):
+    control.observe_plug_charge(WallboxData(values={
+        "evse_state": int(EvseState.IDLE), "cp_state": int(CpState.A1), "charging_release": 1,
+    }))
+
+
 def present(harness, connected=True):
     values = {
         "evse_state": int(EvseState.EV_CONNECTED if connected else EvseState.IDLE),
@@ -79,9 +85,11 @@ def test_cycle_and_policy_bindings_have_no_durable_grants():
     assert state.blocked
     state.observe(True)
     assert state.session != token
+    # An unknown state is no unplug: the connection and its start remain.
+    token, since = state.session, state.since
     state.observe(None)
-    assert state.session is None
-    assert state.last_absent_at is None
+    assert (state.session, state.since) == (token, since)
+    assert state.unknown_since is not None
     state.configure(False, "")
     assert state.blocked
     assert not state.enabled
@@ -172,7 +180,7 @@ def test_read_only_cannot_enable_gate():
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("lost", ["unplug", "unknown", "transport", "policy"])
+@pytest.mark.parametrize("lost", ["unplug", "policy"])
 def test_lost_physical_cycle_rejects_old_authorization(lost):
     async def run():
         h = Harness()
@@ -181,11 +189,6 @@ def test_lost_physical_cycle_rejects_old_authorization(lost):
         await authorize(c)
         if lost == "unplug":
             present(h, False)
-        elif lost == "unknown":
-            c.observe_plug_charge(None)
-        elif lost == "transport":
-            h.client._connection_changed(False)
-            c.observe_plug_charge(None)
         else:
             await c.async_configure_plug_charge(True, policy="b" * 64)
         await c.async_sync_plug_charge()
@@ -281,7 +284,7 @@ def test_final_live_reads_cannot_cross_a_stop_or_expired_request(monkeypatch, ra
                 count += 1
                 if count == 2:  # The actual bus-write precondition, not the early check.
                     if race == "unplug":
-                        c.observe_plug_charge(None)
+                        unplugged(c)
                     elif race == "goal":
                         c.energy_goal._status = "reached"
                     else:
@@ -343,7 +346,7 @@ def test_uncertain_authorization_is_closed_and_never_replayed(monkeypatch, failu
             await authorize(c)
         await c.async_sync_plug_charge()
         assert h.written(R.CHARGING_RELEASE) == [[0], [1], [0]]
-        assert c.plug_charge["session"] is None
+        # Only a fresh grant may release again, never the uncertain one.
         assert not c.plug_charge["authorized"]
         assert c.pending_action is None
         await c.async_shutdown()
@@ -378,7 +381,7 @@ def test_manual_release_waiting_for_bus_cannot_bypass_a_lost_gate_grant(monkeypa
             result = await original(address, **kwargs)
             if address == R.CHARGING_RELEASE.address and not changed:
                 changed = True
-                c.observe_plug_charge(None)
+                unplugged(c)
             return result
         monkeypatch.setattr(h.transport, "read_holding_registers", read)
         with pytest.raises(ServiceValidationError) as exc:
@@ -453,11 +456,11 @@ def test_denial_retries_without_repeated_logs_and_stops_on_unload(caplog):
         await authorize(c)
         h.transport.write_exceptions[R.CHARGING_RELEASE.address] = TimeoutError("unavailable")
         for _ in range(2):
-            c.observe_plug_charge(None)
+            unplugged(c)
             await c._plug_charge._task
         assert caplog.text.count("Cannot enforce Plug & Charge release gate") == 1
         h.transport.write_exceptions.clear()
-        c.observe_plug_charge(None)
+        unplugged(c)
         await c._plug_charge._task
         assert h.transport.bank[R.CHARGING_RELEASE.address] == 0
         await c.async_shutdown()
@@ -547,17 +550,11 @@ def test_control_handoff_preserves_session_only_while_transport_continues(link_l
         await fresh.async_configure_plug_charge(True, policy=POLICY)
         h.control = fresh
         present(h)
-        if link_lost:
-            assert fresh.plug_charge["session"] != prior["session"]
-            assert datetime.fromisoformat(fresh.plug_charge["since"]) > absent_at
-            with pytest.raises(ServiceValidationError) as exc:
-                await fresh.async_authorize_plug_charge(prior["session"], deadline=deadline())
-            assert exc.value.translation_key == "plug_charge_session_changed"
-        else:
-            assert fresh.plug_charge == prior
-            assert fresh.plug_charge["since"] == absent_at.isoformat()
-            await fresh.async_authorize_plug_charge(prior["session"], deadline=deadline())
-            assert fresh.plug_charge["authorized"]
+        # A reconnect proves no unplug; the reads after it keep the connection.
+        assert fresh.plug_charge == prior
+        assert fresh.plug_charge["since"] == absent_at.isoformat()
+        await fresh.async_authorize_plug_charge(prior["session"], deadline=deadline())
+        assert fresh.plug_charge["authorized"]
         assert h.client.connected
         assert h.transport.close_calls == 0
         await fresh.async_shutdown()
@@ -631,3 +628,56 @@ def test_manual_gate_intent_replaces_old_pending_command_and_goal_recovery():
         await goal.async_stop()
         await c.async_shutdown()
     asyncio.run(run())
+
+
+def test_unknown_vehicle_state_keeps_the_grant_until_the_grace_ends(caplog):
+    async def run():
+        h = Harness()
+        c = await armed(h)
+        token = c.plug_charge["session"]
+        await authorize(c)
+        start = datetime.now(UTC)
+        # A failed poll or a transient EVSE/CP combination is no unplug.
+        c.observe_plug_charge(None, observed_at=start)
+        c.observe_plug_charge(WallboxData(values={
+            "evse_state": int(EvseState.IDLE), "cp_state": int(CpState.B1), "charging_release": 1,
+        }), observed_at=start + timedelta(seconds=30))
+        assert c.plug_charge["authorized"]
+        present(h)
+        assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
+        # A longer gap withdraws the grant but keeps the connection and its start.
+        c.observe_plug_charge(None, observed_at=start + timedelta(seconds=100))
+        c.observe_plug_charge(None, observed_at=start + timedelta(seconds=161))
+        await c._plug_charge._task
+        assert "vehicle state unknown for 61 seconds" in caplog.text
+        assert not c.plug_charge["authorized"]
+        assert h.written(R.CHARGING_RELEASE) == [[0], [1], [0]]
+        present(h)
+        assert c.plug_charge["session"] == token
+        # The same connection is granted again without replugging.
+        await authorize(c)
+        assert c.plug_charge["authorized"]
+        unplugged(c)
+        assert "grant ended: vehicle unplugged" in caplog.text
+        assert c.plug_charge["session"] is None
+        await c.async_shutdown()
+
+    import logging
+    caplog.set_level(logging.INFO)
+    asyncio.run(run())
+
+
+def test_a_reconnect_only_suspects_and_a_closed_client_forgets():
+    state = PlugChargeState()
+    state.configure(True, POLICY)
+    state.suspect()
+    assert state.unknown_since is None
+    state.observe(True)
+    state.authorized = True
+    state.suspect()
+    first = state.unknown_since
+    state.suspect()
+    assert state.unknown_since == first
+    state.observe(True)
+    assert state.unknown_since is None
+    assert state.authorized
