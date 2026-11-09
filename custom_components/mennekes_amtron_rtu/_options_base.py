@@ -10,7 +10,14 @@ from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 
 from ._options_draft import OptionsChangedError, OptionsDraft
 from .config_schemas import vehicle_provider_schema
-from .vehicle_profiles import CONF_VEHICLE_DEVICE, CONF_VEHICLE_PROVIDER
+from .vehicle_profiles import (
+    CONF_VEHICLE_DEVICE,
+    CONF_VEHICLE_PROFILES,
+    CONF_VEHICLE_PROVIDER,
+    VehicleProfile,
+    profile_options,
+    profiles,
+)
 from .vehicle_sources import (
     Capability,
     ProviderSelection,
@@ -30,17 +37,44 @@ class SectionOptionsFlow(OptionsFlow):
         super().__init__()
         self._draft: OptionsDraft | None = None
         self._details: dict[str, Any] = {}
+        # The profile whose settings are being edited; None without profiles.
+        self._profile_target: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         raise NotImplementedError
 
+    async def async_step_vehicle(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        raise NotImplementedError
+
     def _begin(self, section: str, keys: set[str]) -> OptionsDraft:
         if self._draft is None or self._draft.section != section:
-            self._draft = OptionsDraft(section, self.config_entry.options, keys)
+            self._draft = OptionsDraft(
+                section, self.config_entry.options, keys, self._profile_target
+            )
         self._details = {}
         return self._draft
+
+    def _target_profile(self) -> VehicleProfile | None:
+        key = self._profile_target
+        return profiles(self.config_entry.options).get(key) if key is not None else None
+
+    def _target_ready(self) -> bool:
+        """A profile was chosen, or there are no profiles and settings are shared."""
+        if CONF_VEHICLE_PROFILES in self.config_entry.options:
+            return self._target_profile() is not None
+        return self._profile_target is None
+
+    def _target_options(self) -> dict[str, Any]:
+        """The chosen profile's current settings, selected or not."""
+        return profile_options(self.config_entry.options, self._profile_target)
+
+    def _vehicle_placeholders(self) -> dict[str, str]:
+        profile = self._target_profile()
+        return {"vehicle": profile.name if profile is not None else "—"}
 
     def _section(self, section: str) -> OptionsDraft | None:
         draft = self._draft
@@ -112,6 +146,7 @@ class SectionOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         self._draft = None
         self._details = {}
+        self._profile_target = None
         return await self.async_step_init()
 
     def _options_changed(self) -> ConfigFlowResult:

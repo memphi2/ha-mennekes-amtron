@@ -22,8 +22,17 @@ class Flow(BaseFlow):
         registry.async_get.side_effect = lambda key: (
             device if key in {"car", "own"} else None
         )
+        # The registered car belongs to one BavarianData account entry.
+        registry._devices = SimpleNamespace(
+            get_devices_for_config_entry_id=lambda entry_id: (
+                [SimpleNamespace(id="car")] if entry_id == "account-entry" else []
+            )
+        )
         self.hass = SimpleNamespace(
-            data={dr.DATA_REGISTRY: registry}, config=SimpleNamespace(country="DE")
+            data={dr.DATA_REGISTRY: registry}, config=SimpleNamespace(country="DE"),
+            config_entries=SimpleNamespace(async_entries=lambda domain: (
+                [SimpleNamespace(entry_id="account-entry")] if domain == "bavariandata" else []
+            )),
         )
 
 
@@ -43,7 +52,7 @@ def test_loss_source_is_independent_and_atomic(source):
         assert menu["menu_options"] == [
             "loss_sensor",
             "loss_vehicle",
-            "back",
+            "vehicle_profile",
         ]
         form = await getattr(flow, f"async_step_loss_{source}")()
         if source == "sensor":
@@ -197,6 +206,7 @@ def test_loss_forms_identify_the_profile_bound_to_the_draft():
     async def run():
         entry = FakeConfigEntry(options=profile_options(provider="none"))
         flow = Flow(entry)
+        flow._profile_target = A
         menu = await flow.async_step_losses()
         expected = {"vehicle": entry.options["vehicle_profiles"][A]["name"]}
         assert menu["description_placeholders"] == expected
@@ -222,8 +232,9 @@ def test_missing_profile_history_has_a_working_manual_and_profile_setup_route():
         options["vehicle_profiles"][A]["identity"] = "previous-vehicle"
         entry = FakeConfigEntry(options=options)
         flow = Flow(entry)
+        flow._profile_target = A
         menu = await flow.async_step_losses()
-        assert menu["menu_options"] == ["loss_sensor", "vehicle_profiles", "back"]
+        assert menu["menu_options"] == ["loss_sensor", "vehicle_profile"]
         # A stale link or a vehicle disappearing after the menu was opened
         # returns useful choices instead of a repeatedly failing empty form.
         fallback = await flow.async_step_loss_profile()
@@ -232,5 +243,25 @@ def test_missing_profile_history_has_a_working_manual_and_profile_setup_route():
         form = await flow.async_step_loss_sensor()
         assert "vehicle_last_charge_energy_entity" in fields(form)
         assert entry.options == options
+
+    asyncio.run(run())
+
+
+def test_losses_need_a_chosen_profile_once_profiles_exist():
+    from tests.test_vehicle_profiles import B, profile_options
+
+    async def run():
+        entry = FakeConfigEntry(options=profile_options(provider="none"))
+        flow = Flow(entry)
+        assert (await flow.async_step_losses())["step_id"] == "vehicle"
+        # A car that is not selected keeps its own loss source.
+        flow._profile_target = B
+        await flow.async_step_losses()
+        result = await flow.async_step_loss_sensor(
+            {"vehicle_last_charge_energy_entity": "sensor.second_energy"}
+        )
+        options = result["data"]["vehicle_profiles"][B]["options"]
+        assert options["vehicle_last_charge_energy_entity"] == "sensor.second_energy"
+        assert result["data"]["active_vehicle_profile"] != B
 
     asyncio.run(run())

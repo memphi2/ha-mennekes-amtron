@@ -13,6 +13,8 @@ CONF_VEHICLE_PROFILES: Final = "vehicle_profiles"
 CONF_ACTIVE_VEHICLE_PROFILE: Final = "active_vehicle_profile"
 CONF_VEHICLE_AUTO_SELECTION: Final = "vehicle_auto_selection"
 CONF_VIRTUAL_PLUG_CHARGE: Final = "virtual_plug_charge"
+# A former per-profile Plug & Charge permission. It is ignored, but kept valid
+# so that stored profiles still load.
 CONF_VEHICLE_PLUG_CHARGE: Final = "vehicle_plug_charge"
 CONF_VEHICLE_DETECTION_SOURCE: Final = "vehicle_detection_source"
 CONF_VEHICLE_CONNECTED_ENTITY: Final = "vehicle_connected_entity"
@@ -268,6 +270,13 @@ def vehicle_options(raw: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
+def profile_options(raw: Mapping[str, Any], profile_id: str | None) -> dict[str, Any]:
+    """Project one profile's settings, whether or not that car is selected."""
+    if CONF_VEHICLE_PROFILES not in raw:
+        return vehicle_options(raw)
+    return vehicle_options({**raw, CONF_ACTIVE_VEHICLE_PROFILE: profile_id})
+
+
 def vehicle_soc_is_configured(effective: Mapping[str, Any]) -> bool:
     """A manually selected SoC or explicitly enabled profile telemetry is usable."""
     if effective.get(CONF_VEHICLE_SOC_USE_PROFILE) is True:
@@ -310,6 +319,4 @@ def each_vehicle_options(raw: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
     catalog = profiles(raw)
     if not catalog:
         return (vehicle_options(raw),)
-    return tuple(
-        vehicle_options({**raw, CONF_ACTIVE_VEHICLE_PROFILE: key}) for key in catalog
-    )
+    return tuple(profile_options(raw, key) for key in catalog)

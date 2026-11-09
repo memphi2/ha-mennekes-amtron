@@ -1,120 +1,49 @@
-"""Explicit automatic vehicle selection with separately configured evidence."""
+"""Each profile's detection evidence; the Active vehicle entity enables automatic mode."""
 
 from __future__ import annotations
 
 from typing import Any, cast
 
 from homeassistant.config_entries import ConfigFlowResult
-from homeassistant.helpers.selector import SelectOptionDict
 
 from ._options_estimates import EstimateOptionsFlow
 from .config_schemas import (
     vehicle_detection_connected_states_schema,
     vehicle_detection_entities_schema,
-    vehicle_detection_mode_schema,
     vehicle_detection_source_schema,
-    vehicle_profile_choice_schema,
 )
 from .vehicle_profiles import (
-    CONF_ACTIVE_VEHICLE_PROFILE,
-    CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_CONNECTED_ENTITY,
     CONF_VEHICLE_CONNECTED_STATES,
     CONF_VEHICLE_DETECTION_SOURCE,
     CONF_VEHICLE_DEVICE,
     CONF_VEHICLE_HOME_ENTITY,
-    CONF_VEHICLE_PLUG_CHARGE,
-    CONF_VEHICLE_PROFILE_ID,
-    CONF_VEHICLE_PROFILE_SELECTED_AT,
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
     CONF_VEHICLE_SOURCE_IDENTITY,
     VehicleDetectionConfig,
     VehicleProfile,
-    active_profile,
     profiles,
     valid_connected_states,
     valid_detection_entity,
 )
 
-_DETECTION_KEYS = {
-    CONF_VEHICLE_PROFILES,
-    CONF_VEHICLE_AUTO_SELECTION,
-    CONF_ACTIVE_VEHICLE_PROFILE,
-    CONF_VEHICLE_PROFILE_SELECTED_AT,
-}
+# Only the profile's own entry is replaced; switching cars meanwhile is harmless.
+_DETECTION_KEYS = {CONF_VEHICLE_PROFILES}
 
 
 class DetectionOptionsFlow(EstimateOptionsFlow):
     """Keep manual selection, detector setup and automatic mode independent."""
 
-    async def async_step_vehicle_detection(
+    async def async_step_vehicle_detection_signals(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        """Configure the chosen profile's evidence without enabling detection."""
+        if (profile := self._target_profile()) is None:
+            return await self.async_step_vehicle()
         self._begin("detection", _DETECTION_KEYS)
-        return self.async_show_menu(
-            step_id="vehicle_detection",
-            menu_options=[
-                "vehicle_detection_mode",
-                "vehicle_detection_profile",
-                "back",
-            ],
-        )
-
-    async def async_step_vehicle_detection_mode(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if (draft := self._section("detection")) is None:
-            return await self.async_step_init()
-        configured = any(
-            profile.detection is not None
-            for profile in profiles(draft.values).values()
-        )
-        errors = {}
-        if user_input is not None:
-            enabled = user_input.get(CONF_VEHICLE_AUTO_SELECTION)
-            if type(enabled) is not bool:
-                errors[CONF_VEHICLE_AUTO_SELECTION] = "vehicle_detection_source_invalid"
-            elif enabled and not configured:
-                self._details["enable_detection"] = True
-                if (profile := active_profile(draft.values)) is not None:
-                    self._details["detection_profile"] = profile.id
-                    return await self.async_step_vehicle_detection_source()
-                return await self.async_step_vehicle_detection_profile()
-            else:
-                draft.values[CONF_VEHICLE_AUTO_SELECTION] = enabled
-                return self._finish_section()
-        return self.async_show_form(
-            step_id="vehicle_detection_mode",
-            data_schema=vehicle_detection_mode_schema(draft.values),
-            errors=errors,
-            last_step=configured,
-        )
-
-    async def async_step_vehicle_detection_profile(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        if (draft := self._section("detection")) is None:
-            return await self.async_step_init()
-        catalog = profiles(draft.values)
-        errors = {}
-        if user_input is not None:
-            key = user_input.get(CONF_VEHICLE_PROFILE_ID)
-            if not isinstance(key, str) or key not in catalog:
-                errors[CONF_VEHICLE_PROFILE_ID] = "vehicle_profile_required"
-            else:
-                self._details["detection_profile"] = key
-                return await self.async_step_vehicle_detection_source()
-        choices: list[SelectOptionDict] = [
-            {"value": profile.id, "label": profile.name} for profile in catalog.values()
-        ]
-        return self.async_show_form(
-            step_id="vehicle_detection_profile",
-            data_schema=vehicle_profile_choice_schema(
-                choices, draft.values.get(CONF_ACTIVE_VEHICLE_PROFILE)
-            ),
-            errors=errors,
-        )
+        self._details["detection_profile"] = profile.id
+        return await self.async_step_vehicle_detection_source()
 
     def _detection_profile(self) -> VehicleProfile | None:
         draft = self._section("detection")
@@ -154,10 +83,10 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
         return self.async_show_form(
             step_id="vehicle_detection_source",
             data_schema=vehicle_detection_source_schema(
+                # Opening the signals means setting them up, so suggest a source.
                 profile.detection.source
                 if profile.detection is not None
-                else ("profile" if capable else "entities")
-                if self._details.get("enable_detection") else "disabled",
+                else ("profile" if capable else "entities"),
                 profile=capable,
             ),
             description_placeholders={"vehicle": profile.name},
@@ -265,12 +194,8 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
         if draft is None or profile is None:
             raise RuntimeError("cannot save incomplete vehicle detection")
         raw_profile = draft.values[CONF_VEHICLE_PROFILES][profile.id]
-        if config is None or profile.detection != config:
-            raw_profile["options"].pop(CONF_VEHICLE_PLUG_CHARGE, None)
         if config is None:
             raw_profile.pop("detection", None)
         else:
             raw_profile["detection"] = config.as_dict()
-        if self._details.get("enable_detection"):
-            draft.values[CONF_VEHICLE_AUTO_SELECTION] = config is not None
         return self._finish_section()

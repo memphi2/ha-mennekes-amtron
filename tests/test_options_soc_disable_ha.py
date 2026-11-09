@@ -63,7 +63,8 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 await store.async_save(trip)
                 before = current_writes(transport)
 
-                result = await async_options(hass, entry, "vehicle", "vehicle_disable")
+                battery = ("vehicle", "vehicle_profile_open", {"vehicle_profile_id": A}, "vehicle_battery")
+                result = await async_options(hass, entry, *battery, "vehicle_disable")
 
                 assert result["type"] == "create_entry"
                 assert entry.options["active_vehicle_profile"] == A
@@ -78,7 +79,7 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 assert (await store.async_load()).deadline is None
                 assert entry.runtime_data.control.is_paused is True
                 assert current_writes(transport) == before
-                menu = await async_options(hass, entry, "vehicle")
+                menu = await async_options(hass, entry, *battery)
                 assert "vehicle_disable" not in menu["menu_options"]
                 hass.config_entries.options.async_abort(menu["flow_id"])
             finally:

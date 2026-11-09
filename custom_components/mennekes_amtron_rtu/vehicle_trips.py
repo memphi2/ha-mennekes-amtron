@@ -90,3 +90,11 @@ class VehicleTripMemory:
     async def async_forget(self, profile_id: str) -> None:
         """Drop a car's parked trip, for example when it no longer plans trips."""
         await self.async_swap(profile_id, None, None)
+
+    async def async_retain(self, planning: set[str]) -> None:
+        """Drop the parked trips of cars that no longer plan departures."""
+        trips = await self._async_load()
+        if trips.trips.keys() <= planning:
+            return
+        trips.trips = {key: trip for key, trip in trips.trips.items() if key in planning}
+        await self._async_save(trips)

@@ -50,7 +50,6 @@ from .network_tariff_lookup import async_lookup_home_tariff
 from .vehicle_profiles import (
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
-    active_profile,
 )
 from .vehicle_sources import (
     loss_source,
@@ -297,29 +296,25 @@ class EstimateOptionsFlow(SectionOptionsFlow):
     async def async_step_losses(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        if not self._target_ready():
+            return await self.async_step_vehicle()
         draft = self._begin("losses", LOSS_KEYS)
         choices = ["loss_sensor"]
         if draft.values.get(CONF_VEHICLE_PROVIDER) not in (None, "none"):
-            choices.append(
-                "loss_profile" if "charge_history" in self._vehicle_capabilities(draft.values)
-                else "vehicle_profiles"
-            )
+            if "charge_history" in self._vehicle_capabilities(draft.values):
+                choices.append("loss_profile")
         elif CONF_VEHICLE_PROFILES not in self.config_entry.options or self._suggested_vehicle(draft.values, "charge_history").provider_id != "none":
             choices.append("loss_vehicle")
         if loss_source(draft.values) != LOSS_SOURCE_DISABLED:
             choices.append("loss_disable")
-        if CONF_VEHICLE_PROFILES in self.config_entry.options and active_profile(self.config_entry.options) is None:
-            choices = ["vehicle_profiles"]
         return self.async_show_menu(
             step_id="losses",
-            menu_options=[*choices, "back"],
+            menu_options=[*choices, "vehicle_profile"],
             description_placeholders=self._loss_placeholders(),
         )
 
     def _loss_placeholders(self) -> dict[str, str]:
-        draft = self._section("losses")
-        profile = active_profile(draft.original if draft is not None else self.config_entry.options)
-        return {"vehicle": profile.name if profile is not None else "—"}
+        return self._vehicle_placeholders()
 
     async def async_step_loss_profile(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if (draft := self._section("losses")) is None:

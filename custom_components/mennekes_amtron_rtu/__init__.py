@@ -144,6 +144,7 @@ from .vehicle_profiles import (
     CONF_VIRTUAL_PLUG_CHARGE,
     SELECTION_KEYS,
     each_vehicle_options,
+    profile_options,
     profiles,
     vehicle_options,
     vehicle_soc_is_configured,
@@ -563,6 +564,13 @@ async def _async_resume_trip(
     hass: HomeAssistant, entry: MennekesAmtronConfigEntry, timed_reset_complete: bool,
 ) -> None:
     """Give a newly selected car back its own open trip, or none at all."""
+    # Any car can be edited without selecting it. A car whose planning was
+    # switched off loses its parked trip, so re-enabling never revives it.
+    await _trip_memory(hass, entry).async_retain({
+        key for key in profiles(entry.options)
+        if vehicle_soc_is_configured(each := profile_options(entry.options, key))
+        and timed_goal_is_enabled(each)
+    })
     options = vehicle_options(entry.options)
     selected = options.get(CONF_VEHICLE_PROFILE_ID)
     if (

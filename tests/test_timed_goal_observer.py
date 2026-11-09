@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import atomicwrites
@@ -111,6 +112,8 @@ def test_vehicle_cap_completion_cannot_rearm_from_unchanged_source(monkeypatch: 
         goal.set_target(80, soc=20)
         goal.observe(60, maximum=60)
         control.soc_goal = goal
+        # The car reports the same charge level the target saw.
+        hass.states["sensor.soc"] = state("sensor.soc", "60", unit_of_measurement="%")
         await observer._evaluate()
         assert observer.status == "reached"
         assert observer.goal.deadline == future
@@ -139,6 +142,72 @@ def test_live_soc_at_goal_consumes_trip_without_writing(monkeypatch: pytest.Monk
         assert observer.status == "reached"
         assert observer.goal.deadline == NOW + timedelta(hours=8)
         assert control.commands == []
+
+    asyncio.run(run())
+
+
+def test_a_raised_target_plans_a_reached_trip_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, hass = setup_observer(monkeypatch)
+        deadline = NOW + timedelta(hours=8)
+        observer.goal.set(deadline)
+        hass.states["sensor.soc"] = state("sensor.soc", "80", unit_of_measurement="%")
+        await observer._evaluate()
+        assert observer.goal.finished == "reached"
+        assert observer.planned_start is None
+        # A charge level falling before departure keeps the trip finished.
+        hass.states["sensor.soc"] = state("sensor.soc", "78", unit_of_measurement="%")
+        await observer._evaluate()
+        assert observer.status == "reached"
+        hass.states["sensor.soc"] = state("sensor.soc", "80", unit_of_measurement="%")
+        control.soc_goal.target_percent = 90.0
+        await observer._evaluate()
+        assert observer.goal.finished is None
+        assert observer.goal.deadline == deadline
+        await observer._evaluate()
+        # 8 kWh in eight hours fits at the minimum current, so it waits.
+        assert observer.status == "paused_until_start"
+        assert NOW < observer.planned_start < deadline
+        assert control.commands == [("pause", None)]
+
+    asyncio.run(run())
+
+
+def test_a_reached_kwh_target_does_not_reopen_the_trip(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=8))
+        hass.states["sensor.soc"] = state("sensor.soc", "80", unit_of_measurement="%")
+        await observer._evaluate()
+        control.soc_goal.target_percent = 90.0
+        control.energy_goal = SimpleNamespace(status="reached")
+        await observer._evaluate()
+        assert observer.goal.finished == "reached"
+
+    asyncio.run(run())
+
+
+def test_planned_start_follows_the_plan_and_clears_without_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, _control, hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=2))
+        await observer._evaluate()
+        # 48 kWh in two hours charges at once; the start is now.
+        assert observer.status in ("paced", "unreachable")
+        assert observer.planned_start == NOW
+        later = NOW + timedelta(minutes=5)
+        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: later)
+        await observer._evaluate()
+        assert observer.planned_start == NOW
+        # Another trip plans its own start instead of keeping the old one.
+        await observer.async_set_deadline(later + timedelta(hours=3))
+        assert observer.planned_start is None
+        await observer._evaluate()
+        assert observer.planned_start is not None
+        del hass.states["sensor.soc"]
+        await observer._evaluate()
+        assert observer.status == "waiting_for_soc"
+        assert observer.planned_start is None
 
     asyncio.run(run())
 

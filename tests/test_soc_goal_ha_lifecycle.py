@@ -52,7 +52,7 @@ async def _options(hass, entry, *, limit=False):
         hass, entry, "wallbox", "wallbox_advanced",
         {"measurement_interval_seconds": 300, "state_change_interval_seconds": 0, "phase_switch_grace_seconds": 0},
     )
-    steps = ["vehicle", "vehicle_soc", {CONF_VEHICLE_SOC_ENTITY: SOC, "use_vehicle_limit": limit}]
+    steps = ["vehicle", "vehicle_settings", "vehicle_battery", "vehicle_soc", {CONF_VEHICLE_SOC_ENTITY: SOC, "use_vehicle_limit": limit}]
     if limit:
         steps.append({CONF_VEHICLE_CHARGE_LIMIT_ENTITY: LIMIT})
     await async_options(hass, entry, *steps)
@@ -144,7 +144,16 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                     assert hass.states.get(status).state == "active"
                 assert current_writes(transport) == charging_writes
 
-                # Lowering the vehicle cap below its present SoC requests a real pause.
+                # Lowering the vehicle cap below its present SoC lets the car end
+                # the charge itself: the target is reached, nothing is paused.
+                hass.states.async_set(LIMIT, "60", {"unit_of_measurement": "%"})
+                await hass.async_block_till_done()
+                assert hass.states.get(status).state == "reached"
+                assert hass.states.get(target).state == "60.0"
+                assert hass.states.get(pause).state == "off"
+                assert current_writes(transport) == charging_writes
+
+                # A target below the car's limit requests a real pause.
                 stopped = asyncio.Event()
 
                 @callback
@@ -156,13 +165,13 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                 unsubscribe = async_track_state_change_event(hass, pause, state_changed)
                 try:
                     runtime.client.write_state.limiter.forget(R.CHARGING_CURRENT_EMS.key)
-                    hass.states.async_set(LIMIT, "60", {"unit_of_measurement": "%"})
+                    await set_target(55)
                     await asyncio.wait_for(stopped.wait(), 15)
                     await hass.async_block_till_done()
                 finally:
                     unsubscribe()
                 assert hass.states.get(status).state == "reached"
-                assert hass.states.get(target).state == "60.0"
+                assert hass.states.get(target).state == "55.0"
                 assert current_writes(transport)[-1] == 1
 
                 # A cold goal owner must restore from disk without starting the car.
@@ -172,7 +181,7 @@ def test_vehicle_target_is_optional_follows_car_cap_and_restores_stop(tmp_path: 
                 assert await hass.config_entries.async_setup(entry.entry_id)
                 await hass.async_block_till_done()
                 assert hass.states.get(status).state == "reached"
-                assert hass.states.get(target).state == "60.0"
+                assert hass.states.get(target).state == "55.0"
                 assert hass.states.get(pause).state == "on"
                 assert current_writes(transport) == before_reload
                 await set_target(0)

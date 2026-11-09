@@ -10,8 +10,18 @@ from homeassistant.helpers import device_registry as dr
 
 from tests.ha_fakes import FakeConfigEntry
 from tests.test_options_flow import fields
-from tests.test_vehicle_profile_options import Flow
+from tests.test_vehicle_profile_options import Flow, open_profile
 from tests.test_vehicle_profiles import A, profile_options
+
+
+def register(registry, devices):
+    """Replace the registered devices of the BavarianData account entry."""
+    registry._devices = SimpleNamespace(
+        get_devices_for_config_entry_id=lambda entry_id: [
+            SimpleNamespace(id=key) for key, device in devices.items()
+            if getattr(device, "config_entry_id", "account-entry") == entry_id
+        ]
+    )
 
 
 def provider_choices(form):
@@ -24,7 +34,7 @@ def test_new_profile_offers_only_a_provider_with_a_real_vehicle(kind):
         flow = Flow(FakeConfigEntry())
         registry = flow.hass.data[dr.DATA_REGISTRY]
         if kind == "missing":
-            registry.devices = {}
+            register(registry, {})
             registry.async_get = Mock(return_value=None)
         elif kind in {"account", "ambiguous"}:
             identifiers = {("bavariandata", "account-entry")}
@@ -36,9 +46,9 @@ def test_new_profile_offers_only_a_provider_with_a_real_vehicle(kind):
             device = SimpleNamespace(
                 config_entry_id="account-entry", identifiers=identifiers,
             )
-            registry.devices = {"car": device}
+            register(registry, {"car": device})
             registry.async_get = Mock(return_value=device)
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         form = await flow.async_step_vehicle_profile_add()
         assert provider_choices(form) == (
             ["none", "bavariandata"] if kind == "vehicle" else ["none"]
@@ -53,9 +63,9 @@ def test_unavailable_provider_cannot_be_submitted_for_a_new_profile():
     async def run():
         flow = Flow(FakeConfigEntry())
         registry = flow.hass.data[dr.DATA_REGISTRY]
-        registry.devices = {}
+        register(registry, {})
         registry.async_get = Mock(return_value=None)
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         result = await flow.async_step_vehicle_profile_add({
             "vehicle_profile_name": "BMW", "vehicle_provider": "bavariandata",
         })
@@ -74,10 +84,11 @@ def test_missing_saved_provider_can_be_renamed_without_losing_binding_or_feature
         raw["vehicle_profiles"][A]["options"] = {"vehicle_soc_use_profile": True}
         flow = Flow(FakeConfigEntry(options=raw))
         registry = flow.hass.data[dr.DATA_REGISTRY]
-        registry.devices = {}
+        register(registry, {})
         registry.async_get = Mock(return_value=None)
-        await flow.async_step_vehicle_profiles()
-        form = await flow.async_step_vehicle_profile_edit_select({"vehicle_profile_id": A})
+        await flow.async_step_vehicle()
+        await open_profile(flow)
+        form = await flow.async_step_vehicle_profile_edit()
         assert provider_choices(form) == ["none", "bavariandata"]
         assert form["errors"] == {}
         result = await flow.async_step_vehicle_profile_edit({
@@ -95,9 +106,10 @@ def test_missing_saved_provider_can_be_renamed_without_losing_binding_or_feature
 def test_missing_saved_provider_can_be_replaced_with_manual_sources_explicitly():
     async def run():
         flow = Flow(FakeConfigEntry(options=profile_options()))
-        flow.hass.data[dr.DATA_REGISTRY].devices = {}
-        await flow.async_step_vehicle_profiles()
-        await flow.async_step_vehicle_profile_edit_select({"vehicle_profile_id": A})
+        register(flow.hass.data[dr.DATA_REGISTRY], {})
+        await flow.async_step_vehicle()
+        await open_profile(flow)
+        await flow.async_step_vehicle_profile_edit()
         result = await flow.async_step_vehicle_profile_edit({
             "vehicle_profile_name": "Manual car", "vehicle_provider": "none",
         })

@@ -3,12 +3,13 @@
 These optional features are available in **stable 0.6.1**, including automatic
 tariff import and yearly refresh. For service connections,
 [update the app first](installation.md#updating-to-061).
-The setup steps follow **beta 0.8.0b5**, which includes central vehicle profiles and
+The setup steps follow **beta 0.8.0b6**, which includes central vehicle profiles and
 clearer configuration dialogs. Existing separate sources continue to work.
 [Check feature availability](README.md#versions-and-feature-availability).
 
 Both features are optional. Open **Settings → Devices & services → Mennekes
-Amtron RTU → Configure**, then **Charging costs** or **Charging losses**.
+Amtron RTU → Configure**, then **Charging costs**. Charging losses belong to a
+car: open its profile under **Vehicles**, then **Charging losses**.
 Choose a source to see only its relevant inputs; confirming the last form saves
 the section directly. They work with a
 direct USB/LAN connection and with the Modbus app/service. No extra Modbus

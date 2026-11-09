@@ -497,25 +497,6 @@ def vehicle_profile_choice_schema(
     return probatio.Schema(fields)
 
 
-def vehicle_detection_mode_schema(current: dict[str, Any]) -> probatio.Schema:
-    return probatio.Schema({
-        probatio.Required("vehicle_auto_selection", default=current.get("vehicle_auto_selection") is True):
-            BooleanSelector(),
-    })
-
-
-def vehicle_plug_charge_schema(
-    current: dict[str, Any], *, permission: bool,
-) -> probatio.Schema:
-    """Edit only the selected vehicle's permission; activation is an entity."""
-    fields: dict[Any, Any] = {}
-    if permission:
-        fields[probatio.Required(
-            "vehicle_plug_charge", default=current.get("vehicle_plug_charge") is True,
-        )] = BooleanSelector()
-    return probatio.Schema(fields)
-
-
 def vehicle_detection_source_schema(current: str, *, profile: bool) -> probatio.Schema:
     choices = ["disabled", "entities"]
     if profile:

@@ -24,6 +24,8 @@ _BLOCK_RETRY_INITIAL_SECONDS = 5.0
 # energy meter never does, as energy goals rely on its failure being visible.
 _BLOCK_HOLD_SECONDS = 30.0
 _NEVER_HELD = frozenset({"statistics"})
+# Vehicle presence depends on these values; losing them must be visible.
+_PRESENCE_KEYS = frozenset({"evse_state", "cp_state"})
 
 
 class DevicePoller:
@@ -52,6 +54,7 @@ class DevicePoller:
         # unsupported register must not occupy the bus on every status poll.
         self._block_retries: dict[str, tuple[float, float]] = {}
         self._block_read_at: dict[str, float] = {}
+        self._lost_blocks: set[str] = set()
 
     def _retry_due(self, name: str) -> bool:
         retry = self._block_retries.get(name)
@@ -141,6 +144,12 @@ class DevicePoller:
                     or self._monotonic() - read_at > _BLOCK_HOLD_SECONDS
                 ):
                     stale.extend(block.keys)
+                    if _PRESENCE_KEYS & set(block.keys) and block.name not in self._lost_blocks:
+                        self._lost_blocks.add(block.name)
+                        _LOGGER.warning(
+                            "Block %s unreadable for over %.0f seconds (%s); vehicle state unknown",
+                            block.name, _BLOCK_HOLD_SECONDS, type(err).__name__,
+                        )
                 else:
                     held.update(block.keys)
                 if block.cadence is not BlockCadence.FAST:
@@ -149,6 +158,9 @@ class DevicePoller:
             else:
                 read.update(result)
                 self._block_read_at[block.name] = self._monotonic()
+                if block.name in self._lost_blocks:
+                    self._lost_blocks.discard(block.name)
+                    _LOGGER.info("Block %s readable again", block.name)
                 total = result.get("energy_total") if block.name == "statistics" else None
                 invalid_meter = block.name == "statistics" and (
                     isinstance(total, bool) or not isinstance(total, (int, float))

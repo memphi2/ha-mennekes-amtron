@@ -329,7 +329,9 @@ def test_soc_and_energy_stores_keep_separate_models_files_and_cached_payloads(tm
         assert restored.target_percent == 70
         assert restored.maximum_percent == 70
         assert restored.observe(75)
-        assert restored.stop_requested
+        # At the car's own limit, the car ends the charge; nothing is paused.
+        assert restored.status == "reached"
+        assert not restored.stop_requested
         await soc_store.async_save(restored)
         assert (await soc_store.async_load()).status == "reached"
         assert (await energy_store.async_load()).snapshot() == energy.snapshot()

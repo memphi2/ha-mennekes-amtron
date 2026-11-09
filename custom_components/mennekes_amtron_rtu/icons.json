@@ -212,7 +212,7 @@
         "state": {
           "waiting_vehicle": "mdi:car-clock",
           "waiting_detection": "mdi:timer-sand",
-          "vehicle_not_permitted": "mdi:lock-outline",
+          "vehicle_not_selected": "mdi:lock-outline",
           "waiting_release": "mdi:timer-sand",
           "authorized": "mdi:check-circle-outline",
           "blocked": "mdi:lock-outline",

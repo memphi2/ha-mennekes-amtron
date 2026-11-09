@@ -44,7 +44,9 @@ def test_a_target_at_the_car_limit_follows_it_both_ways():
     assert (goal.maximum_percent, goal.target_percent) == (95, 95)
     assert goal.observe(70, 65)
     assert goal.target_percent == 65
-    assert goal.stop_requested
+    # The car ends a charge at its own limit; nothing needs to pause.
+    assert goal.status == "reached"
+    assert not goal.stop_requested
 
 
 def test_a_target_below_the_car_limit_never_rises():
@@ -58,13 +60,12 @@ def test_following_a_raised_limit_lifts_only_the_reached_latch():
     goal = configured()
     goal.set_target(80, 50, 80)
     assert goal.observe(80)
-    assert goal.stop_requested
+    assert goal.status == "reached"
     assert goal.observe(82, 95)
     assert (goal.target_percent, goal.status) == (95, "active")
-    assert not goal.stop_requested
     # An unknown charge level ends the latch too; the next report decides.
     assert goal.observe(95)
-    assert goal.stop_requested
+    assert goal.status == "reached"
     assert goal.observe(None, 100)
     assert (goal.target_percent, goal.status) == (100, "active")
 
@@ -164,3 +165,20 @@ def test_restore_rejects_inconsistent_state(changes):
 def test_restore_rejects_invalid_shapes(raw):
     with pytest.raises(ValueError, match="fields"):
         SocGoal.restore(raw)
+
+
+def test_only_a_target_below_the_car_limit_pauses_when_reached():
+    below = configured()
+    below.set_target(70, 50, 80)
+    assert below.observe(70)
+    assert below.stop_requested
+    at_limit = configured()
+    at_limit.set_target(80, 50, 80)
+    assert at_limit.observe(80)
+    assert at_limit.status == "reached"
+    assert not at_limit.stop_requested
+    # Without a known car limit, the wallbox still has to stop the charge.
+    unknown = configured()
+    unknown.set_target(80, 50)
+    assert unknown.observe(80)
+    assert unknown.stop_requested

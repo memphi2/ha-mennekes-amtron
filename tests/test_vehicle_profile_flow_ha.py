@@ -8,9 +8,7 @@ from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.mennekes_amtron_rtu.config_schemas import (
     vehicle_detection_entities_schema,
-    vehicle_detection_mode_schema,
     vehicle_detection_source_schema,
-    vehicle_plug_charge_schema,
     vehicle_profile_choice_schema,
     vehicle_profile_details_schema,
     vehicle_profile_soc_schema,
@@ -26,15 +24,6 @@ from tests.test_soc_goal_ha_lifecycle import _entry
 @pytest.mark.parametrize(
     ("step", "schema"),
     [
-        ("vehicle_plug_charge", vehicle_plug_charge_schema({}, permission=False)),
-        (
-            "vehicle_plug_charge",
-            vehicle_plug_charge_schema(
-                {"vehicle_plug_charge": True},
-                permission=True,
-            ),
-        ),
-        ("vehicle_detection_mode", vehicle_detection_mode_schema({})),
         (
             "vehicle_detection_source",
             vehicle_detection_source_schema("profile", profile=True),
@@ -45,7 +34,7 @@ from tests.test_soc_goal_ha_lifecycle import _entry
         ),
         ("vehicle_detection_entities", vehicle_detection_entities_schema({})),
         (
-            "vehicle_detection_profile",
+            "vehicle_profile_open",
             vehicle_profile_choice_schema(
                 [{"value": "1" * 32, "label": "Owner's EV"}], "1" * 32
             ),
@@ -61,12 +50,6 @@ from tests.test_soc_goal_ha_lifecycle import _entry
             "vehicle_profile_select",
             vehicle_profile_choice_schema(
                 [{"value": "1" * 32, "label": "Owner's EV"}], "1" * 32
-            ),
-        ),
-        (
-            "vehicle_profile_edit_select",
-            vehicle_profile_choice_schema(
-                [{"value": "1" * 32, "label": "Owner's EV"}], None
             ),
         ),
         (
@@ -113,15 +96,19 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
 
                 async def begin():
                     form = await manager.async_init(entry.entry_id)
-                    form = await submit(form, "vehicle")
-                    return await submit(form, "vehicle_profiles")
+                    return await submit(form, "vehicle")
 
-                form = await manager.async_init(entry.entry_id)
-                form = await submit(form, "vehicle")
-                form = await submit(form, "vehicle_plug_charge")
-                assert form["type"] is FlowResultType.MENU
-                assert form["menu_options"] == ["vehicle_profiles", "back"]
-                form = await submit(form, "vehicle_profiles")
+                async def open_profile(key):
+                    form = await submit(await begin(), "vehicle_profile_open")
+                    if form["type"] is FlowResultType.FORM:
+                        form = await submit(form, {"vehicle_profile_id": key})
+                    assert form["step_id"] == "vehicle_profile"
+                    return form
+
+                form = await begin()
+                assert form["menu_options"] == [
+                    "vehicle_profile_add", "vehicle_settings", "back",
+                ]
                 form = await submit(form, "vehicle_profile_add")
                 result = await submit(
                     form,
@@ -129,6 +116,13 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                 )
                 assert result["type"] is FlowResultType.CREATE_ENTRY
                 first = profile_list(entry.options)[0].id
+                form = await open_profile(first)
+                assert form["menu_options"] == [
+                    "vehicle_profile_edit", "vehicle_battery", "departure", "losses",
+                    "vehicle_detection_signals", "vehicle",
+                ]
+                form = await submit(form, "vehicle_battery")
+                assert (await submit(form, "vehicle_profile"))["step_id"] == "vehicle_profile"
                 form = await submit(await begin(), "vehicle_profile_add")
                 await submit(
                     form,
@@ -140,8 +134,7 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                 await submit(form, {"vehicle_profile_id": second})
                 assert entry.options["active_vehicle_profile"] == second
 
-                form = await manager.async_init(entry.entry_id)
-                form = await submit(form, "vehicle")
+                form = await submit(await open_profile(second), "vehicle_battery")
                 form = await submit(form, "vehicle_soc")
                 await submit(
                     form,
@@ -155,8 +148,21 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                 }
                 assert entry.options["vehicle_profiles"][first]["options"] == {}
 
-                form = await submit(await begin(), "vehicle_profile_edit_select")
-                form = await submit(form, {"vehicle_profile_id": second})
+                # A car that is not selected is configured without selecting it.
+                selected_at = entry.options["vehicle_profile_selected_at"]
+                form = await submit(await open_profile(first), "vehicle_battery")
+                form = await submit(form, "vehicle_soc")
+                await submit(
+                    form,
+                    {"vehicle_soc_entity": "sensor.first_soc", "use_vehicle_limit": False},
+                )
+                assert entry.options["vehicle_profiles"][first]["options"] == {
+                    "vehicle_soc_entity": "sensor.first_soc"
+                }
+                assert entry.options["active_vehicle_profile"] == second
+                assert entry.options["vehicle_profile_selected_at"] == selected_at
+
+                form = await submit(await open_profile(second), "vehicle_profile_edit")
                 await submit(
                     form,
                     {"vehicle_profile_name": "Renamed EV", "vehicle_provider": "none"},
@@ -165,14 +171,8 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                 assert entry.options["vehicle_profiles"][second]["options"] == {
                     "vehicle_soc_entity": "sensor.external_soc"
                 }
-                form = await manager.async_init(entry.entry_id)
-                form = await submit(form, "vehicle")
-                form = await submit(form, "vehicle_plug_charge")
-                assert form["type"] is FlowResultType.MENU
-                assert form["menu_options"] == ["vehicle_profiles", "vehicle_detection", "back"]
-                form = await submit(form, "vehicle_detection")
-                form = await submit(form, "vehicle_detection_profile")
-                form = await submit(form, {"vehicle_profile_id": first})
+                form = await submit(await open_profile(first), "vehicle_detection_signals")
+                assert form["step_id"] == "vehicle_detection_source"
                 form = await submit(form, {"vehicle_detection_source": "entities"})
                 await submit(
                     form,
@@ -188,42 +188,19 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                 }
                 assert not entry.options.get("vehicle_auto_selection")
                 assert entry.options["active_vehicle_profile"] == second
-                form = await manager.async_init(entry.entry_id)
-                form = await submit(form, "vehicle")
-                form = await submit(form, "vehicle_detection")
-                form = await submit(form, "vehicle_detection_mode")
-                await submit(form, {"vehicle_auto_selection": True})
-                assert entry.options["vehicle_auto_selection"] is True
+                # Automatic selection is chosen in the Active vehicle entity.
+                hass.config_entries.async_update_entry(
+                    entry, options={**entry.options, "vehicle_auto_selection": True},
+                )
                 form = await submit(await begin(), "vehicle_profile_select")
                 await submit(form, {"vehicle_profile_id": second})
                 assert entry.options["vehicle_auto_selection"] is False
                 form = await submit(await begin(), "vehicle_profile_select")
                 await submit(form, {"vehicle_profile_id": first})
-                hass.config_entries.async_update_entry(
-                    entry, options={**entry.options, "virtual_plug_charge": True},
-                )
-                form = await manager.async_init(entry.entry_id)
-                form = await submit(form, "vehicle")
-                form = await submit(form, "vehicle_plug_charge")
-                await submit(form, {"vehicle_plug_charge": True})
-                assert entry.options["virtual_plug_charge"] is True
-                assert (
-                    entry.options["vehicle_profiles"][first]["options"][
-                        "vehicle_plug_charge"
-                    ]
-                    is True
-                )
                 assert entry.options["vehicle_auto_selection"] is False
                 await submit(await begin(), "vehicle_profile_clear")
                 assert entry.options["active_vehicle_profile"] is None
                 assert len(profile_list(entry.options)) == 2
-                form = await manager.async_init(entry.entry_id)
-                form = await submit(form, "vehicle")
-                form = await submit(form, "vehicle_plug_charge")
-                assert form["type"] is FlowResultType.MENU
-                assert not form.get("errors")
-                await submit(form, "back")
-                assert entry.options["virtual_plug_charge"] is True
             finally:
                 await hass.async_stop()
 

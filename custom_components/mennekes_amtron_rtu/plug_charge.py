@@ -25,7 +25,6 @@ from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
 from .vehicle_detection import SETTLE_SECONDS, VehicleEvidence
 from .vehicle_profiles import (
-    CONF_VEHICLE_PLUG_CHARGE,
     CONF_VIRTUAL_PLUG_CHARGE,
     active_profile,
     profiles,
@@ -42,14 +41,17 @@ _PLAN_PAUSED = "paused_until_start"
 
 
 def plug_charge_policy(options: Mapping[str, Any]) -> str:
-    """Revoke grants when permissions/identity/evidence change, not on reload."""
+    """Revoke grants when identity or evidence change, not on reload.
+
+    A profile with detection signals takes part; the wallbox switch is the only
+    permission.
+    """
     policy = {
         key: {
             "provider": profile.provider_id,
             "device": profile.device_id,
             "identity": profile.identity,
             "detection": profile.detection.as_dict() if profile.detection else None,
-            "permitted": profile.options.get(CONF_VEHICLE_PLUG_CHARGE) is True,
         }
         for key, profile in profiles(options).items()
     }
@@ -183,11 +185,9 @@ class PlugChargeObserver:
             self._set_status("waiting_detection")
             return None
         profile = active_profile(self._entry.options)
-        if (
-            profile is None or profile.id != selected
-            or profile.options.get(CONF_VEHICLE_PLUG_CHARGE) is not True
-        ):
-            self._set_status("vehicle_not_permitted")
+        if profile is None or profile.id != selected:
+            # Another car, or none, is selected manually.
+            self._set_status("vehicle_not_selected")
             return None
         if self._entry.runtime_data.vehicle_profile_id != profile.id:
             # The car's target and departure plan are still being started.
@@ -273,7 +273,7 @@ class PlugChargeObserver:
         if observer is None or self._control.read_only or not self._control.supports_soc_goal:
             return
         limit, goal = observer.maximum, self._control.soc_goal
-        if limit is None or (limit == goal.target_percent and not goal.stop_requested):
+        if limit is None or (limit == goal.target_percent and goal.status != "reached"):
             return
 
         async def adopt() -> None:

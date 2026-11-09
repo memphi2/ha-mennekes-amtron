@@ -7,7 +7,7 @@ import pytest
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import activate_profile
 from tests.ha_fakes import FakeConfigEntry
 from tests.test_options_flow import fields
-from tests.test_vehicle_profile_options import Flow
+from tests.test_vehicle_profile_options import Flow, open_profile
 from tests.test_vehicle_profiles import A, B, profile_options
 
 
@@ -17,7 +17,8 @@ def test_percentage_source_choices_reflect_actual_profile_capabilities(capabilit
         entry = FakeConfigEntry(options=profile_options())
         flow = Flow(entry)
         flow._vehicle_capabilities = lambda _: capabilities
-        await flow.async_step_vehicle()
+        await open_profile(flow)
+        await flow.async_step_vehicle_battery()
         form = await flow.async_step_vehicle_source()
         assert form["description_placeholders"] == {"vehicle": "Car A"}
         assert fields(form)["vehicle_soc_source"].config["options"] == (
@@ -46,7 +47,8 @@ def test_disappearing_capability_rechecks_profile_form_before_save(remaining, us
     async def run():
         entry = FakeConfigEntry(options=profile_options())
         flow = Flow(entry)
-        await flow.async_step_vehicle()
+        await open_profile(flow)
+        await flow.async_step_vehicle_battery()
         await flow.async_step_vehicle_source({"vehicle_soc_source": "profile"})
         flow._vehicle_capabilities = lambda _: remaining
         form = await flow.async_step_vehicle_profile_soc(user_input)
@@ -67,6 +69,7 @@ def test_departure_remove_action_is_offered_only_when_enabled(enabled):
             "vehicle_soc_entity": "sensor.soc", "timed_goal_enabled": enabled,
         }))
         flow = Flow(entry)
+        await open_profile(flow)
         menu = await flow.async_step_departure()
         assert menu["description_placeholders"] == {"vehicle": "Car A"}
         assert ("departure_disable" in menu["menu_options"]) is enabled
@@ -78,16 +81,17 @@ def test_departure_remove_action_is_offered_only_when_enabled(enabled):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("section", ["vehicle", "departure"])
+@pytest.mark.parametrize("section", ["vehicle_battery", "departure"])
 def test_open_form_keeps_its_original_vehicle_name_after_automatic_selection(section):
     async def run():
         entry = FakeConfigEntry(options=profile_options(feature={
             "vehicle_soc_entity": "sensor.original", "timed_goal_enabled": True,
         }))
         flow = Flow(entry)
+        await open_profile(flow)
         await getattr(flow, f"async_step_{section}")()
         entry.options = activate_profile(entry.options, B)
-        if section == "vehicle":
+        if section == "vehicle_battery":
             form = await flow.async_step_vehicle_soc()
             result = await flow.async_step_vehicle_soc({"vehicle_soc_entity": "sensor.changed"})
         else:
@@ -100,6 +104,6 @@ def test_open_form_keeps_its_original_vehicle_name_after_automatic_selection(sec
         assert entry.options["vehicle_profiles"][B]["options"] == {"vehicle_soc_entity": "sensor.other"}
         # Discarding the old draft allows the next section to describe B.
         await flow.async_step_back()
-        assert flow._vehicle_placeholders() == {"vehicle": "Car B"}
+        assert (await open_profile(flow, B))["description_placeholders"] == {"vehicle": "Car B"}
 
     asyncio.run(run())

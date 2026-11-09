@@ -141,7 +141,7 @@ def test_profile_telemetry_and_manual_maximum_remain_independent(tmp_path):
             hass.states.async_set("number.car_max", "15", {"unit_of_measurement": "%"})
             await hass.async_block_till_done()
             assert control.soc_goal.target_percent == 15
-            assert control.soc_goal.stop_requested
+            assert control.soc_goal.status == "reached"
         finally:
             await observer.async_stop()
             await hass.async_stop()

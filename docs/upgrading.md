@@ -9,11 +9,10 @@ then the integration. Keep existing app data and your HA entry. The **#apps**
 catalog carries stable updates; **#apps-beta** follows the beta channel below.
 Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
 
-## Trying 0.8.0b5
+## Trying 0.8.0b6
 
-**0.8.0b5 is a beta of the integration; the beta app stays at 0.8.0b4. 0.6.1
-remains stable.** Opt into prereleases in your integration installer and select
-**v0.8.0b5**. Keep the
+**0.8.0b6 is a beta of the integration and app; 0.6.1 remains stable.** Opt into prereleases in your integration installer and select
+**v0.8.0b6**. Keep the
 existing HA entry. The beta app is offered through
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
 catalog can use **Check for updates** and update their app in place.
@@ -21,14 +20,21 @@ catalog can use **Check for updates** and update their app in place.
 Moving from **#apps** to **#apps-beta** creates a separate app installation.
 Follow the [channel handover](modbus-service.md#updates), preserving its data
 and ensuring only one service owns the wallbox connection. In service mode,
-update the app to **0.8.0b4 first**, wait for initialization, then update the
-integration. Beta 5 keeps each car's upcoming departure when you switch cars
+update the app to **0.8.0b6 first**, wait for initialization, then update the
+integration. Beta 6 offers BavarianData again when adding or editing a vehicle
+profile and moves every vehicle setting into the car's profile under
+**Configure → Vehicles**; automatic selection is switched on in the **Active
+vehicle** entity. A percentage target at the car's own limit no longer pauses
+the wallbox when reached (app **0.8.0b6** for service mode): the car ends that
+charge itself and nothing changes until you unplug. Virtual Plug & Charge no
+longer loses its grant for the rest of a connection when the wallbox status is
+briefly unreadable or contradictory. Beta 5 keeps each car's upcoming departure when you switch cars
 and accepts a text sensor as the cable signal for automatic selection; it needs
 no app update. Beta 4 keeps entities available across a single disturbed Modbus
 read (app **0.8.0b4** for service mode), keeps the selected car after unplugging
 instead of reloading, remembers each car's percentage target and no longer lifts
 a pause after a restart with the car still connected. Beta 3 lets Virtual
-Plug & Charge end a manual pause when a permitted car is plugged in. App
+Plug & Charge end a manual pause when a recognized car is plugged in. App
 **0.8.0b3** lifts that pause while the charging release is
 still off, so the release follows without the state-change interval; with an
 older app the release can wait for that interval. The status sensor names the
@@ -72,8 +78,8 @@ independently of a provider.
 Virtual Plug & Charge is separately optional and stays off until you enable it.
 An existing activation setting is preserved. From **0.8.0b2**, activation uses
 the wallbox's **Virtual Plug & Charge** switch
-under **Configuration**; profile permissions remain in the vehicle options.
-It needs detection sources and permission for each participating profile;
+under **Configuration**. It needs detection sources for each participating
+profile (before 0.8.0b6 also a separate permission per profile);
 automatic profile selection alone does not enable it. Service mode also needs
 app/service **0.8.0b1 or newer** with the charging-permission capability. Follow the [setup steps](vehicle-setup.md#optional-virtual-plug--charge)
 before enabling it; enabling may stop an existing charge while detection is

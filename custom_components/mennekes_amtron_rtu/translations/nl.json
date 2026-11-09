@@ -609,12 +609,15 @@
           "error": "Fout"
         }
       },
+      "timed_goal_planned_start": {
+        "name": "Geplande laadstart"
+      },
       "virtual_plug_charge_status": {
         "name": "Status virtuele Plug & Charge",
         "state": {
           "waiting_vehicle": "Wacht op voertuig",
           "waiting_detection": "Wacht op actuele voertuiggegevens",
-          "vehicle_not_permitted": "Voertuig niet toegestaan",
+          "vehicle_not_selected": "Herkend voertuig niet geselecteerd",
           "waiting_release": "Wacht op laadtoestemming",
           "authorized": "Voertuig toegestaan",
           "blocked": "Laden geblokkeerd",
@@ -912,12 +915,10 @@
         "title": "Instellingen",
         "menu_options": {
           "wallbox": "Wallbox",
-          "vehicle": "Voertuig",
-          "departure": "Volgend vertrek",
-          "costs": "Laadkosten",
-          "losses": "Laadverliezen"
+          "vehicle": "Voertuigen",
+          "costs": "Laadkosten"
         },
-        "description": "Begin bij Laadpaal. Voertuiggegevens, vertrekplanning, kosten en laadverliezen zijn optioneel. Elke sectie wordt in het laatste formulier apart opgeslagen; alleen instellingen van gekozen functies verschijnen."
+        "description": "Begin met Wallbox. Onder Voertuigen heeft elke auto een eigen profiel met alles wat erbij hoort: laadniveau, vertrekplanning, laadverliezen, detectie en Plug & Charge. De laadkosten gelden voor elke auto. Elk onderdeel wordt apart opgeslagen op het laatste formulier; alleen de instellingen van de gekozen functies worden getoond."
       },
       "wallbox": {
         "title": "Wallbox",
@@ -957,17 +958,17 @@
         "description": "De standaardwaarden combineren snelle statusupdates, minder opgeslagen metingen en rustige toestandswisselingen. Home Assistant toont de resterende wachttijd van geplande opdrachten. Deze intervallen vertragen de onafhankelijke heartbeat niet."
       },
       "vehicle": {
-        "title": "Voertuig",
+        "title": "Voertuigen",
+        "description": "Geselecteerd voertuig: **{vehicle}**.\n\nOpen een profiel om alles voor die auto op één plek in te stellen. Met Voertuig selecteren bepaal je welke auto nu laadt. Wil je dat kabel- en thuissignalen de auto kiezen, stel dan per profiel de Detectiesignalen in en kies **Automatische keuze** in de entiteit **Actief voertuig** op de apparaatpagina van de wallbox. Een profiel toevoegen schakelt geen laadfunctie in.\n\nZonder profielen gelden de voertuiginstellingen voor elke auto. Het eerste nieuwe profiel bewaart ze in een profiel met de naam ‘Existing sources’.",
         "menu_options": {
-          "vehicle_soc": "Laadniveau instellen",
-          "vehicle_disable": "Laadniveau niet meer gebruiken",
-          "back": "Terug zonder opslaan",
-          "vehicle_profiles": "Voertuigprofielen",
-          "vehicle_source": "Laadniveau instellen",
-          "vehicle_detection": "Automatische voertuigkeuze",
-          "vehicle_plug_charge": "Virtuele Plug & Charge"
-        },
-        "description": "Actief voertuig: **{vehicle}**.\n\nStel voertuigprofielen en het optionele percentagedoel in. Kies elke auto eenmaal en bepaal daarna afzonderlijk of u zijn laadlimiet, capaciteit, vertrektijden of geschiedenis wilt gebruiken.\n\nZet Laaddoel van voertuig op 0 om alleen het huidige percentagedoel te annuleren. Laadniveau niet meer gebruiken verwijdert hier de bronkoppelingen van dit profiel, inclusief het optionele maximum, wist het percentagedoel en de geplande rit en schakelt de vertrekplanning uit. De bronentiteiten van de voertuigintegratie blijven behouden, evenals voertuigtoestemming, kWh-doel en laadstatus."
+          "vehicle_profile_add": "Profiel toevoegen",
+          "vehicle_settings": "Voertuiginstellingen zonder profiel",
+          "vehicle_profile_open": "Instellingen van een profiel openen",
+          "vehicle_profile_select": "Voertuig selecteren",
+          "vehicle_profile_remove": "Profiel verwijderen",
+          "vehicle_profile_clear": "Geen voertuig selecteren",
+          "back": "Terug zonder opslaan"
+        }
       },
       "vehicle_soc": {
         "title": "Laadniveau instellen",
@@ -979,7 +980,7 @@
           "vehicle_soc_entity": "Kies de sensor voor het werkelijke laadniveau in %. Ontbrekende gegevens laten het laden ongewijzigd totdat geldige waarden terugkeren. Een andere bron wist het procentdoel zonder het laden te starten. Uitschakelen kan via het vorige menu.",
           "use_vehicle_limit": "Schakel dit in om de laadlimiet van het voertuig als extra maximum te kiezen. Er wordt niets naar het voertuig geschreven."
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nHiermee stel je het optionele procentuele laaddoel in via een bestaande laadtoestandsensor. Stel daarna het gewenste percentage in op de apparaatpagina van de laadpaal. Een doel begrenst alleen het laden en heft een handmatige pauze niet op."
+        "description": "Profiel: **{vehicle}**.\n\nHiermee stel je het optionele procentuele laaddoel in via een bestaande laadtoestandsensor. Stel daarna het gewenste percentage in op de apparaatpagina van de laadpaal. Een doel begrenst alleen het laden en heft een handmatige pauze niet op."
       },
       "vehicle_limit": {
         "title": "Laadlimiet van het voertuig",
@@ -989,24 +990,24 @@
         "data_description": {
           "vehicle_charge_limit_entity": "Optioneel: begrens het percentagedoel ook met de laadlimietentiteit van het voertuig. Zonder deze entiteit zijn doelen tot 100% mogelijk. Een lagere limiet verlaagt een bestaand doel; een hogere verhoogt het niet. Bij een onbeschikbare entiteit blijft de laatste geldige limiet gelden. Er worden geen instellingen in het voertuig gewijzigd."
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nGebruik de laadlimiet van het voertuig als extra maximum voor het Home Assistant-laaddoel. Selecteer de ingestelde doellimiet van de auto, niet de actuele laadtoestand."
+        "description": "Profiel: **{vehicle}**.\n\nGebruik de laadlimiet van het voertuig als extra maximum voor het Home Assistant-laaddoel. Selecteer de ingestelde doellimiet van de auto, niet de actuele laadtoestand."
       },
       "departure": {
         "title": "Volgend vertrek",
         "menu_options": {
           "departure_configure": "Vertrekplanning instellen",
           "departure_disable": "Vertrekplanning uitschakelen",
-          "back": "Terug zonder opslaan"
+          "vehicle_profile": "Terug naar profiel"
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nPlan één volgende rit met een procentueel doel, bruikbare accucapaciteit en vertrektijd. Kies daarna het tijdstip op de apparaatpagina of neem het over uit een optionele bron. Dit is geen dagelijks schema. Uitschakelen wist de rit en geplande opdrachten; het procentuele doel blijft behouden."
+        "description": "Profiel: **{vehicle}**.\n\nMet vertrekplanning start Home Assistant het laden vroeg genoeg om het percentagedoel bij de vertrektijd te halen in plaats van meteen te laden.\n\nPlan één volgende rit met een procentueel doel, bruikbare accucapaciteit en vertrektijd. Kies daarna het tijdstip op de apparaatpagina of neem het over uit een optionele bron. Dit is geen dagelijks schema. Uitschakelen wist de rit en geplande opdrachten; het procentuele doel blijft behouden."
       },
       "departure_requires_vehicle": {
         "title": "Laadniveau vereist",
         "menu_options": {
-          "vehicle": "Voertuig",
-          "back": "Terug zonder opslaan"
+          "vehicle_battery": "Laadniveau en laadlimiet",
+          "vehicle_profile": "Terug naar profiel"
         },
-        "description": "Stel eerst een bron voor het laadniveau van het voertuig in en ga daarna terug naar de vertrekplanning."
+        "description": "Profiel: **{vehicle}**.\n\nDe vertrekplanning moet weten hoe vol de accu van deze auto is. Stel eerst het laadniveau in en ga daarna terug naar Volgend vertrek."
       },
       "departure_configure": {
         "title": "Vertrekplanning instellen",
@@ -1016,7 +1017,7 @@
           "use_departure_entity": "Entiteit voor vertrektijd gebruiken",
           "use_vehicle_timer": "Vertrektijden van het voertuig gebruiken"
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nDatum en tijd kun je altijd handmatig invoeren. Kies alleen gewenste extra bronnen; hun instellingen volgen hierna. Een actief plan kan een handmatige pauze opheffen om het vertrekdoel te halen.",
+        "description": "Profiel: **{vehicle}**.\n\nDatum en tijd kun je altijd handmatig invoeren. Kies alleen gewenste extra bronnen; hun instellingen volgen hierna. Een actief plan kan een handmatige pauze opheffen om het vertrekdoel te halen.",
         "data_description": {
           "capacity_source": "Gebruik de bruikbare capaciteit: een vaste waarde, kWh/Wh-sensor of ondersteunde profielwaarde. De planning wacht als de gekozen capaciteit of laadtoestand ontbreekt.",
           "use_calendar": "Voegt een knop toe om de volgende passende kalenderafspraak over te nemen. Elke druk kiest één rit; gebruik de meegeleverde blauwdruk voor geplande kalenderimports.",
@@ -1032,7 +1033,7 @@
         "data_description": {
           "timed_capacity_kwh": "Voer de bruikbare accucapaciteit in, niet de nominale capaciteit."
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nVul de energie in die de accu daadwerkelijk voor het rijden kan opslaan. Hiermee wordt de benodigde laadtijd geschat; de accu-instellingen van de auto veranderen niet."
+        "description": "Profiel: **{vehicle}**.\n\nVul de energie in die de accu daadwerkelijk voor het rijden kan opslaan. Hiermee wordt de benodigde laadtijd geschat; de accu-instellingen van de auto veranderen niet."
       },
       "departure_capacity_entity": {
         "title": "Entiteit voor accucapaciteit",
@@ -1042,7 +1043,7 @@
         "data_description": {
           "timed_capacity_entity": "Kies een sensor voor bruikbare capaciteit in kWh of Wh."
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nKies een sensor voor de bruikbare capaciteit, niet voor resterende energie of laadpercentage. De eenheid moet kWh of Wh zijn. Zonder geldige waarde wacht de planning op capaciteit in plaats van die te raden."
+        "description": "Profiel: **{vehicle}**.\n\nKies een sensor voor de bruikbare capaciteit, niet voor resterende energie of laadpercentage. De eenheid moet kWh of Wh zijn. Zonder geldige waarde wacht de planning op capaciteit in plaats van die te raden."
       },
       "departure_calendar": {
         "title": "Vertrekkalender",
@@ -1054,7 +1055,7 @@
           "timed_calendar_entity": "Kies een kalender en kopieer één afspraak met de bijbehorende knop.",
           "timed_calendar_title": "Alleen afspraken met precies deze titel tellen mee. Afspraken voor de hele dag worden genegeerd."
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nKies een kalender en een exacte afspraaktitel, bijvoorbeeld ‘Naar het werk’. Het begin van de afspraak wordt de vertrektijd. De knop zoekt 14 dagen vooruit en negeert afspraken die de hele dag duren."
+        "description": "Profiel: **{vehicle}**.\n\nKies een kalender en een exacte afspraaktitel, bijvoorbeeld ‘Naar het werk’. Het begin van de afspraak wordt de vertrektijd. De knop zoekt 14 dagen vooruit en negeert afspraken die de hele dag duren."
       },
       "departure_entity": {
         "title": "Entiteit voor vertrektijd",
@@ -1064,7 +1065,7 @@
         "data_description": {
           "timed_departure_entity": "Kies een tijdstempel met datum en tijd of een volledige input_datetime. Alleen een tijdstip is onvoldoende."
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nKies een bron met datum en tijd. Een nieuw geldig toekomstig tijdstip wordt automatisch overgenomen. Stel hiervoor één bron in; handmatige invoer en kalender-/voertuigknoppen blijven beschikbaar."
+        "description": "Profiel: **{vehicle}**.\n\nKies een bron met datum en tijd. Een nieuw geldig toekomstig tijdstip wordt automatisch overgenomen. Stel hiervoor één bron in; handmatige invoer en kalender-/voertuigknoppen blijven beschikbaar."
       },
       "departure_vehicle": {
         "title": "Voertuigintegratie",
@@ -1086,7 +1087,7 @@
           "timed_timer1_days": "Kies de in de BMW ingestelde dagen voor klimaattimer 1. BavarianData levert deze dagen niet. Laat leeg om deze timer te negeren.",
           "timed_timer2_days": "Kies de in de BMW ingestelde dagen voor timer 2. Laat leeg om deze timer te negeren."
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nGebruik de vertrekknop om één actieve timer van het gekozen voertuig over te nemen. Bij een profiel is het voertuig al gekozen. Schakel in BavarianData de sensoren voor actie, uur en minuut in; geef hier terugkerende weekdagen op, omdat de integratie die niet publiceert."
+        "description": "Profiel: **{vehicle}**.\n\nGebruik de vertrekknop om één actieve timer van het gekozen voertuig over te nemen. Bij een profiel is het voertuig al gekozen. Schakel in BavarianData de sensoren voor actie, uur en minuut in; geef hier terugkerende weekdagen op, omdat de integratie die niet publiceert."
       },
       "costs": {
         "title": "Bron van de stroomprijs",
@@ -1170,16 +1171,15 @@
         "menu_options": {
           "loss_sensor": "Laadverliezen via een sensor",
           "loss_vehicle": "Laadgeschiedenis van het voertuig",
+          "loss_profile": "Laadgeschiedenis van dit profiel gebruiken",
           "loss_disable": "Verliesraming uitschakelen",
-          "back": "Terug zonder opslaan",
-          "loss_profile": "Laadgeschiedenis van het gekozen voertuig gebruiken",
-          "vehicle_profiles": "Voertuigprofielen"
+          "vehicle_profile": "Terug naar profiel"
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nVergelijk de door de laadpaal gemeten energie met de energie die tijdens dezelfde voltooide laadsessie in de accu is gekomen. Het laatste verlies en gemiddelde zijn schattingen. Kies het voertuig vóór het laden; ontbrekende of onduidelijke koppelingen blijven onbekend.\n\nAls er geen voertuig is geselecteerd, kies dan eerst een profiel. Ontbreekt zijn laadgeschiedenis, controleer dan het geselecteerde profiel onder Voertuigprofielen of kies een energiesensor."
+        "description": "Profiel: **{vehicle}**.\n\nLaadverliezen tonen hoeveel van de door de wallbox gemeten energie echt in de accu van deze auto is aangekomen.\n\nVergelijk de door de laadpaal gemeten energie met de energie die tijdens dezelfde voltooide laadsessie in de accu is gekomen. Het laatste verlies en gemiddelde zijn schattingen. Kies het voertuig vóór het laden; ontbrekende of onduidelijke koppelingen blijven onbekend.\n\nIs de laadgeschiedenis van deze auto niet beschikbaar, controleer dan de voertuigbron onder Naam en voertuigbron of kies een energiesensor."
       },
       "loss_sensor": {
         "title": "Laadverliezen via een sensor",
-        "description": "Actief voertuig: **{vehicle}**.\n\nSelecteer een sensor voor de energie die tijdens de laatste laadsessie aan de voertuigaccu is toegevoegd, in kWh of Wh. Gebruik geen energie gemeten aan de laadpaal of een totaalteller. Zonder laadtijden is het resultaat een schatting. Bevestig standaard de bijpassende laadsessie met de knop ‘Laadenergie van voertuig koppelen’.",
+        "description": "Profiel: **{vehicle}**.\n\nSelecteer een sensor voor de energie die tijdens de laatste laadsessie aan de voertuigaccu is toegevoegd, in kWh of Wh. Gebruik geen energie gemeten aan de laadpaal of een totaalteller. Zonder laadtijden is het resultaat een schatting. Bevestig standaard de bijpassende laadsessie met de knop ‘Laadenergie van voertuig koppelen’.",
         "data": {
           "vehicle_last_charge_energy_entity": "Accu-energie van het voertuig, laatste laadsessie",
           "charge_loss_auto_match": "Gewijzigde energiewaarde automatisch koppelen"
@@ -1194,14 +1194,14 @@
         "data": {
           "charge_loss_vehicle_provider": "Voertuigintegratie"
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nKies een geïnstalleerde integratie met een ondersteunde adapter. Algemene HA-entiteiten werken zonder adapter. Alleen bestaande lokale voertuiggegevens worden gelezen."
+        "description": "Profiel: **{vehicle}**.\n\nKies een geïnstalleerde integratie met een ondersteunde adapter. Algemene HA-entiteiten werken zonder adapter. Alleen bestaande lokale voertuiggegevens worden gelezen."
       },
       "loss_vehicle_details": {
         "title": "Voertuig voor laadgeschiedenis",
         "data": {
           "charge_loss_vehicle_device": "Voertuig"
         },
-        "description": "Actief voertuig: **{vehicle}**.\n\nKies het voertuig aan deze wallbox. Alleen bestaande lokale laadgeschiedenis wordt gelezen; er wordt geen voertuigupdate gevraagd. Ontbrekende of onduidelijke overeenkomsten blijven onbekend."
+        "description": "Profiel: **{vehicle}**.\n\nKies het voertuig aan deze wallbox. Alleen bestaande lokale laadgeschiedenis wordt gelezen; er wordt geen voertuigupdate gevraagd. Ontbrekende of onduidelijke overeenkomsten blijven onbekend."
       },
       "options_changed": {
         "title": "Instellingen zijn gewijzigd",
@@ -1217,21 +1217,9 @@
           "charging_network_module": "Deze opties verschijnen wanneer het land van Home Assistant op Duitsland staat. Kies de module die voor deze aansluiting is afgesproken. De integratie maakt een schatting en vraagt geen tarief aan of wijzigt je stroomcontract."
         }
       },
-      "vehicle_profiles": {
-        "title": "Voertuigprofielen",
-        "description": "Elke auto behoudt eigen optionele bronnen en instellingen. Kies de auto handmatig of stel onder Voertuig de optionele automatische keuze in. Een profiel toevoegen schakelt geen laadfuncties in.",
-        "menu_options": {
-          "vehicle_profile_add": "Profiel toevoegen",
-          "vehicle_profile_select": "Voertuig kiezen",
-          "vehicle_profile_edit_select": "Profiel bewerken",
-          "vehicle_profile_remove": "Profiel verwijderen",
-          "back": "Terug zonder opslaan",
-          "vehicle_profile_clear": "Geen voertuig kiezen"
-        }
-      },
       "vehicle_profile_add": {
         "title": "Profiel toevoegen",
-        "description": "Geef het profiel een herkenbare naam en kies BavarianData of handmatige entiteitskeuze. Optionele laadfuncties staan bij nieuwe profielen uit.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.",
+        "description": "Geef het profiel een herkenbare naam en kies BavarianData of handmatige entiteitskeuze. Optionele laadfuncties staan bij nieuwe profielen uit.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.",
         "data": {
           "vehicle_profile_name": "Profielnaam",
           "vehicle_provider": "Voertuigintegratie"
@@ -1243,7 +1231,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Profiel bewerken",
-        "description": "Bij hernoemen blijven instellingen behouden. Een andere integratie of ander voertuig kiezen wist de functie-instellingen van dit profiel, zodat gegevens van de vorige auto niet worden hergebruikt.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.",
+        "description": "Bij hernoemen blijven instellingen behouden. Een andere integratie of ander voertuig kiezen wist de functie-instellingen van dit profiel, zodat gegevens van de vorige auto niet worden hergebruikt.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.",
         "data": {
           "vehicle_profile_name": "Profielnaam",
           "vehicle_provider": "Voertuigintegratie"
@@ -1262,13 +1250,6 @@
         "data_description": {
           "vehicle_profile_id": "Selecteer de daadwerkelijk aangesloten auto vóór het laden, vooral voor het vergelijken van laadverliezen. Deze handmatige keuze schakelt automatische voertuigselectie uit."
         }
-      },
-      "vehicle_profile_edit_select": {
-        "title": "Profiel bewerken",
-        "data": {
-          "vehicle_profile_id": "Voertuigprofiel"
-        },
-        "description": "Kies het profiel om te bewerken. Een ander profiel bewerken selecteert dat voertuig niet voor het laden."
       },
       "vehicle_profile_remove": {
         "title": "Profiel verwijderen",
@@ -1290,7 +1271,7 @@
       },
       "vehicle_source": {
         "title": "Laadniveau instellen",
-        "description": "Actief voertuig: **{vehicle}**.\n\nGebruik het gemelde laadniveau van het actieve profiel of kies handmatig een entiteit. Daarna verschijnen alleen de instellingen van de gekozen bron.",
+        "description": "Profiel: **{vehicle}**.\n\nGebruik het gemelde laadniveau van dit profiel of kies handmatig een entiteit. Daarna verschijnen alleen de instellingen van de gekozen bron.",
         "data": {
           "vehicle_soc_source": "Bron van het laadniveau"
         },
@@ -1300,7 +1281,7 @@
       },
       "vehicle_profile_soc": {
         "title": "Laadniveau instellen",
-        "description": "Actief voertuig: **{vehicle}**.\n\nGebruik het gemelde laadniveau van het actieve profiel voor het optionele percentagedoel. De laadlimiet van dezelfde auto kan ook als extra maximum dienen. Er wordt geen instelling in het voertuig gewijzigd.",
+        "description": "Profiel: **{vehicle}**.\n\nGebruik het gemelde laadniveau van dit profiel voor het optionele percentagedoel. De laadlimiet van dezelfde auto kan ook als extra maximum dienen. Er wordt geen instelling in het voertuig gewijzigd.",
         "data": {
           "use_vehicle_limit": "Ook de laadlimiet van het voertuig gebruiken"
         },
@@ -1310,44 +1291,18 @@
       },
       "loss_profile": {
         "title": "Laadgeschiedenis van het voertuig",
-        "description": "Gebruikt de lokale laadgeschiedenis van het actieve profiel zonder een voertuigverversing aan te vragen. Ontbrekende of onduidelijke overeenkomsten blijven onbekend."
-      },
-      "vehicle_detection": {
-        "title": "Automatische voertuigkeuze",
-        "description": "Optioneel: kies de aangesloten auto op basis van kabel- en thuissignalen. Handmatig kiezen blijft de standaard. Configureer de signalen van deelnemende profielen en schakel daarna de automatische keuze in.",
-        "menu_options": {
-          "vehicle_detection_mode": "Automatische keuze in- of uitschakelen",
-          "vehicle_detection_profile": "Herkenningssignalen van een profiel instellen",
-          "back": "Terug zonder opslaan"
-        }
-      },
-      "vehicle_detection_mode": {
-        "title": "Automatische voertuigkeuze",
-        "description": "Er wordt slechts één auto gekozen met geldige signalen voor kabel aangesloten en thuis die recent aan Home Assistant zijn gemeld. Een zeker losgekoppelde kabel of een auto die zeker niet thuis is sluit die auto uit. Anders blokkeren onbekende, niet beschikbare of langer dan 30 minuten niet gemelde signalen de keuze. Bij geen of meerdere overeenkomsten wordt geen voertuig gekozen. Handmatig een auto kiezen schakelt de automatische keuze uit. Herkenning start of hervat het laden niet.",
-        "data": {
-          "vehicle_auto_selection": "Voertuig automatisch kiezen"
-        },
-        "data_description": {
-          "vehicle_auto_selection": "Als nog geen profiel detectiesignalen heeft, begeleiden de volgende stappen u bij het kiezen van een profiel en zijn bronnen. Automatische selectie wordt pas ingeschakeld nadat geldige detectie-instellingen zijn opgeslagen. Ze gebruikt voertuigsignalen, geen identificatie via de laadkabel. U kunt altijd handmatig een auto kiezen."
-        }
-      },
-      "vehicle_detection_profile": {
-        "title": "Herkenningssignalen van een profiel instellen",
-        "description": "Kies het profiel waarvan u de kabel- en thuissignalen wilt instellen. Alleen profielen met ingeschakelde herkenning doen mee.",
-        "data": {
-          "vehicle_profile_id": "Voertuigprofiel"
-        }
+        "description": "Gebruikt de lokale laadgeschiedenis van dit profiel zonder een voertuigverversing aan te vragen. Ontbrekende of onduidelijke overeenkomsten blijven onbekend."
       },
       "vehicle_detection_source": {
         "title": "Herkenningssignalen",
-        "description": "Actief voertuig: **{vehicle}**.\n\nGebruik ondersteunde lokale entiteiten van de voertuigintegratie, kies bestaande Home Assistant-entiteiten of schakel herkenning voor dit profiel uit. Zowel de kabelverbinding als aanwezigheid thuis is nodig. Er worden geen extra cloudverzoeken gedaan.",
+        "description": "Profiel: **{vehicle}**.\n\nDetectiesignalen melden dat deze auto is aangesloten en thuis is. Automatische voertuigselectie en virtueel Plug & Charge gebruiken ze.\n\nGebruik ondersteunde lokale entiteiten van de voertuigintegratie, kies bestaande Home Assistant-entiteiten of schakel herkenning voor dit profiel uit. Zowel de kabelverbinding als aanwezigheid thuis is nodig. Er worden geen extra cloudverzoeken gedaan.",
         "data": {
           "vehicle_detection_source": "Bron voor herkenning"
         }
       },
       "vehicle_detection_entities": {
         "title": "Kabel- en thuissignalen",
-        "description": "Actief voertuig: **{vehicle}**.\n\nKies aparte signalen voor deze auto. Gebruik voor de kabel een binaire sensor met on = aangesloten, of een sensor waarvan je in de volgende stap de statussen ‘aangesloten’ kiest. Thuis vereist een binaire sensor met on = thuis, of een persoon/apparaattracker met home = thuis. De signalen moeten binnen 30 minuten aan Home Assistant worden gemeld. Een melding bewijst niet wanneer de auto zijn locatie heeft gemeten.",
+        "description": "Profiel: **{vehicle}**.\n\nKies aparte signalen voor deze auto. Gebruik voor de kabel een binaire sensor met on = aangesloten, of een sensor waarvan je in de volgende stap de statussen ‘aangesloten’ kiest. Thuis vereist een binaire sensor met on = thuis, of een persoon/apparaattracker met home = thuis. De signalen moeten binnen 30 minuten aan Home Assistant worden gemeld. Een melding bewijst niet wanneer de auto zijn locatie heeft gemeten.",
         "data": {
           "vehicle_connected_entity": "Laadkabel aangesloten",
           "vehicle_home_entity": "Voertuig thuis"
@@ -1359,7 +1314,7 @@
       },
       "vehicle_detection_connected_states": {
         "title": "Statussen ‘kabel aangesloten’",
-        "description": "Actief voertuig: **{vehicle}**.\n\nKies welke statussen van `{entity}` betekenen dat de laadkabel op deze auto is aangesloten. Elke andere gemelde status telt als losgekoppeld; onbekend of niet beschikbaar voorkomt automatische selectie.",
+        "description": "Profiel: **{vehicle}**.\n\nKies welke statussen van `{entity}` betekenen dat de laadkabel op deze auto is aangesloten. Elke andere gemelde status telt als losgekoppeld; onbekend of niet beschikbaar voorkomt automatische selectie.",
         "data": {
           "vehicle_connected_states": "Statussen aangesloten"
         },
@@ -1367,19 +1322,43 @@
           "vehicle_connected_states": "Kies de statussen die de sensor bij een aangesloten kabel meldt, of typ er een precies zoals de sensor hem toont."
         }
       },
-      "vehicle_plug_charge": {
-        "title": "Virtuele Plug & Charge",
-        "description": "Actief voertuig: **{vehicle}**.\n\nGeef hier toestemming voor automatisch laden van dit profiel. Schakel de functie afzonderlijk in of uit met de schakelaar **Virtuele Plug & Charge** onder **Configuratie** op de apparaatpagina van de laadpaal.\n\nAls het profiel of zijn detectiesignalen ontbreken, gebruik dan Voertuigprofielen hieronder om een auto toe te voegen of te kiezen, of Automatische voertuigselectie om de kabel-/thuissignalen in te stellen. Keer daarna hier terug om dit profiel toestemming te geven. Automatische profielselectie mag uit blijven. Nieuwe laadtoestemming vereist één eenduidig herkend, toegestaan actief profiel en een nieuw kabelbericht voor de huidige aansluiting. Alleen handmatige selectie bewijst geen aansluiting.\n\nDeze optionele gemaksfunctie gebruikt geen ISO 15118-authenticatie en vereist uitgeschakelde lokale RFID-autorisatie. Bestaande pauzes, vergrendelingen en bereikte doelen blijven gelden. Inschakelen kan een lopende laadsessie onderbreken terwijl herkenning nog ontbreekt. Uitschakelen hervat het laden niet; gebruik daarna indien gewenst expliciet Laadvrijgave.",
+      "vehicle_profile_open": {
+        "title": "Profiel openen",
+        "description": "Kies de auto waarvan je de instellingen wilt wijzigen. Een profiel openen selecteert die auto niet om te laden.",
         "data": {
-          "vehicle_plug_charge": "Dit voertuig automatisch toestemming geven"
-        },
-        "data_description": {
-          "vehicle_plug_charge": "Toestemming alleen voor het actieve profiel. Handmatige profielselectie bewijst niet dat die auto is aangesloten. Actuele passende kabel-/thuissignalen blijven nodig. Een ander voertuig of andere detectiebronnen verwijdert deze toestemming."
-        },
+          "vehicle_profile_id": "Voertuigprofiel"
+        }
+      },
+      "vehicle_profile": {
+        "title": "Voertuigprofiel",
+        "description": "Profiel: **{vehicle}**.\n\nAlles hier hoort alleen bij deze auto en blijft bewaard, ook als er een andere auto geselecteerd is. Elk onderdeel is optioneel:\n\n- **Naam en voertuigbron:** het profiel hernoemen of koppelen aan de auto in een voertuigintegratie zoals BavarianData, zodat de gegevens automatisch worden gelezen.\n- **Laadniveau en laadlimiet:** laat Home Assistant stoppen bij een percentagedoel, bijvoorbeeld 80 %. Nodig voor vertrekplanning.\n- **Volgend vertrek:** start het laden op tijd om het doel bij de vertrektijd te halen in plaats van meteen te laden.\n- **Laadverliezen:** toont hoeveel van de energie uit de wallbox echt in de accu is aangekomen.\n- **Detectiesignalen:** kabel- en thuissignalen die deze auto herkennen. **Automatische keuze** in de entiteit **Actief voertuig** gebruikt ze, en staat de wallboxschakelaar **Virtueel Plug & Charge** aan, dan begint de herkende auto te laden zodra hij wordt aangesloten. Met een gepland vertrek wordt eerst gepauzeerd en op tijd gestart; is de tijd anders te kort, dan wordt meteen geladen.",
         "menu_options": {
-          "vehicle_profiles": "Voertuigprofielen",
-          "vehicle_detection": "Automatische voertuigkeuze",
-          "back": "Terug zonder opslaan"
+          "vehicle_profile_edit": "Naam en voertuigbron",
+          "vehicle_battery": "Laadniveau en laadlimiet",
+          "departure": "Volgend vertrek",
+          "losses": "Laadverliezen",
+          "vehicle_detection_signals": "Detectiesignalen",
+          "vehicle": "Terug naar voertuigen"
+        }
+      },
+      "vehicle_settings": {
+        "title": "Voertuiginstellingen",
+        "description": "Er zijn nog geen voertuigprofielen, dus deze instellingen gelden voor elke auto. Elk onderdeel is optioneel:\n\n- **Laadniveau en laadlimiet:** laat Home Assistant stoppen bij een percentagedoel, bijvoorbeeld 80 %. Nodig voor vertrekplanning.\n- **Volgend vertrek:** start het laden op tijd om het doel bij de vertrektijd te halen in plaats van meteen te laden.\n- **Laadverliezen:** toont hoeveel van de energie uit de wallbox echt in de accu is aangekomen.\n\nVoeg onder Voertuigen een profiel toe om per auto eigen instellingen te hebben.",
+        "menu_options": {
+          "vehicle_battery": "Laadniveau en laadlimiet",
+          "departure": "Volgend vertrek",
+          "losses": "Laadverliezen",
+          "vehicle": "Terug naar voertuigen"
+        }
+      },
+      "vehicle_battery": {
+        "title": "Laadniveau en laadlimiet",
+        "description": "Profiel: **{vehicle}**.\n\nMet het laadniveau stopt Home Assistant bij een percentagedoel, bijvoorbeeld 80 %, en de vertrekplanning berekent er de laadtijd mee. De laadlimiet van de auto kan als extra maximum worden gebruikt. Stel het gewenste percentage daarna in op de apparaatpagina van de wallbox.\n\nOm alleen het huidige percentagedoel te annuleren, zet je Voertuiglaaddoel op 0. Laadniveau niet meer gebruiken verwijdert hier de bronkoppelingen van dit profiel, inclusief het optionele maximum, en schakelt de vertrekplanning uit; bij de geselecteerde auto worden ook het percentagedoel en de geplande rit gewist. De bronentiteiten in de voertuigintegratie blijven ongewijzigd, net als voertuigtoestemming, kWh-doel en laadstatus.",
+        "menu_options": {
+          "vehicle_soc": "Laadniveau instellen",
+          "vehicle_source": "Laadniveau instellen",
+          "vehicle_disable": "Laadniveau niet meer gebruiken",
+          "vehicle_profile": "Terug naar profiel"
         }
       }
     },
@@ -1412,7 +1391,6 @@
       "vehicle_detection_entity_invalid": "Kies een bestaande binaire kabelsensor en een ondersteunde entiteit voor aanwezigheid thuis.",
       "vehicle_detection_entities_distinct": "Kies verschillende entiteiten voor de kabelverbinding en aanwezigheid thuis.",
       "vehicle_connected_states_invalid": "Kies één tot acht statussen voor aangesloten, elk precies zoals de sensor ze meldt.",
-      "plug_charge_invalid": "Kies aan of uit voor deze instelling.",
       "plug_charge_detection_required": "Selecteer een voertuigprofiel en stel de kabel-/thuisdetectie in voordat je automatisch toestemming geeft."
     }
   },

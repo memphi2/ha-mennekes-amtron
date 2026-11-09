@@ -29,7 +29,8 @@ class SocGoal:
     or until a target at the car's limit follows a raised limit that the
     current charge level has not reached. The last valid car cap remains in force when its
     entity becomes unavailable. None of these operations authorizes starting
-    or resuming charging.
+    or resuming charging. A reached target at the car's own limit pauses
+    nothing: the car ends that charge itself, like at any other charger.
     """
 
     def __init__(self) -> None:
@@ -40,7 +41,7 @@ class SocGoal:
 
     @property
     def stop_requested(self) -> bool:
-        return self.status == "reached"
+        return self.status == "reached" and self.target_percent != self.maximum_percent
 
     def configure_source(self, source: str | None) -> bool:
         """Forget the old car's ceiling and cap when its sources change."""

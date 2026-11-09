@@ -25,8 +25,9 @@ work. In service mode, use app/service 0.6.1 or newer.
    supply it when that source is available.
 3. Set **Next departure** to tomorrow's full date and **07:30**, or copy that
    trip from a calendar or vehicle timer.
-4. Check the displayed date, time, target and planning status. Unlock and
-   authorize the car as required. The plan cannot bypass those restrictions.
+4. Check the displayed date, time, target and planning status. From
+   **0.8.0b6**, **Planned charging start** shows when charging starts, or
+   started, for this trip. Unlock and authorize the car as required. The plan cannot bypass those restrictions.
 5. To add climate, install the [preconditioning blueprint](blueprints.md#start-vehicle-climate-before-departure)
    and choose the HA action and lead time you want.
 
@@ -37,7 +38,7 @@ creates only one HA departure plan.
 ## Enable planning
 
 Set up a vehicle charge-level source and a positive **Vehicle charge target**
-first. Open **Configure → Next departure → Configure departure planning** and enable departure planning. Choose
+first. Open the profile under **Configure → Vehicles**, then **Next departure → Configure departure planning** and enable departure planning. Choose
 a fixed **usable battery capacity** in kWh, a suitable value from the active
 vehicle profile, or an entity that reports it in kWh or Wh. Only the chosen
 capacity input appears. The integration never guesses
@@ -132,7 +133,7 @@ clear **Next departure**. The ordinary percentage target without a departure
 time still only limits charging and never resumes a pause.
 
 With [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge)
-(from **0.8.0b3**), plugging in a permitted car does not start charging ahead of
+(from **0.8.0b3**), plugging in a recognized car does not start charging ahead of
 an armed plan. The release waits until the plan has paused until its start or
 set its current.
 
@@ -142,7 +143,9 @@ The optional [calendar and preconditioning blueprints](blueprints.md) select
 one trip and run your chosen vehicle action before departure. The vehicle
 determines whether preconditioning draws grid or battery power; completed
 charging targets still apply. Once the target is reached, the charging plan
-cannot resume another charge. **Next departure** remains visible until that
+cannot resume another charge. From **0.8.0b6**, raising **Vehicle charge
+target** above the car's charge level plans the same trip again. Every target
+change recalculates the plan. **Next departure** remains visible until that
 time so the climate blueprint can still run, then clears automatically.
 ## Limits and missing data
 

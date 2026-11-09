@@ -5,6 +5,47 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0b6 — 2026-11-09
+
+Beta update of the integration and app; **0.6.1 remains stable**. In service
+mode, update the app to **0.8.0b6** first.
+
+- BavarianData is offered again as a vehicle source when adding or editing a
+  vehicle profile. On the supported Home Assistant versions the integration
+  did not find the registered car, so only **None** was offered and editing an
+  existing BavarianData profile skipped choosing the car and its vehicle
+  entities.
+- All settings of a car are now in its profile. **Configure → Vehicles** lists
+  the profiles; opening one shows its name and vehicle source, charge level and
+  charge limit, next departure, charging losses and detection signals for
+  automatic selection and Virtual Plug & Charge, each with a short explanation
+  of what it is for. Any profile
+  can be changed, not only the selected car. **Next departure** and **Charging
+  losses** are no longer top-level menus.
+- Automatic vehicle selection is switched on only in the **Active vehicle**
+  entity. The duplicate switch in the options is gone; each profile's detection
+  signals stay in the profile.
+- Virtual Plug & Charge no longer needs a separate permission per profile.
+  Every profile with detection signals takes part once the wallbox switch
+  **Virtual Plug & Charge** is on. The status **Recognized vehicle not
+  selected** means another car is
+  selected manually.
+- New sensor **Planned charging start** shows when the departure plan starts
+  charging, or started.
+- Raising **Vehicle charge target** after a trip was reached plans the same
+  departure again instead of leaving it finished.
+- A percentage target at the car's own charge limit no longer pauses the
+  wallbox when reached. The car ends that charge itself, like at any other
+  charger, and nothing changes until unplugging. A target below the car's limit
+  still pauses. Service mode needs app **0.8.0b6**.
+- Virtual Plug & Charge no longer switches the charging release off when the
+  wallbox status is briefly unreadable or contradictory, for example while
+  pausing; before, only a new plug-in restored charging. After 60 seconds of
+  unknown state the release is withdrawn and HA grants the same connection
+  again without replugging. The log names why a grant ended and warns when the
+  status cannot be read for over 30 seconds. Service mode needs app
+  **0.8.0b6**.
+
 ## 0.8.0b5 — 2026-11-08
 
 Beta update of the integration only; **0.6.1 remains stable**. The app stays at

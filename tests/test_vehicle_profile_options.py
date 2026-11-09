@@ -45,6 +45,13 @@ class Flow(BaseFlow):
         self.hass.data[er.DATA_REGISTRY] = registry
 
 
+async def open_profile(flow, key=A):
+    """Open one car's settings the way the Vehicles menu does."""
+    menu = await flow.async_step_vehicle_profile_open({"vehicle_profile_id": key})
+    assert menu["step_id"] == "vehicle_profile"
+    return menu
+
+
 def test_profile_add_preserves_legacy_mixed_sources_and_enables_no_new_features():
     async def run():
         old = {
@@ -54,8 +61,8 @@ def test_profile_add_preserves_legacy_mixed_sources_and_enables_no_new_features(
             "charging_price": 0.4,
         }
         flow = Flow(FakeConfigEntry(options=old))
-        menu = await flow.async_step_vehicle_profiles()
-        assert menu["menu_options"] == ["vehicle_profile_add", "back"]
+        menu = await flow.async_step_vehicle()
+        assert menu["menu_options"] == ["vehicle_profile_add", "vehicle_settings", "back"]
         form = await flow.async_step_vehicle_profile_add(
             {
                 "vehicle_profile_name": "My BMW",
@@ -88,7 +95,7 @@ def test_profile_add_preserves_legacy_mixed_sources_and_enables_no_new_features(
 def test_first_manual_profile_is_active_but_all_vehicle_features_stay_off():
     async def run():
         flow = Flow(FakeConfigEntry())
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         result = await flow.async_step_vehicle_profile_add(
             {"vehicle_profile_name": "Other EV", "vehicle_provider": "none"}
         )
@@ -105,7 +112,7 @@ def test_first_manual_profile_is_active_but_all_vehicle_features_stay_off():
 def test_profile_name_is_required_bounded_and_unique(name):
     async def run():
         flow = Flow(FakeConfigEntry(options=profile_options()))
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         result = await flow.async_step_vehicle_profile_add(
             {"vehicle_profile_name": name, "vehicle_provider": "none"}
         )
@@ -129,7 +136,7 @@ def test_profile_provider_and_catalog_limit_are_validated_before_save():
             for index in range(8)
         }
         flow = Flow(FakeConfigEntry(options=raw))
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         result = await flow.async_step_vehicle_profile_add(
             {"vehicle_profile_name": "More", "vehicle_provider": "bad"}
         )
@@ -152,15 +159,11 @@ def test_profile_edit_rename_keeps_features_but_changed_vehicle_resets_them():
         entry.options["vehicle_profiles"][A]["identity"] = provider_identity(
             flow.hass, "bavariandata", "car"
         )
-        await flow.async_step_vehicle_profiles()
         assert (
-            await flow.async_step_vehicle_profile_edit_select(
-                {"vehicle_profile_id": "missing"}
-            )
+            await flow.async_step_vehicle_profile_open({"vehicle_profile_id": "missing"})
         )["errors"]
-        edit = await flow.async_step_vehicle_profile_edit_select(
-            {"vehicle_profile_id": A}
-        )
+        await open_profile(flow)
+        edit = await flow.async_step_vehicle_profile_edit()
         assert edit["step_id"] == "vehicle_profile_edit"
         await flow.async_step_vehicle_profile_edit(
             {"vehicle_profile_name": "Renamed", "vehicle_provider": "bavariandata"}
@@ -174,8 +177,8 @@ def test_profile_edit_rename_keeps_features_but_changed_vehicle_resets_them():
         )
         assert "vehicle_profile_selected_at" not in same
         entry.options = same
-        await flow.async_step_vehicle_profiles()
-        await flow.async_step_vehicle_profile_edit_select({"vehicle_profile_id": A})
+        await open_profile(flow)
+        await flow.async_step_vehicle_profile_edit()
         await flow.async_step_vehicle_profile_edit(
             {"vehicle_profile_name": "Renamed", "vehicle_provider": "bavariandata"}
         )
@@ -193,13 +196,13 @@ def test_profile_select_clear_and_remove_never_auto_choose_another_vehicle():
     async def run():
         entry = FakeConfigEntry(options=profile_options())
         flow = Flow(entry)
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         selected = (
             await flow.async_step_vehicle_profile_select({"vehicle_profile_id": B})
         )["data"]
         assert selected["active_vehicle_profile"] == B
         entry.options = selected
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         assert (
             await flow.async_step_vehicle_profile_remove(
                 {"vehicle_profile_id": B, "confirm": False}
@@ -213,7 +216,7 @@ def test_profile_select_clear_and_remove_never_auto_choose_another_vehicle():
         assert removed["active_vehicle_profile"] is None
         assert set(profiles(removed)) == {A}
         entry.options = profile_options()
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         inactive_removed = (
             await flow.async_step_vehicle_profile_remove(
                 {"vehicle_profile_id": B, "confirm": True}
@@ -221,7 +224,7 @@ def test_profile_select_clear_and_remove_never_auto_choose_another_vehicle():
         )["data"]
         assert inactive_removed["active_vehicle_profile"] == A
         entry.options = inactive_removed
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         assert (await flow.async_step_vehicle_profile_clear())["data"][
             "active_vehicle_profile"
         ] is None
@@ -233,7 +236,7 @@ def test_profile_management_conflicts_with_concurrent_feature_edit_and_back_disc
     async def run():
         entry = FakeConfigEntry(options=profile_options())
         flow = Flow(entry)
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         await flow.async_step_vehicle_profile_add(
             {"vehicle_profile_name": "Third", "vehicle_provider": "bavariandata"}
         )
@@ -252,7 +255,7 @@ def test_profile_management_conflicts_with_concurrent_feature_edit_and_back_disc
 def test_existing_sources_name_cannot_collide_with_preserved_legacy_profile():
     async def run():
         flow = Flow(FakeConfigEntry(options={"vehicle_soc_entity": "sensor.old"}))
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         saved = (
             await flow.async_step_vehicle_profile_add(
                 {"vehicle_profile_name": "Existing sources", "vehicle_provider": "none"}
@@ -269,7 +272,6 @@ def test_existing_sources_name_cannot_collide_with_preserved_legacy_profile():
     [
         "vehicle_profile_add",
         "vehicle_profile_edit",
-        "vehicle_profile_edit_select",
         "vehicle_profile_device",
         "vehicle_profile_select",
         "vehicle_profile_remove",
@@ -282,16 +284,18 @@ def test_existing_sources_name_cannot_collide_with_preserved_legacy_profile():
 def test_profile_details_cannot_be_entered_without_their_section(step):
     async def run():
         flow = Flow(FakeConfigEntry())
-        assert (await getattr(flow, f"async_step_{step}")())["step_id"] == "init"
+        # Without a section or an opened profile, nothing can be edited.
+        assert (await getattr(flow, f"async_step_{step}")())["step_id"] in ("init", "vehicle")
 
     asyncio.run(run())
 
 
-def test_profile_features_are_selected_independently_and_saved_into_the_active_car():
+def test_profile_features_are_selected_independently_and_saved_into_their_car():
     async def run():
         entry = FakeConfigEntry(options=profile_options())
         flow = Flow(entry)
-        assert "vehicle_source" in (await flow.async_step_vehicle())["menu_options"]
+        await open_profile(flow)
+        assert "vehicle_source" in (await flow.async_step_vehicle_battery())["menu_options"]
         assert set(fields(await flow.async_step_vehicle_source())) == {
             "vehicle_soc_source"
         }
@@ -347,7 +351,8 @@ def test_manual_entity_override_and_disabled_features_do_not_delete_the_profile(
             )
         )
         flow = Flow(entry)
-        await flow.async_step_vehicle()
+        await open_profile(flow)
+        await flow.async_step_vehicle_battery()
         assert (await flow.async_step_vehicle_source({"vehicle_soc_source": "entity"}))[
             "step_id"
         ] == "vehicle_soc"
@@ -358,7 +363,7 @@ def test_manual_entity_override_and_disabled_features_do_not_delete_the_profile(
             "vehicle_soc_entity": "sensor.manual"
         }
         entry.options = saved
-        assert "vehicle_disable" in (await flow.async_step_vehicle())["menu_options"]
+        assert "vehicle_disable" in (await flow.async_step_vehicle_battery())["menu_options"]
         disabled = (await flow.async_step_vehicle_disable())["data"]
         assert disabled["vehicle_profiles"][A]["options"] == {
             "timed_goal_enabled": False
@@ -366,7 +371,7 @@ def test_manual_entity_override_and_disabled_features_do_not_delete_the_profile(
         assert disabled["active_vehicle_profile"] == A
         assert disabled["vehicle_profiles"][B] == entry.options["vehicle_profiles"][B]
         entry.options = disabled
-        assert "vehicle_disable" not in (await flow.async_step_vehicle())["menu_options"]
+        assert "vehicle_disable" not in (await flow.async_step_vehicle_battery())["menu_options"]
 
     asyncio.run(run())
 
@@ -379,33 +384,40 @@ def test_profile_percentage_removal_is_offered_only_for_enabled_soc(configured):
             "vehicle_limit_use_profile": configured,
         }))
         flow = Flow(entry)
-        menu = (await flow.async_step_vehicle())["menu_options"]
+        await open_profile(flow)
+        menu = (await flow.async_step_vehicle_battery())["menu_options"]
+        assert menu[-1] == "vehicle_profile"
         assert "vehicle_source" in menu
         assert ("vehicle_disable" in menu) is configured
 
     asyncio.run(run())
 
 
-def test_no_active_profile_exposes_only_profile_selection_for_vehicle_features():
+def test_vehicle_features_need_an_opened_profile_but_not_a_selected_car():
     async def run():
         flow = Flow(FakeConfigEntry(options=profile_options(active=None)))
         assert (await flow.async_step_vehicle())["menu_options"] == [
-            "vehicle_profiles",
-            "vehicle_plug_charge",
-            "vehicle_detection",
+            "vehicle_profile_add",
+            "vehicle_profile_open",
+            "vehicle_profile_select",
+            "vehicle_profile_remove",
+            "vehicle_profile_clear",
             "back",
         ]
-        assert (await flow.async_step_losses())["menu_options"] == [
-            "vehicle_profiles",
-            "back",
+        for step in ("vehicle_battery", "departure", "losses", "vehicle_profile_edit"):
+            assert (await getattr(flow, f"async_step_{step}")())["step_id"] == "vehicle"
+        menu = await open_profile(flow, B)
+        assert menu["description_placeholders"] == {"vehicle": "Car B"}
+        assert menu["menu_options"] == [
+            "vehicle_profile_edit",
+            "vehicle_battery",
+            "departure",
+            "losses",
+            "vehicle_detection_signals",
+            "vehicle",
         ]
-        assert (await flow.async_step_departure())[
-            "step_id"
-        ] == "departure_requires_vehicle"
-        await flow.async_step_vehicle_profiles()
-        assert (await flow.async_step_vehicle_profile_edit())[
-            "step_id"
-        ] == "vehicle_profiles"
+        assert (await flow.async_step_departure())["step_id"] == "departure"
+        assert (await flow.async_step_losses())["menu_options"][-1] == "vehicle_profile"
         await flow.async_step_back()
         with pytest.raises(RuntimeError, match="incomplete profile"):
             flow._save_profile("car")
@@ -420,7 +432,8 @@ def test_missing_vehicle_capability_cannot_enable_profile_features():
         )
         flow = Flow(entry)
         flow.hass.data[er.DATA_REGISTRY].entries.clear()
-        await flow.async_step_vehicle()
+        await open_profile(flow)
+        await flow.async_step_vehicle_battery()
         source = await flow.async_step_vehicle_source({"vehicle_soc_source": "profile"})
         assert source["errors"]["vehicle_soc_source"] == "vehicle_capability_unavailable"
         assert fields(source)["vehicle_soc_source"].config["options"] == ["entity"]
@@ -447,14 +460,15 @@ def test_changed_vehicle_identity_cannot_enable_soc_or_history_on_old_profile():
         raw = profile_options()
         raw["vehicle_profiles"][A]["identity"] = "bavariandata:car:previous-vehicle"
         flow = Flow(FakeConfigEntry(options=raw))
-        await flow.async_step_vehicle()
+        await open_profile(flow)
+        await flow.async_step_vehicle_battery()
         source = await flow.async_step_vehicle_source({"vehicle_soc_source": "profile"})
         assert source["errors"]["vehicle_soc_source"] == "vehicle_capability_unavailable"
         assert fields(source)["vehicle_soc_source"].config["options"] == ["entity"]
         await flow.async_step_losses()
         fallback = await flow.async_step_loss_profile()
         assert fallback["type"] == "menu"
-        assert fallback["menu_options"] == ["loss_sensor", "vehicle_profiles", "back"]
+        assert fallback["menu_options"] == ["loss_sensor", "vehicle_profile"]
 
     asyncio.run(run())
 
@@ -464,7 +478,7 @@ def test_device_identity_disappearing_during_selection_cannot_save_a_profile(
 ):
     async def run():
         flow = Flow(FakeConfigEntry())
-        await flow.async_step_vehicle_profiles()
+        await flow.async_step_vehicle()
         await flow.async_step_vehicle_profile_add(
             {"vehicle_profile_name": "BMW", "vehicle_provider": "bavariandata"}
         )
@@ -488,13 +502,40 @@ def test_manual_profile_does_not_offer_unavailable_manufacturer_controls():
                 )
             )
         )
+        await open_profile(flow)
         await flow.async_step_departure()
         form = await flow.async_step_departure_configure()
         assert "use_vehicle_timer" not in fields(form)
         assert fields(form)["capacity_source"].config["options"] == ["fixed", "entity"]
         assert (await flow.async_step_losses())["menu_options"] == [
             "loss_sensor",
+            "vehicle_profile",
+        ]
+
+    asyncio.run(run())
+
+
+def test_stale_or_empty_profile_menus_return_to_the_vehicle_overview():
+    async def run():
+        empty = Flow(FakeConfigEntry(options={"vehicle_profiles": {}}))
+        assert (await empty.async_step_vehicle())["menu_options"] == [
+            "vehicle_profile_add",
             "back",
         ]
+        assert (await empty.async_step_vehicle_profile_open())["step_id"] == "vehicle"
+
+        flow = Flow(FakeConfigEntry(options=profile_options()))
+        assert (await flow.async_step_vehicle_profile_select())["step_id"] == "init"
+        await flow.async_step_vehicle()
+        result = await flow.async_step_vehicle_profile_select({"vehicle_profile_id": "9" * 32})
+        assert result["errors"] == {"vehicle_profile_id": "vehicle_profile_required"}
+        flow._profile_target = "9" * 32
+        assert (await flow.async_step_vehicle_profile())["step_id"] == "vehicle"
+
+        await open_profile(flow)
+        assert (await flow.async_step_vehicle_profile_edit())["step_id"] == "vehicle_profile_edit"
+        flow._details = {}
+        result = await flow.async_step_vehicle_profile_edit({"vehicle_profile_name": "Renamed"})
+        assert result["step_id"] == "vehicle"
 
     asyncio.run(run())
