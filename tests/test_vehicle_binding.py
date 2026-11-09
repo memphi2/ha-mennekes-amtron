@@ -88,6 +88,12 @@ def test_a_plug_in_binds_only_after_the_cars_own_fresh_report(tmp_path, caplog):
         assert binding.resting
         assert binding.confirmed is False
         assert "not confirmed as First car" in caplog.text
+        # An unreadable wallbox neither confirms the car nor releases its rules.
+        coordinator.last_update_success = False
+        coordinator.plug(True)
+        await settle(hass)
+        assert binding.resting
+        coordinator.last_update_success = True
         # Its own report after the plug-in confirms it.
         report(hass)
         await settle(hass)

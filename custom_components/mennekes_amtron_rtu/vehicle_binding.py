@@ -172,6 +172,9 @@ class VehicleBinding:
                 changed = True
         if changed:
             self._hass.async_create_task(self._async_save(), "amtron_vehicle_binding", eager_start=False)
+        if wallbox is None and self._resting is not None:
+            # An unreadable wallbox neither confirms the car nor releases its rules.
+            return self._resting
         resting = (
             wallbox is True and profile is not None and profile.detection is not None
             and self._state.vehicle != profile.id
