@@ -8,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import MennekesAmtronCoordinator
-from .device.command_events import EVENT_TYPES, CommandEvent
+from .device.command_events import EVENT_TYPES, CommandEvent, event_type
 from .entity import entry_device_info, entry_entity_unique_id
 from .entry_types import MennekesAmtronConfigEntry
 
@@ -49,5 +49,8 @@ class AmtronControlResultEvent(CoordinatorEntity[MennekesAmtronCoordinator], Eve
 
     @callback
     def _handle_event(self, event: CommandEvent) -> None:
-        self._trigger_event(event.outcome, {"action": event.action, "reason": event.reason})
+        self._trigger_event(
+            event_type(event.action, event.outcome),
+            {"action": event.action, "result": event.outcome, "reason": event.reason},
+        )
         self.async_write_ha_state()

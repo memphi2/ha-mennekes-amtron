@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+### Changed
+
+- **Control result** names the command in its event type, for example
+  `pause_executed` or `set_current_failed`, so HA's history and activity show
+  which command succeeded or failed. The outcome alone is now the `result`
+  attribute. **Breaking:** automations that filter `event_type` for
+  `failed`, `uncertain` and similar must filter `result` instead.
+- **Session duration** shows hours:minutes:seconds instead of seconds.
+
 ### Fixed
 
 - A newly linked car takes over its charge limit only while the car reports

@@ -421,7 +421,13 @@ def test_the_register_gate_rejects_an_icon_that_hides_a_device_class(
 
 
 def test_numeric_sensors_declare_a_display_precision() -> None:
-    """Otherwise a float32 register shows as 230.10000610351562."""
+    """Otherwise a float32 register shows as 230.10000610351562.
+
+    A session duration is a whole number of seconds; without a precision the
+    frontend shows it as hours:minutes:seconds.
+    """
+
+    from homeassistant.components.sensor import SensorDeviceClass
 
     from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
         SENSOR_DESCRIPTIONS,
@@ -432,8 +438,11 @@ def test_numeric_sensors_declare_a_display_precision() -> None:
         for description in SENSOR_DESCRIPTIONS
         if description.native_unit_of_measurement
         and description.suggested_display_precision is None
+        and description.key != "session_duration"
     ]
     assert missing == []
+    duration = next(item for item in SENSOR_DESCRIPTIONS if item.key == "session_duration")
+    assert duration.device_class is SensorDeviceClass.DURATION
 
 
 def test_the_hardware_document_keeps_its_sources_marked(

@@ -119,8 +119,8 @@ first; it starts disabled to avoid history growth from frequent current commands
 You can [exclude it from Recorder](recorder.md#recorder-defaults)
 while keeping live automation triggers. Use it to notify you about a rejected command, an uncertain
 write, a phase-pause timeout or a recovery that did not clear the error. In the
-UI, add a state trigger for the event entity, then filter its `event_type`
-attribute. This follows Home Assistant's [event-entity pattern](https://www.home-assistant.io/integrations/event/).
+UI, add a state trigger for the event entity, then filter its `result`
+attribute; `event_type` names the command as well, for example `pause_failed`. This follows Home Assistant's [event-entity pattern](https://www.home-assistant.io/integrations/event/).
 Use a state trigger, not a raw event-bus trigger.
 
 This example excludes startup/restored state and availability-only changes.
@@ -143,7 +143,7 @@ conditions:
          and not trigger.from_state.attributes.get('restored', false)
          and trigger.to_state.state not in ['unknown', 'unavailable']
          and trigger.to_state.state != trigger.from_state.state
-         and trigger.to_state.attributes.event_type
+         and trigger.to_state.attributes.result
              in ['failed', 'uncertain', 'recovery_failed'] }}
 actions:
   - action: persistent_notification.create

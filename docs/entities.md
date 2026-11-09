@@ -210,14 +210,20 @@ These sit under *Diagnostic* on the device page.
 
 | Entity | Name | Needs | Meaning |
 |---|---|---|---|
-| `event.*_control_result` | Control result | direct connection, or a service supporting command events | Last observed command outcome, with `event_type`, `action` and `reason` attributes. Disabled by default; enable for automations when needed. |
+| `event.*_control_result` | Control result | direct connection, or a service supporting command events | Last observed command and its outcome, with `event_type`, `action`, `result` and `reason` attributes. Disabled by default; enable for automations when needed. |
+
+The event type names the command and its result, for example `pause_executed`
+or `set_current_failed`, so HA's history and activity show which command it
+was. Error recovery reports `recovery_succeeded`, `recovery_failed` or
+`recovery_uncertain`. The `action` attribute holds the command and `result`
+the outcome alone; filter on `result` to react to every failed command.
 
 The timestamp is when HA received the event. `executed` means the command was
 accepted by the controller, not that the vehicle has started charging. Use
 **Charging** and actual power to check that. A queued request creates its result
 when it runs, is replaced, or is cancelled; the pending sensors show the wait.
 
-| Event type | Meaning |
+| Result | Meaning |
 |---|---|
 | `executed` | The controller accepted the command. |
 | `replaced` | A newer request replaced a pending action. |

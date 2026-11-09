@@ -15,15 +15,35 @@ from uuid import uuid4
 
 _LOGGER = logging.getLogger(__name__)
 MAX_EVENTS = 32
-EVENT_TYPES = (
-    "executed", "replaced", "cancelled", "failed", "uncertain",
-    "recovery_succeeded", "recovery_failed",
-)
+CONTROL_OUTCOMES = ("executed", "replaced", "cancelled", "failed", "uncertain")
+RECOVERY_OUTCOMES = ("recovery_succeeded", "recovery_failed", "uncertain")
+OUTCOMES = (*CONTROL_OUTCOMES, "recovery_succeeded", "recovery_failed")
 CONTROL_ACTIONS = (
     "pause", "resume", "set_current", "single_phase", "all_phases",
     "disable_charging", "enable_charging", "lock", "unlock",
 )
 ACTIONS = (*CONTROL_ACTIONS, "recover")
+
+
+def event_type(action: str, outcome: str) -> str:
+    """One type per command and outcome, so HA shows which command it was."""
+    if action == "recover":
+        return f"recovery_{outcome.removeprefix('recovery_')}"
+    return f"{action}_{outcome}"
+
+
+EVENT_TYPES = (
+    *(event_type(action, outcome) for action in CONTROL_ACTIONS for outcome in CONTROL_OUTCOMES),
+    *(event_type("recover", outcome) for outcome in RECOVERY_OUTCOMES),
+)
+_EVENT_TYPES = frozenset(EVENT_TYPES)
+
+
+def _valid(action: object, outcome: object, reason: object) -> bool:
+    return (
+        action in ACTIONS and outcome in OUTCOMES and reason in REASONS
+        and event_type(str(action), str(outcome)) in _EVENT_TYPES
+    )
 REASONS = (
     "completed", "replaced", "shutdown", "phase_timeout", "phase_unconfirmed",
     "connection_error", "write_rejected", "permission_denied",
@@ -59,7 +79,7 @@ class CommandEvents:
 
     def record(self, outcome: str, action: str, reason: str = "completed") -> None:
         """Publish one outcome, without creating a persisted device history."""
-        if outcome not in EVENT_TYPES or action not in ACTIONS or reason not in REASONS:
+        if not _valid(action, outcome, reason):
             raise ValueError("invalid command event")
         self._sequence += 1
         event = CommandEvent(self._sequence, action, outcome, reason)
@@ -104,8 +124,7 @@ class CommandEvents:
             index = row["sequence"]
             if (
                 type(index) is not int or not previous < index <= sequence
-                or row["action"] not in ACTIONS or row["outcome"] not in EVENT_TYPES
-                or row["reason"] not in REASONS
+                or not _valid(row["action"], row["outcome"], row["reason"])
             ):
                 raise ValueError("invalid command event value")
             events.append(CommandEvent(index, row["action"], row["outcome"], row["reason"]))
