@@ -129,7 +129,12 @@ class PlugChargeState:
         return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}
 
     def durable(self) -> dict[str, Any]:
-        return {"enabled": self.enabled, "policy": self.policy, "hold": self.hold, "manual": self.manual}
+        result = {"enabled": self.enabled, "policy": self.policy, "hold": self.hold}
+        # Only a pending release is written: services before 0.8.0b7 refuse
+        # the whole saved state when they find the key.
+        if self.manual:
+            result["manual"] = True
+        return result
 
     @classmethod
     def restore(cls, raw: object) -> PlugChargeState:

@@ -107,8 +107,10 @@ When a profile is linked to a car in a vehicle integration, or its car changes,
 it uses everything that car reports right away: charge level, charge limit,
 usable battery capacity, charging history for losses and detection signals.
 You do not choose those entities yourself; the guided setup shows them, and
-you can switch any area to a manual entity. Departure planning stays off until
-you set it up:
+you can switch any area to a manual entity. The charge limit is only taken
+over while the car reports a value, because an empty limit would refuse every
+percentage target; turn it on later in **Charge level**. Departure planning
+stays off until you set it up:
 
 | Item | What it is for |
 |---|---|

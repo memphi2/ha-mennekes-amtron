@@ -38,8 +38,10 @@ from .vehicle_profiles import (
     active_profile,
     profiles,
 )
+from .vehicle_soc import vehicle_percentage
 from .vehicle_sources import (
     profile_capabilities,
+    profile_entities,
     provider_device_is_valid,
     provider_identity,
 )
@@ -385,7 +387,12 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
         options: dict[str, Any] = {}
         if "soc" in capabilities:
             options[CONF_VEHICLE_SOC_USE_PROFILE] = True
-            options[CONF_VEHICLE_LIMIT_USE_PROFILE] = "charge_limit" in capabilities
+            # A limit without a value would refuse every target until the car
+            # reports one, so only a reported limit is used from the start.
+            limit = profile_entities(self.hass, provider, device).get("charge_limit")
+            options[CONF_VEHICLE_LIMIT_USE_PROFILE] = limit is not None and vehicle_percentage(
+                self.hass.states.get(limit), limit=True,
+            ) is not None
         if "capacity" in capabilities:
             options[CONF_TIMED_USE_VEHICLE_CAPACITY] = True
         if "charge_history" in capabilities:

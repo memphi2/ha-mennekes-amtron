@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from homeassistant.core import State
 
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import profiles
 from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.detection import (
@@ -171,3 +172,15 @@ def test_a_car_that_reports_nothing_starts_without_settings():
     # A device that is no vehicle of the integration offers nothing.
     assert flow._vehicle_defaults("bavariandata", " ") == ({}, None)
     assert flow._vehicle_defaults("none", "") == ({}, None)
+
+
+@pytest.mark.parametrize("limit", [None, "unavailable", "0"])
+def test_a_car_without_a_reported_limit_keeps_targets_free(limit):
+    flow = Flow(FakeConfigEntry(options=profile_options(provider="none")))
+    if limit is not None:
+        flow.states["sensor.test_1"] = State("sensor.test_1", limit, {"unit_of_measurement": "%"})
+    options, _detection = flow._vehicle_defaults("bavariandata", "car")
+    # The charge level is used, but a limit without a value would refuse
+    # every target until the car reports one.
+    assert options["vehicle_soc_use_profile"] is True
+    assert options["vehicle_limit_use_profile"] is False

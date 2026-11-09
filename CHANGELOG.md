@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- A newly linked car takes over its charge limit only while the car reports
+  one. An empty limit refused every percentage target until the car sent a
+  value.
+- The app writes a manual Plug & Charge release into its saved state only
+  while one is pending. Before, an app downgraded to 0.8.0b6 or older refused
+  the whole saved state and did not start.
+
 ## 0.8.0b8 — 2026-11-09
 
 Beta update of the integration and app; **0.6.1 remains stable**. In service

@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from homeassistant.core import State
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
@@ -44,6 +45,8 @@ class Flow(BaseFlow):
             (item for item in entries.values() if item.entity_id == entity_id), None
         )
         self.hass.data[er.DATA_REGISTRY] = registry
+        self.states: dict[str, State] = {}
+        self.hass.states = SimpleNamespace(get=self.states.get)
 
 
 async def open_profile(flow, key=A):
@@ -76,6 +79,7 @@ def test_profile_add_preserves_legacy_mixed_sources_and_uses_what_the_car_report
         assert (
             await flow.async_step_vehicle_profile_device({"vehicle_device": "invalid"})
         )["errors"]
+        flow.states["sensor.test_1"] = State("sensor.test_1", "80", {"unit_of_measurement": "%"})
         menu = await flow.async_step_vehicle_profile_device({"vehicle_device": "car"})
         # The guided setup continues with the new car's charge level.
         assert menu["step_id"] == "vehicle_battery"
