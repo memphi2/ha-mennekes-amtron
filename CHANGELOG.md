@@ -25,6 +25,10 @@ mode, update the app to **0.8.0b7** first.
 - The departure plan status has the new states **Charging at full current** and
   **Finishing at minimum current**; **Adjusting current** and **May finish
   early at minimum current** are gone.
+- **Switch off charging release when unplugged** now also ends a manual pause.
+  Previously the pause stayed after unplugging and the wallbox kept showing it.
+  Without a car and with the release off, this switches nothing and waits for
+  no state-change interval. A stop from a reached energy target stays.
 - **Retries and failures are counted separately.** A lost reply that a resend
   made good — a read retry or a heartbeat resent after one second — counts in
   the new **Connection quality** attribute `retried_transactions` and no longer
