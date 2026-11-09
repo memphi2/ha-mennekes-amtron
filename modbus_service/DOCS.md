@@ -24,7 +24,7 @@ still use only fresh reads.
 **Since 0.8.0b3:** while the charging release is off or no car is connected, a
 current change such as ending a pause no longer starts or waits for the
 state-change interval. Virtual Plug & Charge can therefore end a manual pause and
-release a permitted car immediately. Since 0.8.0b2, decoded Modbus communication
+release a recognized car immediately. Since 0.8.0b2, decoded Modbus communication
 has its own **Debug log** tab beside **Connection**.
 The app retains optional Virtual Plug & Charge, Supervisor **2026.10.4+** guided
 setup, target-saving fixes and visible TCP-login/password fields from 0.8.0b1.
@@ -176,9 +176,9 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
 - **Next departure:** select a one-trip charging deadline in HA. This optional
   plan may resume a pause to meet the time; ordinary kWh/percentage limits alone
   never do. The service discards queued timed-plan commands after their deadline.
-  Configure the vehicle's charge level under **Configure → Vehicle**, then
-  enable **Next departure → Configure departure planning** and choose its
-  battery-capacity source.
+  Open the car's profile under **Configure → Vehicles**, set up its charge
+  level, then enable **Next departure → Configure departure planning** and
+  choose its battery-capacity source.
   See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b6/docs/departure-planning.md).
 - **Loss and cost estimates:** choose optional vehicle and price sources in the
   integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b6/docs/charging-estimates.md).
@@ -224,19 +224,20 @@ replace a small file rather than accumulating a history.
 ### Virtual Plug & Charge
 
 This feature is **optional and off by default**. Configure vehicle profiles and
-fresh cable/home detection in HA, then permit each vehicle under **Configure →
-Vehicle → Virtual Plug & Charge**. Integration **0.8.0b2** activates the feature
-with **Virtual Plug & Charge** under **Configuration** on the wallbox device
-page, preserving the existing activation setting. Automatic profile selection is a separate option; selecting a profile
-manually does not replace the detection check. See the
+fresh cable/home detection in each car's profile in HA, then switch on
+**Virtual Plug & Charge** under **Configuration** on the wallbox device page.
+From integration **0.8.0b6**, that switch is the only permission: every profile
+with detection signals takes part. Automatic selection is chosen in the
+**Active vehicle** entity; selecting a profile manually does not replace the
+detection check. See the
 [vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0b6/docs/vehicle-setup.md#optional-virtual-plug--charge).
 
-The app initially withholds charging release until HA recognizes the active,
-permitted vehicle unambiguously. A grant is valid only for the current physical
+The app initially withholds charging release until HA recognizes the selected
+vehicle unambiguously. A grant is valid only for the current physical
 connection. The app keeps it through HA Core restarts, even if cloud vehicle
 signals later become unavailable. Unplugging, losing wallbox communication or
 restarting the app clears it; a new grant needs fresh recognition from HA.
-Changing the vehicle's permission, identity or detection sources also invalidates
+Changing the vehicle's identity or detection sources also invalidates
 its grant. Deliberate pauses, locks and reached targets remain effective. Local
 RFID authorization must be disabled for this EMS-based feature.
 

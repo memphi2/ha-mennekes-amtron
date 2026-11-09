@@ -325,8 +325,8 @@ and wallbox response time also still apply when a stop is requested.
 Changing or removing either selected source clears the old percentage target
 and remembered maximum without starting charging. To cancel only the current
 target while keeping its sources, set **Vehicle charge target** to **0%**.
-Choose **Stop using vehicle charge level** under **Vehicle** to remove the selected
-profile's charge-level and optional maximum assignments here, along with its
+Choose **Stop using vehicle charge level** under the profile's **Charge level
+and charge limit** to remove that profile's charge-level and optional maximum assignments here, along with its
 percentage target. The source entities in the vehicle integration are kept.
 This also disables
 departure planning and clears its trip, because that plan needs the SoC source.

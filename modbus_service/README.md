@@ -19,7 +19,7 @@ This page needs an administrator and Supervisor **2026.10.4 or newer**.
 Read-only, limits and polling settings remain in the Configuration tab.
 
 New in beta **0.8.0b1**: optional **Virtual Plug & Charge** lets HA grant charging
-for an individually permitted vehicle after fresh cable/home detection. The app
+for a recognized vehicle after fresh cable/home detection. The app
 keeps an accepted grant through HA Core restarts for the same physical connection;
 new connections need fresh recognition. Deliberate pauses, locks and reached
 charging targets remain effective. This is a convenience feature, not ISO 15118
@@ -32,7 +32,7 @@ Since 0.8.0b4, a single disturbed bus read no longer makes the affected values
 briefly unavailable; they are kept for up to 30 seconds.
 Since 0.8.0b3, while the charging release is off, a current
 change such as ending a pause no longer starts or waits for the state-change
-interval, so Virtual Plug & Charge can release a permitted car immediately.
+interval, so Virtual Plug & Charge can release a recognized car immediately.
 Since 0.8.0b2, open its own **Web UI → Debug log** tab
 (German: **Debugprotokoll**), beside **Connection** (**Verbindung**). Switching
 tabs preserves unsaved connection settings.

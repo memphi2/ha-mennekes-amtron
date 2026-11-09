@@ -238,6 +238,8 @@ class TimedGoalObserver:
             await self._cancel_command()
             await self._save_goal(candidate)
             self._reached_target = None
+            # A new trip plans its own start; the old one no longer applies.
+            self.planned_start = None
         self._notify()
         self.request_evaluate()
 

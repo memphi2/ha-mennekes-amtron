@@ -199,6 +199,11 @@ def test_planned_start_follows_the_plan_and_clears_without_one(monkeypatch: pyte
         monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: later)
         await observer._evaluate()
         assert observer.planned_start == NOW
+        # Another trip plans its own start instead of keeping the old one.
+        await observer.async_set_deadline(later + timedelta(hours=3))
+        assert observer.planned_start is None
+        await observer._evaluate()
+        assert observer.planned_start is not None
         del hass.states["sensor.soc"]
         await observer._evaluate()
         assert observer.status == "waiting_for_soc"

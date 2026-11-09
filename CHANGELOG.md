@@ -17,8 +17,9 @@ mode, update the app to **0.8.0b6** first.
   entities.
 - All settings of a car are now in its profile. **Configure → Vehicles** lists
   the profiles; opening one shows its name and vehicle source, charge level and
-  charge limit, next departure, charging losses, detection signals and Virtual
-  Plug & Charge, each with a short explanation of what it is for. Any profile
+  charge limit, next departure, charging losses and detection signals for
+  automatic selection and Virtual Plug & Charge, each with a short explanation
+  of what it is for. Any profile
   can be changed, not only the selected car. **Next departure** and **Charging
   losses** are no longer top-level menus.
 - Automatic vehicle selection is switched on only in the **Active vehicle**
