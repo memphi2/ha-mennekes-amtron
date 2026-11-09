@@ -36,6 +36,11 @@ mode, update the app to **0.8.0b7** first.
 - In service mode, HA reads a queued command's outcome when it is due instead
   of up to one poll later. The log no longer shows such a command together
   with the next action, as if both had happened at the same time.
+- **Each vehicle profile keeps its charge target** even when the description
+  of its vehicle source changes, for example once BavarianData resolves the
+  car after a restart. Previously the target could fall back to 0 and the
+  remembered one was not found. When the integration clears a target because
+  no vehicle source is selected or the source changed, the log now says so.
 - **Retries and failures are counted separately.** A lost reply that a resend
   made good — a read retry or a heartbeat resent after one second — counts in
   the new **Connection quality** attribute `retried_transactions` and no longer

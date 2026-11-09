@@ -73,7 +73,15 @@ class SocGoalController:
             except ValueError as err:
                 raise validation_error("soc_goal_invalid") from err
             if changed:
+                previous = self.model.target_percent
                 await self._replace(candidate)
+                if previous > 0:
+                    # Name the reason: a cleared target is otherwise a mystery.
+                    _LOGGER.info(
+                        "Vehicle charge target %.0f%% cleared: %s", previous,
+                        "no vehicle source is selected" if source is None
+                        else "the vehicle source changed",
+                    )
 
     async def async_set_target(
         self, value: object, *, source: str, soc: object = None, maximum: object = None,

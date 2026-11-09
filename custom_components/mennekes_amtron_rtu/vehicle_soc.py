@@ -181,8 +181,12 @@ class VehicleSocObserver:
             self.source = f"vehicle:{telemetry.source_key}" if telemetry is not None else None
         if self.source is not None and use_vehicle_limit:
             self.source += f"|maximum:{telemetry.source_key if telemetry is not None else 'unavailable'}"
+        # A profile keeps its target even if its source description changes,
+        # for example once a vehicle's identity resolves after a restart.
+        self._memory_key = self.source
         if self.source is not None and profile_id and profile_id != LEGACY_PROFILE_ID:
             self.source = f"profile:{profile_id}:{self.source}"
+            self._memory_key = f"profile:{profile_id}"
         self._unsubscribers: list[CALLBACK_TYPE] = []
         self._pending: _Observations | None = None
         self._inflight: _Observations | None = None
@@ -291,7 +295,12 @@ class VehicleSocObserver:
         """Give a reselected vehicle its own target instead of none."""
         try:
             goal = self._control.soc_goal
-            remembered = self._memory.recall(self.source) if self._memory and self.source else None
+            remembered = None
+            if self._memory and self.source and self._memory_key:
+                remembered = self._memory.recall(self._memory_key)
+                if remembered is None:
+                    # Targets saved before 0.8.0b7 are keyed by the source.
+                    remembered = self._memory.recall(self.source)
             # A read-only owner refuses the command; nothing is restored then.
             if remembered and not self._stopping and goal.status == "disabled":
                 maximum = self.maximum or goal.maximum_percent
@@ -317,7 +326,7 @@ class VehicleSocObserver:
                     self._async_restore_target(), "amtron_vehicle_target", eager_start=False,
                 )
             return
-        if self._memory.remember(self.source, goal.target_percent):
+        if self._memory_key is not None and self._memory.remember(self._memory_key, goal.target_percent):
             self._hass.async_create_task(self._memory.async_save(), eager_start=False)
 
     @callback

@@ -128,3 +128,42 @@ def test_storage_problems_only_cost_the_remembered_targets(tmp_path, monkeypatch
             await hass.async_stop()
 
     asyncio.run(run())
+
+
+def test_a_profile_keeps_its_target_when_its_source_description_changes(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.config.config_dir = str(tmp_path)
+        control, coordinator = Control(), Coordinator()
+        for car in ("sensor.before", "sensor.after", "sensor.legacy"):
+            hass.states.async_set(car, "50", {"unit_of_measurement": "%"})
+        hass.states.async_set("number.limit", "90", {"unit_of_measurement": "%"})
+        memory = VehicleTargetMemory(hass, "entry", "serial")
+
+        async def observer(entity, profile):
+            created = VehicleSocObserver(
+                hass, control, coordinator, entity, "number.limit", profile_id=profile, memory=memory,
+            )
+            await created.async_start()
+            await hass.async_block_till_done()
+            return created
+
+        try:
+            car = await observer("sensor.before", "car")
+            await car.async_set_target(70)
+            await hass.async_block_till_done()
+            await car.async_stop()
+            assert memory.recall("profile:car") == 70
+            # The same profile, now described by another source, gets it back.
+            car = await observer("sensor.after", "car")
+            assert (control.soc_goal.target_percent, control.soc_goal.status) == (70, "active")
+            await car.async_stop()
+            # A target saved under its source before 0.8.0b7 is still found.
+            memory.remember("profile:old:sensor.legacy|number.limit", 60)
+            old = await observer("sensor.legacy", "old")
+            assert control.soc_goal.target_percent == 60
+            await old.async_stop()
+        finally:
+            await hass.async_stop()
+
+    asyncio.run(run())
