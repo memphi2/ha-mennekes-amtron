@@ -1,7 +1,7 @@
 """Resolve optional local vehicle adapters while retaining saved selections."""
 
 from collections.abc import Collection, Mapping
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.core import HomeAssistant
 
@@ -123,7 +123,7 @@ def profile_entities(hass: HomeAssistant, provider_id: str, device_id: str) -> d
     """The car's entities: soc, charge_limit, capacity, plug, location, departure."""
     if not provider_device_is_valid(hass, provider_id, device_id):
         return {}
-    result: dict[str, str] = dict(telemetry_entities(hass, device_id))
+    result = cast(dict[str, str], telemetry_entities(hass, device_id))
     plug, location = detection_entities(hass, device_id)
     result.update({key: value for key, value in (("plug", plug), ("location", location)) if value})
     if timers := departure_entities(hass, device_id):

@@ -28,12 +28,14 @@ def departure_entities(hass: HomeAssistant, device_id: str) -> list[str]:
     if vin is None:
         return []
     registry = er.async_get(hass)
-    found = []
+    found: list[str] = []
     for timer in _TIMERS:
-        entities = []
+        entities: list[str] = []
         for part in ("action", "hour", "minute"):
             entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{vin}_{_PREFIX}.{timer}.{part}")
-            entry = registry.async_get(entity_id) if entity_id is not None else None
+            if entity_id is None:
+                break
+            entry = registry.async_get(entity_id)
             if entry is None or entry.device_id != device_id or entry.disabled_by is not None:
                 break
             entities.append(entity_id)
