@@ -1,5 +1,13 @@
 # Changes
 
+## 0.8.0b8
+
+Beta update through **#apps-beta**; **0.6.1 remains stable**.
+
+- A reached charge or energy target pauses the wallbox only with a car plugged
+  in. Without a car, nothing is paused; the pause follows on the next poll once
+  a car is plugged in.
+
 ## 0.8.0b7
 
 Beta update through **#apps-beta**; **0.6.1 remains stable**.
