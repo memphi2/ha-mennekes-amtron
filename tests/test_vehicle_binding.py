@@ -275,7 +275,11 @@ def test_a_fresh_unplug_report_revokes_the_confirmation(tmp_path, caplog):
         _entry, coordinator, binding = await confirmed_binding(hass, caplog)
         report(hass, plugged=False)
         await settle(hass)
-        assert binding.resting
+        # A real unplug empties the wallbox within the next poll.
+        assert not binding.resting
+        assert "does not behave like" not in caplog.text
+        with patch.object(m, "UNPLUG_GRACE", timedelta(0)):
+            assert binding.resting
         assert "does not behave like First car: it reports itself unplugged" in caplog.text
         # Only a new plug-in report confirms it again.
         coordinator.plug(True)

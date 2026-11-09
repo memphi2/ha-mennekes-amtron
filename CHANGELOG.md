@@ -58,7 +58,8 @@ mode, update the app to **0.8.0b7** first.
   confirmation. The log warns when a car still reports itself plugged in at
   home ten minutes after unplugging.
 - **A confirmed car must stay consistent while charging.** If it afterwards
-  reports itself unplugged, or its charge level (with BavarianData the
+  reports itself unplugged while the wallbox still has a car two minutes
+  later, or its charge level (with BavarianData the
   predicted one) has not risen after the wallbox delivered 4 kWh, its rules rest again with a warning. This
   catches a car that keeps reporting itself plugged in after it left. A full
   battery (95 % or more) and missing charge levels are not checked.

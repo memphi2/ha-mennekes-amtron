@@ -41,6 +41,9 @@ _LOGGER = logging.getLogger(__name__)
 # A car's cloud data may lag behind the unplug. Only a report this long after
 # it that still claims a plugged-in car at home is a stale signal.
 STALE_AFTER = timedelta(minutes=10)
+# The wallbox notices a real unplug within a poll; an unplug report older than
+# this with a car still at the wallbox is about another car.
+UNPLUG_GRACE = timedelta(minutes=2)
 # Several percent for any car battery, even with charging losses.
 PLAUSIBLE_ENERGY_KWH = 4.0
 # A full battery may draw energy for climate or balancing without rising.
@@ -261,6 +264,7 @@ class VehicleBinding:
         if (
             evidence.connected is False and evidence.connected_at is not None
             and confirmed_at is not None and evidence.connected_at > confirmed_at
+            and now - evidence.connected_at >= UNPLUG_GRACE
         ):
             return "it reports itself unplugged"
         if self._plausible:

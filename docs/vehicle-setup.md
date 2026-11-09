@@ -217,8 +217,8 @@ moment. A car that keeps reporting itself plugged in at home ten minutes after
 the wallbox became empty has a stale plug signal; the log warns once.
 
 A confirmed car must stay consistent while it charges. Its rules rest again,
-with a warning in the log, when the car afterwards reports itself **unplugged**,
-or when the wallbox delivered **4 kWh** since charging started and the profile's
+with a warning in the log, when the car afterwards reports itself **unplugged**
+while the wallbox still has a car two minutes later, or when the wallbox delivered **4 kWh** since charging started and the profile's
 charge level reported since then has not risen. With BavarianData this is its
 predicted charge level, which follows the car's charging between the car's rare
 reports. The check skips a battery at 95 % or more, which may draw energy for
