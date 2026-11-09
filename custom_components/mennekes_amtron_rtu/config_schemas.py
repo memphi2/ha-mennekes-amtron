@@ -348,6 +348,7 @@ def vehicle_limit_schema(current: dict[str, Any]) -> probatio.Schema:
 
 def departure_configure_schema(
     current: dict[str, Any], *, vehicle_timer: bool, profile_capacity: bool = False,
+    profile_timer: bool = True,
 ) -> probatio.Schema:
     profile = current.get("vehicle_provider") not in (None, "none")
     capacity_sources = ["fixed", "entity", "profile"] if profile_capacity else ["fixed", "entity"]
@@ -380,7 +381,8 @@ def departure_configure_schema(
                 ),
             ): BooleanSelector(),
     }
-    if profile or "vehicle_profile_id" not in current or vehicle_timer:
+    # A car offers its timers only when it sends them; one in use stays visible.
+    if (profile and profile_timer) or "vehicle_profile_id" not in current or vehicle_timer:
         fields[
             probatio.Required(
                 "use_vehicle_timer",

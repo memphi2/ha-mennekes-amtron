@@ -35,7 +35,7 @@ A profile does not enable every feature at once:
 | Charge level | A percentage charging target |
 | Vehicle charge limit | A maximum selectable percentage based on the car's own limit |
 | Usable battery capacity | Planning current for a selected departure time |
-| Vehicle departure timers | A button to copy the next supported vehicle climate timer |
+| Vehicle departure timers | A button to copy the next supported vehicle climate timer; only when the car sends its timers |
 | Vehicle charging history | Better matching for estimated charging losses |
 | Cable and home signals | Optional selection of the active profile, and recognition for Virtual Plug & Charge |
 
@@ -98,7 +98,15 @@ through these areas one after another instead of a menu for each. Each area
 explains what it is for and is optional: **Next** skips it, and an area you set
 up moves on to the next one. Nothing is saved before **Save and finish** or the
 last area, the detection signals. Changes made meanwhile elsewhere, such as
-another selected car, are kept:
+another selected car, are kept. Each area names the entities it currently uses,
+for example **In use: charge level sensor.i4_soc**.
+
+When a profile is linked to a car in a vehicle integration, or its car changes,
+it uses everything that car reports right away: charge level, charge limit,
+usable battery capacity, charging history for losses and detection signals.
+You do not choose those entities yourself; the guided setup shows them, and
+you can switch any area to a manual entity. Departure planning stays off until
+you set it up:
 
 | Item | What it is for |
 |---|---|

@@ -21,7 +21,7 @@ automatic selection, Virtual Plug & Charge and live app Modbus debugging.
 | Respect the car's own maximum percentage | Its reported charge-limit source, separately enabled | [Vehicle setup](vehicle-setup.md) |
 | Reach a target for my next trip | SoC, usable battery capacity, positive percentage target and a dated departure | [Departure planning](departure-planning.md) |
 | Copy my next trip from a calendar | A HA calendar and exact event title | [Calendar departure](departure-planning.md#calendar) |
-| Use the next BMW climate timer | BavarianData and its enabled timer entities | [Vehicle departure](departure-planning.md#bavariandata-climate-timer) |
+| Use the next BMW climate timer | BavarianData and its enabled timer entities; not every car sends them | [Vehicle departure](departure-planning.md#bavariandata-climate-timer) |
 | Start climate before departure | An existing HA vehicle action or script | [Preconditioning blueprint](blueprints.md#start-vehicle-climate-before-departure) |
 | Choose between several cars | Optional vehicle profiles | [Vehicle selection](vehicle-setup.md#example-two-cars-manual-selection) — beta 0.8.0b4 |
 | Recognize the connected car automatically | Optional profiles and cable/home signals | [Automatic selection](vehicle-setup.md#optional-automatic-vehicle-selection) — beta 0.8.0b4 |

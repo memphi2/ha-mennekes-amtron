@@ -1006,7 +1006,7 @@
           "wizard_next": "Volgende",
           "wizard_finish": "Opslaan en afsluiten"
         },
-        "description": "Profiel: **{vehicle}**.\n\nMet vertrekplanning start Home Assistant het laden vroeg genoeg om het percentagedoel bij de vertrektijd te halen in plaats van meteen te laden.\n\nPlan één volgende rit met een procentueel doel, bruikbare accucapaciteit en vertrektijd. Kies daarna het tijdstip op de apparaatpagina of neem het over uit een optionele bron. Dit is geen dagelijks schema. Uitschakelen wist de rit en geplande opdrachten; het procentuele doel blijft behouden."
+        "description": "Profiel: **{vehicle}**.\n\nIn gebruik: vertrek **{departure_entity}**, accucapaciteit **{capacity_entity}**.\n\nMet vertrekplanning start Home Assistant het laden vroeg genoeg om het percentagedoel bij de vertrektijd te halen in plaats van meteen te laden.\n\nPlan één volgende rit met een procentueel doel, bruikbare accucapaciteit en vertrektijd. Kies daarna het tijdstip op de apparaatpagina of neem het over uit een optionele bron. Dit is geen dagelijks schema. Uitschakelen wist de rit en geplande opdrachten; het procentuele doel blijft behouden."
       },
       "departure_requires_vehicle": {
         "title": "Laadniveau vereist",
@@ -1186,7 +1186,7 @@
           "wizard_next": "Volgende",
           "wizard_finish": "Opslaan en afsluiten"
         },
-        "description": "Profiel: **{vehicle}**.\n\nLaadverliezen tonen hoeveel van de door de wallbox gemeten energie echt in de accu van deze auto is aangekomen.\n\nVergelijk de door de laadpaal gemeten energie met de energie die tijdens dezelfde voltooide laadsessie in de accu is gekomen. Het laatste verlies en gemiddelde zijn schattingen. Kies het voertuig vóór het laden; ontbrekende of onduidelijke koppelingen blijven onbekend.\n\nIs de laadgeschiedenis van deze auto niet beschikbaar, controleer dan de voertuigbron onder Naam en voertuigbron of kies een energiesensor."
+        "description": "Profiel: **{vehicle}**.\n\nIn gebruik: **{loss_entity}**.\n\nLaadverliezen tonen hoeveel van de door de wallbox gemeten energie echt in de accu van deze auto is aangekomen.\n\nVergelijk de door de laadpaal gemeten energie met de energie die tijdens dezelfde voltooide laadsessie in de accu is gekomen. Het laatste verlies en gemiddelde zijn schattingen. Kies het voertuig vóór het laden; ontbrekende of onduidelijke koppelingen blijven onbekend.\n\nIs de laadgeschiedenis van deze auto niet beschikbaar, controleer dan de voertuigbron onder Naam en voertuigbron of kies een energiesensor."
       },
       "loss_sensor": {
         "title": "Laadverliezen via een sensor",
@@ -1230,7 +1230,7 @@
       },
       "vehicle_profile_add": {
         "title": "Profiel toevoegen",
-        "description": "Geef het profiel een herkenbare naam en kies BavarianData of handmatige entiteitskeuze. Optionele laadfuncties staan bij nieuwe profielen uit.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.\n\nDaarna leidt de configuratie je door laadniveau en laadlimiet, volgend vertrek, laadverliezen en detectiesignalen. Kies **Volgende** om een onderdeel over te slaan. Er wordt niets opgeslagen vóór **Opslaan en afsluiten** of de laatste stap.",
+        "description": "Geef het profiel een herkenbare naam en kies BavarianData of handmatige entiteitskeuze. Laadniveau, laadlimiet, accucapaciteit, laadgeschiedenis en detectiesignalen van een gekoppelde auto worden direct gebruikt; vertrekplanning blijft uit.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.\n\nDaarna leidt de configuratie je door laadniveau en laadlimiet, volgend vertrek, laadverliezen en detectiesignalen. Kies **Volgende** om een onderdeel over te slaan. Er wordt niets opgeslagen vóór **Opslaan en afsluiten** of de laatste stap.",
         "data": {
           "vehicle_profile_name": "Profielnaam",
           "vehicle_provider": "Voertuigintegratie"
@@ -1242,7 +1242,7 @@
       },
       "vehicle_profile_edit": {
         "title": "Profiel bewerken",
-        "description": "Bij hernoemen blijven instellingen behouden. Een andere integratie of ander voertuig kiezen wist de functie-instellingen van dit profiel, zodat gegevens van de vorige auto niet worden hergebruikt.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.\n\nDaarna leidt de configuratie je door laadniveau en laadlimiet, volgend vertrek, laadverliezen en detectiesignalen. Kies **Volgende** om een onderdeel over te slaan. Er wordt niets opgeslagen vóór **Opslaan en afsluiten** of de laatste stap.",
+        "description": "Bij hernoemen blijven instellingen behouden. Een andere integratie of ander voertuig kiezen wist de functie-instellingen van dit profiel, zodat gegevens van de vorige auto niet worden hergebruikt; de gegevens van de nieuwe auto worden direct gebruikt.\n\nDe voertuigbron koppelt dit profiel aan de auto in een voertuigintegratie, zodat laadniveau, laadlimiet, capaciteit, vertrektimers, laadgeschiedenis en detectiesignalen daaruit gelezen kunnen worden. Kies Geen om Home Assistant-entiteiten handmatig te selecteren.\n\nAlleen geïnstalleerde integraties met een ondersteund voertuig worden aangeboden. Handmatig gekozen entiteiten blijven altijd mogelijk. Als een opgeslagen voertuigintegratie tijdelijk ontbreekt, blijven bij het hernoemen van het profiel het bestaande voertuig en zijn instellingen behouden.\n\nDaarna leidt de configuratie je door laadniveau en laadlimiet, volgend vertrek, laadverliezen en detectiesignalen. Kies **Volgende** om een onderdeel over te slaan. Er wordt niets opgeslagen vóór **Opslaan en afsluiten** of de laatste stap.",
         "data": {
           "vehicle_profile_name": "Profielnaam",
           "vehicle_provider": "Voertuigintegratie"
@@ -1306,7 +1306,7 @@
       },
       "vehicle_detection_source": {
         "title": "Herkenningssignalen",
-        "description": "Profiel: **{vehicle}**.\n\nDetectiesignalen melden dat deze auto is aangesloten en thuis is. Automatische voertuigselectie en virtueel Plug & Charge gebruiken ze.\n\nGebruik ondersteunde lokale entiteiten van de voertuigintegratie, kies bestaande Home Assistant-entiteiten of schakel herkenning voor dit profiel uit. Zowel de kabelverbinding als aanwezigheid thuis is nodig. Er worden geen extra cloudverzoeken gedaan.",
+        "description": "Profiel: **{vehicle}**.\n\nIn gebruik: stekker **{plug_entity}**, locatie **{location_entity}**.\n\nDetectiesignalen melden dat deze auto is aangesloten en thuis is. Automatische voertuigselectie en virtueel Plug & Charge gebruiken ze.\n\nGebruik ondersteunde lokale entiteiten van de voertuigintegratie, kies bestaande Home Assistant-entiteiten of schakel herkenning voor dit profiel uit. Zowel de kabelverbinding als aanwezigheid thuis is nodig. Er worden geen extra cloudverzoeken gedaan.",
         "data": {
           "vehicle_detection_source": "Bron voor herkenning"
         }
@@ -1364,7 +1364,7 @@
       },
       "vehicle_battery": {
         "title": "Laadniveau en laadlimiet",
-        "description": "Profiel: **{vehicle}**.\n\nMet het laadniveau stopt Home Assistant bij een percentagedoel, bijvoorbeeld 80 %, en de vertrekplanning berekent er de laadtijd mee. De laadlimiet van de auto kan als extra maximum worden gebruikt. Stel het gewenste percentage daarna in op de apparaatpagina van de wallbox.\n\nOm alleen het huidige percentagedoel te annuleren, zet je Voertuiglaaddoel op 0. Laadniveau niet meer gebruiken verwijdert hier de bronkoppelingen van dit profiel, inclusief het optionele maximum, en schakelt de vertrekplanning uit; bij de geselecteerde auto worden ook het percentagedoel en de geplande rit gewist. De bronentiteiten in de voertuigintegratie blijven ongewijzigd, net als voertuigtoestemming, kWh-doel en laadstatus.",
+        "description": "Profiel: **{vehicle}**.\n\nIn gebruik: laadniveau **{soc_entity}**, laadlimiet **{limit_entity}**.\n\nMet het laadniveau stopt Home Assistant bij een percentagedoel, bijvoorbeeld 80 %, en de vertrekplanning berekent er de laadtijd mee. De laadlimiet van de auto kan als extra maximum worden gebruikt. Stel het gewenste percentage daarna in op de apparaatpagina van de wallbox.\n\nOm alleen het huidige percentagedoel te annuleren, zet je Voertuiglaaddoel op 0. Laadniveau niet meer gebruiken verwijdert hier de bronkoppelingen van dit profiel, inclusief het optionele maximum, en schakelt de vertrekplanning uit; bij de geselecteerde auto worden ook het percentagedoel en de geplande rit gewist. De bronentiteiten in de voertuigintegratie blijven ongewijzigd, net als voertuigtoestemming, kWh-doel en laadstatus.",
         "menu_options": {
           "vehicle_soc": "Laadniveau instellen",
           "vehicle_source": "Laadniveau instellen",

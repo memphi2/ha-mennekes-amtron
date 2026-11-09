@@ -16,6 +16,8 @@ from .charge_loss_const import (
     CONF_LOSS_BAVARIAN_DEVICE,
     CONF_VEHICLE_LAST_CHARGE_ENERGY,
     LOSS_SOURCE_DISABLED,
+    LOSS_SOURCE_SENSOR,
+    LOSS_SOURCE_VEHICLE_HISTORY,
 )
 from .charging_cost_const import (
     CONF_AUTO_TARIFF_REFRESH,
@@ -56,9 +58,11 @@ from .vehicle_sources import (
     provider_definitions,
     provider_device_is_valid,
 )
+from .vehicle_sources.bavariandata.history import HISTORY_SERVICE
 from .vehicle_sources.const import (
     CONF_LOSS_VEHICLE_DEVICE,
     CONF_LOSS_VEHICLE_PROVIDER,
+    PROVIDER_BAVARIANDATA,
 )
 
 COST_KEYS = {
@@ -310,8 +314,17 @@ class EstimateOptionsFlow(SectionOptionsFlow):
         return self.async_show_menu(
             step_id="losses",
             menu_options=self._area_menu(choices),
-            description_placeholders=self._loss_placeholders(),
+            description_placeholders={**self._loss_placeholders(), "loss_entity": self._loss_entity(draft.values)},
         )
+
+    def _loss_entity(self, values: dict[str, Any]) -> str:
+        """Where the losses come from, for display."""
+        source = loss_source(values)
+        if source == LOSS_SOURCE_VEHICLE_HISTORY:
+            return f"{PROVIDER_BAVARIANDATA}.{HISTORY_SERVICE}"
+        if source == LOSS_SOURCE_SENSOR:
+            return values.get(CONF_VEHICLE_LAST_CHARGE_ENERGY) or "—"
+        return "—"
 
     def _loss_placeholders(self) -> dict[str, str]:
         return self._vehicle_placeholders()

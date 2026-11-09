@@ -24,9 +24,18 @@ from custom_components.mennekes_amtron_rtu.vehicle_profiles import (
 )
 
 from .bavariandata import BavarianChargeHistorySource, BavarianDepartureSource
-from .bavariandata.detection import BavarianDetectionSource, detection_capabilities
+from .bavariandata.departure import departure_entities
+from .bavariandata.detection import (
+    BavarianDetectionSource,
+    detection_capabilities,
+    detection_entities,
+)
 from .bavariandata.identity import bavarian_vehicle_vin, vehicle_source_key
-from .bavariandata.telemetry import BavarianTelemetrySource, telemetry_capabilities
+from .bavariandata.telemetry import (
+    BavarianTelemetrySource,
+    telemetry_capabilities,
+    telemetry_entities,
+)
 from .const import (
     CONF_LOSS_VEHICLE_DEVICE,
     CONF_LOSS_VEHICLE_PROVIDER,
@@ -105,7 +114,21 @@ def profile_capabilities(hass: HomeAssistant, provider_id: str, device_id: str) 
     """Expose implemented adapters and already enabled telemetry for this car."""
     if not provider_device_is_valid(hass, provider_id, device_id):
         return frozenset()
-    return telemetry_capabilities(hass, device_id) | detection_capabilities(hass, device_id) | frozenset({"departure", "charge_history"})
+    # BMW sends climate timers not for every car; only their entities offer departures.
+    departure: frozenset[Capability] = frozenset({"departure"}) if departure_entities(hass, device_id) else frozenset()
+    return telemetry_capabilities(hass, device_id) | detection_capabilities(hass, device_id) | departure | frozenset({"charge_history"})
+
+
+def profile_entities(hass: HomeAssistant, provider_id: str, device_id: str) -> dict[str, str]:
+    """The car's entities that its profile reads: soc, charge_limit, capacity, plug, location, departure."""
+    if not provider_device_is_valid(hass, provider_id, device_id):
+        return {}
+    result: dict[str, str] = dict(telemetry_entities(hass, device_id))
+    plug, location = detection_entities(hass, device_id)
+    result.update({key: value for key, value in (("plug", plug), ("location", location)) if value})
+    if timers := departure_entities(hass, device_id):
+        result["departure"] = ", ".join(timers)
+    return result
 
 
 def resolve_detection_source(hass: HomeAssistant, options: Mapping[str, Any]) -> VehicleDetectionSource | None:

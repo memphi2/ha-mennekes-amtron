@@ -12,6 +12,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.selector import SelectOptionDict
 
 from ._options_detection import DetectionOptionsFlow
+from .charge_loss_const import CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_VEHICLE_HISTORY
 from .config_schemas import (
     vehicle_device_schema,
     vehicle_profile_choice_schema,
@@ -19,21 +20,30 @@ from .config_schemas import (
 )
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
+    CONF_TIMED_USE_VEHICLE_CAPACITY,
     CONF_VEHICLE_AUTO_SELECTION,
     CONF_VEHICLE_DEVICE,
+    CONF_VEHICLE_LIMIT_USE_PROFILE,
     CONF_VEHICLE_PROFILE_SELECTED_AT,
     CONF_VEHICLE_PROFILES,
     CONF_VEHICLE_PROVIDER,
+    CONF_VEHICLE_SOC_USE_PROFILE,
     LEGACY_PROFILE_ID,
     MAX_VEHICLE_PROFILES,
     PROFILE_OPTION_KEYS,
     RESET_PENDING,
+    VehicleDetectionConfig,
     VehicleProfile,
     activate_profile,
     active_profile,
     profiles,
 )
-from .vehicle_sources import provider_device_is_valid, provider_identity
+from .vehicle_sources import (
+    profile_capabilities,
+    provider_device_is_valid,
+    provider_identity,
+)
+from .vehicle_sources.const import CONF_LOSS_VEHICLE_PROVIDER
 
 _PROFILE_KEYS = {
     CONF_VEHICLE_PROFILES,
@@ -345,7 +355,10 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             existing.device_id,
             existing.identity,
         ) == (provider, device, identity)
-        options = existing.options if existing is not None and same_identity else {}
+        if existing is not None and same_identity:
+            options, detection = existing.options, existing.detection
+        else:
+            options, detection = self._vehicle_defaults(provider, device)
         draft.values[CONF_VEHICLE_PROFILES][key] = VehicleProfile(
             key,
             self._details["profile_name"],
@@ -353,7 +366,7 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             device,
             options,
             identity,
-            existing.detection if existing is not None and same_identity else None,
+            detection,
         ).as_dict()
         if CONF_ACTIVE_VEHICLE_PROFILE not in draft.values:
             draft.values = activate_profile(draft.values, key)
@@ -361,3 +374,22 @@ class ProfileOptionsFlow(DetectionOptionsFlow):
             draft.values[RESET_PENDING] = True
             draft.values[CONF_VEHICLE_PROFILE_SELECTED_AT] = time.time()
         return await self._finish_section()
+
+    def _vehicle_defaults(
+        self, provider: str, device: str
+    ) -> tuple[dict[str, Any], VehicleDetectionConfig | None]:
+        """A newly linked car uses everything it reports; the guided setup shows it."""
+        if provider == "none" or not device:
+            return {}, None
+        capabilities = profile_capabilities(self.hass, provider, device)
+        options: dict[str, Any] = {}
+        if "soc" in capabilities:
+            options[CONF_VEHICLE_SOC_USE_PROFILE] = True
+            options[CONF_VEHICLE_LIMIT_USE_PROFILE] = "charge_limit" in capabilities
+        if "capacity" in capabilities:
+            options[CONF_TIMED_USE_VEHICLE_CAPACITY] = True
+        if "charge_history" in capabilities:
+            options[CONF_CHARGE_LOSS_SOURCE] = LOSS_SOURCE_VEHICLE_HISTORY
+            options[CONF_LOSS_VEHICLE_PROVIDER] = "profile"
+        detection = VehicleDetectionConfig("profile") if "detection" in capabilities else None
+        return options, detection

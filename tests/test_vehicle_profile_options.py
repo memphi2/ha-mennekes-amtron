@@ -28,6 +28,7 @@ class Flow(BaseFlow):
             "vehicle.drivetrain.batteryManagement.header",
             "vehicle.powertrain.electric.battery.stateOfCharge.target",
             "vehicle.drivetrain.batteryManagement.maxEnergy",
+            *(f"vehicle.cabin.climate.timers.overwriteTimer.{part}" for part in ("action", "hour", "minute")),
         )
         entries = {
             f"{VIN}_{descriptor}": SimpleNamespace(
@@ -54,7 +55,7 @@ async def open_profile(flow, key=A):
     return menu
 
 
-def test_profile_add_preserves_legacy_mixed_sources_and_enables_no_new_features():
+def test_profile_add_preserves_legacy_mixed_sources_and_uses_what_the_car_reports():
     async def run():
         old = {
             "vehicle_soc_entity": "sensor.manual",
@@ -88,7 +89,12 @@ def test_profile_add_preserves_legacy_mixed_sources_and_enables_no_new_features(
             item for item in profiles(saved).values() if item.id != LEGACY_PROFILE_ID
         ]
         assert len(added) == 1
-        assert added[0].options == {}
+        # A newly linked car uses everything it reports.
+        assert added[0].options == {
+            "vehicle_soc_use_profile": True, "vehicle_limit_use_profile": True,
+            "timed_use_vehicle_capacity": True, "charge_loss_source": "vehicle_history", "charge_loss_vehicle_provider": "profile",
+        }
+        assert added[0].detection is None
         assert added[0].provider_id == "bavariandata"
         assert not {"vehicle_soc_entity", "timed_bavarian_device"} & saved.keys()
         assert saved["charging_price"] == 0.4
@@ -189,7 +195,10 @@ def test_profile_edit_rename_keeps_features_but_changed_vehicle_resets_them():
         changed = (
             await flow.async_step_vehicle_profile_device({"vehicle_device": "own"})
         )["data"]
-        assert changed["vehicle_profiles"][A]["options"] == {}
+        # The other car starts over with only what it reports.
+        assert changed["vehicle_profiles"][A]["options"] == {
+            "charge_loss_source": "vehicle_history", "charge_loss_vehicle_provider": "profile",
+        }
         assert changed["timed_goal_reset_pending"] is True
         assert changed["vehicle_profile_selected_at"] > 0
 

@@ -3,6 +3,7 @@
 from .registry import (
     loss_source,
     profile_capabilities,
+    profile_entities,
     provider_definitions,
     provider_device_is_valid,
     provider_identity,
@@ -40,6 +41,7 @@ __all__ = [
     "VehicleTelemetrySource",
     "loss_source",
     "profile_capabilities",
+    "profile_entities",
     "provider_definitions",
     "provider_device_is_valid",
     "provider_identity",

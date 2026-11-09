@@ -18,7 +18,28 @@ from homeassistant.helpers import entity_registry as er
 from .identity import DOMAIN, bavarian_vehicle_vin
 
 _PREFIX = "vehicle.cabin.climate.timers"
+_TIMERS = ("overwriteTimer", "weekdaysTimer1", "weekdaysTimer2")
 _WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
+def departure_entities(hass: HomeAssistant, device_id: str) -> list[str]:
+    """The enabled timer entities, for display; BMW does not send them for every car."""
+    vin = bavarian_vehicle_vin(hass, device_id)
+    if vin is None:
+        return []
+    registry = er.async_get(hass)
+    found = []
+    for timer in _TIMERS:
+        entities = []
+        for part in ("action", "hour", "minute"):
+            entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{vin}_{_PREFIX}.{timer}.{part}")
+            entry = registry.async_get(entity_id) if entity_id is not None else None
+            if entry is None or entry.device_id != device_id or entry.disabled_by is not None:
+                break
+            entities.append(entity_id)
+        else:
+            found.append(entities[0])
+    return found
 
 
 def next_timer_occurrence(
@@ -96,9 +117,7 @@ def read_bavarian_departure(
         return state.state
 
     candidates: list[datetime] = []
-    for timer, weekdays in (
-        ("overwriteTimer", None), ("weekdaysTimer1", timer1_days), ("weekdaysTimer2", timer2_days),
-    ):
+    for timer, weekdays in zip(_TIMERS, (None, timer1_days, timer2_days), strict=True):
         prefix = f"{_PREFIX}.{timer}"
         if value(f"{prefix}.action") != "activate":
             continue

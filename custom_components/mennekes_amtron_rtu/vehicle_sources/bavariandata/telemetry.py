@@ -59,6 +59,18 @@ def _entity(hass: HomeAssistant, device_id: str, vin: str, descriptors: tuple[st
     return None
 
 
+def telemetry_entities(hass: HomeAssistant, device_id: str) -> dict[Capability, str]:
+    """The enabled entity each capability reads, for display."""
+    vin = bavarian_vehicle_vin(hass, device_id)
+    if vin is None:
+        return {}
+    return {
+        capability: found[0]
+        for capability, descriptors in zip(_CAPABILITIES, _DESCRIPTORS, strict=True)
+        if (found := _entity(hass, device_id, vin, descriptors)) is not None
+    }
+
+
 def telemetry_capabilities(hass: HomeAssistant, device_id: str) -> frozenset[Capability]:
     """A registered, enabled source can be configured while its value is missing."""
     vin = bavarian_vehicle_vin(hass, device_id)

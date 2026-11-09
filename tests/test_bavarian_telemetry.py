@@ -12,6 +12,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources import (
     ProviderSelection,
     VehicleTelemetry,
     profile_capabilities,
+    profile_entities,
     provider_identity,
     provider_selection,
     resolve_departure_source,
@@ -24,6 +25,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.telemetr
     SOC_DESCRIPTORS,
     BavarianTelemetrySource,
     telemetry_capabilities,
+    telemetry_entities,
 )
 from tests.test_bavarian_history import VIN, vehicle_registry
 
@@ -96,10 +98,18 @@ def test_detects_registered_fields_without_values_and_never_guesses_nominal_capa
             publish(hass, "vehicle.drivetrain.batteryManagement.batterySizeMax", 90)
             source = BavarianTelemetrySource(hass, "car")
             assert source.snapshot == VehicleTelemetry()
-            assert profile_capabilities(hass, "bavariandata", "car") == frozenset({"soc", "charge_limit", "departure", "charge_history"})
+            # Without climate timer entities the car offers no departures.
+            assert profile_capabilities(hass, "bavariandata", "car") == frozenset({"soc", "charge_limit", "charge_history"})
             publish(hass, CAPACITY_DESCRIPTOR, 82000, unit="Wh")
             assert source.snapshot.capacity_kwh == 82
             assert "capacity" in profile_capabilities(hass, "bavariandata", "car")
+            # The options show which entity each value comes from.
+            assert profile_entities(hass, "bavariandata", "car") == {
+                "soc": "sensor.header", "charge_limit": "sensor.target", "capacity": "sensor.maxenergy",
+            }
+            assert profile_entities(hass, "none", "car") == {}
+            hass.data[dr.DATA_REGISTRY].async_get.return_value = None
+            assert telemetry_entities(hass, "car") == {}
         finally:
             await hass.async_stop()
     asyncio.run(run())

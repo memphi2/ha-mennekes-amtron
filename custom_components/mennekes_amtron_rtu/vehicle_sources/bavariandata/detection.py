@@ -55,6 +55,15 @@ def _entity(hass: HomeAssistant, device_id: str, vin: str, domain: str, suffix: 
     return entity_id
 
 
+def detection_entities(hass: HomeAssistant, device_id: str) -> tuple[str | None, str | None]:
+    """The enabled plug and location entities, for display."""
+    vin = bavarian_vehicle_vin(hass, device_id)
+    if vin is None:
+        return None, None
+    plug, tracker = (_entity(hass, device_id, vin, *key) for key in _ENTITY_KEYS)
+    return plug, tracker
+
+
 def detection_capabilities(hass: HomeAssistant, device_id: str) -> frozenset[Capability]:
     """Offer the optional source only when both enabled vehicle entities exist."""
     vin = bavarian_vehicle_vin(hass, device_id)

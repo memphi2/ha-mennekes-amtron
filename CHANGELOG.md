@@ -68,6 +68,16 @@ mode, update the app to **0.8.0b7** first.
   charging losses and detection signals, one after another instead of a
   separate menu for each. **Next** skips an area; nothing is saved before
   **Save and finish** or the last area, so the integration reloads only once.
+- **A profile linked to a car uses its data right away.** Charge level, charge
+  limit, battery capacity, charging history and detection signals no longer
+  have to be set up area by area after adding the profile or changing its car;
+  departure planning stays off until set up.
+- **Departure timers from the car are offered only when the car sends them.**
+  BMW CarData does not send the climate timers' times for every car, e.g. not
+  for an i4 or i5, so the option previously led nowhere. A setup that already
+  reads them keeps the option.
+- **Each settings area names the entities it uses,** e.g. charge level, charge
+  limit, departure and capacity, losses, plug and location.
 
 ## 0.8.0b6 — 2026-11-09
 

@@ -194,9 +194,20 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         ]
         if vehicle_soc_is_configured(draft.values):
             choices.append("vehicle_disable")
+        car = self._car_entities(draft.values)
         return self.async_show_menu(
             step_id="vehicle_battery", menu_options=self._area_menu(choices),
-            description_placeholders=self._vehicle_placeholders(),
+            description_placeholders={
+                **self._vehicle_placeholders(),
+                "soc_entity": (
+                    car.get("soc") if draft.values.get(CONF_VEHICLE_SOC_USE_PROFILE) is True
+                    else draft.values.get(CONF_VEHICLE_SOC_ENTITY)
+                ) or "—",
+                "limit_entity": (
+                    car.get("charge_limit") if draft.values.get(CONF_VEHICLE_LIMIT_USE_PROFILE) is True
+                    else draft.values.get(CONF_VEHICLE_CHARGE_LIMIT_ENTITY)
+                ) or "—",
+            },
         )
 
     async def async_step_vehicle_source(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -331,9 +342,24 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         choices = ["departure_configure"]
         if draft.values.get(CONF_TIMED_GOAL_ENABLED) is True:
             choices.append("departure_disable")
+        kwh = draft.values.get(CONF_TIMED_CAPACITY_KWH)
+        departure = [
+            draft.values.get(key) for key in (CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_DEPARTURE_ENTITY)
+        ]
+        if provider_selection(draft.values, "departure").provider_id != PROVIDER_NONE:
+            departure.append(self._car_entities(draft.values).get("departure") or PROVIDER_BAVARIANDATA)
         return self.async_show_menu(
             step_id="departure", menu_options=self._area_menu(choices),
-            description_placeholders=self._vehicle_placeholders(),
+            description_placeholders={
+                **self._vehicle_placeholders(),
+                "departure_entity": ", ".join(item for item in departure if item) or "—",
+                "capacity_entity": (
+                    self._car_entities(draft.values).get("capacity")
+                    if draft.values.get(CONF_TIMED_USE_VEHICLE_CAPACITY) is True
+                    else draft.values.get(CONF_TIMED_CAPACITY_ENTITY)
+                    or (f"{kwh} kWh" if kwh is not None else None)
+                ) or "—",
+            },
         )
 
     async def async_step_departure_requires_vehicle(
@@ -370,6 +396,8 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 return await self.async_step_departure()
             elif source == "profile" and "capacity" not in self._vehicle_capabilities(draft.values):
                 errors["capacity_source"] = "vehicle_capability_unavailable"
+            elif user_input.get("use_vehicle_timer") is True and not self._timer_available(draft.values):
+                errors["use_vehicle_timer"] = "vehicle_capability_unavailable"
             else:
                 self._details.update(user_input)
                 self._details["remaining"] = [
@@ -415,8 +443,18 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                 draft.values if user_input is None else {**draft.values, **user_input},
                 vehicle_timer=selection.provider_id != PROVIDER_NONE,
                 profile_capacity="capacity" in self._vehicle_capabilities(draft.values),
+                profile_timer="departure" in self._vehicle_capabilities(draft.values),
             ),
             errors=errors,
+        )
+
+    def _timer_available(self, values: dict[str, Any]) -> bool:
+        """The car sends its timers, or they are already in use; without a car any provider."""
+        if values.get(CONF_VEHICLE_PROVIDER) in (None, "none"):
+            return True
+        return (
+            "departure" in self._vehicle_capabilities(values)
+            or provider_selection(values, "departure").provider_id != PROVIDER_NONE
         )
 
     async def async_step_departure_capacity_fixed(

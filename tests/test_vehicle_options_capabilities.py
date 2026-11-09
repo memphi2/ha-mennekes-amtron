@@ -71,7 +71,9 @@ def test_departure_remove_action_is_offered_only_when_enabled(enabled):
         flow = Flow(entry)
         await open_profile(flow)
         menu = await flow.async_step_departure()
-        assert menu["description_placeholders"] == {"vehicle": "Car A"}
+        assert menu["description_placeholders"] == {
+            "vehicle": "Car A", "departure_entity": "—", "capacity_entity": "—",
+        }
         assert ("departure_disable" in menu["menu_options"]) is enabled
         assert "departure_configure" in menu["menu_options"]
         if enabled:

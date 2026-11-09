@@ -195,7 +195,7 @@ def test_unconfigured_loss_estimates_do_not_offer_a_noop_disable_action(source):
         flow = Flow(FakeConfigEntry(options=options))
         menu = await flow.async_step_losses()
         assert "loss_disable" not in menu["menu_options"]
-        assert menu["description_placeholders"] == {"vehicle": "—"}
+        assert menu["description_placeholders"] == {"vehicle": "—", "loss_entity": "—"}
 
     asyncio.run(run())
 
@@ -209,7 +209,7 @@ def test_loss_forms_identify_the_profile_bound_to_the_draft():
         flow._profile_target = A
         menu = await flow.async_step_losses()
         expected = {"vehicle": entry.options["vehicle_profiles"][A]["name"]}
-        assert menu["description_placeholders"] == expected
+        assert menu["description_placeholders"] == {**expected, "loss_entity": "—"}
         form = await flow.async_step_loss_sensor()
         assert form["description_placeholders"] == expected
         # A concurrent vehicle change cannot relabel the old profile's draft.

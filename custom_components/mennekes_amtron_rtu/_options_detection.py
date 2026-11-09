@@ -57,13 +57,12 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
     ) -> ConfigFlowResult:
         if (profile := self._detection_profile()) is None:
             return await self.async_step_init()
-        capable = "detection" in self._vehicle_capabilities(
-            {
-                CONF_VEHICLE_PROVIDER: profile.provider_id,
-                CONF_VEHICLE_DEVICE: profile.device_id,
-                CONF_VEHICLE_SOURCE_IDENTITY: profile.identity,
-            }
-        )
+        vehicle = {
+            CONF_VEHICLE_PROVIDER: profile.provider_id,
+            CONF_VEHICLE_DEVICE: profile.device_id,
+            CONF_VEHICLE_SOURCE_IDENTITY: profile.identity,
+        }
+        capable = "detection" in self._vehicle_capabilities(vehicle)
         errors = {}
         if user_input is not None:
             source = user_input.get(CONF_VEHICLE_DETECTION_SOURCE)
@@ -91,9 +90,21 @@ class DetectionOptionsFlow(EstimateOptionsFlow):
                 else "disabled" if self._wizard is not None else "entities",
                 profile=capable,
             ),
-            description_placeholders={"vehicle": profile.name},
+            description_placeholders={"vehicle": profile.name, **self._detection_entities(profile, vehicle)},
             errors=errors,
         )
+
+    def _detection_entities(self, profile: VehicleProfile, vehicle: dict[str, Any]) -> dict[str, str]:
+        """The plug and location entities detection reads, for display."""
+        detection = profile.detection
+        if detection is None:
+            plug = location = None
+        elif detection.source == "entities":
+            plug, location = detection.connected_entity, detection.home_entity
+        else:
+            car = self._car_entities(vehicle)
+            plug, location = car.get("plug"), car.get("location")
+        return {"plug_entity": plug or "—", "location_entity": location or "—"}
 
     async def async_step_vehicle_detection_entities(
         self, user_input: dict[str, Any] | None = None

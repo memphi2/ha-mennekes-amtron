@@ -78,6 +78,14 @@ published Home Assistant states; it does not fetch BMW cloud data or change the
 vehicle's timers. Those states may be cached, so check **Next departure** after
 importing, especially after changing the timer in your car or the BMW app.
 
+**Not every car sends its timers.** On an i4 and an i5, BMW CarData reported
+only that a departure timer is set, not its time, even with the timer fields
+ticked in the data selection ([BavarianData #308](https://github.com/JustChr/BavarianData/issues/308)).
+From **0.8.0b7**, **Use vehicle departure timers** is offered only when
+BavarianData has enabled action, hour and minute sensors of at least one timer;
+**Next departure** names the timer entities in use. Otherwise, take the
+departure from a calendar or a date/time entity instead.
+
 - BMW streams the timers only when they are ticked in the car's data selection.
   BavarianData's **Choose streamed data** does not tick them, even with the
   *Metadata* cluster selected. In the BMW portal, open the car's **BMW CarData**

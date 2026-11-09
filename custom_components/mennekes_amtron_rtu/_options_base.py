@@ -23,6 +23,7 @@ from .vehicle_sources import (
     Capability,
     ProviderSelection,
     profile_capabilities,
+    profile_entities,
     provider_definitions,
     provider_device_is_valid,
     provider_identity,
@@ -159,6 +160,12 @@ class SectionOptionsFlow(OptionsFlow):
         if identity and identity != provider_identity(self.hass, provider, device):
             return frozenset()
         return profile_capabilities(self.hass, provider, device)
+
+    def _car_entities(self, values: Mapping[str, Any]) -> dict[str, str]:
+        """The car's entities this profile can read, for display."""
+        if not self._vehicle_capabilities(dict(values)):
+            return {}
+        return profile_entities(self.hass, values[CONF_VEHICLE_PROVIDER], values[CONF_VEHICLE_DEVICE])
 
     def _suggested_vehicle(
         self, values: dict[str, Any], capability: Capability
