@@ -42,14 +42,16 @@ from .identity import (
 )
 
 PLUG_DESCRIPTOR = "vehicle.powertrain.tractionBattery.charging.port.anyPosition.isPlugged"
+# BavarianData's standard plug sensor, derived from the fields below. From
+# BavarianData 0.9.30 it names BMW's time for its state and marks a state
+# restored after a restart; an older one has neither and is not used.
+CABLE_SENSOR = "charging_cable"
 # Cars differ in which plug field they stream, so the most direct one wins: an
 # i4 or i5 streams only the port status. BavarianData's evcc bridge reads the
 # same fields; the DC-only and non-streamed port fields say nothing here.
-# BavarianData's derived "Charging Cable" plug sensor is deliberately not one:
-# it carries no BMW timestamp and shows its last value again after a restart,
-# so it cannot prove a fresh plug-in.
 PLUG_SOURCES = (
     ("binary_sensor", PLUG_DESCRIPTOR),
+    ("binary_sensor", CABLE_SENSOR),
     ("sensor", "vehicle.body.chargingPort.status"),
     ("sensor", "vehicle.body.chargingPort.statusClearText"),
 )
@@ -68,9 +70,21 @@ def _entity(hass: HomeAssistant, device_id: str, vin: str, domain: str, suffix: 
     return entity_id
 
 
+def _usable(hass: HomeAssistant, entity_id: str, suffix: str) -> bool:
+    if suffix != CABLE_SENSOR:
+        return True
+    state = hass.states.get(entity_id)
+    return state is not None and "source" in state.attributes
+
+
 def _entities(hass: HomeAssistant, device_id: str, vin: str) -> tuple[str | None, str | None]:
     plug = next(
-        (entity for key in PLUG_SOURCES if (entity := _entity(hass, device_id, vin, *key)) is not None), None,
+        (
+            entity for domain, suffix in PLUG_SOURCES
+            if (entity := _entity(hass, device_id, vin, domain, suffix)) is not None
+            and _usable(hass, entity, suffix)
+        ),
+        None,
     )
     return plug, _entity(hass, device_id, vin, *_TRACKER)
 
@@ -120,6 +134,9 @@ def _connected(observation: _Observation, now: datetime) -> bool | None:
     # The actual BMW descriptor timestamp, when exposed, can be older than the
     # HA report. Do not let an unrelated entity write renew this cable evidence.
     timestamp = state.attributes.get("timestamp")
+    if timestamp is None and state.attributes["descriptor"] == CABLE_SENSOR:
+        # Without BMW's time, the cable sensor's state proves no plug-in.
+        return None
     if timestamp is not None:
         stamp = dt_util.parse_datetime(timestamp) if isinstance(timestamp, str) else None
         if stamp is None or stamp.tzinfo is None or not 0 <= (now - stamp).total_seconds() <= DETECTION_MAX_AGE_SECONDS:

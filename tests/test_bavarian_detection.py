@@ -180,23 +180,38 @@ def test_a_car_streaming_only_its_port_status_is_detected(tmp_path, value, expec
     asyncio.run(run())
 
 
-def test_the_derived_charging_cable_sensor_is_not_cable_evidence(tmp_path):
+def cable(hass, value="on", **attrs):
+    hass.data[er.DATA_REGISTRY].entities["binary_sensor.car_cable"] = SimpleNamespace(
+        unique_id=f"{VIN}_charging_cable", entity_id="binary_sensor.car_cable",
+        device_id="car", disabled_by=None,
+    )
+    hass.states.async_set("binary_sensor.car_cable", value, {
+        "descriptor": "charging_cable", "device_class": "plug", **attrs,
+    })
+
+
+def test_the_charging_cable_sensor_is_preferred_once_it_names_its_measurement(tmp_path):
     async def run():
         hass = local_hass(tmp_path)
         try:
-            # BavarianData 0.9.28's plug-class sensor carries no BMW timestamp
-            # and shows its last value again after a restart, so it cannot prove
-            # a fresh plug-in. The port status it is derived from is used.
-            hass.data[er.DATA_REGISTRY].entities["binary_sensor.car_cable"] = SimpleNamespace(
-                unique_id=f"{VIN}_charging_cable", entity_id="binary_sensor.car_cable",
-                device_id="car", disabled_by=None,
-            )
-            hass.states.async_set("binary_sensor.car_cable", "on", {"descriptor": "charging_cable", "device_class": "plug"})
-            tracker(hass)
-            assert detection_capabilities(hass, "car") == frozenset()
-            assert detection_entities(hass, "car") == (None, "device_tracker.car")
             port(hass)
+            tracker(hass)
+            # Before BavarianData 0.9.30 it carries no BMW time: the port decides.
+            cable(hass)
             assert detection_entities(hass, "car")[0] == "sensor.car_port"
+            stamp = dt_util.utcnow().isoformat()
+            cable(hass, source="vehicle.body.chargingPort.status", timestamp=stamp, restored=False)
+            assert detection_entities(hass, "car")[0] == "binary_sensor.car_cable"
+            detection = BavarianDetectionSource(hass, "car").snapshot
+            assert detection.connected is True
+            assert detection.connected_at == dt_util.parse_datetime(stamp)
+            # A state from before a restart, or one without BMW's time, proves nothing.
+            cable(hass, source="vehicle.body.chargingPort.status", timestamp=stamp, restored=True)
+            assert BavarianDetectionSource(hass, "car").snapshot.connected is None
+            cable(hass, source=None, timestamp=None, restored=False)
+            assert BavarianDetectionSource(hass, "car").snapshot.connected is None
+            cable(hass, "off", source="vehicle.body.chargingPort.status", timestamp=stamp, restored=False)
+            assert BavarianDetectionSource(hass, "car").snapshot.connected is False
         finally:
             await hass.async_stop()
     asyncio.run(run())

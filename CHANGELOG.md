@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- **BavarianData's Charging Cable sensor is the cable signal** for detection
+  from BavarianData 0.9.30, which names when the car measured its plug state
+  and marks a state restored after a restart. With an older BavarianData the
+  charging port status is used as before.
+
 ## 0.8.0 — 2026-11-09
 
 Stable release of the integration and app. Changes since **0.6.1**. In service
