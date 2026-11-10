@@ -5,355 +5,71 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.8.0b8 — 2026-11-09
+## 0.8.0 — 2026-11-09
 
-Beta update of the integration and app; **0.6.1 remains stable**. In service
-mode, update the app to **0.8.0b8** first.
+Stable release of the integration and app. Changes since **0.6.1**. In service
+mode, update the app to **0.8.0** first, then the integration.
 
-- **BavarianData detection works for cars without a plug boolean.** An i4 or
-  i5 streams only **Charging port status** (connected/disconnected); it now
-  counts as the plug signal, so such a car offers detection from the vehicle
-  and, with it, automatic vehicle selection. Previously only manual entities
-  were offered.
-- **A reached target pauses only with a car at the wallbox.** Lowering the
-  percentage target below the car's charge level while it is not plugged in
-  no longer switches the pause on; the pause follows once a car is plugged in.
+### Vehicles
 
-## 0.8.0b7 — 2026-11-09
+- **Vehicle profiles:** keep several cars, each with its own charge level and
+  limit, battery capacity, departure, charging losses, detection signals,
+  percentage target and learned charging phases. Switch the car manually or let
+  the integration recognize it; switching never reloads the integration.
+- **Guided setup:** adding or opening a profile walks through all its settings
+  in one guide. A profile linked to a car in BavarianData uses the car's data
+  right away, and every settings area names the entities it uses. Departure
+  timers from the car are offered only when the car sends them.
+- **Automatic vehicle selection** from cable and home signals: BavarianData's
+  plug or charging-port status and GPS position, or any HA entities, including
+  a text sensor for the plug. A car's target, departure plan and phases apply
+  only once it reports itself plugged in at home after the wallbox was empty,
+  and only while its reports stay consistent with the charge.
+- **BavarianData:** the predicted charge level is used while charging; the
+  measured one remains the fallback.
 
-Beta update of the integration and app; **0.6.1 remains stable**. In service
-mode, update the app to **0.8.0b7** first.
+### Charging
 
-- **Departure planning starts late and finishes on time.** Charging stays
-  paused until the energy still needed takes the remaining time at full current
-  plus a 30-minute reserve. It then charges at full current and reduces to 6 A
-  once the rest fits the remaining time at 6 A, so the car reaches the target at
-  departure rather than early. Previously the plan spread charging at a reduced
-  current and often started many hours before departure. A charge that has
-  started never pauses again for being faster than estimated.
-- **Each vehicle profile remembers its charging phases.** The wallbox reports
-  a car's phases only while it draws current, so the plan previously assumed
-  one phase before every start and started about three times too early for a
-  three-phase car. The phases of each profile's last charge now plan the next
-  start; a car never seen charging is planned with three phases.
-- The departure plan status has the new states **Charging at full current** and
-  **Finishing at minimum current**; **Adjusting current** and **May finish
-  early at minimum current** are gone.
-- **Switch off charging release when unplugged** now also ends a manual pause.
-  Previously the pause stayed after unplugging and the wallbox kept showing it.
-  Without a car and with the release off, this switches nothing and waits for
-  no state-change interval. A stop from a reached energy target stays.
-- **Switching the charging release during a confirmed pause no longer waits**
-  for the state-change interval, and does not restart it. The pause holds the
-  car at 0 A either way; the later resume is the real start and keeps the
-  interval. This also applies to the Virtual Plug & Charge grant.
-- In service mode, HA reads a queued command's outcome when it is due instead
-  of up to one poll later. The log no longer shows such a command together
-  with the next action, as if both had happened at the same time.
-- **Each vehicle profile keeps its charge target** even when the description
-  of its vehicle source changes, for example once BavarianData resolves the
-  car after a restart. Previously the target could fall back to 0 and the
-  remembered one was not found. When the integration clears a target because
-  no vehicle source is selected or the source changed, the log now says so.
-- **Retries and failures are counted separately.** A lost reply that a resend
-  made good — a read retry or a heartbeat resent after one second — counts in
-  the new **Connection quality** attribute `retried_transactions` and no longer
-  degrades the quality. `failed_transactions` counts only transactions that
-  finally failed, now including a heartbeat that missed its 10-second deadline.
-  pymodbus no longer logs each lost reply as an error with a frame dump; it
-  remains visible in debug logging. Service mode needs app **0.8.0b7**.
-- **A car's rules apply only to that car.** A profile with detection signals
-  stays selected while the car is away, but its charge target, departure plan
-  and learned phases apply only once the car reports itself plugged in at home
-  after the wallbox was last seen empty. Another car plugged in meanwhile gets
-  none of them: the plan shows the new state **Car not confirmed** and ends a
-  pause it set, and a reached target is released together with its stop pause.
-  Nothing is deselected. Virtual Plug & Charge also waits for this
-  confirmation. The log warns when a car still reports itself plugged in at
-  home ten minutes after unplugging.
-- **A confirmed car must stay consistent while charging.** If it afterwards
-  reports itself unplugged while the wallbox still has a car two minutes
-  later, or its charge level (with BavarianData the
-  predicted one) has not risen after the wallbox delivered 4 kWh, its rules rest again with a warning. This
-  catches a car that keeps reporting itself plugged in after it left. A full
-  battery (95 % or more) and missing charge levels are not checked.
-- **BavarianData's predicted charge level is used** for a profile that reads
-  the charge level from the car, when that entity is enabled. It continues
-  between the car's rare reports; the measured level remains the fallback.
-- **Charging release by hand with Virtual Plug & Charge.** Switching
-  **Charging release** on now releases the current connection for any car, or
-  the next one without a car plugged in, until the next unplug. The status
-  shows the new state **Released by hand**. Guests can charge without switching
-  Virtual Plug & Charge off. Previously the switch only recorded the request.
-  Service mode needs app **0.8.0b7**.
-- **Adding or opening a vehicle profile guides through all its settings:**
-  name and vehicle source, charge level and charge limit, next departure,
-  charging losses and detection signals, one after another instead of a
-  separate menu for each. **Next** skips an area; nothing is saved before
-  **Save and finish** or the last area, so the integration reloads only once.
-- **A profile linked to a car uses its data right away.** Charge level, charge
-  limit, battery capacity, charging history and detection signals no longer
-  have to be set up area by area after adding the profile or changing its car;
-  departure planning stays off until set up.
-- **Departure timers from the car are offered only when the car sends them.**
-  BMW CarData does not send the climate timers' times for every car, e.g. not
-  for an i4 or i5, so the option previously led nowhere. A setup that already
-  reads them keeps the option.
-- **Each settings area names the entities it uses,** e.g. charge level, charge
-  limit, departure and capacity, losses, plug and location.
+- **Virtual Plug & Charge** (optional, off by default): releases charging for
+  a recognized car, with its own wallbox switch and a status that names why
+  charging is blocked. Switching **Charging release** on releases the current
+  or next connection by hand for any car, for example a guest, until unplugged.
+  The release survives HA and app restarts; manual pauses, locks and reached
+  targets stay in force.
+- **Switch off charging release when unplugged** (optional): the next car needs
+  an explicit release.
+- **Departure planning starts late and finishes on time:** it waits until the
+  remaining time at full current plus a 30-minute reserve is needed, charges at
+  full current and finishes at 6 A. Each profile remembers the phases of its
+  last charge. New sensor **Planned charging start**.
+- **Percentage targets:** a target at the car's own limit follows that limit and
+  lets the car end the charge itself; a target below it pauses the wallbox, but
+  only with a car plugged in. Each car keeps its own target and departure.
 
-## 0.8.0b6 — 2026-11-09
+### Operation
 
-Beta update of the integration and app; **0.6.1 remains stable**. In service
-mode, update the app to **0.8.0b6** first.
+- **Waveshare LAN adapters:** guided detection and setup with optional TCP
+  login, verified settings and rollback on failure.
+- **App Debug log tab:** live decoded Modbus reads, writes and heartbeats, in
+  memory only and limited to ten minutes. The app's connection page works on
+  Supervisor 2026.10.4 and newer.
+- **Steadier entities:** a single disturbed Modbus read no longer makes
+  entities unavailable for a moment. **Connection quality** counts retried and
+  failed transactions separately, and lost replies are no longer logged as
+  errors.
+- **Repairs** notices for sustained heartbeat or service connection failures.
+- **Settings** are split into Wallbox, Vehicles and Charging costs; the price
+  and German network tariffs are chosen separately.
+- **Control result** names the command in its event type, e.g.
+  `pause_executed` or `set_current_failed`. **Session duration** shows
+  hours:minutes:seconds.
+- More robust target storage, reconnects, phase changes and recovery; queued
+  departure commands are cancelled when the car disconnects.
 
-- BavarianData is offered again as a vehicle source when adding or editing a
-  vehicle profile. On the supported Home Assistant versions the integration
-  did not find the registered car, so only **None** was offered and editing an
-  existing BavarianData profile skipped choosing the car and its vehicle
-  entities.
-- All settings of a car are now in its profile. **Configure → Vehicles** lists
-  the profiles; opening one shows its name and vehicle source, charge level and
-  charge limit, next departure, charging losses and detection signals for
-  automatic selection and Virtual Plug & Charge, each with a short explanation
-  of what it is for. Any profile
-  can be changed, not only the selected car. **Next departure** and **Charging
-  losses** are no longer top-level menus.
-- Automatic vehicle selection is switched on only in the **Active vehicle**
-  entity. The duplicate switch in the options is gone; each profile's detection
-  signals stay in the profile.
-- Virtual Plug & Charge no longer needs a separate permission per profile.
-  Every profile with detection signals takes part once the wallbox switch
-  **Virtual Plug & Charge** is on. The status **Recognized vehicle not
-  selected** means another car is
-  selected manually.
-- New sensor **Planned charging start** shows when the departure plan starts
-  charging, or started.
-- Raising **Vehicle charge target** after a trip was reached plans the same
-  departure again instead of leaving it finished.
-- A percentage target at the car's own charge limit no longer pauses the
-  wallbox when reached. The car ends that charge itself, like at any other
-  charger, and nothing changes until unplugging. A target below the car's limit
-  still pauses. Service mode needs app **0.8.0b6**.
-- Virtual Plug & Charge no longer switches the charging release off when the
-  wallbox status is briefly unreadable or contradictory, for example while
-  pausing; before, only a new plug-in restored charging. After 60 seconds of
-  unknown state the release is withdrawn and HA grants the same connection
-  again without replugging. The log names why a grant ended and warns when the
-  status cannot be read for over 30 seconds. Service mode needs app
-  **0.8.0b6**.
+### Breaking
 
-## 0.8.0b5 — 2026-11-08
-
-Beta update of the integration only; **0.6.1 remains stable**. The app stays at
-**0.8.0b4**.
-
-- Automatic vehicle selection accepts a text sensor as the cable signal, for
-  example a charging-port status. Choose which of its states mean connected.
-- Each car keeps its own upcoming departure. Switching to another car no
-  longer discards it: returning to the car restores it if it still lies ahead,
-  and a car without a saved departure starts without one.
-- The departure planning guide explains how to make BMW stream the climate
-  timers that BavarianData needs for the departure import.
-
-## 0.8.0b4 — 2026-11-08
-
-Beta update of the integration and app; **0.6.1 remains stable**. Update the app
-through **#apps-beta** before the integration when updating both components.
-
-- Entities no longer turn unavailable for a moment after a single disturbed
-  Modbus read: recently read status and measurements are kept for up to
-  30 seconds (driver change; in service mode it needs app 0.8.0b4). The energy
-  meter and error recovery still use only fresh reads.
-- Changing the vehicle, manually or automatically, no longer reloads the
-  integration, so no entity turns unavailable for a moment. Vehicle entities
-  exist as soon as any profile uses their feature and are unavailable while the
-  selected car does not use it.
-- Automatic vehicle selection keeps the selected car after unplugging and while
-  its reports are stale. It ends the selection when another car is detected or
-  the wallbox sees a car while the selected one reports itself elsewhere.
-- Each vehicle profile remembers its percentage target. Returning to a car
-  restores it, capped at its current limit, instead of no target.
-- Virtual Plug & Charge lifts a manual pause and adopts the car's limit only for
-  a plug-in observed after unplugging. A restart, update or reconnect with the
-  car still connected restores the grant but keeps the pause and target.
-- Connection quality has a **Failed transactions** attribute: timeouts and
-  malformed responses since start, including retried reads. It changes only on
-  failures (in service mode it needs app 0.8.0b4).
-
-## 0.8.0b3 — 2026-11-08
-
-Beta update of the integration and app; **0.6.1 remains stable**. Update the app
-through **#apps-beta** before the integration when updating both components.
-
-- Virtual Plug & Charge ends a manual pause when a permitted car is plugged in.
-  An armed departure plan decides instead: the release waits until the plan has
-  paused until its start or set its current. Reached targets, a lock, a
-  switched-off charging release and newer queued commands still keep charging
-  stopped.
-- App: a current change while the charging release is off or no car is connected
-  no longer waits for or starts the state-change interval, so the release follows
-  immediately instead of after several minutes.
-- Each recognized Plug & Charge connection starts with the car's own charge
-  limit as the percentage target, which also ends a target reached during the
-  previous connection.
-- A percentage target at the car's limit follows every later change of that
-  limit. A raised limit can end a reached target but never resumes charging.
-- New **Switch off charging release when unplugged** configuration switch: without
-  Virtual Plug & Charge, HA closes the release after each confirmed disconnect so
-  the next car needs an explicit release.
-- The Plug & Charge status sensor names why charging is blocked
-  (`blocked_reason`), and diagnostics include the pause, release and goal-stop
-  intents plus the gate state without session tokens.
-
-## 0.8.0b2 — 2026-11-08
-
-Beta update of the integration and app; **0.6.1 remains stable**. Update the app
-through **#apps-beta** before the integration when updating both components.
-
-- Control Virtual Plug & Charge with its own Home Assistant configuration switch.
-  Keep per-vehicle permissions in setup, preserve pauses and reached targets, and
-  reconcile confirmed policy changes after interrupted service responses.
-- Guide vehicle setup through missing profiles and detection signals. Show the
-  selected vehicle and available sources, and clarify the difference between
-  removing charge-level use and clearing the current percentage target.
-- Move live Modbus debugging into a dedicated app Web UI tab. Preserve unsaved
-  connection settings and only refresh the visible debug tab, with temporary
-  memory-only capture and no additional Recorder history or bus requests.
-- Keep automatic code and security reviews while removing the extra mandatory
-  Codex receipt gate; the required CI checks remain in place.
-
-## 0.8.0b1 — 2026-11-08
-
-Beta update of the integration and app; **0.6.1 remains stable**. Update the app
-through **#apps-beta** before the integration to use the new service features.
-
-- Preserve observed charging sessions and running costs across logical vehicle
-  profile reloads, including the meter baseline before a vehicle is selected.
-  Real connection interruptions still invalidate incomplete measurements.
-- Attribute delayed automatic vehicle recognition to its observed charging
-  cycle, while keeping manual selection boundaries and conflicting vehicles
-  separate. Keep the recognized loss owner through automatic deselection so
-  the completed charge can still be matched.
-
-- Add optional Virtual Plug & Charge: permit individual vehicle profiles and
-  release a connection only after matching fresh cable/home evidence. Keep
-  manual pauses, locks and reached targets effective, with service-owned
-  permission across HA Core restarts and a clear status in Home Assistant.
-
-- Reorganize setup and everyday documentation around user tasks, with dedicated
-  vehicle/departure guides, examples, missing-data help and clear distinctions
-  between stable and beta features.
-
-- Add optional live Modbus debugging in the app Web UI: decoded reads, writes,
-  retries and heartbeats in a redacted 200-entry RAM buffer that expires after
-  ten minutes, without additional bus requests, Recorder history or log files.
-
-- Add optional vehicle profiles with manual or opt-in cable/home selection
-  and shared BavarianData
-  sources for charge level, limit, usable capacity, departure and history.
-  Keep each car's settings and loss averages separate; preserve manual sources
-  and calendar use without enabling charging features automatically. Unresolved
-  or ambiguous detection signals leave no active vehicle; choosing manually
-  overrides automatic selection without starting or resuming charging.
-- Allow the app connection page on stable Supervisor 2026.10.4 and newer,
-  while retaining its administrator and trusted-ingress checks.
-- Keep TCP-login and password fields visible in the app's native configuration,
-  including after updates and connection changes.
-- Separate fixed-price or sensor selection from German network tariffs; suggest
-  0.40 EUR/kWh for a new fixed price and show all Module 3 prices and imported
-  time windows together. The last options form now saves directly.
-- Preserve briefly reached vehicle charge targets during slow target changes,
-  failed saves and lost service responses. Older apps report a specific update
-  requirement for safe percentage-target changes; other controls remain usable.
-- Retry failed energy-target persistence after meter recovery and when stopping.
-- Include app frontend files in the local secret scan and update user guidance.
-
-## 0.7.0b4 — 2026-11-07
-
-Beta update of the integration and app; **0.6.1 remains stable**.
-
-- Keep energy, vehicle-percentage and departure targets consistent through
-  cancelled saves, including time spent waiting for another storage operation.
-- Distinguish failed storage from an already replaced file with unconfirmed
-  durability; stop target-controlled starts when the saved state is unknown.
-- Isolate optional vehicle-history failures from wallbox setup and keep charging
-  loss assignments consistent when their save is interrupted.
-- Preserve an entered adapter password while re-reading the same endpoint;
-  reject invalid adapter settings before stopping the existing connection.
-- Preserve selected adapter settings when the app reads the device again;
-  clarify connection-only login versus changing the adapter in all five languages.
-- Wait for the adapter's TCP listener after applying settings, with bounded
-  retries and immediate password rejection; log setup and restoration stages.
-- Recheck live wallbox state immediately before restart and phase writes,
-  including a vehicle disconnecting and reconnecting during the operation.
-- Keep saved targets and charging intent ordered when shutdown or a cancelled
-  request interrupts the same storage operation more than once.
-- Preserve charging-loss history while a vehicle identity is temporarily
-  unavailable; prevent costs from carrying over into a different plug cycle.
-- Reject unusable service tokens and detect concurrent Supervisor edits before
-  saving the app's connection settings.
-- Report complete polling failures without treating valid Modbus exceptions
-  as a lost connection.
-- Verify installed app catalog files as well as release metadata; remove an
-  unused release flag and correct support and configuration documentation.
-
-## 0.7.0b3 — 2026-11-07
-
-Beta update of the integration and app; **0.6.1 remains stable**. This includes
-the changes from the incomplete 0.7.0b2 publication.
-
-- Retry temporary vehicle-source setup failures automatically and preserve
-  authentication prompts. Keep concurrent connection changes from being
-  overwritten by an older reauthentication or reconfiguration attempt.
-- Retry failed measurement blocks individually with bounded backoff, so a
-  recovered energy meter can unblock its charging target promptly.
-- Confirm the actual current before treating a reached energy or percentage
-  target as already paused; stale readbacks cannot suppress the required stop.
-- Keep heartbeat priority between identity and data reads after reconnects,
-  and finish connection cleanup when setup or a bus search is cancelled.
-- Block further app connection saves after an unconfirmed Supervisor write,
-  skip unchanged options and preserve credentials for equivalent hostnames.
-- Remove unused charging helpers and duplicated limits, simplify installation
-  guidance and strengthen tracked-file and licensing checks.
-
-## 0.7.0b2 — 2026-11-07
-
-- Add optional TCP login and guided setup for recognized Waveshare single-channel
-  LAN adapters, with verified communication settings and rollback on failure.
-- Keep adapter passwords private and request reauthentication after a confirmed
-  rejection. Document the firmware's authentication and transport limitations.
-- Show automatically clearing Repairs notices for sustained heartbeat or service
-  connection failures, including an unreachable Modbus bus.
-- Keep connections stopped after uncertain adapter changes, and clear obsolete
-  connection Repairs when Home Assistant requests renewed service access.
-- Include the connection-page assets in published service images and validate
-  the actual release build context on both supported architectures.
-- Cancel planned charging commands when the vehicle has disconnected, including
-  commands that were waiting for the bus or a charging-state interval.
-
-## 0.7.0b1 — 2026-11-07
-
-Beta release of the integration and app; **0.6.1 remains stable**.
-
-- Split settings into Wallbox, Vehicle charge target, Next departure, Charging
-  costs and Charging losses. Show details only for selected features, save each
-  section independently and preserve other settings.
-- Separate optional vehicle adapters from charging logic. Keep generic HA
-  sensors, manual dates and calendars independent of BavarianData. Preserve
-  existing vehicle selections and departure-button identities.
-- Fix Module 3 and integer-input dialogs, preserve saved minute-level tariffs,
-  and make Home-based tariff import an explicit choice. Run annual refresh at
-  German midnight regardless of Home Assistant’s time zone.
-- Recheck reached targets before enabling writes, replace stale planner-owned
-  commands and safely clear departure plans when disabled. Recover charging-loss
-  estimates after temporary storage failures.
-- Plan conservatively while vehicle phases are unknown, recognize equivalent
-  departure timestamps and keep solar display commands independent of timed
-  charging cancellation.
-- Update the app’s shared control and tariff fixes. App beta **0.7.0b1** is
-  offered through **#apps-beta**; the stable app catalog remains unchanged.
-  Service compatibility remains **API 2, version 0.6.1 or newer**.
+- Automations that filter the **Control result** `event_type` for `failed`,
+  `uncertain` or another outcome must filter the new `result` attribute.
 
 ## 0.6.1 — 2026-11-07
 

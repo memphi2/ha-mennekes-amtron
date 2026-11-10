@@ -84,7 +84,7 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                 recorded = hass.states.get(event_id)
                 assert dt_util.parse_datetime(recorded.state) is not None
                 assert {key: recorded.attributes[key] for key in ("event_type", "action", "reason")} == {
-                    "event_type": "executed", "action": "set_current", "reason": "completed",
+                    "event_type": "set_current_executed", "action": "set_current", "reason": "completed",
                 }
 
                 changes = []

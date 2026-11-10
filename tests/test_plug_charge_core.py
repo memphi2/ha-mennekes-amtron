@@ -186,7 +186,7 @@ def test_a_manual_release_survives_a_restart_and_ends_with_the_gate():
     restored = PlugChargeState.restore(state.durable())
     assert restored.manual
     assert not restored.blocked
-    # States saved before 0.8.0b7 have no manual release.
+    # Older saved states have no manual release.
     legacy = {key: value for key, value in state.durable().items() if key != "manual"}
     assert not PlugChargeState.restore(legacy).manual
     with pytest.raises(ValueError, match="saved"):
@@ -380,7 +380,7 @@ def test_service_persists_policy_but_new_process_requires_new_authorization(tmp_
             assert snap["supports_plug_charge"]
             assert snap["plug_charge"]["session"]
             saved = json.loads((tmp_path / "intent.json").read_text())["plug_charge"]
-            assert saved == {"enabled": True, "policy": POLICY, "hold": True, "manual": False}
+            assert saved == {"enabled": True, "policy": POLICY, "hold": True}
             restored = WriteState()
             IntentStore(tmp_path / "intent.json", service.identity.serial_number).load(restored)
             assert restored.plug_charge.enabled
@@ -505,7 +505,7 @@ def test_service_accepts_only_current_session_authorization(tmp_path):
             result = await service.command({"command": "plug_charge_authorize", "session": session, "deadline": deadline().isoformat(), "expected_serial_number": serial})
             assert result["control"]["plug_charge"]["authorized"]
             stored = json.loads((tmp_path / "intent.json").read_text())["plug_charge"]
-            assert set(stored) == {"enabled", "policy", "hold", "manual"}
+            assert set(stored) == {"enabled", "policy", "hold"}
             assert stored["hold"] is False
             for payload in (
                 {"command": "plug_charge_config", "value": 1},

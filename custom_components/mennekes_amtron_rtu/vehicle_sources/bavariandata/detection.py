@@ -45,6 +45,9 @@ PLUG_DESCRIPTOR = "vehicle.powertrain.tractionBattery.charging.port.anyPosition.
 # Cars differ in which plug field they stream, so the most direct one wins: an
 # i4 or i5 streams only the port status. BavarianData's evcc bridge reads the
 # same fields; the DC-only and non-streamed port fields say nothing here.
+# BavarianData's derived "Charging Cable" plug sensor is deliberately not one:
+# it carries no BMW timestamp and shows its last value again after a restart,
+# so it cannot prove a fresh plug-in.
 PLUG_SOURCES = (
     ("binary_sensor", PLUG_DESCRIPTOR),
     ("sensor", "vehicle.body.chargingPort.status"),

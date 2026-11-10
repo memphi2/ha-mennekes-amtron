@@ -11,10 +11,9 @@ ordinary percentage and kWh targets work without a departure plan.
 when you want the vehicle to stay paused. A percentage target on its own never
 resumes charging.
 
-Departure planning, calendar import and BavarianData timer import are available
-in stable 0.6.1. Shared [vehicle profiles](vehicle-setup.md) and the menu layout
-below are new in **beta 0.8.0b1**; existing separate vehicle sources continue to
-work. In service mode, use app/service 0.6.1 or newer.
+The steps follow **0.8.0**, where the departure belongs to a
+[vehicle profile](vehicle-setup.md); existing separate vehicle sources continue
+to work.
 
 ## Example: ready tomorrow at 07:30
 
@@ -25,8 +24,8 @@ work. In service mode, use app/service 0.6.1 or newer.
    supply it when that source is available.
 3. Set **Next departure** to tomorrow's full date and **07:30**, or copy that
    trip from a calendar or vehicle timer.
-4. Check the displayed date, time, target and planning status. From
-   **0.8.0b6**, **Planned charging start** shows when charging starts, or
+4. Check the displayed date, time, target and planning status.
+   **Planned charging start** shows when charging starts, or
    started, for this trip. Unlock and authorize the car as required. The plan cannot bypass those restrictions.
 5. To add climate, install the [preconditioning blueprint](blueprints.md#start-vehicle-climate-before-departure)
    and choose the HA action and lead time you want.
@@ -81,7 +80,7 @@ importing, especially after changing the timer in your car or the BMW app.
 **Not every car sends its timers.** On an i4 and an i5, BMW CarData reported
 only that a departure timer is set, not its time, even with the timer fields
 ticked in the data selection ([BavarianData #308](https://github.com/JustChr/BavarianData/issues/308)).
-From **0.8.0b7**, **Use vehicle departure timers** is offered only when
+**Use vehicle departure timers** is offered only when
 BavarianData has enabled action, hour and minute sensors of at least one timer;
 **Next departure** names the timer entities in use. Otherwise, take the
 departure from a calendar or a date/time entity instead.
@@ -133,8 +132,7 @@ departure button keeps its existing entity identity and automations.
 ## What the plan changes while charging
 
 The planner uses the current vehicle SoC, remaining time, usable capacity,
-known wallbox limits and phase information. From **0.8.0b7** it works in
-three steps:
+known wallbox limits and phase information. It works in three steps:
 
 1. **Wait.** Charging stays paused until the energy still needed takes the
    remaining time at full current, plus a **30-minute reserve** for a charge
@@ -145,18 +143,17 @@ three steps:
 
 Each SoC report recalculates this. A charge that is faster than estimated never
 pauses again once it has started; it reaches the 6 A step sooner. A slower one
-returns to full current. Before 0.8.0b7 the plan spread charging at a reduced
-current and often started many hours earlier. **An active timed goal can lift even a
+returns to full current. **An active timed goal can lift even a
 manually set charging pause** to meet the selected time. To prevent that,
 clear **Next departure**. The ordinary percentage target without a departure
 time still only limits charging and never resumes a pause.
 
 With [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge)
-(from **0.8.0b3**), plugging in a recognized car does not start charging ahead of
+plugging in a recognized car does not start charging ahead of
 an armed plan. The release waits until the plan has paused until its start or
 set its current.
 
-From **0.8.0b7**, the plan applies only after the selected car confirms the
+The plan applies only after the selected car confirms the
 plug-in. Another car shows **Car not confirmed** and gets no plan; a pause the
 plan set earlier ends. See
 [the car's rules apply only to that car](vehicle-setup.md#the-cars-rules-apply-only-to-that-car).
@@ -167,15 +164,15 @@ The optional [calendar and preconditioning blueprints](blueprints.md) select
 one trip and run your chosen vehicle action before departure. The vehicle
 determines whether preconditioning draws grid or battery power; completed
 charging targets still apply. Once the target is reached, the charging plan
-cannot resume another charge. From **0.8.0b6**, raising **Vehicle charge
+cannot resume another charge. Raising **Vehicle charge
 target** above the car's charge level plans the same trip again. Every target
 change recalculates the plan. **Next departure** remains visible until that
 time so the climate blueprint can still run, then clears automatically.
 ## Limits and missing data
 
 The planner assumes 230 V per phase and initially 90% transfer efficiency.
-The wallbox reports the car's phases only while it draws current. From
-**0.8.0b7** the plan therefore remembers each vehicle profile's phases from its
+The wallbox reports the car's phases only while it draws current. The plan
+therefore remembers each vehicle profile's phases from its
 last charge. A car never seen charging is planned with three phases. A one-phase
 car then starts later than it should; its first charge corrects that from the
 reserve, and every later trip plans with one phase.
@@ -189,12 +186,11 @@ With the independent service, a queued timed-plan command expires at its
 deadline even if HA is offline; it cannot resume charging later as an obsolete
 request. Expiry does not undo a command already applied or stop an ongoing
 charge. The service continues its heartbeat and last applied state, subject
-to its charging limits. Service mode requires **app/service 0.6.1 or newer**
-for this behavior; update it before the integration.
+to its charging limits.
 
-From **0.7.0b3**, the bus owner also checks for a disconnected vehicle before
+The bus owner also checks for a disconnected vehicle before
 applying a planned command. Confirmed unplugging cancels that command, including
-while HA is offline when using service 0.7.0b3. Manual controls remain available.
+while HA is offline in service mode. Manual controls remain available.
 
 Current adjustments require at least 1 A difference and are spaced by at least
 five minutes; the status sensor has

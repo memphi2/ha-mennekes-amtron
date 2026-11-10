@@ -4,10 +4,10 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-**Stable service: 0.6.1.** Integration 0.6.1 requires **service 0.6.1 or newer
-with API 2**. Update the service first so queued timed-plan commands expire even
-while HA is offline. Use the **v0.6.1** release's container reference or source
-archive. Later integration and service versions can differ when the required
+**Current service: 0.8.0.** The integration requires **service 0.6.1 or newer
+with API 2**; Virtual Plug & Charge and Waveshare TCP login need service 0.8.0.
+Update the service first. Use the **v0.8.0** release's container reference or
+source archive. Later integration and service versions can differ when the required
 minimum is met. See [Updates](#operation-and-updates).
 
 ## 1. Prepare the serial handover
@@ -87,11 +87,10 @@ port. No local serial path or container device mapping is needed for LAN.
 The service's HTTP `port` remains **8765**; it is independent of `tcp_port`.
 See [LAN setup and network access](network-gateway.md).
 
-#### Optional TCP login (since 0.7.0b3)
+#### Optional TCP login
 
-TCP login is not available in stable **0.6.1** or beta **0.7.0b1**. Their service
-does not perform the handshake even if the following fields are added. This
-section requires **app/service 0.7.0b3 or newer** from the beta channel.
+This section requires **service 0.8.0 or newer**; older services do not perform
+the handshake even if the following fields are added.
 
 If a supported Waveshare adapter already has TCP login enabled, additionally
 set `tcp_authentication` to `true` and `tcp_auth_password` to its existing web
@@ -111,11 +110,9 @@ that runs independently of Home Assistant.
 
 Copy the **standalone container reference** from the
 [published app catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps)
-for stable **0.6.1**, or from the
-[beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta)
-for **0.8.0b8**. Use the beta service for Virtual Plug & Charge, optional
-Waveshare TCP login and the shared control fixes. The
-integration's minimum compatible service remains **0.6.1 with API 2**.
+for **0.8.0**. Prereleases are in the
+[beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta).
+The integration's minimum compatible service remains **0.6.1 with API 2**.
 Use the complete `ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference
 as the image. The digest selects the verified release even if a registry tag
 changes later. The same reference supports Linux amd64 and arm64.
@@ -187,7 +184,7 @@ updates. A Core restart leaves the service running; a service update interrupts
 its heartbeat briefly. Do not run the old and new service together on the bus.
 
 A normal integration update leaves a compatible service running. Its version
-number need not match the integration: **integration 0.6.1 requires service
+number need not match the integration: **integration 0.8.0 requires service
 0.6.1 or newer with API 2**. Update the service when a service release is available or the
 integration's release notes require a newer minimum, not merely because a new
 integration version exists.
@@ -195,9 +192,9 @@ integration version exists.
 If both need updating, replace the service first, retaining its data directory,
 and wait for initialization. Then update the integration and restart Core.
 Retaining the same data mount preserves saved intent and credentials; no new HA
-entry is needed. For any older service, including 0.5.0 betas and 0.6.0b1,
-upgrade the service to **0.6.1** before integration 0.6.1. An old beta integration may show
-unavailable controls between those updates because its API differs. With writes enabled, the updated service keeps
+entry is needed. For any service older than 0.6.1, upgrade the service before the
+integration. An older integration may show unavailable controls between those
+updates because its API differs. With writes enabled, the updated service keeps
 its heartbeat and charging intent while HA updates.
 
 [Everyday operation and troubleshooting](modbus-service.md#everyday-use) ·

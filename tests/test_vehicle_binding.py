@@ -89,12 +89,10 @@ def test_a_plug_in_binds_only_after_the_cars_own_fresh_report(tmp_path, caplog):
         coordinator.plug(False)
         await settle(hass)
         assert not binding.resting
-        assert binding.confirmed is None
         # A plug-in after the car's last report is not proven to be that car.
         coordinator.plug(True)
         await settle(hass)
         assert binding.resting
-        assert binding.confirmed is False
         assert "not confirmed as First car" in caplog.text
         # An unreadable wallbox neither confirms the car nor releases its rules.
         coordinator.last_update_success = False
@@ -106,7 +104,6 @@ def test_a_plug_in_binds_only_after_the_cars_own_fresh_report(tmp_path, caplog):
         report(hass)
         await settle(hass)
         assert not binding.resting
-        assert binding.confirmed is True
         assert "First car confirmed at the wallbox" in caplog.text
         assert changes == [True, False]
         # The unplug ends the binding; an old report cannot renew it.
@@ -164,7 +161,6 @@ def test_no_selection_unknown_wallbox_or_no_detection_never_rests(tmp_path):
         await binding.async_start()
         coordinator.plug(True)
         assert not binding.resting
-        assert binding.confirmed is None
         entry.options["active_vehicle_profile"] = A
         coordinator.last_update_success = False
         assert not binding.resting

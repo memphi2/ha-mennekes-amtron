@@ -347,9 +347,6 @@ class VehicleSocObserver:
             remembered = None
             if self._memory and self.source and self._memory_key:
                 remembered = self._memory.recall(self._memory_key)
-                if remembered is None:
-                    # Targets saved before 0.8.0b7 are keyed by the source.
-                    remembered = self._memory.recall(self.source)
             # A read-only owner refuses the command; nothing is restored then.
             if remembered and not self._stopping and goal.status == "disabled":
                 maximum = self.maximum or goal.maximum_percent

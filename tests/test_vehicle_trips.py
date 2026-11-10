@@ -41,7 +41,7 @@ def test_open_trips_are_parked_and_resumed_once_per_car(tmp_path):
         assert await memory.async_swap("a", trip(finished=True), "a") is None
         assert await memory.async_swap("a", trip(-1), "a") is None
         await memory.async_swap("a", trip(), None)
-        await memory.async_forget("a")
+        await memory.async_retain(set())
         assert await memory.async_swap(None, None, "a") is None
 
     asyncio.run(run())

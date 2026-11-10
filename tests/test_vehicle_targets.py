@@ -159,11 +159,6 @@ def test_a_profile_keeps_its_target_when_its_source_description_changes(tmp_path
             car = await observer("sensor.after", "car")
             assert (control.soc_goal.target_percent, control.soc_goal.status) == (70, "active")
             await car.async_stop()
-            # A target saved under its source before 0.8.0b7 is still found.
-            memory.remember("profile:old:sensor.legacy|number.limit", 60)
-            old = await observer("sensor.legacy", "old")
-            assert control.soc_goal.target_percent == 60
-            await old.async_stop()
         finally:
             await hass.async_stop()
 

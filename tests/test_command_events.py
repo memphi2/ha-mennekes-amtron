@@ -57,6 +57,11 @@ def test_feed_is_bounded_no_replay_and_listener_failure_isolated(caplog):
     assert len(seen) == 1
     with pytest.raises(ValueError, match="invalid command event"):
         feed.record("secret", "pause")
+    # Only recovery reports a recovery outcome.
+    with pytest.raises(ValueError, match="invalid command event"):
+        feed.record("recovery_failed", "pause")
+    with pytest.raises(ValueError, match="invalid command event"):
+        feed.record("executed", "recover")
 
 
 def test_remote_feed_cursor_deduplicates_and_skips_offline_events():
@@ -264,12 +269,18 @@ def test_event_entity_subscribes_without_replaying_and_tracks_feed_support(monke
         await entity.async_added_to_hass()
         assert writes == []
         feed.record("executed", "resume")
-        assert entity.state_attributes["event_type"] == "executed"
+        # The type names the command, so HA's history shows which one it was.
+        assert entity.state_attributes["event_type"] == "resume_executed"
         assert entity.state_attributes["action"] == "resume"
-        assert len(writes) == 1
+        assert entity.state_attributes["result"] == "executed"
+        feed.record("recovery_failed", "recover", "error_still_active")
+        assert entity.state_attributes["event_type"] == "recovery_failed"
+        feed.record("uncertain", "recover", "unknown")
+        assert entity.state_attributes["event_type"] == "recovery_uncertain"
+        assert len(writes) == 3
         removals[0]()
         feed.record("executed", "lock")
-        assert len(writes) == 1
+        assert len(writes) == 3
         feed.supported = False
         assert not entity.available
     asyncio.run(run())

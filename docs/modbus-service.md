@@ -10,12 +10,12 @@ LAN needs no USB device on its host; see [LAN setup](network-gateway.md) for the
 two supported protocols. Compatible Waveshare adapters also have optional
 [configuration from the app](lan-adapters.md#service-app).
 
-**Stable service: 0.6.1.** Integration 0.6.1 requires **service 0.6.1 or newer
-with API 2**. Update the app first. Later integration and service versions can
-differ when this requirement is met. For newer betas or a change of app channel,
-follow [Updates](#updates).
+**Current service: 0.8.0.** The integration requires **service 0.6.1 or newer
+with API 2**; Virtual Plug & Charge and the **Debug log** tab need app 0.8.0.
+Update the app first. Integration and service versions can differ when this
+requirement is met. For a change of app channel, follow [Updates](#updates).
 Check the [handover](#check-the-handover) on your hardware before relying on it.
-See [Updating to 0.6.1](installation.md#updating-to-061).
+See [Updating to 0.8.0](installation.md#updating-to-080).
 
 [Install on HA OS](#install-on-home-assistant-os) ·
 [Move an existing wallbox](#move-an-existing-wallbox) ·
@@ -49,9 +49,8 @@ if the wallbox has not yet been prepared.
 
 Install **Mennekes Amtron RTU** from the Marketplace on HA 2026.11+, or
 HACS on HA 2026.9/2026.10, and complete the requested Core restart.
-**0.6.1 remains stable.** Choose **beta 0.8.0b8** for vehicle profiles,
-Virtual Plug & Charge and the new app features; follow the
-[beta update guide](upgrading.md#trying-080b6) for an existing installation.
+For an existing installation, follow the
+[update guide](upgrading.md#updating-to-080).
 
 Already using the service? Go to [Updates](#updates); keep your existing entry.
 
@@ -68,11 +67,10 @@ https://github.com/memphi2/ha-mennekes-amtron#apps
 Install **Mennekes Amtron Modbus Service**. During installation, Supervisor may
 show **Building**. Enable **Start on boot** and **Watchdog**.
 
-The repository above provides stable **0.6.1**. The separate
-`https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog provides beta
-**0.8.0b8**. Existing beta-catalog installations update in place. To switch
-catalogs, follow the [channel handover](#updates) and
-[beta update guide](upgrading.md#trying-080b6).
+The repository above provides stable **0.8.0**. The separate
+`https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog carries
+prereleases and also receives stable updates; its installations update in
+place. To switch catalogs, follow the [channel handover](#updates).
 
 ### 3. Configure and start read-only
 
@@ -80,8 +78,7 @@ If another integration owns the USB or LAN connection, complete the
 [handover preparation](#move-an-existing-wallbox) before starting the app.
 
 In the updated app, start the app and choose **Open Web UI** as an
-administrator. App **0.8.0b2** supports **Supervisor 2026.10.4+**; update an
-older beta app if it incorrectly requests 2026.11.0. Choose USB or LAN; USB
+administrator; this needs **Supervisor 2026.10.4+**. Choose USB or LAN; USB
 provides an adapter dropdown, while LAN shows the host/IP and port.
 A missing USB adapter is never replaced automatically. Saving LAN removes its
 old serial path. Save and restart the app from the Info tab to apply changes.
@@ -243,10 +240,10 @@ direct mode uses Home Assistant's own host/container security policy.
 
 ## Updates
 
-**You do not need an app update for every integration update.** Integration
-**0.6.1** now requires **service 0.6.1 or newer with API 2**, because timed
-charging commands must expire in the service even when HA is offline. Update
-older services first, even if you do not configure a timed plan. Future updates
+**You do not need an app update for every integration update.** The integration
+requires **service 0.6.1 or newer with API 2**, because timed charging commands
+must expire in the service even when HA is offline. Update older services
+first, even if you do not configure a timed plan. Future updates
 can reuse a service that meets their stated minimum. Updating only the
 integration leaves that compatible app and its heartbeat running.
 
@@ -258,11 +255,10 @@ app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
 **Updating the app itself briefly interrupts its heartbeat.**
 
-Stable **0.6.1** uses `#apps`; beta **0.8.0b8** uses `#apps-beta`.
-Update the beta app first for Virtual Plug & Charge, live Modbus debugging,
-Supervisor 2026.10.4+ guided setup and the shared control fixes. The general
-minimum compatible service remains **0.6.1 with API 2**. An existing beta
-app updates in place with its data intact. When updating from 0.5.1, check the
+Stable releases use `#apps`; prereleases use `#apps-beta`, which also
+receives stable updates. Update the app to **0.8.0** first for Virtual Plug &
+Charge, live Modbus debugging and the shared control fixes. An existing app
+updates in place with its data intact. When updating from 0.5.1, check the
 [connection-choice change](upgrading.md#app-connection-choice).
 Switching between stable and beta catalogs creates a different app in Supervisor.
 For that channel change, back up app data, note the charging settings and
@@ -291,9 +287,9 @@ For optional vehicle targets, profiles or departure planning, use the
 
 The log shows service startup, USB/LAN connection and heartbeat start/stop.
 The optional [live communication view](troubleshooting.md#watch-app-modbus-communication-live)
-is available in **app 0.8.0b1**, optional and off by default. Logs and
+is optional and off by default. Logs and
 downloadable integration diagnostics remain available without it.
-App **0.8.0b2** gives this view its own **Open Web UI → Debug log** tab
+It has its own **Open Web UI → Debug log** tab
 (**Debugprotokoll** in German), beside **Connection** (**Verbindung**).
 Switching tabs preserves unsaved connection settings.
 Connection and heartbeat failures are logged when their state changes.

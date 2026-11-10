@@ -1,155 +1,30 @@
 # Changes
 
-## 0.8.0b8
+## 0.8.0
 
-Beta update through **#apps-beta**; **0.6.1 remains stable**.
+Stable release through **#apps**; it also updates existing **#apps-beta**
+installations. Changes since **0.6.1**. Keep your app settings and data, and
+update the app before the integration.
 
-- A reached charge or energy target pauses the wallbox only with a car plugged
-  in. Without a car, nothing is paused; the pause follows on the next poll once
-  a car is plugged in.
-
-## 0.8.0b7
-
-Beta update through **#apps-beta**; **0.6.1 remains stable**.
-
-- A lost Modbus reply that a resend made good is counted as a retry and no
-  longer logged as an error with a frame dump, nor shown as degraded connection
-  quality. Read retries and heartbeats resent after one second count as
-  retries; transactions that finally fail and a heartbeat that misses its
-  10-second deadline count as failures. HA shows both counts on **Connection
-  quality**.
-- With Virtual Plug & Charge enabled, switching **Charging release** on
-  releases the current connection, or the next one without a car, by hand for
-  any car until the next unplug. The release survives an app restart.
-  Integrations before 0.8.0b7 do not show it but keep working.
-
-## 0.8.0b6
-
-Beta update through **#apps-beta**; **0.6.1 remains stable**.
-
-- A percentage target at the car's own charge limit no longer pauses the
-  wallbox when reached. The car ends that charge itself, and the session stays
-  untouched until unplugging. A target below the car's limit still pauses.
-- Virtual Plug & Charge no longer switches the charging release off when the
-  wallbox status is briefly unreadable or contradictory, for example while
-  pausing. Previously the grant was lost and only a new plug-in restored it.
-  The grant is withdrawn only after 60 seconds of unknown state, and HA grants
-  the same connection again without replugging. A reconnect alone no longer
-  ends the grant.
-- The log names the reason when a grant ends and warns when the wallbox status
-  block cannot be read for over 30 seconds.
-
-## 0.8.0b4
-
-Beta update through **#apps-beta**; **0.6.1 remains stable**.
-
-- Keep recently read status and measurement values across a single failed
-  block read for up to 30 seconds, so entities no longer turn unavailable for a
-  moment. The energy meter and error recovery still use only fresh reads.
-- Report the number of failed Modbus transactions since start to HA, shown as
-  an attribute of connection quality.
-
-## 0.8.0b3
-
-Beta update through **#apps-beta**; **0.6.1 remains stable**.
-
-- Treat a current change while the charging release is off or no car is
-  connected as no charging transition: it neither waits for nor starts the
-  state-change interval. Virtual Plug & Charge can end a manual pause and
-  release a permitted car without delay. Phase switching keeps its guard.
-- A percentage target at the car's limit follows every later change of that
-  limit. A raised limit can end a reached target but never resumes charging.
-
-## 0.8.0b2
-
-Beta update through **#apps-beta**; **0.6.1 remains stable**.
-
-- Give decoded Modbus communication its own **Debug log** tab beside
-  **Connection**, with mobile layout and keyboard navigation.
-- Preserve unsaved connection settings when switching tabs and stop browser
-  polling while the debug tab is hidden. Capture remains optional, limited to
-  ten minutes and 200 entries in memory, with no extra Modbus requests or history.
-
-## 0.8.0b1
-
-Beta update through **#apps-beta**; **0.6.1 remains stable**.
-
-- Support optional Virtual Plug & Charge permissions from Home Assistant. Keep
-  an accepted permission through HA Core restarts, revoke it on disconnection
-  and preserve manual pauses, locks and reached targets. Restarting the app
-  requires fresh vehicle recognition; this feature is off by default.
-- Add optional decoded Modbus debugging in the Web UI, with reads, writes,
-  retries and heartbeats. Keep at most 200 redacted entries in memory and stop
-  after ten minutes, without extra bus requests or persistent log files.
-
-- Allow the connection page on stable Supervisor 2026.10.4 and newer,
-  while retaining its administrator and trusted-ingress checks.
-- Show TCP-login and password fields in native app configuration and retain
-  their visibility when the connection page saves USB or disabled login.
-- Confirm or cancel uncertain percentage-target requests and reject observations
-  belonging to a replaced target. Bound the temporary request state in memory.
-- Retry energy-target storage after a recovered meter or interrupted shutdown.
-
-## 0.7.0b4
-
-Beta update through **#apps-beta**; **0.6.1 remains stable**.
-
-- Keep target changes durable during cancellation, cancel obsolete queued
-  charging commands and retain a reached target's required stop.
-- Report unconfirmed storage durability without restoring a stale in-memory
-  target or losing a newly saved charging summary.
-- Retain an entered adapter password when detecting the same endpoint and
-  reject invalid adapter settings before stopping the existing connection.
-- Keep selected adapter settings during detection and explain which controls
-  change the app connection or the adapter itself in all five languages.
-- Allow the TCP listener to start after applying adapter settings and report
-  setup, verification and restoration in the app log without credentials.
-- Recheck live status before restart and phase writes, including reconnecting vehicles.
-- Finish interrupted intent saves in order, even after repeated cancellation.
-- Reject service tokens that cannot be used in an HTTP header and detect
-  concurrent Supervisor configuration changes before saving connection options.
-- Report complete polling failures while preserving valid Modbus exception responses.
-
-## 0.7.0b3
-
-Beta update through **#apps-beta**; **0.6.1 remains stable**. Includes the
-changes from the incomplete 0.7.0b2 publication.
-
-- Recover failed measurements with individual, bounded retries.
-- Confirm the current pause before skipping a stop at an energy or SoC target.
-- Let the heartbeat pass between identity verification and data reads after
-  reconnecting, without accepting data from a changed connection.
-- Prevent further connection saves after an unconfirmed Supervisor write;
-  unchanged options no longer send a redundant save request.
-- Retain saved login credentials for equivalent hostnames and clarify the
-  recovery guidance in all five app languages.
-- Remove unused charging helpers; keep API 2 and existing app data.
-
-## 0.7.0b2
-
-- Keep the old connection stopped when a delayed adapter update cannot be ruled
-  out after a failed setup operation.
-- Add optional Waveshare TCP login and guided LAN-adapter detection and setup.
-- Verify and restore communication settings when applying or saving fails, and
-  prevent reconnecting with outdated settings until the app is restarted.
-- Keep the existing adapter web password private and stop repeated login
-  attempts after a confirmed password rejection.
-- Include the connection page in the released Docker image; test the release
-  build context on both supported architectures.
-- Cancel planned charging commands after a confirmed vehicle disconnection,
-  even when Home Assistant is unavailable.
-
-## 0.7.0b1
-
-Beta update; **0.6.1 remains stable**. Available through **#apps-beta** only.
-
-- Recheck reached energy and percentage targets immediately before enabling
-  writes, including commands waiting for the Modbus connection.
-- Preserve previously saved minute-level tariff windows at startup while
-  keeping quarter-hour validation for new tariff settings.
-- Serialize solar display changes with charging commands so a cancelled timed
-  charge cannot reject an unrelated display-mode change.
-- Keep existing app data and connection settings. API 2 remains unchanged.
+- **Virtual Plug & Charge:** the app keeps a car's grant through HA restarts,
+  releases charging by hand for any car until unplugged when **Charging
+  release** is switched on, and withdraws a grant only after 60 seconds of
+  unknown wallbox state. Manual pauses, locks and reached targets stay in force.
+- **Targets:** a target at the car's own limit follows that limit and lets the
+  car end the charge; a target below it pauses the wallbox only with a car
+  plugged in. A current change without a car or release waits for no
+  state-change interval.
+- **Waveshare LAN adapters:** guided detection and setup with optional TCP
+  login, verified settings, rollback on failure and a private adapter password.
+- **Debug log tab:** live decoded Modbus reads, writes and heartbeats, in
+  memory only, at most 200 entries and ten minutes. The connection page works
+  on Supervisor 2026.10.4 and newer.
+- **Steadier connection:** recent values survive a single failed block read
+  for up to 30 seconds; retried and failed transactions are counted separately
+  and lost replies are no longer logged as errors.
+- More robust target storage, reconnects, phase changes and failed
+  measurements; planned charging commands are cancelled when the car
+  disconnects, even while HA is offline. API 2 is unchanged.
 
 ## 0.6.1
 

@@ -63,9 +63,8 @@ release and restart Home Assistant. If needed, add
 `https://github.com/memphi2/ha-mennekes-amtron` in **HACS → ⋮ → Custom
 repositories**, category **Integration**.
 
-**0.6.1 remains stable.** For vehicle profiles, optional automatic selection and
-Virtual Plug & Charge, choose **beta 0.8.0b8** and follow the
-[beta update guide](upgrading.md#trying-080b6).
+When updating an existing installation, follow the
+[update guide](upgrading.md#updating-to-080).
 [Check feature availability](README.md#versions-and-feature-availability)
 before looking for a new option in an installed release.
 
@@ -83,9 +82,8 @@ TCP port** point to the LAN-to-RS-485 hardware. They are different fields for
 different connections. On HA OS, you normally type neither a service URL nor a
 token for the app.
 
-The app's **Open Web UI** provides guided connection setup. App **0.8.0b8**
-supports **Supervisor 2026.10.4+**; update an older beta app if it incorrectly asks
-for 2026.11.0. Native **Configuration** remains available for manual setup.
+The app's **Open Web UI** provides guided connection setup on
+**Supervisor 2026.10.4+**. Native **Configuration** remains available for manual setup.
 [Connection-page details](upgrading.md#app-connection-page).
 
 ## 4. Check readings and try a charge
@@ -110,12 +108,11 @@ required just to use the wallbox.
    follow the required HA Core restart.
 4. Check current readings, heartbeat, pause/release and the intended current.
 
-The app and integration may have different version numbers. Stable 0.6.1 and
-beta 0.8.0b8 require **service 0.6.1+ with API 2** for ordinary service connections.
-A compatible app can keep running during an integration-only update. To use
-Virtual Plug & Charge in service mode, use **app 0.8.0b1 or newer**. Update to
-**app 0.8.0b2** for the separate **Debug log** tab. When updating both components,
-update the app first.
+The app and integration may have different version numbers. Integration 0.8.0
+requires **service 0.6.1+ with API 2** for ordinary service connections.
+A compatible app can keep running during an integration-only update. Virtual
+Plug & Charge and the separate **Debug log** tab need **app 0.8.0**. When
+updating both components, update the app first.
 
 Use **Check for updates** in the app store if an offered app update is missing.
 Moving between stable and beta app catalogs creates a separate app and requires
@@ -123,13 +120,13 @@ Moving between stable and beta app catalogs creates a separate app and requires
 does not require adding the wallbox again. For changed blueprints,
 [update the existing automation](blueprints.md#updating-existing-blueprint-automations).
 
-## Updating to 0.6.1
+## Updating to 0.8.0
 
-When coming from an older stable or beta, update the **app/service to 0.6.1 or
-newer before the integration**. Keep its data and existing HA entry. This provides
-expiry for queued departure commands while HA is offline. Follow the
-[version-specific update guide](upgrading.md#updating-to-061), including old app
-connection-choice changes when relevant.
+Update the **app/service to 0.8.0 before the integration**. Keep its data and
+existing HA entry. Check automations that use **Control result**: its event
+type now names the command. Follow the
+[version-specific update guide](upgrading.md#updating-to-080), including old app
+connection-choice changes when coming from 0.5.1 or older.
 
 ## Change settings later
 

@@ -93,7 +93,7 @@ authorization must already be disabled through the supported installation
 configuration. This integration cannot change or bypass it.
 
 Switching **Charging release** on by hand opens the gate for any car until the
-next unplug (from 0.8.0b7). A long unknown wallbox state also ends that release.
+next unplug. A long unknown wallbox state also ends that release.
 
 Fresh cable/home evidence must match the active profile. Even then,
 upstream integrations can restore previously saved data, and a vehicle change
@@ -144,15 +144,14 @@ the integration's extra current cap, while hardware limits remain in force.
   another current write. An early pause is queued and does not need to be
   requested again. Zero disables the longer interval, not these technical
   write guards. Fresh, consistent EVSE Idle and CP A1/A2 readings bypass the
-  longer interval when no vehicle is connected. From **0.8.0b7**, a release
+  longer interval when no vehicle is connected. A release
   change while the live current register holds the pause value also skips
   and does not restart it, because the pause keeps the car at 0 A; the resume
   that starts the charge keeps the interval. Failed reads, inconsistent
   status or layouts without CP keep the interval. Register-write guards and
   heartbeat remain active; pending waits check for unplugging every five seconds.
-- From 0.7.0b3, departure-plan commands are cancelled on freshly confirmed
-  unplugging before their write. This also applies in service mode while HA is
-  unavailable when the service is updated to 0.7.0b3. Manual commands retain
+- Departure-plan commands are cancelled on freshly confirmed unplugging before
+  their write, in service mode also while HA is unavailable. Manual commands retain
   the no-vehicle interval bypass.
 - Repeating the same state and recovery that preserves existing intent do not
   restart the long timer. Timing guards survive an entry reload in memory.

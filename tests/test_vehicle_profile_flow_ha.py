@@ -14,7 +14,7 @@ from custom_components.mennekes_amtron_rtu.config_schemas import (
     vehicle_profile_soc_schema,
     vehicle_source_schema,
 )
-from custom_components.mennekes_amtron_rtu.vehicle_profiles import profile_list
+from custom_components.mennekes_amtron_rtu.vehicle_profiles import profiles
 from tests.fakes import FakeModbusClient, device_bank
 from tests.options_flow_helpers import assert_options_http
 from tests.test_home_assistant_smoke import _boot
@@ -121,14 +121,14 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                 assert "vehicle_profiles" not in entry.options
                 result = await submit(form, "wizard_finish")
                 assert result["type"] is FlowResultType.CREATE_ENTRY
-                first = profile_list(entry.options)[0].id
+                first = next(iter(profiles(entry.options)))
                 form = await submit(await begin(), "vehicle_profile_add")
                 form = await submit(
                     form,
                     {"vehicle_profile_name": "Second EV", "vehicle_provider": "none"},
                 )
                 await submit(form, "wizard_finish")
-                second = profile_list(entry.options)[1].id
+                second = list(profiles(entry.options))[1]
                 assert entry.options["active_vehicle_profile"] == first
                 form = await submit(await begin(), "vehicle_profile_select")
                 await submit(form, {"vehicle_profile_id": second})
@@ -204,7 +204,7 @@ def test_profile_create_select_and_manual_features_save_through_real_flow_manage
                 assert entry.options["vehicle_auto_selection"] is False
                 await submit(await begin(), "vehicle_profile_clear")
                 assert entry.options["active_vehicle_profile"] is None
-                assert len(profile_list(entry.options)) == 2
+                assert len(profiles(entry.options)) == 2
             finally:
                 await hass.async_stop()
 

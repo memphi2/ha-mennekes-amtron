@@ -155,14 +155,6 @@ class VehicleBinding:
         """A car is plugged in, but the selected car has not confirmed it is that car."""
         return self._update()
 
-    @property
-    def confirmed(self) -> bool | None:
-        """Whether the plugged-in car is the selected one; None without a car or detection."""
-        profile = active_profile(self._entry.options)
-        if profile is None or profile.detection is None or self._wallbox_connected() is not True:
-            return None
-        return not self.resting
-
     @callback
     def _changed(self, _event: object = None) -> None:
         self._update()
@@ -306,7 +298,7 @@ class VehicleBinding:
             return None
         return level, state.last_reported
 
-    def _warn_stale(self, profile: Any, now: datetime) -> None:
+    def _warn_stale(self, profile: VehicleProfile | None, now: datetime) -> None:
         if (
             self._stale_warned or profile is None or profile.detection is None
             or self._first_empty is None or now - self._first_empty < STALE_AFTER

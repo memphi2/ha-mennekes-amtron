@@ -12,6 +12,7 @@ from homeassistant.const import EntityCategory, UnitOfTime
 from custom_components.mennekes_amtron_rtu.device.command_events import (
     ACTIONS,
     EVENT_TYPES,
+    OUTCOMES,
     REASONS,
 )
 from custom_components.mennekes_amtron_rtu.select import (
@@ -122,6 +123,7 @@ def test_command_results_are_fully_translated_in_every_shipped_language() -> Non
         attributes = payload["entity"]["event"]["control_result"]["state_attributes"]
         for attribute, values in (
             ("event_type", EVENT_TYPES),
+            ("result", OUTCOMES),
             ("action", ACTIONS),
             ("reason", REASONS),
         ):

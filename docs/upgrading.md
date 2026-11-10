@@ -4,105 +4,66 @@
 do not require deleting devices, entities or automations. Moving from HACS to
 the Marketplace also keeps the same integration and entry.
 
-**Current stable release: 0.6.1.** In service mode, update the app/service first,
+**Current stable release: 0.8.0.** In service mode, update the app/service first,
 then the integration. Keep existing app data and your HA entry. The **#apps**
-catalog carries stable updates; **#apps-beta** follows the beta channel below.
-Check the [app connection choice](#app-connection-choice) before updating from 0.5.1.
+catalog carries stable updates and also reaches existing **#apps-beta**
+installations. Check the [app connection choice](#app-connection-choice)
+before updating from 0.5.1.
 
-## Trying 0.8.0b8
+## Updating to 0.8.0
 
-**0.8.0b8 is a beta of the integration and app; 0.6.1 remains stable.** Opt into prereleases in your integration installer and select
-**v0.8.0b8**. Keep the
-existing HA entry. The beta app is offered through
-`https://github.com/memphi2/ha-mennekes-amtron#apps-beta`; existing users of that
-catalog can use **Check for updates** and update their app in place.
+In service mode, update the app to **0.8.0 first**, wait for initialization,
+then update the integration. The integration's general minimum remains
+**service 0.6.1 with API 2**, so ordinary connections keep working with an
+older app. Virtual Plug & Charge, its manual release and the separate retry
+count need app 0.8.0. Direct USB/LAN needs no app.
 
-Moving from **#apps** to **#apps-beta** creates a separate app installation.
-Follow the [channel handover](modbus-service.md#updates), preserving its data
-and ensuring only one service owns the wallbox connection. In service mode,
-update the app to **0.8.0b8 first**, wait for initialization, then update the
-integration. Beta 8 detects a BMW i4 or i5 by its charging port status, so
-detection from the vehicle and automatic selection work for these cars, and a
-reached percentage target pauses only with a car at the wallbox. Beta 7 starts a planned departure late at full current and
-finishes at 6 A to reach the target at departure, instead of charging slowly
-from many hours before; each vehicle profile remembers its charging phases for
-that plan. With **Switch off charging release when unplugged**, unplugging now
-also ends a manual pause, and switching the release during a pause no longer
-waits for the state-change interval. It also logs a single lost Modbus reply no longer as an error and
-counts it as a retry (app **0.8.0b7** for service mode). Beta 6 offers BavarianData again when adding or editing a vehicle
-profile and moves every vehicle setting into the car's profile under
-**Configure → Vehicles**; automatic selection is switched on in the **Active
-vehicle** entity. A percentage target at the car's own limit no longer pauses
-the wallbox when reached (app **0.8.0b6** for service mode): the car ends that
-charge itself and nothing changes until you unplug. Virtual Plug & Charge no
-longer loses its grant for the rest of a connection when the wallbox status is
-briefly unreadable or contradictory. Beta 5 keeps each car's upcoming departure when you switch cars
-and accepts a text sensor as the cable signal for automatic selection; it needs
-no app update. Beta 4 keeps entities available across a single disturbed Modbus
-read (app **0.8.0b4** for service mode), keeps the selected car after unplugging
-instead of reloading, remembers each car's percentage target and no longer lifts
-a pause after a restart with the car still connected. Beta 3 lets Virtual
-Plug & Charge end a manual pause when a recognized car is plugged in. App
-**0.8.0b3** lifts that pause while the charging release is
-still off, so the release follows without the state-change interval; with an
-older app the release can wait for that interval. The status sensor names the
-reason when charging stays blocked. Beta 2's separate **Debug log** tab, wallbox
-Plug & Charge switch and guided vehicle setup remain. Supervisor **2026.10.4+**
-remains supported.
-The integration's general minimum remains **service 0.6.1 with API 2**; ordinary
-connections can keep using a compatible older service. Virtual Plug & Charge
-needs the new app capability. Matching version numbers are not generally required.
+**Check your Control result automations.** Its event type now names the
+command, e.g. `pause_failed`. An automation that filters `event_type` for
+`failed`, `uncertain` or another outcome must filter the new `result`
+attribute instead; see [React to command results](automations.md#react-to-command-results).
 
-Adapter configuration and TCP login remain optional. An update does not change
-the LAN adapter or enable its authentication. Use [LAN adapter setup](lan-adapters.md)
-only when you want to configure a compatible adapter. Sustained heartbeat or
+Everything new stays off until you set it up. An update does not create
+vehicle profiles, enable automatic selection or Virtual Plug & Charge, or
+change a LAN adapter or enable its TCP login. Sustained heartbeat or
 service-connection failures now show Repairs notices that clear after recovery.
 
 ## Feature settings after an update
 
-**Beta 0.8.0b1** adds the following profile, automatic-selection,
-Virtual Plug & Charge and configuration improvements. Existing sources remain
-usable until you deliberately adopt the new setup.
+The integration's **Configure** menu has **Wallbox**, **Vehicles** and
+**Charging costs**. Existing charge-level, departure, cost and loss settings
+continue to work; you do not need to recreate them.
 
-The integration's **Configure** menu separates **Wallbox**, **Vehicle**,
-**Next departure**, **Charging costs** and **Charging losses**. Each section
-shows the inputs for the features you enable and saves independently.
-Existing SoC, departure, cost and loss settings continue to work; you do not
-need to recreate them.
+Optional [vehicle profiles](user-guide.md#vehicle-profiles) hold all settings
+of a car: charge level and limit, next departure, charging losses and
+detection signals. Link a profile to the car in BavarianData and it uses the
+car's data right away; any area can still use manual entities. Existing
+configurations continue without profiles. When you first add profiles, the old
+settings are kept in a manual profile instead of being assigned to a guessed
+car. **Use vehicle departure** is the display name of the former BMW button;
+its entity identity and existing automations are kept. Generic HA entity
+sources remain available for other vehicle integrations; manual and calendar
+departure work without a vehicle source.
 
-Optional [vehicle profiles](user-guide.md#vehicle-profiles) let you choose
-BavarianData and the car once, then enable its supported features separately.
-Manual selection remains the default. Automatic selection from cable and home
-signals is separately optional; an update does not enable it. Existing
-configurations continue without profiles, including independent vehicles for departure and charging history and
-the existing loss average. When you first add profiles, the old settings are
-retained in a manual profile instead of being assigned to a guessed car.
-**Use vehicle departure** is the new display name of the former BMW button;
-its entity identity and existing automations are retained. BavarianData is the
-first implemented vehicle adapter. Generic HA entity sources remain
-available for other vehicle integrations; manual and calendar departure work
-independently of a provider.
+Automatic vehicle selection is switched on in the **Active vehicle** entity
+and uses each profile's detection signals. Manual selection remains the
+default.
 
-Virtual Plug & Charge is separately optional and stays off until you enable it.
-An existing activation setting is preserved. From **0.8.0b2**, activation uses
-the wallbox's **Virtual Plug & Charge** switch
-under **Configuration**. It needs detection sources for each participating
-profile (before 0.8.0b6 also a separate permission per profile);
-automatic profile selection alone does not enable it. Service mode also needs
-app/service **0.8.0b1 or newer** with the charging-permission capability. Follow the [setup steps](vehicle-setup.md#optional-virtual-plug--charge)
+Virtual Plug & Charge stays off until you switch on **Virtual Plug & Charge**
+under the wallbox's **Configuration**. Every profile with detection signals
+takes part. Follow the [setup steps](vehicle-setup.md#optional-virtual-plug--charge)
 before enabling it; enabling may stop an existing charge while detection is
-pending. Disabling the feature does not resume charging.
+pending. Disabling it does not resume charging.
 
 Departure planning has its own enable setting. Disabling it clears its active
-trip and cancels its queued commands while preserving the ordinary percentage
-target and current pause state. See [feature setup](user-guide.md#configuration-and-options).
+trip and cancels its queued commands while keeping the percentage target and
+the current pause state. See [feature setup](user-guide.md#configuration-and-options).
 
-Module 3 now offers **Enter or edit manually** or **Import for HA Home**. Opening its
+Module 3 offers **Enter or edit manually** or **Import for HA Home**. Opening its
 settings alone makes no external lookup. Yearly refresh is a separate
 optional choice after manual entry or import; it can replace saved manual prices
 and windows with the new year's published tariff. It repeats the Home-coordinate
-lookup, with daily retries if no usable tariff is available. Existing choices
-are retained; opening settings alone does not enable it.
+lookup, with daily retries if no usable tariff is available.
 
 ## Updating to 0.6.1
 
@@ -128,7 +89,7 @@ see [Privacy](../PRIVACY.md) and [Charging estimates](charging-estimates.md).
 The app also includes updated shared tariff validation.
 
 Future integration and service versions can still differ when the service meets
-the declared minimum. Stable 0.6.1 includes the earlier beta improvements below.
+the declared minimum.
 
 ## Updating to 0.6.0b1
 
@@ -183,9 +144,8 @@ LAN shows the gateway host/IP and TCP port. Saving LAN also clears any old USB
 path, so an unplugged adapter cannot block the change. A missing USB adapter is
 never replaced automatically.
 
-App **0.8.0b1** accepts **Supervisor 2026.10.4 or newer** for the administrator
-access check. Older apps through 0.7.0b4 had an overly strict 2026.11.0 requirement;
-update the beta app to receive the correction. The integration's minimum Home
+App **0.8.0** accepts **Supervisor 2026.10.4 or newer** for the administrator
+access check; older apps required 2026.11.0. The integration's minimum Home
 Assistant version is unchanged. On Supervisor versions older than 2026.10.4,
 the native app **Configuration** tab remains available for manual setup.
 Keep your existing integration entry.

@@ -227,11 +227,6 @@ def profiles(raw: Mapping[str, Any]) -> dict[str, VehicleProfile]:
     return result
 
 
-def profile_list(raw: Mapping[str, Any]) -> tuple[VehicleProfile, ...]:
-    """Preserve the user's profile order for selectors."""
-    return tuple(profiles(raw).values())
-
-
 def active_profile(raw: Mapping[str, Any]) -> VehicleProfile | None:
     """Resolve only an explicit active selection, never the first available car."""
     key = raw.get(CONF_ACTIVE_VEHICLE_PROFILE)

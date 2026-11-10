@@ -444,7 +444,7 @@ class RemoteClient(MennekesModbusClient):
                     or started.utcoffset() is None
                 ):
                     raise ValueError("invalid plug charge start")
-                # Services before 0.8.0b7 have no manual release.
+                # Services before 0.8.0 have no manual release.
                 manual = control.get("plug_charge_manual", False)
                 if type(manual) is not bool or (manual and not gate["enabled"]):
                     raise ValueError("invalid plug charge release")

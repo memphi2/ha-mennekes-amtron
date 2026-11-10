@@ -11,6 +11,7 @@ from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.capabilities import supported_blocks
 from custom_components.mennekes_amtron_rtu.device.client import MennekesModbusClient
 from custom_components.mennekes_amtron_rtu.device.client_errors import (
+    AmtronConnectionError,
     AmtronProtocolError,
     AmtronRateLimitedError,
 )
@@ -21,6 +22,21 @@ from tests.fakes import device_bank
 from tests.test_serial_faults import frame
 
 PROTOCOLS = ["rtu_over_tcp", "modbus_tcp"]
+
+
+async def connect_quickly(client):
+    """Connect despite a tight request timeout on a busy test machine.
+
+    The timeout under test also bounds opening the socket, which a loaded
+    machine can exceed; only the requests afterwards are being tested.
+    """
+    for _attempt in range(4):
+        try:
+            await client.async_connect()
+            return
+        except AmtronConnectionError:
+            await client.async_close()
+    await client.async_connect()
 
 
 def register_reply(payload, bank):
@@ -155,7 +171,7 @@ def test_network_lost_write_ack_preserves_floor_without_repeating_applied_write(
                 "127.0.0.1", tcp_port=port, connection_type=protocol, timeout=0.04
             ))
             try:
-                await client.async_connect()
+                await connect_quickly(client)
                 with pytest.raises(AmtronProtocolError):
                     await client.async_write_register(R.CHARGING_CURRENT_EMS, 8)
                 failed, = client.write_trace.snapshot()
@@ -185,7 +201,7 @@ def test_network_read_timeouts_use_only_read_budget_and_release_bus_for_heartbea
                 "127.0.0.1", tcp_port=port, connection_type=protocol, timeout=0.04
             ))
             try:
-                await client.async_connect()
+                await connect_quickly(client)
                 with pytest.raises(AmtronProtocolError):
                     await client.async_read_register(R.EVSE_STATE)
                 assert [payload[1] for payload in requests] == [3, 3, 3]
