@@ -15,8 +15,16 @@ from homeassistant.util import dt as dt_util
 from custom_components.mennekes_amtron_rtu import vehicle_binding as m
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.vehicle_sources import types
 from tests.test_vehicle_detection import detection_catalog
 from tests.test_vehicle_profile_runtime import A, B
+
+
+@pytest.fixture(autouse=True)
+def exact_plug_order(monkeypatch):
+    """These cases order reports to the millisecond; the plug window has its own tests."""
+    monkeypatch.setattr(m, "PLUG_WINDOW", timedelta(0))
+    monkeypatch.setattr(types, "PLUG_WINDOW", timedelta(0))
 
 
 class Coordinator:

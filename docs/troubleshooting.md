@@ -339,7 +339,9 @@ integration version, then review the following before changing wallbox settings:
 
 New positive matches settle for three seconds. Reports older than 30 minutes,
 unknown/unavailable states and an uncertain GPS position at the Home boundary
-cannot establish a positive match. See [vehicle setup](vehicle-setup.md) for the
+cannot establish a positive match. The one exception is the location of a parked
+car: its last known position at home counts when its plug report arrives within
+two minutes of the wallbox seeing a car. See [vehicle setup](vehicle-setup.md) for the
 complete signal and freshness rules.
 
 ## Virtual Plug & Charge is waiting
@@ -351,7 +353,7 @@ mode it also requires app 0.8.0. Check its status on the wallbox device.
 |---|---|
 | No recognized vehicle | Select the intended profile or use automatic selection. Its cable and home signals must give one unambiguous match. |
 | Recognized vehicle not selected | Another car, or none, is selected manually. Select the recognized car in **Active vehicle**, or choose **Automatic selection**. |
-| Cable is connected, but permission is still pending | A new cable report for this connection is needed, since the last confirmed disconnected wallbox reading or controller startup. Wait for the normal vehicle-integration update; a manual profile choice does not replace this evidence. |
+| Cable is connected, but permission is still pending | A new cable report for this connection is needed, dated no earlier than two minutes before the last confirmed disconnected wallbox reading. Without a position report in the last 30 minutes, the plug report must arrive within two minutes of the plug-in. Wait for the normal vehicle-integration update; a manual profile choice does not replace this evidence. |
 | Permission is granted, but charging has not started | Check the manual pause, wallbox lock, Charging release, reached goals and local RFID requirement. Granting permission does not remove them. |
 | It waits again after the app restarted or the bus was lost | The previous connection grant was invalidated. Fresh physical connection and vehicle evidence are required. An HA-only restart leaves the running app's existing grant intact. |
 | Disabling the feature did not restart charging | Expected: use Charging release explicitly, and resume only if any remaining pause or lock is also unwanted. |

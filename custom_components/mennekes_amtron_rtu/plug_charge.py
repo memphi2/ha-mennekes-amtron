@@ -30,6 +30,7 @@ from .vehicle_profiles import (
     profiles,
     without_selection,
 )
+from .vehicle_sources import PLUG_WINDOW
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -189,7 +190,9 @@ class PlugChargeObserver:
         if gate.get("authorized"):
             self._set_status("authorized")
             return None
-        selected = self._evidence.selected()
+        raw_since = gate.get("since")
+        since = dt_util.parse_datetime(raw_since) if isinstance(raw_since, str) else None
+        selected = self._evidence.selected(since)
         if selected is None:
             self._set_status("waiting_detection")
             return None
@@ -208,11 +211,9 @@ class PlugChargeObserver:
             self._set_status("waiting_detection")
             return None
         evidence = self._evidence.snapshot(selected)
-        raw_since = gate.get("since")
-        since = dt_util.parse_datetime(raw_since) if isinstance(raw_since, str) else None
         if (
             evidence.connected_at is None or evidence.connected_at.tzinfo is None
-            or since is None or since.tzinfo is None or evidence.connected_at < since
+            or since is None or since.tzinfo is None or evidence.connected_at < since - PLUG_WINDOW
         ):
             self._set_status("waiting_detection")
             return None

@@ -35,7 +35,7 @@ from .vehicle_profiles import (
 )
 from .vehicle_soc import vehicle_percentage
 from .vehicle_soc_const import CONF_VEHICLE_SOC_ENTITY
-from .vehicle_sources import profile_entities
+from .vehicle_sources import PLUG_WINDOW, profile_entities
 
 _LOGGER = logging.getLogger(__name__)
 # A car's cloud data may lag behind the unplug. Only a report this long after
@@ -151,6 +151,11 @@ class VehicleBinding:
         return unsubscribe
 
     @property
+    def plugged_at(self) -> datetime | None:
+        """About when the car at the wallbox arrived; None without a car."""
+        return self._state.absent_at if self._wallbox_connected() is True else None
+
+    @property
     def resting(self) -> bool:
         """A car is plugged in, but the selected car has not confirmed it is that car."""
         return self._update()
@@ -211,7 +216,7 @@ class VehicleBinding:
                     )
                     self._state.vehicle = None
                     # Only a report after this one can confirm the car again.
-                    self._state.absent_at = now
+                    self._state.absent_at = now + PLUG_WINDOW
                     self._confirmed_at = None
                     changed = True
         if changed:
@@ -239,10 +244,10 @@ class VehicleBinding:
 
     def _fresh(self, profile_id: str) -> bool:
         evidence = self._evidence.snapshot(profile_id)
-        if evidence.connected is not True or evidence.home is not True or evidence.connected_at is None:
-            return False
         absent_at = self._state.absent_at
-        return absent_at is None or evidence.connected_at >= absent_at
+        if evidence.at_home(absent_at) is not True or evidence.connected_at is None:
+            return False
+        return absent_at is None or evidence.connected_at >= absent_at - PLUG_WINDOW
 
     def _reset_check(self, now: datetime) -> None:
         self._confirmed_at = now

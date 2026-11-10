@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal, Protocol
 
 from homeassistant.core import CALLBACK_TYPE
@@ -14,6 +14,9 @@ from custom_components.mennekes_amtron_rtu.device.charging_session import (
 Capability = Literal["soc", "charge_limit", "capacity", "departure", "charge_history", "detection"]
 
 DETECTION_MAX_AGE_SECONDS = 1800
+# A car's own plug report and the wallbox's poll come from two clocks. A report
+# this close to the plug-in belongs to it.
+PLUG_WINDOW = timedelta(minutes=2)
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +27,27 @@ class VehicleDetection:
     home: bool | None = None
     # Evidence age matters for grants, but does not change automatic selection.
     connected_at: datetime | None = field(default=None, compare=False)
+    # The last known location, however old: a parked car reports none.
+    parked_home: bool | None = field(default=None, compare=False)
+
+    def at_home(self, plugged_at: datetime | None) -> bool | None:
+        """Whether this car reports itself plugged in at home.
+
+        A stale location counts only for a plug report that coincides with the
+        wallbox's plug-in, so a car plugged in long after parking is recognized.
+        """
+        if self.connected is False or self.home is False:
+            return False
+        if self.connected is not True:
+            return None
+        if self.home is True:
+            return True
+        if (
+            self.parked_home is True and plugged_at is not None and self.connected_at is not None
+            and abs(self.connected_at - plugged_at) <= PLUG_WINDOW
+        ):
+            return True
+        return None
 
 
 class VehicleDetectionSource(Protocol):

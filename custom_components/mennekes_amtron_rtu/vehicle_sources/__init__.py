@@ -15,6 +15,7 @@ from .registry import (
 )
 from .types import (
     DETECTION_MAX_AGE_SECONDS,
+    PLUG_WINDOW,
     Capability,
     ChargeHistorySource,
     DepartureSource,
@@ -29,6 +30,7 @@ from .types import (
 
 __all__ = [
     "DETECTION_MAX_AGE_SECONDS",
+    "PLUG_WINDOW",
     "Capability",
     "ChargeHistorySource",
     "DepartureSource",

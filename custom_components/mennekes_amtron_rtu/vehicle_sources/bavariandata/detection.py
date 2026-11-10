@@ -101,13 +101,13 @@ def _observation(state: State | None) -> _Observation:
     return _Observation(state, state.last_reported if state is not None else None)
 
 
-def _fresh(observation: _Observation, now: datetime) -> State | None:
+def _fresh(observation: _Observation, now: datetime, max_age: float = DETECTION_MAX_AGE_SECONDS) -> State | None:
     state, reported = observation.state, observation.reported
     if (
         state is None or reported is None
         or state.state in ("unknown", "unavailable")
         or state.attributes.get("restored") is True
-        or not 0 <= (now - reported).total_seconds() <= DETECTION_MAX_AGE_SECONDS
+        or not 0 <= (now - reported).total_seconds() <= max_age
     ):
         return None
     return state
@@ -138,8 +138,10 @@ def _number(value: object, minimum: float, maximum: float = math.inf) -> float |
     return result if math.isfinite(result) and minimum <= result <= maximum else None
 
 
-def _home(observation: _Observation, zone: State | None, now: datetime) -> bool | None:
-    state = _fresh(observation, now)
+def _home(
+    observation: _Observation, zone: State | None, now: datetime, max_age: float = DETECTION_MAX_AGE_SECONDS,
+) -> bool | None:
+    state = _fresh(observation, now, max_age)
     if (
         state is None or state.attributes.get("source_type") != "gps"
         or zone is None or zone.state in ("unknown", "unavailable")
@@ -182,6 +184,7 @@ class BavarianDetectionSource(BavarianVehicleBinding):
             connected_at = dt_util.parse_datetime(timestamp) if isinstance(timestamp, str) else None
         return VehicleDetection(
             _connected(states[0], now), _home(states[1], zone, now), connected_at,
+            parked_home=_home(states[1], zone, now, math.inf),
         )
 
     @property
