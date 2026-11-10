@@ -77,6 +77,30 @@ def test_bavarian_keeps_the_last_location_of_a_parked_car(tmp_path):
     asyncio.run(run())
 
 
+def test_bavarian_dates_the_plug_in_by_the_cars_clock_only_for_the_change(tmp_path):
+    async def run():
+        hass = local_hass(tmp_path)
+        try:
+            tracker(hass)
+            entity_id = plug(hass, "off")
+            plugged = dt_util.utcnow() - timedelta(minutes=5)
+            # Delivered five minutes late: the car's time of the change counts.
+            plug(hass, "on", timestamp=plugged.isoformat())
+            source = BavarianDetectionSource(hass, "car")
+            assert source.snapshot.changed_at == plugged
+            # A later report renews the timestamp, not the change.
+            changed = hass.states.get(entity_id).last_changed
+            plug(hass, "on", timestamp=dt_util.utcnow().isoformat())
+            assert source.snapshot.changed_at == changed
+            # Without a usable car time, Home Assistant's change time counts.
+            plug(hass, "off")
+            plug(hass, "on", timestamp="2026-11-10T18:54:12")
+            assert source.snapshot.changed_at == hass.states.get(entity_id).last_changed
+        finally:
+            await hass.async_stop()
+    asyncio.run(run())
+
+
 def test_selection_accepts_a_parked_car_only_for_this_plug_in(tmp_path):
     async def run():
         hass = HomeAssistant(str(tmp_path))

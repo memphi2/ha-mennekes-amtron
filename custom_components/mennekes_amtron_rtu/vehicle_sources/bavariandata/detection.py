@@ -165,6 +165,21 @@ def _home(
     return None if in_zone(zone, latitude, longitude, accuracy) else False
 
 
+def _changed_at(state: State | None) -> datetime | None:
+    """When the car's cable state changed, by the car's own clock if known.
+
+    A delayed cloud delivery keeps the BMW time of the change. A timestamp
+    renewed by a later report of the same state is not that time.
+    """
+    if state is None:
+        return None
+    timestamp = state.attributes.get("timestamp")
+    stamp = dt_util.parse_datetime(timestamp) if isinstance(timestamp, str) else None
+    if stamp is not None and stamp.tzinfo is not None and state.last_updated == state.last_changed:
+        return stamp
+    return state.last_changed
+
+
 class BavarianDetectionSource(BavarianVehicleBinding):
     """Keep one vehicle's cable and GPS hints separate from charging status."""
 
@@ -185,7 +200,7 @@ class BavarianDetectionSource(BavarianVehicleBinding):
         return VehicleDetection(
             _connected(states[0], now), _home(states[1], zone, now), connected_at,
             parked_home=_home(states[1], zone, now, math.inf),
-            changed_at=state.last_changed if state is not None else None,
+            changed_at=_changed_at(state),
         )
 
     @property
