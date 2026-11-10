@@ -1,5 +1,11 @@
 # Changes
 
+## 0.8.2
+
+- **Virtual Plug & Charge:** **Charging release** switched off by hand stops
+  only the current connection and ends at the unplug. A stop saved earlier no
+  longer refuses every later plug-in of the recognized car.
+
 ## 0.8.0
 
 Stable release through **#apps**; it also updates existing **#apps-beta**
