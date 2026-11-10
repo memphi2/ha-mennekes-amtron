@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.2 — 2026-11-10
+
+Update the app to **0.8.2** in service mode; the integration also works with
+app 0.8.0 but keeps the old behavior there.
+
+- **Virtual Plug & Charge:** **Charging release** switched off by hand stops
+  only the current connection. Until now it was remembered for good, so the
+  closed gate kept refusing every later plug-in of the recognized car, unseen
+  because the switch shows off while the gate is closed anyway. A stop already
+  saved ends at the next unplug or when Virtual Plug & Charge is switched on.
+  Without Virtual Plug & Charge, a release switched off stays off as before.
+
 ## 0.8.1 — 2026-11-10
 
 - **Session duration** is shown in hours and minutes, e.g. **1 h 15 min**.
