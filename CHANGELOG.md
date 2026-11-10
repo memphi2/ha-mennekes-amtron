@@ -14,9 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   settings.
 - **Virtual Plug & Charge and automatic selection** recognize a car plugged in
   long after parking. A parked car sends no new position, so after 30 minutes
-  its location no longer counted and the wallbox stayed locked. Now a plug
-  report within two minutes of the wallbox seeing the car is enough together
-  with the car's last known position at home. A fresh position elsewhere still
+  its location no longer counted and the wallbox stayed locked. Now a cable
+  signal that switches to plugged in within two minutes of the wallbox seeing
+  the car is enough together with the car's last known position at home. A fresh position elsewhere still
   excludes the car. The same two minutes absorb small clock differences
   between the car and the wallbox.
 

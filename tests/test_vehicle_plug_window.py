@@ -42,16 +42,16 @@ NOW = dt_util.utcnow()
 
 @pytest.mark.parametrize(("evidence", "plugged_at", "expected"), [
     (VehicleDetection(True, True, NOW), None, True),
-    (VehicleDetection(False, None, NOW, parked_home=True), NOW, False),
-    (VehicleDetection(True, False, NOW, parked_home=True), NOW, False),
+    (VehicleDetection(False, None, NOW, parked_home=True, changed_at=NOW), NOW, False),
+    (VehicleDetection(True, False, NOW, parked_home=True, changed_at=NOW), NOW, False),
     (VehicleDetection(None, True, NOW), NOW, None),
-    (VehicleDetection(True, None, NOW - timedelta(seconds=90), parked_home=True), NOW, True),
-    (VehicleDetection(True, None, NOW + timedelta(seconds=90), parked_home=True), NOW, True),
-    (VehicleDetection(True, None, NOW - PLUG_WINDOW - timedelta(seconds=1), parked_home=True), NOW, None),
-    (VehicleDetection(True, None, NOW, parked_home=True), None, None),
-    (VehicleDetection(True, None, None, parked_home=True), NOW, None),
-    (VehicleDetection(True, None, NOW, parked_home=False), NOW, None),
-    (VehicleDetection(True, None, NOW, parked_home=None), NOW, None),
+    (VehicleDetection(True, None, NOW, parked_home=True, changed_at=NOW - timedelta(seconds=90)), NOW, True),
+    (VehicleDetection(True, None, NOW, parked_home=True, changed_at=NOW + timedelta(seconds=90)), NOW, True),
+    (VehicleDetection(True, None, NOW, parked_home=True, changed_at=NOW - PLUG_WINDOW - timedelta(seconds=1)), NOW, None),
+    (VehicleDetection(True, None, NOW, parked_home=True, changed_at=NOW), None, None),
+    (VehicleDetection(True, None, NOW, parked_home=True), NOW, None),
+    (VehicleDetection(True, None, NOW, parked_home=False, changed_at=NOW), NOW, None),
+    (VehicleDetection(True, None, NOW, parked_home=None, changed_at=NOW), NOW, None),
 ])
 def test_a_stale_home_counts_only_for_a_plug_report_at_the_plug_in(evidence, plugged_at, expected):
     assert evidence.at_home(plugged_at) is expected
@@ -94,6 +94,14 @@ def test_selection_accepts_a_parked_car_only_for_this_plug_in(tmp_path):
         hass.states.async_set("binary_sensor.second_plug", "on")
         assert evidence.selected(now) is None
         assert evidence.effective(B, plugged_at=now) is None
+        # A car plugged in elsewhere for hours only repeats its report: it is
+        # not the car that just arrived, but stays unresolved as before.
+        hass.states.async_set("binary_sensor.second_plug", "off", timestamp=time.time() - PARKED - 60)
+        hass.states.async_set("binary_sensor.second_plug", "on", timestamp=time.time() - PARKED)
+        hass.states.async_set("binary_sensor.second_plug", "on")
+        assert evidence.snapshot(B).connected is True
+        assert evidence.snapshot(B).at_home(now) is None
+        assert evidence.selected(now) is None
         await hass.async_stop()
     asyncio.run(run())
 

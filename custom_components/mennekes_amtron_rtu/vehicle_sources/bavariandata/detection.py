@@ -185,6 +185,7 @@ class BavarianDetectionSource(BavarianVehicleBinding):
         return VehicleDetection(
             _connected(states[0], now), _home(states[1], zone, now), connected_at,
             parked_home=_home(states[1], zone, now, math.inf),
+            changed_at=state.last_changed if state is not None else None,
         )
 
     @property

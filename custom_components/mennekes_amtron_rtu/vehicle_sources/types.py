@@ -29,12 +29,16 @@ class VehicleDetection:
     connected_at: datetime | None = field(default=None, compare=False)
     # The last known location, however old: a parked car reports none.
     parked_home: bool | None = field(default=None, compare=False)
+    # When the cable signal switched to its current state; a repeated report
+    # does not move it.
+    changed_at: datetime | None = field(default=None, compare=False)
 
     def at_home(self, plugged_at: datetime | None) -> bool | None:
         """Whether this car reports itself plugged in at home.
 
-        A stale location counts only for a plug report that coincides with the
-        wallbox's plug-in, so a car plugged in long after parking is recognized.
+        A stale location counts only when the car's cable signal switched to
+        plugged in together with the wallbox, so a car plugged in long after
+        parking is recognized.
         """
         if self.connected is False or self.home is False:
             return False
@@ -43,8 +47,8 @@ class VehicleDetection:
         if self.home is True:
             return True
         if (
-            self.parked_home is True and plugged_at is not None and self.connected_at is not None
-            and abs(self.connected_at - plugged_at) <= PLUG_WINDOW
+            self.parked_home is True and plugged_at is not None and self.changed_at is not None
+            and abs(self.changed_at - plugged_at) <= PLUG_WINDOW
         ):
             return True
         return None

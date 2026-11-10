@@ -91,6 +91,7 @@ class VehicleEvidence:
             home=entity_signal(home, home=True),
             connected_at=connected.last_reported if connected is not None else None,
             parked_home=entity_signal(home, home=True, max_age=math.inf),
+            changed_at=connected.last_changed if connected is not None else None,
         )
 
     def snapshot(self, profile_id: str) -> VehicleDetection:

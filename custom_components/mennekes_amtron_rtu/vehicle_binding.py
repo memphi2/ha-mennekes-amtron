@@ -215,7 +215,8 @@ class VehicleBinding:
                         profile.name, reason,
                     )
                     self._state.vehicle = None
-                    # Only a report after this one can confirm the car again.
+                    # Only a report after this one can confirm the car again;
+                    # the comparison allows PLUG_WINDOW before this time.
                     self._state.absent_at = now + PLUG_WINDOW
                     self._confirmed_at = None
                     changed = True
