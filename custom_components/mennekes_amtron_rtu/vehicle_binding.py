@@ -298,7 +298,7 @@ class VehicleBinding:
             return None
         return level, state.last_reported
 
-    def _warn_stale(self, profile: Any, now: datetime) -> None:
+    def _warn_stale(self, profile: VehicleProfile | None, now: datetime) -> None:
         if (
             self._stale_warned or profile is None or profile.detection is None
             or self._first_empty is None or now - self._first_empty < STALE_AFTER
