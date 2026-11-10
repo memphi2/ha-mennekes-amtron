@@ -192,6 +192,8 @@ class PlugChargeObserver:
             return None
         raw_since = gate.get("since")
         since = dt_util.parse_datetime(raw_since) if isinstance(raw_since, str) else None
+        if since is not None and since.tzinfo is None:
+            since = None
         selected = self._evidence.selected(since)
         if selected is None:
             self._set_status("waiting_detection")
@@ -213,7 +215,7 @@ class PlugChargeObserver:
         evidence = self._evidence.snapshot(selected)
         if (
             evidence.connected_at is None or evidence.connected_at.tzinfo is None
-            or since is None or since.tzinfo is None or evidence.connected_at < since - PLUG_WINDOW
+            or since is None or evidence.connected_at < since - PLUG_WINDOW
         ):
             self._set_status("waiting_detection")
             return None

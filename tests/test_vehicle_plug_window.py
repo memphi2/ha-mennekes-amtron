@@ -109,6 +109,10 @@ def test_plug_and_charge_grants_a_car_plugged_in_long_after_parking(tmp_path, mo
             h.control.plug_charge["since"] = (dt_util.utcnow() + PLUG_WINDOW + timedelta(minutes=1)).isoformat()
             h.coordinator.async_update_listeners()
             assert h.observer.status == "waiting_detection"
+            # A plug-in time without a time zone proves nothing.
+            h.control.plug_charge["since"] = dt_util.utcnow().replace(tzinfo=None).isoformat()
+            h.coordinator.async_update_listeners()
+            assert h.observer.status == "waiting_detection"
     asyncio.run(run())
 
 
