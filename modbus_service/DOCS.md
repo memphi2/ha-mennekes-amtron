@@ -6,7 +6,7 @@ the last charging state, including a deliberate pause, while HA is offline.
 
 **amd64 and aarch64 · separate integration required**
 
-Version **0.8.0** is available through **#apps** and also updates existing
+Version **0.8.2** is available through **#apps** and also updates existing
 **#apps-beta** installations in place. Keep the app data and HA entry, and
 update this app before integration **0.8.0**. Switching catalogs creates a
 separate app and requires a handover. See [Updates](#updates).
@@ -18,17 +18,17 @@ pauses only with a car plugged in; a target at the car's own limit lets the car
 end the charge. Existing connections keep their settings until you change them.
 
 LAN-to-RS-485 adapters are supported without local USB.
-See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/network-gateway.md)
+See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/network-gateway.md)
 for transparent RTU over TCP versus translating Modbus TCP. Supported Waveshare
-models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/lan-adapters.md#service-app).
+models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/lan-adapters.md#service-app).
 
 [First setup](#first-setup) · [Daily use](#daily-use) ·
 [Updates](#updates) · [Help](#help)
 
 ## First setup
 
-Install **Mennekes Amtron RTU integration 0.8.0**. Complete any requested Home Assistant Core restart.
-See [Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/installation.md).
+Install **Mennekes Amtron RTU integration 0.8.2**. Complete any requested Home Assistant Core restart.
+See [Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/installation.md).
 The integration and this app are
 separate installations. Already using the app? Follow [Updates](#updates)
 instead: the app and integration can be updated independently.
@@ -101,7 +101,7 @@ TCP-server mode and disables storage polling, autonomous preambles and old
 serial-buffer replay. Unknown custom payloads are refused. Applying these settings
 restarts the adapter and stops the app's old Modbus connection immediately.
 After successful saving, restart the app to connect using the new settings.
-Detection alone changes nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/lan-adapters.md).
+Detection alone changes nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/lan-adapters.md).
 
 The native **Configuration** tab contains manual connection fields; it does
 not have an adapter detection button. To detect and configure a compatible
@@ -158,16 +158,16 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
   health changes rather than every beat.
 - **Charging targets:** set an **Energy target** in kWh, or configure an optional
   vehicle percentage target through the integration. Targets only limit charging.
-  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/user-guide.md#energy-target).
+  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/user-guide.md#energy-target).
 - **Next departure:** select a one-trip charging deadline in HA. This optional
   plan may resume a pause to meet the time; ordinary kWh/percentage limits alone
   never do. The service discards queued timed-plan commands after their deadline.
   Open the car's profile under **Configure → Vehicles**, set up its charge
   level, then enable **Next departure → Configure departure planning** and
   choose its battery-capacity source.
-  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/departure-planning.md).
+  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/departure-planning.md).
 - **Loss and cost estimates:** choose optional vehicle and price sources in the
-  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/charging-estimates.md).
+  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/charging-estimates.md).
 
 Early pause/resume, phase, release and lock changes are queued.
 HA's **Pending change** and **Pending change due** show the request and its
@@ -216,7 +216,7 @@ That switch is the only permission: every profile
 with detection signals takes part. Automatic selection is chosen in the
 **Active vehicle** entity; selecting a profile manually does not replace the
 detection check. See the
-[vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/vehicle-setup.md#optional-virtual-plug--charge).
+[vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/vehicle-setup.md#optional-virtual-plug--charge).
 
 The app initially withholds charging release until HA recognizes the selected
 vehicle unambiguously. A grant is valid only for the current physical
@@ -304,7 +304,7 @@ uses HA's own security policy and does not automatically use this service profil
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
 | Not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
-| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/troubleshooting.md#renew-service-access). |
+| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/troubleshooting.md#renew-service-access). |
 | Service API or minimum version is incompatible | Check the API and minimum service version required in the integration’s release notes. Version numbers do not need to match. Follow [Updates](#updates) if needed; changing the token does not fix this. |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
@@ -340,4 +340,4 @@ Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Error-200 recovery while paused and particular LAN gateways still need
 confirmation on the actual hardware; automated tests do not establish that.
 
-[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/modbus-service.md)
+[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/modbus-service.md)

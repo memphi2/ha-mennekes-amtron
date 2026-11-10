@@ -289,7 +289,7 @@ the car, the plan decides instead. The grant waits until the plan has applied it
 decision: it keeps the car paused until the calculated start, or sets the planned
 current. Charging therefore never starts briefly before a planned pause. A plan
 that still lacks its target, charge level or capacity does not hold a manual
-pause. A wallbox lock, disabled charging release, reached target or a newer
+pause. A wallbox lock, a charging release switched off for this connection, reached target or a newer
 queued command still prevents charging; the feature does not remove those
 choices. While charging stays blocked, the status sensor's **Blocking reason**
 attribute names the condition, such as **Departure plan is preparing the
