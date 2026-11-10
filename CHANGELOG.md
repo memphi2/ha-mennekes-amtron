@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.1 — 2026-11-10
+
+- **Session duration** is shown in hours and minutes, e.g. **1 h 15 min**.
+  0.8.0 meant to show it as hours:minutes:seconds, but Home Assistant formats
+  a duration only in minutes, hours or days and kept showing seconds. A sensor
+  created earlier keeps seconds; choose **h** as its unit in the entity
+  settings.
+- **Virtual Plug & Charge and automatic selection** recognize a car plugged in
+  long after parking. A parked car sends no new position, so after 30 minutes
+  its location no longer counted and the wallbox stayed locked. Now a cable
+  signal that switches to plugged in within two minutes of the wallbox seeing
+  the car is enough together with the car's last known position at home. A fresh position elsewhere still
+  excludes the car. The same two minutes absorb small clock differences
+  between the car and the wallbox.
+
 ## 0.8.0 — 2026-11-09
 
 Stable release of the integration and app. Changes since **0.6.1**. In service

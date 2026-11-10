@@ -101,13 +101,13 @@ def _observation(state: State | None) -> _Observation:
     return _Observation(state, state.last_reported if state is not None else None)
 
 
-def _fresh(observation: _Observation, now: datetime) -> State | None:
+def _fresh(observation: _Observation, now: datetime, max_age: float = DETECTION_MAX_AGE_SECONDS) -> State | None:
     state, reported = observation.state, observation.reported
     if (
         state is None or reported is None
         or state.state in ("unknown", "unavailable")
         or state.attributes.get("restored") is True
-        or not 0 <= (now - reported).total_seconds() <= DETECTION_MAX_AGE_SECONDS
+        or not 0 <= (now - reported).total_seconds() <= max_age
     ):
         return None
     return state
@@ -138,8 +138,10 @@ def _number(value: object, minimum: float, maximum: float = math.inf) -> float |
     return result if math.isfinite(result) and minimum <= result <= maximum else None
 
 
-def _home(observation: _Observation, zone: State | None, now: datetime) -> bool | None:
-    state = _fresh(observation, now)
+def _home(
+    observation: _Observation, zone: State | None, now: datetime, max_age: float = DETECTION_MAX_AGE_SECONDS,
+) -> bool | None:
+    state = _fresh(observation, now, max_age)
     if (
         state is None or state.attributes.get("source_type") != "gps"
         or zone is None or zone.state in ("unknown", "unavailable")
@@ -163,6 +165,21 @@ def _home(observation: _Observation, zone: State | None, now: datetime) -> bool 
     return None if in_zone(zone, latitude, longitude, accuracy) else False
 
 
+def _changed_at(state: State | None) -> datetime | None:
+    """When the car's cable state changed, by the car's own clock if known.
+
+    A delayed cloud delivery keeps the BMW time of the change. A timestamp
+    renewed by a later report of the same state is not that time.
+    """
+    if state is None:
+        return None
+    timestamp = state.attributes.get("timestamp")
+    stamp = dt_util.parse_datetime(timestamp) if isinstance(timestamp, str) else None
+    if stamp is not None and stamp.tzinfo is not None and state.last_updated == state.last_changed:
+        return stamp
+    return state.last_changed
+
+
 class BavarianDetectionSource(BavarianVehicleBinding):
     """Keep one vehicle's cable and GPS hints separate from charging status."""
 
@@ -182,6 +199,8 @@ class BavarianDetectionSource(BavarianVehicleBinding):
             connected_at = dt_util.parse_datetime(timestamp) if isinstance(timestamp, str) else None
         return VehicleDetection(
             _connected(states[0], now), _home(states[1], zone, now), connected_at,
+            parked_home=_home(states[1], zone, now, math.inf),
+            changed_at=_changed_at(state),
         )
 
     @property

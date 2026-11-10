@@ -423,8 +423,8 @@ def test_the_register_gate_rejects_an_icon_that_hides_a_device_class(
 def test_numeric_sensors_declare_a_display_precision() -> None:
     """Otherwise a float32 register shows as 230.10000610351562.
 
-    A session duration is a whole number of seconds; without a precision the
-    frontend shows it as hours:minutes:seconds.
+    A session duration is shown in hours, which the frontend writes as
+    "1 h 15 min"; a display precision would round those hours.
     """
 
     from homeassistant.components.sensor import SensorDeviceClass
@@ -443,6 +443,7 @@ def test_numeric_sensors_declare_a_display_precision() -> None:
     assert missing == []
     duration = next(item for item in SENSOR_DESCRIPTIONS if item.key == "session_duration")
     assert duration.device_class is SensorDeviceClass.DURATION
+    assert duration.suggested_unit_of_measurement == "h"
 
 
 def test_the_hardware_document_keeps_its_sources_marked(

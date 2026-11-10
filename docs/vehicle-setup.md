@@ -169,7 +169,11 @@ car while the selected one reports itself disconnected or away; no percentage
 target then applies to the unknown car. A valid disconnected or away signal excludes that car, even
 if its other signal is missing. For the remaining candidates, unknown or
 unavailable signals block selection, as do signals not reported to Home Assistant
-within 30 minutes.
+within 30 minutes. A parked car sends no new position, so its last known
+position at home still counts when its cable signal switches to plugged in
+within two minutes of the wallbox seeing a car. A signal that only repeats an
+older plug-in does not count. A car plugged in long after parking is
+therefore recognized; a fresh position elsewhere still excludes it.
 No matching car or several matching cars means **no active vehicle**. The
 previous car's target and departure plan stop applying when the assignment
 changes; each car keeps them for its return. Detection alone never starts charging or lifts a pause. If the result is

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State, callback
@@ -40,12 +41,13 @@ SETTLE_SECONDS = 3
 
 def entity_signal(
     state: State | None, *, home: bool, connected_states: tuple[str, ...] = (),
+    max_age: float = DETECTION_MAX_AGE_SECONDS,
 ) -> bool | None:
     """Only current, explicit HA presence/connection states can identify a car."""
     if state is None or state.attributes.get("restored") is True:
         return None
     age = (dt_util.utcnow() - state.last_reported).total_seconds()
-    if not -5 <= age <= DETECTION_MAX_AGE_SECONDS:
+    if not -5 <= age <= max_age:
         return None
     if state.domain == "binary_sensor":
         return {"on": True, "off": False}.get(state.state)
@@ -81,12 +83,15 @@ class VehicleEvidence:
             source = self._sources.get(profile.id)
             return source.snapshot if source is not None else VehicleDetection()
         connected = self._hass.states.get(detection.connected_entity)
+        home = self._hass.states.get(detection.home_entity)
         return VehicleDetection(
             connected=entity_signal(
                 connected, home=False, connected_states=detection.connected_states,
             ),
-            home=entity_signal(self._hass.states.get(detection.home_entity), home=True),
+            home=entity_signal(home, home=True),
             connected_at=connected.last_reported if connected is not None else None,
+            parked_home=entity_signal(home, home=True, max_age=math.inf),
+            changed_at=connected.last_changed if connected is not None else None,
         )
 
     def snapshot(self, profile_id: str) -> VehicleDetection:
@@ -98,21 +103,27 @@ class VehicleEvidence:
         """An old observer cannot authorize a modified vehicle catalog."""
         return profiles(self._entry.options) == self._profiles
 
-    def selected(self) -> str | None:
-        """One positive car is insufficient if another configured car is unknown."""
+    def selected(self, plugged_at: datetime | None = None) -> str | None:
+        """One positive car is insufficient if another configured car is unknown.
+
+        ``plugged_at`` is when the wallbox saw the current car arrive; a car
+        that reports itself plugged in then needs no fresh location.
+        """
         candidates = []
         for key, profile in self._profiles.items():
             if profile.detection is None:
                 continue
-            value = self._snapshot(profile)
-            if value.connected is False or value.home is False:
+            match = self._snapshot(profile).at_home(plugged_at)
+            if match is False:
                 continue
-            if value.connected is not True or value.home is not True:
+            if match is None:
                 return None
             candidates.append(key)
         return candidates[0] if len(candidates) == 1 else None
 
-    def effective(self, active: str | None, *, wallbox_connected: bool | None = None) -> str | None:
+    def effective(
+        self, active: str | None, *, wallbox_connected: bool | None = None, plugged_at: datetime | None = None,
+    ) -> str | None:
         """Keep the active car until another one is identified or unknown.
 
         Unplugging or stale reports do not deselect it, so a briefly missing
@@ -120,14 +131,12 @@ class VehicleEvidence:
         itself plugged in, or a car at the wallbox while the active one reports itself elsewhere,
         ends the selection, so its goals never apply to another vehicle.
         """
-        selected = self.selected()
+        selected = self.selected(plugged_at)
         if selected is not None or active is None or (profile := self._profiles.get(active)) is None:
             return selected
         for key, other in self._profiles.items():
-            if key != active and other.detection is not None:
-                evidence = self._snapshot(other)
-                if evidence.connected is True and evidence.home is True:
-                    return None
+            if key != active and other.detection is not None and self._snapshot(other).at_home(plugged_at) is True:
+                return None
         evidence = self._snapshot(profile)
         if wallbox_connected is True and (evidence.connected is False or evidence.home is False):
             return None
@@ -193,9 +202,10 @@ class VehicleDetectionObserver(VehicleEvidence):
             self._cancel_pending()
             return
         active = self._entry.options.get(CONF_ACTIVE_VEHICLE_PROFILE)
-        selected = self.effective(active, wallbox_connected=self._wallbox_connected())
+        plugged_at = self._plugged_at()
+        selected = self.effective(active, wallbox_connected=self._wallbox_connected(), plugged_at=plugged_at)
         if selected == active:
-            if selected is not None and selected == self.selected():
+            if selected is not None and selected == self.selected(plugged_at):
                 confirm_automatic_vehicle(self._hass, self._entry, selected)
             self._cancel_pending()
             return
@@ -222,8 +232,13 @@ class VehicleDetectionObserver(VehicleEvidence):
         candidate = self._candidate
         self._pending = None
         self._candidate = None
-        if self._current() and candidate == self.selected():
+        if self._current() and candidate == self.selected(self._plugged_at()):
             self._apply(candidate)
+
+    def _plugged_at(self) -> datetime | None:
+        runtime = getattr(self._entry, "runtime_data", None)
+        binding = getattr(runtime, "vehicle_binding", None)
+        return binding.plugged_at if binding is not None else None
 
     def _wallbox_connected(self) -> bool | None:
         runtime = getattr(self._entry, "runtime_data", None)

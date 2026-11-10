@@ -282,7 +282,9 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         register_key="session_duration",
         native_unit_of_measurement=UnitOfTime.SECONDS,
         device_class=SensorDeviceClass.DURATION,
-        # Without a display precision the frontend shows hours:minutes:seconds.
+        # The frontend writes durations in hours as "1 h 15 min" and shows
+        # seconds as a plain number. A display precision would round the hours.
+        suggested_unit_of_measurement=UnitOfTime.HOURS,
     ),
     AmtronSensorEntityDescription(
         key="energy_total",
