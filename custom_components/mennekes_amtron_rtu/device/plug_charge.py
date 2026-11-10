@@ -173,8 +173,21 @@ class PlugChargeController:
             cp_supported=self._control._identity.layout_version >= CP_STATE.min_layout,
         )
         self.state.observe(present, observed_at=observed_at)
+        if present is False:
+            self._end_manual_stop()
         if self.state.blocked and (data is None or data.get(CHARGING_RELEASE.key) != 0):
             self._schedule_deny()
+
+    def _end_manual_stop(self) -> None:
+        """A release switched off by hand ends with its connection.
+
+        The gate already keeps every connection closed until a car is
+        recognized. A remembered stop would only refuse every later plug-in
+        of the recognized car, unseen behind the closed gate.
+        """
+        if self.state.enabled and self._control.charging_release_requested is False:
+            _LOGGER.info("Plug & Charge: the charging release switched off by hand ended with the connection")
+            self._control.charging_release_requested = None
 
     def _schedule_deny(self) -> None:
         if not self._stopping and not self._control.read_only and (self._task is None or self._task.done()):
@@ -213,6 +226,7 @@ class PlugChargeController:
             self._control._require_write_access()
         async with self._control.energy_goal_guard:
             self.state.configure(enabled, policy)
+            self._end_manual_stop()
             await self.async_sync_locked()
 
     def check_release(self, *, recovery: bool = False) -> None:
@@ -262,6 +276,8 @@ class PlugChargeController:
         present = vehicle_connected(evse, cp, cp_supported=cp_supported)
         if present is not True:
             self.state.observe(present)
+            if present is False:
+                self._end_manual_stop()
             self._schedule_deny()
             raise validation_error("plug_charge_session_changed")
         if (

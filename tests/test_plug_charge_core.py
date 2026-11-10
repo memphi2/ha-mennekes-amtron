@@ -151,6 +151,46 @@ def test_a_manual_release_opens_the_gate_for_this_connection_only():
     asyncio.run(run())
 
 
+
+def test_a_release_switched_off_by_hand_stops_only_this_connection():
+    async def run():
+        h = Harness()
+        control = await armed(h)
+        await authorize(control)
+        await control.async_set_charging_release(False)
+        assert control.charging_release_requested is False
+        assert h.written(R.CHARGING_RELEASE)[-1] == [0]
+        # Unknown readings are no unplug and keep the stop.
+        control.observe_plug_charge(None)
+        assert control.charging_release_requested is False
+        # The unplug ends it: the next recognized plug-in can be granted.
+        h.transport.bank[R.EVSE_STATE.address] = int(EvseState.IDLE)
+        h.transport.bank[R.CP_STATE.address] = int(CpState.A1)
+        unplugged(control)
+        assert control.charging_release_requested is None
+        present(h)
+        await authorize(control)
+        assert control.plug_charge["authorized"]
+        assert h.written(R.CHARGING_RELEASE)[-1] == [1]
+        await control.async_shutdown()
+    asyncio.run(run())
+
+
+def test_enabling_plug_and_charge_forgets_an_old_release_stop():
+    async def run():
+        h = Harness()
+        control = await h.connect()
+        control.charging_release_requested = False
+        await control.async_configure_plug_charge(True, policy=POLICY)
+        assert control.charging_release_requested is None
+        # Without Plug & Charge, a stop is kept, also after an unplug.
+        await control.async_configure_plug_charge(False)
+        control.charging_release_requested = False
+        unplugged(control)
+        assert control.charging_release_requested is False
+        await control.async_shutdown()
+    asyncio.run(run())
+
 def test_a_manual_release_without_a_car_waits_for_the_next_plug_in():
     async def run():
         h = Harness()
@@ -638,8 +678,8 @@ def test_manual_release_after_a_refusal_releases_this_connection_by_hand():
     async def run():
         h = Harness()
         c = await armed(h)
+        # Switched off by hand, this connection is refused even when recognized.
         await c.async_set_charging_release(False)
-        present(h, False)
         present(h)
         with pytest.raises(ServiceValidationError) as exc:
             await authorize(c)
