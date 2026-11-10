@@ -4,7 +4,7 @@
 service is the preferred way to connect the integration: the wallbox keeps its
 last charging state, including a deliberate pause, independently of HA.
 
-**Version 0.8.0 · Home Assistant app or standalone service**
+**Version 0.8.2 · Home Assistant app or standalone service**
 
 Stable releases are available through **#apps** and also update existing
 **#apps-beta** installations in place. Keep their data and the existing HA
@@ -42,8 +42,8 @@ that a resend made good counts as a retry, not an error.
 | Using | Start here |
 |---|---|
 | Home Assistant OS | [App setup and everyday use](DOCS.md) — discovery supplies the address and token. |
-| Home Assistant Container or another host | [Docker/Python setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/service-standalone.md) |
-| An existing direct USB or LAN connection | [Handover guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/modbus-service.md#move-an-existing-wallbox) — keep your device and entity IDs. |
+| Home Assistant Container or another host | [Docker/Python setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/service-standalone.md) |
+| An existing direct USB or LAN connection | [Handover guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/modbus-service.md#move-an-existing-wallbox) — keep your device and entity IDs. |
 
 Install the Mennekes Amtron RTU integration separately. App and integration
 versions may differ: a compatible app keeps running during integration updates.
@@ -53,10 +53,10 @@ Direct USB and LAN connections remain available without this service.
 
 The service needs exclusive access to the RS-485 adapter. App, host, power and
 USB failures can still interrupt the heartbeat, so configure the wallbox's
-[fallback behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/safety.md#the-heartbeat-and-what-happens-without-it).
+[fallback behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/safety.md#the-heartbeat-and-what-happens-without-it).
 
-[LAN-to-RS-485 adapters](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/network-gateway.md) are also supported,
+[LAN-to-RS-485 adapters](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/network-gateway.md) are also supported,
 with transparent RTU over TCP or translating Modbus TCP gateways. No local USB
 device is needed. Network and gateway outages can still interrupt the heartbeat.
 
-[Technical reference](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.0/docs/service-reference.md) · [Changes](CHANGELOG.md)
+[Technical reference](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/service-reference.md) · [Changes](CHANGELOG.md)
