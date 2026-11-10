@@ -180,6 +180,28 @@ def test_a_car_streaming_only_its_port_status_is_detected(tmp_path, value, expec
     asyncio.run(run())
 
 
+def test_the_derived_charging_cable_sensor_is_not_cable_evidence(tmp_path):
+    async def run():
+        hass = local_hass(tmp_path)
+        try:
+            # BavarianData 0.9.28's plug-class sensor carries no BMW timestamp
+            # and shows its last value again after a restart, so it cannot prove
+            # a fresh plug-in. The port status it is derived from is used.
+            hass.data[er.DATA_REGISTRY].entities["binary_sensor.car_cable"] = SimpleNamespace(
+                unique_id=f"{VIN}_charging_cable", entity_id="binary_sensor.car_cable",
+                device_id="car", disabled_by=None,
+            )
+            hass.states.async_set("binary_sensor.car_cable", "on", {"descriptor": "charging_cable", "device_class": "plug"})
+            tracker(hass)
+            assert detection_capabilities(hass, "car") == frozenset()
+            assert detection_entities(hass, "car") == (None, "device_tracker.car")
+            port(hass)
+            assert detection_entities(hass, "car")[0] == "sensor.car_port"
+        finally:
+            await hass.async_stop()
+    asyncio.run(run())
+
+
 def test_the_port_status_text_counts_too(tmp_path):
     async def run():
         hass = local_hass(tmp_path)
