@@ -1,5 +1,5 @@
 name: Mennekes Amtron Modbus Service
-version: 0.6.1
+version: 0.8.0
 url: https://github.com/memphi2/ha-mennekes-amtron
 slug: mennekes_amtron_modbus
 description: Independent Modbus connection and heartbeat for Mennekes Amtron
@@ -27,6 +27,8 @@ options:
   connection_type: USB / RS-485
   host: ""
   tcp_port: 502
+  tcp_authentication: false
+  tcp_auth_password: ""
   device_id: 50
   baudrate: "57600"
   frame: 8n2
@@ -43,6 +45,8 @@ schema:
   serial_port: str?
   host: str?
   tcp_port: port
+  tcp_authentication: bool?
+  tcp_auth_password: password?
   device_id: int(10,50)
   baudrate: list(9600|14400|19200|28800|38400|56000|57600)
   frame: list(8n2|8e1|8o1)

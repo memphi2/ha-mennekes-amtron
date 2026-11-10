@@ -1,5 +1,31 @@
 # Changes
 
+## 0.8.0
+
+Stable release through **#apps**; it also updates existing **#apps-beta**
+installations. Changes since **0.6.1**. Keep your app settings and data, and
+update the app before the integration.
+
+- **Virtual Plug & Charge:** the app keeps a car's grant through HA restarts,
+  releases charging by hand for any car until unplugged when **Charging
+  release** is switched on, and withdraws a grant only after 60 seconds of
+  unknown wallbox state. Manual pauses, locks and reached targets stay in force.
+- **Targets:** a target at the car's own limit follows that limit and lets the
+  car end the charge; a target below it pauses the wallbox only with a car
+  plugged in. A current change without a car or release waits for no
+  state-change interval.
+- **Waveshare LAN adapters:** guided detection and setup with optional TCP
+  login, verified settings, rollback on failure and a private adapter password.
+- **Debug log tab:** live decoded Modbus reads, writes and heartbeats, in
+  memory only, at most 200 entries and ten minutes. The connection page works
+  on Supervisor 2026.10.4 and newer.
+- **Steadier connection:** recent values survive a single failed block read
+  for up to 30 seconds; retried and failed transactions are counted separately
+  and lost replies are no longer logged as errors.
+- More robust target storage, reconnects, phase changes and failed
+  measurements; planned charging commands are cancelled when the car
+  disconnects, even while HA is offline. API 2 is unchanged.
+
 ## 0.6.1
 
 - Expire queued timed charging commands at their deadline even while Home

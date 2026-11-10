@@ -4,7 +4,7 @@ configuration:
     description: "Kies de USB-adapter in de keuzelijst via Webinterface openen. Het pad wordt hier opgeslagen. Genegeerd voor LAN en verwijderd bij het opslaan van LAN via de webinterface."
   device_id:
     name: Wallboxadres
-    description: Het Modbus-adres dat in de wallbox is ingesteld.
+    description: "Adres van de laadpaal op de RS-485-bus, ook bij LAN. Fabriekswaarde: 50; ondersteund bereik: 10–50. Gebruik het adres dat in de laadpaal is ingesteld."
   baudrate:
     name: Baudrate
     description: "Alleen voor USB / RS-485: moet overeenkomen met de wallbox. Stel bij LAN de baudrate in op de adapter."
@@ -13,7 +13,7 @@ configuration:
     description: "Alleen voor USB / RS-485: databits, pariteit en stopbits van de wallbox. Stel deze bij LAN in op de adapter."
   read_only:
     name: Alleen lezen
-    description: Schakelt laadopdrachten, inclusief de bediening vanuit Home Assistant, en de heartbeat van de service uit; Modbus-leesverzoeken blijven actief.
+    description: "Ingeschakeld: alleen waarden volgen; laadopdrachten en de app-heartbeat zijn uitgeschakeld, ook bediening via Home Assistant. Zet deze optie uit om heartbeat en laadbediening toe te staan. Modbus-leesverzoeken blijven in beide modi actief."
   current_cap:
     name: Maximale stroom
     description: Maximale aangevraagde EMS-stroom in ampère. Uitdrukkelijke opdrachten voor 0 A verwijderen de EMS-limiet.
@@ -28,21 +28,27 @@ configuration:
     description: Aantal seconden tussen statusuitlezingen. De heartbeat loopt onafhankelijk.
   measurement_interval:
     name: Meetinterval
-    description: Aantal seconden tussen metingen; 30 seconden beperkt de Recorder-belasting.
+    description: "Seconden tussen metingen van vermogen, spanning, stroom en energie. De standaard 30 seconden beperkt frequente updates van de Home Assistant-geschiedenis. Status en heartbeat hebben eigen intervallen."
   listen:
     name: API-luisteradres
     description: Behoud 0.0.0.0 voor toegang via het privénetwerk van de app.
   port:
     name: Interne API-poort
-    description: Vast ingesteld op 8765; het beschikbaar stellen van een hostpoort is optioneel en meestal niet nodig.
+    description: "De HTTP-API van de app gebruikt 8765. Home Assistant bereikt deze normaal via het privénetwerk van de apps zonder een hostpoort te publiceren. De TCP-poort van de LAN-adapter stel je apart in."
   connection_type:
     name: Wallboxverbinding
-    description: "Kies via Webinterface openen een USB-adapter of vul de LAN-host en poort in. Sla de wijzigingen op en herstart daarna de app."
+    description: "Open voor een compatibele LAN-adapter de Webinterface via het tabblad Info van de app. Kies LAN, vul de host in en kies ‘Instellingen van LAN-adapter lezen’. Kies om deze in te stellen ‘Adapterinstellingen toepassen bij opslaan’, sla op en herstart de app. Hier kun je ook USB-adapters kiezen."
   host:
     name: Adapterhost / IP-adres
-    description: "Verplicht voor LAN: hostnaam of IP-adres van de adapter, zonder URL-schema of pad. Laat dit leeg voor USB / RS-485. Gebruik een vertrouwd privénetwerk."
+    description: "Verplicht voor LAN: hostnaam of IP-adres van de adapter, zonder URL-schema of pad. Vul deze host in de Webinterface in om een compatibele adapter te herkennen en in te stellen. Laat dit leeg voor USB / RS-485. Gebruik een vertrouwd privénetwerk."
   tcp_port:
     name: TCP-poort van adapter
     description: TCP-poort die op de adapter is ingesteld; standaard 502. Dit is niet HTTP-poort 8765 van de onafhankelijke service.
+  tcp_authentication:
+    name: "TCP-aanmelding gebruiken in deze app"
+    description: "Dit wijzigt alleen de appverbinding. Lees eerst de instellingen van een compatibele adapter en kies toepassen bij opslaan om de aanmelding ook op de adapter in of uit te schakelen. Gebruik Webinterface openen voor de adapterinstellingen. Aanmelding versleutelt niet en is bij firmware 1.523 te omzeilen. Gebruik een beschermd lokaal netwerk."
+  tcp_auth_password:
+    name: "Huidig webwachtwoord van de adapter"
+    description: "Huidig webwachtwoord voor TCP-aanmelding: 1–9 afdrukbare ASCII-tekens zonder spaties. Laat leeg als TCP-aanmelding is uitgeschakeld. Het adapterwachtwoord wordt hierdoor niet gewijzigd."
 network:
   8765/tcp: Service-API met authenticatie; interne toegang vereist geen hostpoort.

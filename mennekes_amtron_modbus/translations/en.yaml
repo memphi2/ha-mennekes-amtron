@@ -4,7 +4,7 @@ configuration:
     description: "Choose the USB adapter from the dropdown in Open Web UI. Its path is saved here. Ignored for LAN and removed when saving LAN through the Web UI."
   device_id:
     name: Wallbox address
-    description: Modbus address configured in the wallbox.
+    description: "Wallbox address on the RS-485 bus, also when using LAN. Factory default: 50; supported range: 10–50. Use the wallbox’s configured address."
   baudrate:
     name: Baud rate
     description: "For USB / RS-485 only: match the wallbox. For LAN, configure the baud rate on the adapter."
@@ -13,7 +13,7 @@ configuration:
     description: "For USB / RS-485 only: match the wallbox data bits, parity and stop bits. For LAN, configure these on the adapter."
   read_only:
     name: Read-only
-    description: Disables charging commands, including Home Assistant controls, and the service heartbeat; Modbus reads remain active.
+    description: "Enabled: monitor values only; charging commands and the app heartbeat are disabled, including control from Home Assistant. Disable this option to allow heartbeat and charging controls. Modbus reads continue in both modes."
   current_cap:
     name: Current cap
     description: Maximum requested EMS current in amperes. Explicit 0 A commands remove the EMS limit.
@@ -28,21 +28,27 @@ configuration:
     description: Seconds between status polls. The heartbeat runs independently.
   measurement_interval:
     name: Measurement interval
-    description: Seconds between measurement polls; 30 seconds limits Recorder traffic.
+    description: "Seconds between power, voltage, current and energy measurements. The default 30 seconds reduces frequent Home Assistant history updates. Status polling and heartbeat have their own intervals."
   listen:
     name: API listen address
     description: Keep 0.0.0.0 for access through the app's private network.
   port:
     name: Internal API port
-    description: Fixed at 8765; host port publication is optional and normally unnecessary.
+    description: "The app’s HTTP API uses 8765. Home Assistant normally reaches it through the private app network without publishing a host port. The LAN adapter’s TCP port is configured separately."
   connection_type:
     name: Wallbox connection
-    description: "Use Open Web UI to choose a USB adapter or enter the LAN host and port. Save changes, then restart the app."
+    description: "For a compatible LAN adapter, open the app’s Info tab and select Open Web UI. Choose LAN, enter the host and select “Read LAN adapter settings”. To configure it, select “Apply adapter settings when saving” and save. Restart the app afterwards. USB adapters can also be selected there."
   host:
     name: Adapter host / IP
-    description: "Required for LAN: adapter host name or IP address, without a URL scheme or path. Leave empty for USB / RS-485. Use a trusted private network."
+    description: "Required for LAN: adapter host name or IP address, without a URL scheme or path. To detect and configure a compatible adapter, enter this host in Open Web UI. Leave empty for USB / RS-485. Use a trusted private network."
   tcp_port:
     name: Adapter TCP port
     description: TCP port configured on the adapter; default 502. This is not the independent service HTTP port 8765.
+  tcp_authentication:
+    name: "Use TCP login in this app"
+    description: "This changes the app connection only. To enable or disable login on a compatible adapter, first read its settings and select “Apply adapter settings when saving”. Use Open Web UI for adapter setup. Login does not encrypt traffic; it can be bypassed on firmware 1.523. Use a protected local network."
+  tcp_auth_password:
+    name: "Existing adapter web password"
+    description: "Existing adapter web password for TCP login: 1–9 printable ASCII characters without spaces. Leave empty when TCP login is disabled. This does not change the adapter password."
 network:
   8765/tcp: Authenticated service API; internal access needs no host port.
