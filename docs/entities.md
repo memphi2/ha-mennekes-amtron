@@ -163,7 +163,7 @@ remembered resume target while paused, which may be the pending target. See
 | `sensor.*_total_power` | Total power | W | power | always | Active power on all phases. |
 | `sensor.*_session_maximum_current` | Session maximum current | A | current | always | The highest current this session may use, after every static limit the wallbox applies. |
 | `sensor.*_session_energy` | Session energy | kWh | energy | always | Energy transferred in the current session. |
-| `sensor.*_session_duration` | Session duration | s | duration | always | Length of the current session. Live/history value without new long-term statistics. |
+| `sensor.*_session_duration` | Session duration | h | duration | always | Length of the current session, shown as e.g. **1 h 15 min**. A sensor created before 0.8.1 keeps seconds; choose **h** as its unit in the entity settings. Live/history value without new long-term statistics. |
 | `sensor.*_total_energy` | Total energy | kWh | energy | layout v01.02 | Lifetime energy on the AC port. Usable as an Energy dashboard source; the manufacturer marks it as **not usable for billing**. |
 | `sensor.*_charging_sessions` | Charging sessions |  |  | layout v01.02 | Lifetime number of charging sessions. |
 

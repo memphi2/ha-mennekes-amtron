@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- **Session duration** is shown in hours and minutes, e.g. **1 h 15 min**.
+  0.8.0 meant to show it as hours:minutes:seconds, but Home Assistant formats
+  a duration only in minutes, hours or days and kept showing seconds. A sensor
+  created earlier keeps seconds; choose **h** as its unit in the entity
+  settings.
+
 ## 0.8.0 — 2026-11-09
 
 Stable release of the integration and app. Changes since **0.6.1**. In service
