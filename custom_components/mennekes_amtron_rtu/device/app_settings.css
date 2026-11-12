@@ -29,3 +29,9 @@ button{border:1px solid var(--accent);border-radius:7px;background:var(--accent)
 .overview-commands li { border-top: 1px solid var(--border); padding: 12px 0; overflow-wrap: anywhere; }
 .overview-commands small { display: block; margin-top: 5px; }
 @media (max-width: 550px) { .overview-card { padding: 16px; } }
+
+/* Runtime settings use three short columns, not the wide telegram table. */
+#runtime h1 { overflow-wrap: anywhere; }
+#runtime table { min-width: 0; table-layout: fixed; }
+#runtime th:first-child { width: 50%; }
+#runtime th, #runtime td { padding: 9px 4px; }
