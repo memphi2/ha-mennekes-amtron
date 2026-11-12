@@ -74,3 +74,10 @@ def test_native_pending_changes_remain_visible_and_noop_is_empty():
     assert not reverted["restart_required"]
     assert reverted["changes"][0]["saved"] == 16
     assert reverted["changes"][0]["proposed"] == 6
+
+
+@pytest.mark.parametrize("field", sorted(HOT_FIELDS))
+@pytest.mark.parametrize("value", [5.0, 5.5])
+def test_ingress_poll_intervals_match_the_supervisor_integer_schema(field, value):
+    with pytest.raises(ValueError, match=f"{field}: .*integer seconds"):
+        runtime_candidate(SAVED, {field: value}, token=TOKEN)

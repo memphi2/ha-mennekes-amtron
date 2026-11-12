@@ -37,7 +37,7 @@ def test_preview_and_save_apply_only_hot_intervals_without_bus_side_effects(tmp_
             monkeypatch.setattr(ui, "SUPERVISOR_PEER", "127.0.0.1")
             async with TestClient(TestServer(create_console_app(settings))) as client:
                 headers, revision = await edit_context(client)
-                changes = {"scan_interval": 11.5, "measurement_interval": 45, "current_cap": 8}
+                changes = {"scan_interval": 11, "measurement_interval": 45, "current_cap": 8}
                 before = (list(transport.reads), list(transport.writes))
                 owner, heartbeat, poller = service.client, service.heartbeat, service._poller
                 retry_history = deepcopy(poller._block_retries)
@@ -55,7 +55,7 @@ def test_preview_and_save_apply_only_hot_intervals_without_bus_side_effects(tmp_
                 assert data["active"]["current_cap"] == 16
                 assert data["saved"]["current_cap"] == 8
                 assert data["restart_required"]
-                assert service.config.scan_interval == 11.5
+                assert service.config.scan_interval == 11
                 assert service.config.measurement_interval == 45
                 assert service.config.current_cap == 16
                 assert settings.options["current_cap"] == 8
@@ -147,13 +147,13 @@ def test_concurrent_native_settings_are_not_overwritten(tmp_path, monkeypatch):
                     if path == "/addons/self/info":
                         reads += 1
                         if reads == 2:
-                            settings.options["port"] = 8888
+                            settings.options["state_change_interval_seconds"] = 400
                     return await original(method, path, payload)
 
                 monkeypatch.setattr(settings, "_request", request)
                 result = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": {"scan_interval": 10}, "confirm": True})
                 assert result.status == 409
-                assert settings.options["port"] == 8888
+                assert settings.options["state_change_interval_seconds"] == 400
                 assert settings.options["scan_interval"] == 5
                 assert not any(method == "POST" for method, _path, _payload in settings.calls)
         finally:

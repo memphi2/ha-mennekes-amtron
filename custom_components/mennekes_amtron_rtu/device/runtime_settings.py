@@ -24,6 +24,9 @@ def runtime_candidate(
     """Validate the complete candidate through the existing config boundary."""
     if not isinstance(changes, dict) or not changes or changes.keys() - set(RUNTIME_FIELDS):
         raise ValueError("invalid runtime settings")
+    for key in HOT_FIELDS & changes.keys():
+        if type(changes[key]) is not int:
+            raise ValueError(f"{key}: app polling intervals must be integer seconds")
     updated = {**saved, **changes}
     config = ServerConfig.from_dict({**updated, "token": token})
     return updated, config

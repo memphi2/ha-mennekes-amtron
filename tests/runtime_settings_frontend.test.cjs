@@ -64,3 +64,8 @@ test("failed initial load leaves a usable reload action without editable stale v
 test("uncertain prior save disables all editing",async()=>{
   const h=await harness([payload({write_blocked:true})]);assert.ok(names.every(key=>h.el(key).disabled));assert.equal(h.el("runtime_check").disabled,true);assert.match(h.el("runtime_notice").textContent,/ungewissen/);
 });
+
+test("a previously saved restart-required change is visible immediately",async()=>{
+  const h=await harness([payload({saved:{...fields,current_cap:8},restart_required:true,restart_fields:["current_cap"]})]);
+  assert.equal(h.el("runtime_preview").hidden,false);assert.equal(h.el("runtime_changes").children.length,0);assert.match(h.el("runtime_restart").textContent,/Neustart/);assert.equal(h.el("current_cap").value,"8");
+});

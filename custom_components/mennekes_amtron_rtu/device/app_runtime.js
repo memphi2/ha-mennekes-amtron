@@ -47,6 +47,7 @@
     try {
       const data=await request("./api/runtime"); values(data); state=data; blocked=data.write_blocked===true;
       names.forEach(key=>{el(key).value=String(data.saved[key]);});
+      el("runtime_changes").replaceChildren();el("runtime_preview").hidden=!data.restart_required;
       el("runtime_form").hidden=false; el("runtime_notice").textContent=text(blocked ? "blocked" : "ready");
     } catch (_) { state=null;blocked=true;el("runtime_form").hidden=false;el("runtime_values").replaceChildren();names.forEach(key=>{el(key).value="";});el("runtime_notice").textContent=text("error"); }
     finally { busy=false; buttons(); }
