@@ -157,13 +157,11 @@ def test_home_assistant_sets_the_integration_up(tmp_path: Path, request: pytest.
 
             registry = er.async_get(hass)
             entities = er.async_entries_for_config_entry(registry, entry.entry_id)
-            assert len(entities) > 20
             assert all(entity.platform == "mennekes_amtron_rtu" for entity in entities)
             # Recorder examples use the device name, not the integration domain.
-            recorder_examples = {
-                f"sensor.mennekes_amtron_current_l{phase}" for phase in (1, 2, 3)
-            }
-            assert recorder_examples | {
+            assert len(entities) > 15
+            assert {
+                "sensor.mennekes_amtron_signaled_current",
                 "sensor.mennekes_amtron_session_energy",
                 "sensor.mennekes_amtron_total_power",
                 "sensor.mennekes_amtron_total_energy",

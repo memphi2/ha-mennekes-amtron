@@ -302,15 +302,6 @@
           "unlocked": "Déverrouillé"
         }
       },
-      "current_l1": {
-        "name": "Courant L1"
-      },
-      "current_l2": {
-        "name": "Courant L2"
-      },
-      "current_l3": {
-        "name": "Courant L3"
-      },
       "detected_ev_phases": {
         "name": "Phases détectées du véhicule",
         "state": {

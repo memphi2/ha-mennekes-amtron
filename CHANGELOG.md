@@ -16,8 +16,12 @@ Integration only; the app stays at 0.9.0b1.
 - **Breaking: no automatic cleanup of the entities folded in 0.9.0b1.**
   Delete their leftover entries under **Settings → Devices & services →
   Entities**. No compatibility code is kept before 1.0.
-- **Total power** also carries `power_l1` to `power_l3` while power flows, so
-  every value of the former per-phase sensors is still available.
+- **Breaking: the three phase-current sensors are attributes too.** While
+  power flows, **Total power** carries `current_l1` to `current_l3`,
+  `voltage_l1` to `voltage_l3` and `power_l1` to `power_l3`, so every phase
+  value is in one place; **Current L1** to **L3** are gone and keep no
+  statistics of their own. The Recorder profiles now exclude signaled current
+  and temperature (less detail) and also session energy (statistics only).
 - A status block that briefly cannot be read no longer makes every poll
   re-read the measurement and counter blocks while its last value is held.
 - **Switch off charging release when unplugged** no longer writes to the

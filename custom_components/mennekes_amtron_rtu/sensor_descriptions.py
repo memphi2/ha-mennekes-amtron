@@ -150,9 +150,6 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     _enum("detected_ev_phases", DetectedEvPhases),
     _current("signaled_current"),
-    _current("current_l1"),
-    _current("current_l2"),
-    _current("current_l3"),
     AmtronSensorEntityDescription(
         key="power_total",
         translation_key="power_total",
@@ -161,10 +158,11 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
-        # The phase details under load, in whole volts and watts: while
-        # charging, the power changes with every poll anyway, so they add no
-        # history rows.
+        # The phase details under load, in whole volts and watts and tenths
+        # of an ampere: while charging, the power changes with every poll
+        # anyway, so they add no history rows.
         attributes={
+            **{f"current_l{n}": under_load(number_attribute(f"current_l{n}", 1)) for n in (1, 2, 3)},
             **{f"voltage_l{n}": under_load(number_attribute(f"voltage_l{n}", 0)) for n in (1, 2, 3)},
             **{f"power_l{n}": under_load(number_attribute(f"power_l{n}", 0)) for n in (1, 2, 3)},
         },

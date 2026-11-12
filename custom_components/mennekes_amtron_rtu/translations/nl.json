@@ -302,15 +302,6 @@
           "unlocked": "Ontgrendeld"
         }
       },
-      "current_l1": {
-        "name": "Stroom L1"
-      },
-      "current_l2": {
-        "name": "Stroom L2"
-      },
-      "current_l3": {
-        "name": "Stroom L3"
-      },
       "detected_ev_phases": {
         "name": "Gedetecteerde voertuigfasen",
         "state": {

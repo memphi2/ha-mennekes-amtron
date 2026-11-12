@@ -22,8 +22,8 @@ from .entity import entry_entity_unique_id
 from .exceptions import service_validation_error
 
 SERVICE = "get_recorder_exclusions"
-DETAIL_KEYS = ("current_l1", "current_l2", "current_l3")
-EXTRA_KEYS = ("signaled_current", "session_energy", "temperature")
+DETAIL_KEYS = ("signaled_current", "temperature")
+EXTRA_KEYS = ("session_energy",)
 PROFILES = {"full": (), "detail": DETAIL_KEYS, "lean": DETAIL_KEYS + EXTRA_KEYS}
 SCHEMA = probatio.Schema(
     {
