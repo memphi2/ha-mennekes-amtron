@@ -98,4 +98,4 @@ packages = ["amtron_device"]
 package-dir = {amtron_device = "custom_components/mennekes_amtron_rtu/device"}
 
 [tool.setuptools.package-data]
-amtron_device = ["app_settings.html", "app_settings.js", "app_settings.css", "app_overview.html", "app_overview.js"]
+amtron_device = ["*.html", "*.js", "*.css"]

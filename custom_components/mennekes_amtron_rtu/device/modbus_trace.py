@@ -18,6 +18,7 @@ from pymodbus.exceptions import ModbusIOException
 
 from .client_errors import AmtronConnectionError, AmtronProtocolError
 from .decode import decode_register, enum_option
+from .register_monitor import RegisterMonitor
 from .registers import HEARTBEAT, REGISTERS, SERIAL_NUMBER, RegisterDataType
 
 MAX_RECORDS = 200
@@ -30,6 +31,7 @@ class ModbusTrace:
 
     def __init__(self, *, clock: Callable[[], float] = time.monotonic) -> None:
         self._clock = clock
+        self.register_monitor: RegisterMonitor | None = None
         self._deadline = 0.0
         self._generation = 0
         self._sequence = 0
@@ -65,9 +67,9 @@ class ModbusTrace:
             self.close()
 
     def start(self) -> TraceStart | None:
-        """Mark a physical attempt only while an explicit capture is active."""
+        """Mark attempts for enabled capture or the bounded passive register view."""
         self._expire()
-        return (self._generation, self._clock()) if self._deadline else None
+        return (self._generation, self._clock()) if self._deadline or self.register_monitor is not None else None
 
     def finish(
         self, started: TraceStart | None, *, operation: str,
@@ -75,6 +77,22 @@ class ModbusTrace:
         words: Sequence[int] | None, error: BaseException | None,
     ) -> None:
         """Retain only register-map values and classified errors, never raw data."""
+        category = None
+        if error is not None:
+            if isinstance(error, asyncio.CancelledError):
+                category = "cancelled"
+            elif isinstance(error, AmtronConnectionError):
+                category = "connection"
+            elif isinstance(error.__cause__, ModbusIOException):
+                category = "timeout"
+            elif isinstance(error, AmtronProtocolError):
+                category = "device_exception" if error.exception_code is not None else "protocol"
+            else:
+                category = "unexpected"
+        if self.register_monitor is not None:
+            self.register_monitor.observe(
+                operation=operation, address=address, count=count, words=words, error=category,
+            )
         self._expire()
         if started is None or not self._deadline or started[0] != self._generation:
             return
@@ -88,25 +106,11 @@ class ModbusTrace:
                     values.append({"register": spec.key, "address": f"0x{spec.address:04X}", "redacted": True})
                 elif address <= spec.address and spec.end_address <= address + len(words):
                     section = words[spec.address - address:spec.end_address - address]
-                    # A malformed transport reply must not make the optional
-                    # observer raise or alter the original transaction outcome.
                     value = decode_register(spec, section) if all(type(word) is int and 0 <= word <= 0xFFFF for word in section) else None
                     values.append({
                         "register": spec.key, "address": f"0x{spec.address:04X}",
                         "value": value, "unit": spec.unit, "enum": enum_option(spec, value),
                     })
-        category = None
-        if error is not None:
-            if isinstance(error, asyncio.CancelledError):
-                category = "cancelled"
-            elif isinstance(error, AmtronConnectionError):
-                category = "connection"
-            elif isinstance(error.__cause__, ModbusIOException):
-                category = "timeout"
-            elif isinstance(error, AmtronProtocolError):
-                category = "device_exception" if error.exception_code is not None else "protocol"
-            else:
-                category = "unexpected"
         self._sequence += 1
         self._records.append({
             "sequence": self._sequence,
