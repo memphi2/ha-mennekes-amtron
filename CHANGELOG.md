@@ -12,8 +12,9 @@ entry; the integration also works with app 0.8.2.
 
 - **Breaking: fewer entities, more attributes.** Each sensor now answers one
   question; a register that only details or explains another sensor's state is
-  an attribute of that sensor. 32 entities are gone and are removed from the
-  entity registry on the first start, so no orphans stay behind:
+  an attribute of that sensor. 32 entities are gone; delete their leftover
+  entries under **Settings → Devices & services → Entities**. No compatibility
+  shim is kept before 1.0:
   - **Charging status** carries `evse_state` and `cp_state`; the sensors
     **EVSE state** and **CP state** are gone.
   - **Error** (binary sensor) carries `code` and `category`; **Error code** is
@@ -53,8 +54,7 @@ entry; the integration also works with app 0.8.2.
   **Error**, **Downgrade notification** the `current` attribute of
   **Downgrade active**; re-select those inputs in automations made from them.
   Templates that read a removed entity need its attribute instead, for example
-  `state_attr('sensor.<wallbox>_session_energy', 'duration_minutes')`. See
-  [Updating to 0.9.0](docs/upgrading.md#updating-to-090).
+  `state_attr('sensor.<wallbox>_session_energy', 'duration_minutes')`.
 - **App:** the sidebar entry is now called **Modbus RTU** instead of the full
   app name.
 - **BavarianData's Charging Cable sensor** is the first cable source for

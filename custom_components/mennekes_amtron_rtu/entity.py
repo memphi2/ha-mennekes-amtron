@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -39,39 +38,6 @@ def entry_entity_unique_id(entry: MennekesAmtronConfigEntry, key: str) -> str:
     """Return the unique id this integration gives one entity of an entry."""
 
     return f"{entry_device_key(entry)}_{key}"
-
-
-# Entities that 0.9.0 folded into another entity's attributes. Their registry
-# rows would otherwise linger on the device page as "no longer provided".
-RETIRED_ENTITIES: dict[str, frozenset[str]] = {
-    "sensor": frozenset({
-        "evse_state", "cp_state", "error_code", "switched_phases",
-        "voltage_l1", "voltage_l2", "voltage_l3", "power_l1", "power_l2", "power_l3",
-        "session_max_current", "session_duration", "sessions_total",
-        "modbus_layout_version", "downgrade_current", "max_current_house",
-        "max_evse_current", "ems_fallback_behaviour", "ems_fallback_current",
-        "grid_imbalance_threshold", "solar_min_current", "phase_switching_pause",
-        "phase_rotation", "phase_switching_mode", "grid_phases_connected",
-        "pending_change_until", "timed_goal_planned_start",
-    }),
-    "binary_sensor": frozenset({
-        "heartbeat", "authorization_enabled", "grid_imbalance_enabled",
-        "cable_lock_enabled", "phase_switch_capable",
-    }),
-}
-
-
-@callback
-def async_remove_retired_entities(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
-    """Drop the registry rows of entities this entry no longer provides."""
-
-    registry = hass.data.get(er.DATA_REGISTRY)
-    if registry is None:
-        return
-    for registered in er.async_entries_for_config_entry(registry, entry.entry_id):
-        for key in RETIRED_ENTITIES.get(registered.domain, ()):
-            if registered.unique_id == entry_entity_unique_id(entry, key):
-                registry.async_remove(registered.entity_id)
 
 
 def entry_device_info(entry: MennekesAmtronConfigEntry) -> DeviceInfo:

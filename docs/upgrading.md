@@ -10,53 +10,6 @@ catalog carries stable updates and also reaches existing **#apps-beta**
 installations. Check the [app connection choice](#app-connection-choice)
 before updating from 0.5.1.
 
-## Updating to 0.9.0
-
-Each sensor now answers one question; a register that only details or
-explains another sensor's state is an attribute of that sensor. 32 entities
-are gone, and the integration removes them from the entity registry on its
-first start, so nothing stays behind as unavailable. Nothing needs deleting
-or re-adding; the remaining entities keep their IDs, names and icons.
-
-| Was an entity until 0.8.2 | Is now |
-|---|---|
-| **EVSE state**, **CP state** | `evse_state`, `cp_state` attributes of **Charging status** |
-| **Error code** | `code`, `category` attributes of **Error** |
-| **Heartbeat** (binary sensor) | `heartbeat` attribute (`ok`/`problem`) of **Connection quality** |
-| **Voltage L1–L3**, **Power L1–L3** | `voltage_l1`–`voltage_l3` attributes of **Total power** (whole volts, only while power flows); a per-phase power is voltage × current |
-| **Session duration**, **Session maximum current**, **Charging sessions** | `duration_minutes`, `maximum_current`, `sessions` attributes of **Session energy** |
-| **Pending change due** | `due` attribute of **Pending change** |
-| **Planned charging start** | `planned_start` attribute of **Timed charging status** |
-| **Wallbox phase selection** | `switched` attribute of **Requested phases** |
-| **Downgrade current** | `current` attribute of **Downgrade active** |
-| **Energy manager fallback**, **Energy manager fallback current** | `behaviour`, `fallback_current` attributes of **Energy manager fallback active** |
-| **Authorization enabled** | `enabled` attribute of **Authorization** |
-| **Permanent cable lock** | `permanent` attribute of **Cable lock** |
-| **Modbus layout version**, **Maximum house current**, **Maximum wallbox current**, **Phase rotation**, **Connected grid phases**, **Phase switching supported**, **Phase switching mode**, **Phase switching pause**, **Grid imbalance monitoring**, **Grid imbalance threshold**, **Sunshine+ minimum current** | state and attributes of the new **Wallbox settings** diagnostic sensor |
-
-What to do after the update:
-
-1. **Automations made from the bundled blueprints:** open them and re-select
-   the changed input. *Charge from PV surplus* takes **Requested phases**
-   instead of the phase-selection sensor, *Recover from a lost heartbeat* the
-   **Error** binary sensor instead of the error-code sensor, and *Downgrade
-   notification* no longer asks for a current entity.
-2. **Templates and your own automations** read the attribute instead of the
-   removed entity, for example
-   `{{ state_attr('sensor.<wallbox>_session_energy', 'duration_minutes') }}`
-   or a state trigger on `sensor.<wallbox>_connection_quality` with
-   `attribute: heartbeat` and `to: problem`.
-3. **Dashboards** that showed a removed entity need the attribute, for
-   example an *Entity* card with `attribute: voltage_l1` on **Total power**.
-4. **Recorder:** the history and statistics of the removed entities are not
-   deleted; HA offers to remove orphaned statistics under **Settings → System
-   → Repairs**. The profiles in the integration options exclude the phase
-   currents (less detail) and signaled current, session energy and
-   temperature (statistics only). Attributes compile no statistics.
-
-Every remaining sensor is enabled by default; the voltage and per-phase power
-sensors that new installations since 0.6.0 started disabled no longer exist.
-
 ## Updating to 0.8.0
 
 In service mode, update the app to **0.8.0 first**, wait for initialization,
