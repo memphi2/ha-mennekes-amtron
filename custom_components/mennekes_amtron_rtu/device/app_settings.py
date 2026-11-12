@@ -53,7 +53,9 @@ _VERSION = re.compile(r"([0-9]{4})\.([0-9]{1,2})\.([0-9]+)")
 _FIELDS = {"connection_type", "serial_port", "host", "tcp_port", "device_id", "baudrate", "frame", "tcp_authentication"}
 _NETWORK_EXTRAS = {"tcp_authentication", "tcp_auth_password", "adapter_token", "adapter_baudrate", "adapter_frame"}
 _ASSETS = {
-    "/": ("app_settings.html", "text/html"),
+    "/": ("app_overview.html", "text/html"),
+    "/connection": ("app_settings.html", "text/html"),
+    "/app_overview.js": ("app_overview.js", "text/javascript"),
     "/app_settings.js": ("app_settings.js", "text/javascript"),
     "/app_settings.css": ("app_settings.css", "text/css"),
 }
@@ -171,12 +173,14 @@ class AppSettings:
     def __init__(
         self, supervisor_token: str, service_token: str,
         *, modbus_trace: ModbusTrace | None = None,
+        overview: Callable[[], Awaitable[dict[str, Any]]] | None = None,
         configuration_guard: Callable[[], AbstractAsyncContextManager[ConnectionConfigurationGuard]] | None = None,
     ) -> None:
         self._supervisor_token = supervisor_token
         self._service_token = service_token
         self._secret = secrets.token_bytes(32)
         self._modbus_trace = modbus_trace
+        self._overview = overview
         self._session: ClientSession | None = None
         self._lock = asyncio.Lock()
         self._slots = asyncio.Semaphore(2)
@@ -244,6 +248,20 @@ class AppSettings:
         if not isinstance(options, dict):
             raise SettingsError("supervisor_unavailable", 503)
         return options
+
+    async def read_overview(self, request: web.Request) -> web.Response:
+        """Authorize every passive overview read; never proxy a raw snapshot."""
+        await self._authorize(request)
+        if request.query:
+            raise SettingsError("invalid_request")
+        if self._overview is None:
+            raise SettingsError("overview_unavailable", 503)
+        try:
+            async with asyncio.timeout(2):
+                snapshot = await self._overview()
+        except TimeoutError as err:
+            raise SettingsError("overview_unavailable", 503) from err
+        return web.json_response(snapshot)
 
     async def read(self, request: web.Request) -> web.Response:
         user = await self._authorize(request)
@@ -550,6 +568,7 @@ def create_settings_app(settings: AppSettings) -> web.Application:
     app = web.Application(middlewares=[settings.guard], client_max_size=4096)
     app.cleanup_ctx.append(settings.lifecycle)
     add_settings_asset_routes(app)
+    app.router.add_get("/api/overview", settings.read_overview)
     app.router.add_get("/api/config", settings.read)
     app.router.add_post("/api/config", settings.save)
     app.router.add_post("/api/adapter", settings.inspect_adapter)

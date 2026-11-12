@@ -17,7 +17,7 @@ from scripts import check_service_assets as probe
 from scripts import service_image as images
 
 
-@pytest.mark.parametrize("broken", [None, "app_settings.html", "app_settings.js", "app_settings.css", "modified"])
+@pytest.mark.parametrize("broken", [None, "app_settings.html", "app_settings.js", "app_settings.css", "app_overview.html", "app_overview.js", "modified"])
 def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_changed_assets(
     tmp_path, monkeypatch, broken,
 ):
@@ -67,6 +67,7 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
     ("127.0.0.1", "/", "POST"),
     ("127.0.0.1", "/api/modbus-debug", "GET"),
     ("127.0.0.1", "/api/modbus-debug", "POST"),
+    ("127.0.0.1", "/api/overview", "GET"),
 ])
 def test_probe_guard_never_allows_remote_clients_or_configuration(remote, path, method):
     async def run():
@@ -81,4 +82,4 @@ def test_probe_guard_never_allows_remote_clients_or_configuration(remote, path, 
 def test_probe_requires_all_assets_before_loading_the_installed_package(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["asset-probe", "{}"])
     assert probe.main() == 1
-    assert "expected hashes for all three app assets" in capsys.readouterr().err
+    assert "expected hashes for all registered app assets" in capsys.readouterr().err

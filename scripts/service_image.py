@@ -28,7 +28,9 @@ ARCHITECTURES = {"amd64", "aarch64"}
 OCI_ARCH = {"amd64": "amd64", "aarch64": "arm64"}
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 APP_ASSETS = {
-    "/": "app_settings.html",
+    "/": "app_overview.html",
+    "/connection": "app_settings.html",
+    "/app_overview.js": "app_overview.js",
     "/app_settings.js": "app_settings.js",
     "/app_settings.css": "app_settings.css",
 }

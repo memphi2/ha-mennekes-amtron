@@ -17,7 +17,9 @@ from collections.abc import Awaitable, Callable
 from aiohttp import ClientSession, ClientTimeout, web
 
 ASSETS = {
-    "/": ("app_settings.html", "text/html"),
+    "/": ("app_overview.html", "text/html"),
+    "/connection": ("app_settings.html", "text/html"),
+    "/app_overview.js": ("app_overview.js", "text/javascript"),
     "/app_settings.js": ("app_settings.js", "text/javascript"),
     "/app_settings.css": ("app_settings.css", "text/css"),
 }
@@ -37,7 +39,7 @@ async def local_assets_only(
 async def check_assets(expected: dict[str, str]) -> None:
     """Check the installed package's actual HTTP handlers and exact source bytes."""
     if expected.keys() != ASSETS.keys():
-        raise ValueError("expected hashes for all three app assets")
+        raise ValueError("expected hashes for all registered app assets")
     settings_module = importlib.import_module("amtron_device.app_settings")
     app = web.Application(middlewares=[local_assets_only])
     settings_module.add_settings_asset_routes(app)

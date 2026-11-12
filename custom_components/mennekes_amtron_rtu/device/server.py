@@ -26,6 +26,7 @@ from .connection import NetworkConfig, SerialConfig
 from .service_config import ServerConfig
 from .service_discovery import app_token, publish_discovery
 from .service_http import create_app
+from .service_overview import service_overview
 from .service_runtime import ModbusService
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ async def run(config: ServerConfig | SetupConfig, state: Path, supervisor_token:
             settings_runner = web.AppRunner(
                 create_settings_app(AppSettings(
                     supervisor_token, config.token,
+                    overview=lambda: service_overview(service),
                     modbus_trace=service.client.modbus_trace if service is not None else None,
                     configuration_guard=(service.client.async_connection_configuration if service is not None else None),
                 )), access_log=None,
