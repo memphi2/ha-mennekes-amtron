@@ -8,7 +8,10 @@ import pytest
 from pymodbus.exceptions import ModbusIOException
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
-from custom_components.mennekes_amtron_rtu.device.data import ConnectionState, WallboxData
+from custom_components.mennekes_amtron_rtu.device.data import (
+    ConnectionState,
+    WallboxData,
+)
 from custom_components.mennekes_amtron_rtu.device.enums import EvseState
 from custom_components.mennekes_amtron_rtu.device.poller import DevicePoller
 from custom_components.mennekes_amtron_rtu.device.register_blocks import (
@@ -59,7 +62,7 @@ def test_failed_status_does_not_accelerate_other_blocks(state, failure):
         h.clock[0] = start + (60 if state == EvseState.IDLE else 30)
         h.transport.reads.clear()
         await poller.async_poll(data, last_success=True)
-        assert ACTIVE <= {address for address, _count in h.transport.reads}
+        assert {address for address, _count in h.transport.reads} >= ACTIVE
 
     asyncio.run(run())
 
