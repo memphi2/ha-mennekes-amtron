@@ -314,6 +314,29 @@
             }
           }
         }
+      },
+      "wallbox_event": {
+        "default": "mdi:ev-station",
+        "state_attributes": {
+          "event_type": {
+            "default": "mdi:ev-station",
+            "state": {
+              "vehicle_plugged_in": "mdi:ev-plug-type2",
+              "vehicle_unplugged": "mdi:power-plug-off-outline",
+              "charging_started": "mdi:battery-charging",
+              "charging_stopped": "mdi:battery-check-outline",
+              "error_occurred": "mdi:alert-circle-outline",
+              "error_cleared": "mdi:check-circle-outline",
+              "authorized": "mdi:card-account-details-outline",
+              "authorization_rejected": "mdi:card-off-outline",
+              "downgrade_started": "mdi:arrow-down-bold-circle-outline",
+              "downgrade_ended": "mdi:arrow-up-bold-circle-outline",
+              "cable_locked": "mdi:lock-outline",
+              "cable_unlocked": "mdi:lock-open-variant-outline",
+              "phases_switched": "mdi:sine-wave"
+            }
+          }
+        }
       }
     },
     "datetime": {

@@ -769,6 +769,59 @@
             }
           }
         }
+      },
+      "wallbox_event": {
+        "name": "Wallbox-Ereignis",
+        "state_attributes": {
+          "event_type": {
+            "name": "Änderung",
+            "state": {
+              "vehicle_plugged_in": "Fahrzeug eingesteckt",
+              "vehicle_unplugged": "Fahrzeug abgesteckt",
+              "charging_started": "Laden gestartet",
+              "charging_stopped": "Laden beendet",
+              "error_occurred": "Fehler aufgetreten",
+              "error_cleared": "Fehler behoben",
+              "authorized": "Autorisiert",
+              "authorization_rejected": "Autorisierung abgelehnt",
+              "downgrade_started": "Downgrade begonnen",
+              "downgrade_ended": "Downgrade beendet",
+              "cable_locked": "Kabel verriegelt",
+              "cable_unlocked": "Kabel entriegelt",
+              "phases_switched": "Phasen umgeschaltet"
+            }
+          },
+          "cp_state": {
+            "name": "Control-Pilot-Zustand"
+          },
+          "evse_state": {
+            "name": "Wallbox-Zustand"
+          },
+          "session_energy": {
+            "name": "Energie der Sitzung"
+          },
+          "session_duration": {
+            "name": "Dauer der Sitzung"
+          },
+          "error_code": {
+            "name": "Fehlercode"
+          },
+          "error_category": {
+            "name": "Fehlerkategorie"
+          },
+          "authorization": {
+            "name": "Autorisierung"
+          },
+          "downgrade_current": {
+            "name": "Downgrade-Strom"
+          },
+          "cable_lock": {
+            "name": "Kabelverriegelung"
+          },
+          "phases": {
+            "name": "Phasen"
+          }
+        }
       }
     },
     "datetime": {

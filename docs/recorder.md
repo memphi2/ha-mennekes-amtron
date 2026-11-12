@@ -24,6 +24,10 @@ one state change per observed outcome: a command every five seconds could add
 if you only need live notifications. Exclusion does not stop automation triggers.
 Heartbeats and polls create no command events.
 
+The **Wallbox event** entity is enabled by default. It records one state
+change per reported wallbox change, such as a plug-in, a charge start or a
+fault: a handful of rows per charging session, none while nothing happens.
+
 The new charging/quality/goal status entities use stable enum states and have
 no long-term statistics. The energy target changes only when you set it. Its
 baseline and stop state are saved outside Recorder, only on changes; ordinary

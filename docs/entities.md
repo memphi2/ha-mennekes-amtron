@@ -249,6 +249,46 @@ See the [notification example](automations.md#react-to-command-results).
 The [energy-target guide](user-guide.md#energy-target)
 explains restart behavior, measurement failures and stopping accuracy.
 
+## Wallbox events
+
+| Entity | Name | Needs | Meaning |
+|---|---|---|---|
+| `event.*_wallbox_event` | Wallbox event | direct connection or service | A change the wallbox itself reported between two polls, with `event_type` and the attributes of that moment. Enabled by default. |
+
+**Control result** tells you what your commands did; **Wallbox event** tells
+you what the wallbox did on its own: a car plugged in, a charge that ended, a
+fault, an RFID decision. Use it for notifications and for automations that
+react to the car rather than to your own commands.
+
+| Event type | When | Attributes |
+|---|---|---|
+| `vehicle_plugged_in` | A car is connected (EVSE and control-pilot state). | `cp_state` |
+| `vehicle_unplugged` | The car is gone. | `cp_state`, `session_energy` (kWh) and `session_duration` (s) last seen with the car |
+| `charging_started` | The wallbox state became **charging**. | `evse_state` |
+| `charging_stopped` | The wallbox left **charging**, for a pause, a reached target or an unplug. | `evse_state`, `session_energy`, `session_duration` |
+| `error_occurred` | The error code became non-zero. | `error_code`, `error_category` |
+| `error_cleared` | The error code returned to 0. | the code and category that were cleared |
+| `authorized` | RFID or the energy manager authorized the connection. | `authorization` |
+| `authorization_rejected` | The authorization was refused. | `authorization` |
+| `downgrade_started` | The external downgrade input became active. | `downgrade_current` (A) |
+| `downgrade_ended` | The downgrade input released. | |
+| `cable_locked` / `cable_unlocked` | The cable lock status changed between locked and unlocked; a fixed cable never reports this. | `cable_lock` |
+| `phases_switched` | The wallbox changed the phases it uses when it closes the relay. | `phases`: `all_available` or `single_phase` |
+
+Attribute values are the same stable options as the matching sensors, so they
+work in every UI language. A charge that ends with the unplug reports
+`charging_stopped` first, then `vehicle_unplugged`.
+
+Only a change between two known readings creates an event. The first reading
+after HA starts, after a reload, after a lost connection or after a failed poll
+is a baseline: nothing is reported for it, and a change that happened in the
+gap is not reported at an invented time. A reading that is briefly unknown,
+for example the vehicle presence during a wallbox fault, keeps its last known
+baseline, so a fault that clears does not invent a plug-in. A change that flips
+back within one poll interval is not seen. Measurements, counters,
+configuration registers and your own commands never create wallbox events.
+See the [notification example](automations.md#react-to-wallbox-events).
+
 ## Enumerated states
 
 What the enum entities can report. The option names are what automations

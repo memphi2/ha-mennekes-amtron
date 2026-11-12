@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.9.0b1 — unreleased
+
+Integration beta. The app stays at **0.8.2**; no app update is needed.
+
+- **New event entity Wallbox event** reports what the wallbox changed on its
+  own, as a counterpart to **Control result**, which reports your commands:
+  `vehicle_plugged_in` and `vehicle_unplugged` (with the energy and duration of
+  the session), `charging_started` and `charging_stopped`, `error_occurred` and
+  `error_cleared` (with the code and category), `authorized` and
+  `authorization_rejected`, `downgrade_started` and `downgrade_ended`,
+  `cable_locked` and `cable_unlocked`, and `phases_switched`. Only a change
+  between two known readings creates an event: the first reading after a
+  start, a reload, a lost connection or a failed poll is a baseline, and a
+  reading that is briefly unknown during a fault keeps its last known
+  baseline. The entity is enabled by default and records only those changes.
+  See [React to wallbox events](docs/automations.md#react-to-wallbox-events).
+
 ## 0.8.2 — 2026-11-10
 
 Update the app to **0.8.2** in service mode; the integration also works with

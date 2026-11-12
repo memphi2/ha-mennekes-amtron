@@ -769,6 +769,59 @@
             }
           }
         }
+      },
+      "wallbox_event": {
+        "name": "Evento della wallbox",
+        "state_attributes": {
+          "event_type": {
+            "name": "Cambiamento",
+            "state": {
+              "vehicle_plugged_in": "Veicolo collegato",
+              "vehicle_unplugged": "Veicolo scollegato",
+              "charging_started": "Ricarica avviata",
+              "charging_stopped": "Ricarica terminata",
+              "error_occurred": "Errore rilevato",
+              "error_cleared": "Errore risolto",
+              "authorized": "Autorizzato",
+              "authorization_rejected": "Autorizzazione rifiutata",
+              "downgrade_started": "Riduzione di potenza iniziata",
+              "downgrade_ended": "Riduzione di potenza terminata",
+              "cable_locked": "Cavo bloccato",
+              "cable_unlocked": "Cavo sbloccato",
+              "phases_switched": "Fasi commutate"
+            }
+          },
+          "cp_state": {
+            "name": "Stato del control pilot"
+          },
+          "evse_state": {
+            "name": "Stato della wallbox"
+          },
+          "session_energy": {
+            "name": "Energia della sessione"
+          },
+          "session_duration": {
+            "name": "Durata della sessione"
+          },
+          "error_code": {
+            "name": "Codice di errore"
+          },
+          "error_category": {
+            "name": "Categoria di errore"
+          },
+          "authorization": {
+            "name": "Autorizzazione"
+          },
+          "downgrade_current": {
+            "name": "Corrente ridotta"
+          },
+          "cable_lock": {
+            "name": "Blocco del cavo"
+          },
+          "phases": {
+            "name": "Fasi"
+          }
+        }
       }
     },
     "datetime": {

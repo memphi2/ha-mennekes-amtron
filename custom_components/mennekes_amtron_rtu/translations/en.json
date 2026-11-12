@@ -769,6 +769,59 @@
             }
           }
         }
+      },
+      "wallbox_event": {
+        "name": "Wallbox event",
+        "state_attributes": {
+          "event_type": {
+            "name": "Change",
+            "state": {
+              "vehicle_plugged_in": "Vehicle plugged in",
+              "vehicle_unplugged": "Vehicle unplugged",
+              "charging_started": "Charging started",
+              "charging_stopped": "Charging stopped",
+              "error_occurred": "Error occurred",
+              "error_cleared": "Error cleared",
+              "authorized": "Authorized",
+              "authorization_rejected": "Authorization rejected",
+              "downgrade_started": "Downgrade started",
+              "downgrade_ended": "Downgrade ended",
+              "cable_locked": "Cable locked",
+              "cable_unlocked": "Cable unlocked",
+              "phases_switched": "Phases switched"
+            }
+          },
+          "cp_state": {
+            "name": "Control pilot state"
+          },
+          "evse_state": {
+            "name": "Wallbox state"
+          },
+          "session_energy": {
+            "name": "Session energy"
+          },
+          "session_duration": {
+            "name": "Session duration"
+          },
+          "error_code": {
+            "name": "Error code"
+          },
+          "error_category": {
+            "name": "Error category"
+          },
+          "authorization": {
+            "name": "Authorization"
+          },
+          "downgrade_current": {
+            "name": "Downgrade current"
+          },
+          "cable_lock": {
+            "name": "Cable lock"
+          },
+          "phases": {
+            "name": "Phases"
+          }
+        }
       }
     },
     "datetime": {

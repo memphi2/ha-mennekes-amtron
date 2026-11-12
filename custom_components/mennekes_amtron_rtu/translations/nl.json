@@ -769,6 +769,59 @@
             }
           }
         }
+      },
+      "wallbox_event": {
+        "name": "Wallbox-gebeurtenis",
+        "state_attributes": {
+          "event_type": {
+            "name": "Wijziging",
+            "state": {
+              "vehicle_plugged_in": "Voertuig aangesloten",
+              "vehicle_unplugged": "Voertuig losgekoppeld",
+              "charging_started": "Laden gestart",
+              "charging_stopped": "Laden gestopt",
+              "error_occurred": "Fout opgetreden",
+              "error_cleared": "Fout verholpen",
+              "authorized": "Geautoriseerd",
+              "authorization_rejected": "Autorisatie geweigerd",
+              "downgrade_started": "Vermogensbeperking gestart",
+              "downgrade_ended": "Vermogensbeperking beëindigd",
+              "cable_locked": "Kabel vergrendeld",
+              "cable_unlocked": "Kabel ontgrendeld",
+              "phases_switched": "Fasen omgeschakeld"
+            }
+          },
+          "cp_state": {
+            "name": "Control-pilot-status"
+          },
+          "evse_state": {
+            "name": "Wallbox-status"
+          },
+          "session_energy": {
+            "name": "Energie van de sessie"
+          },
+          "session_duration": {
+            "name": "Duur van de sessie"
+          },
+          "error_code": {
+            "name": "Foutcode"
+          },
+          "error_category": {
+            "name": "Foutcategorie"
+          },
+          "authorization": {
+            "name": "Autorisatie"
+          },
+          "downgrade_current": {
+            "name": "Beperkte stroom"
+          },
+          "cable_lock": {
+            "name": "Kabelvergrendeling"
+          },
+          "phases": {
+            "name": "Fasen"
+          }
+        }
       }
     },
     "datetime": {

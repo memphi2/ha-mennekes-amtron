@@ -769,6 +769,59 @@
             }
           }
         }
+      },
+      "wallbox_event": {
+        "name": "Événement de la wallbox",
+        "state_attributes": {
+          "event_type": {
+            "name": "Changement",
+            "state": {
+              "vehicle_plugged_in": "Véhicule branché",
+              "vehicle_unplugged": "Véhicule débranché",
+              "charging_started": "Charge démarrée",
+              "charging_stopped": "Charge arrêtée",
+              "error_occurred": "Erreur survenue",
+              "error_cleared": "Erreur résolue",
+              "authorized": "Autorisé",
+              "authorization_rejected": "Autorisation refusée",
+              "downgrade_started": "Réduction de puissance commencée",
+              "downgrade_ended": "Réduction de puissance terminée",
+              "cable_locked": "Câble verrouillé",
+              "cable_unlocked": "Câble déverrouillé",
+              "phases_switched": "Phases commutées"
+            }
+          },
+          "cp_state": {
+            "name": "État du control pilot"
+          },
+          "evse_state": {
+            "name": "État de la wallbox"
+          },
+          "session_energy": {
+            "name": "Énergie de la session"
+          },
+          "session_duration": {
+            "name": "Durée de la session"
+          },
+          "error_code": {
+            "name": "Code d'erreur"
+          },
+          "error_category": {
+            "name": "Catégorie d'erreur"
+          },
+          "authorization": {
+            "name": "Autorisation"
+          },
+          "downgrade_current": {
+            "name": "Courant réduit"
+          },
+          "cable_lock": {
+            "name": "Verrouillage du câble"
+          },
+          "phases": {
+            "name": "Phases"
+          }
+        }
       }
     },
     "datetime": {

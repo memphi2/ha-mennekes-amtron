@@ -15,6 +15,12 @@ from custom_components.mennekes_amtron_rtu.device.command_events import (
     OUTCOMES,
     REASONS,
 )
+from custom_components.mennekes_amtron_rtu.device.wallbox_events import (
+    ATTRIBUTES as WALLBOX_ATTRIBUTES,
+)
+from custom_components.mennekes_amtron_rtu.device.wallbox_events import (
+    EVENT_TYPES as WALLBOX_EVENT_TYPES,
+)
 from custom_components.mennekes_amtron_rtu.select import (
     async_setup_entry as setup_selects,
 )
@@ -112,6 +118,21 @@ def test_icon_states_match_translated_states_without_claiming_three_phases() -> 
         definition = icons[platform][key]
         all_phases = definition["state"].get("all_available", definition["default"])
         assert "numeric-3" not in all_phases
+
+
+def test_wallbox_events_are_fully_translated_in_every_shipped_language() -> None:
+    for path in [
+        INTEGRATION / "strings.json",
+        *sorted((INTEGRATION / "translations").glob("*.json")),
+    ]:
+        payload = json.loads(path.read_text())
+        entity = payload["entity"]["event"]["wallbox_event"]
+        assert entity["name"], path.name
+        attributes = entity["state_attributes"]
+        assert set(attributes["event_type"]["state"]) == set(WALLBOX_EVENT_TYPES), path.name
+        assert all(attributes["event_type"]["state"].values()), path.name
+        assert set(attributes) == {"event_type", *WALLBOX_ATTRIBUTES}, path.name
+        assert all(attributes[key]["name"] for key in attributes), path.name
 
 
 def test_command_results_are_fully_translated_in_every_shipped_language() -> None:

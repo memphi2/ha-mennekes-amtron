@@ -49,7 +49,17 @@ def test_event_opt_in_command_poll_and_reload_lifecycle(tmp_path: Path) -> None:
                 await hass.async_block_till_done()
                 registry = er.async_get(hass)
                 registered = er.async_entries_for_config_entry(registry, entry.entry_id)
-                event_id = next(item.entity_id for item in registered if item.domain == "event")
+                event_id = next(
+                    item.entity_id for item in registered
+                    if item.unique_id.endswith("_control_result")
+                )
+                wallbox_event_id = next(
+                    item.entity_id for item in registered
+                    if item.unique_id.endswith("_wallbox_event")
+                )
+                # Wallbox changes are enabled by default and start without a baseline event.
+                assert registry.async_get(wallbox_event_id).disabled_by is None
+                assert hass.states.get(wallbox_event_id).state == STATE_UNKNOWN
                 number_id = next(
                     item.entity_id for item in registered
                     if item.unique_id.endswith("_charging_current_limit")
