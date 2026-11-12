@@ -24,6 +24,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout, web
 
 from .app_adapter_setup import AdapterSetup
 from .connection import validate_network_host
+from .decode import is_hex32
 from .modbus_trace import ModbusTrace
 from .service_config import ServerConfig
 from .waveshare_gateway import (
@@ -47,7 +48,6 @@ _TRANSPORT_LABELS = {
 }
 _TRANSPORTS = {**{label: key for key, label in _TRANSPORT_LABELS.items()}, **{key: key for key in _TRANSPORT_LABELS}}
 _SERIAL_PATH = re.compile(r"/dev/(?:tty(?:USB|ACM|AMA|S|SC|THS|XRUSB)[0-9]+|serial/(?:by-id|by-path)/[^/\x00]+)")
-_USER_ID = re.compile(r"[0-9a-f]{32}")
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"([0-9]{4})\.([0-9]{1,2})\.([0-9]+)")
 _FIELDS = {"connection_type", "serial_port", "host", "tcp_port", "device_id", "baudrate", "frame", "tcp_authentication"}
@@ -228,7 +228,7 @@ class AppSettings:
             raise SettingsError("supervisor_update_required", 503)
         user = request.headers.get("X-Remote-User-Id", "")
         groups = request.headers.get("X-Remote-User-Groups", "").split(",")
-        if not _USER_ID.fullmatch(user) or "system-admin" not in groups:
+        if not is_hex32(user) or "system-admin" not in groups:
             raise SettingsError("admin_required", 403)
         return user
 

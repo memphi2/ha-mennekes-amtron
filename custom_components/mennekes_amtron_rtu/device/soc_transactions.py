@@ -9,6 +9,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from .decode import is_hex32
 from .persistence import StorageCommitUncertainError, StorageStateUnknownError
 
 if TYPE_CHECKING:
@@ -49,9 +50,9 @@ class SocTransactions:
 
     @staticmethod
     def _token(value: object) -> str:
-        if not isinstance(value, str) or len(value) != 32 or any(c not in "0123456789abcdef" for c in value):
+        if not is_hex32(value):
             raise ValueError("invalid percentage-goal reservation")
-        return value
+        return str(value)
 
     async def _response(self, outcome: str, revision: str | None = None) -> dict[str, Any]:
         return {

@@ -23,7 +23,7 @@ from .device.const import DOMAIN
 from .device.errors import DeviceError
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
-from .vehicle_detection import SETTLE_SECONDS, VehicleEvidence
+from .vehicle_detection import SETTLE_SECONDS, vehicle_evidence
 from .vehicle_profiles import (
     CONF_VIRTUAL_PLUG_CHARGE,
     active_profile,
@@ -67,7 +67,7 @@ class PlugChargeObserver:
         self._entry = entry
         self._control = entry.runtime_data.control
         self._coordinator = entry.runtime_data.coordinator
-        self._evidence = VehicleEvidence(hass, entry)
+        self._evidence = vehicle_evidence(hass, entry)
         self._policy = plug_charge_policy(entry.options)
         self._configured_options = deepcopy(dict(entry.options))
         self._switch_applied = False

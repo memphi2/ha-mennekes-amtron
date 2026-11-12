@@ -8,7 +8,7 @@ from homeassistant.core import State
 
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import profiles
 from custom_components.mennekes_amtron_rtu.vehicle_sources.bavariandata.detection import (
-    PLUG_DESCRIPTOR,
+    CHARGING_CABLE,
 )
 from tests.ha_fakes import FakeConfigEntry
 from tests.test_bavarian_history import VIN
@@ -99,7 +99,7 @@ def test_a_new_car_uses_its_detection_signals_and_names_them():
         entry = FakeConfigEntry(options=profile_options(provider="none"))
         flow = Flow(entry)
         registry = flow.hass.data["entity_registry"]
-        for unique, entity_id in ((f"{VIN}_{PLUG_DESCRIPTOR}", "binary_sensor.car_plug"),
+        for unique, entity_id in ((f"{VIN}_{CHARGING_CABLE}", "binary_sensor.car_plug"),
                                   (f"{VIN}_tracker", "device_tracker.car")):
             registry.entries[unique] = SimpleNamespace(entity_id=entity_id, device_id="car", disabled_by=None)
         await flow.async_step_vehicle()

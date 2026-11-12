@@ -135,12 +135,10 @@ profile. Open **Configure → Vehicles → Open a profile’s settings**, choose
 
 - **Use the vehicle integration**: BavarianData supplies the vehicle's cable
   sensor and GPS tracker. The cable sensor is BavarianData's **Charging
-  Cable** from 0.9.30 on: it names the plug reading that decided it and
-  carries BMW's time for it, so it proves a fresh plug-in for every car,
-  whichever plug field it streams. With an older BavarianData the plug
-  boolean is used or, for cars such as an i4 or i5 that do not stream it,
-  **Charging port status**; its **Charging Cable** sensor then carries no BMW
-  time and is passed over. Its position is compared with Home Assistant's Home
+  Cable**, which needs **BavarianData 0.9.30 or newer**: it names the plug
+  reading that decided it and carries BMW's time for it, so it proves a fresh
+  plug-in for every car, whichever plug field it streams. An older
+  BavarianData offers no detection signals. Its position is compared with Home Assistant's Home
   zone. Existing enabled entities are used; no extra cloud requests or vehicle
   commands are sent.
 - **Select Home Assistant entities**: choose two separate signals for this car.

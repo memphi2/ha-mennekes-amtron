@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .data import WallboxData
+from .decode import is_hex32
 from .errors import DeviceError, DeviceValidationError, validation_error
 from .registers import (
     AUTHORIZATION_ENABLED,
@@ -32,7 +33,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _POLICY = re.compile(r"(?:[0-9a-f]{64})?")
-_SESSION = re.compile(r"[0-9a-f]{32}")
 # An unknown vehicle state is not an unplug. Brief read gaps and transient
 # EVSE/CP combinations keep the grant; a longer one withdraws it.
 UNKNOWN_GRACE = timedelta(seconds=60)
@@ -291,7 +291,7 @@ class PlugChargeController:
 
     async def async_authorize(self, session: str, deadline: datetime) -> None:
         self._control._require_write_access()
-        if not isinstance(session, str) or _SESSION.fullmatch(session) is None:
+        if not is_hex32(session):
             raise validation_error("plug_charge_session_changed")
         if (
             not isinstance(deadline, datetime) or deadline.tzinfo is None or deadline.utcoffset() is None

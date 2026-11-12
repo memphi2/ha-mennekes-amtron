@@ -101,7 +101,8 @@ class DevicePoller:
             key=lambda block: order[block.cadence],
         )
         for block in blocks:
-            state_changed = read.get("evse_state") != values.get("evse_state")
+            # A status block held over a failed read has no new state to compare.
+            state_changed = "evse_state" in read and read["evse_state"] != values.get("evse_state")
             if block.cadence is BlockCadence.SLOW and not (
                 slow_due or (block.name == "statistics" and state_changed)
                 or (block.name == "statistics" and not last_success)

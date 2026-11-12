@@ -26,7 +26,7 @@ from .device.registers import CP_STATE, EVSE_STATE, SESSION_ENERGY
 from .device.vehicle import vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
-from .vehicle_detection import VehicleEvidence
+from .vehicle_detection import vehicle_evidence
 from .vehicle_profiles import (
     CONF_VEHICLE_SOC_USE_PROFILE,
     VehicleProfile,
@@ -106,7 +106,7 @@ class VehicleBinding:
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass = hass
         self._entry = entry
-        self._evidence = VehicleEvidence(hass, entry)
+        self._evidence = vehicle_evidence(hass, entry)
         runtime = entry.runtime_data
         self._store = VehicleBindingStore(hass, entry.entry_id, runtime.identity.serial_number or "")
         self._state = VehicleBindingState()
@@ -157,8 +157,11 @@ class VehicleBinding:
 
     @property
     def resting(self) -> bool:
-        """A car is plugged in, but the selected car has not confirmed it is that car."""
-        return self._update()
+        """A car is plugged in, but the selected car has not confirmed it is that car.
+
+        A plain read: the state moves only in the subscribed callbacks.
+        """
+        return self._resting is True
 
     @callback
     def _changed(self, _event: object = None) -> None:

@@ -730,6 +730,11 @@ async def _async_switch_vehicle(
         if auto and runtime.vehicle_detection is None:
             runtime.vehicle_detection = VehicleDetectionObserver(hass, entry)
             runtime.vehicle_detection.start()
+    except asyncio.CancelledError:
+        # A cancelled switch leaves the observers half stopped and its caller
+        # never sees the result: only a reload brings the car's rules back.
+        hass.config_entries.async_schedule_reload(entry.entry_id)
+        raise
     except Exception:
         # Any failure falls back to a full reload, which retries the setup.
         _LOGGER.debug("Vehicle switch needs a reload", exc_info=True)

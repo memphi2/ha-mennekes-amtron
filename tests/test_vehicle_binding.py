@@ -151,6 +151,7 @@ def test_the_binding_survives_a_restart_but_not_a_car_change(tmp_path):
         assert not restarted.resting
         # Another selected car needs its own confirmation.
         entry.options["active_vehicle_profile"] = B
+        restarted._changed()
         assert restarted.resting
         report(hass, name="second")
         await settle(hass)
@@ -283,6 +284,7 @@ def test_a_fresh_unplug_report_revokes_the_confirmation(tmp_path, caplog):
         assert not binding.resting
         assert "does not behave like" not in caplog.text
         with patch.object(m, "UNPLUG_GRACE", timedelta(0)):
+            binding._changed()
             assert binding.resting
         assert "does not behave like First car: it reports itself unplugged" in caplog.text
         # Only a new plug-in report confirms it again.

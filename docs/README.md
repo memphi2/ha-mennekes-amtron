@@ -32,7 +32,7 @@ Already installed? Keep your device and entity IDs. Use
 
 ## Versions and feature availability
 
-These pages cover **0.9.0b1**. Check your installed integration and app versions
+These pages cover **0.9.0b2**. Check your installed integration and app versions
 before looking for a new option.
 
 | Version | Added functionality |

@@ -5,7 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.9.0b1 — unreleased
+## 0.9.0b2 — unreleased
+
+Integration only; the app stays at 0.9.0b1.
+
+- **Breaking: automatic vehicle selection and Virtual Plug & Charge with
+  BavarianData need BavarianData 0.9.30 or newer.** Its dated **Charging
+  Cable** sensor is now the only cable source; the plug boolean and the port
+  status of older versions are no longer read.
+- **Breaking: no automatic cleanup of the entities folded in 0.9.0b1.**
+  Delete their leftover entries under **Settings → Devices & services →
+  Entities**. No compatibility code is kept before 1.0.
+- **Total power** also carries `power_l1` to `power_l3` while power flows, so
+  every value of the former per-phase sensors is still available.
+- A status block that briefly cannot be read no longer makes every poll
+  re-read the measurement and counter blocks while its last value is held.
+- **Switch off charging release when unplugged** no longer writes to the
+  wallbox after its entry was reloaded or unloaded in the same moment.
+- A vehicle change that is cancelled halfway reloads the entry instead of
+  leaving the car's target, trip and loss features stopped.
+- A percentage target the service refuses, or that another command overtook,
+  is reported as not changeable right now instead of as an unreachable service.
+- The plug and location signals of the configured cars are watched once per
+  wallbox instead of once per feature using them.
+
+## 0.9.0b1 — 2026-11-12
 
 Beta of the integration and the app. The app update only renames its sidebar
 entry; the integration also works with app 0.8.2.

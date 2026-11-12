@@ -138,7 +138,11 @@ class AmtronReleaseOffOnUnplugSwitch(MennekesAmtronControlEntity, SwitchEntity, 
             unplugged and self.is_on and not control.read_only
             and control.plug_charge.get("enabled") is not True
         ):
-            self.hass.async_create_task(self._after_unplug())
+            # Tied to the entry: an unload cancels it before it can write to
+            # a control that has been shut down or replaced.
+            self._entry.async_create_background_task(
+                self.hass, self._after_unplug(), "amtron_release_off_on_unplug",
+            )
         super()._handle_coordinator_update()
 
     async def _after_unplug(self) -> None:

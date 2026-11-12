@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import math
-import re
 from collections.abc import Awaitable, Callable
 from copy import copy
 from datetime import UTC, datetime
@@ -33,7 +32,7 @@ from .device.const import (
 )
 from .device.control import PENDING_ACTIONS
 from .device.data import DeviceIdentity, WallboxData, WriteDiagnostics
-from .device.decode import RegisterValue
+from .device.decode import RegisterValue, is_hex32
 from .device.energy_goal import EnergyGoal
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
@@ -326,7 +325,7 @@ class RemoteClient(MennekesModbusClient):
                 raise ValueError("invalid percentage transaction capability")
             revision = control.get("soc_goal_revision")
             if transactions and (
-                not isinstance(revision, str) or re.fullmatch(r"[0-9a-f]{32}", revision) is None
+                not is_hex32(revision)
             ):
                 raise ValueError("invalid percentage goal revision")
             section = "control.state_change_interval_seconds"
@@ -904,7 +903,7 @@ class RemoteControl(AmtronControl):
             previous_revision = self.soc_goal_revision
             reservation = await self._soc_transaction_request("/v2/soc-goal/reserve", {})
             token = reservation.get("token")
-            if not isinstance(token, str) or re.fullmatch(r"[0-9a-f]{32}", token) is None:
+            if not is_hex32(token):
                 raise DeviceError("service_unavailable")
             self._soc_transaction = (token, previous_revision)
             self._soc_transaction_fenced = False
@@ -913,6 +912,10 @@ class RemoteControl(AmtronControl):
                 "value": value, "source": source, "soc": soc, "maximum": maximum,
             })
             outcome = self._apply_soc_transaction_result(result, previous_revision)
+            if outcome in ("rejected", "superseded"):
+                # The service answered: it refused the target, or another
+                # command changed it first. That is not an unreachable service.
+                raise DeviceValidationError("soc_goal_unavailable")
             if outcome != "applied":
                 raise DeviceError("service_unavailable")
         if self._notify_pending is not None:

@@ -229,7 +229,8 @@ def test_release_is_switched_off_after_a_confirmed_unplug(enabled, plug_charge, 
         switches, entry, _transport = await _switches()
         switch = switches["release_off_on_unplug"]
         tasks: list[object] = []
-        switch.hass = SimpleNamespace(async_create_task=lambda coro: tasks.append(asyncio.ensure_future(coro)))
+        switch.hass = SimpleNamespace()
+        tasks = entry.background_tasks
         switch.async_write_ha_state = lambda: None
         control = entry.runtime_data.control
         control.async_set_charging_release = AsyncMock()
@@ -259,7 +260,8 @@ def test_a_failed_release_off_is_logged_not_raised(caplog) -> None:
         switches, entry, _transport = await _switches()
         switch = switches["release_off_on_unplug"]
         tasks: list[object] = []
-        switch.hass = SimpleNamespace(async_create_task=lambda coro: tasks.append(asyncio.ensure_future(coro)))
+        switch.hass = SimpleNamespace()
+        tasks = entry.background_tasks
         switch.async_write_ha_state = lambda: None
         entry.runtime_data.control.async_set_charging_release = AsyncMock(side_effect=HomeAssistantError("busy"))
         await switch.async_turn_on()
@@ -282,7 +284,8 @@ def test_unplugging_also_ends_a_manual_pause(monkeypatch, release, paused, goal_
         switches, entry, _transport = await _switches()
         switch = switches["release_off_on_unplug"]
         tasks: list[object] = []
-        switch.hass = SimpleNamespace(async_create_task=lambda coro: tasks.append(asyncio.ensure_future(coro)))
+        switch.hass = SimpleNamespace()
+        tasks = entry.background_tasks
         switch.async_write_ha_state = lambda: None
         control = entry.runtime_data.control
         control.async_set_charging_release = AsyncMock()

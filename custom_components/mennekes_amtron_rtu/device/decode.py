@@ -9,6 +9,7 @@ decoding bug has exactly one place to live.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Mapping, Sequence
 
 from pymodbus.client.mixin import ModbusClientMixin
@@ -86,6 +87,26 @@ def enum_option(spec: RegisterSpec, value: RegisterValue) -> str | None:
     if spec.enum_map is None or not isinstance(value, int):
         return None
     return spec.enum_map.get(value)
+
+
+HEX32 = re.compile(r"[0-9a-f]{32}")
+
+
+def is_hex32(value: object) -> bool:
+    """A 128-bit token, revision or id as lower-case hex."""
+    return isinstance(value, str) and HEX32.fullmatch(value) is not None
+
+
+def as_number(value: object) -> float | None:
+    """A numeric register value; a bool or text is not one."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def as_integer(value: object) -> int | None:
+    """A count or code; a bool is not one."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _clean_string(value: object) -> str | None:

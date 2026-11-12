@@ -156,7 +156,7 @@ pending target. See
 | `sensor.*_current_l1` | Current L1 | A | current | always | RMS output current on L1. |
 | `sensor.*_current_l2` | Current L2 | A | current | always | RMS output current on L2. |
 | `sensor.*_current_l3` | Current L3 | A | current | always | RMS output current on L3. |
-| `sensor.*_total_power` | Total power | W | power | always | Active power on all phases. While power flows, the RMS voltages under load ride along as `voltage_l1`, `voltage_l2` and `voltage_l3` (whole volts); an idle wallbox reports none, so a wobbling mains voltage writes no history. The phase currents are their own sensors; a per-phase power is voltage × current. |
+| `sensor.*_total_power` | Total power | W | power | always | Active power on all phases. While power flows, the RMS voltages under load ride along as `voltage_l1`, `voltage_l2` and `voltage_l3` (whole volts) and the active power per phase as `power_l1`, `power_l2` and `power_l3` (whole watts); an idle wallbox reports none, so a wobbling mains voltage writes no history. The phase currents are their own sensors. |
 | `sensor.*_session_energy` | Session energy | kWh | energy | always | Energy transferred in the current session. Attributes: `duration_minutes` (length of the session, in minutes, so the attribute changes once a minute rather than once a second), `maximum_current` (the highest current this session may use after every static limit, A) and `sessions` (lifetime number of charging sessions, layout v01.02). |
 | `sensor.*_total_energy` | Total energy | kWh | energy | layout v01.02 | Lifetime energy on the AC port. Usable as an Energy dashboard source; the manufacturer marks it as **not usable for billing**. |
 
