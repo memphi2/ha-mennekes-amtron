@@ -87,18 +87,23 @@ def test_invalid_decoding_unknown_enums_and_wallbox_faults(monitor):
     assert rows(view)[R.EVSE_STATE.key]["status"] == "degraded"
 
 
-def test_identity_is_redacted_but_one_time_reads_do_not_become_stale(monitor):
+def test_identity_is_redacted_and_respects_its_actual_slow_poll_cadence(monitor):
     view, clock = monitor
     raw = b"PRIVATE-SERIAL".ljust(R.SERIAL_NUMBER.count * 2, b"\0")
     words = [int.from_bytes(raw[index:index + 2], "big") for index in range(0, len(raw), 2)]
     observe(view, R.SERIAL_NUMBER, words)
-    clock[0] += 3600
     item = rows(view)[R.SERIAL_NUMBER.key]
     assert item["status"] == "ok"
-    assert item["redacted"] and item["raw"] is None and item["value"] is None
-    assert item["expected_interval_seconds"] is None
+    assert item["redacted"]
+    assert item["raw"] is None
+    assert item["value"] is None
+    assert item["expected_interval_seconds"] == 60
+    clock[0] += 60
+    assert rows(view)[R.SERIAL_NUMBER.key]["status"] == "ok"
     observe(view, R.SERIAL_NUMBER, error="timeout")
     assert rows(view)[R.SERIAL_NUMBER.key]["status"] == "degraded"
+    clock[0] += 121
+    assert rows(view)[R.SERIAL_NUMBER.key]["status"] == "error"
 
 
 def test_write_acknowledgement_does_not_overwrite_readback(monitor):

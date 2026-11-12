@@ -12,8 +12,9 @@ last successful update, last attempt, and observation quality are separate.
 - **Error**: no usable sample or no current device connection / expired grace.
 - **Unknown / unsupported / write-only** are explicit, not painted green.
 
-One-time identity registers do not become stale merely because they are not
-periodically polled. Active/idle and configured polling cadences are respected.
+The monitor follows the declared block cadence, including the slow identity
+blocks. Active/idle and configured polling cadences are respected. Registers
+with no periodic block are not marked overdue solely due to age.
 Acknowledged writes never substitute for readback. Serial-number words are
 redacted in memory and in responses; authentication packets are not observed.
 
