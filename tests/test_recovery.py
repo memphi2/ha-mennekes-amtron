@@ -535,8 +535,8 @@ def test_recovery_and_repairs_complete_in_real_home_assistant(tmp_path, clear_de
                     == 8
                 )
                 assert (
-                    hass.states.get("binary_sensor.mennekes_amtron_heartbeat").state
-                    == "off"
+                    hass.states.get("sensor.mennekes_amtron_connection_quality").attributes["heartbeat"]
+                    == "ok"
                 )
 
                 # A new fault fifteen seconds later is its own incident.

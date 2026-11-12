@@ -199,11 +199,11 @@ def test_reconfiguring_a_real_entry_preserves_entity_ids(tmp_path):
                 }
                 assert entities.items() <= migrated.items()
                 # The direct entry was read-only. The service now owns write
-                # access, so migration exposes its heartbeat and all controls.
+                # access, so migration exposes all controls.
                 assert {
                     value[0].split(".", 1)[0]
                     for key, value in migrated.items() if key not in entities
-                } == {"binary_sensor", "number", "switch", "select", "button"}
+                } == {"number", "switch", "select", "button"}
                 assert not entry.runtime_data.control.read_only
                 assert not current_writes(transport)
         finally:

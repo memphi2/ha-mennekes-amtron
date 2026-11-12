@@ -132,7 +132,7 @@ def test_derived_entities_are_available_without_control_and_record_no_counters(l
         assert status.entity_category is None
         assert status.device_class is SensorDeviceClass.ENUM
         assert status.state_class is None
-        assert status.extra_state_attributes is None
+        assert status.extra_state_attributes == {"evse_state": "ready_to_charge", "cp_state": "b2"}
         assert status.unique_id.endswith("_charging_status")
         assert quality.entity_category is EntityCategory.DIAGNOSTIC
         assert quality.state_class is None

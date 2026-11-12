@@ -15,10 +15,11 @@ from .device.decode import RegisterValue
 from .device.enums import (
     RequestedPhases,
     SolarChargingMode,
+    SwitchedPhases,
     enum_option,
     enum_options,
 )
-from .device.registers import REQUESTED_PHASES, SOLAR_CHARGING_MODE
+from .device.registers import REQUESTED_PHASES, SOLAR_CHARGING_MODE, SWITCHED_PHASES
 from .entity import MennekesAmtronControlEntity, MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
@@ -176,6 +177,13 @@ class AmtronRequestedPhasesSelect(MennekesAmtronControlEntity, SelectEntity):
         """Return the requested phase usage."""
 
         return _option_of(RequestedPhases, self.register_value)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        """Which phases the wallbox will really use when it next closes the relay."""
+
+        switched = _option_of(SwitchedPhases, self.wallbox_data.get(SWITCHED_PHASES.key))
+        return {"switched": switched} if switched is not None else None
 
     async def async_select_option(self, option: str) -> None:
         """Request single-phase or all-phase charging."""

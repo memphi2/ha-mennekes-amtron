@@ -204,12 +204,6 @@
   },
   "entity": {
     "binary_sensor": {
-      "authorization_enabled": {
-        "name": "Autorisation activée"
-      },
-      "cable_lock_enabled": {
-        "name": "Verrouillage permanent du câble"
-      },
       "charging": {
         "name": "Charge en cours"
       },
@@ -219,20 +213,11 @@
       "error": {
         "name": "Erreur"
       },
-      "grid_imbalance_enabled": {
-        "name": "Surveillance du déséquilibre des phases"
-      },
       "master_lost_fallback": {
         "name": "Repli du gestionnaire d’énergie actif"
       },
-      "phase_switch_capable": {
-        "name": "Commutation des phases prise en charge"
-      },
       "vehicle_connected": {
         "name": "Véhicule connecté"
-      },
-      "heartbeat": {
-        "name": "Signal de présence"
       }
     },
     "button": {
@@ -317,22 +302,6 @@
           "unlocked": "Déverrouillé"
         }
       },
-      "cp_state": {
-        "name": "État du pilote (CP)",
-        "state": {
-          "a1": "A1 (aucun véhicule)",
-          "a2": "A2 (véhicule déconnecté)",
-          "b1": "B1 (véhicule connecté)",
-          "b2": "B2 (prêt, courant proposé)",
-          "c1": "C1 (véhicule prêt à charger)",
-          "c2": "C2 (charge en cours)",
-          "d1": "D1",
-          "d2": "D2",
-          "e": "E (erreur)",
-          "f": "F (erreur)",
-          "init": "Initialisation"
-        }
-      },
       "current_l1": {
         "name": "Courant L1"
       },
@@ -351,133 +320,23 @@
           "two_phases": "2 phases"
         }
       },
-      "downgrade_current": {
-        "name": "Courant de limitation externe"
-      },
-      "ems_fallback_behaviour": {
-        "name": "Repli du gestionnaire d’énergie",
-        "state": {
-          "disabled": "Désactivé, conserve les dernières valeurs",
-          "fallback_current": "Charge avec le courant de repli",
-          "pause_on_timeout": "Met en pause en l’absence du signal de présence"
-        }
-      },
-      "ems_fallback_current": {
-        "name": "Courant de repli du gestionnaire d’énergie"
-      },
       "energy_total": {
         "name": "Énergie totale"
-      },
-      "error_code": {
-        "name": "Code d’erreur",
-        "state": {
-          "connected_phases_mismatch": "Phases raccordées incohérentes",
-          "energy_manager_unavailable": "Gestionnaire d’énergie indisponible",
-          "ev_overcurrent": "Surintensité du véhicule",
-          "no_error": "Aucune erreur",
-          "other": "Autre erreur",
-          "voltage_out_of_range": "Tension hors plage"
-        }
-      },
-      "evse_state": {
-        "name": "État de la borne",
-        "state": {
-          "charging": "Charge en cours",
-          "error": "Erreur",
-          "ev_connected": "Véhicule connecté",
-          "idle": "Au repos",
-          "not_initialized": "Non initialisée",
-          "preconditions_valid": "Conditions préalables remplies",
-          "ready_to_charge": "Prête à charger",
-          "service_mode": "Mode maintenance"
-        }
-      },
-      "grid_imbalance_threshold": {
-        "name": "Seuil de déséquilibre des phases"
-      },
-      "grid_phases_connected": {
-        "name": "Phases du réseau raccordées",
-        "state": {
-          "l1": "L1",
-          "l1_l2_l3": "L1, L2, L3"
-        }
-      },
-      "max_current_house": {
-        "name": "Courant maximal de l’installation"
-      },
-      "max_evse_current": {
-        "name": "Courant maximal de la borne"
-      },
-      "modbus_layout_version": {
-        "name": "Version de la table de registres Modbus"
-      },
-      "phase_rotation": {
-        "name": "Ordre des phases",
-        "state": {
-          "l1_l2_l3": "L1-L2-L3",
-          "l2_l3_l1": "L2-L3-L1",
-          "l3_l1_l2": "L3-L1-L2"
-        }
-      },
-      "phase_switching_mode": {
-        "name": "Mode de commutation des phases",
-        "state": {
-          "solar_dynamic": "Solaire, 1 ou 3 phases",
-          "solar_one_phase": "Solaire, 1 phase uniquement",
-          "solar_three_phases": "Solaire, 3 phases uniquement"
-        }
-      },
-      "phase_switching_pause": {
-        "name": "Pause de commutation des phases"
-      },
-      "power_l1": {
-        "name": "Puissance L1"
-      },
-      "power_l2": {
-        "name": "Puissance L2"
-      },
-      "power_l3": {
-        "name": "Puissance L3"
       },
       "power_total": {
         "name": "Puissance totale"
       },
-      "session_duration": {
-        "name": "Durée de la session"
-      },
       "session_energy": {
         "name": "Énergie de la session"
-      },
-      "session_max_current": {
-        "name": "Courant maximal de la session"
-      },
-      "sessions_total": {
-        "name": "Sessions de charge"
       },
       "signaled_current": {
         "name": "Courant proposé au véhicule"
       },
-      "solar_min_current": {
-        "name": "Courant minimal Sunshine+"
-      },
-      "switched_phases": {
-        "name": "Sélection des phases de la borne",
-        "state": {
-          "all_available": "Toutes les phases disponibles",
-          "single_phase": "Une seule phase"
-        }
-      },
       "temperature": {
         "name": "Température"
       },
-      "voltage_l1": {
-        "name": "Tension L1"
-      },
-      "voltage_l2": {
-        "name": "Tension L2"
-      },
-      "voltage_l3": {
-        "name": "Tension L3"
+      "wallbox_settings": {
+        "name": "Réglages de la wallbox"
       },
       "pending_change": {
         "name": "Changement en attente",
@@ -493,9 +352,6 @@
           "unlock": "Déverrouiller la borne",
           "lock": "Verrouiller la borne"
         }
-      },
-      "pending_change_until": {
-        "name": "Changement prévu à"
       },
       "charging_status": {
         "name": "État de la recharge",
@@ -612,9 +468,6 @@
           "write_pending": "Écriture en attente",
           "error": "Erreur"
         }
-      },
-      "timed_goal_planned_start": {
-        "name": "Début de charge prévu"
       },
       "virtual_plug_charge_status": {
         "name": "État de Plug & Charge virtuel",

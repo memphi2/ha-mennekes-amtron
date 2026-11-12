@@ -113,7 +113,7 @@ Whatever you set, read it back afterwards:
 **percentage of the maximum charging current** with DIP 4 and DIP 5 on bank
 S2: 0 %, 25 %, 50 % or 75 %, with 6 A as the floor.
 
-Read it back with `sensor.*_downgrade_current`.
+Read it back as the `current` attribute of `binary_sensor.*_downgrade_active`.
 
 ### Solar mode — DIP 7
 
@@ -135,7 +135,7 @@ limits the charging current to the smallest of the energy-manager current, the
 downgrade current, the maximum EVSE current and the maximum house current.
 **(Spec)**: values written over Modbus are automatically limited by the
 configuration of the wallbox. The integration makes the state visible through
-`binary_sensor.*_downgrade_active` and `sensor.*_downgrade_current`, and
+`binary_sensor.*_downgrade_active` with its `current` attribute, and
 nothing more.
 
 **It decides whether you may be the master.** If your §14a control box is
@@ -213,9 +213,10 @@ dead bus.
 2. For an answer outside Home Assistant, the integration ships a read-only bus
    check; see
    [quickstart.md](quickstart.md#optional-command-line-bus-check).
-3. After setup, read the DIP-configured values back from the diagnostic
-   sensors: **Maximum house current**, **Maximum wallbox current**,
-   **Downgrade current** and **Phase switching mode**. If a reading differs
+3. After setup, read the DIP-configured values back from the attributes of
+   the **Wallbox settings** diagnostic sensor (`max_current_house`,
+   `max_evse_current`, `phase_switching_mode`) and the `current` attribute
+   of **Downgrade active**. If a reading differs
    from the intended setup, have the installer check the configuration and
    model-specific interpretation before enabling control.
 

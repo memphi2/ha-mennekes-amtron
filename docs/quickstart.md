@@ -113,11 +113,11 @@ any repair messages and check the **Heartbeat** sensor before charging.
 3. Test **Charging paused**: on requests pause; off requests resume.
    Early pause and resume requests are queued for the configured interval
    (default 300 seconds);
-   check **Pending change** and **Pending change due**. **0 A removes the current limit; it does not
+   check **Pending change** and its `due` attribute. **0 A removes the current limit; it does not
    stop charging.**
 
-You should now see changing power/energy readings, a healthy heartbeat with
-writes enabled, and the expected pause state. If a request is waiting, leave it
+You should now see changing power/energy readings, **Connection quality** with
+`heartbeat: ok` once writes are enabled, and the expected pause state. If a request is waiting, leave it
 queued or cancel it; do not repeatedly restart the app to force it.
 
 Continue with [everyday use](user-guide.md), [optional functions and examples](features.md)

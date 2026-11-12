@@ -1,33 +1,8 @@
 {
   "entity": {
     "binary_sensor": {
-      "authorization_enabled": {
-        "default": "mdi:card-account-details-outline",
-        "state": {
-          "on": "mdi:card-account-details"
-        }
-      },
-      "cable_lock_enabled": {
-        "default": "mdi:lock-outline",
-        "state": {
-          "on": "mdi:lock-check-outline"
-        }
-      },
       "downgrade_active": {
         "default": "mdi:transmission-tower-export"
-      },
-      "grid_imbalance_enabled": {
-        "default": "mdi:scale-balance"
-      },
-      "phase_switch_capable": {
-        "default": "mdi:swap-horizontal"
-      },
-      "heartbeat": {
-        "default": "mdi:heart-outline",
-        "state": {
-          "on": "mdi:heart-off",
-          "off": "mdi:heart-pulse"
-        }
       }
     },
     "button": {
@@ -90,9 +65,6 @@
           "fixed_cable": "mdi:ev-plug-type2"
         }
       },
-      "cp_state": {
-        "default": "mdi:sine-wave"
-      },
       "detected_ev_phases": {
         "default": "mdi:help-circle-outline",
         "state": {
@@ -101,56 +73,10 @@
           "three_phases": "mdi:numeric-3-circle"
         }
       },
-      "ems_fallback_behaviour": {
-        "default": "mdi:lan-disconnect"
-      },
-      "error_code": {
-        "default": "mdi:alert-circle-outline",
-        "state": {
-          "no_error": "mdi:check-circle-outline"
-        }
-      },
-      "evse_state": {
-        "default": "mdi:ev-station",
-        "state": {
-          "charging": "mdi:lightning-bolt",
-          "error": "mdi:alert-circle-outline",
-          "service_mode": "mdi:wrench-outline"
-        }
-      },
-      "grid_phases_connected": {
-        "default": "mdi:transmission-tower",
-        "state": {
-          "l1": "mdi:numeric-1-circle",
-          "l1_l2_l3": "mdi:numeric-3-circle"
-        }
-      },
-      "modbus_layout_version": {
-        "default": "mdi:tag-text-outline"
-      },
-      "phase_rotation": {
-        "default": "mdi:rotate-right"
-      },
       "pending_change": {
         "default": "mdi:timer-sand",
         "state": {
           "none": "mdi:timer-off-outline"
-        }
-      },
-      "phase_switching_mode": {
-        "default": "mdi:swap-horizontal",
-        "state": {
-          "solar_one_phase": "mdi:numeric-1-circle",
-          "solar_three_phases": "mdi:numeric-3-circle"
-        }
-      },
-      "sessions_total": {
-        "default": "mdi:counter"
-      },
-      "switched_phases": {
-        "default": "mdi:swap-horizontal",
-        "state": {
-          "single_phase": "mdi:numeric-1-circle"
         }
       },
       "charging_status": {
@@ -221,6 +147,9 @@
           "blocked": "mdi:lock-outline",
           "disabled": "mdi:power-plug-off"
         }
+      },
+      "wallbox_settings": {
+        "default": "mdi:tune-vertical"
       }
     },
     "switch": {

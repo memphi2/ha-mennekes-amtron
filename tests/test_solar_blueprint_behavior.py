@@ -73,13 +73,13 @@ def test_current_blueprint_respects_pause_and_power_units(
 
             hass.services.async_register("number", "set_value", record)
             hass.states.async_set("sensor.surplus", "0", {"unit_of_measurement": unit})
-            hass.states.async_set("sensor.phases", phases)
+            hass.states.async_set("select.phases", "all_available", {"switched": phases})
             hass.states.async_set("binary_sensor.vehicle", "on")
             hass.states.async_set("number.current", current, {"max": 16})
             hass.states.async_set("switch.paused", pause or "off")
             inputs = {
                 "surplus_power": "sensor.surplus",
-                "switched_phases": "sensor.phases",
+                "switched_phases": "select.phases",
                 "vehicle_connected": "binary_sensor.vehicle",
                 "charging_current": "number.current",
             }
@@ -122,13 +122,13 @@ def test_latest_surplus_replaces_a_command_that_is_still_running(tmp_path: Path)
 
             hass.services.async_register("number", "set_value", record)
             hass.states.async_set("sensor.surplus", "0", {"unit_of_measurement": "W"})
-            hass.states.async_set("sensor.phases", "single_phase")
+            hass.states.async_set("select.phases", "single_phase", {"switched": "single_phase"})
             hass.states.async_set("binary_sensor.vehicle", "on")
             hass.states.async_set("number.current", "6", {"max": 16})
             hass.states.async_set("switch.paused", "off")
             config = _expand("solar_surplus_charging.yaml", {
                 "surplus_power": "sensor.surplus",
-                "switched_phases": "sensor.phases",
+                "switched_phases": "select.phases",
                 "vehicle_connected": "binary_sensor.vehicle",
                 "charging_current": "number.current",
                 "charging_paused": "switch.paused",
@@ -253,7 +253,8 @@ def test_current_blueprint_recalculates_with_a_stable_surplus(
             hass.services.async_register("number", "set_value", record)
             hass.states.async_set("sensor.surplus", "0", {"unit_of_measurement": unit})
             hass.states.async_set(
-                "sensor.phases", "all_available" if event == "phase" else "single_phase"
+                "select.phases", "single_phase",
+                {"switched": "all_available" if event == "phase" else "single_phase"},
             )
             hass.states.async_set(
                 "binary_sensor.vehicle", "off" if event == "connect" else "on"
@@ -262,7 +263,7 @@ def test_current_blueprint_recalculates_with_a_stable_surplus(
             hass.states.async_set("switch.paused", "on" if event == "resume" else "off")
             inputs = {
                 "surplus_power": "sensor.surplus",
-                "switched_phases": "sensor.phases",
+                "switched_phases": "select.phases",
                 "vehicle_connected": "binary_sensor.vehicle",
                 "charging_current": "number.current",
                 "maximum_current": blueprint_cap,
@@ -281,13 +282,13 @@ def test_current_blueprint_recalculates_with_a_stable_surplus(
             await hass.async_block_till_done()
             assert calls == ([6] if event == "phase" else [])
             calls.clear()
-            entity, value = {
-                "resume": ("switch.paused", "off"),
-                "connect": ("binary_sensor.vehicle", "on"),
-                "phase": ("sensor.phases", "single_phase"),
+            entity, value, attributes = {
+                "resume": ("switch.paused", "off", {}),
+                "connect": ("binary_sensor.vehicle", "on", {}),
+                "phase": ("select.phases", "single_phase", {"switched": "single_phase"}),
             }[event]
             # No further surplus update: only the wallbox state changes.
-            hass.states.async_set(entity, value)
+            hass.states.async_set(entity, value, attributes)
             await hass.async_block_till_done()
             assert calls == ([] if expected is None else [expected])
         finally:

@@ -10,7 +10,7 @@ database row every few seconds.
 
 from __future__ import annotations
 
-from datetime import datetime
+from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.core import HomeAssistant
@@ -22,8 +22,9 @@ from .coordinator import MennekesAmtronCoordinator
 from .device.capabilities import capability_is_supported
 from .device.charging_status import charging_status
 from .device.decode import RegisterValue, enum_option
-from .device.registers import CP_STATE, ENERGY_TOTAL, REGISTERS_BY_KEY
+from .device.registers import CP_STATE, ENERGY_TOTAL, EVSE_STATE, REGISTERS_BY_KEY
 from .entity import MennekesAmtronEntity
+from .entity_attributes import read_attributes
 from .entry_types import MennekesAmtronConfigEntry
 from .estimate_sensor import AmtronEstimateSensor
 from .sensor_descriptions import (
@@ -55,20 +56,13 @@ async def async_setup_entry(
             description.register_key,
         ):
             continue
-        if description.key == "error_code":
-            entities.append(
-                AmtronErrorCodeSensor(entry, runtime_data.coordinator, description)
-            )
-        else:
-            entities.append(
-                AmtronSensor(entry, runtime_data.coordinator, description)
-            )
+        entities.append(AmtronSensor(entry, runtime_data.coordinator, description))
     entities.extend(
         AmtronStateSensor(entry, runtime_data.coordinator, description)
         for description in CONTROL_SENSOR_DESCRIPTIONS
         if (description.key != "energy_goal_status" or identity.layout_version >= ENERGY_TOTAL.min_layout)
         and (description.key != "soc_goal_status" or SOC in features)
-        and (description.key not in ("timed_goal_status", "timed_goal_planned_start") or TIMED in features)
+        and (description.key != "timed_goal_status" or TIMED in features)
         and (description.key != "virtual_plug_charge_status" or runtime_data.plug_charge is not None)
     )
     entities.extend(
@@ -91,6 +85,13 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
         super().__init__(entry, coordinator, description.key)
         self.entity_description = description
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # Heartbeat health changes between polls and even when polling stopped.
+        heartbeat = self.runtime_data.heartbeat
+        if self.entity_description.key == "connection_quality" and heartbeat is not None:
+            self.async_on_remove(heartbeat.async_add_listener(self.async_write_ha_state))
+
     @property
     def available(self) -> bool:
         if not self.coordinator.last_update_success:
@@ -103,12 +104,12 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
                 self.runtime_data.control.supports_soc_goal
                 and observer is not None and observer.source is not None
             )
-        if self.entity_description.key in ("timed_goal_status", "timed_goal_planned_start"):
+        if self.entity_description.key == "timed_goal_status":
             return self.runtime_data.timed_goal is not None
         return True
 
     @property
-    def native_value(self) -> str | datetime | None:
+    def native_value(self) -> str | None:
         key = self.entity_description.key
         if key == "charging_status":
             return charging_status(
@@ -125,30 +126,39 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
         if key == "timed_goal_status":
             observer = self.runtime_data.timed_goal
             return observer.status if observer is not None else None
-        if key == "timed_goal_planned_start":
-            observer = self.runtime_data.timed_goal
-            return observer.planned_start if observer is not None else None
         if key == "virtual_plug_charge_status":
             plug_charge = self.runtime_data.plug_charge
             return plug_charge.status if plug_charge is not None else None
-        if key == "pending_change":
-            return control.pending_action or "none"
-        return control.pending_until
+        return control.pending_action or "none"
 
     @property
-    def extra_state_attributes(self) -> dict[str, str | int] | None:
-        """Explain a blocked virtual release without exposing session data."""
-        if self.entity_description.key == "connection_quality":
-            counts = {
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """The details behind a status: fixed values, never ticking counters."""
+        key = self.entity_description.key
+        attributes: dict[str, Any] = {}
+        if key == "charging_status":
+            data = self.wallbox_data
+            attributes = {
+                "evse_state": enum_option(EVSE_STATE, data.get(EVSE_STATE.key)),
+                "cp_state": enum_option(CP_STATE, data.get(CP_STATE.key)),
+            }
+        elif key == "connection_quality":
+            heartbeat = self.runtime_data.heartbeat
+            healthy = heartbeat.healthy if heartbeat is not None else None
+            attributes = {
+                "heartbeat": None if healthy is None else "ok" if healthy else "problem",
                 "failed_transactions": self.wallbox_data.connection_failures,
                 "retried_transactions": self.wallbox_data.connection_retries,
             }
-            return {key: value for key, value in counts.items() if value is not None} or None
-        if self.entity_description.key != "virtual_plug_charge_status":
-            return None
-        plug_charge = self.runtime_data.plug_charge
-        reason = plug_charge.blocked_reason if plug_charge is not None else None
-        return {"blocked_reason": reason} if reason is not None else None
+        elif key == "pending_change":
+            attributes = {"due": self.runtime_data.control.pending_until}
+        elif key == "timed_goal_status":
+            observer = self.runtime_data.timed_goal
+            attributes = {"planned_start": observer.planned_start if observer is not None else None}
+        elif key == "virtual_plug_charge_status":
+            plug_charge = self.runtime_data.plug_charge
+            attributes = {"blocked_reason": plug_charge.blocked_reason if plug_charge is not None else None}
+        return {name: value for name, value in attributes.items() if value is not None} or None
 
 
 class AmtronSensor(MennekesAmtronEntity, SensorEntity):
@@ -184,23 +194,11 @@ class AmtronSensor(MennekesAmtronEntity, SensorEntity):
             return _rounded(value, description)
         return None
 
-
-class AmtronErrorCodeSensor(AmtronSensor):
-    """The active error code, reported as a documented category.
-
-    The register is a plain number and the specification documents only a few
-    of them, so the raw code stays visible as an attribute instead of being
-    squeezed into an invented option name.
-    """
-
     @property
-    def extra_state_attributes(self) -> dict[str, int] | None:
-        """Return the raw error code of the wallbox."""
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """The registers that detail this sensor's state."""
 
-        value = self.register_value
-        if not isinstance(value, int):
-            return None
-        return {"code": value}
+        return read_attributes(self.wallbox_data, self.entity_description.attributes)
 
 
 def _rounded(

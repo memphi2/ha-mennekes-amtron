@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -15,16 +14,11 @@ from .binary_sensor_descriptions import (
 )
 from .coordinator import MennekesAmtronCoordinator
 from .device.capabilities import capability_is_supported
-from .device.heartbeat import HeartbeatTask
 from .device.registers import CP_STATE
 from .device.vehicle import vehicle_connected
-from .entity import MennekesAmtronEntity, entry_device_info, entry_entity_unique_id
+from .entity import MennekesAmtronEntity
+from .entity_attributes import read_attributes
 from .entry_types import MennekesAmtronConfigEntry
-
-if TYPE_CHECKING:
-    from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
-else:
-    from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 PARALLEL_UPDATES = 0
 
@@ -48,36 +42,6 @@ async def async_setup_entry(
             description.register_key,
         )
     )
-    if runtime_data.heartbeat is not None:
-        async_add_entities([AmtronHeartbeatSensor(entry, runtime_data.heartbeat)])
-
-
-class AmtronHeartbeatSensor(BinarySensorEntity):
-    """Report missed heartbeats even when register polling has stopped."""
-
-    _attr_has_entity_name = True
-    _attr_should_poll = False
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_device_class = BinarySensorDeviceClass.PROBLEM
-    _attr_translation_key = "heartbeat"
-
-    def __init__(self, entry: MennekesAmtronConfigEntry, heartbeat: HeartbeatTask) -> None:
-        self._heartbeat = heartbeat
-        self._attr_unique_id = entry_entity_unique_id(entry, "heartbeat")
-        self._attr_device_info = entry_device_info(entry)
-
-    @property
-    def is_on(self) -> bool | None:
-        """On means a missed deadline or stopped task; off means healthy."""
-
-        healthy = self._heartbeat.healthy
-        return None if healthy is None else not healthy
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        self.async_on_remove(
-            self._heartbeat.async_add_listener(self.async_write_ha_state)
-        )
 
 
 class AmtronBinarySensor(MennekesAmtronEntity, BinarySensorEntity):
@@ -104,6 +68,12 @@ class AmtronBinarySensor(MennekesAmtronEntity, BinarySensorEntity):
         """Return the derived state of this binary sensor."""
 
         return self.entity_description.is_on_fn(self.register_value)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """The registers that detail this state."""
+
+        return read_attributes(self.wallbox_data, self.entity_description.attributes)
 
 
 class AmtronVehicleConnectedSensor(AmtronBinarySensor):

@@ -57,7 +57,7 @@ state, described below.
 ## Waiting between charging changes
 
 A requested change may be queued. **Pending change** tells you what will happen;
-**Pending change due** shows when, once the timing is known. You do not need to
+its `due` attribute shows when, once the timing is known. You do not need to
 press the control again. The most recent charging request replaces the previous
 queued request; repeating the same request does not extend its wait.
 
@@ -112,13 +112,13 @@ connection may use the bus: read-only mode still sends Modbus requests.
 | Reading | What it tells you |
 |---|---|
 | **Vehicle connected** | A cable/vehicle is detected. Authorization, vehicle settings and charging release still determine whether it charges. |
-| **Charging** / **EVSE state** | The charging state reported by the wallbox. |
+| **Charging** / **Charging status** | The charging state reported by the wallbox, and why it is not charging. The raw wallbox states are the `evse_state` and `cp_state` attributes. |
 | **Signaled current** | The current offered to the vehicle. Hardware limits or a grid-operator downgrade can reduce it. The vehicle may draw less. |
 | **Total power** | The actual combined charging power. |
 | **Session energy** | Energy delivered during this session. |
 | **Total energy** | The lifetime counter for the Energy dashboard. It is not usable for billing. |
-| **Downgrade active** / **Downgrade current** | A hardware restriction from the grid operator. An automation cannot override it. |
-| **Heartbeat** | Whether heartbeat delivery is healthy. It records status changes rather than every heartbeat. |
+| **Downgrade active** | A hardware restriction from the grid operator, with the applied limit as the `current` attribute. An automation cannot override it. |
+| **Connection quality** | Bus health, with heartbeat delivery as the `heartbeat` attribute (`ok` or `problem`). It records status changes rather than every heartbeat. |
 
 The [entity reference](entities.md) lists all entities, supported features and
 the exact state values available to templates.

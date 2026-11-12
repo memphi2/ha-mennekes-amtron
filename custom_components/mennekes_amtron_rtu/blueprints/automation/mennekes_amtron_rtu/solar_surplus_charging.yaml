@@ -61,17 +61,18 @@ blueprint:
             - integration: mennekes_amtron_rtu
               domain: binary_sensor
     switched_phases:
-      name: Wallbox phase selection
+      name: Requested phases
       description: >-
-        Choose Wallbox phase selection (formerly Switched phases). This blueprint
-        assumes a three-phase supply: single phase uses one phase and all
-        available uses three. It does not detect the vehicle's actual phase
-        use. An unknown state leaves the current unchanged.
+        Choose Requested phases; its switched attribute says which phases the
+        wallbox really uses. This blueprint assumes a three-phase supply: single
+        phase uses one phase and all available uses three. It does not detect
+        the vehicle's actual phase use. An unknown state leaves the current
+        unchanged.
       selector:
         entity:
           filter:
             - integration: mennekes_amtron_rtu
-              domain: sensor
+              domain: select
     grid_voltage:
       name: Grid voltage
       description: The voltage used to convert watts into amps.
@@ -130,6 +131,7 @@ triggers:
     entity_id: !input surplus_power
   - trigger: state
     entity_id: !input switched_phases
+    attribute: switched
   - trigger: state
     entity_id: !input vehicle_connected
     to: "on"
@@ -147,7 +149,7 @@ conditions:
       {{ paused_entity != '' and is_state(paused_entity, 'off')
          and is_number(states(surplus_entity))
          and state_attr(surplus_entity, 'unit_of_measurement') in ['W', 'kW']
-         and states(phases_entity) in ['single_phase', 'all_available']
+         and state_attr(phases_entity, 'switched') in ['single_phase', 'all_available']
          and not is_state(current_entity, 'unavailable')
          and is_number(state_attr(current_entity, 'max'))
          and minimum | float >= 6
@@ -160,7 +162,7 @@ actions:
       entity_id: !input charging_current
     data:
       value: >-
-        {% set phases = 1 if is_state(phases_entity, 'single_phase') else 3 %}
+        {% set phases = 1 if state_attr(phases_entity, 'switched') == 'single_phase' else 3 %}
         {% set factor = 1000 if state_attr(surplus_entity, 'unit_of_measurement') == 'kW' else 1 %}
         {% set amps = states(surplus_entity) | float * factor / (volts | float) / phases %}
         {{ [[amps | round(1), minimum | float] | max,

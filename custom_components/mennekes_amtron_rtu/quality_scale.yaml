@@ -61,10 +61,10 @@ rules:
       use standard state and numeric-state triggers, including state changes of the command-result event entity.
   entity-event-setup:
     status: done
-    comment: The [heartbeat entity lifecycle](custom_components/mennekes_amtron_rtu/binary_sensor.py#AmtronHeartbeatSensor.async_added_to_hass)
-      subscribes only after addition and registers cleanup with async_on_remove; coordinator entities
-      use the HA lifecycle. The [command event entity](custom_components/mennekes_amtron_rtu/event.py#AmtronControlResultEvent.async_added_to_hass)
-      also registers listener cleanup. [Heartbeat entity tests](tests/test_binary_sensor.py) exercise transitions
+    comment: The [connection quality sensor](custom_components/mennekes_amtron_rtu/sensor.py#AmtronStateSensor.async_added_to_hass)
+      subscribes to heartbeat health only after addition and registers cleanup with async_on_remove;
+      coordinator entities use the HA lifecycle. The [command event entity](custom_components/mennekes_amtron_rtu/event.py#AmtronControlResultEvent.async_added_to_hass)
+      also registers listener cleanup. [Heartbeat tests](tests/test_binary_sensor.py) exercise transitions
       and removal.
   entity-unique-id:
     status: done
@@ -74,7 +74,7 @@ rules:
   has-entity-name:
     status: done
     comment: The [shared entity base](custom_components/mennekes_amtron_rtu/entity.py#MennekesAmtronEntity)
-      and [heartbeat entity](custom_components/mennekes_amtron_rtu/binary_sensor.py#AmtronHeartbeatSensor)
+      and [event entities](custom_components/mennekes_amtron_rtu/event.py#AmtronWallboxEvent)
       enable contextual entity names.
   runtime-data:
     status: done

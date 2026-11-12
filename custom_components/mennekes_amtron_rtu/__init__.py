@@ -90,6 +90,7 @@ from .device.identity import async_read_identity
 from .device.soc_goal_controller import SocGoalController
 from .device.waveshare_auth import WaveshareAuthenticationRejectedError
 from .device.write_state import WriteState
+from .entity import async_remove_retired_entities
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import (
     GoalStore,
@@ -506,6 +507,7 @@ async def async_setup_entry(
             await SocGoalStore(hass, entry.entry_id, "").async_remove()
             await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
         platforms = tuple(_entry_platforms(entry))
+        async_remove_retired_entities(hass, entry)
         await hass.config_entries.async_forward_entry_setups(
             entry, platforms
         )

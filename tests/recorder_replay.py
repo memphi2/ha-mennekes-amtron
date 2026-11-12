@@ -23,25 +23,12 @@ from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from tests.fakes import FakeModbusClient, device_bank, put
 from tests.test_home_assistant_smoke import _boot
 
-OPTIONAL_MEASUREMENTS = [
-    f"{kind}_l{phase}"
-    for kind in ("voltage", "power")
-    for phase in (1, 2, 3)
-]
 DEFAULT_STATISTICS = {
     "current_l1", "current_l2", "current_l3", "signaled_current", "total_power",
-    "session_energy", "total_energy", "charging_sessions", "downgrade_current",
-    "temperature",
+    "session_energy", "total_energy", "temperature",
 }
-DETAILS = [
-    f"{kind}_l{phase}"
-    for kind in ("current", "voltage", "power")
-    for phase in (1, 2, 3)
-] + ["session_duration"]
-EXTRAS = [
-    "signaled_current", "downgrade_current", "session_energy",
-    "charging_sessions", "temperature",
-]
+DETAILS = ["current_l1", "current_l2", "current_l3"]
+EXTRAS = ["signaled_current", "session_energy", "temperature"]
 PROFILES = {"full": [], "detail": DETAILS, "lean": DETAILS + EXTRAS}
 SCENARIOS = ("constant", "idle", "connected_idle", "mixed", "charging")
 

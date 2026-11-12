@@ -13,20 +13,12 @@ blueprint:
   input:
     downgrade_active:
       name: Downgrade active
-      description: The wallbox downgrade binary sensor.
+      description: The wallbox Downgrade active binary sensor; its current attribute holds the limit.
       selector:
         entity:
           filter:
             - integration: mennekes_amtron_rtu
               domain: binary_sensor
-    downgrade_current:
-      name: Downgrade current
-      description: The wallbox downgrade-current sensor.
-      selector:
-        entity:
-          filter:
-            - integration: mennekes_amtron_rtu
-              domain: sensor
     notify_action:
       name: Notification action
       description: The notify action to call, for example notify.persistent_notification.
@@ -38,7 +30,7 @@ mode: queued
 max: 5
 
 variables:
-  current_entity: !input downgrade_current
+  downgrade_entity: !input downgrade_active
   notify_service: !input notify_action
 
 triggers:
@@ -62,7 +54,7 @@ actions:
               title: Wallbox downgraded
               message: >-
                 The grid operator limited the wallbox to
-                {{ states(current_entity) }} A.
+                {{ state_attr(downgrade_entity, 'current') }} A.
       - conditions:
           - condition: trigger
             id: released

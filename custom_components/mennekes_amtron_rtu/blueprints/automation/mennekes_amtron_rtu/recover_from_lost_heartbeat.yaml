@@ -20,13 +20,14 @@ blueprint:
     min_version: "2026.9.0"
   input:
     error_code:
-      name: Error code
-      description: The wallbox error-code sensor.
+      name: Error
+      description: The wallbox Error binary sensor; its category attribute names the error.
       selector:
         entity:
           filter:
             - integration: mennekes_amtron_rtu
-              domain: sensor
+              domain: binary_sensor
+              device_class: problem
     recover_button:
       name: Recover from error
       description: The wallbox recovery button.
@@ -49,6 +50,7 @@ max_exceeded: silent
 triggers:
   - trigger: state
     entity_id: !input error_code
+    attribute: category
     to: energy_manager_unavailable
     for: !input settle_time
 

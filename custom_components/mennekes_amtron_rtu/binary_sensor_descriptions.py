@@ -3,19 +3,23 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from homeassistant.components.binary_sensor import BinarySensorEntityDescription
-from homeassistant.const import EntityCategory
 
+from .data import WallboxData
 from .device.decode import RegisterValue
 from .device.enums import (
     DowngradeStatus,
     EvseState,
-    PhaseOptionsHardware,
+    ems_fallback_behaviour,
+    ems_fallback_current,
+    enum_option,
+    error_category,
 )
 from .device.vehicle import vehicle_connected
+from .entity_attributes import AttributeReaders, integer_attribute, number_attribute
 
 if TYPE_CHECKING:
     from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
@@ -24,16 +28,35 @@ else:
 
 @dataclass(frozen=True, kw_only=True)
 class AmtronBinarySensorEntityDescription(BinarySensorEntityDescription):
-    """Describe one binary sensor derived from a register."""
+    """Describe one binary sensor derived from a register, with its details."""
 
     register_key: str
     is_on_fn: Callable[[RegisterValue], bool | None]
+    attributes: AttributeReaders = field(default_factory=dict)
 
 
 def _is_flag(value: RegisterValue) -> bool | None:
     if not isinstance(value, int):
         return None
     return value == 1
+
+
+def _error_category(data: WallboxData) -> str | None:
+    value = data.get("error_code")
+    return enum_option(error_category(value)) if isinstance(value, int) else None
+
+
+def _fallback_behaviour(data: WallboxData) -> str | None:
+    """What 0x030E asks the wallbox to do without a heartbeat."""
+    value = data.get("ems_fallback_current")
+    behaviour = ems_fallback_behaviour(value) if isinstance(value, int) else None
+    return enum_option(behaviour) if behaviour is not None else None
+
+
+def _fallback_current(data: WallboxData) -> float | None:
+    """The fallback current, only when 0x030E really holds one."""
+    value = data.get("ems_fallback_current")
+    return ems_fallback_current(value) if isinstance(value, int) else None
 
 
 BINARY_SENSOR_DESCRIPTIONS: tuple[AmtronBinarySensorEntityDescription, ...] = (
@@ -62,6 +85,7 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[AmtronBinarySensorEntityDescription, ...] = (
         is_on_fn=lambda value: (
             value == DowngradeStatus.DOWNGRADED if isinstance(value, int) else None
         ),
+        attributes={"current": number_attribute("downgrade_current", 2)},
     ),
     AmtronBinarySensorEntityDescription(
         key="error",
@@ -69,6 +93,9 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[AmtronBinarySensorEntityDescription, ...] = (
         register_key="error_code",
         device_class=BinarySensorDeviceClass.PROBLEM,
         is_on_fn=lambda value: (value != 0 if isinstance(value, int) else None),
+        # The register is a plain number and the specification documents only
+        # a few of them: the raw code stays visible beside its category.
+        attributes={"code": integer_attribute("error_code"), "category": _error_category},
     ),
     AmtronBinarySensorEntityDescription(
         key="master_lost_fallback",
@@ -76,37 +103,6 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[AmtronBinarySensorEntityDescription, ...] = (
         register_key="master_lost_fallback",
         device_class=BinarySensorDeviceClass.PROBLEM,
         is_on_fn=_is_flag,
-    ),
-    AmtronBinarySensorEntityDescription(
-        key="authorization_enabled",
-        translation_key="authorization_enabled",
-        register_key="authorization_enabled",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        is_on_fn=_is_flag,
-    ),
-    AmtronBinarySensorEntityDescription(
-        key="grid_imbalance_enabled",
-        translation_key="grid_imbalance_enabled",
-        register_key="grid_imbalance",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        is_on_fn=_is_flag,
-    ),
-    AmtronBinarySensorEntityDescription(
-        key="cable_lock_enabled",
-        translation_key="cable_lock_enabled",
-        register_key="cable_lock_setting",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        is_on_fn=_is_flag,
-    ),
-    AmtronBinarySensorEntityDescription(
-        key="phase_switch_capable",
-        translation_key="phase_switch_capable",
-        register_key="phase_options_hw",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        is_on_fn=lambda value: (
-            value == PhaseOptionsHardware.ONE_OR_THREE_PHASES
-            if isinstance(value, int)
-            else None
-        ),
+        attributes={"behaviour": _fallback_behaviour, "fallback_current": _fallback_current},
     ),
 )

@@ -114,7 +114,6 @@ def test_real_profile_select_rebinds_sources_clears_old_trip_and_preserves_pause
                     "mennekes_amtron_vehicle_charge_target",
                     "mennekes_amtron_vehicle_charge_target_status",
                     "mennekes_amtron_timed_charging_status",
-                    "mennekes_amtron_planned_charging_start",
                     "mennekes_amtron_next_departure",
                     "mennekes_amtron_clear_departure_time",
                 }

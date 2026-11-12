@@ -102,7 +102,7 @@ therefore draw from the grid when the available solar power is too low.
    increases; using it directly can make the current oscillate. Verify your
    sensor's definition before enabling the automation.
 2. For **Charge from PV surplus**, select **Charging current limit**,
-   **Charging paused**, **Vehicle connected** and **Wallbox phase selection** (called **Switched phases** in 0.5.2b2) from
+   **Charging paused**, **Vehicle connected** and **Requested phases** (whose `switched` attribute is the wallbox's answer; before 0.9.0 this was the **Wallbox phase selection** sensor) from
    the same wallbox. Set the maximum current to suit the installation. The
    automation also respects the number entity's configured maximum.
 3. Check the phase assumption: `single_phase` divides the power by one phase;
