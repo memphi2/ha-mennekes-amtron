@@ -187,13 +187,28 @@ def check_temporary_files() -> None:
 async def check_connection_page(session: ClientSession, mode: str, original: dict[str, Any]) -> None:
     """Exercise installed assets, local enumeration and the self API under policy."""
     headers = {"X-Remote-User-Id": "a" * 32, "X-Remote-User-Groups": "system-admin"}
-    for path, expected_type in (("/", "text/html"), ("/app_settings.js", "text/javascript"), ("/app_settings.css", "text/css")):
+    for path, expected_type in (
+        ("/", "text/html"), ("/connection", "text/html"),
+        ("/app_overview.js", "text/javascript"),
+        ("/app_settings.js", "text/javascript"), ("/app_settings.css", "text/css"),
+    ):
         async with session.get(SETTINGS_API + path, headers={"Accept-Language": "de-DE"}) as response:
             require(response.status == 200 and response.content_type == expected_type, "connection asset was not served")
             content = await response.text()
             require(bool(content) and SUPERVISOR_TOKEN not in content, "connection asset was empty or exposed a credential")
             if path == "/":
+                require('lang="de"' in content and 'id="overview"' in content, "translated overview page missing")
+            elif path == "/connection":
                 require('lang="de"' in content and 'id="serial_port"' in content, "translated connection page or adapter selector missing")
+    async with session.get(SETTINGS_API + "/api/overview") as response:
+        require(response.status == 403, "overview accepted a non-admin request")
+    async with session.get(SETTINGS_API + "/api/overview", headers=headers) as response:
+        overview = await response.json()
+        require(response.status == 200 and overview.get("schema") == 1, "overview could not be read")
+        require(overview.get("state") == "no_vehicle", "overview differs from the simulated wallbox")
+        require(SERIAL not in json.dumps(overview) and SUPERVISOR_TOKEN not in json.dumps(overview), "overview exposed private identity or credentials")
+    async with session.post(SETTINGS_API + "/api/overview", headers=headers, json={}) as response:
+        require(response.status == 405, "overview accepted a write")
     async with session.get(SETTINGS_API + "/api/config") as response:
         require(response.status == 403, "connection settings accepted a non-admin request")
     async with session.get(SETTINGS_API + "/api/config", headers=headers) as response:
