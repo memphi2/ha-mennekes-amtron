@@ -27,6 +27,7 @@ This guide follows **0.8.0**. See
 | Charge from solar surplus | A suitable power sensor and the PV blueprint | [PV charging](blueprints.md#set-up-pv-charging) |
 | Estimate charging costs | A fixed gross price or existing dynamic price sensor | [Charging costs](charging-estimates.md#charging-costs-fixed-or-dynamic-price) |
 | Estimate losses | Battery energy from the matching vehicle charge | [Charging losses](charging-estimates.md#charging-losses-choose-the-available-data) |
+| Get notified when the car is unplugged or the wallbox faults | Nothing extra; the **Wallbox event** entity | [React to wallbox events](automations.md#react-to-wallbox-events) |
 | Reduce database growth | Recorder exclusions and retention choices | [Recorder guide](recorder.md) |
 
 ## Example: one car, no vehicle integration

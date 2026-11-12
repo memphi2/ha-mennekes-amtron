@@ -1,9 +1,15 @@
-"""Static sensor descriptions, derived from the register map."""
+"""Static sensor descriptions, derived from the register map.
+
+Each sensor answers one question. A register that only details or explains
+another sensor's state is one of its attributes: the phase voltages ride on
+the total power, the session counters on the session energy, the installation
+settings on the wallbox settings sensor.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 
 from homeassistant.components.sensor import (
@@ -14,11 +20,9 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     EntityCategory,
     UnitOfElectricCurrent,
-    UnitOfElectricPotential,
     UnitOfEnergy,
     UnitOfPower,
     UnitOfTemperature,
-    UnitOfTime,
 )
 
 from .device.charging_status import CHARGING_STATUS_OPTIONS
@@ -28,23 +32,20 @@ from .device.energy_goal import ENERGY_GOAL_STATES
 from .device.enums import (
     AuthorizationStatus,
     CableLockStatus,
-    CpState,
     DetectedEvPhases,
-    EmsFallbackBehaviour,
-    ErrorCategory,
-    EvseState,
-    GridPhasesConnected,
-    PhaseRotation,
-    PhaseSwitchingMode,
-    SwitchedPhases,
-    ems_fallback_behaviour,
-    ems_fallback_current,
-    enum_option,
     enum_options,
-    error_category,
 )
 from .device.registers import layout_label
 from .device.soc_goal import SOC_GOAL_STATES
+from .entity_attributes import (
+    AttributeReaders,
+    enum_attribute,
+    flag_attribute,
+    integer_attribute,
+    minutes_attribute,
+    number_attribute,
+    under_load,
+)
 
 CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
@@ -66,11 +67,6 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
             "paused_until_start", "charging", "finishing", "unreachable",
             "late", "reached", "write_pending", "error",
         ],
-    ),
-    SensorEntityDescription(
-        key="timed_goal_planned_start",
-        translation_key="timed_goal_planned_start",
-        device_class=SensorDeviceClass.TIMESTAMP,
     ),
     SensorEntityDescription(
         key="soc_goal_status",
@@ -103,160 +99,60 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=["none", *PENDING_ACTIONS],
     ),
-    SensorEntityDescription(
-        key="pending_change_until",
-        translation_key="pending_change_until",
-        device_class=SensorDeviceClass.TIMESTAMP,
-    ),
 )
 
 
 @dataclass(frozen=True, kw_only=True)
 class AmtronSensorEntityDescription(SensorEntityDescription):
-    """Describe one sensor backed by a register."""
+    """Describe one sensor backed by a register, with the registers it details."""
 
     register_key: str
     enum_class: type[IntEnum] | None = None
     value_fn: Callable[[RegisterValue], str | float | None] | None = None
+    attributes: AttributeReaders = field(default_factory=dict)
 
 
 def _enum(
     key: str,
     enum_class: type[IntEnum],
     *,
-    register_key: str | None = None,
     entity_category: EntityCategory | None = None,
-    value_fn: Callable[[RegisterValue], str | float | None] | None = None,
+    attributes: AttributeReaders | None = None,
 ) -> AmtronSensorEntityDescription:
     return AmtronSensorEntityDescription(
         key=key,
         translation_key=key,
-        register_key=register_key or key,
+        register_key=key,
         device_class=SensorDeviceClass.ENUM,
         options=list(enum_options(enum_class)),
         enum_class=enum_class,
         entity_category=entity_category,
-        value_fn=value_fn,
+        attributes=attributes or {},
     )
 
 
-def _fallback_behaviour_option(value: RegisterValue) -> str | None:
-    """Map 0x030E onto what it asks the wallbox to do."""
-
-    if not isinstance(value, int):
-        return None
-    behaviour = ems_fallback_behaviour(value)
-    return enum_option(behaviour) if behaviour is not None else None
-
-
-def _fallback_current(value: RegisterValue) -> float | None:
-    """Return 0x030E only when it really holds a charging current."""
-
-    return ems_fallback_current(value) if isinstance(value, int) else None
-
-
-def _error_category_option(value: RegisterValue) -> str | None:
-    """Map a raw error code onto its documented category option."""
-
-    if not isinstance(value, int):
-        return None
-    return enum_option(error_category(value))
-
-
-def _current(
-    key: str,
-    *,
-    entity_category: EntityCategory | None = None,
-    state_class: SensorStateClass | None = SensorStateClass.MEASUREMENT,
-) -> AmtronSensorEntityDescription:
+def _current(key: str) -> AmtronSensorEntityDescription:
     return AmtronSensorEntityDescription(
         key=key,
         translation_key=key,
         register_key=key,
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         device_class=SensorDeviceClass.CURRENT,
-        state_class=state_class,
+        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
-        entity_category=entity_category,
     )
 
 
 SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
-    _enum("evse_state", EvseState),
-    _enum("cp_state", CpState, entity_category=EntityCategory.DIAGNOSTIC),
-    _enum("authorization_status", AuthorizationStatus),
     _enum(
-        "error_code",
-        ErrorCategory,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_error_category_option,
+        "authorization_status", AuthorizationStatus,
+        attributes={"enabled": flag_attribute("authorization_enabled")},
     ),
     _enum("detected_ev_phases", DetectedEvPhases),
-    _enum("switched_phases", SwitchedPhases),
     _current("signaled_current"),
     _current("current_l1"),
     _current("current_l2"),
     _current("current_l3"),
-    AmtronSensorEntityDescription(
-        key="voltage_l1",
-        entity_registry_enabled_default=False,
-        translation_key="voltage_l1",
-        register_key="voltage_l1",
-        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        device_class=SensorDeviceClass.VOLTAGE,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
-    ),
-    AmtronSensorEntityDescription(
-        key="voltage_l2",
-        entity_registry_enabled_default=False,
-        translation_key="voltage_l2",
-        register_key="voltage_l2",
-        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        device_class=SensorDeviceClass.VOLTAGE,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
-    ),
-    AmtronSensorEntityDescription(
-        key="voltage_l3",
-        entity_registry_enabled_default=False,
-        translation_key="voltage_l3",
-        register_key="voltage_l3",
-        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        device_class=SensorDeviceClass.VOLTAGE,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=1,
-    ),
-    AmtronSensorEntityDescription(
-        key="power_l1",
-        entity_registry_enabled_default=False,
-        translation_key="power_l1",
-        register_key="power_l1",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=0,
-    ),
-    AmtronSensorEntityDescription(
-        key="power_l2",
-        entity_registry_enabled_default=False,
-        translation_key="power_l2",
-        register_key="power_l2",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=0,
-    ),
-    AmtronSensorEntityDescription(
-        key="power_l3",
-        entity_registry_enabled_default=False,
-        translation_key="power_l3",
-        register_key="power_l3",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=0,
-    ),
     AmtronSensorEntityDescription(
         key="power_total",
         translation_key="power_total",
@@ -265,8 +161,14 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
+        # The voltages under load, in whole volts: while charging, the power
+        # changes with every poll anyway, so they add no history rows.
+        attributes={
+            "voltage_l1": under_load(number_attribute("voltage_l1", 0)),
+            "voltage_l2": under_load(number_attribute("voltage_l2", 0)),
+            "voltage_l3": under_load(number_attribute("voltage_l3", 0)),
+        },
     ),
-    _current("session_max_current", state_class=None),
     AmtronSensorEntityDescription(
         key="session_energy",
         translation_key="session_energy",
@@ -275,16 +177,11 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
         suggested_display_precision=3,
-    ),
-    AmtronSensorEntityDescription(
-        key="session_duration",
-        translation_key="session_duration",
-        register_key="session_duration",
-        native_unit_of_measurement=UnitOfTime.SECONDS,
-        device_class=SensorDeviceClass.DURATION,
-        # The frontend writes durations in hours as "1 h 15 min" and shows
-        # seconds as a plain number. A display precision would round the hours.
-        suggested_unit_of_measurement=UnitOfTime.HOURS,
+        attributes={
+            "duration_minutes": minutes_attribute("session_duration"),
+            "maximum_current": number_attribute("session_max_current", 2),
+            "sessions": integer_attribute("sessions_total"),
+        },
     ),
     AmtronSensorEntityDescription(
         key="energy_total",
@@ -294,12 +191,6 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
         suggested_display_precision=2,
-    ),
-    AmtronSensorEntityDescription(
-        key="sessions_total",
-        translation_key="sessions_total",
-        register_key="sessions_total",
-        state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     # Diagnostic category
     AmtronSensorEntityDescription(
@@ -312,76 +203,31 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         suggested_display_precision=1,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    _enum(
+        "cable_lock_status", CableLockStatus,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attributes={"permanent": flag_attribute("cable_lock_setting")},
+    ),
+    # The installation: set by DIP switches and the installer, read once per
+    # poll but changing only when someone opens the wallbox.
     AmtronSensorEntityDescription(
-        key="modbus_layout_version",
-        translation_key="modbus_layout_version",
+        key="wallbox_settings",
+        translation_key="wallbox_settings",
         register_key="modbus_layout_version",
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
         value_fn=lambda value: layout_label(value) if isinstance(value, int) else None,
-    ),
-    _current("downgrade_current", entity_category=EntityCategory.DIAGNOSTIC),
-    _current(
-        "max_current_house",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=None,
-    ),
-    _current(
-        "max_evse_current",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=None,
-    ),
-    _enum(
-        "ems_fallback_behaviour",
-        EmsFallbackBehaviour,
-        register_key="ems_fallback_current",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_fallback_behaviour_option,
-    ),
-    AmtronSensorEntityDescription(
-        key="ems_fallback_current",
-        translation_key="ems_fallback_current",
-        register_key="ems_fallback_current",
-        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
-        device_class=SensorDeviceClass.CURRENT,
-        suggested_display_precision=0,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_fallback_current,
-    ),
-    _current(
-        "grid_imbalance_threshold",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=None,
-    ),
-    _current(
-        "solar_min_current",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=None,
-    ),
-    AmtronSensorEntityDescription(
-        key="phase_switching_pause",
-        translation_key="phase_switching_pause",
-        register_key="phase_switching_pause",
-        native_unit_of_measurement=UnitOfTime.SECONDS,
-        device_class=SensorDeviceClass.DURATION,
-        suggested_display_precision=0,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    _enum("phase_rotation", PhaseRotation, entity_category=EntityCategory.DIAGNOSTIC),
-    _enum(
-        "cable_lock_status",
-        CableLockStatus,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    _enum(
-        "phase_switching_mode",
-        PhaseSwitchingMode,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    _enum(
-        "grid_phases_connected",
-        GridPhasesConnected,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        attributes={
+            "max_current_house": number_attribute("max_current_house", 2),
+            "max_evse_current": number_attribute("max_evse_current", 2),
+            "phase_rotation": enum_attribute("phase_rotation"),
+            "grid_phases_connected": enum_attribute("grid_phases_connected"),
+            "phase_options": enum_attribute("phase_options_hw"),
+            "phase_switching_mode": enum_attribute("phase_switching_mode"),
+            "phase_switching_pause_seconds": integer_attribute("phase_switching_pause"),
+            "grid_imbalance_monitoring": flag_attribute("grid_imbalance"),
+            "grid_imbalance_threshold": number_attribute("grid_imbalance_threshold", 2),
+            "solar_min_current": number_attribute("solar_min_current", 2),
+        },
     ),
 )
 

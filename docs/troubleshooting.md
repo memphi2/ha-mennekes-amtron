@@ -56,8 +56,8 @@ update does not require updating or restarting a compatible app.
 
 If just one feature is missing, check the [entity reference](entities.md):
 older register layouts provide fewer sensors, phase selection requires capable
-hardware, and some diagnostics are disabled by default. Enable **Modbus layout
-version** in its entity settings to compare your device with the reference.
+hardware. The **Wallbox settings** diagnostic sensor shows the register layout
+your device implements; compare it with the reference.
 
 Do not delete and re-add an existing wallbox to recover its controls. Using
 **Reconfigure** or confirming its discovered app preserves the matched device
@@ -70,7 +70,7 @@ distinguish a waiting interval from a device problem:
 
 | Message or symptom | Next step |
 |---|---|
-| A remaining wait time is shown | Early changes are queued and shown in **Pending change** and **Pending change due**. |
+| A remaining wait time is shown | Early changes are queued and shown in **Pending change** and its `due` attribute. |
 | Service unavailable | Check the app log and its USB/LAN connection. HA reconnecting does not replay old commands. |
 | Device rejected a write | Check satellite configuration, supported hardware/registers, device state and whether another master is using the bus. |
 | Restart refused | The wallbox must report **idle** before its **Restart** button can be used. |
@@ -282,8 +282,8 @@ firmware-specific limitation.
 | Pause/resume is refused just after startup | Early pause and resume requests are queued for the configurable state-change interval and five-second write floor. An HA Core restart does not reset a running service's timing. |
 | The slider maximum is lower than expected | Check the device maximum and HA current cap. In service mode, the app's current cap also applies. |
 | Offered current is lower than the slider setting | Installation limits and an active downgrade can lower **Signaled current**. The vehicle can draw less again. |
-| A current change waits while paused | Setting a current can resume charging. Inspect **Pending change** and **Pending change due** for a queued resume. |
-| Charging continues after requesting pause | The pause shares the state-change interval and the five-second current-write floor. Check **Pending change** and **Pending change due**: the pause replaces an older pending start and runs when permitted. Release-off and lock-on also wait; switching controls does not bypass the interval. |
+| A current change waits while paused | Setting a current can resume charging. Inspect **Pending change** and its `due` attribute for a queued resume. |
+| Charging continues after requesting pause | The pause shares the state-change interval and the five-second current-write floor. Check **Pending change** and its `due` attribute: the pause replaces an older pending start and runs when permitted. Release-off and lock-on also wait; switching controls does not bypass the interval. |
 | The slider still shows a value during a pause | It shows the remembered resume setting. Check **Charging paused**, **Signaled current** and **Total power** for actual charging. |
 | A manual pause is undone later | Check automations that write the current or pause switch. Disable the PV pause/resume automation if the manual pause should remain. |
 | A pending change disappears after restart | A restart of the bus owner cancels queued commands. Request the action again if still wanted. HA Core restarting alone does not cancel a running service's queue. |
@@ -317,7 +317,7 @@ vehicle state before trying again; a pause command being accepted does not by
 itself confirm that the vehicle has stopped charging.
 
 While waiting for that confirmation, **Pending change** still shows the requested
-phase action but **Pending change due** is unknown. This is expected: the vehicle
+phase action but its `due` attribute is absent. This is expected: the vehicle
 determines when confirmation arrives. Once confirmed, the due time shows the end
 of the configured extra wait. An idle wallbox with no vehicle skips confirmation
 and that extra wait.

@@ -202,6 +202,45 @@ def test_the_derived_charging_cable_sensor_is_not_cable_evidence(tmp_path):
     asyncio.run(run())
 
 
+def cable(hass, value="on", *, entity_id="binary_sensor.car_cable", **attrs):
+    hass.data[er.DATA_REGISTRY].entities[entity_id] = SimpleNamespace(
+        unique_id=f"{VIN}_charging_cable", entity_id=entity_id, device_id="car", disabled_by=None,
+    )
+    hass.states.async_set(entity_id, value, {"descriptor": "charging_cable", "device_class": "plug", **attrs})
+    return entity_id
+
+
+def test_a_dated_charging_cable_sensor_is_the_first_cable_source(tmp_path):
+    async def run():
+        hass = local_hass(tmp_path)
+        try:
+            # BavarianData 0.9.30 names the reading that decided the sensor and
+            # carries BMW's time for it, so it is preferred over that reading.
+            now = dt_util.utcnow()
+            stamp = (now - timedelta(minutes=5)).isoformat()
+            port(hass, "disconnected")
+            tracker(hass)
+            cable(hass, source="vehicle.body.chargingPort.status", timestamp=stamp, from_before_restart=False)
+            assert detection_entities(hass, "car") == ("binary_sensor.car_cable", "device_tracker.car")
+            snapshot = BavarianDetectionSource(hass, "car").snapshot
+            assert snapshot.connected is True
+            assert snapshot.connected_at == dt_util.parse_datetime(stamp)
+            # A reading we do not bind ourselves still counts through the sensor.
+            cable(hass, "off", source="vehicle.drivetrain.electricEngine.charging.connectorStatus", timestamp=stamp)
+            assert BavarianDetectionSource(hass, "car").snapshot.connected is False
+            # The state from before a restart keeps BMW's old time: no fresh plug-in.
+            cable(hass, source=PLUG_DESCRIPTOR, timestamp=(now - timedelta(hours=3)).isoformat(), from_before_restart=True)
+            assert BavarianDetectionSource(hass, "car").snapshot.connected is None
+            # The port said "invalid": the sensor names no reading and no time.
+            cable(hass, "unknown", source=None, timestamp=None, from_before_restart=False)
+            assert BavarianDetectionSource(hass, "car").snapshot.connected is None
+            cable(hass, source="other", timestamp=stamp)
+            assert BavarianDetectionSource(hass, "car").snapshot.connected is None
+        finally:
+            await hass.async_stop()
+    asyncio.run(run())
+
+
 def test_the_port_status_text_counts_too(tmp_path):
     async def run():
         hass = local_hass(tmp_path)

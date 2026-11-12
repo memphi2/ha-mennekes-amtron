@@ -324,19 +324,21 @@ def test_real_ha_reports_disconnected_bus_and_clears_when_heartbeat_returns(monk
                 runtime = entry.runtime_data
                 registry = ir.async_get(hass)
                 issue_id = _issue(entry, ISSUE_HEARTBEAT_UNAVAILABLE)
-                entity_id = er.async_get(hass).async_get_entity_id("binary_sensor", DOMAIN, f"{SERIAL_NUMBER}_heartbeat")
+                entity_id = er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{SERIAL_NUMBER}_connection_quality")
                 assert entity_id is not None
-                assert hass.states.get(entity_id).state == "off"
+                assert hass.states.get(entity_id).attributes["heartbeat"] == "ok"
                 transport.read_exceptions[R.EVSE_STATE.address] = raise_connection_error()
                 transport.write_exceptions[R.HEARTBEAT.address] = raise_connection_error()
                 await runtime.coordinator.async_refresh()
                 assert not runtime.coordinator.last_update_success
-                # This same deadline fires when no acknowledgement arrives. It
-                # changes the binary sensor even though no register can be read.
+                # This same deadline fires when no acknowledgement arrives. The
+                # sensor is unavailable while nothing can be read; the heartbeat
+                # still tracks its health and raises the repair.
                 runtime.heartbeat._deadline_expired()
                 await asyncio.sleep(0.04)
                 await hass.async_block_till_done()
-                assert hass.states.get(entity_id).state == "on"
+                assert hass.states.get(entity_id).state == "unavailable"
+                assert runtime.heartbeat.healthy is False
                 assert registry.async_get_issue(DOMAIN, issue_id) is not None
                 assert registry.async_get_issue(DOMAIN, _issue(entry, ISSUE_EMS_HEARTBEAT_LOST)) is None
                 assert all(address == R.HEARTBEAT.address for address, *_ in transport.writes)
@@ -347,7 +349,7 @@ def test_real_ha_reports_disconnected_bus_and_clears_when_heartbeat_returns(monk
                 assert await runtime.heartbeat.async_beat_once()
                 runtime.heartbeat._set_healthy(True)
                 await hass.async_block_till_done()
-                assert hass.states.get(entity_id).state == "off"
+                assert hass.states.get(entity_id).attributes["heartbeat"] == "ok"
                 assert registry.async_get_issue(DOMAIN, issue_id) is None
 
                 # A config reload stops the old heartbeat; that shutdown must

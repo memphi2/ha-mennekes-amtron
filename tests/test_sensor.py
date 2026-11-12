@@ -21,41 +21,49 @@ async def _sensors(**kwargs: object) -> dict[str, object]:
 
 def test_the_validated_device_exposes_every_sensor() -> None:
     sensors = asyncio.run(_sensors())
-    assert sensors["evse_state"].native_value == "idle"
-    assert sensors["cp_state"].native_value == "b1"
     assert sensors["authorization_status"].native_value == "authorized"
+    assert sensors["authorization_status"].extra_state_attributes == {"enabled": False}
     assert sensors["cable_lock_status"].native_value == "fixed_cable"
+    assert sensors["cable_lock_status"].extra_state_attributes == {"permanent": False}
     assert sensors["power_total"].native_value == 0.0
-    assert sensors["voltage_l1"].native_value is not None
-    assert sensors["sessions_total"].native_value == 42
-    assert sensors["session_duration"].native_value == 600
-    assert sensors["modbus_layout_version"].native_value == "v01.03"
-    assert sensors["grid_phases_connected"].native_value == "l1_l2_l3"
     assert sensors["detected_ev_phases"].native_value == "three_phases"
+    assert sensors["wallbox_settings"].native_value == "v01.03"
+    settings = sensors["wallbox_settings"].extra_state_attributes
+    assert settings["grid_phases_connected"] == "l1_l2_l3"
+    assert settings["phase_options"] == "one_or_three_phases"
+    assert settings["grid_imbalance_monitoring"] is True
+    assert settings["max_evse_current"] == 16.0
 
 
-def test_an_older_layout_gets_fewer_sensors() -> None:
+def test_the_voltages_ride_on_the_total_power_only_under_load() -> None:
+    sensors = asyncio.run(_sensors())
+    power = sensors["power_total"]
+    values = power.coordinator.data.values
+    # Idle: a wobbling mains voltage would write a row every poll for nothing.
+    assert power.extra_state_attributes is None
+    values["power_total"] = 3680.0
+    values["voltage_l2"] = 229.4
+    assert power.extra_state_attributes == {"voltage_l1": 230, "voltage_l2": 229, "voltage_l3": 230}
+    values["power_total"] = True
+    assert power.extra_state_attributes is None
+
+
+def test_the_session_counters_ride_on_the_session_energy() -> None:
+    sensors = asyncio.run(_sensors())
+    energy = sensors["session_energy"]
+    assert energy.extra_state_attributes == {
+        "duration_minutes": 10, "maximum_current": 16.0, "sessions": 42,
+    }
+
+
+def test_an_older_layout_gets_fewer_sensors_and_attributes() -> None:
     sensors = asyncio.run(_sensors(layout=R.LAYOUT_V01_00))
     assert "temperature" not in sensors
     assert "energy_total" not in sensors
     assert "signaled_current" not in sensors
-    assert "evse_state" in sensors
-
-
-def test_the_error_sensor_reports_a_category_and_the_raw_code() -> None:
-    async def run() -> dict[str, object]:
-        return await _sensors(bank=device_bank(error_code=200))
-
-    sensors = asyncio.run(run())
-    error = sensors["error_code"]
-    assert error.native_value == "energy_manager_unavailable"
-    assert error.extra_state_attributes == {"code": 200}
-
-
-def test_an_undocumented_error_code_becomes_other() -> None:
-    sensors = asyncio.run(_sensors(bank=device_bank(error_code=4711)))
-    assert sensors["error_code"].native_value == "other"
-    assert sensors["error_code"].extra_state_attributes == {"code": 4711}
+    assert "wallbox_settings" in sensors
+    assert "grid_phases_connected" not in (sensors["wallbox_settings"].extra_state_attributes or {})
+    assert sensors["authorization_status"].extra_state_attributes is None
 
 
 def test_a_missing_value_yields_no_state() -> None:
@@ -64,18 +72,18 @@ def test_a_missing_value_yields_no_state() -> None:
         _hass, entry, _transport = await build_runtime(hass=hass)
         added: dict[str, object] = {}
         await async_setup_entry(hass, entry, lambda items: added.update(collect(items)))
-        entry.runtime_data.coordinator.data.values["evse_state"] = None
-        entry.runtime_data.coordinator.data.values["power_total"] = None
-        entry.runtime_data.coordinator.data.values["modbus_layout_version"] = None
-        entry.runtime_data.coordinator.data.values["error_code"] = None
-        entry.runtime_data.coordinator.data.values["ems_fallback_current"] = None
-        assert added["evse_state"].native_value is None
+        values = entry.runtime_data.coordinator.data.values
+        values["power_total"] = 1000.0
+        for key in ("voltage_l1", "voltage_l2", "voltage_l3"):
+            values[key] = None
+        assert added["power_total"].extra_state_attributes is None
+        values["power_total"] = None
+        values["modbus_layout_version"] = None
+        values["authorization_status"] = None
         assert added["power_total"].native_value is None
-        assert added["modbus_layout_version"].native_value is None
-        assert added["error_code"].extra_state_attributes is None
-        assert added["error_code"].native_value is None
-        assert added["ems_fallback_behaviour"].native_value is None
-        assert added["ems_fallback_current"].native_value is None
+        assert added["power_total"].extra_state_attributes is None
+        assert added["wallbox_settings"].native_value is None
+        assert added["authorization_status"].native_value is None
 
     asyncio.run(run())
 
@@ -86,25 +94,24 @@ def test_an_undocumented_enum_value_yields_no_state() -> None:
         _hass, entry, _transport = await build_runtime(hass=hass)
         added: dict[str, object] = {}
         await async_setup_entry(hass, entry, lambda items: added.update(collect(items)))
-        entry.runtime_data.coordinator.data.values["evse_state"] = 42
-        assert added["evse_state"].native_value is None
+        entry.runtime_data.coordinator.data.values["authorization_status"] = 42
+        entry.runtime_data.coordinator.data.values["phase_rotation"] = 42
+        assert added["authorization_status"].native_value is None
+        assert "phase_rotation" not in added["wallbox_settings"].extra_state_attributes
 
     asyncio.run(run())
 
 
-def test_the_fallback_register_is_not_reported_as_an_ampere_value() -> None:
-    """0x030E holds a mode for 0 and 1 and a current only for 6 to 32."""
-
+def test_a_bool_or_text_never_becomes_an_attribute_number() -> None:
     async def run() -> None:
-        for raw, behaviour, current in (
-            (0, "disabled", None),
-            (1, "pause_on_timeout", None),
-            (6, "fallback_current", 6),
-            (16, "fallback_current", 16),
-            (3, None, None),
-        ):
-            sensors = await _sensors(bank=device_bank(fallback_current=raw))
-            assert sensors["ems_fallback_behaviour"].native_value == behaviour
-            assert sensors["ems_fallback_current"].native_value == current
+        sensors = await _sensors(bank=device_bank())
+        values = sensors["power_total"].coordinator.data.values
+        values["power_total"] = 1000.0
+        values["voltage_l1"] = True
+        values["voltage_l2"] = "230"
+        values["session_duration"] = -5
+        values["sessions_total"] = True
+        assert sensors["power_total"].extra_state_attributes == {"voltage_l3": 230}
+        assert sensors["session_energy"].extra_state_attributes == {"maximum_current": 16.0}
 
     asyncio.run(run())

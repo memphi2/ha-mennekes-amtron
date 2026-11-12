@@ -45,7 +45,7 @@ def test_profiles_use_actual_ids_and_read_permissions_without_writes(tmp_path):
                 original = registry.async_get_entity_id("sensor", DOMAIN, entry_entity_unique_id(entries[0], "current_l1"))
                 registry.async_update_entity(original, new_entity_id="sensor.garage_custom_current")
                 devices = [dr.async_entries_for_config_entry(dr.async_get(hass), e.entry_id)[0].id for e in entries]
-                for profile, count in (("full", 0), ("detail", 20), ("lean", 30)):
+                for profile, count in (("full", 0), ("detail", 6), ("lean", 12)):
                     response = await hass.services.async_call(DOMAIN, "get_recorder_exclusions", {
                         "device_id": devices + devices[:1], "profile": profile,
                     }, blocking=True, return_response=True)
@@ -60,7 +60,7 @@ def test_profiles_use_actual_ids_and_read_permissions_without_writes(tmp_path):
                 single = await hass.services.async_call(DOMAIN, "get_recorder_exclusions", {
                     "device_id": devices[0], "profile": "lean",
                 }, blocking=True, return_response=True)
-                assert len(single["entities"]) == 15
+                assert len(single["entities"]) == 6
                 assert all(not transport.writes for transport in transports)
                 assert not hass.services.has_service("recorder", "purge")
                 denied = SimpleNamespace(id="denied", permissions=SimpleNamespace(check_entity=lambda *_: False))

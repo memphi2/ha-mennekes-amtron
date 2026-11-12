@@ -37,33 +37,35 @@ def test_pending_sensors_publish_fixed_deadlines_without_poll_churn():
         entities = {}
         await async_setup_entry(hass, entry, lambda items: entities.update(collect(items)))
         action = entities["pending_change"]
-        deadline = entities["pending_change_until"]
+
+        def deadline():
+            return (action.extra_state_attributes or {}).get("due")
+
         assert action.available
         assert action.native_value == "none"
-        assert deadline.native_value is None
+        assert deadline() is None
         notifications = []
         remove = coordinator.async_add_listener(lambda: notifications.append(coordinator.data))
         try:
             await control.async_pause_charging()
             await control.async_resume_charging()
-            expected = deadline.native_value
+            expected = deadline()
             assert isinstance(expected, datetime)
             assert expected.tzinfo == UTC
             assert action.native_value == "resume"
             before = len(notifications)
             for _ in range(4):
                 await coordinator.async_refresh()
-                assert deadline.native_value == expected
+                assert deadline() == expected
             assert len(notifications) == before
             # While still paused, a block switches no charge: it applies at
             # once and replaces the queued start.
             await control.async_set_charging_release(False)
             assert action.native_value == "none"
-            assert deadline.native_value is None
+            assert deadline() is None
             assert transport.bank[R.CHARGING_RELEASE.address] == 0
             coordinator.last_update_success = False
             assert not action.available
-            assert not deadline.available
         finally:
             remove()
             await control.async_shutdown()

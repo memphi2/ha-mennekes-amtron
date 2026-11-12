@@ -91,8 +91,9 @@ The app's **Open Web UI** provides guided connection setup on
 Compare the readings with the wallbox while still read-only. Choose an
 appropriate current cap, then enable writes in the single place shown in the
 connection table. Follow [First charge](quickstart.md#7-first-charge) to check
-current control, pause and resume. Verify **Heartbeat** and resolve connection
-repairs before adding automation.
+current control, pause and resume. Verify **Connection quality** (its
+`heartbeat` attribute should read `ok`) and resolve connection repairs before
+adding automation.
 
 Basic charging is now ready. [Optional functions](features.md) covers vehicle
 sources, one or several cars, targets, calendars, costs and losses. None is

@@ -110,6 +110,62 @@ Repeated recovery is not a substitute for a functioning connection.
 Use **Notify on a grid-operator downgrade** to see when a hardware restriction
 starts and ends. The integration observes that restriction; it cannot remove it.
 
+## React to wallbox events
+
+**Wallbox event** reports what the wallbox did on its own: a car plugged in or
+unplugged, a charge that started or stopped, a fault that appeared or cleared,
+an RFID decision, a downgrade, a cable lock or a phase switch. It is enabled by
+default and creates no entry at startup; see the
+[event meanings](entities.md#wallbox-events). Use a state trigger on the entity
+and filter its `event_type` attribute; the attributes hold the values of that
+moment, for example the energy of the session that just ended.
+
+This example reports the charged energy when the car is unplugged and raises a
+notification for a wallbox fault. Replace the entity ID with your actual
+**Wallbox event** entity.
+
+```yaml
+alias: Wallbox reports
+triggers:
+  - trigger: state
+    entity_id: event.mennekes_amtron_wallbox_event
+    not_from:
+      - unknown
+      - unavailable
+    not_to:
+      - unknown
+      - unavailable
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.to_state.attributes.event_type == 'vehicle_unplugged' }}
+        sequence:
+          - action: notify.notify
+            data:
+              message: >-
+                Charged {{ trigger.to_state.attributes.session_energy | round(1) }} kWh.
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.to_state.attributes.event_type == 'error_occurred' }}
+        sequence:
+          - action: persistent_notification.create
+            data:
+              notification_id: wallbox_error
+              title: Wallbox error
+              message: >-
+                Error {{ trigger.to_state.attributes.error_code }}
+                ({{ trigger.to_state.attributes.error_category }}).
+mode: queued
+```
+
+A reached charge target also ends in `charging_stopped`; the energy target's
+own stop is reported by **Control result** as well. Use `mode: queued` so that
+a `charging_stopped` and a `vehicle_unplugged` from the same poll are both handled.
+
 ## React to command results
 
 Enable **Control result** under **Settings → Devices & services → Entities**

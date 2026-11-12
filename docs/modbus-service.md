@@ -177,7 +177,7 @@ the wallbox's hardware limits still apply. See the [user guide](user-guide.md)
 for charging controls and automations.
 
 Early pause/resume, phase, release and lock changes
-wait in one pending slot. **Pending change** and **Pending change due** show
+wait in one pending slot. **Pending change** and its `due` attribute show
 the action and when it can run. A newer charging request replaces it. A stop
 replaces a pending start and also waits for its due time. Heartbeat and recovery
 that preserves the current intent keep running. Zero disables the longer wait,

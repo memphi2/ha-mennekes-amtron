@@ -1,5 +1,10 @@
 # Changes
 
+## 0.9.0b1
+
+- The sidebar entry is called **Modbus RTU** instead of the full app name.
+  Nothing else changes; the app also works with integration 0.8.2.
+
 ## 0.8.2
 
 - **Virtual Plug & Charge:** **Charging release** switched off by hand stops

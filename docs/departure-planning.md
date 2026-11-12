@@ -25,8 +25,8 @@ to work.
 3. Set **Next departure** to tomorrow's full date and **07:30**, or copy that
    trip from a calendar or vehicle timer.
 4. Check the displayed date, time, target and planning status.
-   **Planned charging start** shows when charging starts, or
-   started, for this trip. Unlock and authorize the car as required. The plan cannot bypass those restrictions.
+   The `planned_start` attribute of **Timed charging status** shows when
+   charging starts, or started, for this trip. Unlock and authorize the car as required. The plan cannot bypass those restrictions.
 5. To add climate, install the [preconditioning blueprint](blueprints.md#start-vehicle-climate-before-departure)
    and choose the HA action and lead time you want.
 
@@ -136,7 +136,8 @@ known wallbox limits and phase information. It works in three steps:
 
 1. **Wait.** Charging stays paused until the energy still needed takes the
    remaining time at full current, plus a **30-minute reserve** for a charge
-   slower than estimated. **Planned charging start** shows that time.
+   slower than estimated. The `planned_start` attribute of **Timed charging
+   status** shows that time.
 2. **Full current.** Charging runs at the wallbox's maximum current.
 3. **Finish at 6 A.** Once the rest fits the remaining time at 6 A, the plan
    reduces to 6 A and lands on the target at departure instead of early.

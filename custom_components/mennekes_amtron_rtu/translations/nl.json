@@ -204,12 +204,6 @@
   },
   "entity": {
     "binary_sensor": {
-      "authorization_enabled": {
-        "name": "Autorisatie ingeschakeld"
-      },
-      "cable_lock_enabled": {
-        "name": "Permanente kabelvergrendeling"
-      },
       "charging": {
         "name": "Laden"
       },
@@ -219,20 +213,11 @@
       "error": {
         "name": "Storing"
       },
-      "grid_imbalance_enabled": {
-        "name": "Faseonbalansbewaking"
-      },
       "master_lost_fallback": {
         "name": "Terugvalmodus energiemanager actief"
       },
-      "phase_switch_capable": {
-        "name": "Fasewisseling ondersteund"
-      },
       "vehicle_connected": {
         "name": "Voertuig aangesloten"
-      },
-      "heartbeat": {
-        "name": "Heartbeat"
       }
     },
     "button": {
@@ -317,22 +302,6 @@
           "unlocked": "Ontgrendeld"
         }
       },
-      "cp_state": {
-        "name": "CP-status",
-        "state": {
-          "a1": "A1 (geen voertuig)",
-          "a2": "A2 (voertuig losgekoppeld)",
-          "b1": "B1 (voertuig aangesloten)",
-          "b2": "B2 (gereed, stroom aangeboden)",
-          "c1": "C1 (voertuig klaar om te laden)",
-          "c2": "C2 (laden)",
-          "d1": "D1",
-          "d2": "D2",
-          "e": "E (storing)",
-          "f": "F (storing)",
-          "init": "Initialisatie"
-        }
-      },
       "current_l1": {
         "name": "Stroom L1"
       },
@@ -351,133 +320,23 @@
           "two_phases": "2 fasen"
         }
       },
-      "downgrade_current": {
-        "name": "Stroom bij vermogensbeperking"
-      },
-      "ems_fallback_behaviour": {
-        "name": "Gedrag bij uitval energiemanager",
-        "state": {
-          "disabled": "Uitgeschakeld, behoudt de laatste waarden",
-          "fallback_current": "Laadt met de ingestelde stroom bij uitval",
-          "pause_on_timeout": "Pauzeert als de heartbeat uitblijft"
-        }
-      },
-      "ems_fallback_current": {
-        "name": "Stroom bij uitval energiemanager"
-      },
       "energy_total": {
         "name": "Totale energie"
-      },
-      "error_code": {
-        "name": "Foutcode",
-        "state": {
-          "connected_phases_mismatch": "Aangesloten fasen komen niet overeen",
-          "energy_manager_unavailable": "Energiemanager niet beschikbaar",
-          "ev_overcurrent": "Te hoge stroomafname door voertuig",
-          "no_error": "Geen storing",
-          "other": "Andere storing",
-          "voltage_out_of_range": "Spanning buiten toegestaan bereik"
-        }
-      },
-      "evse_state": {
-        "name": "EVSE-status",
-        "state": {
-          "charging": "Laden",
-          "error": "Storing",
-          "ev_connected": "Voertuig aangesloten",
-          "idle": "In rust",
-          "not_initialized": "Niet geïnitialiseerd",
-          "preconditions_valid": "Aan voorwaarden voldaan",
-          "ready_to_charge": "Klaar om te laden",
-          "service_mode": "Onderhoudsmodus"
-        }
-      },
-      "grid_imbalance_threshold": {
-        "name": "Grenswaarde faseonbalans"
-      },
-      "grid_phases_connected": {
-        "name": "Aangesloten netfasen",
-        "state": {
-          "l1": "L1",
-          "l1_l2_l3": "L1, L2, L3"
-        }
-      },
-      "max_current_house": {
-        "name": "Maximale stroom huisaansluiting"
-      },
-      "max_evse_current": {
-        "name": "Maximale stroom wallbox"
-      },
-      "modbus_layout_version": {
-        "name": "Versie Modbus-registerindeling"
-      },
-      "phase_rotation": {
-        "name": "Fasevolgorde",
-        "state": {
-          "l1_l2_l3": "L1-L2-L3",
-          "l2_l3_l1": "L2-L3-L1",
-          "l3_l1_l2": "L3-L1-L2"
-        }
-      },
-      "phase_switching_mode": {
-        "name": "Fasewisselmodus",
-        "state": {
-          "solar_dynamic": "Zonnestroom, 1 of 3 fasen",
-          "solar_one_phase": "Zonnestroom, alleen 1 fase",
-          "solar_three_phases": "Zonnestroom, alleen 3 fasen"
-        }
-      },
-      "phase_switching_pause": {
-        "name": "Pauze bij fasewisseling"
-      },
-      "power_l1": {
-        "name": "Vermogen L1"
-      },
-      "power_l2": {
-        "name": "Vermogen L2"
-      },
-      "power_l3": {
-        "name": "Vermogen L3"
       },
       "power_total": {
         "name": "Totaal vermogen"
       },
-      "session_duration": {
-        "name": "Laadsessieduur"
-      },
       "session_energy": {
         "name": "Energie laadsessie"
-      },
-      "session_max_current": {
-        "name": "Maximale stroom laadsessie"
-      },
-      "sessions_total": {
-        "name": "Laadsessies"
       },
       "signaled_current": {
         "name": "Aangeboden stroom"
       },
-      "solar_min_current": {
-        "name": "Minimale stroom Zonnestroom+"
-      },
-      "switched_phases": {
-        "name": "Fasekeuze van de laadpaal",
-        "state": {
-          "all_available": "Alle beschikbare fasen",
-          "single_phase": "Eén fase"
-        }
-      },
       "temperature": {
         "name": "Temperatuur"
       },
-      "voltage_l1": {
-        "name": "Spanning L1"
-      },
-      "voltage_l2": {
-        "name": "Spanning L2"
-      },
-      "voltage_l3": {
-        "name": "Spanning L3"
+      "wallbox_settings": {
+        "name": "Wallbox-instellingen"
       },
       "pending_change": {
         "name": "Geplande wijziging",
@@ -493,9 +352,6 @@
           "unlock": "Wallbox ontgrendelen",
           "lock": "Wallbox vergrendelen"
         }
-      },
-      "pending_change_until": {
-        "name": "Wijziging gepland om"
       },
       "charging_status": {
         "name": "Laadstatus",
@@ -612,9 +468,6 @@
           "write_pending": "Schrijfopdracht wacht",
           "error": "Fout"
         }
-      },
-      "timed_goal_planned_start": {
-        "name": "Geplande laadstart"
       },
       "virtual_plug_charge_status": {
         "name": "Status virtuele Plug & Charge",
@@ -767,6 +620,59 @@
               "energy_goal": "Stop door een laaddoel",
               "deadline_expired": "Vertrektijd verstreken"
             }
+          }
+        }
+      },
+      "wallbox_event": {
+        "name": "Wallbox-gebeurtenis",
+        "state_attributes": {
+          "event_type": {
+            "name": "Wijziging",
+            "state": {
+              "vehicle_plugged_in": "Voertuig aangesloten",
+              "vehicle_unplugged": "Voertuig losgekoppeld",
+              "charging_started": "Laden gestart",
+              "charging_stopped": "Laden gestopt",
+              "error_occurred": "Fout opgetreden",
+              "error_cleared": "Fout verholpen",
+              "authorized": "Geautoriseerd",
+              "authorization_rejected": "Autorisatie geweigerd",
+              "downgrade_started": "Vermogensbeperking gestart",
+              "downgrade_ended": "Vermogensbeperking beëindigd",
+              "cable_locked": "Kabel vergrendeld",
+              "cable_unlocked": "Kabel ontgrendeld",
+              "phases_switched": "Fasen omgeschakeld"
+            }
+          },
+          "cp_state": {
+            "name": "Control-pilot-status"
+          },
+          "evse_state": {
+            "name": "Wallbox-status"
+          },
+          "session_energy": {
+            "name": "Energie van de sessie"
+          },
+          "session_duration": {
+            "name": "Duur van de sessie"
+          },
+          "error_code": {
+            "name": "Foutcode"
+          },
+          "error_category": {
+            "name": "Foutcategorie"
+          },
+          "authorization": {
+            "name": "Autorisatie"
+          },
+          "downgrade_current": {
+            "name": "Beperkte stroom"
+          },
+          "cable_lock": {
+            "name": "Kabelvergrendeling"
+          },
+          "phases": {
+            "name": "Fasen"
           }
         }
       }

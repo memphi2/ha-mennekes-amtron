@@ -22,21 +22,8 @@ from .entity import entry_entity_unique_id
 from .exceptions import service_validation_error
 
 SERVICE = "get_recorder_exclusions"
-DETAIL_KEYS = (
-    *tuple(
-        f"{kind}_l{phase}"
-        for kind in ("current", "voltage", "power")
-        for phase in (1, 2, 3)
-    ),
-    "session_duration",
-)
-EXTRA_KEYS = (
-    "signaled_current",
-    "downgrade_current",
-    "session_energy",
-    "sessions_total",
-    "temperature",
-)
+DETAIL_KEYS = ("current_l1", "current_l2", "current_l3")
+EXTRA_KEYS = ("signaled_current", "session_energy", "temperature")
 PROFILES = {"full": (), "detail": DETAIL_KEYS, "lean": DETAIL_KEYS + EXTRA_KEYS}
 SCHEMA = probatio.Schema(
     {

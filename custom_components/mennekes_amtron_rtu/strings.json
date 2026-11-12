@@ -204,12 +204,6 @@
   },
   "entity": {
     "binary_sensor": {
-      "authorization_enabled": {
-        "name": "Authorization enabled"
-      },
-      "cable_lock_enabled": {
-        "name": "Permanent cable lock"
-      },
       "charging": {
         "name": "Charging"
       },
@@ -219,20 +213,11 @@
       "error": {
         "name": "Error"
       },
-      "grid_imbalance_enabled": {
-        "name": "Grid imbalance monitoring"
-      },
       "master_lost_fallback": {
         "name": "Energy manager fallback active"
       },
-      "phase_switch_capable": {
-        "name": "Phase switching supported"
-      },
       "vehicle_connected": {
         "name": "Vehicle connected"
-      },
-      "heartbeat": {
-        "name": "Heartbeat"
       }
     },
     "button": {
@@ -317,22 +302,6 @@
           "unlocked": "Unlocked"
         }
       },
-      "cp_state": {
-        "name": "CP state",
-        "state": {
-          "a1": "A1 (no vehicle)",
-          "a2": "A2 (vehicle disconnected)",
-          "b1": "B1 (vehicle connected)",
-          "b2": "B2 (ready, current offered)",
-          "c1": "C1 (vehicle ready to charge)",
-          "c2": "C2 (charging)",
-          "d1": "D1",
-          "d2": "D2",
-          "e": "E (error)",
-          "f": "F (error)",
-          "init": "Init"
-        }
-      },
       "current_l1": {
         "name": "Current L1"
       },
@@ -351,133 +320,23 @@
           "two_phases": "2 phases"
         }
       },
-      "downgrade_current": {
-        "name": "Downgrade current"
-      },
-      "ems_fallback_behaviour": {
-        "name": "Energy manager fallback",
-        "state": {
-          "disabled": "Disabled, keeps the last values",
-          "fallback_current": "Charges with the fallback current",
-          "pause_on_timeout": "Pauses on heartbeat timeout"
-        }
-      },
-      "ems_fallback_current": {
-        "name": "Energy manager fallback current"
-      },
       "energy_total": {
         "name": "Total energy"
-      },
-      "error_code": {
-        "name": "Error code",
-        "state": {
-          "connected_phases_mismatch": "Connected phases mismatch",
-          "energy_manager_unavailable": "Energy manager unavailable",
-          "ev_overcurrent": "Vehicle overcurrent",
-          "no_error": "No error",
-          "other": "Other error",
-          "voltage_out_of_range": "Voltage out of range"
-        }
-      },
-      "evse_state": {
-        "name": "EVSE state",
-        "state": {
-          "charging": "Charging",
-          "error": "Error",
-          "ev_connected": "Vehicle connected",
-          "idle": "Idle",
-          "not_initialized": "Not initialized",
-          "preconditions_valid": "Preconditions valid",
-          "ready_to_charge": "Ready to charge",
-          "service_mode": "Service mode"
-        }
-      },
-      "grid_imbalance_threshold": {
-        "name": "Grid imbalance threshold"
-      },
-      "grid_phases_connected": {
-        "name": "Connected grid phases",
-        "state": {
-          "l1": "L1",
-          "l1_l2_l3": "L1, L2, L3"
-        }
-      },
-      "max_current_house": {
-        "name": "Maximum house current"
-      },
-      "max_evse_current": {
-        "name": "Maximum wallbox current"
-      },
-      "modbus_layout_version": {
-        "name": "Modbus layout version"
-      },
-      "phase_rotation": {
-        "name": "Phase rotation",
-        "state": {
-          "l1_l2_l3": "L1-L2-L3",
-          "l2_l3_l1": "L2-L3-L1",
-          "l3_l1_l2": "L3-L1-L2"
-        }
-      },
-      "phase_switching_mode": {
-        "name": "Phase switching mode",
-        "state": {
-          "solar_dynamic": "Solar, 1 or 3 phases",
-          "solar_one_phase": "Solar, 1 phase only",
-          "solar_three_phases": "Solar, 3 phases only"
-        }
-      },
-      "phase_switching_pause": {
-        "name": "Phase switching pause"
-      },
-      "power_l1": {
-        "name": "Power L1"
-      },
-      "power_l2": {
-        "name": "Power L2"
-      },
-      "power_l3": {
-        "name": "Power L3"
       },
       "power_total": {
         "name": "Total power"
       },
-      "session_duration": {
-        "name": "Session duration"
-      },
       "session_energy": {
         "name": "Session energy"
-      },
-      "session_max_current": {
-        "name": "Session maximum current"
-      },
-      "sessions_total": {
-        "name": "Charging sessions"
       },
       "signaled_current": {
         "name": "Signaled current"
       },
-      "solar_min_current": {
-        "name": "Sunshine+ minimum current"
-      },
-      "switched_phases": {
-        "name": "Wallbox phase selection",
-        "state": {
-          "all_available": "All available phases",
-          "single_phase": "Single phase"
-        }
-      },
       "temperature": {
         "name": "Temperature"
       },
-      "voltage_l1": {
-        "name": "Voltage L1"
-      },
-      "voltage_l2": {
-        "name": "Voltage L2"
-      },
-      "voltage_l3": {
-        "name": "Voltage L3"
+      "wallbox_settings": {
+        "name": "Wallbox settings"
       },
       "pending_change": {
         "name": "Pending change",
@@ -493,9 +352,6 @@
           "unlock": "Unlock wallbox",
           "lock": "Lock wallbox"
         }
-      },
-      "pending_change_until": {
-        "name": "Pending change due"
       },
       "charging_status": {
         "name": "Charging status",
@@ -612,9 +468,6 @@
           "write_pending": "Write pending",
           "error": "Error"
         }
-      },
-      "timed_goal_planned_start": {
-        "name": "Planned charging start"
       },
       "virtual_plug_charge_status": {
         "name": "Virtual Plug & Charge status",
@@ -767,6 +620,59 @@
               "energy_goal": "Charge target stop",
               "deadline_expired": "Departure time expired"
             }
+          }
+        }
+      },
+      "wallbox_event": {
+        "name": "Wallbox event",
+        "state_attributes": {
+          "event_type": {
+            "name": "Change",
+            "state": {
+              "vehicle_plugged_in": "Vehicle plugged in",
+              "vehicle_unplugged": "Vehicle unplugged",
+              "charging_started": "Charging started",
+              "charging_stopped": "Charging stopped",
+              "error_occurred": "Error occurred",
+              "error_cleared": "Error cleared",
+              "authorized": "Authorized",
+              "authorization_rejected": "Authorization rejected",
+              "downgrade_started": "Downgrade started",
+              "downgrade_ended": "Downgrade ended",
+              "cable_locked": "Cable locked",
+              "cable_unlocked": "Cable unlocked",
+              "phases_switched": "Phases switched"
+            }
+          },
+          "cp_state": {
+            "name": "Control pilot state"
+          },
+          "evse_state": {
+            "name": "Wallbox state"
+          },
+          "session_energy": {
+            "name": "Session energy"
+          },
+          "session_duration": {
+            "name": "Session duration"
+          },
+          "error_code": {
+            "name": "Error code"
+          },
+          "error_category": {
+            "name": "Error category"
+          },
+          "authorization": {
+            "name": "Authorization"
+          },
+          "downgrade_current": {
+            "name": "Downgrade current"
+          },
+          "cable_lock": {
+            "name": "Cable lock"
+          },
+          "phases": {
+            "name": "Phases"
           }
         }
       }

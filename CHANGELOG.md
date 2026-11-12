@@ -5,6 +5,77 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.9.0b1 — unreleased
+
+Beta of the integration and the app. The app update only renames its sidebar
+entry; the integration also works with app 0.8.2.
+
+- **Breaking: fewer entities, more attributes.** Each sensor now answers one
+  question; a register that only details or explains another sensor's state is
+  an attribute of that sensor. 32 entities are gone and are removed from the
+  entity registry on the first start, so no orphans stay behind:
+  - **Charging status** carries `evse_state` and `cp_state`; the sensors
+    **EVSE state** and **CP state** are gone.
+  - **Error** (binary sensor) carries `code` and `category`; **Error code** is
+    gone.
+  - **Connection quality** carries `heartbeat` (`ok` or `problem`); the
+    **Heartbeat** binary sensor is gone. The repairs for a lost heartbeat are
+    unchanged.
+  - **Total power** carries `voltage_l1` to `voltage_l3` in whole volts while
+    power flows; the six voltage and per-phase power sensors are gone. The
+    phase currents stay.
+  - **Session energy** carries `duration_minutes`, `maximum_current` and
+    `sessions`; **Session duration**, **Session maximum current** and
+    **Charging sessions** are gone.
+  - **Pending change** carries `due`; **Pending change due** is gone.
+    **Timed charging status** carries `planned_start`; **Planned charging
+    start** is gone.
+  - **Requested phases** (select) carries `switched`, the wallbox's answer;
+    **Wallbox phase selection** is gone.
+  - **Downgrade active** carries `current`; **Downgrade current** is gone.
+    **Energy manager fallback active** carries `behaviour` and
+    `fallback_current`; the two fallback sensors are gone. **Authorization**
+    carries `enabled`, **Cable lock** carries `permanent`; the four on/off
+    setting sensors are gone.
+  - New diagnostic sensor **Wallbox settings**: its state is the register
+    layout (formerly **Modbus layout version**, disabled by default), its
+    attributes are the installation values set with DIP switches and the
+    service tool (house and wallbox maximum current, phase rotation, connected
+    grid phases, phase options, phase switching mode and pause, grid imbalance
+    monitoring and threshold, Sunshine+ minimum current), each formerly a
+    diagnostic sensor.
+  Every remaining sensor is enabled by default. Attributes are stored with the
+  state they belong to and compile no statistics; the Recorder profiles now
+  exclude phase currents (less detail) and signaled current, session energy and
+  temperature (statistics only). The bundled blueprints take the new entities:
+  **Charge from PV surplus** reads the `switched` attribute of **Requested
+  phases**, **Recover from a lost heartbeat** the `category` attribute of
+  **Error**, **Downgrade notification** the `current` attribute of
+  **Downgrade active**; re-select those inputs in automations made from them.
+  Templates that read a removed entity need its attribute instead, for example
+  `state_attr('sensor.<wallbox>_session_energy', 'duration_minutes')`. See
+  [Updating to 0.9.0](docs/upgrading.md#updating-to-090).
+- **App:** the sidebar entry is now called **Modbus RTU** instead of the full
+  app name.
+- **BavarianData's Charging Cable sensor** is the first cable source for
+  automatic selection and Virtual Plug & Charge. From BavarianData 0.9.30 it
+  names the plug reading that decided it and carries BMW's time for it, so it
+  proves a fresh plug-in for every car, including one that streams only its
+  connector status. An older BavarianData's cable sensor has neither and is
+  passed over for the plug reading itself, as before.
+- **New event entity Wallbox event** reports what the wallbox changed on its
+  own, as a counterpart to **Control result**, which reports your commands:
+  `vehicle_plugged_in` and `vehicle_unplugged` (with the energy and duration of
+  the session), `charging_started` and `charging_stopped`, `error_occurred` and
+  `error_cleared` (with the code and category), `authorized` and
+  `authorization_rejected`, `downgrade_started` and `downgrade_ended`,
+  `cable_locked` and `cable_unlocked`, and `phases_switched`. Only a change
+  between two known readings creates an event: the first reading after a
+  start, a reload, a lost connection or a failed poll is a baseline, and a
+  reading that is briefly unknown during a fault keeps its last known
+  baseline. The entity is enabled by default and records only those changes.
+  See [React to wallbox events](docs/automations.md#react-to-wallbox-events).
+
 ## 0.8.2 — 2026-11-10
 
 Update the app to **0.8.2** in service mode; the integration also works with

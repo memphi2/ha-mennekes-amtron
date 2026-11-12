@@ -42,18 +42,30 @@ from .identity import (
 )
 
 PLUG_DESCRIPTOR = "vehicle.powertrain.tractionBattery.charging.port.anyPosition.isPlugged"
-# Cars differ in which plug field they stream, so the most direct one wins: an
-# i4 or i5 streams only the port status. BavarianData's evcc bridge reads the
-# same fields; the DC-only and non-streamed port fields say nothing here.
-# BavarianData's derived "Charging Cable" plug sensor is deliberately not one:
-# it carries no BMW timestamp and shows its last value again after a restart,
-# so it cannot prove a fresh plug-in.
+CHARGING_CABLE = "charging_cable"
+# BavarianData's derived "Charging Cable" plug sensor comes first: since 0.9.30
+# it names the plug reading that decided it and carries BMW's time for it, so it
+# proves a fresh plug-in and covers every car, whichever plug field it streams.
+# An older BavarianData's cable sensor has neither and is passed over for the
+# reading itself: the most direct one wins, and an i4 or i5 streams only the
+# port status. The DC-only and non-streamed port fields say nothing here.
 PLUG_SOURCES = (
+    ("binary_sensor", CHARGING_CABLE),
     ("binary_sensor", PLUG_DESCRIPTOR),
     ("sensor", "vehicle.body.chargingPort.status"),
     ("sensor", "vehicle.body.chargingPort.statusClearText"),
 )
-_PLUG_DESCRIPTORS = frozenset(descriptor for _domain, descriptor in PLUG_SOURCES)
+_PLUG_DESCRIPTORS = frozenset(
+    descriptor for _domain, descriptor in PLUG_SOURCES if descriptor != CHARGING_CABLE
+)
+# The readings the cable sensor may name, including one we do not bind directly.
+_CABLE_READINGS = _PLUG_DESCRIPTORS | {"vehicle.drivetrain.electricEngine.charging.connectorStatus"}
+
+
+def _dated_cable(hass: HomeAssistant, entity_id: str) -> bool:
+    """Only a cable sensor that says which reading decided it, and when, counts."""
+    state = hass.states.get(entity_id)
+    return state is not None and {"source", "timestamp"} <= state.attributes.keys()
 _PLUG_STATES = {"on": True, "off": False, "connected": True, "disconnected": False}
 HOME_ENTITY = "zone.home"
 _TRACKER = ("device_tracker", "tracker")
@@ -70,7 +82,12 @@ def _entity(hass: HomeAssistant, device_id: str, vin: str, domain: str, suffix: 
 
 def _entities(hass: HomeAssistant, device_id: str, vin: str) -> tuple[str | None, str | None]:
     plug = next(
-        (entity for key in PLUG_SOURCES if (entity := _entity(hass, device_id, vin, *key)) is not None), None,
+        (
+            entity for domain, descriptor in PLUG_SOURCES
+            if (entity := _entity(hass, device_id, vin, domain, descriptor)) is not None
+            and (descriptor != CHARGING_CABLE or _dated_cable(hass, entity))
+        ),
+        None,
     )
     return plug, _entity(hass, device_id, vin, *_TRACKER)
 
@@ -115,7 +132,13 @@ def _fresh(observation: _Observation, now: datetime, max_age: float = DETECTION_
 
 def _connected(observation: _Observation, now: datetime) -> bool | None:
     state = _fresh(observation, now)
-    if state is None or state.attributes.get("descriptor") not in _PLUG_DESCRIPTORS:
+    if state is None:
+        return None
+    if "source" in state.attributes:
+        # The cable sensor: trusted only with a named reading and BMW's time.
+        if state.attributes["source"] not in _CABLE_READINGS or state.attributes.get("timestamp") is None:
+            return None
+    elif state.attributes.get("descriptor") not in _PLUG_DESCRIPTORS:
         return None
     # The actual BMW descriptor timestamp, when exposed, can be older than the
     # HA report. Do not let an unrelated entity write renew this cable evidence.

@@ -60,7 +60,7 @@ restart for an integration-only update. Follow [Updates](docs/installation.md#up
 | Set the charging current | **Charging current limit** slider |
 | Remove the current limit | **0 A**; this does not pause charging |
 | Pause or resume | **Charging paused** switch |
-| Check the heartbeat | **Heartbeat** diagnostic sensor |
+| Check the heartbeat | `heartbeat` attribute of the **Connection quality** diagnostic sensor |
 | Track energy | **Total energy** in the Energy dashboard |
 | Add targets, a trip time or vehicle data | [Optional functions and examples](docs/features.md) |
 | Estimate costs or charging losses | [Charging estimates](docs/charging-estimates.md) |

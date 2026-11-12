@@ -204,12 +204,6 @@
   },
   "entity": {
     "binary_sensor": {
-      "authorization_enabled": {
-        "name": "Autorizzazione abilitata"
-      },
-      "cable_lock_enabled": {
-        "name": "Blocco permanente del cavo"
-      },
       "charging": {
         "name": "Ricarica"
       },
@@ -219,20 +213,11 @@
       "error": {
         "name": "Errore"
       },
-      "grid_imbalance_enabled": {
-        "name": "Monitoraggio squilibrio di rete"
-      },
       "master_lost_fallback": {
         "name": "Fallback del gestore energetico attivo"
       },
-      "phase_switch_capable": {
-        "name": "Commutazione delle fasi supportata"
-      },
       "vehicle_connected": {
         "name": "Veicolo collegato"
-      },
-      "heartbeat": {
-        "name": "Heartbeat"
       }
     },
     "button": {
@@ -317,22 +302,6 @@
           "unlocked": "Sbloccato"
         }
       },
-      "cp_state": {
-        "name": "Stato CP",
-        "state": {
-          "a1": "A1 (nessun veicolo)",
-          "a2": "A2 (veicolo scollegato)",
-          "b1": "B1 (veicolo collegato)",
-          "b2": "B2 (pronto, corrente offerta)",
-          "c1": "C1 (veicolo pronto alla ricarica)",
-          "c2": "C2 (ricarica)",
-          "d1": "D1",
-          "d2": "D2",
-          "e": "E (errore)",
-          "f": "F (errore)",
-          "init": "Inizializzazione"
-        }
-      },
       "current_l1": {
         "name": "Corrente L1"
       },
@@ -351,133 +320,23 @@
           "two_phases": "2 fasi"
         }
       },
-      "downgrade_current": {
-        "name": "Corrente con limitazione di rete"
-      },
-      "ems_fallback_behaviour": {
-        "name": "Fallback del gestore energetico",
-        "state": {
-          "disabled": "Disabilitato, mantiene gli ultimi valori",
-          "fallback_current": "Ricarica con la corrente di fallback",
-          "pause_on_timeout": "Pausa alla scadenza dell'heartbeat"
-        }
-      },
-      "ems_fallback_current": {
-        "name": "Corrente di fallback del gestore energetico"
-      },
       "energy_total": {
         "name": "Energia totale"
-      },
-      "error_code": {
-        "name": "Codice di errore",
-        "state": {
-          "connected_phases_mismatch": "Fasi collegate non corrispondenti",
-          "energy_manager_unavailable": "Gestore energetico non disponibile",
-          "ev_overcurrent": "Sovracorrente del veicolo",
-          "no_error": "Nessun errore",
-          "other": "Altro errore",
-          "voltage_out_of_range": "Tensione fuori intervallo"
-        }
-      },
-      "evse_state": {
-        "name": "Stato della wallbox",
-        "state": {
-          "charging": "Ricarica",
-          "error": "Errore",
-          "ev_connected": "Veicolo collegato",
-          "idle": "Inattiva",
-          "not_initialized": "Non inizializzata",
-          "preconditions_valid": "Prerequisiti soddisfatti",
-          "ready_to_charge": "Pronta alla ricarica",
-          "service_mode": "Modalità di manutenzione"
-        }
-      },
-      "grid_imbalance_threshold": {
-        "name": "Soglia di squilibrio di rete"
-      },
-      "grid_phases_connected": {
-        "name": "Fasi di rete collegate",
-        "state": {
-          "l1": "L1",
-          "l1_l2_l3": "L1, L2, L3"
-        }
-      },
-      "max_current_house": {
-        "name": "Corrente massima dell'impianto"
-      },
-      "max_evse_current": {
-        "name": "Corrente massima della wallbox"
-      },
-      "modbus_layout_version": {
-        "name": "Versione della mappa Modbus"
-      },
-      "phase_rotation": {
-        "name": "Sequenza delle fasi",
-        "state": {
-          "l1_l2_l3": "L1-L2-L3",
-          "l2_l3_l1": "L2-L3-L1",
-          "l3_l1_l2": "L3-L1-L2"
-        }
-      },
-      "phase_switching_mode": {
-        "name": "Modalità di commutazione delle fasi",
-        "state": {
-          "solar_dynamic": "Solare, 1 o 3 fasi",
-          "solar_one_phase": "Solare, solo 1 fase",
-          "solar_three_phases": "Solare, solo 3 fasi"
-        }
-      },
-      "phase_switching_pause": {
-        "name": "Pausa per commutazione delle fasi"
-      },
-      "power_l1": {
-        "name": "Potenza L1"
-      },
-      "power_l2": {
-        "name": "Potenza L2"
-      },
-      "power_l3": {
-        "name": "Potenza L3"
       },
       "power_total": {
         "name": "Potenza totale"
       },
-      "session_duration": {
-        "name": "Durata della sessione"
-      },
       "session_energy": {
         "name": "Energia della sessione"
-      },
-      "session_max_current": {
-        "name": "Corrente massima della sessione"
-      },
-      "sessions_total": {
-        "name": "Sessioni di ricarica"
       },
       "signaled_current": {
         "name": "Corrente comunicata al veicolo"
       },
-      "solar_min_current": {
-        "name": "Corrente minima Sunshine+"
-      },
-      "switched_phases": {
-        "name": "Selezione delle fasi della wallbox",
-        "state": {
-          "all_available": "Tutte le fasi disponibili",
-          "single_phase": "Una fase"
-        }
-      },
       "temperature": {
         "name": "Temperatura"
       },
-      "voltage_l1": {
-        "name": "Tensione L1"
-      },
-      "voltage_l2": {
-        "name": "Tensione L2"
-      },
-      "voltage_l3": {
-        "name": "Tensione L3"
+      "wallbox_settings": {
+        "name": "Impostazioni della wallbox"
       },
       "pending_change": {
         "name": "Modifica in attesa",
@@ -493,9 +352,6 @@
           "unlock": "Sbloccare la wallbox",
           "lock": "Blocca la wallbox"
         }
-      },
-      "pending_change_until": {
-        "name": "Modifica prevista alle"
       },
       "charging_status": {
         "name": "Stato di ricarica",
@@ -612,9 +468,6 @@
           "write_pending": "Scrittura in attesa",
           "error": "Errore"
         }
-      },
-      "timed_goal_planned_start": {
-        "name": "Inizio ricarica previsto"
       },
       "virtual_plug_charge_status": {
         "name": "Stato di Plug & Charge virtuale",
@@ -767,6 +620,59 @@
               "energy_goal": "Arresto richiesto da un obiettivo di ricarica",
               "deadline_expired": "Ora di partenza trascorsa"
             }
+          }
+        }
+      },
+      "wallbox_event": {
+        "name": "Evento della wallbox",
+        "state_attributes": {
+          "event_type": {
+            "name": "Cambiamento",
+            "state": {
+              "vehicle_plugged_in": "Veicolo collegato",
+              "vehicle_unplugged": "Veicolo scollegato",
+              "charging_started": "Ricarica avviata",
+              "charging_stopped": "Ricarica terminata",
+              "error_occurred": "Errore rilevato",
+              "error_cleared": "Errore risolto",
+              "authorized": "Autorizzato",
+              "authorization_rejected": "Autorizzazione rifiutata",
+              "downgrade_started": "Riduzione di potenza iniziata",
+              "downgrade_ended": "Riduzione di potenza terminata",
+              "cable_locked": "Cavo bloccato",
+              "cable_unlocked": "Cavo sbloccato",
+              "phases_switched": "Fasi commutate"
+            }
+          },
+          "cp_state": {
+            "name": "Stato del control pilot"
+          },
+          "evse_state": {
+            "name": "Stato della wallbox"
+          },
+          "session_energy": {
+            "name": "Energia della sessione"
+          },
+          "session_duration": {
+            "name": "Durata della sessione"
+          },
+          "error_code": {
+            "name": "Codice di errore"
+          },
+          "error_category": {
+            "name": "Categoria di errore"
+          },
+          "authorization": {
+            "name": "Autorizzazione"
+          },
+          "downgrade_current": {
+            "name": "Corrente ridotta"
+          },
+          "cable_lock": {
+            "name": "Blocco del cavo"
+          },
+          "phases": {
+            "name": "Fasi"
           }
         }
       }

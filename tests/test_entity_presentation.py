@@ -6,14 +6,20 @@ import asyncio
 import json
 from pathlib import Path
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-from homeassistant.const import EntityCategory, UnitOfTime
+from homeassistant.components.sensor import SensorStateClass
+from homeassistant.const import EntityCategory
 
 from custom_components.mennekes_amtron_rtu.device.command_events import (
     ACTIONS,
     EVENT_TYPES,
     OUTCOMES,
     REASONS,
+)
+from custom_components.mennekes_amtron_rtu.device.wallbox_events import (
+    ATTRIBUTES as WALLBOX_ATTRIBUTES,
+)
+from custom_components.mennekes_amtron_rtu.device.wallbox_events import (
+    EVENT_TYPES as WALLBOX_EVENT_TYPES,
 )
 from custom_components.mennekes_amtron_rtu.select import (
     async_setup_entry as setup_selects,
@@ -36,58 +42,34 @@ def test_main_feedback_and_controls_remain_primary() -> None:
         await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
         await setup_selects(hass, entry, lambda items: selects.update(collect(items)))
 
-        assert sensors["evse_state"].entity_category is None
-        assert sensors["switched_phases"].entity_category is None
+        assert sensors["charging_status"].entity_category is None
         assert sensors["pending_change"].entity_category is None
-        assert sensors["cp_state"].entity_category is EntityCategory.DIAGNOSTIC
-        assert sensors["error_code"].entity_category is EntityCategory.DIAGNOSTIC
+        assert sensors["cable_lock_status"].entity_category is EntityCategory.DIAGNOSTIC
+        assert sensors["wallbox_settings"].entity_category is EntityCategory.DIAGNOSTIC
         assert selects["requested_phases"].entity_category is None
+        assert selects["requested_phases"].extra_state_attributes == {"switched": "all_available"}
         assert selects["solar_charging_mode"].entity_category is EntityCategory.CONFIG
         # Naming/category changes must keep the established registry identity.
-        assert sensors["switched_phases"].unique_id.endswith("_switched_phases")
+        assert sensors["wallbox_settings"].unique_id.endswith("_wallbox_settings")
         assert selects["solar_charging_mode"].unique_id.endswith("_solar_charging_mode")
 
     asyncio.run(run())
 
 
-def test_optional_detail_entities_start_disabled() -> None:
+def test_every_sensor_starts_enabled_and_measurements_keep_their_statistics() -> None:
     async def run() -> None:
         hass, entry, _transport = await build_runtime()
         sensors = {}
         await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
-        disabled = {
-            key
-            for key, entity in sensors.items()
-            if not entity.entity_registry_enabled_default
-        }
-        assert disabled == {
-            "modbus_layout_version",
-            "voltage_l1",
-            "voltage_l2",
-            "voltage_l3",
-            "power_l1",
-            "power_l2",
-            "power_l3",
-        }
-        # Detail measurements remain usable after users enable them.
-        assert sensors["voltage_l1"].native_value is not None
-        assert sensors["power_l1"].state_class is SensorStateClass.MEASUREMENT
+        assert all(entity.entity_registry_enabled_default for entity in sensors.values())
+        assert sensors["power_total"].state_class is SensorStateClass.MEASUREMENT
         assert sensors["energy_total"].state_class is SensorStateClass.TOTAL_INCREASING
-
-    asyncio.run(run())
-
-
-def test_session_duration_keeps_live_value_without_long_term_statistics() -> None:
-    async def run() -> None:
-        hass, entry, _transport = await build_runtime()
-        sensors = {}
-        await setup_sensors(hass, entry, lambda items: sensors.update(collect(items)))
-        duration = sensors["session_duration"]
-        assert duration.native_value == 600
-        assert duration.device_class is SensorDeviceClass.DURATION
-        assert duration.native_unit_of_measurement == UnitOfTime.SECONDS
-        assert duration.entity_registry_enabled_default
-        assert duration.state_class is None
+        assert sensors["session_energy"].state_class is SensorStateClass.TOTAL_INCREASING
+        # Details ride along as attributes, without statistics of their own.
+        sensors["power_total"].coordinator.data.values["power_total"] = 1000.0
+        assert sensors["power_total"].extra_state_attributes["voltage_l1"] == 230
+        assert sensors["session_energy"].extra_state_attributes["duration_minutes"] == 10
+        assert sensors["wallbox_settings"].device_class is None
 
     asyncio.run(run())
 
@@ -105,13 +87,24 @@ def test_icon_states_match_translated_states_without_claiming_three_phases() -> 
             )
             assert set(states) <= set(supported), (platform, key)
     # All available phases also covers a single-phase supply.
-    for platform, key in (
-        ("select", "requested_phases"),
-        ("sensor", "switched_phases"),
-    ):
-        definition = icons[platform][key]
-        all_phases = definition["state"].get("all_available", definition["default"])
-        assert "numeric-3" not in all_phases
+    definition = icons["select"]["requested_phases"]
+    all_phases = definition["state"].get("all_available", definition["default"])
+    assert "numeric-3" not in all_phases
+
+
+def test_wallbox_events_are_fully_translated_in_every_shipped_language() -> None:
+    for path in [
+        INTEGRATION / "strings.json",
+        *sorted((INTEGRATION / "translations").glob("*.json")),
+    ]:
+        payload = json.loads(path.read_text())
+        entity = payload["entity"]["event"]["wallbox_event"]
+        assert entity["name"], path.name
+        attributes = entity["state_attributes"]
+        assert set(attributes["event_type"]["state"]) == set(WALLBOX_EVENT_TYPES), path.name
+        assert all(attributes["event_type"]["state"].values()), path.name
+        assert set(attributes) == {"event_type", *WALLBOX_ATTRIBUTES}, path.name
+        assert all(attributes[key]["name"] for key in attributes), path.name
 
 
 def test_command_results_are_fully_translated_in_every_shipped_language() -> None:
