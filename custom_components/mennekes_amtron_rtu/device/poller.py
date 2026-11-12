@@ -56,6 +56,12 @@ class DevicePoller:
         self._block_read_at: dict[str, float] = {}
         self._lost_blocks: set[str] = set()
 
+    def update_measurement_interval(self, interval: float) -> None:
+        """Update cadence without discarding block freshness or retry history."""
+        if isinstance(interval, bool) or not isinstance(interval, (int, float)) or not 2 <= interval <= 300:
+            raise ValueError("measurement interval must be between 2 and 300 seconds")
+        self._measurement_interval = float(interval)
+
     def _retry_due(self, name: str) -> bool:
         retry = self._block_retries.get(name)
         return retry is not None and self._monotonic() >= retry[0]

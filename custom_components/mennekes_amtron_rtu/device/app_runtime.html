@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMTRON · Runtime settings</title><link rel="stylesheet" href="./app_settings.css"><script src="./app_runtime.js" defer></script></head>
+<body><main><p class="eyebrow">Mennekes Amtron · Service</p>
+<nav class="overview-nav" aria-label="Service"><a href="./" data-text="overview">Overview</a><a href="./registers" data-text="registers">Registers</a><a href="./connection" data-text="connection">Connection</a><a href="./runtime" aria-current="page" data-text="title">Runtime settings</a></nav>
+<h1 data-text="title">Runtime settings</h1>
+<p data-text="intro">Preview every change before saving. Polling intervals apply at the next ordinary cycle; the current poll or wait is not interrupted. Control limits require a service restart.</p>
+<p id="runtime_notice" role="status" aria-live="polite"></p><p id="runtime_error" role="alert" hidden></p>
+<form id="runtime_form" hidden>
+<div class="debug-scroll modbus-debug"><table><thead><tr><th data-text="setting">Setting</th><th data-text="effective">Effective</th><th data-text="saved">Saved</th></tr></thead><tbody id="runtime_values"></tbody></table></div>
+<div class="columns"><div><label for="scan_interval" data-text="scan_interval">Status interval (s)</label><input id="scan_interval" type="number" min="2" max="300" step="1" required></div><div><label for="measurement_interval" data-text="measurement_interval">Measurement interval (s)</label><input id="measurement_interval" type="number" min="2" max="300" step="1" required></div></div>
+<fieldset><legend data-text="restart">Requires restart</legend>
+<label for="current_cap" data-text="current_cap">Service current cap (A)</label><input id="current_cap" type="number" min="6" max="32" step="0.1" required>
+<label for="state_change_interval_seconds" data-text="state_change_interval_seconds">State-change interval (s)</label><input id="state_change_interval_seconds" type="number" min="0" max="3600" step="1" required>
+<label for="phase_switch_grace_seconds" data-text="phase_switch_grace_seconds">Phase-switch grace (s)</label><input id="phase_switch_grace_seconds" type="number" min="0" max="30" step="1" required>
+<p class="hint" data-text="limits">Saving a lower limit does not immediately reduce current. Until restart the effective limit above remains in force. No automatic restart is performed.</p></fieldset>
+<section id="runtime_preview" class="overview-card" aria-live="polite" hidden><h2 data-text="preview">Change preview</h2><ul id="runtime_changes"></ul><p id="runtime_restart"></p></section>
+<div class="actions"><button id="runtime_reload" type="button" class="secondary" data-text="reload">Reload</button><button id="runtime_check" type="submit" data-text="preview">Preview</button><button id="runtime_save" type="button" disabled data-text="save">Confirm and save</button></div>
+</form></main></body></html>

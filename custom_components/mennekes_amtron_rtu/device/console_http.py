@@ -8,23 +8,25 @@ from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
-from .app_settings import AppSettings, SettingsError, create_settings_app
+from .app_settings import SettingsError, create_settings_app
+from .console_runtime_settings import RuntimeSettingsConsole
 
 if TYPE_CHECKING:
     from .service_console_runtime import ConsoleModbusService
 
 CONSOLE_ASSETS = {
+    "/runtime": ("app_runtime.html", "text/html"),
+    "/app_runtime.js": ("app_runtime.js", "text/javascript"),
     "/registers": ("app_registers.html", "text/html"),
     "/app_registers.js": ("app_registers.js", "text/javascript"),
 }
 
 
-class ServiceConsole(AppSettings):
+class ServiceConsole(RuntimeSettingsConsole):
     """Only explicitly registered operations extend the configuration surface."""
 
     def __init__(self, *args: Any, service: ConsoleModbusService | None, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.service = service
+        super().__init__(*args, service=service, **kwargs)
 
     async def read_registers(self, request: web.Request) -> web.Response:
         await self._authorize(request)
@@ -59,4 +61,7 @@ def create_console_app(settings: ServiceConsole) -> web.Application:
     app = create_settings_app(settings)
     add_console_asset_routes(app)
     app.router.add_get("/api/registers", settings.read_registers)
+    app.router.add_get("/api/runtime", settings.read_runtime)
+    app.router.add_post("/api/runtime/preview", settings.preview_runtime)
+    app.router.add_post("/api/runtime", settings.save_runtime)
     return app
