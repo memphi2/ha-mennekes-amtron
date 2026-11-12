@@ -154,8 +154,8 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
   while read-only or while the app is not ready. HA does not send old commands
   when permission changes. The service may still recover error 200 automatically
   by reasserting its saved state, including a deliberate pause.
-- **Heartbeat status:** check HA's **Heartbeat** diagnostic sensor. It records
-  health changes rather than every beat.
+- **Heartbeat status:** check the `heartbeat` attribute of HA's **Connection
+  quality** diagnostic sensor. It records health changes rather than every beat.
 - **Charging targets:** set an **Energy target** in kWh, or configure an optional
   vehicle percentage target through the integration. Targets only limit charging.
   See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/user-guide.md#energy-target).
@@ -170,7 +170,7 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
   integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/charging-estimates.md).
 
 Early pause/resume, phase, release and lock changes are queued.
-HA's **Pending change** and **Pending change due** show the request and its
+HA's **Pending change** and its `due` attribute show the request and its
 scheduled time. The latest charging request replaces the old one. **A stop
 request also waits**, replacing any pending start. A pause within the five-second
 current-write interval is queued too and does not need to be requested again.
