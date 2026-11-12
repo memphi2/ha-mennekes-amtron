@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## 0.9.0b1 — unreleased
 
-Integration beta. The app stays at **0.8.2**; no app update is needed.
+Beta of the integration and the app. The app update only renames its sidebar
+entry; the integration also works with app 0.8.2.
 
+- **App:** the sidebar entry is now called **Modbus RTU** instead of the full
+  app name.
 - **New event entity Wallbox event** reports what the wallbox changed on its
   own, as a counterpart to **Control result**, which reports your commands:
   `vehicle_plugged_in` and `vehicle_unplugged` (with the energy and duration of
