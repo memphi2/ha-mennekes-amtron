@@ -39,8 +39,9 @@ def runtime_preview(active: ServerConfig, saved: ServerConfig, proposed: ServerC
     ]
     restart = [key for key in RUNTIME_FIELDS if key not in HOT_FIELDS and current[key] != target[key]]
     # Do not hide unrelated pending changes made in the native Supervisor form.
-    for key in ("connection", "read_only", "listen", "port"):
-        if getattr(active, key) != getattr(proposed, key):
-            restart.append(key)
+    restart.extend(
+        key for key in ("connection", "read_only", "listen", "port")
+        if getattr(active, key) != getattr(proposed, key)
+    )
     return {"active": current, "saved": original, "proposed": target,
             "changes": changes, "restart_fields": restart, "restart_required": bool(restart)}

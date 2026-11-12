@@ -35,14 +35,14 @@ def test_candidate_preserves_unrelated_options_and_never_projects_credentials():
 
 @pytest.mark.parametrize("changes", [None, [], {}, True, {"token": TOKEN}, {"read_only": False}, {"host": "other"}])
 def test_scope_is_narrow_and_not_an_alternate_connection_editor(changes):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid runtime settings"):
         runtime_candidate(SAVED, changes, token=TOKEN)
 
 
 @pytest.mark.parametrize("field", RUNTIME_FIELDS)
 @pytest.mark.parametrize("value", [None, True, -1, float("nan"), float("inf"), "10"])
 def test_invalid_values_fail_before_a_save(field, value):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=field):
         runtime_candidate(SAVED, {field: value}, token=TOKEN)
 
 
@@ -59,7 +59,7 @@ def test_exact_boundaries_and_restart_labels(field, low, high):
         assert result["proposed"][field] == value
         expected = "live" if field in HOT_FIELDS else "restart"
         assert all(change["effect"] == expected for change in result["changes"])
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=field):
         runtime_candidate(SAVED, {field: high + 1}, token=TOKEN)
 
 

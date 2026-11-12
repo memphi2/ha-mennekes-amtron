@@ -197,9 +197,9 @@ def test_polling_update_preserves_cadence_and_refuses_shutdown(tmp_path):
         try:
             poller = service._poller
             for invalid in (None, True, 1, 301, float("nan"), "5"):
-                with pytest.raises(ValueError):
+                with pytest.raises(ValueError, match="measurement interval"):
                     poller.update_measurement_interval(invalid)
-                with pytest.raises(ValueError):
+                with pytest.raises(ValueError, match="numeric value"):
                     await service.apply_polling_intervals(invalid, 30)
             service._poller = None
             await service.apply_polling_intervals(7, 11)
