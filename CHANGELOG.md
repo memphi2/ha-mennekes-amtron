@@ -12,6 +12,12 @@ entry; the integration also works with app 0.8.2.
 
 - **App:** the sidebar entry is now called **Modbus RTU** instead of the full
   app name.
+- **BavarianData's Charging Cable sensor** is the first cable source for
+  automatic selection and Virtual Plug & Charge. From BavarianData 0.9.30 it
+  names the plug reading that decided it and carries BMW's time for it, so it
+  proves a fresh plug-in for every car, including one that streams only its
+  connector status. An older BavarianData's cable sensor has neither and is
+  passed over for the plug reading itself, as before.
 - **New event entity Wallbox event** reports what the wallbox changed on its
   own, as a counterpart to **Control result**, which reports your commands:
   `vehicle_plugged_in` and `vehicle_unplugged` (with the energy and duration of
