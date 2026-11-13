@@ -27,9 +27,14 @@ def test_unknown_and_ambiguous_cars_explain_waiting_without_granting(tmp_path, m
             assert h.observer.decision_reason == reason
             assert h.observer.blocked_reason is None
             before = h.control.plug_charge.copy()
-            first = h.observer.decision_details
-            assert h.observer.decision_details == first
+            details = h.observer.decision_details
+            # The support view names the same reason, for the car evidence too.
+            assert details["reason"] == reason
+            assert details["detection"]["reason"] == reason
+            assert details["last_grant_error"] is None
+            # Reading it changes neither the gate nor the decision.
             assert h.control.plug_charge == before
+            assert h.observer.decision_reason == reason
             h.control.async_authorize_plug_charge.assert_not_awaited()
             h.control.async_resume_charging.assert_not_awaited()
     asyncio.run(run())

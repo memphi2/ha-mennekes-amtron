@@ -175,9 +175,16 @@ def test_prewrite_guard_does_not_wait_for_the_next_tick(tmp_path, change):
         assert not c.stop_requested()
         h.change(**change)
         assert c.stop_requested()
-        h.change(**change)
         assert c.current_policy("service-job:" + "b" * 32, True) is False
+        before = len(h.calls)
         await c.tick()
+        applied = [value for value, _owner, _deadline in h.calls[before:]]
+        if h.sample.available and h.sample.present is True:
+            # The tick enforces the stop the guard already reported.
+            assert applied == [None]
+        else:
+            # Without a readable car nothing is written, a start least of all.
+            assert applied == []
     asyncio.run(run())
 
 

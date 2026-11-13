@@ -6,13 +6,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
-
 
 def test_runtime_settings_frontend():
     node = shutil.which("node")
-    if node is None:
-        pytest.skip("Node.js is needed for the optional UI interaction tests")
+    assert node is not None, "Node.js is required for the shipped UI tests"
     result = subprocess.run(
         [node, "--test", str(Path(__file__).with_name("runtime_settings_frontend.test.cjs"))],
         capture_output=True, text=True, timeout=30, check=False,

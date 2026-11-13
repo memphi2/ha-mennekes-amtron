@@ -29,9 +29,12 @@ def test_atomic_roundtrip_has_private_permissions_and_no_resume(tmp_path):
     restored = m.ChargeJobStore(path, "wallbox").load()
     assert restored.reason == "service_restarted"
     assert restored.energy.baseline_kwh == 100
-    before = path.stat().st_mtime_ns
+    # An atomic replace gives the file a new inode; an unchanged job keeps it.
+    before = path.stat().st_ino
     store.save(value)
-    assert path.stat().st_mtime_ns == before
+    assert path.stat().st_ino == before
+    store.save(None)
+    assert path.stat().st_ino != before
     store.save(None)
     assert store.load() is None
     assert list(tmp_path.iterdir()) == [path]

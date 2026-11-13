@@ -59,6 +59,12 @@ def test_guest_preview_confirm_and_target_conflicts_use_existing_security(tmp_pa
             assert accepted["job"]["kind"] == "guest"
             assert accepted["job"]["energy_kwh"] == 15
             assert h.calls == [12]
-            assert (await client.post(endpoint, headers=headers, json={**payload, "allow_rfid_bypass": True})).status == 409
+            # An extra field is refused by the action allowlist itself, with a
+            # current revision, before any job or permission check.
+            current = await (await client.get(endpoint, headers=HEADERS if ingress else AUTH)).json()
+            smuggled = {**payload, "revision": current["revision"], "scope": current["scope"], "allow_rfid_bypass": True}
+            response = await client.post(endpoint, headers=headers, json=smuggled)
+            assert response.status == 409
+            assert (await response.json())["error"] == "invalid_job_request"
             await c.stop()
     asyncio.run(run())

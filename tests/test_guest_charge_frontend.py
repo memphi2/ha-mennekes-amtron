@@ -6,13 +6,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-import pytest
-
 
 def test_guest_frontend():
     node = shutil.which("node")
-    if node is None:
-        pytest.skip("Node.js is not installed")
+    assert node is not None, "Node.js is required for the shipped UI tests"
     result = subprocess.run(
         [node, "--test", str(Path(__file__).with_name("guest_charge_frontend.test.cjs"))],
         capture_output=True, text=True, check=False,

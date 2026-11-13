@@ -21,7 +21,7 @@ async function harness(responses=[payload()]) {
   const nodes=new Map();const el=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   const calls=[];const timers=new Map();let next=0;
   const context={navigator:{language:"de-DE"},document:{documentElement:{lang:"en"},getElementById:el,querySelectorAll:()=>[],createElement:()=>new Element()},AbortController,
-    setTimeout:(fn,delay)=>{timers.set(++next,{fn,delay});return next;},clearTimeout:id=>timers.delete(id),
+    setTimeout:(fn,delay)=>{const id=++next;timers.set(id,{fn:()=>{timers.delete(id);return fn();},delay});return id;},clearTimeout:id=>timers.delete(id),
     fetch:async(url,options)=>{calls.push({url,options});const item=responses.shift();if(item instanceof Error)throw item;const data=typeof item==="function"?await item():item;return {ok:true,json:async()=>data};}};
   vm.runInNewContext(source,context);
   const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();

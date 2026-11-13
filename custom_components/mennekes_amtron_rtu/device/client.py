@@ -59,6 +59,12 @@ _PYMODBUS_LOGGER = logging.getLogger("pymodbus.logging")
 _OWN_TRANSACTION: ContextVar[bool] = ContextVar("amtron_modbus_transaction", default=False)
 
 
+# pymodbus replaces a message equal to the one before by "Repeating....",
+# once, so a second lost reply arrives under that text.
+_REPEATED = "Repeating...."
+_last_was_lost_reply = False
+
+
 def _demote_lost_reply(record: logging.LogRecord) -> bool:
     """Keep one lost reply out of the error log; the callers retry and count it.
 
@@ -67,10 +73,14 @@ def _demote_lost_reply(record: logging.LogRecord) -> bool:
     holds the last values, and link quality counts the failure. A command
     that really failed is logged by its own caller.
     """
-    if (
-        _OWN_TRANSACTION.get() and record.levelno >= logging.ERROR
-        and record.getMessage().startswith("No response received after")
-    ):
+    # Mirrors pymodbus's own module-wide last-message state.
+    global _last_was_lost_reply
+    message = record.getMessage()
+    if message == _REPEATED:
+        lost_reply = _last_was_lost_reply
+    else:
+        lost_reply = _last_was_lost_reply = message.startswith("No response received after")
+    if _OWN_TRANSACTION.get() and record.levelno >= logging.ERROR and lost_reply:
         record.levelno, record.levelname = logging.DEBUG, "DEBUG"
         return _PYMODBUS_LOGGER.isEnabledFor(logging.DEBUG)
     return True

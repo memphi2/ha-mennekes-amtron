@@ -163,7 +163,11 @@ def test_reached_target_cancels_queued_departure_even_after_plug_charge_grant(tm
                 else:
                     path.owner.soc_goal.set_target(90, soc=80)
                     assert path.owner.soc_goal.source == SOC_SOURCE
-                await asyncio.sleep(0)
+                # Give any background resume or flush every chance to run.
+                path.clock[0] += 301
+                for _ in range(20):
+                    await asyncio.sleep(0)
+                assert path.owner._flush_task is None or path.owner._flush_task.done()
                 assert path.owner.pending_action is None
                 assert path.owner.pause_requested is True
                 assert current_writes(path.transport) == before

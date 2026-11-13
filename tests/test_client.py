@@ -496,27 +496,39 @@ def test_the_current_register_enforces_its_floor_without_caller_opt_in() -> None
     asyncio.run(run())
 
 
-def test_a_lost_reply_is_demoted_but_other_pymodbus_errors_stay(caplog) -> None:
+def test_a_lost_reply_is_demoted_but_other_pymodbus_errors_stay(caplog, monkeypatch) -> None:
     from pymodbus.logging import Log
 
     from custom_components.mennekes_amtron_rtu.device.client import _OWN_TRANSACTION
 
-    # Another pymodbus user in the same process keeps its error.
+    lost = "No response received after 3 retries, continue with next request"
+    # pymodbus keeps its last message module-wide; start from a clean state.
+    monkeypatch.setattr(Log, "last_log_text", "")
+    monkeypatch.setattr(Log, "repeat_log", False)
+    # Another pymodbus user in the same process keeps its errors, repeats included.
     with caplog.at_level(logging.INFO, logger="pymodbus.logging"):
-        # pymodbus collapses a repeated message, hence the other retry count.
-        Log.error("No response received after 3 retries, continue with next request")
-    assert [record.levelname for record in caplog.records] == ["ERROR"]
+        Log.error(lost)
+        Log.error(lost)
+    assert [record.levelname for record in caplog.records] == ["ERROR", "ERROR"]
+    assert caplog.records[1].getMessage() == "Repeating...."
     caplog.clear()
     token = _OWN_TRANSACTION.set(True)
     try:
         with caplog.at_level(logging.INFO, logger="pymodbus.logging"):
+            # Our own lost replies, the second one collapsed by pymodbus.
+            Log.error("No response received after 0 retries, continue with next request")
             Log.error("No response received after 0 retries, continue with next request")
             Log.error("ERROR: request uses device id=1 but received 2.")
-        assert [record.getMessage()[:22] for record in caplog.records] == ["ERROR: request uses de"]
+            # A repeat of a real error stays an error.
+            Log.error("ERROR: request uses device id=1 but received 2.")
+        assert [record.getMessage()[:22] for record in caplog.records] == [
+            "ERROR: request uses de", "Repeating....",
+        ]
         caplog.clear()
         with caplog.at_level(logging.DEBUG, logger="pymodbus.logging"):
-            Log.error("No response received after 0 retries, continue with next request")
-        assert [record.levelname for record in caplog.records] == ["DEBUG"]
+            Log.error("No response received after 1 retries, continue with next request")
+            Log.error("No response received after 1 retries, continue with next request")
+        assert [record.levelname for record in caplog.records] == ["DEBUG", "DEBUG"]
     finally:
         _OWN_TRANSACTION.reset(token)
 
@@ -542,7 +554,10 @@ def test_the_lost_reply_mark_ends_with_its_transaction(monkeypatch) -> None:
         assert all(seen)
         # Neither this task nor one it starts later inherits the mark.
         assert client_module._OWN_TRANSACTION.get() is False
-        assert await asyncio.create_task(asyncio.sleep(0, client_module._OWN_TRANSACTION.get())) is False
+        async def read_mark() -> bool:
+            return client_module._OWN_TRANSACTION.get()
+
+        assert await asyncio.create_task(read_mark()) is False
         await client.async_close()
 
     asyncio.run(run())

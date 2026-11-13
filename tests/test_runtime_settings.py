@@ -58,7 +58,12 @@ def test_exact_boundaries_and_restart_labels(field, low, high):
         result = runtime_preview(active, active, candidate)
         assert result["proposed"][field] == value
         expected = "live" if field in HOT_FIELDS else "restart"
-        assert all(change["effect"] == expected for change in result["changes"])
+        # A boundary equal to the active value changes nothing; any other is
+        # exactly one change with the right effect.
+        changed = getattr(active, field) != value
+        assert [(change["key"], change["effect"]) for change in result["changes"]] == (
+            [(field, expected)] if changed else []
+        )
     with pytest.raises(ValueError, match=field):
         runtime_candidate(SAVED, {field: high + 1}, token=TOKEN)
 

@@ -36,7 +36,7 @@ function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPr
     else if(body.action==="clear")state={...state,revision:"revision-4",job:null};
     return {ok:true,json:async()=>structuredClone(state)};
   };
-  vm.runInNewContext(source,{document,navigator:{language},crypto:{randomUUID:()=>"12345678-1234-1234-1234-123456789012"},Date,Number,String,JSON,Error,AbortController,fetch,setTimeout:(fn)=>{timers.set(++next,fn);return next;},clearTimeout:id=>timers.delete(id),addEventListener:(k,f)=>{winEvents[k]=f;}});
+  vm.runInNewContext(source,{document,navigator:{language},crypto:{randomUUID:()=>"12345678-1234-1234-1234-123456789012"},Date,Number,String,JSON,Error,AbortController,fetch,setTimeout:(fn)=>{const id=++next;timers.set(id,()=>{timers.delete(id);return fn();});return id;},clearTimeout:id=>timers.delete(id),addEventListener:(k,f)=>{winEvents[k]=f;}});
   return {el,calls,document,docEvents,winEvents,timers,setState:nextState=>{state={...state,...nextState};},submit:()=>el("job_form").events.submit({preventDefault(){}}),click:id=>el(id).events.click(),finishBoostPreview:()=>finishBoostPreview()};
 }
 
@@ -63,7 +63,7 @@ test("invalid time windows and browser validation never reach the server",async(
   const h=harness();await flush();h.el("job_finish").value="invalid";await h.submit();assert.equal(h.calls.length,1);assert.match(h.el("job_notice").textContent,/Ungültiger/);h.el("job_form").reportValidity=()=>false;await h.submit();assert.equal(h.calls.length,1);
 });
 test("background tabs invalidate previews and do not poll",async()=>{
-  const h=harness();await flush();await h.submit();const before=h.calls.length;h.document.hidden=true;h.docEvents.visibilitychange();await flush();assert.equal(h.calls.length,before);assert.equal(h.el("job_confirmation").hidden,true);h.document.hidden=false;h.docEvents.visibilitychange();await flush();assert.equal(h.calls.length,before+1);h.winEvents.pagehide();assert.equal(h.timers.size,0);h.winEvents.pageshow();await flush();
+  const h=harness();await flush();await h.submit();const before=h.calls.length;h.document.hidden=true;h.docEvents.visibilitychange();await flush();assert.equal(h.calls.length,before);assert.equal(h.el("job_confirmation").hidden,true);h.document.hidden=false;h.docEvents.visibilitychange();await flush();assert.equal(h.calls.length,before+1);h.winEvents.pagehide();assert.equal(h.timers.size,0);const shown=h.calls.length;h.winEvents.pageshow();await flush();assert.equal(h.calls.length,shown+1);assert.equal(h.timers.size,1);
 });
 test("English labels and changed server revision invalidate old confirmation",async()=>{
   const h=harness({language:"en-US"});await flush();await h.submit();h.setState({revision:"new-revision"});for(const callback of [...h.timers.values()])callback();await flush();assert.equal(h.el("job_confirmation").hidden,true);assert.equal(h.document.documentElement.lang,"en");

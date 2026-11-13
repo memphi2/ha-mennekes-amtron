@@ -230,6 +230,7 @@ def test_a_confirmed_goal_pause_is_reread_once_the_poll_or_link_changes(change):
         await _settle(runner)
         assert control.energy_goal.status == "reached"
         harness.transport.reads.clear()
+        writes_before = current_writes(harness.transport)
         if change == "poll":
             # A wallbox reboot or fallback shows up in the next poll.
             harness.snapshot = WallboxData(values={"charging_current_ems": 16.0})
@@ -245,10 +246,13 @@ def test_a_confirmed_goal_pause_is_reread_once_the_poll_or_link_changes(change):
         await control.async_pause_for_energy_goal()
         read = (R.CHARGING_CURRENT_EMS.address, R.CHARGING_CURRENT_EMS.count) in harness.transport.reads
         if change == "poll":
-            # The poll already shows charging: the pause is enforced again.
-            assert control.pending_action == "pause" or current_writes(harness.transport) == [1]
+            # The poll already shows charging: the pause is written again at once.
+            assert current_writes(harness.transport) == [*writes_before, 1]
+            assert control.pending_action is None
         else:
             assert read is (change != "none")
+            # A confirmed pause read back again needs no second write.
+            assert current_writes(harness.transport) == writes_before
         if change == "pending":
             assert control._pending is None
         await runner.async_stop()
