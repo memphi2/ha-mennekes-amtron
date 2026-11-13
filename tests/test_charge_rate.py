@@ -51,7 +51,7 @@ def train(rates=(9, 9, 9), *, key=KEY):
 
 def forecast(learner, value=None, data=None, **changes):
     return charging_forecast(learner, value if value is not None else job(), data if data is not None else sample(),
-                             **{"profile": PROFILE, "phases": 3, "monotonic": 1180, "charging": True, **changes})
+                             **{"profile": PROFILE, "phases": 3, "monotonic": 1180, "charging": True, "meter_at": AT + 180, **changes})
 
 
 def test_live_estimate_is_a_range_and_does_not_change_inputs():
@@ -69,7 +69,8 @@ def test_live_estimate_is_a_range_and_does_not_change_inputs():
     assert data.now < earliest < latest < value.finish_at
     assert result["deadline_status"] == "likely"
     assert before == (vars(value), vars(data), learner.history.snapshot())
-    assert SCOPE not in str(result) and PROFILE not in str(result)
+    assert SCOPE not in str(result)
+    assert PROFILE not in str(result)
 
 
 @pytest.mark.parametrize("value", [None, True, "12", -1, float("nan"), float("inf"), 10**1000])
@@ -134,7 +135,7 @@ def test_cached_reports_do_not_extend_freshness_and_short_intervals_accumulate()
     assert learner.history.generation == 1
     learner, total = train()
     learner.observe(KEY, energy=total, at=AT + 180, monotonic=1300, now=AT + 300, charging=True)
-    assert forecast(learner, data=sample(now=NOW + timedelta(seconds=400)), monotonic=1400)["state"] == "stale"
+    assert forecast(learner, data=sample(now=NOW + timedelta(seconds=400)), monotonic=1400, meter_at=AT + 400)["state"] == "stale"
     assert learner.history.generation == 3
 
 
@@ -236,8 +237,8 @@ def test_history_is_conditional_only_for_an_existing_scheduled_pause():
 
 @pytest.mark.parametrize(("rates", "state"), [((1, 1, 10), "unstable"), ((0.055, 0.055, 0.055), "unstable"), ((0.1, 0.1, 0.1), "beyond_horizon")])
 def test_variability_and_horizon_prevent_false_precision(rates, state):
-    learner, _ = train(rates)
-    assert forecast(learner, job(energy=SimpleNamespace(baseline_kwh=100, target_kwh=1000)))["state"] == state
+    learner, energy = train(rates)
+    assert forecast(learner, job(energy=SimpleNamespace(baseline_kwh=100, target_kwh=1000)), sample(total_kwh=energy))["state"] == state
 
 
 def test_deadline_risk_is_not_a_new_stop_or_start_policy():
@@ -269,3 +270,30 @@ def test_current_and_phase_plausibility_reject_impossible_intervals_and_history(
     raw = [{"source": PROFILE, "current_ma": 6000, "phases": 1, "rates_kw": [3], "updated_at": AT}]
     with pytest.raises(ValueError, match="rate history value"):
         RateHistory.restore(raw)
+
+
+def test_cached_reads_do_not_slide_the_estimated_finish_forward():
+    learner, _ = train()
+    initial = forecast(learner)
+    later = forecast(learner, data=sample(now=NOW + timedelta(minutes=4)), monotonic=1240)
+    assert initial["earliest_finish"] == later["earliest_finish"]
+    assert initial["latest_finish"] == later["latest_finish"]
+    nearly_done = sample(now=NOW + timedelta(minutes=5))
+    result = forecast(learner, job(energy=SimpleNamespace(baseline_kwh=100, target_kwh=0.5)), data=nearly_done, monotonic=1300)
+    assert result["state"] == "awaiting_meter"
+    assert result["latest_finish"] is None
+    assert result["remaining_kwh"] == 0.05
+
+
+@pytest.mark.parametrize("meter_at", [None, True, AT - 500, AT + 500])
+def test_a_current_frame_requires_its_own_valid_meter_timestamp(meter_at):
+    learner, _ = train()
+    assert forecast(learner, meter_at=meter_at)["state"] == "unavailable"
+
+
+def test_current_meter_and_learning_frame_cannot_be_mixed():
+    learner, _ = train()
+    for values in ({"meter_at": AT + 179}, {"data": sample(total_kwh=101)}):
+        result = forecast(learner, **values)
+        assert result["state"] == "awaiting_meter"
+        assert result["earliest_finish"] is None

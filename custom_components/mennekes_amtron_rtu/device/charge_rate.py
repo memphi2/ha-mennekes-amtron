@@ -188,18 +188,18 @@ class ChargeRateLearner:
         self.history.add(key, rate, stamp)
         self.reason = "ready" if len(self._rates) >= MIN_SAMPLES else "learning"
 
-    def rates(self, key: LiveKey, *, now: float, monotonic: float, historical: bool) -> tuple[tuple[float, ...], str, float | None]:
+    def rates(self, key: LiveKey, *, now: float, monotonic: float, historical: bool) -> tuple[tuple[float, ...], str, float | None, float | None]:
         previous = self._previous
         if (
             key == self._key and previous is not None and len(self._rates) >= MIN_SAMPLES
             and 0 <= monotonic - previous.monotonic <= MAX_INTERVAL
             and 0 <= now - previous.reported_at <= MAX_INTERVAL
         ):
-            return tuple(self._rates), "live", previous.reported_at
+            return tuple(self._rates), "live", previous.reported_at, previous.energy
         known = self.history.get(key, now) if historical else None
         if known is not None and len(known.rates) >= MIN_SAMPLES:
-            return known.rates, "history", known.updated_at
-        return (), "none", None
+            return known.rates, "history", known.updated_at, None
+        return (), "none", None, None
 
 
 def _finish(job: ChargeJob, remaining: float, delivered: float, now: datetime, rate: float) -> datetime:
@@ -218,7 +218,7 @@ def _finish(job: ChargeJob, remaining: float, delivered: float, now: datetime, r
 
 def charging_forecast(
     learner: ChargeRateLearner, job: ChargeJob | None, sample: JobInputs, *,
-    profile: str | None, phases: int, monotonic: float, charging: bool,
+    profile: str | None, phases: int, monotonic: float, charging: bool, meter_at: object = None,
 ) -> dict[str, Any]:
     """Describe a conditional AC-ceiling estimate, never new permission."""
     result: dict[str, Any] = {"basis": "ac_meter", "state": "no_job", "source": "none",
@@ -232,7 +232,8 @@ def charging_forecast(
         return result
     baseline, total = job.energy.baseline_kwh, finite(sample.total_kwh, 0, 1e12)
     result["state"] = "unavailable"
-    if not sample.available or sample.present is not True or sample.scope != job.binding or not sample.meter_fresh or baseline is None or total is None or total < baseline:
+    stamp = finite(meter_at, 0, MAX_EPOCH)
+    if not sample.available or sample.present is not True or sample.scope != job.binding or not sample.meter_fresh or baseline is None or total is None or total < baseline or stamp is None or not 0 <= sample.now.timestamp() - stamp <= MAX_INTERVAL:
         return result
     delivered = total - baseline
     remaining = max(0.0, job.energy.target_kwh - delivered)
@@ -247,9 +248,12 @@ def charging_forecast(
     if key is None or (not charging and not planned_pause) or sample.independent_stop or not sample.permitted or sample.pending:
         return result
     now = sample.now.timestamp()
-    rates, source, observed = learner.rates(key, now=now, monotonic=monotonic, historical=planned_pause)
+    rates, source, observed, live_energy = learner.rates(key, now=now, monotonic=monotonic, historical=planned_pause)
     if not rates:
         result["state"] = "scheduled" if planned_pause else "stale" if learner.reason == "ready" else learner.reason
+        return result
+    if source == "live" and (observed != stamp or live_energy is None or not math.isclose(live_energy, total, rel_tol=0, abs_tol=1e-6)):
+        result["state"] = "awaiting_meter"
         return result
     typical = median(rates)
     slow, fast = min(rates) * 0.85, max(rates) * 1.15
@@ -261,8 +265,13 @@ def charging_forecast(
     if remaining / slow > 7 * 24:
         result.update(state="beyond_horizon", deadline_status="at_risk")
         return result
-    earliest = _finish(job, remaining, delivered, sample.now, fast)
-    latest = _finish(job, remaining, delivered, sample.now, slow)
+    anchor = datetime.fromtimestamp(observed, UTC) if source == "live" and observed is not None else sample.now
+    earliest = _finish(job, remaining, delivered, anchor, fast)
+    latest = _finish(job, remaining, delivered, anchor, slow)
+    if latest <= sample.now:
+        result["state"] = "awaiting_meter"
+        return result
+    earliest = max(earliest, sample.now)
     deadline = "likely" if latest <= job.finish_at else "at_risk" if earliest <= job.finish_at else "unlikely"
     result.update(state="estimate", earliest_finish=earliest.isoformat(), latest_finish=latest.isoformat(), deadline_status=deadline)
     return result

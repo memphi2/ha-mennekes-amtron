@@ -4,6 +4,7 @@
   const de = (navigator.language || "").toLowerCase().startsWith("de");
   document.documentElement.lang = de ? "de" : "en";
   const words = {
+    forecast_title:["Estimated time to the AC-energy ceiling","Schätzung bis zur AC-Energieobergrenze"], forecast_hint:["Conditional on similar charging conditions. Not a battery percentage or a guaranteed finish; other limits may stop earlier.","Ähnliche Ladebedingungen vorausgesetzt. Kein Batterie-Prozentwert und keine garantierte Endzeit; andere Grenzen können früher stoppen."],
     reserve:["Immediate reserve, kWh","Sofortreserve in kWh"], reserve_hint:["Charge this portion now, then wait for the planned start. Included in the total energy ceiling, not extra. Zero disables; AC meter energy, not battery percentage.","Diese Teilmenge jetzt laden, danach auf den geplanten Start warten. In der Gesamtobergrenze enthalten, nicht zusätzlich. Null deaktiviert; AC-Zählerenergie, kein Batterie-Prozentwert."], reserve_done:["reserve reached","Reserve erreicht"], reserve_pending:["reserve not reached yet","Reserve noch nicht erreicht"],
     overview:["Overview","Übersicht"], jobs:["Charging jobs","Ladeaufträge"], runtime:["Runtime","Betrieb"], registers:["Registers","Register"], connection:["Connection","Verbindung"],
     intro:["A local time window with an additional-energy ceiling. Existing release and battery limits remain in force.","Ein lokales Zeitfenster mit zusätzlicher Energieobergrenze. Bestehende Freigabe- und Batteriegrenzen bleiben wirksam."],
@@ -32,6 +33,34 @@
   el("job_start").value = local(new Date(Date.now()+60000));
   el("job_finish").value = local(new Date(Date.now()+8*3600000));
   const reserveText = job => job?.reserve_kwh ? ` · ${t("reserve")}: ${job.reserve_kwh}${typeof job.reserve_reached === "boolean" ? ` (${t(job.reserve_reached ? "reserve_done" : "reserve_pending")})` : ""}` : "";
+  const forecastWords = {
+    awaiting_meter:["Waiting for a new meter reading to confirm progress","Wartet auf einen neuen Zählerstand zur Fortschrittsbestätigung"],
+    learning:["Collecting valid measurement intervals","Sammelt gültige Messintervalle"], scheduled:["Waiting for the window; no matching learned rate yet","Wartet auf das Zeitfenster; noch keine passende Messbasis"],
+    unavailable:["No reliable current forecast","Keine verlässliche aktuelle Prognose"], stale:["Measurement basis is too old","Messbasis ist veraltet"], unstable:["Power varies too much for a useful finish range","Leistung schwankt zu stark für einen sinnvollen Zeitbereich"],
+    meter_unavailable:["No current meter reading","Kein aktueller Zählerstand"], measurement_gap:["Measurement gap; learning again","Messlücke; Messbasis wird neu aufgebaut"],
+    meter_reset:["Counter or clock changed; learning again","Zähler oder Uhrzeit verändert; Messbasis wird neu aufgebaut"], meter_jump:["Implausible energy interval","Unplausibles Energieintervall"],
+    not_charging:["No confirmed energy intake","Keine bestätigte Energieaufnahme"], waiting_vehicle:["Waiting for confirmed energy intake","Wartet auf bestätigte Energieaufnahme"], no_energy_progress:["No measured energy increase","Kein gemessener Energiezuwachs"],
+    complete:["AC-energy ceiling reached","AC-Energieobergrenze erreicht"], stopped:["Order ended; no active forecast","Auftrag beendet; keine aktive Prognose"], beyond_horizon:["Target lies beyond the forecast horizon at this rate","Ziel liegt bei dieser Leistung außerhalb des Prognosehorizonts"],
+    live:["Current measured intervals","Aktuelle Messintervalle"], history:["Previous measured intervals","Frühere Messintervalle"], likely:["Within the accepted time window","Innerhalb des angenommenen Zeitfensters"], at_risk:["Time window may be too short","Zeitfenster könnte zu kurz sein"], unlikely:["Energy target unlikely within the time window","Energieziel voraussichtlich nicht im Zeitfenster erreichbar"], unknown:["Deadline feasibility unknown","Erreichbarkeit im Zeitfenster unbekannt"],
+    storage:["Learned rates are not currently being saved","Lernwerte werden derzeit nicht dauerhaft gespeichert"]
+  };
+  const ft = key => (Object.hasOwn(forecastWords, key) ? forecastWords[key] : forecastWords.unavailable)[de ? 1 : 0];
+  const validDate = value => typeof value === "string" && value.length <= 64 && /T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value));
+  function renderForecast(value, hasJob) {
+    el("job_forecast").hidden = !value || !hasJob;
+    el("job_forecast_summary").textContent = "";
+    el("job_forecast_detail").textContent = "";
+    el("job_forecast_storage").textContent = "";
+    if (!value || !hasJob) return;
+    const valid = value.basis === "ac_meter" && value.state === "estimate" && ["live","history"].includes(value.source)
+      && typeof value.power_kw === "number" && Number.isFinite(value.power_kw) && value.power_kw > 0 && value.power_kw <= 30
+      && Number.isInteger(value.samples) && value.samples >= 3 && value.samples <= 16
+      && validDate(value.earliest_finish) && validDate(value.latest_finish) && validDate(value.observed_at)
+      && Date.parse(value.earliest_finish) <= Date.parse(value.latest_finish);
+    el("job_forecast_summary").textContent = valid ? `${date(value.earliest_finish)} → ${date(value.latest_finish)} · ${ft(value.deadline_status)}` : ft(value.basis === "ac_meter" ? value.state : "unavailable");
+    if (valid) el("job_forecast_detail").textContent = `${value.power_kw.toLocaleString(de ? "de-DE" : "en", {maximumFractionDigits:1})} kW · ${ft(value.source)}: ${value.samples} · ${date(value.observed_at)}`;
+    if (value.history_storage === "unavailable") el("job_forecast_storage").textContent = ft("storage");
+  }
   function invalidate() { proposal=null; el("job_confirmation").hidden=true; }
   function render() {
     const good = state?.schema === 1 && state.ready && !state.storage_error;
@@ -45,6 +74,7 @@
     el("job_boost_minutes").disabled=busy || state?.boost_available !== true;
     el("job_cancel_boost").disabled=busy || !state?.job?.boost_until;
     const job=state?.job;
+    renderForecast(state?.forecast, Boolean(job));
     el("job_state").textContent=job ? t(job.state) : t("no_job");
     el("job_detail").textContent=job ? `${t(job.reason)} · ${date(job.start_at)} → ${date(job.finish_at)} · ${job.current_a} A${job.scope_ended ? ` · ${t("end_scope")}` : ""}` : "";
     el("job_progress").textContent=job ? `${job.delivered_kwh == null ? "—" : Number(job.delivered_kwh).toLocaleString(undefined,{maximumFractionDigits:2})} / ${job.energy_kwh} kWh${reserveText(job)}${state.action_error ? ` · ${t(state.action_error)}` : ""}` : "";
@@ -117,7 +147,7 @@
     await post({action,revision,confirm:true});state=null;render();void read();
   });
   document.addEventListener("visibilitychange",()=>{suspend();invalidate();state=null;render();if(!document.hidden)void read();});
-  addEventListener("pagehide",()=>{hidden=true;suspend();});
+  addEventListener("pagehide",()=>{hidden=true;suspend();invalidate();state=null;render();});
   addEventListener("pageshow",()=>{hidden=false;void read();});
   notice(t("loading"));render();void read();
 })();

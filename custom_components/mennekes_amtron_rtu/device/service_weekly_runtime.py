@@ -19,10 +19,11 @@ class WeeklyModbusService(JobModbusService):
 
     jobs: WeeklyChargeJobs | None = None
     weekly: WeeklyController | None = None
+    job_controller_type: type[WeeklyChargeJobs] = WeeklyChargeJobs
 
     def _configure_control(self, control: AmtronControl) -> None:
         identity = self.identity.serial_number or f"{self.config.connection.port}:{self.config.connection.device_id}"
-        self.jobs = WeeklyChargeJobs(
+        self.jobs = self.job_controller_type(
             ChargeJobStore(self.state_path.with_name("charge-job.json"), identity),
             self._job_inputs, self._apply_job_current,
         )

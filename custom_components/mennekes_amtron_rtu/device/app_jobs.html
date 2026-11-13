@@ -24,6 +24,12 @@
     <h2 data-text="active">Current order</h2>
     <p class="overview-state" id="job_state"></p>
     <p id="job_detail"></p><p id="job_progress"></p>
+    <section id="job_forecast" aria-labelledby="job_forecast_title" hidden>
+      <h3 id="job_forecast_title" data-text="forecast_title">Estimated time to the AC-energy ceiling</h3>
+      <p id="job_forecast_summary"></p><p id="job_forecast_detail" class="hint"></p>
+      <p class="hint" data-text="forecast_hint">Conditional on similar charging conditions. Not a battery percentage or a guaranteed finish; other limits may stop earlier.</p>
+      <p id="job_forecast_storage" class="hint"></p>
+    </section>
     <div class="actions">
       <button id="job_stop" type="button" data-text="stop">Stop automation for this connection</button>
       <button id="job_clear" type="button" class="secondary" data-text="clear">Clear stopped order without resuming</button>
