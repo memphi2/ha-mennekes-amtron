@@ -49,6 +49,7 @@
       if(!response.ok||data.schema!==1||typeof data.revision!=="string"||typeof data.csrf!=="string")throw new Error("invalid");
       if(own!==generation||!live())return;
       if(proposal&&proposal.revision!==data.revision)invalidate();
+      if(lastError===t("offline"))lastError="";
       state=data;render();
     }catch(_){if(own===generation&&live()){state=null;invalidate();lastError=t("offline");render();}}
     finally{clearTimeout(timeout);if(own===generation){readAbort=null;if(live())timer=setTimeout(read,5000);}}

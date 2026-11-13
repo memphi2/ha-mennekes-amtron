@@ -82,3 +82,11 @@ test('missing CSRF or bad schema disables actions and hides stale progress',asyn
   const h=setup([{...initial(),csrf:undefined}],'en');await flush();
   assert.equal(h.elements.get('guest_fields').disabled,true);assert.match(h.elements.get('guest_notice').textContent,/No current response/);
 });
+
+test('recovery clears an offline notice without requiring an edit',async()=>{
+  const h=setup([new Error('offline'),initial()]);await flush();
+  assert.equal(h.elements.get('guest_fields').disabled,true);
+  const timer=[...h.timers.values()].find(t=>t.ms===5000);await timer.fn();await flush();
+  assert.equal(h.elements.get('guest_fields').disabled,false);
+  assert.match(h.elements.get('guest_notice').textContent,/Bereit/);
+});
