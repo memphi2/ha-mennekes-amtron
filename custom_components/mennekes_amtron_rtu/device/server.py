@@ -22,8 +22,8 @@ from .app_settings import (
 )
 from .connection import NetworkConfig, SerialConfig
 from .service_config import ServerConfig
+from .service_departure_runtime import DepartureModbusService as ModbusService
 from .service_discovery import app_token, publish_discovery
-from .service_forecast_runtime import ForecastModbusService as ModbusService
 from .service_overview import service_overview
 from .service_weekly_http import (
     WeeklyConsole as ServiceConsole,

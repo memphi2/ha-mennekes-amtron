@@ -28,6 +28,7 @@ from amtron_device.charge_job import ChargeJob
 from amtron_device.charge_job_store import ChargeJobStore
 from amtron_device.charge_rate_store import RateStore
 from amtron_device.decode import encode_register
+from amtron_device.departure_store import DepartureStore
 from pymodbus import FramerType
 from pymodbus.server import ModbusSerialServer, ModbusTcpServer
 from pymodbus.simulator import SimData, SimDevice
@@ -184,12 +185,14 @@ def check_environment(profile: str) -> None:
     require(not (DATA / "intent.json").exists(), "intent fixture must start empty")
     require(not (DATA / "charge-job.json").exists(), "charge job fixture must start empty")
     require(not (DATA / "charge-rates.json").exists(), "rate history fixture must start empty")
+    require(not (DATA / "departure-plan.json").exists(), "departure plan fixture must start empty")
 
 
 def check_temporary_files() -> None:
     require(
         not list(DATA.glob(".token-*")) and not list(DATA.glob(".intent-*"))
-        and not list(DATA.glob(".job-*")) and not list(DATA.glob(".rates-*")),
+        and not list(DATA.glob(".job-*")) and not list(DATA.glob(".rates-*"))
+        and not list(DATA.glob(".departure-*")),
         "atomic save left temporary files",
     )
 
@@ -234,6 +237,24 @@ def check_rate_storage() -> None:
         require(RateStore(path, SERIAL).load().snapshot() == [], "cleared rate history could not be saved")
     except OSError as error:
         raise ProbeError("rate history storage was denied") from error
+
+
+def check_departure_storage() -> None:
+    """Save and read back a departure plan with the real store under the profile.
+
+    Home Assistant hands no trip to the probe, so the service never saves one
+    on its own; this process runs confined by the same profile.
+    """
+    path = DATA / "departure-plan.json"
+    plan = {"trip": {"deadline": None, "source": "probe", "finished": None}}
+    try:
+        DepartureStore(path, SERIAL).save(plan)
+        require(DepartureStore(path, SERIAL).load() == plan, "saved departure plan could not be read back")
+        require(stat.S_IMODE(path.stat().st_mode) == 0o600, "departure plan file is not private")
+        DepartureStore(path, SERIAL).save(None)
+        require(DepartureStore(path, SERIAL).load() is None, "cleared departure plan could not be saved")
+    except OSError as error:
+        raise ProbeError("departure plan storage was denied") from error
 
 
 async def check_connection_page(session: ClientSession, mode: str, original: dict[str, Any]) -> None:
@@ -404,6 +425,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
             await child.stop()
             check_charge_job_storage()
             check_rate_storage()
+            check_departure_storage()
             check_temporary_files()
             for instance in children:
                 require(token.encode() not in instance.output and SUPERVISOR_TOKEN.encode() not in instance.output, "service logs exposed a credential")
@@ -412,7 +434,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
                 "discovery": True, "heartbeat": True, "pause_restart": True,
                 "token_preserved": True, "denials": 4, "shutdown": True,
                 "serial_settings": True, "connection_ui": True, "charge_job_storage": True,
-                "rate_storage": True}
+                "rate_storage": True, "departure_storage": True}
     finally:
         for instance in children:
             await instance.stop(clean=False)

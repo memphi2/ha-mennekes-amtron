@@ -51,7 +51,7 @@ def test_real_service_learns_without_extra_reads_writes_or_credentials(
     async def run():
         monkeypatch.setattr(runtime, "JobModbusService", m.ForecastModbusService)
         async with runtime.job_service(tmp_path) as (s, transport, clock):
-            assert server.ModbusService is m.ForecastModbusService
+            assert issubclass(server.ModbusService, m.ForecastModbusService)
             assert isinstance(s.jobs, m.ForecastJobs)
             s.control.soc_goal.configure_source("fixture-private-profile")
             await s.refresh()
