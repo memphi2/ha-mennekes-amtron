@@ -300,12 +300,14 @@ def test_live_bus_preconditions_are_stronger_than_the_cached_job_intent(bad_regi
         c = control()
         c.configure_service_policy(lambda _owner, _enabling: True, lambda: False)
         c._active_command = _PendingCommand("set_current", 12, owner="job")
-        values = {R.EVSE_STATE: 2, R.CP_STATE: 11, R.ERROR_CODE: 0, R.LOCK_EVSE: 0, R.CHARGING_RELEASE: 1}
-        if bad_register:
-            values[bad_register] = bad_value
+        # RegisterSpec contains enum dictionaries and is not a hashable key.
+        # Use the same stable names as decoded WallboxData instead.
+        values = {R.EVSE_STATE.key: 2, R.CP_STATE.key: 11, R.ERROR_CODE.key: 0, R.LOCK_EVSE.key: 0, R.CHARGING_RELEASE.key: 1}
+        if bad_register is not None:
+            values[bad_register.key] = bad_value
         async def read(register):
-            return values[register]
-        if bad_register:
+            return values[register.key]
+        if bad_register is not None:
             with pytest.raises(_TimedCommandCancelledError, match="unknown"):
                 await c._async_check_timed_vehicle(read)
         else:
