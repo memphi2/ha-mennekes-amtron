@@ -6,7 +6,9 @@ import stat
 import pytest
 
 from custom_components.mennekes_amtron_rtu.device import charge_job_store as m
-from custom_components.mennekes_amtron_rtu.device.persistence import StorageCommitUncertainError
+from custom_components.mennekes_amtron_rtu.device.persistence import (
+    StorageCommitUncertainError,
+)
 from tests.test_charge_job import job
 
 
@@ -83,7 +85,7 @@ def test_failure_cleanup_and_uncertain_commit(tmp_path, monkeypatch, point):
     if point == "replace":
         monkeypatch.setattr(m.Path, "replace", replace)
     error = StorageCommitUncertainError if point.startswith("directory") else OSError
-    with pytest.raises(error, match="simulated|job replaced"):
+    with pytest.raises(error, match=r"simulated|job replaced"):
         store.save(job())
     assert not list(tmp_path.glob(".job-*"))
     if point.startswith("directory"):
