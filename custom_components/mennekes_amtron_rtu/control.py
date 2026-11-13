@@ -12,6 +12,7 @@ from .device.control import ControlOptions as ControlOptions
 from .device.departure_plan import DepartureInputs, DepartureState
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
+from .device.operation import Operation
 from .exceptions import home_assistant_error, service_validation_error
 
 
@@ -47,6 +48,11 @@ class AmtronControl(DeviceControl):
 
     @property
     def departure(self) -> DepartureState | None:
+        return None
+
+    @property
+    def operation(self) -> Operation | None:
+        """Only a service summarizes its controllers."""
         return None
 
     async def async_set_departure_trip(

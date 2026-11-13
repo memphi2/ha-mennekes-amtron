@@ -493,6 +493,85 @@
             }
           }
         }
+      },
+      "operation_controller": {
+        "name": "Ladesteuerung",
+        "state": {
+          "unavailable": "Wallbox nicht erreichbar",
+          "guest_order": "Gastauftrag",
+          "weekly_plan": "Wochenplan",
+          "charging_job": "Ladeauftrag",
+          "departure_plan": "Abfahrtsplanung",
+          "direct": "Direkte Steuerung"
+        },
+        "state_attributes": {
+          "vehicle": {
+            "name": "Fahrzeug",
+            "state": {
+              "unknown": "Unbekannt",
+              "none": "Nicht angeschlossen",
+              "connected": "Angeschlossen",
+              "confirmed": "Bestätigt"
+            }
+          },
+          "target": {
+            "name": "Ziel",
+            "state": {
+              "level": "Ladestand",
+              "energy": "Energie"
+            }
+          },
+          "target_value": {
+            "name": "Zielwert"
+          },
+          "target_deadline": {
+            "name": "Zielzeit"
+          }
+        }
+      },
+      "operation_waiting": {
+        "name": "Wartegrund beim Laden",
+        "state": {
+          "none": "Nichts hält das Laden auf",
+          "wallbox_unavailable": "Wallbox nicht erreichbar",
+          "no_vehicle": "Kein Fahrzeug angeschlossen",
+          "release_off": "Ladefreigabe ausgeschaltet",
+          "plug_charge_waiting": "Virtuelles Plug & Charge hat das Fahrzeug nicht freigegeben",
+          "until_job_start": "Wartet auf den Start des Auftrags",
+          "meter_unavailable": "Wartet auf den Energiezähler",
+          "job_suspended": "Auftrag wartet auf den Nachweis desselben Steckvorgangs",
+          "job_ended": "Auftrag beendet, pausiert bis zum Abstecken",
+          "until_weekly_window": "Wartet auf das Fenster des Wochenplans",
+          "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
+          "until_planned_start": "Pausiert bis zum geplanten Start",
+          "estimated_target_reached": "Bis zum errechneten Ziel geladen",
+          "waiting_for_device": "Wartet auf Wallbox",
+          "waiting_for_soc": "Wartet auf Fahrzeugladestand",
+          "waiting_for_capacity": "Wartet auf Akkukapazität",
+          "waiting_for_target": "Wartet auf Prozentziel",
+          "read_only": "Nur lesen",
+          "command_pending": "Änderung vorgemerkt",
+          "target_reached": "Ziel erreicht",
+          "paused": "Laden pausiert"
+        }
+      },
+      "operation_next": {
+        "name": "Nächster Ladeschritt",
+        "state": {
+          "none": "Nichts geplant",
+          "queued_command": "Vorgemerkte Änderung wird ausgeführt",
+          "job_start": "Auftrag startet",
+          "job_end": "Auftrag endet",
+          "weekly_window": "Fenster des Wochenplans öffnet",
+          "plan_start": "Geplantes Laden startet",
+          "target_reached": "Ziel voraussichtlich erreicht",
+          "departure": "Abfahrt"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Zeitpunkt"
+          }
+        }
       }
     },
     "switch": {

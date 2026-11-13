@@ -19,6 +19,7 @@ from .departure_plan import (
 )
 from .departure_store import DepartureStore
 from .errors import DeviceError
+from .operation import summarize
 from .service_forecast_runtime import ForecastModbusService
 
 _LOGGER = logging.getLogger(__name__)
@@ -180,7 +181,22 @@ class DepartureModbusService(ForecastModbusService):
             "supports_departure_plan": True,
             "departure": departure.snapshot() if departure is not None and departure.ready else None,
         }
+        result["control"]["operation"] = self._operation(result)
         return result
+
+    def _operation(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+        """Who controls the charge, why it waits and what comes next."""
+        control = self.control
+        jobs, weekly = self.jobs, self.weekly
+        ready = jobs is not None and jobs.ready
+        sample = self._job_inputs()
+        return summarize(
+            available=snapshot["available"] is True, present=sample.present,
+            control=snapshot["control"], departure=snapshot["control"]["departure"],
+            job=jobs.snapshot()["job"] if jobs is not None and ready else None,
+            weekly=weekly.waiting() if weekly is not None and weekly.ready else None,
+            goal_stop=control is not None and control.energy_goal_stop_requested,
+        )
 
     async def stop(self) -> None:
         try:

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from .charging_status import charging_status
 from .command_events import CONTROL_ACTIONS, CommandEvents
 from .data import WallboxData
+from .operation import Operation
 from .registers import CP_STATE
 
 if TYPE_CHECKING:
@@ -40,11 +41,25 @@ def _instant(value: object) -> str | None:
     return parsed.isoformat() if parsed.tzinfo is not None and parsed.utcoffset() is not None else None
 
 
+def _operation(raw: object) -> dict[str, Any] | None:
+    """The service's own summary, or nothing when it does not hold up."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        Operation.restore(raw)
+    except ValueError:
+        return None
+    return raw
+
+
 def overview_snapshot(
     snapshot: dict[str, Any] | None, *, ready: bool = True,
     held: frozenset[str] = frozenset(), goal_stop: bool = False,
 ) -> dict[str, Any]:
-    """Never publish identifiers, raw errors, stale readbacks or inferred plans.
+    """Never publish identifiers, raw errors or stale readbacks.
+
+    The summary of who controls the charge is the service's own, passed on
+    only when it validates; this page infers no plan of its own.
 
     Intent and goal settings remain visible during a bus outage, but they are
     not measurements. The existing status function determines observed state;
@@ -116,6 +131,7 @@ def overview_snapshot(
             "energy_kwh": _number(energy.get("target_kwh")),
             "soc_percent": _number(soc.get("target_percent")),
         },
+        "operation": _operation(control.get("operation")) if configured and ready else None,
         "commands": [asdict(event) for event in reversed(events[2])] if events else [],
     }
 

@@ -36,6 +36,7 @@ from .device.enums import (
     DetectedEvPhases,
     enum_options,
 )
+from .device.operation import CONTROLLERS, EVENTS, WAITING
 from .device.registers import layout_label
 from .device.soc_goal import SOC_GOAL_STATES
 from .entity_attributes import (
@@ -48,7 +49,27 @@ from .entity_attributes import (
     under_load,
 )
 
+OPERATION_SENSOR_KEYS = frozenset({"operation_controller", "operation_waiting", "operation_next"})
+
 CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="operation_controller",
+        translation_key="operation_controller",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(CONTROLLERS),
+    ),
+    SensorEntityDescription(
+        key="operation_waiting",
+        translation_key="operation_waiting",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(WAITING),
+    ),
+    SensorEntityDescription(
+        key="operation_next",
+        translation_key="operation_next",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(EVENTS),
+    ),
     SensorEntityDescription(
         key="virtual_plug_charge_status",
         translation_key="virtual_plug_charge_status",

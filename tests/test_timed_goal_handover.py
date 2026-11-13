@@ -234,6 +234,7 @@ def test_the_direct_backend_never_plans_in_a_service():
         control = AmtronControl.__new__(AmtronControl)
         assert control.supports_departure_plan is False
         assert control.departure is None
+        assert control.operation is None
         with pytest.raises(DeviceError, match="service_unavailable"):
             await control.async_set_departure_trip(None, None)
         with pytest.raises(DeviceError, match="service_unavailable"):
@@ -297,6 +298,21 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
                     damaged = {**payload, "control": {**payload["control"], **broken}}
                     with pytest.raises(ServiceConnectionError, match=r"control\.departure"):
                         client.apply_snapshot(damaged)
+                # The service's summary is validated like its plan.
+                assert control.operation is None
+                summary = {
+                    "controller": "departure_plan", "waiting": "until_planned_start",
+                    "next": {"event": "plan_start", "at": deadline.isoformat()},
+                    "target": {"kind": "level", "value": 80.0, "deadline": deadline.isoformat()},
+                    "vehicle": "confirmed",
+                }
+                payload["control"]["operation"] = summary
+                client.apply_snapshot(payload)
+                assert (control.operation.controller, control.operation.next_at) == ("departure_plan", deadline)
+                damaged = {**payload, "control": {**payload["control"], "operation": {**summary, "waiting": "x"}}}
+                with pytest.raises(ServiceConnectionError, match=r"control\.operation"):
+                    client.apply_snapshot(damaged)
+                assert control.operation.waiting == "until_planned_start"
         finally:
             await service.stop()
     asyncio.run(run())

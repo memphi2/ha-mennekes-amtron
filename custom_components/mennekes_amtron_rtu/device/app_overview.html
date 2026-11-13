@@ -16,6 +16,17 @@
     <p id="overview_notice" class="overview-notice" role="status" aria-live="polite" data-overview="loading">Loading service state…</p>
     <noscript>JavaScript is required to display current service state.</noscript>
     <div id="overview_data" hidden>
+      <section id="operation" class="overview-card" aria-labelledby="operation_title" hidden>
+        <h2 id="operation_title" data-overview="op_title">Charging control</h2>
+        <p id="op_controller" class="overview-state"></p>
+        <dl class="overview-values">
+          <div><dt data-overview="op_wait">Why it waits</dt><dd id="op_waiting"></dd></div>
+          <div><dt data-overview="op_next">Next step</dt><dd id="op_step"></dd></div>
+          <div><dt data-overview="op_target">Target</dt><dd id="op_goal"></dd></div>
+          <div><dt data-overview="op_vehicle">Vehicle</dt><dd id="op_car"></dd></div>
+        </dl>
+        <p class="hint" data-overview="op_hint">A summary of the service's own controllers. It explains, it does not command.</p>
+      </section>
       <section class="overview-card" aria-labelledby="observed_title">
         <h2 id="observed_title" data-overview="observed">Observed charging state</h2>
         <p id="charge_state" class="overview-state"></p>
@@ -35,7 +46,7 @@
           <div><dt data-overview="energy_target">Energy target</dt><dd id="energy_target"></dd></div>
           <div><dt data-overview="soc_target">Battery target</dt><dd id="soc_target"></dd></div>
         </dl>
-        <p class="hint" data-overview="plan_hint">Targets are saved limits, not progress. Vehicle identity, current battery level and the full departure plan belong to Home Assistant and are not available on this page.</p>
+        <p class="hint" data-overview="plan_hint">Targets are saved limits, not progress. The car's current battery level stays in Home Assistant.</p>
       </section>
       <section class="overview-card" aria-labelledby="commands_title">
         <h2 id="commands_title" data-overview="commands">Recent command results</h2>

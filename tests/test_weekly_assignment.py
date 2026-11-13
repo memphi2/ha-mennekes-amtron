@@ -61,6 +61,8 @@ def test_a_car_that_returns_before_its_window_keeps_its_departure(tmp_path):
         h = await Garage(tmp_path).assigned()
         assert h.weekly.book.assigned == ((PLAN, "profile:bmw"),)
         assert h.weekly.snapshot()["plans"][0]["assigned"] is True
+        # The summary names the plan's own order.
+        assert h.weekly.waiting()["job_id"] == h.jobs.job.identifier
         first = h.jobs.job.identifier
         assert h.weekly.book.used(PLAN, TODAY)
         writes = len(h.calls)
@@ -73,6 +75,7 @@ def test_a_car_that_returns_before_its_window_keeps_its_departure(tmp_path):
             assert not h.weekly.book.used(PLAN, TODAY)
             assert h.jobs.job.identifier == first
             assert len(h.calls) == writes
+            assert h.weekly.waiting() == {"plan_id": PLAN, "job_id": None, "start_at": OPEN.isoformat()}
         revision = h.weekly.revision
         await h.weekly.tick()
         assert h.weekly.revision == revision

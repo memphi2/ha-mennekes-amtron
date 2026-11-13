@@ -40,6 +40,7 @@ from .device.errors import DeviceError, DeviceValidationError
 from .device.heartbeat import HeartbeatTask
 from .device.identity import usable_max_evse_current
 from .device.link_quality import CONNECTION_QUALITY_STATES
+from .device.operation import Operation
 from .device.register_blocks import REGISTER_BLOCKS
 from .device.registers import ERROR_CODE, RegisterSpec
 from .device.soc_goal import SocGoal
@@ -109,6 +110,8 @@ class RemoteClient(MennekesModbusClient):
         self._snapshot_lock = asyncio.Lock()
         # The service's departure plan from the last valid snapshot.
         self.departure: DepartureState | None = None
+        # The service's summary of who controls the charge, None for a service without one.
+        self.operation: Operation | None = None
         self.pending_until: datetime | None = None
         self.events = CommandEvents(supported=False)
         self._last_energy_observed_at: float | None = None
@@ -336,6 +339,9 @@ class RemoteClient(MennekesModbusClient):
                 raise ValueError("invalid departure plan capability")
             departure_raw = control.get("departure")
             departure = None if departure_raw is None else DepartureState.restore(departure_raw)
+            section = "control.operation"
+            operation_raw = control.get("operation")
+            operation = None if operation_raw is None else Operation.restore(operation_raw)
             section = "control.state_change_interval_seconds"
             interval = control.get("state_change_interval_seconds")
             if interval is not None and (
@@ -511,6 +517,7 @@ class RemoteClient(MennekesModbusClient):
         self.write_state.energy_goal = goal
         self.write_state.soc_goal = soc_goal
         self.departure = departure if control.get("supports_departure_plan") is True else None
+        self.operation = operation
         if self.on_update is not None:
             self.on_update()
         if require_available and payload.get("available") is not True:
@@ -950,6 +957,10 @@ class RemoteControl(AmtronControl):
     @property
     def departure(self) -> DepartureState | None:
         return self._remote.departure
+
+    @property
+    def operation(self) -> Operation | None:
+        return self._remote.operation
 
     async def _departure_command(self, command: str, **values: Any) -> None:
         await self._remote.execute(command, **values)

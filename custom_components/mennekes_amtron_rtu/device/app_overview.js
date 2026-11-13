@@ -26,11 +26,57 @@
     energy_target: ["Energy target", "Energieziel", "Objectif énergétique", "Energiedoel", "Obiettivo energetico"],
     soc_target: ["Battery target", "Batterieziel", "Objectif batterie", "Accudoel", "Obiettivo batteria"],
     disabled: ["Off", "Aus", "Désactivé", "Uit", "Disattivato"],
-    plan_hint: ["Targets are saved limits, not progress. Vehicle identity, current battery level and the full departure plan belong to Home Assistant and are not available here.", "Ziele sind gespeicherte Grenzen, kein Ladefortschritt. Fahrzeugzuordnung, aktueller Akkustand und vollständiger Abfahrtsplan liegen in Home Assistant und sind hier nicht verfügbar.", "Les objectifs sont des limites enregistrées, pas une progression. Le véhicule, son niveau actuel et le plan de départ complet restent dans Home Assistant.", "Doelen zijn opgeslagen grenzen, geen voortgang. Voertuigkoppeling, actuele accustand en het volledige vertrekplan staan in Home Assistant.", "Gli obiettivi sono limiti salvati, non progressi. Veicolo, livello attuale e piano completo di partenza restano in Home Assistant."],
+    plan_hint: ["Targets are saved limits, not progress. The car's current battery level stays in Home Assistant.", "Ziele sind gespeicherte Grenzen, kein Ladefortschritt. Der aktuelle Akkustand des Fahrzeugs bleibt in Home Assistant.", "Les objectifs sont des limites enregistrées, pas une progression. Le niveau actuel du véhicule reste dans Home Assistant.", "Doelen zijn opgeslagen grenzen, geen voortgang. De actuele accustand van het voertuig blijft in Home Assistant.", "Gli obiettivi sono limiti salvati, non progressi. Il livello attuale del veicolo resta in Home Assistant."],
     commands: ["Recent command results", "Letzte Befehlsergebnisse", "Derniers résultats de commandes", "Recente opdrachtresultaten", "Risultati recenti dei comandi"],
     history_hint: ["Up to 32 results since service start, newest first. Sequence numbers are not timestamps. This is not a session journal.", "Bis zu 32 Ergebnisse seit Service-Start, neueste zuerst. Laufende Nummern sind keine Zeitangaben. Dies ist kein Ladejournal.", "Jusqu’à 32 résultats depuis le démarrage, les plus récents d’abord. Les numéros ne sont pas des horaires. Ce n’est pas un journal de sessions.", "Maximaal 32 resultaten sinds servicestart, nieuwste eerst. Volgnummers zijn geen tijdstippen. Dit is geen sessielogboek.", "Fino a 32 risultati dall’avvio, dal più recente. I numeri non sono orari. Non è un registro delle sessioni."],
     no_commands: ["No command results yet.", "Noch keine Befehlsergebnisse.", "Aucun résultat pour le moment.", "Nog geen opdrachtresultaten.", "Nessun risultato disponibile."],
     footer: ["Local, read-only service overview. Open Home Assistant to change charging.", "Lokale, nur lesende Service-Übersicht. Ladung weiterhin in Home Assistant bedienen.", "Vue locale en lecture seule. Modifiez la recharge dans Home Assistant.", "Lokaal, alleen-lezen overzicht. Bedien het laden in Home Assistant.", "Panoramica locale di sola lettura. Modificare la ricarica in Home Assistant."],
+    op_title: ["Charging control", "Ladesteuerung", "Pilotage de la recharge", "Laadsturing", "Controllo della ricarica"],
+    op_wait: ["Why it waits", "Warum es wartet", "Pourquoi elle attend", "Waarom het wacht", "Perché attende"],
+    op_next: ["Next step", "Nächster Schritt", "Prochaine étape", "Volgende stap", "Prossimo passo"],
+    op_target: ["Target", "Ziel", "Cible", "Doel", "Obiettivo"],
+    op_vehicle: ["Vehicle", "Fahrzeug", "Véhicule", "Voertuig", "Veicolo"],
+    op_by: ["by", "bis", "d’ici", "tegen", "entro"],
+    op_hint: ["A summary of the service's own controllers. It explains, it does not command.", "Eine Zusammenfassung der Steuerungen des Services. Sie erklärt, sie steuert nicht.", "Un résumé des pilotages du service. Il explique, il ne commande pas.", "Een samenvatting van de sturingen van de service. Ze legt uit, ze stuurt niet.", "Un riepilogo dei controlli del servizio. Spiega, non comanda."],
+    op_unavailable: ["Wallbox unavailable", "Wallbox nicht erreichbar", "Borne injoignable", "Wallbox niet bereikbaar", "Wallbox non raggiungibile"],
+    op_guest_order: ["Guest order", "Gastauftrag", "Ordre invité", "Gastopdracht", "Ordine ospite"],
+    op_weekly_plan: ["Weekly plan", "Wochenplan", "Plan hebdomadaire", "Weekplan", "Piano settimanale"],
+    op_charging_job: ["Charging job", "Ladeauftrag", "Ordre de recharge", "Laadopdracht", "Ordine di ricarica"],
+    op_departure_plan: ["Departure planning", "Abfahrtsplanung", "Planification du départ", "Vertrekplanning", "Pianificazione della partenza"],
+    op_direct: ["Direct control", "Direkte Steuerung", "Commande directe", "Directe bediening", "Controllo diretto"],
+    wait_none: ["Nothing is holding the charge", "Nichts hält das Laden auf", "Rien ne retient la recharge", "Niets houdt het laden tegen", "Nulla trattiene la ricarica"],
+    wait_wallbox_unavailable: ["Wallbox unavailable", "Wallbox nicht erreichbar", "Borne injoignable", "Wallbox niet bereikbaar", "Wallbox non raggiungibile"],
+    wait_no_vehicle: ["No vehicle connected", "Kein Fahrzeug angeschlossen", "Aucun véhicule connecté", "Geen voertuig aangesloten", "Nessun veicolo collegato"],
+    wait_release_off: ["Charging release switched off", "Ladefreigabe ausgeschaltet", "Autorisation de recharge désactivée", "Laadvrijgave uitgeschakeld", "Abilitazione alla ricarica disattivata"],
+    wait_plug_charge_waiting: ["Virtual Plug & Charge has not released the car", "Virtuelles Plug & Charge hat das Fahrzeug nicht freigegeben", "Le Plug & Charge virtuel n’a pas autorisé le véhicule", "Virtueel Plug & Charge heeft het voertuig niet vrijgegeven", "Il Plug & Charge virtuale non ha abilitato il veicolo"],
+    wait_until_job_start: ["Waiting for the job's start", "Wartet auf den Start des Auftrags", "En attente du début de l’ordre", "Wacht op de start van de opdracht", "In attesa dell’avvio dell’ordine"],
+    wait_meter_unavailable: ["Waiting for the energy meter", "Wartet auf den Energiezähler", "En attente du compteur d’énergie", "Wacht op de energiemeter", "In attesa del contatore di energia"],
+    wait_job_suspended: ["Job waits for proof of the same plug-in", "Auftrag wartet auf den Nachweis desselben Steckvorgangs", "L’ordre attend la preuve du même branchement", "Opdracht wacht op bewijs van dezelfde aansluiting", "L’ordine attende la prova dello stesso collegamento"],
+    wait_job_ended: ["Job ended, paused until unplugged", "Auftrag beendet, pausiert bis zum Abstecken", "Ordre terminé, en pause jusqu’au débranchement", "Opdracht beëindigd, gepauzeerd tot loskoppelen", "Ordine terminato, in pausa fino allo scollegamento"],
+    wait_until_weekly_window: ["Waiting for the weekly plan's window", "Wartet auf das Fenster des Wochenplans", "En attente de la fenêtre du plan hebdomadaire", "Wacht op het venster van het weekplan", "In attesa della finestra del piano settimanale"],
+    wait_vehicle_unconfirmed: ["Car not confirmed", "Fahrzeug nicht bestätigt", "Véhicule non confirmé", "Voertuig niet bevestigd", "Veicolo non confermato"],
+    wait_until_planned_start: ["Paused until the planned start", "Pausiert bis zum geplanten Start", "En pause jusqu’au démarrage prévu", "Gepauzeerd tot de geplande start", "In pausa fino all’avvio pianificato"],
+    wait_estimated_target_reached: ["Charged to the estimated target", "Bis zum errechneten Ziel geladen", "Chargé jusqu’à l’objectif estimé", "Geladen tot het berekende doel", "Caricato fino all’obiettivo stimato"],
+    wait_waiting_for_device: ["Waiting for wallbox", "Wartet auf Wallbox", "En attente de la borne", "Wacht op laadpaal", "In attesa wallbox"],
+    wait_waiting_for_soc: ["Waiting for vehicle charge level", "Wartet auf Fahrzeugladestand", "En attente du niveau de charge", "Wacht op laadniveau", "In attesa livello di carica"],
+    wait_waiting_for_capacity: ["Waiting for battery capacity", "Wartet auf Akkukapazität", "En attente de la capacité", "Wacht op accucapaciteit", "In attesa capacità"],
+    wait_waiting_for_target: ["Waiting for percentage target", "Wartet auf Prozentziel", "En attente de la cible en %", "Wacht op procentdoel", "In attesa obiettivo %"],
+    wait_read_only: ["Read only", "Nur lesen", "Lecture seule", "Alleen lezen", "Sola lettura"],
+    wait_command_pending: ["Change queued", "Änderung vorgemerkt", "Modification en attente", "Wijziging in wachtrij", "Modifica in coda"],
+    wait_target_reached: ["Target reached", "Ziel erreicht", "Cible atteinte", "Doel bereikt", "Obiettivo raggiunto"],
+    wait_paused: ["Charging paused", "Laden pausiert", "Recharge en pause", "Laden gepauzeerd", "Ricarica in pausa"],
+    step_none: ["Nothing scheduled", "Nichts geplant", "Rien de prévu", "Niets gepland", "Nulla in programma"],
+    step_queued_command: ["Queued change runs", "Vorgemerkte Änderung wird ausgeführt", "La modification en attente s’exécute", "Wijziging in wachtrij wordt uitgevoerd", "La modifica in coda viene eseguita"],
+    step_job_start: ["Job starts", "Auftrag startet", "L’ordre démarre", "Opdracht start", "L’ordine inizia"],
+    step_job_end: ["Job ends", "Auftrag endet", "L’ordre se termine", "Opdracht eindigt", "L’ordine termina"],
+    step_weekly_window: ["Weekly plan's window opens", "Fenster des Wochenplans öffnet", "La fenêtre du plan hebdomadaire s’ouvre", "Venster van het weekplan opent", "Si apre la finestra del piano settimanale"],
+    step_plan_start: ["Planned charge starts", "Geplantes Laden startet", "La recharge planifiée démarre", "Gepland laden start", "Inizia la ricarica pianificata"],
+    step_target_reached: ["Target expected", "Ziel voraussichtlich erreicht", "Cible attendue", "Doel verwacht", "Obiettivo previsto"],
+    step_departure: ["Departure", "Abfahrt", "Départ", "Vertrek", "Partenza"],
+    car_unknown: ["Unknown", "Unbekannt", "Inconnu", "Onbekend", "Sconosciuto"],
+    car_none: ["Not connected", "Nicht angeschlossen", "Non connecté", "Niet aangesloten", "Non collegato"],
+    car_connected: ["Connected", "Angeschlossen", "Connecté", "Aangesloten", "Collegato"],
+    car_confirmed: ["Confirmed", "Bestätigt", "Confirmé", "Bevestigd", "Confermato"],
     readonly: ["Controls: read-only", "Steuerung: nur lesend", "Commandes : lecture seule", "Bediening: alleen lezen", "Comandi: sola lettura"],
     writable: ["Service writes enabled", "Service-Schreibzugriff aktiviert", "Écriture du service activée", "Schrijftoegang ingeschakeld", "Scrittura del servizio abilitata"],
     heartbeat: ["Heartbeat", "Heartbeat", "Heartbeat", "Heartbeat", "Heartbeat"],
@@ -95,9 +141,15 @@
   const format = (value, unit, digits = 1) => number(value)
     ? `${value.toLocaleString(languages[column], { maximumFractionDigits: digits })} ${unit}` : "—";
   const put = (id, value) => { el(id).textContent = value; };
+  const moment = stamp => {
+    const time = typeof stamp === "string" ? new Date(stamp) : null;
+    return time && Number.isFinite(time.getTime())
+      ? time.toLocaleString(languages[column], { timeZoneName: "short" }) : null;
+  };
   function render(data) {
     if (!data || data.schema !== 1 || typeof data.available !== "boolean" || !data.measurements || !data.targets
-        || !Array.isArray(data.commands) || data.commands.length > 32) throw new Error("invalid overview");
+        || !Array.isArray(data.commands) || data.commands.length > 32
+        || (data.operation && !(data.operation.next && data.operation.target))) throw new Error("invalid overview");
     put("charge_state", text(data.state));
     put("charge_reason", text(data.reason));
     put("service_mode", text(data.read_only === true ? "readonly" : data.read_only === false ? "writable" : "unknown"));
@@ -109,10 +161,20 @@
     put("current_limit", current === 0 ? text("unlimited")
       : number(current) && current < 6 ? `${text("pause_limit")} (${format(current, "A", 2)})` : format(current, "A", 2));
     put("next_action", data.pending ? text(data.pending.action) : text("no_pending"));
-    const stamp = data.pending?.not_before;
-    const due = stamp ? new Date(stamp) : null;
-    put("next_due", due && Number.isFinite(due.getTime())
-      ? `${text("not_before")}: ${due.toLocaleString(languages[column], { timeZoneName: "short" })}` : data.pending ? text("no_due") : "");
+    const due = moment(data.pending?.not_before);
+    put("next_due", due ? `${text("not_before")}: ${due}` : data.pending ? text("no_due") : "");
+    const summary = data.operation;
+    el("operation").hidden = !summary;
+    if (summary) {
+      put("op_controller", text(`op_${summary.controller}`));
+      put("op_waiting", text(`wait_${summary.waiting}`));
+      const at = moment(summary.next.at);
+      put("op_step", at ? `${text(`step_${summary.next.event}`)} · ${at}` : text("step_none"));
+      const target = summary.target, by = moment(target.deadline);
+      const amount = target.kind === "level" ? format(target.value, "%") : format(target.value, "kWh", 2);
+      put("op_goal", target.kind === "none" ? text("disabled") : by ? `${amount} ${text("op_by")} ${by}` : amount);
+      put("op_car", text(`car_${summary.vehicle}`));
+    }
     put("energy_target", data.targets.energy_kwh === 0 ? text("disabled") : format(data.targets.energy_kwh, "kWh", 2));
     put("soc_target", data.targets.soc_percent === 0 ? text("disabled") : format(data.targets.soc_percent, "%"));
     const rows = data.commands.map(command => {

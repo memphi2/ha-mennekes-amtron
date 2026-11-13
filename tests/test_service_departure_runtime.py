@@ -19,6 +19,7 @@ from custom_components.mennekes_amtron_rtu.device.departure_store import (
     DepartureStore,
 )
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+from custom_components.mennekes_amtron_rtu.device.operation import Operation
 from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
     DepartureModbusService,
 )
@@ -93,6 +94,38 @@ def test_a_late_start_pauses_through_the_control_and_survives_a_restart(departur
         async with departure_service() as (restarted, _transport, _clock):
             assert restarted.departure.plan_paused
             assert restarted.departure.trip.deadline is not None
+    asyncio.run(run())
+
+
+def test_the_snapshot_summarizes_who_controls_the_charge(departure_service):
+    async def run():
+        async with departure_service() as (s, _transport, _clock):
+            await s.refresh()
+            summary = s.snapshot()["control"]["operation"]
+            assert (summary["controller"], summary["waiting"], summary["vehicle"]) == (
+                "direct", "none", "connected",
+            )
+            await hand_over(s, hours=10)
+            await s.departure.tick()
+            summary = s.snapshot()["control"]["operation"]
+            assert summary["controller"] == "departure_plan"
+            assert summary["waiting"] == "until_planned_start"
+            assert summary["vehicle"] == "confirmed"
+            assert summary["next"] == {
+                "event": "plan_start", "at": s.departure.planned_start.isoformat(),
+            }
+            assert summary["target"] == {
+                "kind": "level", "value": 80.0, "deadline": s.departure.trip.deadline.isoformat(),
+            }
+            assert Operation.restore(summary).controller == "departure_plan"
+            # An order from the app takes the wallbox over from the plan.
+            job = {"id": "j", "state": "charging", "holding": True, "energy_kwh": 5.0,
+                   "start_at": summary["next"]["at"], "finish_at": summary["target"]["deadline"]}
+            s.jobs.snapshot = lambda: {"job": job}
+            assert s.snapshot()["control"]["operation"]["controller"] == "charging_job"
+            # Until the controllers have loaded, only the plan is summarized.
+            s.jobs.ready = s.weekly.ready = False
+            assert s.snapshot()["control"]["operation"]["controller"] == "departure_plan"
     asyncio.run(run())
 
 

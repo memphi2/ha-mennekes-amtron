@@ -317,6 +317,20 @@ snapshot's `control` object reports `supports_departure_plan: true` and
 | `confirmed` | Whether the handed-over car is confirmed for this plug-in |
 | `forecast` | `null` unless a plan is computed; otherwise `finish_at` (when the target is reached: the departure, or later when it is unreachable, rounded up to five minutes), `level_at_departure` (percent), `efficiency` (learned share of the metered energy that reaches the battery, 0.9 until learned) and `full_power_kw` (metered power at full current for the current phases, or `null`) |
 
+`control.operation` summarizes all controllers of the service for a reader. It
+is derived from their published state and decides nothing:
+
+| Field | Meaning |
+|---|---|
+| `controller` | `unavailable`, `guest_order`, `weekly_plan`, `charging_job`, `departure_plan` or `direct`. An order that holds the wallbox comes before an open departure, a departure before a weekly plan that waits for its window |
+| `waiting` | The first reason that keeps the car from charging, or `none`: `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, then the controller's reason (`until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `until_weekly_window`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`), then `target_reached`, `command_pending` or `paused` |
+| `next` | `event` (`none`, `queued_command`, `job_start`, `job_end`, `weekly_window`, `plan_start`, `target_reached`, `departure`) and `at`, an ISO timestamp that is `null` exactly for `none`. A queued command is named when it comes first |
+| `target` | `kind` (`none`, `level` in percent, `energy` in kWh), `value` and `deadline` (ISO timestamp or `null`) |
+| `vehicle` | `unknown`, `none`, `connected`, or `confirmed` once Home Assistant confirmed its car for this plug-in |
+
+The overview page receives the same object as `operation` from
+`/api/overview`, or `null` when it does not validate.
+
 Two commands hand the plan over. Both need `expected_serial_number`, reject
 other fields and are accepted while the wallbox is unreachable, because they
 access no bus:

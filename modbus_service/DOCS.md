@@ -91,7 +91,7 @@ for details.
 
 | Page | Purpose |
 |---|---|
-| **Overview** | Observed charging state, heartbeat, power, the next queued action and recent command results. Read-only. |
+| **Overview** | Which controller decides about the charge, why the car waits and what comes next; observed charging state, heartbeat, power, the next queued action and recent command results. Read-only. |
 | **Connection** | USB or LAN connection and optional LAN-adapter setup. Changes apply after an app restart. |
 | **Debug log** | Live Modbus recording for up to 10 minutes, in memory only. |
 | **Registers** | Every known register with raw and decoded value and its read quality. Read-only. |

@@ -29,6 +29,10 @@ Update the app together with integration 0.9.0b2.
   charges at once and then waits for the planned start. The plan learns each
   car's transfer efficiency and its metered power at full current, plans the
   start with both and reports a forecast up to the percentage target.
+- **Charging control on the overview:** one card names which controller
+  decides right now (guest order, charging job, weekly plan, departure plan or
+  none), why the car does not charge yet, the next step with its time and the
+  target. Home Assistant shows the same summary as three sensors.
 - **Immediate reserve:** a job or the first departure of a weekly plan can
   charge part of its energy amount at once, then wait for the planned start.
 - **Finish estimate:** the Charging jobs page shows when an order will

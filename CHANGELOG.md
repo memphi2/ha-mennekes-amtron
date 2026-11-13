@@ -47,6 +47,14 @@ Update the app to 0.9.0b2 together with the integration.
   projected charge level and the forecast. **Timed charging status** shows
   `estimated_finish`, `estimated_level_at_departure`, `learned_efficiency`
   and `measured_power_kw` as attributes.
+- **Who controls the charge, why it waits and what comes next.** With the
+  Modbus service app three new sensors show the app's own summary: **Charging
+  control** (guest order, charging job, weekly plan, departure planning or
+  direct control, with the target and the car's state as attributes),
+  **Charging wait reason** and **Next charging step** with its time as the
+  `at` attribute. The app's overview page shows the same card. See
+  [charging control at a glance](docs/entities.md#charging-control-at-a-glance),
+  which includes a Mushroom card example.
 - **Minimum charge level for departure planning.** A new option per vehicle
   profile: below this percentage the car charges at once at full current and
   then waits for the planned start. **Timed charging status** shows **Charging

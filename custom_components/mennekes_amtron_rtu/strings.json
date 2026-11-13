@@ -493,6 +493,85 @@
             }
           }
         }
+      },
+      "operation_controller": {
+        "name": "Charging control",
+        "state": {
+          "unavailable": "Wallbox unavailable",
+          "guest_order": "Guest order",
+          "weekly_plan": "Weekly plan",
+          "charging_job": "Charging job",
+          "departure_plan": "Departure planning",
+          "direct": "Direct control"
+        },
+        "state_attributes": {
+          "vehicle": {
+            "name": "Vehicle",
+            "state": {
+              "unknown": "Unknown",
+              "none": "Not connected",
+              "connected": "Connected",
+              "confirmed": "Confirmed"
+            }
+          },
+          "target": {
+            "name": "Target",
+            "state": {
+              "level": "Charge level",
+              "energy": "Energy"
+            }
+          },
+          "target_value": {
+            "name": "Target value"
+          },
+          "target_deadline": {
+            "name": "Target time"
+          }
+        }
+      },
+      "operation_waiting": {
+        "name": "Charging wait reason",
+        "state": {
+          "none": "Nothing is holding the charge",
+          "wallbox_unavailable": "Wallbox unavailable",
+          "no_vehicle": "No vehicle connected",
+          "release_off": "Charging release switched off",
+          "plug_charge_waiting": "Virtual Plug & Charge has not released the car",
+          "until_job_start": "Waiting for the job's start",
+          "meter_unavailable": "Waiting for the energy meter",
+          "job_suspended": "Job waits for proof of the same plug-in",
+          "job_ended": "Job ended, paused until unplugged",
+          "until_weekly_window": "Waiting for the weekly plan's window",
+          "vehicle_unconfirmed": "Car not confirmed",
+          "until_planned_start": "Paused until the planned start",
+          "estimated_target_reached": "Charged to the estimated target",
+          "waiting_for_device": "Waiting for wallbox",
+          "waiting_for_soc": "Waiting for vehicle charge level",
+          "waiting_for_capacity": "Waiting for battery capacity",
+          "waiting_for_target": "Waiting for percentage target",
+          "read_only": "Read only",
+          "command_pending": "Change queued",
+          "target_reached": "Target reached",
+          "paused": "Charging paused"
+        }
+      },
+      "operation_next": {
+        "name": "Next charging step",
+        "state": {
+          "none": "Nothing scheduled",
+          "queued_command": "Queued change runs",
+          "job_start": "Job starts",
+          "job_end": "Job ends",
+          "weekly_window": "Weekly plan's window opens",
+          "plan_start": "Planned charge starts",
+          "target_reached": "Target expected",
+          "departure": "Departure"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Time"
+          }
+        }
       }
     },
     "switch": {

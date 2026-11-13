@@ -81,6 +81,77 @@ release, or whether the observed connection is authorized. Authorization does
 not mean that the vehicle is drawing power. The sensor has no per-poll timestamps
 or session-token attributes. See [setup and status help](vehicle-setup.md#optional-virtual-plug--charge).
 
+## Charging control at a glance
+
+With the Modbus service app, three sensors summarize what the app's own
+controllers are doing. Home Assistant only shows the app's summary; it decides
+nothing from it. They are absent with a direct serial or LAN connection.
+
+**Charging control** names who decides:
+
+| State | Meaning |
+|---|---|
+| Guest order, Charging job, Weekly plan | An [order from the app](app-guide.md#charging-jobs) holds the wallbox until it ends and the car is unplugged or the order is cleared. A weekly plan also shows here while it waits for its next window. |
+| Departure planning | A [departure](departure-planning.md#with-the-modbus-service-app) is set and not finished. |
+| Direct control | No plan or order: your switches, numbers, targets and automations apply. |
+| Wallbox unavailable | The app has no current reading. |
+
+**Charging wait reason** names the first thing that keeps the car from
+charging: no car, a switched-off release, Virtual Plug & Charge, then the
+controller's own reason (for example **Paused until the planned start**), then
+a reached target, a queued change or a manual pause. An order comes before a
+departure plan, so the plan's status **An order from the app has priority**
+appears here as the order's reason.
+
+**Next charging step** is the earliest of the controller's next event and a
+queued change. While the plan charges, **Target expected** carries the
+[forecast](departure-planning.md#with-the-modbus-service-app); otherwise the
+departure itself is the next step.
+
+A standard card shows all three translated:
+
+```yaml
+type: entities
+title: Wallbox
+entities:
+  - sensor.amtron_charging_control
+  - sensor.amtron_charging_wait_reason
+  - sensor.amtron_next_charging_step
+  - sensor.amtron_charging_status
+```
+
+With the third-party [Mushroom](https://github.com/piitaya/lovelace-mushroom)
+cards, one template card tells the whole story. Replace `amtron` with your
+device's entity prefix:
+
+```yaml
+type: custom:mushroom-template-card
+entity: sensor.amtron_charging_control
+icon: mdi:ev-station
+icon_color: >-
+  {{ 'green' if is_state('sensor.amtron_charging_wait_reason', 'none')
+     else 'red' if is_state('sensor.amtron_charging_control', 'unavailable')
+     else 'orange' }}
+primary: "{{ state_translated('sensor.amtron_charging_control') }}"
+secondary: >-
+  {{ state_translated('sensor.amtron_charging_wait_reason') }}
+  {%- set at = state_attr('sensor.amtron_next_charging_step', 'at') %}
+  {%- if at %}
+
+  {{ state_translated('sensor.amtron_next_charging_step') }}:
+  {{ as_timestamp(at) | timestamp_custom('%a %H:%M') }}
+  {%- endif %}
+  {%- set value = state_attr('sensor.amtron_charging_control', 'target_value') %}
+  {%- if value %}
+
+  {{ value | round(1) }}
+  {{- ' %' if is_state_attr('sensor.amtron_charging_control', 'target', 'level') else ' kWh' }}
+  {%- endif %}
+multiline_secondary: true
+tap_action:
+  action: more-info
+```
+
 ## Controls
 
 For availability, use the connection table above. Service controls follow the
@@ -142,6 +213,9 @@ pending target. See
 |---|---|---|---|---|---|
 | `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. A reached target pauses only with a car at the wallbox. |
 | `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure; the `planned_start` attribute holds when the plan starts charging for the next trip, or when it started, and is absent while the plan lacks its inputs or the trip is done. With the Modbus service app the app plans and this sensor shows its state, including **Charged to the estimated target** and **An order from the app has priority**. **Charging to the minimum level** means the car is below its [minimum charge level](departure-planning.md#minimum-charge-level) and charges before the planned start. With the app, the attributes `estimated_finish`, `estimated_level_at_departure`, `learned_efficiency` and `measured_power_kw` carry its [forecast](departure-planning.md#with-the-modbus-service-app). |
+| `sensor.*_charging_control` | Charging control | — | enum | Modbus service app | Which of the app's controllers decides about the charge right now; see [Charging control at a glance](#charging-control-at-a-glance). The attributes `vehicle`, `target`, `target_value` and `target_deadline` name the car's state and what is charged towards. |
+| `sensor.*_charging_wait_reason` | Charging wait reason | — | enum | Modbus service app | Why the car does not charge yet, or **Nothing is holding the charge**. It names the first reason that applies, not every one. |
+| `sensor.*_next_charging_step` | Next charging step | — | enum | Modbus service app | What the app expects next; the `at` attribute holds its time. No countdown is recorded. |
 | `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability | Shows recognition, permission and release status, or Disabled. **Charging blocked** carries a `blocked_reason` attribute (for example `release_off`, `wallbox_locked`, `authorization_required`, `pause_requested`, `energy_goal_stop` or `register_unavailable`). **Released by hand** shows a manual release for the current or next connection. No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. The raw wallbox states behind it are the `evse_state` and `cp_state` attributes (see [Attribute values](#attribute-values)). |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
@@ -268,6 +342,9 @@ and templates see.
 | `sensor.*_cable_lock` | `fixed_cable`, `locked`, `undetermined`, `unlocked` |
 | `select.*_solar_display_mode` | `fast`, `not_active`, `sunshine`, `sunshine_plus` |
 | `select.*_requested_phases` | `all_available`, `single_phase` |
+| `sensor.*_charging_control` | `unavailable`, `guest_order`, `weekly_plan`, `charging_job`, `departure_plan`, `direct` |
+| `sensor.*_charging_wait_reason` | `none`, `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, `until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `until_weekly_window`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`, `target_reached`, `paused` |
+| `sensor.*_next_charging_step` | `none`, `queued_command`, `job_start`, `job_end`, `weekly_window`, `plan_start`, `target_reached`, `departure` |
 
 ### Attribute values
 
@@ -282,6 +359,8 @@ value leaves the attribute out.
 | `behaviour` on **Energy manager fallback active** | `disabled`, `fallback_current`, `pause_on_timeout` |
 | `switched` on **Requested phases** | `all_available`, `single_phase` |
 | `heartbeat` on **Connection quality** | `ok`, `problem` |
+| `vehicle` on **Charging control** | `unknown`, `none`, `connected`, `confirmed` |
+| `target` on **Charging control** | `level` (percent), `energy` (kWh); absent without a target |
 | `phase_rotation` on **Wallbox settings** | `l1_l2_l3`, `l2_l3_l1`, `l3_l1_l2` |
 | `grid_phases_connected` on **Wallbox settings** | `l1`, `l1_l2_l3` |
 | `phase_options` on **Wallbox settings** | `one_phase_only`, `one_or_three_phases`, `three_phases_only` |

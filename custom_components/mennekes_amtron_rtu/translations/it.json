@@ -493,6 +493,85 @@
             }
           }
         }
+      },
+      "operation_controller": {
+        "name": "Controllo della ricarica",
+        "state": {
+          "unavailable": "Wallbox non raggiungibile",
+          "guest_order": "Ordine ospite",
+          "weekly_plan": "Piano settimanale",
+          "charging_job": "Ordine di ricarica",
+          "departure_plan": "Pianificazione della partenza",
+          "direct": "Controllo diretto"
+        },
+        "state_attributes": {
+          "vehicle": {
+            "name": "Veicolo",
+            "state": {
+              "unknown": "Sconosciuto",
+              "none": "Non collegato",
+              "connected": "Collegato",
+              "confirmed": "Confermato"
+            }
+          },
+          "target": {
+            "name": "Obiettivo",
+            "state": {
+              "level": "Livello di carica",
+              "energy": "Energia"
+            }
+          },
+          "target_value": {
+            "name": "Valore obiettivo"
+          },
+          "target_deadline": {
+            "name": "Orario obiettivo"
+          }
+        }
+      },
+      "operation_waiting": {
+        "name": "Motivo di attesa della ricarica",
+        "state": {
+          "none": "Nulla trattiene la ricarica",
+          "wallbox_unavailable": "Wallbox non raggiungibile",
+          "no_vehicle": "Nessun veicolo collegato",
+          "release_off": "Abilitazione alla ricarica disattivata",
+          "plug_charge_waiting": "Il Plug & Charge virtuale non ha abilitato il veicolo",
+          "until_job_start": "In attesa dell’avvio dell’ordine",
+          "meter_unavailable": "In attesa del contatore di energia",
+          "job_suspended": "L’ordine attende la prova dello stesso collegamento",
+          "job_ended": "Ordine terminato, in pausa fino allo scollegamento",
+          "until_weekly_window": "In attesa della finestra del piano settimanale",
+          "vehicle_unconfirmed": "Veicolo non confermato",
+          "until_planned_start": "In pausa fino all’avvio pianificato",
+          "estimated_target_reached": "Caricato fino all’obiettivo stimato",
+          "waiting_for_device": "In attesa wallbox",
+          "waiting_for_soc": "In attesa livello di carica",
+          "waiting_for_capacity": "In attesa capacità",
+          "waiting_for_target": "In attesa obiettivo %",
+          "read_only": "Sola lettura",
+          "command_pending": "Modifica in coda",
+          "target_reached": "Obiettivo raggiunto",
+          "paused": "Ricarica in pausa"
+        }
+      },
+      "operation_next": {
+        "name": "Prossimo passo della ricarica",
+        "state": {
+          "none": "Nulla in programma",
+          "queued_command": "La modifica in coda viene eseguita",
+          "job_start": "L’ordine inizia",
+          "job_end": "L’ordine termina",
+          "weekly_window": "Si apre la finestra del piano settimanale",
+          "plan_start": "Inizia la ricarica pianificata",
+          "target_reached": "Obiettivo previsto",
+          "departure": "Partenza"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Orario"
+          }
+        }
       }
     },
     "switch": {

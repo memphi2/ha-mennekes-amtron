@@ -493,6 +493,85 @@
             }
           }
         }
+      },
+      "operation_controller": {
+        "name": "Laadsturing",
+        "state": {
+          "unavailable": "Wallbox niet bereikbaar",
+          "guest_order": "Gastopdracht",
+          "weekly_plan": "Weekplan",
+          "charging_job": "Laadopdracht",
+          "departure_plan": "Vertrekplanning",
+          "direct": "Directe bediening"
+        },
+        "state_attributes": {
+          "vehicle": {
+            "name": "Voertuig",
+            "state": {
+              "unknown": "Onbekend",
+              "none": "Niet aangesloten",
+              "connected": "Aangesloten",
+              "confirmed": "Bevestigd"
+            }
+          },
+          "target": {
+            "name": "Doel",
+            "state": {
+              "level": "Laadniveau",
+              "energy": "Energie"
+            }
+          },
+          "target_value": {
+            "name": "Doelwaarde"
+          },
+          "target_deadline": {
+            "name": "Streeftijd"
+          }
+        }
+      },
+      "operation_waiting": {
+        "name": "Wachtreden bij het laden",
+        "state": {
+          "none": "Niets houdt het laden tegen",
+          "wallbox_unavailable": "Wallbox niet bereikbaar",
+          "no_vehicle": "Geen voertuig aangesloten",
+          "release_off": "Laadvrijgave uitgeschakeld",
+          "plug_charge_waiting": "Virtueel Plug & Charge heeft het voertuig niet vrijgegeven",
+          "until_job_start": "Wacht op de start van de opdracht",
+          "meter_unavailable": "Wacht op de energiemeter",
+          "job_suspended": "Opdracht wacht op bewijs van dezelfde aansluiting",
+          "job_ended": "Opdracht beëindigd, gepauzeerd tot loskoppelen",
+          "until_weekly_window": "Wacht op het venster van het weekplan",
+          "vehicle_unconfirmed": "Voertuig niet bevestigd",
+          "until_planned_start": "Gepauzeerd tot de geplande start",
+          "estimated_target_reached": "Geladen tot het berekende doel",
+          "waiting_for_device": "Wacht op laadpaal",
+          "waiting_for_soc": "Wacht op laadniveau",
+          "waiting_for_capacity": "Wacht op accucapaciteit",
+          "waiting_for_target": "Wacht op procentdoel",
+          "read_only": "Alleen lezen",
+          "command_pending": "Wijziging in wachtrij",
+          "target_reached": "Doel bereikt",
+          "paused": "Laden gepauzeerd"
+        }
+      },
+      "operation_next": {
+        "name": "Volgende laadstap",
+        "state": {
+          "none": "Niets gepland",
+          "queued_command": "Wijziging in wachtrij wordt uitgevoerd",
+          "job_start": "Opdracht start",
+          "job_end": "Opdracht eindigt",
+          "weekly_window": "Venster van het weekplan opent",
+          "plan_start": "Gepland laden start",
+          "target_reached": "Doel verwacht",
+          "departure": "Vertrek"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Tijdstip"
+          }
+        }
       }
     },
     "switch": {

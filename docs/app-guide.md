@@ -27,6 +27,11 @@ service and orders that keep running while Home Assistant is offline.
 The overview opens first. It refreshes every five seconds while the page is
 visible and shows:
 
+- **Charging control**: which of the app's controllers decides right now (a
+  guest order, a charging job, a weekly plan, the departure plan or none), why
+  the car does not charge yet, the next step with its time, the target and
+  whether Home Assistant confirmed the car. Home Assistant shows the same
+  summary as [three sensors](entities.md#charging-control-at-a-glance).
 - the **observed charging state** read from the wallbox, and why the app holds
   a pause or a stop, for example a reached target or a switched-off release
 - power, session energy and the current limit read back from the wallbox;

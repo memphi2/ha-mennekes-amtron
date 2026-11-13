@@ -133,3 +133,22 @@ def test_ingress_overview_requires_admin_and_never_accepts_writes(monkeypatch):
             assert (await client.get("/api/overview", headers=HEADERS)).status == 503
             assert not any(method == "POST" for method, _path, _payload in settings.calls)
     asyncio.run(run())
+
+
+def test_the_services_summary_is_passed_on_only_when_it_holds_up():
+    summary = {
+        "controller": "charging_job", "waiting": "until_job_start",
+        "next": {"event": "job_start", "at": "2026-11-14T02:00:00+00:00"},
+        "target": {"kind": "energy", "value": 12.0, "deadline": "2026-11-14T06:00:00+00:00"},
+        "vehicle": "connected",
+    }
+    raw = snapshot()
+    assert overview_snapshot(raw)["operation"] is None
+    raw["control"]["operation"] = summary
+    assert overview_snapshot(raw)["operation"] == summary
+    # Until the service has started there is nothing to summarize.
+    assert overview_snapshot(raw, ready=False)["operation"] is None
+    assert overview_snapshot(None)["operation"] is None
+    for broken in ({**summary, "controller": "private-serial"}, {**summary, "source": "x"}, "text"):
+        raw["control"]["operation"] = broken
+        assert overview_snapshot(raw)["operation"] is None

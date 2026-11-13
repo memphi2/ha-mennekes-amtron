@@ -427,6 +427,19 @@ class WeeklyController:
         return [{**row.snapshot(), "consumed": self.book.used(plan.identifier, row.local_date)}
                 for row in plan.upcoming(now=self.jobs.inputs().now)]
 
+    def waiting(self) -> dict[str, Any] | None:
+        """The confirmed plan, its order and the start of its next open window."""
+        consent = self.consent
+        if consent is None:
+            return None
+        plan = next((item for item in self.book.plans if item.identifier == consent.plan_id), None)
+        starts = [] if plan is None else [
+            row.start_at for row in plan.upcoming(now=self.jobs.inputs().now)
+            if row.start_at is not None and not self.book.used(plan.identifier, row.local_date)
+        ]
+        return {"plan_id": consent.plan_id, "job_id": consent.job_id,
+                "start_at": starts[0].isoformat() if starts else None}
+
     def snapshot(self) -> dict[str, Any]:
         sample, consent = self.jobs.inputs(), self.consent
         return {"schema": 1, "revision": self.revision, "ready": self.ready,

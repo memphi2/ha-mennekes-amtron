@@ -30,6 +30,7 @@ from .estimate_sensor import AmtronEstimateSensor
 from .sensor_descriptions import (
     CONTROL_SENSOR_DESCRIPTIONS,
     ESTIMATE_SENSOR_DESCRIPTIONS,
+    OPERATION_SENSOR_KEYS,
     SENSOR_DESCRIPTIONS,
     AmtronSensorEntityDescription,
 )
@@ -64,6 +65,7 @@ async def async_setup_entry(
         and (description.key != "soc_goal_status" or SOC in features)
         and (description.key != "timed_goal_status" or TIMED in features)
         and (description.key != "virtual_plug_charge_status" or runtime_data.plug_charge is not None)
+        and (description.key not in OPERATION_SENSOR_KEYS or runtime_data.control.operation is not None)
     )
     entities.extend(
         AmtronEstimateSensor(entry, runtime_data.coordinator, description)
@@ -106,6 +108,8 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
             )
         if self.entity_description.key == "timed_goal_status":
             return self.runtime_data.timed_goal is not None
+        if self.entity_description.key in OPERATION_SENSOR_KEYS:
+            return self.runtime_data.control.operation is not None
         return True
 
     @property
@@ -119,6 +123,14 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
         if key == "connection_quality":
             return self.wallbox_data.connection_quality
         control = self.runtime_data.control
+        if key in OPERATION_SENSOR_KEYS:
+            operation = control.operation
+            if operation is None:
+                return None
+            return {
+                "operation_controller": operation.controller,
+                "operation_waiting": operation.waiting,
+            }.get(key, operation.next_event)
         if key == "energy_goal_status":
             return control.energy_goal.status
         if key == "soc_goal_status":
@@ -162,6 +174,15 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
                 "learned_efficiency": forecast.efficiency if forecast is not None else None,
                 "measured_power_kw": forecast.full_power_kw if forecast is not None else None,
             }
+        elif key == "operation_controller" and (operation := self.runtime_data.control.operation) is not None:
+            attributes = {
+                "vehicle": operation.vehicle,
+                "target": None if operation.target_kind == "none" else operation.target_kind,
+                "target_value": operation.target_value,
+                "target_deadline": operation.target_deadline,
+            }
+        elif key == "operation_next" and (operation := self.runtime_data.control.operation) is not None:
+            attributes = {"at": operation.next_at}
         elif key == "virtual_plug_charge_status":
             plug_charge = self.runtime_data.plug_charge
             attributes = {

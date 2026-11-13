@@ -493,6 +493,85 @@
             }
           }
         }
+      },
+      "operation_controller": {
+        "name": "Pilotage de la recharge",
+        "state": {
+          "unavailable": "Borne injoignable",
+          "guest_order": "Ordre invité",
+          "weekly_plan": "Plan hebdomadaire",
+          "charging_job": "Ordre de recharge",
+          "departure_plan": "Planification du départ",
+          "direct": "Commande directe"
+        },
+        "state_attributes": {
+          "vehicle": {
+            "name": "Véhicule",
+            "state": {
+              "unknown": "Inconnu",
+              "none": "Non connecté",
+              "connected": "Connecté",
+              "confirmed": "Confirmé"
+            }
+          },
+          "target": {
+            "name": "Cible",
+            "state": {
+              "level": "Niveau de charge",
+              "energy": "Énergie"
+            }
+          },
+          "target_value": {
+            "name": "Valeur cible"
+          },
+          "target_deadline": {
+            "name": "Heure cible"
+          }
+        }
+      },
+      "operation_waiting": {
+        "name": "Motif d’attente de la recharge",
+        "state": {
+          "none": "Rien ne retient la recharge",
+          "wallbox_unavailable": "Borne injoignable",
+          "no_vehicle": "Aucun véhicule connecté",
+          "release_off": "Autorisation de recharge désactivée",
+          "plug_charge_waiting": "Le Plug & Charge virtuel n’a pas autorisé le véhicule",
+          "until_job_start": "En attente du début de l’ordre",
+          "meter_unavailable": "En attente du compteur d’énergie",
+          "job_suspended": "L’ordre attend la preuve du même branchement",
+          "job_ended": "Ordre terminé, en pause jusqu’au débranchement",
+          "until_weekly_window": "En attente de la fenêtre du plan hebdomadaire",
+          "vehicle_unconfirmed": "Véhicule non confirmé",
+          "until_planned_start": "En pause jusqu’au démarrage prévu",
+          "estimated_target_reached": "Chargé jusqu’à l’objectif estimé",
+          "waiting_for_device": "En attente de la borne",
+          "waiting_for_soc": "En attente du niveau de charge",
+          "waiting_for_capacity": "En attente de la capacité",
+          "waiting_for_target": "En attente de la cible en %",
+          "read_only": "Lecture seule",
+          "command_pending": "Modification en attente",
+          "target_reached": "Cible atteinte",
+          "paused": "Recharge en pause"
+        }
+      },
+      "operation_next": {
+        "name": "Prochaine étape de recharge",
+        "state": {
+          "none": "Rien de prévu",
+          "queued_command": "La modification en attente s’exécute",
+          "job_start": "L’ordre démarre",
+          "job_end": "L’ordre se termine",
+          "weekly_window": "La fenêtre du plan hebdomadaire s’ouvre",
+          "plan_start": "La recharge planifiée démarre",
+          "target_reached": "Cible attendue",
+          "departure": "Départ"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Heure"
+          }
+        }
       }
     },
     "switch": {
