@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from .service_console_runtime import ConsoleModbusService
 
 CONSOLE_ASSETS = {
+    "/jobs": ("app_jobs.html", "text/html"),
+    "/app_jobs.js": ("app_jobs.js", "text/javascript"),
     "/runtime": ("app_runtime.html", "text/html"),
     "/app_runtime.js": ("app_runtime.js", "text/javascript"),
     "/registers": ("app_registers.html", "text/html"),

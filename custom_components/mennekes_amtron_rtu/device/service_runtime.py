@@ -46,6 +46,8 @@ API_VERSION = 2
 class ModbusService:
     """All stateful operations remain here when HA disconnects or restarts."""
 
+    control_type: type[AmtronControl] = AmtronControl
+
     def __init__(
         self,
         config: ServerConfig,
@@ -135,7 +137,7 @@ class ModbusService:
             measurement_interval=self.config.measurement_interval,
             timeline=self.diagnostics.timeline,
         )
-        control = AmtronControl(
+        control = self.control_type(
             self.client,
             diagnostics=self.diagnostics,
             identity=identity,
@@ -149,6 +151,7 @@ class ModbusService:
             request_refresh=self._control_updated,
             validate_deferred=self._validate_deferred,
         )
+        self._configure_control(control)
         goal = EnergyGoalController(control, self.client, self._persist)
         soc_goal = SocGoalController(control, self._persist)
         try:
@@ -183,6 +186,9 @@ class ModbusService:
             _LOGGER.info("Heartbeat started")
         else:
             _LOGGER.info("Heartbeat disabled in read-only mode")
+
+    def _configure_control(self, control: AmtronControl) -> None:
+        """Allow an in-process service owner to install guards before first use."""
 
     async def _run(self) -> None:
         """Fail the service if its independent heartbeat writer exits."""
