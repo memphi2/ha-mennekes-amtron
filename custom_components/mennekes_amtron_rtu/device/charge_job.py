@@ -23,7 +23,8 @@ REASONS = frozenset({
     "user_stop", "service_restarted", "connection_lost", "vehicle_changed",
     "goal_changed", "independent_stop", "meter_reset", "clock_changed", "storage_error",
 })
-_FIELDS = frozenset({"id", "binding", "start_at", "finish_at", "current_a", "energy", "state", "reason"})
+_INTERRUPTIONS = frozenset({"service_restarted", "connection_lost", "vehicle_changed", "goal_changed", "independent_stop", "meter_reset", "clock_changed", "storage_error"})
+_FIELDS = frozenset({"id", "binding", "start_at", "finish_at", "current_a", "energy", "state", "reason", "scope_ended"})
 
 
 def job_time(value: object) -> datetime:
@@ -62,6 +63,7 @@ class ChargeJob:
     energy: EnergyGoal
     state: str = "scheduled"
     reason: str = "scheduled"
+    scope_ended: bool = False
     _last_now: datetime | None = None
 
     @classmethod
@@ -97,7 +99,7 @@ class ChargeJob:
         return self.state != "charging"
 
     def interrupt(self, reason: str) -> None:
-        if reason not in REASONS:
+        if reason not in _INTERRUPTIONS:
             raise ValueError("invalid job interruption reason")
         if not self.terminal:
             self.state, self.reason = "interrupted", reason
@@ -112,6 +114,8 @@ class ChargeJob:
         independent_stop: bool = False,
     ) -> None:
         """Compute intent only; the owner separately confirms actual writes."""
+        if present is False:
+            self.scope_ended = True
         if self.terminal:
             return
         now = job_time(now.isoformat())
@@ -145,7 +149,7 @@ class ChargeJob:
             "id": self.identifier, "binding": self.binding,
             "start_at": self.start_at.isoformat(), "finish_at": self.finish_at.isoformat(),
             "current_a": self.current_a, "energy": self.energy.snapshot(),
-            "state": self.state, "reason": self.reason,
+            "state": self.state, "reason": self.reason, "scope_ended": self.scope_ended,
         }
 
     @classmethod
@@ -167,7 +171,18 @@ class ChargeJob:
         energy = EnergyGoal.restore(raw["energy"])
         if energy.target_kwh == 0:
             raise ValueError("invalid saved job energy ceiling")
-        job = cls(identifier, binding, start, finish, _current(raw["current_a"]), energy, state, reason)
+        if type(raw["scope_ended"]) is not bool:
+            raise ValueError("invalid saved job scope")
+        pairs = {"scheduled": "scheduled", "charging": "charging", "waiting_meter": "meter_unavailable", "reached": "energy_reached", "finished": "window_ended", "stopped": "user_stop"}
+        expected_energy = {"scheduled": "active", "charging": "active", "waiting_meter": "meter_unavailable", "reached": "reached"}
+        if (
+            (state in pairs and reason != pairs[state])
+            or (state == "interrupted" and reason not in _INTERRUPTIONS)
+            or (state in expected_energy and energy.status != expected_energy[state])
+            or (raw["scope_ended"] and state not in TERMINAL)
+        ):
+            raise ValueError("inconsistent saved job state")
+        job = cls(identifier, binding, start, finish, _current(raw["current_a"]), energy, state, reason, raw["scope_ended"])
         if restarted:
             job.interrupt("service_restarted")
         return job
