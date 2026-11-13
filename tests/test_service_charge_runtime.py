@@ -19,7 +19,9 @@ from custom_components.mennekes_amtron_rtu.device.client import (
     SerialConfig,
 )
 from custom_components.mennekes_amtron_rtu.device.control import (
+    AmtronControl,
     ControlOptions,
+    ServiceChargePolicy,
     _PendingCommand,
     _TimedCommandCancelledError,
 )
@@ -33,9 +35,6 @@ from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
 from custom_components.mennekes_amtron_rtu.device.service_config import ServerConfig
 from custom_components.mennekes_amtron_rtu.device.service_console_runtime import (
     ConsoleModbusService,
-)
-from custom_components.mennekes_amtron_rtu.device.service_job_control import (
-    JobAmtronControl,
 )
 from custom_components.mennekes_amtron_rtu.device.service_job_runtime import (
     JobModbusService,
@@ -266,20 +265,20 @@ def test_initialization_hook_and_scheduler_lifetime(monkeypatch, tmp_path):
 def control():
     client = Mock()
     client.write_state = WriteState()
-    return JobAmtronControl(client, diagnostics=WriteDiagnostics(), identity=DeviceIdentity(layout_version=259), options=ControlOptions(False, 16), state=WallboxData)
+    return AmtronControl(client, diagnostics=WriteDiagnostics(), identity=DeviceIdentity(layout_version=259), options=ControlOptions(False, 16), state=WallboxData)
 
 
 def test_policy_hooks_preserve_legacy_owners_and_gate_all_enabling_writes():
     c = control()
     command = _PendingCommand("set_current", 12, owner="job", deadline=datetime.now(UTC) + timedelta(hours=1))
     assert c._timed_cancellation_reason(command) == "energy_goal"
-    c.configure_service_policy(lambda _owner, _enabling: None, lambda: False)
+    c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: None, lambda: False))
     assert c._timed_cancellation_reason(command) == "energy_goal"
     assert c._timed_cancellation_reason(_PendingCommand("pause", 1)) is None
-    c.configure_service_policy(lambda _owner, _enabling: True, lambda: False)
+    c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: True, lambda: False))
     assert c._timed_cancellation_reason(command) is None
     assert c._timed_cancellation_reason(replace(command, deadline=datetime.now(UTC) - timedelta(seconds=1))) == "deadline_expired"
-    c.configure_service_policy(lambda _owner, _enabling: False, lambda: True)
+    c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: False, lambda: True))
     assert c._timed_cancellation_reason(command) == "energy_goal"
     with pytest.raises(DeviceError, match="energy_goal_stop_active"):
         c._check_write_allowed(R.CHARGING_CURRENT_EMS, 12, recovery_release=False)
@@ -287,7 +286,7 @@ def test_policy_hooks_preserve_legacy_owners_and_gate_all_enabling_writes():
     with pytest.raises(DeviceError, match="energy_goal_stop_active"):
         c._check_write_allowed(R.LOCK_EVSE, 0, recovery_release=False)
     c._active_command = None
-    c.configure_service_policy(lambda _owner, _enabling: None, lambda: False)
+    c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: None, lambda: False))
     c._check_write_allowed(R.CHARGING_CURRENT_EMS, 1, recovery_release=False)
     c._check_write_allowed(R.CHARGING_CURRENT_EMS, 12, recovery_release=False)
 
@@ -298,7 +297,7 @@ def test_policy_hooks_preserve_legacy_owners_and_gate_all_enabling_writes():
 def test_live_bus_preconditions_are_stronger_than_the_cached_job_intent(bad_register, bad_value):
     async def run():
         c = control()
-        c.configure_service_policy(lambda _owner, _enabling: True, lambda: False)
+        c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: True, lambda: False))
         c._active_command = _PendingCommand("set_current", 12, owner="job")
         # RegisterSpec contains enum dictionaries and is not a hashable key.
         # Use the same stable names as decoded WallboxData instead.
@@ -314,7 +313,7 @@ def test_live_bus_preconditions_are_stronger_than_the_cached_job_intent(bad_regi
             await c._async_check_timed_vehicle(read)
             c._identity.layout_version = 256
             await c._async_check_timed_vehicle(read)
-            c.configure_service_policy(lambda _owner, _enabling: None, lambda: False)
+            c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: None, lambda: False))
             await c._async_check_timed_vehicle(read)
             c._active_command = None
             await c._async_check_timed_vehicle(read)

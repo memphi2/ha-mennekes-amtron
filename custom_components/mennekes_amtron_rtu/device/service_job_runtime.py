@@ -9,15 +9,14 @@ import math
 import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 from .charge_job_controller import ChargeJobController, JobInputs
 from .charge_job_store import ChargeJobStore
-from .control import AmtronControl
+from .control import AmtronControl, ServiceChargePolicy
 from .errors import DeviceError
 from .registers import CP_STATE
 from .service_console_runtime import ConsoleModbusService
-from .service_job_control import JobAmtronControl
 from .vehicle import vehicle_connected
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,7 +28,6 @@ _COMPETING = frozenset({"set_current", "resume", "timed_current", "solar", "phas
 class JobModbusService(ConsoleModbusService):
     """Keep jobs local across HA disconnects; never assume continuity on boot."""
 
-    control_type = JobAmtronControl
     jobs: ChargeJobController | None = None
     _job_scope: str | None = None
 
@@ -39,7 +37,7 @@ class JobModbusService(ConsoleModbusService):
             ChargeJobStore(self.state_path.with_name("charge-job.json"), identity),
             self._job_inputs, self._apply_job_current,
         )
-        cast(JobAmtronControl, control).configure_service_policy(self.jobs.current_policy, self.jobs.stop_requested)
+        control.set_service_policy(ServiceChargePolicy(self.jobs.current_policy, self.jobs.stop_requested))
 
     async def _initialize(self) -> None:
         self._job_scope = None

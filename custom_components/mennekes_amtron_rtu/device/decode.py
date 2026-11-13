@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping, Sequence
+from typing import TypeGuard
 
 from pymodbus.client.mixin import ModbusClientMixin
 
@@ -92,7 +93,7 @@ def enum_option(spec: RegisterSpec, value: RegisterValue) -> str | None:
 HEX32 = re.compile(r"[0-9a-f]{32}")
 
 
-def is_hex32(value: object) -> bool:
+def is_hex32(value: object) -> TypeGuard[str]:
     """A 128-bit token, revision or id as lower-case hex."""
     return isinstance(value, str) and HEX32.fullmatch(value) is not None
 

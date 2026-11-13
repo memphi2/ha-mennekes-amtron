@@ -69,6 +69,7 @@ from .registers import (
 )
 from .runtime_events import EventType
 from .soc_goal import SocGoal
+from .vehicle import vehicle_connected
 from .write_state import WriteState
 
 if TYPE_CHECKING:
@@ -112,6 +113,19 @@ class _PendingCommand:
     recovery_generation: int | None = None
     owner: str | None = None
     deadline: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ServiceChargePolicy:
+    """A service-owned charging order's say over the single write path.
+
+    ``permits(owner, enabling)`` answers for commands the order owns: True
+    lets them run, False refuses them, None leaves them to the ordinary
+    rules. ``stop_requested`` adds the order's own stop to the goal stops.
+    """
+
+    permits: Callable[[str | None, bool], bool | None]
+    stop_requested: Callable[[], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +204,15 @@ class AmtronControl:
         self.goal_controller: EnergyGoalController | None = None
         self.soc_goal_controller: SocGoalController | None = None
         self._plug_charge = PlugChargeController(self)
+        self._service_policy: ServiceChargePolicy | None = None
+
+    def set_service_policy(self, policy: ServiceChargePolicy | None) -> None:
+        """Let a service-owned charging order fence and authorize its commands."""
+        self._service_policy = policy
+
+    def _service_permits(self, owner: str | None, *, enabling: bool) -> bool | None:
+        policy = self._service_policy
+        return policy.permits(owner, enabling) if policy is not None else None
 
     @property
     def supports_plug_charge(self) -> bool:
@@ -235,6 +258,8 @@ class AmtronControl:
         ) or (
             self.soc_goal_controller.stop_requested if self.soc_goal_controller is not None
             else self.soc_goal.stop_requested
+        ) or (
+            self._service_policy is not None and self._service_policy.stop_requested()
         )
 
     @property
@@ -1362,6 +1387,10 @@ class AmtronControl:
         # Observations can latch a stop while this command awaits the bus or
         # physical identity. Recheck under the bus lock, immediately before
         # sending, so a refused start neither writes nor consumes the 5s floor.
+        if self._write_enables_charging(spec, value):
+            owner = self._active_command.owner if self._active_command is not None else None
+            if self._service_permits(owner, enabling=True) is False:
+                raise validation_error("energy_goal_stop_active")
         self._check_timed_command()
         if spec == CHARGING_RELEASE and value == 1:
             self._plug_charge.check_release(recovery=recovery_release)
@@ -1372,7 +1401,25 @@ class AmtronControl:
             raise validation_error("energy_goal_stop_active")
 
     async def _async_check_timed_vehicle(self, read: LockedRegisterReader) -> None:
-        """Cancel a trip's command if live EVSE and CP both prove unplugging."""
+        """Cancel a trip's command if live EVSE and CP both prove unplugging.
+
+        A service order's start needs more: a car proven present and a
+        wallbox without error, unlocked and released.
+        """
+        command = self._active_command
+        if (
+            command is not None and command.owner is not None
+            and self._service_permits(command.owner, enabling=command.action != "pause") is True
+        ):
+            evse = await read(EVSE_STATE)
+            cp_supported = self._identity.layout_version >= CP_STATE.min_layout
+            cp = await read(CP_STATE) if cp_supported else None
+            if vehicle_connected(evse, cp, cp_supported=cp_supported) is not True:
+                raise _TimedCommandCancelledError("unknown")
+            for register, expected in ((ERROR_CODE, 0), (LOCK_EVSE, 0), (CHARGING_RELEASE, 1)):
+                if await read(register) != expected:
+                    raise _TimedCommandCancelledError("unknown")
+            return
         if await self._async_vehicle_absent(read):
             # Keep the existing reason vocabulary: older compatible HA
             # integrations reject service snapshots with unknown event values.
@@ -1383,6 +1430,10 @@ class AmtronControl:
             return None
         if command.deadline is not None and datetime.now(UTC) >= command.deadline:
             return "deadline_expired"
+        permission = self._service_permits(command.owner, enabling=command.action != "pause")
+        if permission is not None:
+            # A service order does not depend on HA's charge target.
+            return None if permission and not self.energy_goal_stop_requested else "energy_goal"
         if self.soc_goal.status != "active" or self.soc_goal.target_percent <= 0 or self.energy_goal_stop_requested:
             return "energy_goal"
         return None

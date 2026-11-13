@@ -46,8 +46,6 @@ API_VERSION = 2
 class ModbusService:
     """All stateful operations remain here when HA disconnects or restarts."""
 
-    control_type: type[AmtronControl] = AmtronControl
-
     def __init__(
         self,
         config: ServerConfig,
@@ -137,7 +135,7 @@ class ModbusService:
             measurement_interval=self.config.measurement_interval,
             timeline=self.diagnostics.timeline,
         )
-        control = self.control_type(
+        control = AmtronControl(
             self.client,
             diagnostics=self.diagnostics,
             identity=identity,
