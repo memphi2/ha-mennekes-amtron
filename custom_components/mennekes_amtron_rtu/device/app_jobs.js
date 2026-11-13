@@ -5,6 +5,8 @@
   const found = languages.indexOf((document.documentElement.lang || "").slice(0, 2).toLowerCase());
   const column = found < 0 ? 0 : found, locale = languages[column];
   const words = {
+    forecast_title:["Estimated time to the AC-energy ceiling","Schätzung bis zur AC-Energieobergrenze","Estimation jusqu’au plafond d’énergie AC","Schatting tot de AC-energiegrens","Stima fino al tetto di energia AC"],
+    forecast_hint:["Conditional on similar charging conditions. Not a battery percentage or a guaranteed finish; other limits may stop earlier.","Ähnliche Ladebedingungen vorausgesetzt. Kein Batterie-Prozentwert und keine garantierte Endzeit; andere Grenzen können früher stoppen.","Sous réserve de conditions de recharge similaires. Ni un pourcentage de batterie ni une fin garantie ; d’autres limites peuvent arrêter plus tôt.","Onder vergelijkbare laadomstandigheden. Geen accupercentage en geen gegarandeerd einde; andere grenzen kunnen eerder stoppen.","A condizioni di ricarica simili. Non è una percentuale della batteria né una fine garantita; altri limiti possono fermare prima."],
     reserve:["Immediate reserve, kWh","Sofortreserve in kWh","Réserve immédiate, kWh","Directe reserve, kWh","Riserva immediata, kWh"],
     reserve_hint:["Charge this portion now, then wait for the planned start. Included in the total energy ceiling, not extra. Zero disables; AC meter energy, not battery percentage.","Diese Teilmenge jetzt laden, danach auf den geplanten Start warten. In der Gesamtobergrenze enthalten, nicht zusätzlich. Null deaktiviert; AC-Zählerenergie, kein Batterie-Prozentwert.","Recharger cette part maintenant, puis attendre le début prévu. Comprise dans le plafond total, pas en plus. Zéro désactive ; énergie du compteur AC, pas un pourcentage de batterie.","Laad dit deel nu en wacht daarna op de geplande start. Inbegrepen in de totale bovengrens, niet extra. Nul schakelt uit; AC-meterenergie, geen accupercentage.","Ricaricare subito questa parte, poi attendere l’inizio previsto. Inclusa nel tetto totale, non in aggiunta. Zero la disattiva; energia del contatore AC, non percentuale della batteria."],
     reserve_done:["reserve reached","Reserve erreicht","réserve atteinte","reserve bereikt","riserva raggiunta"],
@@ -84,6 +86,48 @@
   el("job_finish").value = local(new Date(Date.now()+8*3600000));
   const ended = job => ["reached","finished","stopped","interrupted"].includes(job.state);
   const reserveText = job => job?.reserve_kwh ? ` · ${t("reserve")}: ${job.reserve_kwh}${typeof job.reserve_reached === "boolean" ? ` (${t(job.reserve_reached ? "reserve_done" : "reserve_pending")})` : ""}` : "";
+  const forecastWords = {
+    awaiting_meter:["Waiting for a new meter reading to confirm progress","Wartet auf einen neuen Zählerstand zur Fortschrittsbestätigung","En attente d’un nouveau relevé du compteur pour confirmer la progression","Wacht op een nieuwe meterstand om de voortgang te bevestigen","In attesa di una nuova lettura del contatore per confermare l’avanzamento"],
+    learning:["Collecting valid measurement intervals","Sammelt gültige Messintervalle","Collecte d’intervalles de mesure valides","Verzamelt geldige meetintervallen","Raccolta di intervalli di misura validi"],
+    scheduled:["Waiting for the window; no matching learned rate yet","Wartet auf das Zeitfenster; noch keine passende Messbasis","En attente de la plage ; pas encore de puissance apprise correspondante","Wacht op het tijdvenster; nog geen passend geleerd vermogen","In attesa della finestra; nessuna potenza appresa corrispondente"],
+    unavailable:["No reliable current forecast","Keine verlässliche aktuelle Prognose","Aucune prévision actuelle fiable","Geen betrouwbare actuele prognose","Nessuna previsione attuale affidabile"],
+    stale:["Measurement basis is too old","Messbasis ist veraltet","La base de mesure est trop ancienne","Meetbasis is te oud","La base di misura è troppo vecchia"],
+    unstable:["Power varies too much for a useful finish range","Leistung schwankt zu stark für einen sinnvollen Zeitbereich","La puissance varie trop pour une plage de fin utile","Vermogen schommelt te sterk voor een bruikbaar eindbereik","La potenza varia troppo per un intervallo di fine utile"],
+    meter_unavailable:["No current meter reading","Kein aktueller Zählerstand","Aucun relevé de compteur actuel","Geen actuele meterstand","Nessuna lettura attuale del contatore"],
+    measurement_gap:["Measurement gap; learning again","Messlücke; Messbasis wird neu aufgebaut","Interruption de mesure ; nouvel apprentissage","Meetonderbreking; opnieuw leren","Interruzione della misura; nuovo apprendimento"],
+    meter_reset:["Counter or clock changed; learning again","Zähler oder Uhrzeit verändert; Messbasis wird neu aufgebaut","Compteur ou horloge modifié ; nouvel apprentissage","Meter of klok gewijzigd; opnieuw leren","Contatore o orologio modificato; nuovo apprendimento"],
+    meter_jump:["Implausible energy interval","Unplausibles Energieintervall","Intervalle d’énergie invraisemblable","Onwaarschijnlijk energie-interval","Intervallo di energia non plausibile"],
+    not_charging:["No confirmed energy intake","Keine bestätigte Energieaufnahme","Aucune absorption d’énergie confirmée","Geen bevestigde energieopname","Nessun assorbimento di energia confermato"],
+    waiting_vehicle:["Waiting for confirmed energy intake","Wartet auf bestätigte Energieaufnahme","En attente d’une absorption d’énergie confirmée","Wacht op bevestigde energieopname","In attesa di un assorbimento di energia confermato"],
+    no_energy_progress:["No measured energy increase","Kein gemessener Energiezuwachs","Aucune hausse d’énergie mesurée","Geen gemeten energietoename","Nessun aumento di energia misurato"],
+    complete:["AC-energy ceiling reached","AC-Energieobergrenze erreicht","Plafond d’énergie AC atteint","AC-energiegrens bereikt","Tetto di energia AC raggiunto"],
+    stopped:["Order ended; no active forecast","Auftrag beendet; keine aktive Prognose","Ordre terminé ; aucune prévision active","Opdracht beëindigd; geen actieve prognose","Ordine terminato; nessuna previsione attiva"],
+    beyond_horizon:["Target lies beyond the forecast horizon at this rate","Ziel liegt bei dieser Leistung außerhalb des Prognosehorizonts","À cette puissance, l’objectif dépasse l’horizon de prévision","Bij dit vermogen ligt het doel buiten de prognosehorizon","A questa potenza l’obiettivo è oltre l’orizzonte di previsione"],
+    live:["Current measured intervals","Aktuelle Messintervalle","Intervalles mesurés actuels","Actuele meetintervallen","Intervalli misurati attuali"],
+    history:["Previous measured intervals","Frühere Messintervalle","Intervalles mesurés précédents","Eerdere meetintervallen","Intervalli misurati precedenti"],
+    likely:["Within the accepted time window","Innerhalb des angenommenen Zeitfensters","Dans la plage horaire acceptée","Binnen het aanvaarde tijdvenster","Entro la finestra oraria accettata"],
+    at_risk:["Time window may be too short","Zeitfenster könnte zu kurz sein","La plage horaire pourrait être trop courte","Tijdvenster is mogelijk te kort","La finestra oraria potrebbe essere troppo breve"],
+    unlikely:["Energy target unlikely within the time window","Energieziel voraussichtlich nicht im Zeitfenster erreichbar","Objectif d’énergie peu probable dans la plage horaire","Energiedoel waarschijnlijk niet binnen het tijdvenster","Obiettivo di energia improbabile entro la finestra oraria"],
+    unknown:["Deadline feasibility unknown","Erreichbarkeit im Zeitfenster unbekannt","Faisabilité dans la plage inconnue","Haalbaarheid binnen het tijdvenster onbekend","Fattibilità entro la finestra sconosciuta"],
+    storage:["Learned rates are not currently being saved","Lernwerte werden derzeit nicht dauerhaft gespeichert","Les puissances apprises ne sont pas enregistrées actuellement","Geleerde waarden worden momenteel niet opgeslagen","I valori appresi non vengono salvati al momento"]
+  };
+  const ft = key => (Object.hasOwn(forecastWords, key) ? forecastWords[key] : forecastWords.unavailable)[column];
+  const validDate = value => typeof value === "string" && value.length <= 64 && /T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value));
+  function renderForecast(value, hasJob) {
+    el("job_forecast").hidden = !value || !hasJob;
+    el("job_forecast_summary").textContent = "";
+    el("job_forecast_detail").textContent = "";
+    el("job_forecast_storage").textContent = "";
+    if (!value || !hasJob) return;
+    const valid = value.basis === "ac_meter" && value.state === "estimate" && ["live","history"].includes(value.source)
+      && typeof value.power_kw === "number" && Number.isFinite(value.power_kw) && value.power_kw > 0 && value.power_kw <= 30
+      && Number.isInteger(value.samples) && value.samples >= 3 && value.samples <= 16
+      && validDate(value.earliest_finish) && validDate(value.latest_finish) && validDate(value.observed_at)
+      && Date.parse(value.earliest_finish) <= Date.parse(value.latest_finish);
+    el("job_forecast_summary").textContent = valid ? `${date(value.earliest_finish)} → ${date(value.latest_finish)} · ${ft(value.deadline_status)}` : ft(value.basis === "ac_meter" ? value.state : "unavailable");
+    if (valid) el("job_forecast_detail").textContent = `${value.power_kw.toLocaleString(locale, {maximumFractionDigits:1})} kW · ${ft(value.source)}: ${value.samples} · ${date(value.observed_at)}`;
+    if (value.history_storage === "unavailable") el("job_forecast_storage").textContent = ft("storage");
+  }
   function invalidate() { proposal=null; el("job_confirmation").hidden=true; }
   function render() {
     const good = state?.schema === 1 && state.ready && !state.storage_error;
@@ -97,6 +141,7 @@
     el("job_boost_minutes").disabled=busy || state?.boost_available !== true;
     el("job_cancel_boost").disabled=busy || !state?.job?.boost_until;
     const job=state?.job;
+    renderForecast(state?.forecast, Boolean(job));
     el("job_state").textContent=job ? t(job.state) : t("no_job");
     el("job_detail").textContent=job ? `${t(job.reason)} · ${date(job.start_at)} → ${date(job.finish_at)} · ${job.current_a} A${job.scope_ended ? ` · ${t("end_scope")}` : !job.holding ? ` · ${t("released")}` : ""}` : "";
     el("job_progress").textContent=job ? `${job.delivered_kwh == null ? "—" : Number(job.delivered_kwh).toLocaleString(locale,{maximumFractionDigits:2})} / ${job.energy_kwh} kWh${reserveText(job)}${state.action_error ? ` · ${t(state.action_error)}` : ""}` : "";
@@ -169,7 +214,7 @@
     await post({action,revision,confirm:true});state=null;render();void read();
   });
   document.addEventListener("visibilitychange",()=>{suspend();invalidate();state=null;render();if(!document.hidden)void read();});
-  addEventListener("pagehide",()=>{hidden=true;suspend();});
+  addEventListener("pagehide",()=>{hidden=true;suspend();invalidate();state=null;render();});
   addEventListener("pageshow",()=>{hidden=false;void read();});
   notice(t("loading"));render();void read();
 })();

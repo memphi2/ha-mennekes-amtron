@@ -214,7 +214,8 @@ recurring failures require their logged cause to be corrected.
 
 Pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. A charging job is saved in
-`charge-job.json` and weekly plans in `weekly-plans.json` the same way. The file is atomically replaced with
+`charge-job.json`, weekly plans in `weekly-plans.json` and learned charging power
+in `charge-rates.json` the same way. The file is atomically replaced with
 owner-only permissions when those settings change. Both the file and directory
 are synced before a save is considered complete. This is bounded state rather
 than a growing history. Include the data directory in backups and protect its
@@ -367,6 +368,24 @@ An optional `reserve_kwh` (0.1 kWh steps, at most `energy_kwh`) charges that
 part at once and then waits for `start_at`; see
 [immediate reserve](app-guide.md#immediate-reserve). `GET` then also reports
 `reserve_reached`.
+
+`GET` also returns a `forecast` for the [finish estimate](app-guide.md#finish-estimate),
+computed from the meter readings the service polls anyway; it adds no Modbus
+reads and changes nothing. `state` is `estimate` when `earliest_finish` and
+`latest_finish` hold a range; otherwise it names why there is none, for
+example `learning`, `scheduled`, `waiting_vehicle`, `awaiting_meter`, `stale`,
+`unstable`, `beyond_horizon`, `unavailable`, `complete` or `stopped`. `source`
+is `live` or `history`, `power_kw` the median measured power, `samples` the
+number of intervals and `deadline_status` one of `likely`, `at_risk`,
+`unlikely` and `unknown`. `history_storage` is `unavailable` while learned
+values cannot be saved.
+
+Learned powers are kept per hashed vehicle reference, current and phase count in
+`/data/charge-rates.json`: at most 64 of them with 16 values each, for 30 days,
+at most 64 KiB, bound to the wallbox identity like the other files. The file
+holds no vehicle identifier and no charging permission. It is written at most
+every ten minutes and at shutdown; an unreadable or unwritable file only stops
+the history, never charging.
 
 Errors return HTTP 409 with a key such as `job_changed` (stale revision or
 scope), `job_exists`, `job_not_permitted`, `job_preview_expired`,

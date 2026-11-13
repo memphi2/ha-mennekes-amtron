@@ -21,6 +21,8 @@ Update the app together with integration 0.9.0b2.
   up to seven days. Between departures Home Assistant controls charging.
 - **Immediate reserve:** a job or the first departure of a weekly plan can
   charge part of its energy amount at once, then wait for the planned start.
+- **Finish estimate:** the Charging jobs page shows when an order will
+  probably reach its energy amount, from the measured charging power.
 - **Registers:** a read-only page with the raw register values, their age
   and read quality.
 - **Runtime:** preview new poll intervals and apply them without restarting

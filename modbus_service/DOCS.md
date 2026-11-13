@@ -96,7 +96,7 @@ for details.
 | **Debug log** | Live Modbus recording for up to 10 minutes, in memory only. |
 | **Registers** | Every known register with raw and decoded value and its read quality. Read-only. |
 | **Runtime** | Polling intervals apply without restart; current cap and waits after the next restart. Preview before saving. |
-| **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with an optional immediate reserve and early start. |
+| **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with an optional immediate reserve, early start and an estimated finish. |
 | **Guest charging** | An immediate, limited order for a visitor's car after local authorization. |
 | **Weekly plans** | Recurring departures for one car, activated for the plugged-in car for up to seven days. |
 
@@ -197,7 +197,8 @@ Switching the app to read-only also stops the heartbeat.
 
 To give the bus to another master, stop the app. Disabling the HA entry or
 selecting read-only does not release it. Include the app data in backups: it
-contains the saved charging state, a charging job and the private access token.
+contains the saved charging state, a charging job, weekly plans, learned
+charging power and the private access token.
 
 ### Virtual Plug & Charge
 

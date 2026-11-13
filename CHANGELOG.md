@@ -73,6 +73,10 @@ Update the app to 0.9.0b2 together with the integration.
   to seven days; each date runs at most once, also after an edit or restart.
   A job or weekly plan can charge an immediate reserve of its energy amount at
   once and then wait for the planned start (#67).
+- Charging jobs estimate when they reach their energy amount (#68): a time
+  range from the power the wallbox meter measured, and from earlier charges of
+  the same car, current and phases while an order waits for its window. The
+  estimate never changes charging; the learned values stay in the app.
 - A finished, stopped or interrupted order hands control back to Home
   Assistant once the wallbox confirms its pause. Charging stays paused until
   you resume it in Home Assistant; clearing the order is no longer needed, and

@@ -202,9 +202,11 @@ service's queue running.
 
 Configure and understand the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
 The service does not remove the need for it. Include app data in backups:
-it contains saved charging intent, a charging job and the private access token.
+it contains saved charging intent, a charging job, weekly plans, learned
+charging power and the private access token.
 
-The app saves changed settings, not a growing history. Heartbeat history records
+The app saves changed settings and a bounded history of measured charging power
+for the [finish estimate](app-guide.md#finish-estimate), not a growing history. Heartbeat history records
 health changes rather than every beat. For smaller HA history, use a
 [Recorder profile](recorder.md).
 
@@ -213,7 +215,8 @@ health changes rather than every beat. For smaller HA history, use a
 The app includes a custom AppArmor profile.
 Supervisor loads it automatically when the app is installed;
 keep **Protection mode on**. It limits the service to its runtime files, USB/LAN
-communication and its own token, charging-state and charging-job files. App options remain
+communication and its own token, charging-state, charging-job, weekly-plan and
+charging-power files. App options remain
 read-only to the service. Normal heartbeat and charging operation are intended
 to continue within these limits.
 

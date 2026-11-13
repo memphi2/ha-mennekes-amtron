@@ -23,6 +23,7 @@ from .app_settings import (
 from .connection import NetworkConfig, SerialConfig
 from .service_config import ServerConfig
 from .service_discovery import app_token, publish_discovery
+from .service_forecast_runtime import ForecastModbusService as ModbusService
 from .service_overview import service_overview
 from .service_weekly_http import (
     WeeklyConsole as ServiceConsole,
@@ -33,7 +34,6 @@ from .service_weekly_http import (
 from .service_weekly_http import (
     create_weekly_console as create_console_app,
 )
-from .service_weekly_runtime import WeeklyModbusService as ModbusService
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -26,6 +26,7 @@ from amtron_device import registers
 from amtron_device.app_settings import serial_adapters
 from amtron_device.charge_job import ChargeJob
 from amtron_device.charge_job_store import ChargeJobStore
+from amtron_device.charge_rate_store import RateStore
 from amtron_device.decode import encode_register
 from pymodbus import FramerType
 from pymodbus.server import ModbusSerialServer, ModbusTcpServer
@@ -182,11 +183,13 @@ def check_environment(profile: str) -> None:
     require(not (DATA / "service-token").exists(), "token fixture must start empty")
     require(not (DATA / "intent.json").exists(), "intent fixture must start empty")
     require(not (DATA / "charge-job.json").exists(), "charge job fixture must start empty")
+    require(not (DATA / "charge-rates.json").exists(), "rate history fixture must start empty")
 
 
 def check_temporary_files() -> None:
     require(
-        not list(DATA.glob(".token-*")) and not list(DATA.glob(".intent-*")) and not list(DATA.glob(".job-*")),
+        not list(DATA.glob(".token-*")) and not list(DATA.glob(".intent-*"))
+        and not list(DATA.glob(".job-*")) and not list(DATA.glob(".rates-*")),
         "atomic save left temporary files",
     )
 
@@ -212,6 +215,25 @@ def check_charge_job_storage() -> None:
         require(ChargeJobStore(path, SERIAL).load() is None, "cleared charge job could not be saved")
     except OSError as error:
         raise ProbeError("charge job storage was denied") from error
+
+
+def check_rate_storage() -> None:
+    """Save and read back the optional rate history with the real store.
+
+    The simulated wallbox never charges, so the service learns nothing and
+    the store is exercised here, confined by the same profile.
+    """
+    path = DATA / "charge-rates.json"
+    rates = [{"source": "c" * 64, "current_ma": 12000, "phases": 3,
+              "rates_kw": [8.0, 8.1, 8.2], "updated_at": float(int(datetime.now(UTC).timestamp()))}]
+    try:
+        RateStore(path, SERIAL).save(rates)
+        require(RateStore(path, SERIAL).load().snapshot() == rates, "saved rate history could not be read back")
+        require(stat.S_IMODE(path.stat().st_mode) == 0o600, "rate history file is not private")
+        RateStore(path, SERIAL).save([])
+        require(RateStore(path, SERIAL).load().snapshot() == [], "cleared rate history could not be saved")
+    except OSError as error:
+        raise ProbeError("rate history storage was denied") from error
 
 
 async def check_connection_page(session: ClientSession, mode: str, original: dict[str, Any]) -> None:
@@ -381,6 +403,7 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
             await denied_access()
             await child.stop()
             check_charge_job_storage()
+            check_rate_storage()
             check_temporary_files()
             for instance in children:
                 require(token.encode() not in instance.output and SUPERVISOR_TOKEN.encode() not in instance.output, "service logs exposed a credential")
@@ -388,7 +411,8 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
         return {"status": "passed", "mode": mode, "profile": profile, "enforcing": True,
                 "discovery": True, "heartbeat": True, "pause_restart": True,
                 "token_preserved": True, "denials": 4, "shutdown": True,
-                "serial_settings": True, "connection_ui": True, "charge_job_storage": True}
+                "serial_settings": True, "connection_ui": True, "charge_job_storage": True,
+                "rate_storage": True}
     finally:
         for instance in children:
             await instance.stop(clean=False)

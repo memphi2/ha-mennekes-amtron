@@ -11,7 +11,7 @@ token is needed in the browser. They need **Supervisor 2026.10.4 or newer**.
 | [Debug log](#connection-and-debug-log) | A short live recording of the Modbus traffic for troubleshooting. |
 | [Registers](#registers) | Every wallbox register with its raw and decoded value. Read-only. |
 | [Runtime](#runtime-settings) | Polling intervals and control limits, with a preview before saving. |
-| [Charging jobs](#charging-jobs) | A charging order the app runs on its own, with optional early start. |
+| [Charging jobs](#charging-jobs) | A charging order the app runs on its own, with optional early start and an estimated finish. |
 | [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
 | [Weekly plans](#weekly-plans) | Recurring departures for one car, turned into charging jobs for up to seven days. |
 
@@ -90,6 +90,36 @@ of the app controls charging. These Home Assistant actions **stop** the order:
 The meter is read at the normal polling interval, so a little more energy than
 the set amount can flow before the pause takes effect. The order is a limit, not
 a guarantee that the car receives this amount or finishes by the end time.
+
+### Finish estimate
+
+While an order charges, the page estimates when its energy amount will be
+reached: a time range, the measured power and whether the range fits the window
+(**Within the accepted time window**, **Time window may be too short** or
+**Energy target unlikely within the time window**). The estimate comes from the
+wallbox meter, not from the battery level; the car or another limit may stop
+earlier. It never changes the order.
+
+- It needs at least three valid measuring intervals of 30 to 180 seconds with
+  unchanged current and phases. Until then the page says it is collecting
+  intervals. A pause, a changed current or phase setting, a meter gap or a
+  meter reset starts again.
+- The range spans the slowest and fastest measured power with a 15 % margin.
+  It is not a guarantee: tapering near a full battery, temperature or other
+  limits can change it. If the power varies too much or the end lies more than
+  seven days ahead, no range is shown.
+- The range includes the immediate reserve, a boost and the wait for the
+  planned start, without counting energy twice.
+- While an order waits for its window, the range can come from earlier
+  measurements of the same car, current and phases within the last 30 days. The
+  car is the vehicle selected in Home Assistant or the weekly plan's profile.
+  Guest orders and orders without a selected vehicle learn only for the
+  current charge.
+
+While an order waits for proof of the same plug-in
+([after an app restart or a connection loss](#after-an-app-restart-or-a-connection-loss)),
+no estimate is shown. If the learned values cannot be saved, the page says so;
+charging is not affected.
 
 ### Immediate reserve
 

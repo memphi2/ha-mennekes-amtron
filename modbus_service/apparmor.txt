@@ -57,10 +57,10 @@ profile mennekes_amtron_modbus flags=(attach_disconnected,mediate_deleted) {
   /dev/tty{USB,ACM,AMA,S,SC,THS,XRUSB}[0-9]* rwk,
   /dev/serial/{by-id,by-path}/* rwk,
 
-  # Options are read-only. Token and accepted charging intent use same-directory
-  # temporary files, fsync and atomic rename; no general /data or /tmp writes.
+  # Options are read-only. Token, accepted intent and advisory history use
+  # named same-directory files; no general /data or /tmp write permission.
   /data/ r,
   /data/options.json r,
-  /data/{service-token,intent.json,charge-job.json,weekly-plans.json} rw,
-  /data/.{token,intent,job,weekly}-* rw,
+  /data/{service-token,intent.json,charge-job.json,weekly-plans.json,charge-rates.json} rw,
+  /data/.{token,intent,job,weekly,rates}-* rw,
 }
