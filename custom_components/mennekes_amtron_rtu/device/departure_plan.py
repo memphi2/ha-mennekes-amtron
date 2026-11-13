@@ -440,6 +440,13 @@ class DepartureController:
         # Home Assistant confirmed this plug-in before a restart or a gap.
         return "confirmed" if self._session.continues(s.session) else "unconfirmed"
 
+    def confirmed_vehicle(self, s: DepartureSample) -> tuple[str, str] | None:
+        """The car Home Assistant confirmed for the plug-in of this sample."""
+        inputs = self.inputs
+        if not self.ready or inputs is None or s.scope is None or self._binding(s) != "confirmed":
+            return None
+        return inputs.vehicle, s.scope
+
     def _unbind(self) -> None:
         # A provisional stop stays: a car that leaves at its projected target
         # still counts as reached at departure.

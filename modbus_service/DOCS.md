@@ -144,6 +144,8 @@ interrupted and HA controls charging again. It never restarts by itself.
 A weekly plan creates one such job per departure, each when its window opens.
 Between departures HA controls charging, for example for PV surplus. An
 activation ends at unplugging, an app restart or after seven days at the latest.
+A plan activated while HA had confirmed the car remembers it and then activates
+itself whenever HA confirms that car for a plug-in, until you stop the plan.
 See
 [the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/app-guide.md#weekly-plans).
 

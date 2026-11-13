@@ -47,6 +47,10 @@ class DepartureModbusService(ForecastModbusService):
             self._end_departure_pause,
         )
 
+    def _confirmed_vehicle(self) -> tuple[str, str] | None:
+        departure = self.departure
+        return None if departure is None else departure.confirmed_vehicle(self._departure_sample())
+
     async def _initialize(self) -> None:
         await super()._initialize()
         if self.departure is None:

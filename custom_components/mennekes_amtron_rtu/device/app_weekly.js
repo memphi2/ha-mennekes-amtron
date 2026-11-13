@@ -12,7 +12,7 @@
     loading:["Loading…", "Wird geladen…", "Chargement…", "Laden…", "Caricamento…"],
     activation:["Current activation", "Aktuelle Aktivierung", "Activation actuelle", "Huidige activering", "Attivazione attuale"],
     stop:["Stop weekly automation", "Wochenautomatik stoppen", "Arrêter l’automatisme hebdomadaire", "Weekautomatisering stoppen", "Interrompere l’automazione settimanale"],
-    stop_hint:["Stops its own job and recurrence. An independent guest or manual job is not changed.", "Stoppt den zugehörigen Auftrag und weitere Termine. Ein unabhängiger Gast- oder manueller Auftrag bleibt unverändert.", "Arrête son propre ordre et la récurrence. Un ordre invité ou manuel indépendant n’est pas modifié.", "Stopt de eigen opdracht en de herhaling. Een onafhankelijke gast- of handmatige opdracht blijft ongewijzigd.", "Ferma il proprio ordine e la ricorrenza. Un ordine ospite o manuale indipendente non viene modificato."],
+    stop_hint:["Stops its own job and recurrence, and the plan no longer activates itself for its car. An independent guest or manual job is not changed.", "Stoppt den zugehörigen Auftrag und weitere Termine; der Plan aktiviert sich für sein Fahrzeug nicht mehr selbst. Ein unabhängiger Gast- oder manueller Auftrag bleibt unverändert.", "Arrête son propre ordre et la récurrence ; le plan ne s’active plus de lui-même pour son véhicule. Un ordre invité ou manuel indépendant n’est pas modifié.", "Stopt de eigen opdracht en de herhaling; het plan activeert zichzelf niet meer voor zijn voertuig. Een onafhankelijke gast- of handmatige opdracht blijft ongewijzigd.", "Ferma il proprio ordine e la ricorrenza; il piano non si attiva più da solo per il suo veicolo. Un ordine ospite o manuale indipendente non viene modificato."],
     saved_plans:["Saved vehicle plans", "Gespeicherte Fahrzeugpläne", "Plans de véhicule enregistrés", "Opgeslagen voertuigplannen", "Piani del veicolo salvati"],
     new_plan:["New plan", "Neuer Plan", "Nouveau plan", "Nieuw plan", "Nuovo piano"],
     recipe:["Recipe — not charging permission", "Planvorlage — noch keine Ladefreigabe", "Modèle — pas une autorisation de recharge", "Sjabloon — geen laadtoestemming", "Modello — non un consenso alla ricarica"],
@@ -35,7 +35,7 @@
     proposal:["Confirm recipe", "Plan bestätigen", "Confirmer le modèle", "Sjabloon bevestigen", "Confermare il modello"],
     save:["Save this recipe", "Diesen Plan speichern", "Enregistrer ce modèle", "Dit sjabloon opslaan", "Salvare questo modello"],
     activate_title:["Activate saved plan for this vehicle", "Gespeicherten Plan für dieses Fahrzeug aktivieren", "Activer le plan enregistré pour ce véhicule", "Opgeslagen plan voor dit voertuig activeren", "Attivare il piano salvato per questo veicolo"],
-    consent_hint:["Recurrence applies only to this connection, for at most seven days. Each departure has its own energy ceiling; between departures Home Assistant controls charging. Restart, unplugging, a manual stop or editing the active recipe ends it.", "Die Wiederholung gilt nur für diesen Steckvorgang, höchstens sieben Tage. Jede Abfahrt hat eine eigene Energieobergrenze; zwischen den Abfahrten steuert Home Assistant die Ladung. Neustart, Abstecken, manueller Stopp oder Änderung des aktiven Plans beenden sie.", "La récurrence ne vaut que pour cette connexion, sept jours au plus. Chaque départ a son propre plafond d’énergie ; entre les départs, Home Assistant pilote la recharge. Un redémarrage, un débranchement, un arrêt manuel ou une modification du modèle actif y mettent fin.", "De herhaling geldt alleen voor deze verbinding, hoogstens zeven dagen. Elk vertrek heeft een eigen energiegrens; tussen de vertrekken regelt Home Assistant het laden. Een herstart, loskoppelen, een handmatige stop of het wijzigen van het actieve sjabloon beëindigt haar.", "La ricorrenza vale solo per questo collegamento, al massimo sette giorni. Ogni partenza ha il proprio tetto di energia; tra le partenze Home Assistant controlla la ricarica. Riavvio, scollegamento, stop manuale o modifica del modello attivo la terminano."],
+    consent_hint:["Recurrence applies to this connection, for at most seven days. Each departure has its own energy ceiling; between departures Home Assistant controls charging. Restart, unplugging, a manual stop or editing the active recipe ends it. If Home Assistant has confirmed the selected car for this connection, the plan remembers the car and activates itself whenever Home Assistant confirms it again: after plugging in, after a restart and beyond seven days.", "Die Wiederholung gilt für diesen Steckvorgang, höchstens sieben Tage. Jede Abfahrt hat eine eigene Energieobergrenze; zwischen den Abfahrten steuert Home Assistant die Ladung. Neustart, Abstecken, manueller Stopp oder Änderung des aktiven Plans beenden sie. Hat Home Assistant das ausgewählte Fahrzeug für diesen Steckvorgang bestätigt, merkt sich der Plan das Fahrzeug und aktiviert sich selbst, sobald Home Assistant es erneut bestätigt: nach dem Anstecken, nach einem Neustart und über sieben Tage hinaus.", "La récurrence vaut pour cette connexion, sept jours au plus. Chaque départ a son propre plafond d’énergie ; entre les départs, Home Assistant pilote la recharge. Un redémarrage, un débranchement, un arrêt manuel ou une modification du modèle actif y mettent fin. Si Home Assistant a confirmé le véhicule choisi pour cette connexion, le plan retient le véhicule et s’active de lui-même dès que Home Assistant le confirme à nouveau : après le branchement, après un redémarrage et au-delà de sept jours.", "De herhaling geldt voor deze verbinding, hoogstens zeven dagen. Elk vertrek heeft een eigen energiegrens; tussen de vertrekken regelt Home Assistant het laden. Een herstart, loskoppelen, een handmatige stop of het wijzigen van het actieve sjabloon beëindigt haar. Heeft Home Assistant het gekozen voertuig voor deze verbinding bevestigd, dan onthoudt het plan het voertuig en activeert het zichzelf zodra Home Assistant het opnieuw bevestigt: na het aansluiten, na een herstart en langer dan zeven dagen.", "La ricorrenza vale per questo collegamento, al massimo sette giorni. Ogni partenza ha il proprio tetto di energia; tra le partenze Home Assistant controlla la ricarica. Riavvio, scollegamento, stop manuale o modifica del modello attivo la terminano. Se Home Assistant ha confermato il veicolo selezionato per questo collegamento, il piano ricorda il veicolo e si attiva da solo non appena Home Assistant lo conferma di nuovo: dopo il collegamento, dopo un riavvio e oltre i sette giorni."],
     confirm_vehicle:["I have checked that the selected vehicle is connected.", "Ich habe geprüft, dass das ausgewählte Fahrzeug angeschlossen ist.", "J’ai vérifié que le véhicule choisi est connecté.", "Ik heb gecontroleerd dat het gekozen voertuig is aangesloten.", "Ho verificato che il veicolo selezionato è collegato."],
     activate_preview:["Preview activation", "Aktivierung prüfen", "Aperçu de l’activation", "Voorbeeld van de activering", "Anteprima dell’attivazione"],
     activate:["Confirm activation", "Aktivierung bestätigen", "Confirmer l’activation", "Activering bevestigen", "Confermare l’attivazione"],
@@ -50,6 +50,7 @@
     saved:["Recipe saved. Activation is a separate confirmation.", "Plan gespeichert. Die Aktivierung muss separat bestätigt werden.", "Modèle enregistré. L’activation est une confirmation distincte.", "Sjabloon opgeslagen. Activeren is een aparte bevestiging.", "Modello salvato. L’attivazione è una conferma separata."],
     active:["Active for this connection", "Für diesen Steckvorgang aktiv", "Actif pour cette connexion", "Actief voor deze verbinding", "Attivo per questo collegamento"],
     inactive:["Not activated", "Nicht aktiviert", "Non activé", "Niet geactiveerd", "Non attivato"],
+    assigned:["Activates itself for its confirmed car", "Aktiviert sich für sein bestätigtes Fahrzeug selbst", "S’active de lui-même pour son véhicule confirmé", "Activeert zichzelf voor zijn bevestigde voertuig", "Si attiva da solo per il suo veicolo confermato"],
     consumed:["Already consumed", "Bereits verbraucht", "Déjà utilisé", "Al gebruikt", "Già usato"],
     skipped:["Skipped", "Ausgesetzt", "Ignoré", "Overgeslagen", "Saltato"],
     ready:["Scheduled window", "Geplantes Ladefenster", "Plage prévue", "Gepland venster", "Finestra pianificata"],
@@ -85,6 +86,7 @@
   const plan = () => state?.plans.find(item => item.plan.id === selected)?.plan || null;
   const stamp = value => { const date = new Date(value); return Number.isFinite(date.getTime()) ? date.toLocaleString(locale, {timeZoneName:"short"}) : "—"; };
   function notice(text, error = false) { el("weekly_notice").textContent = text; el("weekly_notice").dataset.error = String(error); }
+  function assigned(data) { return (data?.plans || []).filter(item=>item.assigned === true).map(item=>item.plan.vehicle_profile); }
   function discard() { planProposal = null; activation = null; el("weekly_preview").hidden = true; el("activation_preview").hidden = true; }
   function controls() {
     const usable = Boolean(state?.ready && !state.storage_error && !busy);
@@ -95,7 +97,7 @@
     el("activate").disabled = !usable || !activation;
     el("save_plan").disabled = !usable || !planProposal;
     el("remove_plan").disabled = !usable || !plan();
-    el("deactivate").disabled = !usable || !state?.active;
+    el("deactivate").disabled = !usable || !(state?.active || assigned(state).length);
   }
   function fill(recipe) {
     loadedRecipe = JSON.stringify(recipe);
@@ -116,8 +118,12 @@
     const opts = [new Option(t("new_plan"),""), ...data.plans.map(item=>new Option(item.plan.vehicle_profile,item.plan.id))];
     el("plan_select").replaceChildren(...opts); el("plan_select").value=selected;
     if (!dirty && loadedRecipe !== JSON.stringify(plan())) fill(plan());
-    el("weekly_active").hidden = !data.active;
-    el("active_description").textContent = data.active ? `${data.active.vehicle_profile}\n${t("until")}: ${stamp(data.active.until)}` : "";
+    const remembered = assigned(data);
+    el("weekly_active").hidden = !data.active && !remembered.length;
+    el("active_description").textContent = [
+      ...(data.active ? [data.active.vehicle_profile, `${t("until")}: ${stamp(data.active.until)}`] : []),
+      ...(remembered.length ? [`${t("assigned")}: ${remembered.join(", ")}`] : []),
+    ].join("\n");
     controls();
   }
   function rows(values) {

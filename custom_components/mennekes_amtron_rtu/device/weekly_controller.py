@@ -7,6 +7,8 @@ import hashlib
 import hmac
 import json
 import secrets
+from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -25,6 +27,12 @@ class WeeklyError(ValueError):
     """Stable public refusal code, without raw storage or device error text."""
 
 
+def vehicle_key(source: str) -> str:
+    """A vehicle profile stays the same car when its source description changes."""
+    parts = source.split(":", 2)
+    return ":".join(parts[:2]) if len(parts) == 3 and parts[0] == "profile" else source
+
+
 @dataclass(slots=True)
 class SessionConsent:
     plan_id: str
@@ -37,18 +45,30 @@ class SessionConsent:
 
 
 class WeeklyController:
-    """Persist at-most-once occurrence claims, never persist vehicle consent.
+    """Persist at-most-once occurrence claims and the car a plan was activated for.
 
     One activation covers only the currently confirmed connection for at most
     seven days. Recipe edits, manual stops, restart, unplugging or a lasting
     connection gap end it. A completed occurrence hands control back to Home
     Assistant; the next one starts at its own window, never after a stopped or
     interrupted occurrence. A failed/uncertain claim is not silently replayed.
+
+    A plan activated by hand while Home Assistant had confirmed the car for
+    that plug-in remembers the car. Once Home Assistant confirms the same car
+    for a later plug-in, or again after a restart, the plan activates itself,
+    once per plug-in. Stopping the plan or its charge by hand forgets the car.
     """
 
-    def __init__(self, store: WeeklyStore, jobs: WeeklyChargeJobs) -> None:
+    def __init__(
+        self, store: WeeklyStore, jobs: WeeklyChargeJobs,
+        confirmed: Callable[[], tuple[str, str] | None] | None = None,
+    ) -> None:
         self.store = store
         self.jobs = jobs
+        # The car Home Assistant confirmed and the plug-in it confirmed it for.
+        self.confirmed = confirmed
+        # The plug-in that already had its activation, by hand or by itself.
+        self._served: str | None = None
         self.book = WeeklyBook()
         self.ready = False
         self.storage_error = False
@@ -183,20 +203,35 @@ class WeeklyController:
             self.jobs.preview(frozen["request"], revision=frozen["job_revision"], scope=frozen["scope"])
             self.consent = SessionConsent(frozen["plan_id"], frozen["vehicle_profile"], frozen["scope"],
                                           job_time(frozen["active_until"]), self.jobs.manual_stop_epoch, sample.now)
+            self._served = frozen["scope"]
             self._last_confirmation = signature
             self._changed()
             try:
-                await self._dispatch(frozen["request"], frozen["occurrence"]["date"], frozen["job_revision"])
+                await self._dispatch(frozen["request"], frozen["occurrence"]["date"], frozen["job_revision"],
+                                     vehicle=self._vehicle(frozen["scope"]))
             except BaseException:
                 await self._disarm("activation_unconfirmed")
                 raise
             return self.snapshot()
 
-    async def _dispatch(self, request: dict[str, Any], day: str, job_revision: str) -> None:
+    def _vehicle(self, scope: str | None) -> str | None:
+        found = self.confirmed() if self.confirmed is not None else None
+        return vehicle_key(found[0]) if found is not None and scope is not None and found[1] == scope else None
+
+    async def _forget(self, plan_id: str | None) -> None:
+        candidate = self.book.unassign(plan_id)
+        if candidate != self.book:
+            await self._save(candidate)
+
+    async def _dispatch(
+        self, request: dict[str, Any], day: str, job_revision: str, *, vehicle: str | None = None,
+    ) -> None:
         consent = self.consent
         if consent is None:
             raise WeeklyError("weekly_inactive")
         candidate = self.book.reserve(consent.plan_id, date.fromisoformat(day))
+        if vehicle is not None:
+            candidate = candidate.assign(consent.plan_id, vehicle)
         await self._save(candidate)
         # A stop during the storage await invalidates this permission too.
         if self.jobs.manual_stop_epoch != consent.stop_epoch:
@@ -223,23 +258,85 @@ class WeeklyController:
     async def deactivate(self, *, revision: object) -> dict[str, Any]:
         async with self._lock:
             self._check(revision)
+            consent = self.consent
             await self._disarm("user_stop")
+            # Without an active plan the stop ends every automatic activation.
+            await self._forget(None if consent is None else consent.plan_id)
             return self.snapshot()
+
+    async def _activate_assigned(self) -> None:
+        """Serve the car a plan was activated for, once per plug-in."""
+        if self.storage_error or self._closing or not self.book.assigned:
+            return
+        sample = self.jobs.inputs()
+        scope = sample.scope
+        if not sample.available or sample.present is not True or scope is None or scope == self._served:
+            return
+        vehicle = self._vehicle(scope)
+        plan_id = None if vehicle is None else self.book.assigned_plan(vehicle)
+        if plan_id is None:
+            return
+        plan = self.book.plan(plan_id)
+        until = sample.now + timedelta(days=7)
+        consent = SessionConsent(plan_id, plan.vehicle_profile, scope, until, self.jobs.manual_stop_epoch, sample.now)
+        job = self.jobs.job
+        row: WeeklyOccurrence | None = None
+        if job is not None and not job.terminal:
+            # After a restart the plan's own order may still run; any other
+            # order is waited for.
+            rows = plan.upcoming(now=sample.now, horizon_days=7, limit=32)
+            if job.binding != scope or all(item.identifier != job.identifier for item in rows):
+                return
+            consent.job_id = job.identifier
+        else:
+            row = self._next(plan, sample.now, until)
+            if (
+                row is None or sample.pending or not sample.meter_fresh or not sample.permitted
+                or sample.independent_stop
+            ):
+                return
+            try:
+                # The ordinary admission, without any write: an order that
+                # still needs clearing is waited for, and uses up no date.
+                proposal = self.jobs.preview(
+                    row.job_request(now=sample.now, vehicle_profile=plan.vehicle_profile),
+                    revision=self.jobs.revision, scope=scope,
+                )
+            except ValueError:
+                return
+        self.consent, self._served, self.reason = consent, scope, "active"
+        self._changed()
+        if row is None:
+            return
+        try:
+            await self._dispatch(proposal["request"], row.local_date.isoformat(), proposal["revision"])
+        except (OSError, ValueError, DeviceError):
+            await self._disarm("activation_unconfirmed")
 
     async def tick(self) -> None:
         async with self._lock:
             consent = self.consent
             if consent is None:
+                await self._activate_assigned()
                 return
             sample = self.jobs.inputs()
             if self.storage_error or self._closing:
                 await self._disarm("weekly_storage_unavailable")
                 return
+            stopped = self.jobs.manual_stop_epoch != consent.stop_epoch
             if (
-                sample.present is False or self.jobs.manual_stop_epoch != consent.stop_epoch
+                sample.present is False or stopped
                 or sample.now >= consent.expires or sample.now < consent.last_now - timedelta(seconds=5)
             ):
+                if sample.now >= consent.expires:
+                    # An assigned car that stays plugged in is served on.
+                    self._served = None
                 await self._disarm("session_ended")
+                if stopped:
+                    # A stop by hand also ends the automatic activation. A
+                    # failed save already fences it.
+                    with suppress(WeeklyError):
+                        await self._forget(consent.plan_id)
                 return
             if not sample.available or sample.present is None:
                 # A short gap: the order and the connection scope bound it.
@@ -299,7 +396,9 @@ class WeeklyController:
         sample, consent = self.jobs.inputs(), self.consent
         return {"schema": 1, "revision": self.revision, "ready": self.ready,
                 "storage_error": self.storage_error, "reason": self.reason,
-                "plans": [{"plan": plan.snapshot(), "upcoming": self._rows(plan)} for plan in self.book.plans],
+                "plans": [{"plan": plan.snapshot(), "upcoming": self._rows(plan),
+                           "assigned": any(key == plan.identifier for key, _ in self.book.assigned)}
+                          for plan in self.book.plans],
                 "active": None if consent is None else {"plan_id": consent.plan_id, "vehicle_profile": consent.profile,
                                                          "until": consent.expires.isoformat(), "job_id": consent.job_id},
                 "scope": sample.scope, "available": sample.available, "present": sample.present,

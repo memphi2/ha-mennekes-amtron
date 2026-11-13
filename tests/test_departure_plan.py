@@ -716,3 +716,16 @@ def test_commands_need_a_ready_plan_and_shutdown_saves(tmp_path):
         assert restored.inputs == inputs()
         assert restored.anchor == box.plan.anchor
     run(go())
+
+
+def test_the_confirmed_car_is_named_only_for_its_own_plug_in(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        assert box.plan.confirmed_vehicle(box.state) is None
+        plan = await box.start()
+        assert plan.confirmed_vehicle(box.state) == (CAR, SCOPE)
+        assert plan.confirmed_vehicle(sample(scope=None)) is None
+        assert plan.confirmed_vehicle(sample(scope=OTHER, session=None)) is None
+        await plan.set_inputs(inputs(scope=None))
+        assert plan.confirmed_vehicle(box.state) is None
+    run(go())

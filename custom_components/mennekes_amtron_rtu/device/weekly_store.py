@@ -1,4 +1,4 @@
-"""Bounded recipes and monotonic consumed dates; never persist session consent."""
+"""Bounded recipes, consumed dates and the car a recipe was activated for."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from .weekly_plan import WeeklyPlan
 MAX_PLANS = 16
 MAX_LEDGER = 128
 MAX_WEEKLY_BYTES = 131072
+MAX_VEHICLE_LENGTH = 512
 _ID = re.compile(r"[0-9a-f]{32}")
 
 
@@ -30,12 +31,15 @@ class WeeklyBook:
 
     plans: tuple[WeeklyPlan, ...] = ()
     consumed: tuple[tuple[str, date], ...] = ()
+    # Plan id and the car Home Assistant had confirmed when the plan was
+    # activated by hand. It names who may be served again, not a consent.
+    assigned: tuple[tuple[str, str], ...] = ()
 
     @classmethod
     def parse(cls, raw: object) -> WeeklyBook:
-        if not isinstance(raw, dict) or raw.keys() != {"plans", "consumed"}:
+        if not isinstance(raw, dict) or raw.keys() - {"assigned"} != {"plans", "consumed"}:
             raise ValueError("invalid weekly book fields")
-        recipes, ledger = raw["plans"], raw["consumed"]
+        recipes, ledger, cars = raw["plans"], raw["consumed"], raw.get("assigned", {})
         if not isinstance(recipes, list) or len(recipes) > MAX_PLANS:
             raise ValueError("invalid weekly plan count")
         if not isinstance(ledger, dict) or len(ledger) > MAX_LEDGER:
@@ -54,11 +58,21 @@ class WeeklyBook:
             if day.isoformat() != text:
                 raise ValueError("invalid weekly consumed date")
             consumed.append((key, day))
-        return cls(tuple(sorted(plans, key=lambda item: item.identifier)), tuple(sorted(consumed)))
+        if (
+            not isinstance(cars, dict) or cars.keys() - {plan.identifier for plan in plans}
+            or any(not isinstance(car, str) or not 1 <= len(car) <= MAX_VEHICLE_LENGTH for car in cars.values())
+            or len(set(cars.values())) != len(cars)
+        ):
+            raise ValueError("invalid weekly vehicle assignment")
+        return cls(
+            tuple(sorted(plans, key=lambda item: item.identifier)), tuple(sorted(consumed)),
+            tuple(sorted(cars.items())),
+        )
 
     def snapshot(self) -> dict[str, Any]:
         return {"plans": [plan.snapshot() for plan in self.plans],
-                "consumed": {key: day.isoformat() for key, day in self.consumed}}
+                "consumed": {key: day.isoformat() for key, day in self.consumed},
+                "assigned": dict(self.assigned)}
 
     def plan(self, identifier: object) -> WeeklyPlan:
         for plan in self.plans:
@@ -75,7 +89,24 @@ class WeeklyBook:
         self.plan(identifier)
         raw = self.snapshot()
         raw["plans"] = [item for item in raw["plans"] if item["id"] != identifier]
+        raw["assigned"].pop(identifier, None)
         return self.parse(raw)
+
+    def assign(self, identifier: str, vehicle: str) -> WeeklyBook:
+        """One car has one plan; its earlier plan loses the car."""
+        self.plan(identifier)
+        raw = self.snapshot()
+        raw["assigned"] = {key: car for key, car in self.assigned if car != vehicle} | {identifier: vehicle}
+        return self.parse(raw)
+
+    def unassign(self, identifier: str | None) -> WeeklyBook:
+        """Forget one plan's car, or every car for None."""
+        raw = self.snapshot()
+        raw["assigned"] = {key: car for key, car in self.assigned if identifier not in (None, key)}
+        return self.parse(raw)
+
+    def assigned_plan(self, vehicle: str) -> str | None:
+        return next((key for key, car in self.assigned if car == vehicle), None)
 
     def used(self, identifier: str, day: date) -> bool:
         previous = dict(self.consumed).get(identifier)

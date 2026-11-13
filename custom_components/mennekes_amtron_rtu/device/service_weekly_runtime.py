@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class WeeklyModbusService(JobModbusService):
-    """Recipes survive restarts; vehicle/session consent deliberately does not."""
+    """Recipes and the car they were activated for survive restarts; consent does not."""
 
     jobs: WeeklyChargeJobs | None = None
     weekly: WeeklyController | None = None
@@ -31,7 +31,12 @@ class WeeklyModbusService(JobModbusService):
         control.set_service_policy(ServiceChargePolicy(self.jobs.current_policy, self.jobs.stop_requested))
         self.weekly = WeeklyController(
             WeeklyStore(self.state_path.with_name("weekly-plans.json"), identity), self.jobs,
+            lambda: self._confirmed_vehicle(),
         )
+
+    def _confirmed_vehicle(self) -> tuple[str, str] | None:
+        """The car Home Assistant confirmed, and the plug-in it did so for."""
+        return None
 
     async def _initialize(self) -> None:
         await super()._initialize()

@@ -470,7 +470,7 @@ dates, the active activation and the current job. Every `POST` names an
 | `save_plan`, `remove_plan` | `revision`, `plan` or `plan_id`, `confirm` | Saves or removes a plan. Editing or removing the active plan stops its job. |
 | `preview_activation` | `revision`, `plan_id`, `vehicle_profile`, `scope` | Returns a signed proposal for the first job and the activation end. |
 | `activate` | `proposal`, `confirm` | Starts the activation within 60 seconds of the preview. Repeating it returns the outcome without extending it. |
-| `deactivate` | `revision`, `confirm` | Ends the activation and stops its job. |
+| `deactivate` | `revision`, `confirm` | Ends the activation, stops its job and forgets the plan's remembered car. Without an activation it forgets every remembered car. |
 
 The first job is created on activation. Each later job is created when its
 window opens, replacing the finished one; until then the finished job has handed
@@ -483,8 +483,19 @@ A `plan` has `id`, `vehicle_profile`, `timezone` (IANA), `weekdays` (Monday is
 The activation itself is never saved; a service restart ends it. A running job
 of the plan may then continue on its own as described above. Each local
 date is marked as used before its job is created, so a date never runs twice,
-also after an edit or restart. Plans and used dates are kept in
-`/data/weekly-plans.json`, at most 128 KiB.
+also after an edit or restart. Plans, used dates and remembered cars are kept
+in `/data/weekly-plans.json`, at most 128 KiB.
+
+An `activate` while Home Assistant has confirmed a car for the plug-in (see
+`departure_inputs` under [Departure plan](#departure-plan)) saves that car with
+the plan; each entry of `plans` then reports `assigned: true`. A car handed
+over as `profile:<id>:…` is remembered as `profile:<id>`, any other by its full
+source text. Once the same car is confirmed for the current plug-in and no
+activation exists, the service activates the plan itself, once per plug-in and
+again when seven days have passed. It takes up a job of the plan that is still
+running, or creates the job for the next unused date after the ordinary job
+admission succeeds. A manual job stop or clear during an activation, and
+`deactivate`, remove the remembered car.
 
 Errors return HTTP 409 with a key such as `weekly_changed`,
 `weekly_already_active`, `weekly_vehicle_not_confirmed`,

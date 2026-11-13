@@ -223,3 +223,17 @@ def test_initialisation_needs_a_configured_plan(departure_service, monkeypatch):
                 await departure_runtime.DepartureModbusService._initialize(s)
             monkeypatch.undo()
     asyncio.run(run())
+
+
+def test_weekly_plans_learn_the_confirmed_car_from_the_departure_plan(departure_service):
+    async def run():
+        async with departure_service() as (s, _transport, _clock):
+            assert s.weekly.confirmed() is None
+            given, _result = await hand_over(s)
+            assert s.weekly.confirmed() == (CAR, given.scope)
+            # A service without a departure plan confirms no car.
+            assert departure_runtime.ForecastModbusService._confirmed_vehicle(s) is None
+            plan, s.departure = s.departure, None
+            assert s.weekly.confirmed() is None
+            s.departure = plan
+    asyncio.run(run())

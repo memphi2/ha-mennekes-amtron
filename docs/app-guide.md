@@ -239,13 +239,35 @@ An activation covers only this connection and ends after seven days at the
 latest. Unplugging, an app restart, a wallbox unreadable for more than a minute
 between departures, a stop or clear on **Charging jobs**, editing or removing
 the active plan, **Stop weekly automation** or another limit that stops a
-running job all end it; it never restarts by itself. A running job of the plan
-continues after an app restart only as described under
-[After an app restart](#after-an-app-restart-or-a-connection-loss), and then
-without the plan. Each departure
-date runs at most once, also after an edit or a restart. A local time that does
-not exist on a clock change is shown as invalid instead of being moved; for a
-repeated time, choose the earlier or later occurrence.
+running job all end it. A running job of the plan continues after an app
+restart only as described under
+[After an app restart](#after-an-app-restart-or-a-connection-loss). Each
+departure date runs at most once, also after an edit or a restart. A local time
+that does not exist on a clock change is shown as invalid instead of being
+moved; for a repeated time, choose the earlier or later occurrence.
+
+### Automatic activation for a confirmed car
+
+If Home Assistant has [confirmed the selected car](vehicle-setup.md) for the
+plug-in at the moment you confirm the activation, the plan remembers that car.
+From then on it activates itself, without a new confirmation, as soon as Home
+Assistant confirms the same car for a plug-in:
+
+- after the car is plugged in again
+- after an app restart; a job of the plan that continues is taken up again,
+  otherwise the next departure is planned
+- after seven days, while the car stays plugged in
+
+The page shows **Activates itself for its confirmed car** for such a plan. A
+plan activates itself once per plug-in. After you edit the active plan, it waits
+for the next plug-in. While another order runs, or a stopped or interrupted
+order still needs clearing on **Charging jobs**, it waits as well.
+
+**Stop weekly automation**, and a stop or clear on **Charging jobs** while the
+plan is active, make the plan forget its car; so does removing the plan.
+Activate it again by hand to have it remembered once more. A car has one such
+plan: activating another plan for the same car moves the car to that plan.
+Without a car confirmed by Home Assistant, every activation stays a manual one.
 
 ## Registers
 

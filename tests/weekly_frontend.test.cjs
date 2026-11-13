@@ -88,3 +88,15 @@ test("remove and deactivate are explicit bounded commands",async()=>{
   const second=await harness({...state(),active:{plan_id:plan.id,vehicle_profile:"fixture",until:proposal().active_until}});
   second.responses.push({...state(),revision:"r2"});await second.trigger("deactivate");assert.equal(JSON.parse(second.requests.at(-1).body).confirm,true);
 });
+
+test("a plan that activates itself is shown and can be stopped without an activation",async()=>{
+  const remembered={...state(),plans:[{plan,upcoming:[],assigned:true}]};
+  const h=await harness(remembered);
+  assert.equal(h.nodes.weekly_active.hidden,false);assert.equal(h.nodes.deactivate.disabled,false);
+  assert.match(h.nodes.active_description.textContent,/^Aktiviert sich für sein bestätigtes Fahrzeug selbst: fixture$/);
+  h.responses.push({...state(),revision:"r2"});await h.trigger("deactivate");
+  assert.equal(JSON.parse(h.requests.at(-1).body).action,"deactivate");
+  assert.equal(h.nodes.weekly_active.hidden,true);assert.equal(h.nodes.deactivate.disabled,true);
+  const active=await harness({...remembered,active:{plan_id:plan.id,vehicle_profile:"fixture",until:"2026-11-23T05:00:00Z"}});
+  assert.match(active.nodes.active_description.textContent,/^fixture\n.+\nAktiviert sich/);
+});
