@@ -205,9 +205,22 @@ def test_planned_start_follows_the_plan_and_clears_without_one(monkeypatch: pyte
         assert observer.planned_start is None
         await observer._evaluate()
         assert observer.planned_start is not None
-        del hass.states["sensor.soc"]
+        started = observer.planned_start
+        # A charge level or poll that drops out keeps the started plan.
+        soc = hass.states.pop("sensor.soc")
         await observer._evaluate()
         assert observer.status == "waiting_for_soc"
+        assert observer.planned_start == started
+        hass.states["sensor.soc"] = soc
+        observer._runtime.coordinator.last_update_success = False
+        await observer._evaluate()
+        assert observer.status == "waiting_for_device"
+        assert observer.planned_start == started
+        observer._runtime.coordinator.last_update_success = True
+        # A missing target ends it.
+        observer._runtime.control.soc_goal.status = "inactive"
+        await observer._evaluate()
+        assert observer.status == "waiting_for_target"
         assert observer.planned_start is None
 
     asyncio.run(run())
@@ -829,5 +842,27 @@ def test_an_unconfirmed_car_ends_the_plans_pause_and_gets_no_plan(monkeypatch):
         binding.resting = False
         await observer._evaluate()
         assert observer.status == "paused_until_start"
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("withdraw", [False, True])
+def test_only_another_car_ends_the_plans_pause_on_stop(monkeypatch, withdraw):
+    async def run():
+        observer, control, _hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        resumed = []
+
+        async def resume():
+            resumed.append(True)
+
+        control.async_resume_charging = resume
+        observer.goal.set(NOW + timedelta(hours=16))
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+        control.pause_requested = True
+        # A reload keeps the pause for the same car's plan.
+        await observer.async_stop(withdraw=withdraw)
+        assert resumed == ([True] if withdraw else [])
 
     asyncio.run(run())

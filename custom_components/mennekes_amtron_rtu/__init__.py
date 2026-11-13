@@ -671,13 +671,20 @@ async def _async_start_vehicle(
     runtime.vehicle_profile_id = options.get(CONF_VEHICLE_PROFILE_ID)
 
 
-async def _async_stop_vehicle(runtime: MennekesAmtronRuntimeData) -> None:
-    """Stop the selected vehicle's observers; the wallbox keeps running."""
+async def _async_stop_vehicle(
+    runtime: MennekesAmtronRuntimeData, *, withdraw: bool = False,
+) -> None:
+    """Stop the selected vehicle's observers; the wallbox keeps running.
+
+    ``withdraw`` ends the car's plan pause when another car takes over.
+    """
     runtime.vehicle_profile_id = None
     timed, soc, loss = runtime.timed_goal, runtime.vehicle_soc, runtime.charge_loss
     runtime.timed_goal = runtime.vehicle_soc = runtime.charge_loss = None
     runtime.vehicle_telemetry = None
-    for owner in (timed, soc, loss):
+    if timed is not None:
+        await timed.async_stop(withdraw=withdraw)
+    for owner in (soc, loss):
         if owner is not None:
             await owner.async_stop()
 
@@ -717,7 +724,7 @@ async def _async_switch_vehicle(
     runtime.vehicle_switching = True
     try:
         await _async_park_trip(hass, entry)
-        await _async_stop_vehicle(runtime)
+        await _async_stop_vehicle(runtime, withdraw=True)
         auto = entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
         if not auto and runtime.vehicle_detection is not None:
             runtime.vehicle_detection.stop()

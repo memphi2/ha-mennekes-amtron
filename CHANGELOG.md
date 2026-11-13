@@ -43,6 +43,10 @@ Integration only; the app stays at 0.9.0b1.
   pause is confirmed.
 - Lost-reply messages of other Modbus integrations in Home Assistant are no
   longer demoted to debug.
+- The PV surplus blueprint works on wallboxes without phase switching: leave
+  Requested phases empty and set the phase count instead.
+- Selecting another car ends the old car's departure-plan pause, and a
+  dropped charge level or poll no longer pauses a plan that already started.
 - Includes the changes of #56 to #62: departure finishing window, Plug &
   Charge decision reasons, and the app's overview, register and runtime pages.
 

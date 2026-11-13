@@ -164,7 +164,12 @@ class TimedGoalObserver:
             self._unsubs.append(binding.subscribe(self.request_evaluate))
         self.request_evaluate()
 
-    async def async_stop(self) -> None:
+    async def async_stop(self, *, withdraw: bool = False) -> None:
+        """Stop following the trip; ``withdraw`` also ends this plan's pause.
+
+        A reload keeps the pause, as the same car's plan takes it over again.
+        Another car, or none, must not stay paused by this car's plan.
+        """
         self._stopping = True
         for unsub in self._unsubs:
             unsub()
@@ -175,6 +180,8 @@ class TimedGoalObserver:
                 await self._task
         try:
             await self._cancel_command()
+            if withdraw:
+                await self._end_plan_pause()
         except (AmtronBusError, HomeAssistantError, OSError) as err:
             # The independent service still expires the queued command at its
             # deadline. A disconnected service must not abort HA teardown.
@@ -469,11 +476,13 @@ class TimedGoalObserver:
         soc = observer.latest_soc if observer is not None else vehicle_percentage(
             self._hass.states.get(soc_entity) if isinstance(soc_entity, str) else None
         )
+        # A charge level or poll that drops out for a moment keeps the plan's
+        # start: forgetting it would pause a charge that already runs.
         if soc is None:
-            await self._wait_for_input("waiting_for_soc")
+            await self._wait_for_input("waiting_for_soc", keep_start=True)
             return
         if not self._runtime.coordinator.last_update_success:
-            await self._wait_for_input("waiting_for_device")
+            await self._wait_for_input("waiting_for_device", keep_start=True)
             return
         if control.read_only:
             await self._wait_for_input("read_only")
@@ -578,18 +587,21 @@ class TimedGoalObserver:
     async def _rest(self) -> None:
         """Another car may be plugged in: withdraw this car's plan, pause included."""
         await self._cancel_command()
+        await self._end_plan_pause()
+        self._set_status("vehicle_unconfirmed")
+
+    async def _end_plan_pause(self) -> None:
         control = self._runtime.control
         if self._plan_paused and control.pause_requested is True and not control.read_only:
             await control.async_resume_charging()
-            _LOGGER.info("Departure plan pause ended: the car at the wallbox is not confirmed")
+            _LOGGER.info("Departure plan pause ended: the plan no longer applies to the car")
         self._plan_paused = False
-        self._set_status("vehicle_unconfirmed")
 
-    async def _wait_for_input(self, status: str) -> None:
+    async def _wait_for_input(self, status: str, *, keep_start: bool = False) -> None:
         # Keep an already applied charge unchanged, but do not let an older
         # queued start run after the plan's target or input became unavailable.
         await self._cancel_command()
-        self._set_status(status)
+        self._set_status(status, keep_start=keep_start)
 
     def _target_raised(self) -> bool:
         """The percentage target lies above the car's current charge level."""
@@ -609,8 +621,8 @@ class TimedGoalObserver:
         )
         return soc is not None and soc < goal.target_percent
 
-    def _set_status(self, status: str) -> None:
-        if status not in _PLANNED:
+    def _set_status(self, status: str, *, keep_start: bool = False) -> None:
+        if status not in _PLANNED and not keep_start:
             self.planned_start = None
         if status != self.status:
             self.status = status
