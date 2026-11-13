@@ -60,7 +60,7 @@ def test_reserve_charges_now_then_waits_and_finishes_under_one_ceiling():
 
 @pytest.mark.parametrize("value", [None, True, "5", -1, 0.05, 0.11, 20.1, float("nan"), float("inf"), 10**1000])
 def test_bad_or_excessive_reserve_is_rejected_before_a_job_exists(value):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"energy|reserve"):
         model(reserve_kwh=value)
 
 
@@ -156,7 +156,7 @@ def test_atomic_snapshot_retains_latch_but_restart_does_not_restore_permission(r
 def test_invalid_saved_reserve_is_not_treated_as_disabled(raw):
     value = model().snapshot()
     value["reserve"] = raw
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="reserve"):
         ChargeJob.restore(value)
 
 
