@@ -36,9 +36,20 @@
     connection:["Connection","Verbindung","Connexion","Verbinding","Connessione"],
     read_only:["Read-only mode","Nur-Lesen-Modus","Mode lecture seule","Alleen-lezenmodus","Modalità sola lettura"],
     listen:["Listen address","Listen-Adresse","Adresse d’écoute","Luisteradres","Indirizzo di ascolto"],
-    port:["API port","API-Port","Port de l’API","API-poort","Porta API"]
+    port:["API port","API-Port","Port de l’API","API-poort","Porta API"],
+    busy:["Another request is running. Try again shortly.", "Eine andere Anfrage läuft noch. Gleich noch einmal versuchen.", "Une autre requête est en cours. Réessayez dans un instant.", "Een ander verzoek loopt nog. Probeer het zo opnieuw.", "Un’altra richiesta è in corso. Riprova tra poco."],
+    reload_required:["Reload this page and try again.", "Seite neu laden und erneut versuchen.", "Rechargez cette page et réessayez.", "Herlaad deze pagina en probeer het opnieuw.", "Ricaricare la pagina e riprovare."],
+    admin_required:["Sign in to Home Assistant as an administrator.", "Bei Home Assistant als Administrator anmelden.", "Connectez-vous à Home Assistant en tant qu’administrateur.", "Meld je aan bij Home Assistant als beheerder.", "Accedi a Home Assistant come amministratore."],
+    supervisor_unavailable:["Home Assistant Supervisor did not answer. Reload this page.", "Home Assistant Supervisor hat nicht geantwortet. Seite neu laden.", "Supervisor n’a pas répondu. Rechargez la page.", "Supervisor heeft niet geantwoord. Herlaad deze pagina.", "Supervisor non ha risposto. Ricaricare la pagina."],
+    supervisor_update_required:["Update Home Assistant Supervisor to 2026.10.4 or newer.", "Home Assistant Supervisor auf 2026.10.4 oder neuer aktualisieren.", "Mettez Supervisor à jour vers 2026.10.4 ou ultérieur.", "Werk Supervisor bij naar 2026.10.4 of nieuwer.", "Aggiorna Supervisor alla versione 2026.10.4 o successiva."],
+    invalid_request:["The request was rejected. Reload this page and try again.", "Anfrage abgelehnt. Seite neu laden und erneut versuchen.", "Requête refusée. Rechargez la page et réessayez.", "Verzoek geweigerd. Herlaad de pagina en probeer het opnieuw.", "Richiesta rifiutata. Ricaricare la pagina e riprovare."],
+    runtime_apply_pending:["Saved, but not applied yet. Reload to check the effective values.", "Gespeichert, aber noch nicht übernommen. Neu laden, um die wirksamen Werte zu prüfen.", "Enregistré, mais pas encore appliqué. Rechargez pour vérifier les valeurs en vigueur.", "Opgeslagen, maar nog niet toegepast. Herlaad om de actieve waarden te controleren.", "Salvato, ma non ancora applicato. Ricaricare per verificare i valori in vigore."],
+    settings_changed:["Settings changed elsewhere. Reload before saving again; nothing was saved.", "Einstellungen wurden anderswo geändert. Vor dem Speichern neu laden; nichts wurde gespeichert.", "Les réglages ont changé ailleurs. Rechargez avant d’enregistrer ; rien n’a été enregistré.", "De instellingen zijn elders gewijzigd. Herlaad voor het opslaan; er is niets opgeslagen.", "Le impostazioni sono cambiate altrove. Ricaricare prima di salvare; non è stato salvato nulla."],
+    runtime_settings_invalid:["Values outside the allowed range.", "Werte außerhalb des erlaubten Bereichs.", "Valeurs hors de la plage autorisée.", "Waarden buiten het toegestane bereik.", "Valori fuori dall’intervallo consentito."]
   };
   const text = key => labels[key]?.[column] || key;
+  // A known server key names the cause; anything else stays the generic text.
+  const failure = err => { const key = err?.message === "options_save_uncertain" ? "blocked" : err?.message; return labels[key] ? text(key) : text("error"); };
   document.querySelectorAll("[data-text]").forEach(node => { node.textContent = text(node.dataset.text); });
   const el = id => document.getElementById(id);
   let state = null, pending = null, busy = false, blocked = false;
@@ -56,7 +67,7 @@
       const options={cache:"no-store",signal:controller.signal};
       if (payload) Object.assign(options,{method:"POST",headers:{"Content-Type":"application/json","X-Amtron-CSRF":state.csrf},body:JSON.stringify(payload)});
       const response=await fetch(path,options), data=await response.json();
-      if (!response.ok) throw new Error("request failed");
+      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "error");
       return data;
     } finally { clearTimeout(timeout); }
   }
@@ -84,7 +95,7 @@
       const rows=data.changes.map(change=>{const li=document.createElement("li");li.textContent=`${text(change.key)}: ${change.effective} → ${change.proposed} · ${text(change.effect)}`;return li;});
       if (!rows.length) { const li=document.createElement("li");li.textContent=text("no_changes");rows.push(li); }
       el("runtime_changes").replaceChildren(...rows); el("runtime_preview").hidden=false;
-    } catch (_) { el("runtime_error").textContent=text("error");el("runtime_error").hidden=false; }
+    } catch (err) { el("runtime_error").textContent=failure(err);el("runtime_error").hidden=false; }
     finally {busy=false;buttons();}
   });
   el("runtime_save").addEventListener("click",async()=>{
@@ -93,7 +104,7 @@
     try {
       const data=await request("./api/runtime",payload);values(data);state={...state,...data};
       pending=null;el("runtime_preview").hidden=false;el("runtime_changes").replaceChildren();el("runtime_notice").textContent=text("done");
-    } catch (_) {pending=null;blocked=true;el("runtime_error").textContent=text("error");el("runtime_error").hidden=false;}
+    } catch (err) {pending=null;blocked=true;el("runtime_error").textContent=failure(err);el("runtime_error").hidden=false;}
     finally {busy=false;buttons();}
   });
   el("runtime_reload").addEventListener("click",()=>void load());

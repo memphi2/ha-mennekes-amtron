@@ -56,6 +56,8 @@ class JobInputs:
     current_cap: float
     pending: bool = False
     vehicle_target_active: bool = False
+    # Writes are disabled in the app configuration.
+    read_only: bool = False
     # Only the Plug & Charge release is missing, as after an app restart:
     # an order waits for Home Assistant's grant instead of ending.
     release_waiting: bool = False
@@ -451,4 +453,5 @@ class ChargeJobController:
             "max_current_a": sample.current_cap, "now": sample.now.isoformat(),
             "boost_available": self._can_boost(sample),
             "vehicle_target_active": sample.vehicle_target_active,
+            "read_only": sample.read_only,
         }

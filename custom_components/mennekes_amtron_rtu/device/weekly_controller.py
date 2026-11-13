@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 import time
 from collections.abc import Callable
@@ -20,6 +21,8 @@ from .errors import DeviceError
 from .persistence import finish_goal_save
 from .weekly_plan import WeeklyOccurrence, WeeklyPlan
 from .weekly_store import WeeklyBook, WeeklyStore
+
+_LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .weekly_jobs import WeeklyChargeJobs
@@ -100,9 +103,16 @@ class WeeklyController:
             self.consent = None
             try:
                 self.book = await asyncio.to_thread(self.store.load)
-            except (OSError, ValueError):
+            except OSError:
                 self.storage_error = True
                 self.reason = "weekly_storage_unavailable"
+            except (ValueError, TypeError, ArithmeticError, RecursionError):
+                # Another wallbox's or a damaged file must not block the
+                # plans for good; the next save replaces it.
+                _LOGGER.warning("Saved weekly plans belong to another wallbox or are damaged; starting without them")
+                self.book = WeeklyBook()
+                self.storage_error = False
+                self.reason = "inactive"
             else:
                 self.storage_error = False
                 self.reason = "inactive"
@@ -494,4 +504,5 @@ class WeeklyController:
                 "active": None if consent is None else {"plan_id": consent.plan_id, "vehicle_profile": consent.profile,
                                                          "until": consent.expires.isoformat(), "job_id": consent.job_id},
                 "scope": sample.scope, "available": sample.available, "present": sample.present,
-                "max_current_a": sample.current_cap, "job": self.jobs.snapshot()["job"]}
+                "max_current_a": sample.current_cap, "read_only": sample.read_only,
+                "job": self.jobs.snapshot()["job"]}

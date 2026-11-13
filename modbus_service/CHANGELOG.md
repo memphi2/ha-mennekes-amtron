@@ -46,6 +46,10 @@ Update the app together with integration 0.9.0b2.
   confirms its pause; charging stays paused until you resume it there.
 - All pages are available in English, German, French, Dutch and Italian and
   share one navigation bar.
+- The pages always load completely, keep a refused action visible, name
+  read-only mode as the cause and say why a runtime setting was not saved.
+  Weekly plans of another wallbox or a damaged plan file start empty instead
+  of blocking the weekly plans.
 
 ## 0.9.0b1
 

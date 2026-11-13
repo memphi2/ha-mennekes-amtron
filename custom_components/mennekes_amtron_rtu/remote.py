@@ -619,7 +619,8 @@ class RemoteClient(MennekesModbusClient):
         )
         if block is None:
             raise AmtronConnectionError("unsupported diagnostic block")
-        response = await self.request("POST", "/v2/read", {"block": block.name})
+        # Diagnostics reads must not mark the entry unavailable.
+        response = await self.request("POST", "/v2/read", {"block": block.name}, update_connection=False)
         words = response.get("words")
         if (
             not isinstance(words, list)

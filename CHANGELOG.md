@@ -164,6 +164,14 @@ Update the app to 0.9.0b2 together with the integration.
   published state after two seconds instead of running into its timeout.
 - All app pages are available in English, German, French, Dutch and Italian
   and share one navigation bar.
+- **The app pages load completely and name their refusals.** Page files no
+  longer count against the limit of two parallel requests, which could leave
+  a page without its script or style. A refused action on the Charging jobs
+  page stays visible until the next action, read-only mode is named as the
+  cause, and the Runtime page says why a save failed. Weekly plans saved for
+  another wallbox, or a damaged plan file, no longer block the weekly plans;
+  they start empty. Downloading diagnostics no longer marks a remote wallbox
+  unavailable.
 - **Docs:** [the app's web pages](docs/app-guide.md) explains the overview,
   charging jobs, boost, guest charging, registers and runtime settings in one
   guide. The separate update guide is gone; the release notes name every

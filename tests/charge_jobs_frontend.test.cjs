@@ -6,7 +6,7 @@ const vm=require("node:vm");
 const path=require("node:path");
 const source=fs.readFileSync(path.join(__dirname,"../custom_components/mennekes_amtron_rtu/device/app_jobs.js"),"utf8");
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPreview=false, language="de"}={}){
+function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPreview=false, refuseClear=false, language="de"}={}){
   const elements=new Map(),docEvents={},winEvents={},timers=new Map(),calls=[];let next=0, finishBoostPreview=null;
   const el=id=>{
     if(!elements.has(id))elements.set(id,{value:"",textContent:"",disabled:false,hidden:false,max:"",events:{},addEventListener(name,fn){this.events[name]=fn;},reportValidity(){return true;}});
@@ -33,6 +33,7 @@ function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPr
       if(lostBoost)throw new Error("reply lost");
     }else if(body.action==="cancel_boost")state={...state,revision:"boost-3",job:{...state.job,boost_until:null,state:"scheduled",reason:"scheduled"}};
     else if(body.action==="stop")state={...state,revision:"revision-3",job:{...state.job,state:"stopped",reason:"user_stop"}};
+    else if(body.action==="clear"&&refuseClear)return {ok:false,json:async()=>({error:"job_clear_requires_pause"})};
     else if(body.action==="clear")state={...state,revision:"revision-4",job:null};
     return {ok:true,json:async()=>structuredClone(state)};
   };
@@ -122,4 +123,16 @@ test("a finished order whose pause was confirmed allows a new order but no stop"
   for(const callback of [...h.timers.values()])callback();await flush();
   assert.equal(h.el("job_fields").disabled,true);assert.equal(h.el("job_stop").disabled,true);
   assert.doesNotMatch(h.el("job_detail").textContent,/Home Assistant/);
+});
+
+test("a refusal stays visible after the state is read again, until the next action",async()=>{
+  const h=harness({refuseClear:true});await flush();await h.submit();await h.click("job_confirm");await flush();
+  await h.click("job_stop");await flush();await h.click("job_clear");await flush();
+  assert.match(h.el("job_notice").textContent,/Löschen erfordert/);
+  for(const callback of [...h.timers.values()])callback();await flush();
+  assert.match(h.el("job_notice").textContent,/Löschen erfordert/);
+  await h.submit();for(const callback of [...h.timers.values()])callback();await flush();assert.doesNotMatch(h.el("job_notice").textContent,/Löschen erfordert/);
+});
+test("read-only mode names the configuration instead of a missing release",async()=>{
+  const h=harness();h.setState({read_only:true,permitted:false});await flush();assert.match(h.el("job_notice").textContent,/^Nur-Lesen-Modus/);
 });

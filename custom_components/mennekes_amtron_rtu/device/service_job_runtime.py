@@ -129,6 +129,7 @@ class JobModbusService(ConsoleModbusService):
             control is not None and control.pending_action is not None,
             vehicle_target_active=control is not None and control.soc_goal.target_percent > 0,
             session=session, release_waiting=release_waiting, status_known=status_known,
+            read_only=control is not None and control.read_only,
         )
 
     def _note_session(self) -> None:

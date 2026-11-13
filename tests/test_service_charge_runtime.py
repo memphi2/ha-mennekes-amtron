@@ -213,6 +213,8 @@ def test_service_snapshot_readback_and_stale_samples_are_passive(tmp_path):
 def test_read_only_service_and_unconfigured_actuator_fail_closed(tmp_path):
     async def run():
         async with job_service(tmp_path, read_only=True) as (s, _transport, _clock):
+            # The pages name the configuration instead of a missing release.
+            assert s.jobs.snapshot()["read_only"] is True
             with pytest.raises(JobRequestError, match="job_not_permitted"):
                 await s.jobs.create(request(), revision=s.jobs.revision, scope=s.jobs.snapshot()["scope"])
             original = s.control

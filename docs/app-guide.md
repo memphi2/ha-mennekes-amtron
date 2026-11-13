@@ -70,7 +70,7 @@ reached, it stops the order.
 2. Enter **Start**, **Finish no later than**, the **additional energy** in kWh
    and the **current per phase** in A. The current cannot exceed the app's
    current cap. Optionally enter an [immediate reserve](#immediate-reserve).
-3. Select **Preview**, check the summary and select **Confirm this order**.
+3. Select **Preview**, check the summary and select **Confirm this action**.
 
 Confirm soon after the preview. If the start time is already more than a minute
 in the past, the app asks for a new preview.

@@ -79,7 +79,8 @@ def test_a_weekly_order_survives_the_gate_and_one_lost_reply(tmp_path, monkeypat
 
 def test_bad_weekly_storage_does_not_restart_the_working_bus(tmp_path, monkeypatch):
     async def run():
-        (tmp_path / "weekly-plans.json").write_text("{")
+        # Unreadable, not only damaged: a damaged file starts empty instead.
+        (tmp_path / "weekly-plans.json").mkdir()
         monkeypatch.setattr(runtime, "JobModbusService", m.WeeklyModbusService)
         async with runtime.job_service(tmp_path) as (service, _transport, _clock):
             assert service.jobs.ready

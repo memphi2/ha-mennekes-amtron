@@ -38,7 +38,7 @@ def create_app(service: ModbusService) -> web.Application:
                 },
                 status=409,
             )
-        except ValueError, TypeError:
+        except ValueError, TypeError, RecursionError:
             return web.json_response({"error": "invalid_request"}, status=400)
         except AmtronBusError, OSError:
             return web.json_response({"error": "service_unavailable"}, status=503)

@@ -22,7 +22,11 @@ from custom_components.mennekes_amtron_rtu.device.weekly_controller import (
     WeeklyError,
 )
 from custom_components.mennekes_amtron_rtu.device.weekly_jobs import WeeklyChargeJobs
-from custom_components.mennekes_amtron_rtu.device.weekly_store import WeeklyStore
+from custom_components.mennekes_amtron_rtu.device.weekly_plan import WeeklyPlan
+from custom_components.mennekes_amtron_rtu.device.weekly_store import (
+    WeeklyBook,
+    WeeklyStore,
+)
 
 NOW = datetime(2026, 11, 16, 5, tzinfo=UTC)
 SCOPE = "b" * 64
@@ -394,13 +398,34 @@ def test_unreadable_storage_and_uninitialized_controller_are_not_permission(tmp_
         h = Harness(tmp_path)
         with pytest.raises(WeeklyError, match="weekly_storage_unavailable"):
             h.weekly.preview_plan(recipe(), revision=h.weekly.revision)
-        monkeypatch.setattr(h.weekly.store, "load", Mock(side_effect=ValueError("fixture")))
+        monkeypatch.setattr(h.weekly.store, "load", Mock(side_effect=OSError("fixture")))
         await h.weekly.initialize()
         assert h.weekly.ready
         assert h.weekly.storage_error
         assert h.weekly.reason == "weekly_storage_unavailable"
         with pytest.raises(WeeklyError, match="weekly_inactive"):
             await h.weekly._dispatch({}, "2026-11-16", h.jobs.revision)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("content", ["foreign", "damaged", "nested"])
+def test_foreign_or_damaged_plans_start_empty_and_are_replaced(tmp_path, content, caplog):
+    async def run():
+        h = Harness(tmp_path)
+        path = tmp_path / "weekly-plans.json"
+        if content == "foreign":
+            WeeklyStore(path, "other wallbox").save(WeeklyBook(plans=(WeeklyPlan.parse(recipe()),)))
+        else:
+            path.write_text("{" if content == "damaged" else "[" * 2000 + "]" * 2000)
+        await h.initialize()
+        assert h.weekly.ready
+        assert not h.weekly.storage_error
+        assert h.weekly.reason == "inactive"
+        assert h.weekly.book.plans == ()
+        assert "starting without them" in caplog.text
+        # The next save replaces the rejected file with this wallbox's plans.
+        await h.save()
+        assert [plan.identifier for plan in WeeklyStore(path, "fixture").load().plans] == [PLAN]
     asyncio.run(run())
 
 

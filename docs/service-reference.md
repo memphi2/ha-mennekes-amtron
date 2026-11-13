@@ -82,6 +82,7 @@ Supervisor roles. See [the app's web pages](app-guide.md).
 | `/registers`, `GET /api/registers` | Register explorer, from passive observations |
 | `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
 | `/jobs`, `/guest`, `/api/jobs` | Charging jobs, boost and guest charging |
+| `/weekly`, `/api/weekly` | Weekly plans; see [Weekly plan API](#weekly-plan-api) |
 
 Values saved on the **Runtime** page apply without a restart. Each previewed
 change names its `effect`: `next_cycle` for the polling intervals, `immediate`
@@ -230,8 +231,9 @@ than a growing history. Include the data directory in backups and protect its
 configuration/token.
 
 A file of another wallbox or format, or a damaged one, is not used. For
-`intent.json` the service then starts as on its first run, keeps the
-wallbox's own state, logs a warning and replaces the file with its next save.
+`intent.json` and `weekly-plans.json` the service then starts as on its first
+run, keeps the wallbox's own state, logs a warning and replaces the file with
+its next save. The weekly plans start empty then and need to be created again.
 A save that fails is logged; the wallbox stays in use. After a failed save of
 the weekly plans their changes are refused with `weekly_storage_unavailable`
 until the file reads back, which is tried every ten seconds while no plan is
@@ -279,6 +281,8 @@ service data rather than maintaining a second queue.
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |
 | `GET`/`POST /v2/jobs` | Authenticated charging-job state and operations; see [Charging job API](#charging-job-api). |
+| `GET`/`POST /v2/weekly` | Authenticated weekly-plan state and operations; see [Weekly plan API](#weekly-plan-api). |
+| `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number
 already bound to the client's configured wallbox. For example, a pause request

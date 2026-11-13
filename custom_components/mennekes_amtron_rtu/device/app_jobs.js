@@ -74,14 +74,25 @@
     boost_cancel:["Return to plan now","Jetzt zum Plan zurückkehren","Revenir au plan maintenant","Nu terug naar het plan","Tornare ora al piano"],
     boost_until:["Boost until","Boost bis","Boost jusqu’à","Boost tot","Boost fino a"],
     job_boost_unavailable:["Boost requires an active order before its planned start and current permission.","Boost erfordert einen aktiven Auftrag vor dessen geplantem Start und eine aktuelle Freigabe.","Le boost exige un ordre actif avant son début prévu et une autorisation actuelle.","Boost vereist een actieve opdracht vóór de geplande start en een actuele vrijgave.","Il boost richiede un ordine attivo prima del suo inizio previsto e un consenso attuale."],
-    invalid_boost_duration:["Enter a whole number from 1 to 120 minutes.","Eine ganze Zahl von 1 bis 120 Minuten eingeben.","Saisissez un nombre entier de 1 à 120 minutes.","Voer een geheel getal van 1 tot 120 minuten in.","Inserire un numero intero da 1 a 120 minuti."]
+    invalid_boost_duration:["Enter a whole number from 1 to 120 minutes.","Eine ganze Zahl von 1 bis 120 Minuten eingeben.","Saisissez un nombre entier de 1 à 120 minutes.","Voer een geheel getal van 1 tot 120 minuten in.","Inserire un numero intero da 1 a 120 minuti."],
+    read_only:["Read-only mode: writes are disabled in the app configuration.", "Nur-Lesen-Modus: Schreiben ist in der App-Konfiguration abgeschaltet.", "Mode lecture seule : les écritures sont désactivées dans la configuration de l’application.", "Alleen-lezenmodus: schrijven is uitgeschakeld in de app-configuratie.", "Modalità sola lettura: le scritture sono disattivate nella configurazione dell’app."],
+    busy:["Another request is running. Try again shortly.", "Eine andere Anfrage läuft noch. Gleich noch einmal versuchen.", "Une autre requête est en cours. Réessayez dans un instant.", "Een ander verzoek loopt nog. Probeer het zo opnieuw.", "Un’altra richiesta è in corso. Riprova tra poco."],
+    reload_required:["Reload this page and try again.", "Seite neu laden und erneut versuchen.", "Rechargez cette page et réessayez.", "Herlaad deze pagina en probeer het opnieuw.", "Ricaricare la pagina e riprovare."],
+    admin_required:["Sign in to Home Assistant as an administrator.", "Bei Home Assistant als Administrator anmelden.", "Connectez-vous à Home Assistant en tant qu’administrateur.", "Meld je aan bij Home Assistant als beheerder.", "Accedi a Home Assistant come amministratore."],
+    supervisor_unavailable:["Home Assistant Supervisor did not answer. Reload this page.", "Home Assistant Supervisor hat nicht geantwortet. Seite neu laden.", "Supervisor n’a pas répondu. Rechargez la page.", "Supervisor heeft niet geantwoord. Herlaad deze pagina.", "Supervisor non ha risposto. Ricaricare la pagina."],
+    supervisor_update_required:["Update Home Assistant Supervisor to 2026.10.4 or newer.", "Home Assistant Supervisor auf 2026.10.4 oder neuer aktualisieren.", "Mettez Supervisor à jour vers 2026.10.4 ou ultérieur.", "Werk Supervisor bij naar 2026.10.4 of nieuwer.", "Aggiorna Supervisor alla versione 2026.10.4 o successiva."],
+    invalid_request:["The request was rejected. Reload this page and try again.", "Anfrage abgelehnt. Seite neu laden und erneut versuchen.", "Requête refusée. Rechargez la page et réessayez.", "Verzoek geweigerd. Herlaad de pagina en probeer het opnieuw.", "Richiesta rifiutata. Ricaricare la pagina e riprovare."],
+    job_service_starting:["The service is still starting. Try again shortly.", "Der Service startet noch. Gleich noch einmal versuchen.", "Le service démarre encore. Réessayez dans un instant.", "De service start nog. Probeer het zo opnieuw.", "Il servizio si sta ancora avviando. Riprova tra poco."],
+    weekly_service_starting:["The service is still starting. Try again shortly.", "Der Service startet noch. Gleich noch einmal versuchen.", "Le service démarre encore. Réessayez dans un instant.", "De service start nog. Probeer het zo opnieuw.", "Il servizio si sta ancora avviando. Riprova tra poco."],
+    weekly_stop_unconfirmed:["The weekly plan's stop is not confirmed yet. Try again shortly.", "Der Stopp des Wochenplans ist noch nicht bestätigt. Gleich noch einmal versuchen.", "L’arrêt du plan hebdomadaire n’est pas encore confirmé. Réessayez dans un instant.", "De stop van het weekplan is nog niet bevestigd. Probeer het zo opnieuw.", "Lo stop del piano settimanale non è ancora confermato. Riprova tra poco."],
+    guest_vehicle_target_active:["Vehicle battery target active; no guest order created.", "Fahrzeug-Batterieziel aktiv; kein Gastauftrag angelegt.", "Objectif de batterie du véhicule actif ; aucun ordre invité créé.", "Batterijdoel van het voertuig actief; geen gastopdracht aangemaakt.", "Obiettivo batteria del veicolo attivo; nessun ordine ospite creato."]
   };
   const t = k => words[k]?.[column] || k;
   document.querySelectorAll("[data-text]").forEach(n => { n.textContent = t(n.dataset.text); });
   const el = id => document.getElementById(id), notice = message => { el("job_notice").textContent = message; };
   const date = value => new Date(value).toLocaleString(locale, {timeZoneName:"short"});
   const local = d => { const p = n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
-  let state = null, proposal = null, busy = false, timer = null, readAbort = null, generation = 0, hidden = false;
+  let state = null, proposal = null, busy = false, timer = null, readAbort = null, generation = 0, hidden = false, lastError = "";
   el("job_start").value = local(new Date(Date.now()+60000));
   el("job_finish").value = local(new Date(Date.now()+8*3600000));
   const ended = job => ["reached","finished","stopped","interrupted"].includes(job.state);
@@ -158,21 +169,22 @@
       if (!response.ok || data.schema!==1 || typeof data.revision!=="string" || typeof data.csrf!=="string") throw new Error("invalid");
       if (own!==generation || busy) return;
       if (proposal && proposal.revision!==data.revision) invalidate();
-      state=data;render();notice(data.storage_error ? t("storage_error") : data.job ? t(data.job.state) : data.available && data.permitted && data.meter_fresh ? t("ready") : t("unavailable"));
+      // A refusal stays visible until the next action.
+      state=data;render();notice(lastError || (data.storage_error ? t("storage_error") : data.job ? t(data.job.state) : data.read_only ? t("read_only") : data.available && data.permitted && data.meter_fresh ? t("ready") : t("unavailable")));
     } catch (_) { if(own===generation){ state=null;invalidate();render();notice(t("offline")); } }
     finally {clearTimeout(timeout);if(own===generation){readAbort=null;if(!hidden&&!document.hidden)timer=setTimeout(read,5000);}}
   }
   async function post(payload) {
     if (busy || !state) return null;
-    busy=true;suspend();render();
+    busy=true;lastError="";suspend();render();
     const own=generation, abort=new AbortController(), timeout=setTimeout(()=>abort.abort(),15000);
     try {
       const response=await fetch("./api/jobs",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","X-Amtron-CSRF":state.csrf},body:JSON.stringify(payload),signal:abort.signal});
       const data=await response.json();
       if(own!==generation || hidden || document.hidden)return null;
-      if(!response.ok){notice(t(data.error || "uncertain"));return null;}
+      if(!response.ok){lastError=t(data.error || "uncertain");notice(lastError);return null;}
       return data;
-    } catch (_) { notice(t("uncertain"));return null; }
+    } catch (_) { lastError=t("uncertain");notice(lastError);return null; }
     finally {clearTimeout(timeout);busy=false;render();}
   }
   el("job_form").addEventListener("input",invalidate);

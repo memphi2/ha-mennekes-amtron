@@ -537,10 +537,14 @@ class AppSettings:
         if request.headers.get("Sec-Fetch-Site") == "cross-site":
             raise web.HTTPForbidden
         try:
-            if self._slots.locked():
-                raise SettingsError("busy", 503)
-            async with self._slots:
+            if not request.path.startswith("/api/"):
+                # Packaged page assets load in parallel and never call the Supervisor.
                 response = await handler(request)
+            elif self._slots.locked():
+                raise SettingsError("busy", 503)
+            else:
+                async with self._slots:
+                    response = await handler(request)
         except SettingsError as err:
             response = web.json_response({"error": err.key}, status=err.status)
         except (ClientError, TimeoutError, OSError, ValueError, TypeError):

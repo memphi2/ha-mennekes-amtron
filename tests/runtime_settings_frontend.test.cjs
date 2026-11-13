@@ -22,7 +22,7 @@ async function harness(responses=[payload()], language="de") {
   const calls=[];const timers=new Map();let next=0;
   const context={document:{documentElement:{lang:language},getElementById:el,querySelectorAll:()=>[],createElement:()=>new Element()},AbortController,
     setTimeout:(fn,delay)=>{const id=++next;timers.set(id,{fn:()=>{timers.delete(id);return fn();},delay});return id;},clearTimeout:id=>timers.delete(id),
-    fetch:async(url,options)=>{calls.push({url,options});const item=responses.shift();if(item instanceof Error)throw item;const data=typeof item==="function"?await item():item;return {ok:true,json:async()=>data};}};
+    fetch:async(url,options)=>{calls.push({url,options});const item=responses.shift();if(item instanceof Error)throw item;if(item?.refused)return {ok:false,json:async()=>({error:item.refused})};const data=typeof item==="function"?await item():item;return {ok:true,json:async()=>data};}};
   vm.runInNewContext(source,context);
   const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
   return {el,calls,responses,flush};
@@ -91,4 +91,14 @@ test("saved values that are not in use yet point to saving them here",async()=>{
     assert.ok(h.el("runtime_notice").textContent.startsWith(start));assert.equal(h.el("current_cap").value,"8");
   }
   const h=await harness([payload({saved:{...fields,current_cap:8},write_blocked:true})]);assert.match(h.el("runtime_notice").textContent,/ungewissen/);
+});
+
+test("a refused save names its cause; unknown keys keep the generic text",async()=>{
+  const h=await harness();h.responses.push(payload(),{refused:"runtime_apply_pending"});
+  await h.el("runtime_form").emit("submit");await h.el("runtime_save").emit("click");
+  assert.match(h.el("runtime_error").textContent,/^Gespeichert, aber noch nicht übernommen/);
+  h.responses.push(payload(),{refused:"settings_changed"});await h.el("runtime_reload").emit("click");await h.flush();
+  await h.el("runtime_form").emit("submit");assert.match(h.el("runtime_error").textContent,/anderswo geändert/);
+  h.responses.push(payload(),{refused:"surprise"});await h.el("runtime_reload").emit("click");await h.flush();
+  await h.el("runtime_form").emit("submit");assert.match(h.el("runtime_error").textContent,/^Anfrage fehlgeschlagen/);
 });
