@@ -18,8 +18,15 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
-from .charging_plan import ChargePlan, plan_current, usable_capacity
+from .device.charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
+from .device.departure_step import (
+    MIN_WRITE_INTERVAL,
+    keeps_start,
+    needs_current,
+    plan_step,
+    same_command,
+)
 from .device.enums import (
     DetectedEvPhases,
     EvseState,
@@ -28,10 +35,10 @@ from .device.enums import (
 )
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.registers import EVSE_STATE
+from .device.timed_goal import TimedGoal, matches_departure_source
 from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
 from .goal_store import TimedGoalStore
-from .timed_goal import TimedGoal, matches_departure_source
 from .timed_goal_const import (
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
@@ -54,9 +61,6 @@ if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
-_MIN_CHANGE_A = 1.0
-_MIN_WRITE_INTERVAL = 300.0
-_PAUSE_MARGIN = timedelta(seconds=360)
 
 
 def departure_time(state: State | None) -> datetime | None:
@@ -91,13 +95,6 @@ def capacity_from_state(state: State | None) -> float | None:
     except (OverflowError, ValueError):
         return None
     return usable_capacity(value, state.attributes.get("unit_of_measurement", ""))
-
-
-# Statuses of a computed plan; a pending command keeps its start time.
-_PLANNED = frozenset({
-    "queued", "write_pending", "paused_until_start", "charging",
-    "finishing", "unreachable", "late",
-})
 
 
 class TimedGoalObserver:
@@ -499,8 +496,9 @@ class TimedGoalObserver:
         if snapshot_vehicle_connected(data.get, self._runtime.identity.layout_version) is not True:
             await self._wait_for_input("waiting_for_device")
             return
+        now = dt_util.utcnow()
         plan: ChargePlan = plan_current(
-            now=dt_util.utcnow(), deadline=deadline,
+            now=now, deadline=deadline,
             soc_percent=soc, target_percent=goal.target_percent,
             capacity_kwh=capacity, phases=self._phases(),
             max_current_a=control.max_charging_current,
@@ -513,26 +511,14 @@ class TimedGoalObserver:
             # block commands without proving that either target was reached.
             await self._wait_for_input("waiting_for_device")
             return
-        now = dt_util.utcnow()
-        # A started charge keeps going: a faster charge than estimated moves
-        # the computed start later, and pausing for it would only cost relay
-        # switching. The minimum current at the end absorbs the lead instead.
-        started = self.planned_start is not None and self.planned_start <= now
-        pause_until_start = (
-            not started and plan.start_at is not None and plan.start_at - now > _PAUSE_MARGIN
-        )
-        if pause_until_start:
-            self.planned_start = plan.start_at
-        elif not started:
-            # The plan charges now; keep when it began.
-            self.planned_start = now
-        desired_current = None if pause_until_start else plan.current_a
+        step = plan_step(plan, self.planned_start, now)
+        self.planned_start = step.planned_start
         if control.pending_action is not None:
-            await self._cancel_outdated_command(desired_current, trip)
+            await self._cancel_outdated_command(step.current_a, trip)
         if control.pending_action is not None:
             self._set_status("queued")
             return
-        if pause_until_start:
+        if step.pauses:
             self._set_status("paused_until_start")
             if control.is_paused is False:
                 await self._write(None, trip)
@@ -540,21 +526,15 @@ class TimedGoalObserver:
         self._set_status(plan.status)
         if plan.current_a is None or control.is_paused is None:
             return
-        current = self._runtime.coordinator.current_data().get("charging_current_ems")
-        if control.is_paused or not isinstance(current, (int, float)) or (
-            current == 0 or abs(float(current) - plan.current_a) >= _MIN_CHANGE_A
-        ):
+        applied = self._runtime.coordinator.current_data().get("charging_current_ems")
+        if needs_current(plan.current_a, paused=control.is_paused, applied=applied):
             await self._write(plan.current_a, trip)
 
     async def _cancel_outdated_command(self, current: float | None, expected: TimedGoal) -> None:
         async with self._goal_lock:
             if self.goal is not expected or self._stopping or not self._command_submitted:
                 return
-            previous = self._command_current
-            if previous == current or (
-                previous is not None and current is not None
-                and abs(previous - current) < _MIN_CHANGE_A
-            ):
+            if same_command(self._command_current, current):
                 return
             # Fresh valid SoC/capacity/phase data can make our queued start or
             # pause obsolete. Cancellation checks the owner at the service,
@@ -572,7 +552,7 @@ class TimedGoalObserver:
         if deadline is None or deadline <= dt_util.utcnow():
             return
         now = time.monotonic()
-        if self._last_write_at is not None and now - self._last_write_at < _MIN_WRITE_INTERVAL:
+        if self._last_write_at is not None and now - self._last_write_at < MIN_WRITE_INTERVAL:
             return
         # Record even uncertain writes, so reconnect churn cannot flood the bus.
         self._last_write_at = now
@@ -628,8 +608,7 @@ class TimedGoalObserver:
 
     def _set_status(self, status: str, *, keep_start: bool = False) -> None:
         # Only a start that already passed is kept; a future one is planned anew.
-        started = self.planned_start is not None and self.planned_start <= dt_util.utcnow()
-        if status not in _PLANNED and not (keep_start and started):
+        if not keeps_start(status, self.planned_start, dt_util.utcnow(), keep_start=keep_start):
             self.planned_start = None
         if status != self.status:
             self.status = status

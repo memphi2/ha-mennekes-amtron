@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from .device.const import CHARGING_CURRENT_MINIMUM
+from .const import CHARGING_CURRENT_MINIMUM
 
 MAX_CAPACITY_KWH = 250.0
 NOMINAL_VOLTAGE_V = 230.0

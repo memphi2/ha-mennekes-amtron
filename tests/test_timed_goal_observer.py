@@ -20,9 +20,9 @@ from custom_components.mennekes_amtron_rtu.device.persistence import (
 )
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
+from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
-from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.timed_goal_observer import departure_time
 from tests.ha_fakes import FakeHass
 from tests.test_control import Harness

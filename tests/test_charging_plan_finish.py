@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.charging_plan import plan_current
+from custom_components.mennekes_amtron_rtu.device.charging_plan import plan_current
 
 NOW = datetime(2026, 11, 12, 6, tzinfo=UTC)
 

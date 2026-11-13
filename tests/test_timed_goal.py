@@ -19,10 +19,10 @@ from custom_components.mennekes_amtron_rtu.datetime import (
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.energy_goal import EnergyGoal
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.options_flow import (
     _timed_errors,
 )
-from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.timed_goal_observer import (
     TimedGoalObserver,
     capacity_from_state,

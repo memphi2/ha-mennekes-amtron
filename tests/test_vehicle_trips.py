@@ -12,8 +12,8 @@ from homeassistant.util import dt as dt_util
 
 from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu import vehicle_trips as m
+from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
-from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
 from tests.ha_fakes import FakeConfigEntry, FakeHass
 from tests.test_vehicle_profiles import A, B, profile_options
 

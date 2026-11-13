@@ -7,7 +7,7 @@ from datetime import UTC, timedelta, timezone
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.timed_goal import (
+from custom_components.mennekes_amtron_rtu.device.timed_goal import (
     TimedGoal,
     matches_departure_source,
 )

@@ -16,7 +16,7 @@ from .device.const import DOMAIN
 from .device.energy_goal import EnergyGoal
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.soc_goal import SocGoal
-from .timed_goal import TimedGoal
+from .device.timed_goal import TimedGoal
 
 
 class _GoalModel(Protocol):

@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.charging_plan import (
+from custom_components.mennekes_amtron_rtu.device.charging_plan import (
     plan_current,
     usable_capacity,
 )
