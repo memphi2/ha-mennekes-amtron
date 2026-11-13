@@ -138,14 +138,12 @@ Update the app to 0.9.0b2 together with the integration.
 - **Switching departure planning off also ends the app's plan** for that car.
 - **One lost poll no longer pauses a charge with a kWh target**, a small
   clock correction no longer pauses a running order, and a failing disk no
-  longer shows the wallbox as unavailable. See the
-  [failures and restart audit](docs/reviews/2026-11-failures-and-restart.md).
+  longer shows the wallbox as unavailable.
 - **A saved app state of another wallbox, or a damaged one, no longer keeps
   the app from starting.** The app starts as on its first run and replaces the
   file. After a failed save the weekly plans work again once their file reads
   back, and charging to a minimum level no longer rewrites the plan file with
-  every meter reading. See the
-  [storage and data integrity audit](docs/reviews/2026-11-storage-and-integrity.md).
+  every meter reading.
 - **A departure that ends no longer leaves the car paused.** When the
   departure is cleared, or passes while the plan still paused, the plan ends
   its own pause, with and without the app. A stop at the reached target stays
