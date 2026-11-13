@@ -15,6 +15,10 @@ DEFAULT_BATTERY_EFFICIENCY = 0.9
 # Time a late start keeps for a charge slower than estimated; the minimum
 # current at the end uses up what is left of it.
 START_RESERVE = timedelta(minutes=30)
+# Match the observer's five-minute write floor: do not send a full-current
+# pulse that would cross the finishing boundary before it can be reduced.
+FINISHING_WINDOW_HOURS = 5 / 60
+_TIME_TOLERANCE_HOURS = 1e-6  # Less than four milliseconds of date/float rounding.
 
 
 def usable_capacity(value: object, unit: str = "kWh") -> float | None:
@@ -49,9 +53,10 @@ def plan_current(
     """Start late at full current and land on the target at departure.
 
     The start leaves a reserve for a slower charge than estimated. Charging
-    stays at full current until the remaining energy just fits the rest of the
-    time at the minimum current, and then finishes at that minimum instead of
-    early. Each fresh SoC report recalculates this; never issue a bus command.
+    stays at full current until the finishing boundary enters the next
+    five-minute control window. An intermediate current then approaches the
+    minimum without a full-current overshoot. Each fresh SoC report
+    recalculates this; never issue a bus command.
     """
     if now.tzinfo is None or deadline.tzinfo is None or now.utcoffset() is None or deadline.utcoffset() is None:
         raise ValueError("charge deadline needs an aware timestamp")
@@ -77,10 +82,17 @@ def plan_current(
         return ChargePlan(max_current_a, "late")
     kw_per_amp = NOMINAL_VOLTAGE_V * phases * efficiency / 1000
     full_hours = required / (max_current_a * kw_per_amp)
-    if full_hours > hours:
+    if full_hours > hours + _TIME_TOLERANCE_HOURS:
         return ChargePlan(max_current_a, "unreachable")
     minimum_hours = required / (CHARGING_CURRENT_MINIMUM * kw_per_amp)
     start_at = deadline - min(timedelta(hours=minimum_hours), timedelta(hours=full_hours) + START_RESERVE)
-    if minimum_hours >= hours:
-        return ChargePlan(max_current_a, "charging", start_at)
-    return ChargePlan(CHARGING_CURRENT_MINIMUM, "finishing", start_at)
+    if minimum_hours <= hours + _TIME_TOLERANCE_HOURS:
+        return ChargePlan(CHARGING_CURRENT_MINIMUM, "finishing", start_at)
+    # Consume only the energy above the minimum-current trajectory in the
+    # next control window. In the final partial window, aim at the deadline
+    # itself. Whole-amp upward steps match the observer's 1 A change threshold
+    # and avoid understating the remaining demand; the configured cap wins.
+    window = min(hours, FINISHING_WINDOW_HOURS)
+    surplus_amp_hours = CHARGING_CURRENT_MINIMUM * (minimum_hours - hours)
+    current = min(max_current_a, math.ceil(CHARGING_CURRENT_MINIMUM + surplus_amp_hours / window))
+    return ChargePlan(current, "charging", start_at)
