@@ -136,11 +136,16 @@ class JobModbusService(ConsoleModbusService):
         jobs = self.jobs
         if jobs is not None and jobs.holding and "expected_serial_number" in payload and payload["expected_serial_number"] == self.identity.serial_number:
             command, value = payload.get("command"), payload.get("value")
-            if command in _COMPETING or (command == "release" and value is True) or (command == "lock" and value is False):
+            if (isinstance(command, str) and command in _COMPETING) or (command == "release" and value is True) or (command == "lock" and value is False):
                 raise DeviceError("energy_goal_stop_active")
-            if command in ("pause", "cancel_pending", "cancel_timed_current") or (
-                command == "release" and value is False
-            ) or (command == "lock" and value is True):
+            if command in ("pause", "cancel_pending") or (
+                command == "cancel_timed_current" and jobs.job is not None
+                and payload.get("owner") == f"service-job:{jobs.job.identifier}"
+            ) or (command == "release" and value is False) or (command == "lock" and value is True):
+                # HA detaches its own timed owner during a restart. Cancelling
+                # that unrelated owner must not cancel a service-owned order.
+                if payload.keys() - {"command", "value", "owner", "expected_serial_number"}:
+                    raise ValueError("unsupported stop command field")
                 await jobs.stop()
         return await super().command(payload, _soc_outcome=_soc_outcome)
 

@@ -19,6 +19,7 @@ from custom_components.mennekes_amtron_rtu.device.client import (
     SerialConfig,
 )
 from custom_components.mennekes_amtron_rtu.device.control import (
+    ControlOptions,
     _PendingCommand,
     _TimedCommandCancelledError,
 )
@@ -39,6 +40,7 @@ from custom_components.mennekes_amtron_rtu.device.service_job_control import (
 from custom_components.mennekes_amtron_rtu.device.service_job_runtime import (
     JobModbusService,
 )
+from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
 from tests.fakes import FakeModbusClient, device_bank, put
 
 TOKEN = "service-test-credential-32-characters"  # noqa: S105 - fixture
@@ -123,7 +125,6 @@ def test_competing_clients_cannot_take_over_an_accepted_job(tmp_path, command, v
 
 @pytest.mark.parametrize(("command", "value"), [
     ("pause", None), ("release", False), ("lock", True), ("cancel_pending", None),
-    ("cancel_timed_current", None),
 ])
 def test_manual_restrictive_commands_latch_the_job_stop(tmp_path, command, value):
     async def run():
@@ -196,9 +197,13 @@ def test_read_only_service_and_unconfigured_actuator_fail_closed(tmp_path):
         async with job_service(tmp_path, read_only=True) as (s, _transport, _clock):
             with pytest.raises(JobRequestError, match="job_not_permitted"):
                 await s.jobs.create(request(), revision=s.jobs.revision, scope=s.jobs.snapshot()["scope"])
+            original = s.control
             s.control = None
-            with pytest.raises(DeviceError, match="service_unavailable"):
-                await s._apply_job_current(12, "job", datetime.now(UTC))
+            try:
+                with pytest.raises(DeviceError, match="service_unavailable"):
+                    await s._apply_job_current(12, "job", datetime.now(UTC))
+            finally:
+                s.control = original
     asyncio.run(run())
 
 
@@ -260,8 +265,6 @@ def test_initialization_hook_and_scheduler_lifetime(monkeypatch, tmp_path):
 
 def control():
     client = Mock()
-    from custom_components.mennekes_amtron_rtu.device.control import ControlOptions
-    from custom_components.mennekes_amtron_rtu.device.write_state import WriteState
     client.write_state = WriteState()
     return JobAmtronControl(client, diagnostics=WriteDiagnostics(), identity=DeviceIdentity(layout_version=259), options=ControlOptions(False, 16), state=WallboxData)
 
@@ -313,4 +316,21 @@ def test_live_bus_preconditions_are_stronger_than_the_cached_job_intent(bad_regi
             await c._async_check_timed_vehicle(read)
             c._active_command = None
             await c._async_check_timed_vehicle(read)
+    asyncio.run(run())
+
+
+def test_ha_planner_detach_does_not_cancel_a_service_order(tmp_path):
+    async def run():
+        async with job_service(tmp_path) as (s, transport, clock):
+            await s.jobs.create(request(), revision=s.jobs.revision, scope=s.jobs.snapshot()["scope"])
+            before = list(transport.writes)
+            await s.command({"command": "cancel_timed_current", "owner": "ha-departure", "expected_serial_number": s.identity.serial_number})
+            assert s.jobs.job.state == "charging"
+            assert transport.writes == before
+            with pytest.raises(ValueError, match="stop command field"):
+                await s.command({"command": "pause", "address": 123, "expected_serial_number": s.identity.serial_number})
+            assert s.jobs.job.state == "charging"
+            clock[0] += 1000
+            await s.command({"command": "cancel_timed_current", "owner": f"service-job:{s.jobs.job.identifier}", "expected_serial_number": s.identity.serial_number})
+            assert s.jobs.job.state == "stopped"
     asyncio.run(run())

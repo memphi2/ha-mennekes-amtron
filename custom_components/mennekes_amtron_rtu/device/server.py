@@ -25,7 +25,11 @@ from .service_config import ServerConfig
 from .service_discovery import app_token, publish_discovery
 from .service_job_http import (
     JobConsole as ServiceConsole,
+)
+from .service_job_http import (
     create_job_app as create_app,
+)
+from .service_job_http import (
     create_job_console as create_console_app,
 )
 from .service_job_runtime import JobModbusService as ModbusService
