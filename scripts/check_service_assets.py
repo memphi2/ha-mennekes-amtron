@@ -16,13 +16,9 @@ from collections.abc import Awaitable, Callable
 
 from aiohttp import ClientSession, ClientTimeout, web
 
-ASSETS = {
-    "/": ("app_overview.html", "text/html"),
-    "/connection": ("app_settings.html", "text/html"),
-    "/app_overview.js": ("app_overview.js", "text/javascript"),
-    "/app_settings.js": ("app_settings.js", "text/javascript"),
-    "/app_settings.css": ("app_settings.css", "text/css"),
-}
+# The routes the installed package registers; filled from the package itself,
+# so a new page needs no second table here or on the host.
+ASSETS: dict[str, tuple[str, str]] = {}
 
 
 @web.middleware
@@ -37,24 +33,35 @@ async def local_assets_only(
 
 
 async def check_assets(expected: dict[str, str]) -> None:
-    """Check the installed package's actual HTTP handlers and exact source bytes."""
-    if expected.keys() != ASSETS.keys():
+    """Serve every registered asset and compare it with the source by file name.
+
+    ``expected`` maps each app asset file of the source tree to its hash. A
+    file without a route fails as well as a route without its file.
+    """
+    if not expected:
         raise ValueError("expected hashes for all registered app assets")
     settings_module = importlib.import_module("amtron_device.app_settings")
+    console_module = importlib.import_module("amtron_device.console_http")
+    ASSETS.clear()
+    ASSETS.update(settings_module._ASSETS)  # noqa: SLF001 - the package's own route table
+    ASSETS.update(console_module.CONSOLE_ASSETS)
+    if {filename for filename, _type in ASSETS.values()} != expected.keys():
+        raise ValueError("expected hashes for all registered app assets")
     app = web.Application(middlewares=[local_assets_only])
     settings_module.add_settings_asset_routes(app)
+    console_module.add_console_asset_routes(app)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     try:
         await web.TCPSite(runner, "127.0.0.1", 0).start()
         port = runner.addresses[0][1]
         async with ClientSession(timeout=ClientTimeout(total=5), trust_env=False) as session:
-            for path, (_, content_type) in ASSETS.items():
+            for path, (filename, content_type) in ASSETS.items():
                 async with session.get(f"http://127.0.0.1:{port}{path}", allow_redirects=False) as response:
                     content = await response.read()
                     if (
                         response.status != 200 or response.content_type != content_type
-                        or hashlib.sha256(content).hexdigest() != expected[path]
+                        or hashlib.sha256(content).hexdigest() != expected[filename]
                     ):
                         raise ValueError(f"installed app asset differs or cannot be served: {path}")
     finally:

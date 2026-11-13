@@ -1,5 +1,26 @@
 # Changes
 
+## 0.9.0b2
+
+Update the app together with integration 0.9.0b2.
+
+- **Overview:** **Open Web UI** now starts on an overview of the wallbox, the
+  last commands and their results. Adapter and connection settings moved to
+  the **Connection** page.
+- **Charging jobs:** an energy and time order for the car that is plugged in,
+  with preview, confirmation and stop. It keeps running when Home Assistant
+  restarts or disconnects, ends at unplugging and never restarts after an app
+  restart.
+- **Boost:** charge early for up to two hours before a job's planned start,
+  then return to the plan.
+- **Guest charging:** a bounded order for a guest car that is already
+  authorized at the wallbox, for example by RFID. It never grants a release,
+  unlocks the wallbox or uses a saved vehicle target.
+- **Registers:** a read-only page with the raw register values, their age
+  and read quality.
+- **Runtime:** preview new poll intervals and apply them without restarting
+  the app.
+
 ## 0.9.0b1
 
 - The sidebar entry is called **Modbus RTU** instead of the full app name.

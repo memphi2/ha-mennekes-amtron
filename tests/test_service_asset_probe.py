@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -17,7 +18,10 @@ from scripts import check_service_assets as probe
 from scripts import service_image as images
 
 
-@pytest.mark.parametrize("broken", [None, "app_settings.html", "app_settings.js", "app_settings.css", "app_overview.html", "app_overview.js", "modified"])
+@pytest.mark.parametrize("broken", [
+    None, "app_settings.html", "app_settings.js", "app_settings.css", "app_overview.html",
+    "app_overview.js", "app_jobs.js", "app_guest.html", "app_registers.js", "modified", "unrouted",
+])
 def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_changed_assets(
     tmp_path, monkeypatch, broken,
 ):
@@ -37,6 +41,9 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
     ))
     if broken == "modified":
         (package / "app_settings.js").write_text("/* incomplete or wrong build */")
+    elif broken == "unrouted":
+        # A source asset that no route serves must fail too.
+        monkeypatch.setattr(images, "APP_ASSET_PATTERN", re.compile(r"app_\w+\.(?:html|js|css)|app_settings\.py"))
     elif broken is not None:
         (package / broken).unlink()
     commands = []
@@ -58,7 +65,11 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
     else:
         with pytest.raises(subprocess.CalledProcessError) as error:
             images.check_installed_assets("isolated-test-image")
-        assert b"installed app asset differs or cannot be served" in error.value.stderr
+        expected = (
+            b"expected hashes for all registered app assets" if broken == "unrouted"
+            else b"installed app asset differs or cannot be served"
+        )
+        assert expected in error.value.stderr
     assert len(commands) == 1
 
 

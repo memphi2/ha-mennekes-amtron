@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## 0.9.0b2 — unreleased
 
-Integration only; the app stays at 0.9.0b1.
+Update the app to 0.9.0b2 together with the integration.
 
 - **Breaking: automatic vehicle selection and Virtual Plug & Charge with
   BavarianData need BavarianData 0.9.30 or newer.** Its dated **Charging

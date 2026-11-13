@@ -197,10 +197,12 @@ def test_probe_failure_removes_only_its_own_container(monkeypatch, tmp_path, fai
         {"serial_settings": None},
         {"connection_ui": False},
         {"connection_ui": None},
+        {"charge_job_storage": False},
+        {"charge_job_storage": None},
     ],
 )
 def test_success_requires_the_expected_enforcing_profile(monkeypatch, tmp_path, replacement):
-    report = {"status": "passed", "mode": "modbus_tcp", "profile": PROFILE_NAME, "enforcing": True, "serial_settings": True, "connection_ui": True}
+    report = {"status": "passed", "mode": "modbus_tcp", "profile": PROFILE_NAME, "enforcing": True, "serial_settings": True, "connection_ui": True, "charge_job_storage": True}
     report.update(replacement)
     monkeypatch.setattr(
         gate, "command",
