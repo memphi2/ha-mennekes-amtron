@@ -113,6 +113,14 @@ def test_an_order_that_let_go_no_longer_controls() -> None:
     assert (result["controller"], result["waiting"]) == ("direct", "none")
 
 
+def test_weekly_plan_between_departures_still_controls() -> None:
+    # The plan's ended order no longer holds the wallbox, but its id stays.
+    done = _job("reached", holding=False)
+    result = _sum(job=done, weekly={"plan_id": "p", "job_id": "job-1", "start_at": START})
+    assert (result["controller"], result["waiting"]) == ("weekly_plan", "until_weekly_window")
+    assert result["next"] == {"event": "weekly_window", "at": START}
+
+
 def test_weekly_plan_waits_for_its_window() -> None:
     result = _sum(weekly={"plan_id": "p", "job_id": None, "start_at": START})
     assert result["controller"] == "weekly_plan"

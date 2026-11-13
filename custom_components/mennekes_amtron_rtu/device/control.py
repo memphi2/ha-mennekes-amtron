@@ -1017,10 +1017,14 @@ class AmtronControl:
         return value
 
     async def _async_transition_write(
-        self, spec: RegisterSpec, value: int, *, changed: bool,
+        self, spec: RegisterSpec, value: int, *, changed: bool | Callable[[], bool],
         min_interval: float = 0.0,
         precondition: WritePrecondition | None = None,
     ) -> None:
+        """Write a switch; ``changed`` may be decided by the write's precondition."""
+        def switched() -> bool:
+            return changed() if callable(changed) else changed
+
         if self.energy_goal_stop_requested and (
             (spec == CHARGING_RELEASE and value == 1)
             or (spec == LOCK_EVSE and value == 0)
@@ -1031,14 +1035,14 @@ class AmtronControl:
                 spec, value, min_interval=min_interval, refresh=False, precondition=precondition,
             )
         except (DeviceError, asyncio.CancelledError) as err:
-            if changed and self._uncertain(err):
+            if switched() and self._uncertain(err):
                 self._write_state.mode_change_at = self._monotonic()
             raise
         if spec == CHARGING_RELEASE:
             self._release_writes += 1
             if value == 1:
                 self._plug_charge.release_written()
-        if changed:
+        if switched():
             self._write_state.mode_change_at = self._monotonic()
         self._clear_pending()
         if self._request_refresh is not None:
@@ -1059,27 +1063,29 @@ class AmtronControl:
             if switches and (remaining := self._mode_change_remaining()) > 0:
                 raise AmtronRateLimitedError("state_change", remaining)
 
+        if not released and current != 0:
+            # A stop keeps the plain write path: a link that drops during
+            # guarded reads must not hold it back.
+            switches = await self._async_release_switches_charge()
+            if switches:
+                await self._async_check_transition_interval()
         previous = self.charging_release_requested
         self.charging_release_requested = released
         try:
             await self._async_transition_write(
-                CHARGING_RELEASE, int(released), changed=False,
-                precondition=admit if current != int(released) else None,
+                CHARGING_RELEASE, int(released), changed=lambda: switches,
+                precondition=admit if released and current != 1 else None,
             )
         except AmtronRateLimitedError:
             # Nothing was sent; the request is not an intent yet.
             self.charging_release_requested = previous
             raise
         except (DeviceError, asyncio.CancelledError) as err:
-            if switches and self._uncertain(err):
-                self._write_state.mode_change_at = self._monotonic()
             # A failed block retains its intent unless identity verification
             # proves that no command could have reached the intended device.
             if released or isinstance(err.__cause__, AmtronIdentityError):
                 self.charging_release_requested = previous
             raise
-        if switches:
-            self._write_state.mode_change_at = self._monotonic()
 
     async def _async_apply_lock(self, locked: bool) -> None:
         current = await self._async_read_switch(LOCK_EVSE, stopping=locked)

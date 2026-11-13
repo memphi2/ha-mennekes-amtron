@@ -301,3 +301,38 @@ def test_a_car_plugged_in_before_the_release_write_keeps_the_guard():
         await control.async_shutdown()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("released", [True, False])
+def test_a_release_change_starts_the_interval_even_when_the_refresh_fails(released):
+    async def run():
+        harness = Harness(state_change_interval_seconds=300)
+        control = await harness.connect()
+        put(harness.transport.bank, R.EVSE_STATE, EvseState.CHARGING)
+        put(harness.transport.bank, R.CHARGING_RELEASE, int(not released))
+
+        async def fail():
+            raise OSError("fixture")
+
+        control._request_refresh = fail
+        with pytest.raises(OSError, match="fixture"):
+            await control.async_set_charging_release(released)
+        assert len(harness.transport.writes) == 1
+        assert control._write_state.mode_change_at == harness.clock[0]
+        await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_switching_the_release_off_survives_a_link_that_drops_while_checking():
+    async def run():
+        harness = Harness(state_change_interval_seconds=300)
+        control = await harness.connect()
+        put(harness.transport.bank, R.EVSE_STATE, EvseState.CHARGING)
+        harness.transport.read_exceptions[R.EVSE_STATE.address] = raise_connection_error()
+        await control.async_set_charging_release(False)
+        # The stop is written although its check could not read the state.
+        assert [address for address, _words in harness.transport.writes] == [R.CHARGING_RELEASE.address]
+        await control.async_shutdown()
+
+    asyncio.run(run())

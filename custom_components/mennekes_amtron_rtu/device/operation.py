@@ -100,7 +100,8 @@ def summarize(
     status = plan.get("status")
     holding = held.get("holding") is True
     planning = trip.get("deadline") is not None and trip.get("finished") is None
-    awaiting_window = bool(consent) and consent.get("job_id") is None
+    # Also between departures: the plan's ended order no longer holds.
+    awaiting_window = bool(consent) and not holding
 
     waits: str | None = None
     following = _event("none", None)

@@ -531,7 +531,11 @@ class ModbusService:
             try:
                 await asyncio.wait_for(self._command_lock.acquire(), _PATIENCE_SECONDS)
             except TimeoutError:
-                return published[1]
+                # A command that ended meanwhile may have replaced or
+                # withdrawn the state; only the current one is served.
+                if self._published is not None:
+                    return self._published[1]
+                return await self.stable_snapshot()
             try:
                 return self._publish()
             finally:
