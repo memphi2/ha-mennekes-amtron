@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mennekes Amtron · Charging jobs</title>
+  <link rel="stylesheet" href="./app_settings.css">
+  <script src="./app_jobs.js" defer></script>
+</head>
+<body>
+<main id="jobs">
+  <p class="eyebrow">Mennekes Amtron</p>
+  <nav class="overview-nav" aria-label="Service">
+    <a href="./" data-text="overview">Overview</a>
+    <a href="./jobs" aria-current="page" data-text="jobs">Charging jobs</a>
+    <a href="./runtime" data-text="runtime">Runtime</a>
+    <a href="./registers" data-text="registers">Registers</a>
+    <a href="./connection" data-text="connection">Connection</a>
+  </nav>
+  <h1 data-text="jobs">Charging jobs</h1>
+  <p data-text="intro">A local time window with an additional-energy ceiling. Existing release and battery limits remain in force.</p>
+  <p id="job_notice" role="status" aria-live="polite"></p>
+  <section class="overview-card" id="job_status" hidden>
+    <h2 data-text="active">Current order</h2>
+    <p class="overview-state" id="job_state"></p>
+    <p id="job_detail"></p><p id="job_progress"></p>
+    <div class="actions">
+      <button id="job_stop" type="button" data-text="stop">Stop automation for this connection</button>
+      <button id="job_clear" type="button" class="secondary" data-text="clear">Clear stopped order without resuming</button>
+    </div>
+    <section aria-labelledby="job_boost_title">
+      <h3 id="job_boost_title" data-text="boost_title">Temporary early charging</h3>
+      <p class="hint" data-text="boost_hint">Charge before the scheduled start, then return to the original plan. Current and energy limits stay unchanged.</p>
+      <p id="job_boost_until" role="status"></p>
+      <label for="job_boost_minutes" data-text="boost_minutes">Duration in minutes (1–120)</label>
+      <input id="job_boost_minutes" type="number" min="1" max="120" step="1" value="30" required>
+      <div class="actions">
+        <button id="job_boost_preview" type="button" data-text="boost_preview">Preview boost</button>
+        <button id="job_cancel_boost" type="button" class="secondary" data-text="boost_cancel">Return to plan now</button>
+      </div>
+    </section>
+  </section>
+  <section class="overview-card">
+    <h2 data-text="new">New order</h2>
+    <form id="job_form">
+      <fieldset id="job_fields" disabled>
+        <legend data-text="window">Local charging window</legend>
+        <label for="job_start" data-text="start">Start</label>
+        <input id="job_start" type="datetime-local" required>
+        <label for="job_finish" data-text="finish">Finish no later than</label>
+        <input id="job_finish" type="datetime-local" required>
+        <div class="columns">
+          <div><label for="job_energy" data-text="energy">Additional energy, kWh</label><input id="job_energy" type="number" min="0.1" max="1000" step="0.1" value="10" required></div>
+          <div><label for="job_current" data-text="current">Current per phase, A</label><input id="job_current" type="number" min="6" max="32" step="0.1" value="6" required></div>
+        </div>
+        <p class="hint" data-text="scope">Applies only to this confirmed physical connection. The order does not identify or authorize the vehicle. Reconnection or service restart requires a new confirmation.</p>
+        <button type="submit" id="job_preview" data-text="preview">Preview</button>
+      </fieldset>
+    </form>
+    <section id="job_confirmation" class="adapter-preview" hidden>
+      <h2 data-text="confirm_title">Confirm the charging order</h2>
+      <p id="job_summary"></p>
+      <p class="hint" data-text="limits">This is not a guaranteed energy delivery or finish-time forecast. The vehicle and all existing safety limits remain authoritative.</p>
+      <button type="button" id="job_confirm" data-text="confirm">Confirm this order</button>
+    </section>
+  </section>
+  <footer data-text="footer">A requested stop is not a confirmed physical stop. Check the overview and command results. No automatic retry after an uncertain browser response.</footer>
+</main>
+</body>
+</html>

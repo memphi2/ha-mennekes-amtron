@@ -21,11 +21,18 @@ from .app_settings import (
     create_setup_app,
 )
 from .connection import NetworkConfig, SerialConfig
-from .console_http import ServiceConsole, create_console_app
 from .service_config import ServerConfig
-from .service_console_runtime import ConsoleModbusService as ModbusService
 from .service_discovery import app_token, publish_discovery
-from .service_http import create_app
+from .service_job_http import (
+    JobConsole as ServiceConsole,
+)
+from .service_job_http import (
+    create_job_app as create_app,
+)
+from .service_job_http import (
+    create_job_console as create_console_app,
+)
+from .service_job_runtime import JobModbusService as ModbusService
 from .service_overview import service_overview
 
 _LOGGER = logging.getLogger(__name__)
@@ -129,24 +136,40 @@ def main() -> None:
         config = app_configuration(values) if supervisor_token else ServerConfig.from_dict(values)
     except (ValueError, OSError) as err:
         detail = str(err) if phase == "validating options" else type(err).__name__
-        parser.exit(2, f"Invalid or unreadable service configuration during {phase}: {detail}.\n")
+        parser.exit(
+            2,
+            f"Invalid or unreadable service configuration during {phase}: {detail}.\n",
+        )
     connection = config.connection if isinstance(config, ServerConfig) else None
     if isinstance(config, ServerConfig) and isinstance(connection, SerialConfig):
         _LOGGER.info(
-            "Configuration accepted: mode=%s, transport=serial, Modbus address=%s, baudrate=%s, frame=%s%s%s",
-            "read-only" if config.read_only else "master", connection.device_id,
-            connection.baudrate, connection.bytesize, connection.parity, connection.stopbits,
+            "Configuration accepted: mode=%s, transport=serial, Modbus address=%s, "
+            "baudrate=%s, frame=%s%s%s",
+            "read-only" if config.read_only else "master",
+            connection.device_id,
+            connection.baudrate,
+            connection.bytesize,
+            connection.parity,
+            connection.stopbits,
         )
     elif isinstance(config, ServerConfig) and isinstance(connection, NetworkConfig):
         _LOGGER.info(
             "Configuration accepted: mode=%s, transport=%s, Modbus address=%s, TCP port=%s",
-            "read-only" if config.read_only else "master", connection.connection_type,
-            connection.device_id, connection.tcp_port,
+            "read-only" if config.read_only else "master",
+            connection.connection_type,
+            connection.device_id,
+            connection.tcp_port,
         )
     try:
         asyncio.run(run(config, args.state, supervisor_token))
     except Exception as err:  # noqa: BLE001 - sanitize fatal errors at the process boundary
-        _LOGGER.error("Modbus service terminated (%s, errno=%s)", type(err).__name__, getattr(err, "errno", None))
+        # Exception messages can include private paths or credentials. Report
+        # the failure class and errno; lifecycle messages identify the phase.
+        _LOGGER.error(
+            "Modbus service terminated (%s, errno=%s)",
+            type(err).__name__,
+            getattr(err, "errno", None),
+        )
         raise SystemExit(1) from None
 
 
