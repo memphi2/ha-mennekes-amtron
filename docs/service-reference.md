@@ -315,6 +315,7 @@ snapshot's `control` object reports `supports_departure_plan: true` and
 | `inputs` | Digest of the car data last handed over, or `null` |
 | `scope` | Opaque digest of the current plug-in, or `null` without a car |
 | `confirmed` | Whether the handed-over car is confirmed for this plug-in |
+| `forecast` | `null` unless a plan is computed; otherwise `finish_at` (when the target is reached: the departure, or later when it is unreachable, rounded up to five minutes), `level_at_departure` (percent), `efficiency` (learned share of the metered energy that reaches the battery, 0.9 until learned) and `full_power_kw` (metered power at full current for the current phases, or `null`) |
 
 Two commands hand the plan over. Both need `expected_serial_number`, reject
 other fields and are accepted while the wallbox is unreachable, because they
@@ -326,8 +327,9 @@ access no bus:
 | `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) and `detected` (whether the car itself reported this plug-in; a weekly plan activates itself only then) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
 
 The plan writes through the same guarded path as `timed_current`, with the
-owner `departure`. It is saved in `/data/departure-plan.json`, at most 8 KiB
-and bound to the wallbox identity. An unreadable file only clears the plan
+owner `departure`. It is saved in `/data/departure-plan.json`, together with
+what the plan learned about up to eight cars, at most 8 KiB and bound to the
+wallbox identity. An unreadable file only clears the plan, and what it learned,
 until Home Assistant hands it over again. HA must be running to start climate
 actions.
 

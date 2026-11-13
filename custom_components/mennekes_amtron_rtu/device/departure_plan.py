@@ -24,8 +24,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from .charge_job import SessionMark
-from .charging_plan import DEFAULT_BATTERY_EFFICIENCY, plan_current, usable_capacity
+from .charging_plan import ChargePlan, plan_current, usable_capacity
 from .client_errors import AmtronBusError
+from .departure_model import (
+    MIN_LEVEL_GAIN,
+    POWER_WINDOW_SECONDS,
+    DepartureModel,
+)
 from .departure_step import (
     MIN_WRITE_INTERVAL,
     keeps_start,
@@ -56,7 +61,11 @@ _INPUT_KEYS = frozenset({
 })
 _PLAN_KEYS = frozenset({
     "trip", "inputs", "anchor", "session", "planned_start", "plan_paused", "estimated_stop",
+    "learned",
 })
+# Near a full battery the car tapers; that power says nothing about a charge.
+_TAPER_LEVEL = 90.0
+_FORECAST_STEP = 300
 DEPARTURE_STATES = (
     "disabled", "waiting_for_target", "waiting_for_capacity", "waiting_for_soc",
     "waiting_for_device", "vehicle_unconfirmed", "read_only", "order_active", "queued",
@@ -172,7 +181,38 @@ class SocAnchor:
 _DIGEST = re.compile(r"[0-9a-f]{32}")
 _STATE_KEYS = frozenset({
     "trip", "status", "planned_start", "estimated_soc", "inputs", "scope", "confirmed",
+    "forecast",
 })
+
+
+@dataclass(frozen=True, slots=True)
+class DepartureForecast:
+    """When the plan reaches the target, and what it learned about the car."""
+
+    finish_at: datetime
+    level_at_departure: float
+    efficiency: float
+    full_power_kw: float | None
+
+    @classmethod
+    def restore(cls, raw: object) -> DepartureForecast:
+        if not isinstance(raw, dict) or raw.keys() != {
+            "finish_at", "level_at_departure", "efficiency", "full_power_kw",
+        }:
+            raise ValueError("invalid departure forecast fields")
+        efficiency, power = raw["efficiency"], raw["full_power_kw"]
+        for value in (efficiency, power):
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or value <= 0
+            ):
+                raise ValueError("invalid departure forecast value")
+        if efficiency is None or efficiency > 1:
+            raise ValueError("invalid departure forecast efficiency")
+        return cls(
+            instant(raw["finish_at"]), percentage(raw["level_at_departure"]), float(efficiency),
+            None if power is None else float(power),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +226,7 @@ class DepartureState:
     inputs: str | None
     scope: str | None
     confirmed: bool
+    forecast: DepartureForecast | None = None
 
     @classmethod
     def restore(cls, raw: object) -> DepartureState:
@@ -202,6 +243,7 @@ class DepartureState:
         return cls(
             TimedGoal.restore(raw["trip"]), status, None if start is None else instant(start),
             None if level is None else percentage(level), digest, scope, confirmed,
+            None if raw["forecast"] is None else DepartureForecast.restore(raw["forecast"]),
         )
 
 
@@ -271,6 +313,15 @@ class DepartureController:
         self._trail_scope: str | None = None
         self._estimate: float | None = None
         self._last_error: str | None = None
+        # What this wallbox's cars taught the plan; kept across trips.
+        self.model = DepartureModel()
+        # The report a learned efficiency counts from, within one plug-in.
+        self._learn_from: SocAnchor | None = None
+        # Since when the car charges at the plan's full current: meter time,
+        # reading and phases.
+        self._full_from: tuple[float, float, int] | None = None
+        self._at_full = False
+        self.forecast: dict[str, Any] | None = None
         self._reset()
 
     def _reset(self) -> None:
@@ -315,6 +366,7 @@ class DepartureController:
         start = None if raw["planned_start"] is None else instant(raw["planned_start"])
         if type(raw["plan_paused"]) is not bool or type(raw["estimated_stop"]) is not bool:
             raise ValueError("invalid departure plan flags")
+        self.model = DepartureModel.restore(raw["learned"])
         self.trip, self.inputs, self.anchor, self._session = trip, inputs, anchor, session
         self.planned_start = start
         self.plan_paused, self.estimated_stop = raw["plan_paused"], raw["estimated_stop"]
@@ -328,6 +380,7 @@ class DepartureController:
             "planned_start": None if self.planned_start is None else self.planned_start.isoformat(),
             "plan_paused": self.plan_paused,
             "estimated_stop": self.estimated_stop,
+            "learned": self.model.snapshot(),
         }
 
     def _decision(self) -> dict[str, Any]:
@@ -357,6 +410,7 @@ class DepartureController:
             "inputs": None if self.inputs is None else self.inputs.digest,
             "scope": self.scope,
             "confirmed": self.confirmed,
+            "forecast": self.forecast,
         }
 
     async def set_trip(self, deadline: datetime | None, source: str | None, *, withdraw: bool = False) -> None:
@@ -419,6 +473,7 @@ class DepartureController:
                 return
             sample = self.sample()
             self._observe(sample)
+            self._at_full, self.forecast = False, None
             try:
                 await self._evaluate(sample)
             except (AmtronBusError, DeviceError) as err:
@@ -429,7 +484,63 @@ class DepartureController:
                     self._last_error = reason
             else:
                 self._last_error = None
+            self._learn_power(sample)
             await self._save()
+
+    def _learn_power(self, s: DepartureSample) -> None:
+        """Meter what the car really draws while the plan offers full current."""
+        inputs = self.inputs
+        if not self._at_full or inputs is None or s.phases is None or s.meter_at is None or s.total_kwh is None:
+            self._full_from = None
+            return
+        start = self._full_from
+        if start is None or start[2] != s.phases:
+            self._full_from = (s.meter_at, s.total_kwh, s.phases)
+            return
+        seconds = s.meter_at - start[0]
+        if seconds < POWER_WINDOW_SECONDS:
+            return
+        car = self.model.car(inputs.vehicle).with_power(s.phases, (s.total_kwh - start[1]) * 3600 / seconds)
+        self.model.learn(inputs.vehicle, car)
+        self._full_from = (s.meter_at, s.total_kwh, s.phases)
+
+    def _learn_efficiency(self, new: SocAnchor) -> None:
+        """Compare two reports of the car with the energy metered between them."""
+        inputs, base = self.inputs, self._learn_from
+        if base is None or new.percent <= base.percent:
+            # Only a report from this plug-in starts a comparison: an older
+            # one may predate the drive here.
+            here = bool(self._trail) and new.observed_at.timestamp() >= self._trail[0][0]
+            self._learn_from = new if here else None
+            return
+        if (
+            inputs is None or inputs.capacity_kwh is None or new.percent >= 100
+            or new.percent - base.percent < MIN_LEVEL_GAIN
+        ):
+            return
+        car = self.model.car(inputs.vehicle).with_charge(
+            level_gain=new.percent - base.percent, capacity_kwh=inputs.capacity_kwh,
+            metered_kwh=new.meter_kwh - base.meter_kwh,
+        )
+        self.model.learn(inputs.vehicle, car)
+        self._learn_from = new
+
+    def _forecast_for(
+        self, plan: ChargePlan, s: DepartureSample, deadline: datetime, soc: float,
+        efficiency: float, power: float | None,
+    ) -> dict[str, Any]:
+        """When the target is reached, and the level the car leaves with."""
+        finish, level = deadline, s.target_percent
+        if plan.status in ("unreachable", "late") and plan.full_hours:
+            # Rounded, so that the forecast does not change with every tick.
+            at = (s.now + timedelta(hours=plan.full_hours)).timestamp()
+            finish = datetime.fromtimestamp(math.ceil(at / _FORECAST_STEP) * _FORECAST_STEP, UTC)
+            hours = max(0.0, (deadline - s.now).total_seconds() / 3600)
+            level = soc + (s.target_percent - soc) * min(1.0, hours / plan.full_hours)
+        return {
+            "finish_at": finish.isoformat(), "level_at_departure": round(level),
+            "efficiency": round(efficiency, 2), "full_power_kw": None if power is None else round(power, 1),
+        }
 
     async def shutdown(self) -> None:
         self._closing = True
@@ -465,7 +576,7 @@ class DepartureController:
         # A provisional stop stays: a car that leaves at its projected target
         # still counts as reached at departure.
         self._session = self._bound_scope = None
-        self.anchor = None
+        self.anchor = self._learn_from = None
 
     async def _evaluate(self, s: DepartureSample) -> None:
         if self.plan_paused and self._command_current is not None and s.paused is False:
@@ -549,11 +660,15 @@ class DepartureController:
             # commands without proving that the target was reached.
             await self._wait("waiting_for_device", s)
             return
+        vehicle = self.inputs.vehicle if self.inputs is not None else None
+        phases = s.phases or (self.inputs.phases if self.inputs else None) or 3
+        efficiency, power = self.model.efficiency(vehicle), self.model.car(vehicle).power(phases)
         plan = plan_current(
             now=s.now, deadline=deadline, soc_percent=soc, target_percent=s.target_percent,
-            capacity_kwh=capacity, phases=s.phases or (self.inputs.phases if self.inputs else None) or 3,
-            max_current_a=s.max_current_a,
+            capacity_kwh=capacity, phases=phases, max_current_a=s.max_current_a,
+            efficiency=efficiency, full_power_kw=power,
         )
+        self.forecast = self._forecast_for(plan, s, deadline, soc, efficiency, power)
         minimum = self.inputs.minimum_percent if self.inputs is not None else 0.0
         step = plan_step(
             plan, self.planned_start, s.now,
@@ -575,6 +690,8 @@ class DepartureController:
             return
         if needs_current(step.current_a, paused=s.paused, applied=s.applied_a):
             await self._write(step.current_a, deadline)
+        elif step.current_a == s.max_current_a and not s.paused and soc < _TAPER_LEVEL:
+            self._at_full = True
 
     async def _stop_at_estimate(self, s: DepartureSample, deadline: datetime) -> None:
         """Hold at the projected target until the car reports or departs."""
@@ -604,6 +721,7 @@ class DepartureController:
         meter = self._meter_at(observed.timestamp(), s)
         if meter is not None:
             self.anchor = SocAnchor(inputs.soc_percent, observed, meter)
+            self._learn_efficiency(self.anchor)
 
     def _meter_at(self, at: float, s: DepartureSample) -> float | None:
         """The first reading of this plug-in at or after ``at``.
@@ -622,7 +740,7 @@ class DepartureController:
         anchor, inputs = self.anchor, self.inputs
         if anchor is None or inputs is None or inputs.capacity_kwh is None or s.total_kwh is None:
             return None
-        gained = max(0.0, s.total_kwh - anchor.meter_kwh) * DEFAULT_BATTERY_EFFICIENCY
+        gained = max(0.0, s.total_kwh - anchor.meter_kwh) * self.model.efficiency(inputs.vehicle)
         return min(100.0, anchor.percent + gained / inputs.capacity_kwh * 100)
 
     def _target_raised(self, s: DepartureSample) -> bool:

@@ -61,6 +61,23 @@ def test_a_small_charge_starts_when_the_minimum_current_just_fits() -> None:
     )
 
 
+def test_a_metered_full_power_replaces_the_nominal_one_within_bounds() -> None:
+    nominal = plan(8)
+    assert nominal.full_hours == pytest.approx(48 / (16 * 0.621))
+    # 7 kW instead of 11 kW: the charge takes longer and starts earlier.
+    slower = plan(8, full_power_kw=7.0)
+    assert slower.full_hours == pytest.approx(48 / (7.0 * 0.9))
+    assert slower.start_at < nominal.start_at
+    # More than 110 % or less than 30 % of the nominal power is not believed.
+    assert plan(8, full_power_kw=50.0).full_hours == pytest.approx(48 / (11.04 * 1.1 * 0.9))
+    assert plan(8, full_power_kw=1.0).full_hours == pytest.approx(48 / (11.04 * 0.3 * 0.9))
+    assert plan(1, full_power_kw=7.0).status == "unreachable"
+    assert plan(-1, full_power_kw=7.0).full_hours == pytest.approx(48 / 6.3)
+    for bad in (0.0, -1.0, float("nan")):
+        with pytest.raises(ValueError, match="invalid charge-plan input"):
+            plan(8, full_power_kw=bad)
+
+
 def test_plan_reports_reached_and_late_without_inventing_a_pause() -> None:
     assert plan(8, soc_percent=80).current_a is None
     assert plan(-1).status == "late"

@@ -172,7 +172,7 @@ def test_without_a_trip_or_car_nothing_is_planned(tmp_path):
         assert (plan.status, plan.snapshot()) == ("disabled", {
             "trip": {"deadline": None, "source": None, "finished": None}, "status": "disabled",
             "planned_start": None, "estimated_soc": None, "inputs": None, "scope": SCOPE,
-            "confirmed": False,
+            "confirmed": False, "forecast": None,
         })
         await plan.set_trip(NOW + timedelta(hours=2), "manual")
         await plan.tick()
@@ -687,7 +687,10 @@ def test_the_plan_survives_storage_failures(tmp_path, caplog, monkeypatch):
 @pytest.mark.parametrize("content", [
     b"{", b'{"version":1,"identity":"fixture","plan":{"trip":null}}',
     (b'{"version":1,"identity":"fixture","plan":{"trip":{"deadline":null,"source":null,"finished":null},'
-    b'"inputs":null,"anchor":null,"session":null,"planned_start":null,"plan_paused":1,"estimated_stop":false}}'),
+    b'"inputs":null,"anchor":null,"session":null,"planned_start":null,"plan_paused":1,"estimated_stop":false,"learned":{}}}'),
+    (b'{"version":1,"identity":"fixture","plan":{"trip":{"deadline":null,"source":null,"finished":null},'
+    b'"inputs":null,"anchor":null,"session":null,"planned_start":null,"plan_paused":false,"estimated_stop":false,'
+    b'"learned":[]}}'),
 ])
 def test_an_unreadable_plan_waits_for_home_assistant(tmp_path, caplog, content):
     async def go():
@@ -758,4 +761,104 @@ def test_below_its_minimum_level_the_car_charges_at_once_then_waits_for_the_star
         assert (plan.status, box.writes) == ("paused_until_start", [16.0, None])
         assert plan.planned_start > start
         assert DepartureInputs.restore(inputs(minimum_percent=55).snapshot()).minimum_percent == 55.0
+    run(go())
+
+
+def test_two_reports_of_the_car_teach_its_efficiency(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        # A report from before the plug-in may predate the drive: nothing is learned from it.
+        plan = await box.start(hours=10, given=inputs(minimum_percent=100))
+        assert plan.status == "minimum_level"
+        later = NOW + timedelta(hours=1)
+        box.set(now=later, total_kwh=106.0, meter_at=later.timestamp())
+        await plan.tick()
+        await plan.set_inputs(inputs(minimum_percent=100, soc_percent=58, soc_observed_at=later))
+        await plan.tick()
+        assert plan.model.cars == {}
+        # From here both reports belong to this plug-in: 10 % of 60 kWh from 7.5 kWh metered.
+        end = later + timedelta(hours=1)
+        box.set(now=end, total_kwh=113.5, meter_at=end.timestamp())
+        await plan.tick()
+        await plan.set_inputs(inputs(minimum_percent=100, soc_percent=68, soc_observed_at=end))
+        await plan.tick()
+        assert plan.model.cars["profile:bmw"].efficiency == 0.8
+        assert plan.forecast["efficiency"] == 0.8
+        # A small rise is mostly rounding; a fall starts over.
+        for percent, minutes in ((70, 10), (60, 20)):
+            at = end + timedelta(minutes=minutes)
+            box.set(now=at, total_kwh=114.0 + minutes / 10, meter_at=at.timestamp())
+            await plan.tick()
+            await plan.set_inputs(inputs(minimum_percent=100, soc_percent=percent, soc_observed_at=at))
+            await plan.tick()
+        assert plan.model.cars["profile:bmw"].efficiency == 0.8
+        assert plan._learn_from.percent == 60
+        # The projection uses what was learned: 5 kWh x 0.8 / 60 kWh.
+        at = end + timedelta(minutes=50)
+        box.set(now=at, total_kwh=121.0, meter_at=at.timestamp())
+        await plan.tick()
+        assert plan.snapshot()["estimated_soc"] == round(60 + 5 * 0.8 / 60 * 100, 1)
+        # What was learned survives a restart, and unplugging ends the comparison.
+        restarted = Box(tmp_path)
+        await restarted.plan.initialize()
+        assert restarted.plan.model.cars["profile:bmw"].efficiency == 0.8
+        box.set(present=False)
+        await plan.tick()
+        assert plan._learn_from is None
+    run(go())
+
+
+def test_the_power_at_full_current_is_metered_and_corrects_the_forecast(tmp_path):
+    async def go():
+        box = Box(tmp_path, applied_a=16.0)
+        plan = await box.start(hours=2)
+        assert (plan.status, box.writes) == ("charging", [])
+        assert plan.forecast == {
+            "finish_at": (NOW + timedelta(hours=2)).isoformat(), "level_at_departure": 80,
+            "efficiency": 0.9, "full_power_kw": None,
+        }
+        # The car draws 7 kW although 16 A on three phases would be 11 kW.
+        for minutes in (5, 10):
+            at = NOW + timedelta(minutes=minutes)
+            box.set(now=at, total_kwh=100.0 + 7.0 * minutes / 60, meter_at=at.timestamp())
+            await plan.tick()
+        assert plan.model.cars["profile:bmw"].full_kw == (None, None, 7.0)
+        assert plan.status == "charging"
+        # At 7 kW the rest takes about 2.7 h: the target is no longer reachable.
+        await plan.tick()
+        assert plan.status == "unreachable"
+        assert plan.forecast["full_power_kw"] == 7.0
+        assert 70 < plan.forecast["level_at_departure"] < 80
+        finish = instant(plan.forecast["finish_at"])
+        assert NOW + timedelta(hours=2, minutes=45) < finish < NOW + timedelta(hours=3)
+        assert finish.timestamp() % 300 == 0
+        # Another current or unknown phases end the measurement.
+        box.set(applied_a=8.0)
+        box.clock[0] += 300
+        await plan.tick()
+        assert plan._full_from is None
+        box.set(phases=None)
+        await plan.tick()
+        assert plan._full_from is None
+    run(go())
+
+
+def test_a_change_of_phases_starts_the_power_measurement_again(tmp_path):
+    async def go():
+        box = Box(tmp_path, applied_a=16.0)
+        plan = await box.start(hours=2)
+        assert plan._full_from == (NOW.timestamp(), 100.0, 3)
+        at = NOW + timedelta(minutes=5)
+        box.set(now=at, total_kwh=100.5, meter_at=at.timestamp(), phases=1)
+        await plan.tick()
+        assert plan._full_from == (at.timestamp(), 100.5, 1)
+        assert plan.model.cars == {}
+    run(go())
+
+
+def test_a_reduced_current_is_not_measured_as_full_power(tmp_path):
+    async def go():
+        box = Box(tmp_path, applied_a=6.0)
+        plan = await box.start(hours=0.2, given=inputs(soc_percent=79))
+        assert (plan.status, box.writes, plan._full_from) == ("finishing", [], None)
     run(go())

@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from .charge_job import job_time
+from .departure_model import vehicle_key
 from .errors import DeviceError
 from .persistence import finish_goal_save
 from .weekly_plan import WeeklyOccurrence, WeeklyPlan
@@ -25,12 +26,6 @@ if TYPE_CHECKING:
 
 class WeeklyError(ValueError):
     """Stable public refusal code, without raw storage or device error text."""
-
-
-def vehicle_key(source: str) -> str:
-    """A vehicle profile stays the same car when its source description changes."""
-    parts = source.split(":", 2)
-    return ":".join(parts[:2]) if len(parts) == 3 and parts[0] == "profile" else source
 
 
 @dataclass(slots=True)

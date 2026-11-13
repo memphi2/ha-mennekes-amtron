@@ -154,7 +154,14 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
             attributes = {"due": self.runtime_data.control.pending_until}
         elif key == "timed_goal_status":
             observer = self.runtime_data.timed_goal
-            attributes = {"planned_start": observer.planned_start if observer is not None else None}
+            forecast = observer.forecast if observer is not None else None
+            attributes = {
+                "planned_start": observer.planned_start if observer is not None else None,
+                "estimated_finish": forecast.finish_at if forecast is not None else None,
+                "estimated_level_at_departure": forecast.level_at_departure if forecast is not None else None,
+                "learned_efficiency": forecast.efficiency if forecast is not None else None,
+                "measured_power_kw": forecast.full_power_kw if forecast is not None else None,
+            }
         elif key == "virtual_plug_charge_status":
             plug_charge = self.runtime_data.plug_charge
             attributes = {

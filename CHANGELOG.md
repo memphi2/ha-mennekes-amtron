@@ -40,6 +40,13 @@ Update the app to 0.9.0b2 together with the integration.
   status** shows the app's plan and gains the states **Charged to the
   estimated target** and **An order from the app has priority**. See
   [departure planning](docs/departure-planning.md#with-the-modbus-service-app).
+- **The app learns each car and forecasts to the percentage target.** With
+  the Modbus service app the departure plan learns per vehicle profile how
+  much of the metered energy reaches the battery and what power the car
+  really draws at full current, and uses both for the start time, the
+  projected charge level and the forecast. **Timed charging status** shows
+  `estimated_finish`, `estimated_level_at_departure`, `learned_efficiency`
+  and `measured_power_kw` as attributes.
 - **Minimum charge level for departure planning.** A new option per vehicle
   profile: below this percentage the car charges at once at full current and
   then waits for the planned start. **Timed charging status** shows **Charging

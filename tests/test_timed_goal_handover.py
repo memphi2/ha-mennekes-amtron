@@ -13,6 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from custom_components.mennekes_amtron_rtu.control import AmtronControl
 from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
+    DepartureForecast,
     DepartureInputs,
     DepartureState,
 )
@@ -30,12 +31,17 @@ from tests.test_timed_goal import NOW, setup_observer
 SCOPE = "a" * 64
 CAR = "profile:bmw:sensor.soc|"
 REPORTED = NOW - timedelta(minutes=3)
+FORECAST = {
+    "finish_at": (NOW + timedelta(hours=8)).isoformat(), "level_at_departure": 74,
+    "efficiency": 0.9, "full_power_kw": None,
+}
 
 
 def plan(trip: TimedGoal | None = None, **changes) -> dict:
     return {
         "trip": (trip or TimedGoal()).snapshot(), "status": "disabled", "planned_start": None,
-        "estimated_soc": None, "inputs": None, "scope": SCOPE, "confirmed": False, **changes,
+        "estimated_soc": None, "inputs": None, "scope": SCOPE, "confirmed": False, "forecast": None,
+        **changes,
     }
 
 
@@ -98,9 +104,14 @@ def test_the_trip_and_car_are_handed_over_once_and_the_service_state_is_shown(mo
         await observer._evaluate()
         assert service.inputs[-1] == DepartureInputs(CAR, SCOPE, 80.0, None, 20.0, REPORTED, 30.0)
         start = NOW + timedelta(hours=5)
-        service.state = {**service.state, "status": "paused_until_start", "planned_start": start.isoformat()}
+        forecast = {"finish_at": deadline.isoformat(), "level_at_departure": 80, "efficiency": 0.88, "full_power_kw": 10.6}
+        service.state = {
+            **service.state, "status": "paused_until_start", "planned_start": start.isoformat(),
+            "forecast": forecast,
+        }
         await observer._evaluate()
         assert (observer.status, observer.planned_start) == ("paused_until_start", start)
+        assert observer.forecast == DepartureForecast(deadline, 80.0, 0.88, 10.6)
         # Nothing changed: nothing is sent again.
         assert (len(service.trips), len(service.inputs)) == (1, 2)
     asyncio.run(run())
@@ -250,9 +261,10 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
                 payload["control"]["departure"] = None
                 client.apply_snapshot(payload)
                 assert (control.supports_departure_plan, control.departure) == (True, None)
-                payload["control"]["departure"] = plan(estimated_soc=41.5, inputs="b" * 32)
+                payload["control"]["departure"] = plan(estimated_soc=41.5, inputs="b" * 32, forecast=FORECAST)
                 client.apply_snapshot(payload)
                 assert control.departure.estimated_soc == 41.5
+                assert control.departure.forecast.full_power_kw is None
                 sent = []
 
                 async def request(_method, _path, body):
@@ -275,6 +287,12 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
                     {"departure": plan(status="flying")}, {"departure": plan(scope="x")},
                     {"departure": plan(inputs="x")}, {"departure": plan(confirmed=1)},
                     {"departure": plan(estimated_soc=101)}, {"departure": plan(planned_start="soon")},
+                    {"departure": plan(forecast={})},
+                    {"departure": plan(forecast={**FORECAST, "efficiency": 1.2})},
+                    {"departure": plan(forecast={**FORECAST, "efficiency": None})},
+                    {"departure": plan(forecast={**FORECAST, "full_power_kw": True})},
+                    {"departure": plan(forecast={**FORECAST, "full_power_kw": 0})},
+                    {"departure": plan(forecast={**FORECAST, "finish_at": "soon"})},
                 ):
                     damaged = {**payload, "control": {**payload["control"], **broken}}
                     with pytest.raises(ServiceConnectionError, match=r"control\.departure"):

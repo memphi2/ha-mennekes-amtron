@@ -224,9 +224,23 @@ the trip there as described above.
   Assistant confirms the selected car for each plug-in. Without a charge level
   the status is **Waiting for vehicle charge level**.
 - **Between two reports the app projects the charge level**: the last reported
-  level plus the metered energy since then at 90% transfer efficiency. Energy
-  charged before a report is not counted twice, because every report carries
-  its own time.
+  level plus the metered energy since then at the car's transfer efficiency,
+  90% until the app has learned it. Energy charged before a report is not
+  counted twice, because every report carries its own time.
+- **The app learns each car.** From two reports of the car during one plug-in
+  that lie at least five percentage points apart, and the energy metered
+  between them, it learns how much of the metered energy reaches the battery
+  (60% to 100%; a slightly wrong capacity is absorbed as well). While the plan
+  charges at full current, it also meters the power the car really draws, per
+  number of phases. A car that draws less than the wallbox offers therefore
+  gets an earlier start, and the 30-minute reserve stays for the unexpected.
+  Both values are kept per vehicle profile for up to eight cars and survive a
+  restart.
+- **The forecast runs to the percentage target.** **Timed charging status**
+  shows it as attributes: `estimated_finish`, `estimated_level_at_departure`,
+  `learned_efficiency` and, once metered, `measured_power_kw`. As long as the
+  target is reachable, the plan lands on it at departure. Once it is not, the
+  finish time lies after the departure and the level below the target.
 - **At the projected target the app pauses** and shows **Charged to the
   estimated target**. This stop is provisional: a later report more than one
   percentage point below the target charges again, a report at or above it

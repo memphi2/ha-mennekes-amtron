@@ -14,6 +14,9 @@ from custom_components.mennekes_amtron_rtu.button import (
 from custom_components.mennekes_amtron_rtu.datetime import (
     async_setup_entry as setup_datetime,
 )
+from custom_components.mennekes_amtron_rtu.device.departure_plan import (
+    DepartureForecast,
+)
 from custom_components.mennekes_amtron_rtu.sensor import (
     async_setup_entry as setup_sensors,
 )
@@ -31,7 +34,7 @@ async def _entities(hass, entry):
 def _timed_observer():
     return SimpleNamespace(
         goal=SimpleNamespace(deadline=datetime(2026, 11, 10, 7, tzinfo=UTC)),
-        status="paced",
+        status="paced", planned_start=None, forecast=None,
         async_set_deadline=AsyncMock(),
         async_use_next_calendar_event=AsyncMock(),
         async_use_vehicle_departure=AsyncMock(),
@@ -72,6 +75,15 @@ def test_departure_status_remains_visible_without_calendar_configuration():
         assert status.native_value == "paced"
         entry.runtime_data.timed_goal.status = "waiting_for_soc"
         assert status.native_value == "waiting_for_soc"
+        # The service's forecast is shown beside the planned start.
+        assert status.extra_state_attributes is None
+        finish = datetime(2026, 11, 10, 7, 30, tzinfo=UTC)
+        entry.runtime_data.timed_goal.planned_start = datetime(2026, 11, 10, 3, tzinfo=UTC)
+        entry.runtime_data.timed_goal.forecast = DepartureForecast(finish, 74.0, 0.88, None)
+        assert status.extra_state_attributes == {
+            "planned_start": datetime(2026, 11, 10, 3, tzinfo=UTC), "estimated_finish": finish,
+            "estimated_level_at_departure": 74.0, "learned_efficiency": 0.88,
+        }
         entry.runtime_data.coordinator.last_update_success = False
         assert not status.available
         assert not datetimes["timed_departure"].available

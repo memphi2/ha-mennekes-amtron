@@ -20,7 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from .device.charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
-from .device.departure_plan import DepartureInputs
+from .device.departure_plan import DepartureForecast, DepartureInputs
 from .device.departure_step import (
     MIN_WRITE_INTERVAL,
     keeps_start,
@@ -115,6 +115,8 @@ class TimedGoalObserver:
         self.status = "disabled"
         # When the plan starts, or started, charging for the open trip.
         self.planned_start: datetime | None = None
+        # The service's forecast for the trip; a plan made here has none.
+        self.forecast: DepartureForecast | None = None
         # The target a reached trip met; only a higher one plans it again.
         self._reached_target: float | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
@@ -568,8 +570,9 @@ class TimedGoalObserver:
         # The service is still loading its plan.
         status = remote.status if remote is not None else "waiting_for_device"
         start = remote.planned_start if remote is not None else None
-        if (status, start) != (self.status, self.planned_start):
-            self.status, self.planned_start = status, start
+        forecast = remote.forecast if remote is not None else None
+        if (status, start, forecast) != (self.status, self.planned_start, self.forecast):
+            self.status, self.planned_start, self.forecast = status, start, forecast
             self._notify()
 
     async def _sync_trip(self, service: TimedGoal) -> None:

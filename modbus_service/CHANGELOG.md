@@ -26,7 +26,9 @@ Update the app together with integration 0.9.0b2.
   current itself, also while Home Assistant is offline. Without new reports
   from the car it projects the charge level from the metered energy and pauses
   at the target. Below the minimum charge level set in Home Assistant it
-  charges at once and then waits for the planned start.
+  charges at once and then waits for the planned start. The plan learns each
+  car's transfer efficiency and its metered power at full current, plans the
+  start with both and reports a forecast up to the percentage target.
 - **Immediate reserve:** a job or the first departure of a weekly plan can
   charge part of its energy amount at once, then wait for the planned start.
 - **Finish estimate:** the Charging jobs page shows when an order will
