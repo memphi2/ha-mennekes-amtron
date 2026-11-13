@@ -22,8 +22,8 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
 from .device.enums import EvseState
-from .device.registers import CP_STATE, EVSE_STATE, SESSION_ENERGY
-from .device.vehicle import vehicle_connected
+from .device.registers import EVSE_STATE, SESSION_ENERGY
+from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
 from .vehicle_detection import vehicle_evidence
@@ -164,6 +164,11 @@ class VehicleBinding:
         return self._resting is True
 
     @callback
+    def refresh(self) -> None:
+        """Judge the newly selected car before its rules start."""
+        self._update()
+
+    @callback
     def _changed(self, _event: object = None) -> None:
         self._update()
 
@@ -172,10 +177,7 @@ class VehicleBinding:
         if not runtime.coordinator.last_update_success:
             return None
         data = runtime.coordinator.current_data()
-        return vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=runtime.identity.layout_version >= CP_STATE.min_layout,
-        )
+        return snapshot_vehicle_connected(data.get, runtime.identity.layout_version)
 
     def _update(self) -> bool:
         now = dt_util.utcnow()
@@ -285,6 +287,10 @@ class VehicleBinding:
         if level > check.soc:
             # The car charges: this confirmation holds for the connection.
             self._plausible = True
+            return None
+        if level < check.soc:
+            # The first level was an older report; measure from this one.
+            self._check = _ChargeCheck(float(energy), level)
             return None
         if check.due_at is None:
             if energy - check.energy >= PLAUSIBLE_ENERGY_KWH:

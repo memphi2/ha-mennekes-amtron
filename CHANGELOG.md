@@ -47,6 +47,14 @@ Integration only; the app stays at 0.9.0b1.
   Requested phases empty and set the phase count instead.
 - Selecting another car ends the old car's departure-plan pause, and a
   dropped charge level or poll no longer pauses a plan that already started.
+- Release off after unplugging keeps its setting through a restart while the
+  wallbox is offline or read-only; before, it came back switched off.
+- A selected car is judged at once, so a car that has not confirmed the
+  plug-in gets no charge target or departure plan, not even until the next poll.
+- An older, higher charge level no longer makes the plausibility check end a
+  confirmed car's rules while it charges.
+- Virtual Plug & Charge on a read-only wallbox now loads with a warning instead
+  of retrying the setup forever.
 - Includes the changes of #56 to #62: departure finishing window, Plug &
   Charge decision reasons, and the app's overview, register and runtime pages.
 

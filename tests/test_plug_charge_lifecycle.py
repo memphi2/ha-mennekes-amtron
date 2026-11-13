@@ -4,7 +4,6 @@ import asyncio
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components import mennekes_amtron_rtu as integration
 from custom_components.mennekes_amtron_rtu.device import registers as R
@@ -43,18 +42,19 @@ def test_direct_gate_is_enforced_before_heartbeat_and_stops_observer(tmp_path, m
     asyncio.run(run())
 
 
-def test_read_only_configuration_cannot_silently_enable_a_gate(tmp_path, monkeypatch):
+def test_read_only_configuration_loads_without_enabling_the_gate(tmp_path, monkeypatch, caplog):
     async def run():
         hass = FakeHass(str(tmp_path))
         transport = FakeModbusClient(device_bank())
         _patch_client(monkeypatch, transport)
         _patch_issues(monkeypatch)
         entry = FakeConfigEntry(options={"virtual_plug_charge": True})
-        with pytest.raises(ConfigEntryNotReady) as error:
-            await integration.async_setup_entry(hass, entry)
-        assert error.value.translation_key == "plug_charge_unavailable"
-        assert not entry.runtime_data.client.connected
+        # Retrying the setup would never gain write access.
+        assert await integration.async_setup_entry(hass, entry)
+        assert entry.runtime_data.control.plug_charge.get("enabled") is not True
+        assert "not applied while the wallbox is read-only" in caplog.text
         assert not transport.writes
+        assert await integration.async_unload_entry(hass, entry)
 
     asyncio.run(run())
 

@@ -27,8 +27,8 @@ from .device.enums import (
     SwitchedPhases,
 )
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
-from .device.registers import CP_STATE, EVSE_STATE
-from .device.vehicle import vehicle_connected
+from .device.registers import EVSE_STATE
+from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
 from .goal_store import TimedGoalStore
 from .timed_goal import TimedGoal, matches_departure_source
@@ -488,10 +488,7 @@ class TimedGoalObserver:
             await self._wait_for_input("read_only")
             return
         data = self._runtime.coordinator.current_data()
-        if vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=self._runtime.identity.layout_version >= CP_STATE.min_layout,
-        ) is not True:
+        if snapshot_vehicle_connected(data.get, self._runtime.identity.layout_version) is not True:
             await self._wait_for_input("waiting_for_device")
             return
         plan: ChargePlan = plan_current(

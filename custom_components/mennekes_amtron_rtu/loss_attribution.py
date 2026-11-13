@@ -14,8 +14,7 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 
 from .device.charging_session import CompletedSession
 from .device.const import DOMAIN
-from .device.registers import CP_STATE, EVSE_STATE
-from .device.vehicle import vehicle_connected
+from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .vehicle_profiles import (
     CONF_ACTIVE_VEHICLE_PROFILE,
@@ -85,10 +84,7 @@ class LossAttribution:
             # A replacement coordinator has not polled yet. Its empty initial
             # value is not evidence that the retained physical link was lost.
             return
-        present = vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=runtime.identity.layout_version >= CP_STATE.min_layout,
-        ) if coordinator.last_update_success and (
+        present = snapshot_vehicle_connected(data.get, runtime.identity.layout_version) if coordinator.last_update_success and (
             (client := getattr(runtime, "client", None)) is None or client.connected
         ) else None
         if present is None:

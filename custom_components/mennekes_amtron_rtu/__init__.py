@@ -360,7 +360,11 @@ async def async_setup_entry(
         # Configure the gate before starting heartbeat/recovery. The app owns
         # the previous grant; an unchanged policy survives this HA reload.
         plug_enabled = entry.options.get(CONF_VIRTUAL_PLUG_CHARGE) is True
-        if plug_enabled or (
+        if plug_enabled and control.read_only:
+            # Enabling needs write access; retrying setup would never get it.
+            # The gate keeps its last state until writing is allowed again.
+            _LOGGER.warning("Virtual Plug & Charge is not applied while the wallbox is read-only")
+        elif plug_enabled or (
             CONF_VIRTUAL_PLUG_CHARGE in entry.options and control.supports_plug_charge
             and control.plug_charge.get("enabled") is True
         ):
@@ -733,6 +737,9 @@ async def _async_switch_vehicle(
         await _async_resume_trip(hass, entry, timed_reset_complete)
         await _async_cancel_old_trip(hass, entry, timed_reset_complete)
         options = vehicle_options(entry.options)
+        if runtime.vehicle_binding is not None:
+            # Its rest state still judges the previous car until the next poll.
+            runtime.vehicle_binding.refresh()
         await _async_start_vehicle(hass, entry, options, timed_reset_complete, lambda: None)
         if auto and runtime.vehicle_detection is None:
             runtime.vehicle_detection = VehicleDetectionObserver(hass, entry)

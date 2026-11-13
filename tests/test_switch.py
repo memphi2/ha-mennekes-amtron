@@ -303,3 +303,21 @@ def test_unplugging_also_ends_a_manual_pause(monkeypatch, release, paused, goal_
         assert control.async_resume_charging.await_count == int(resumed)
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(("stored", "expected"), [({"enabled": True}, True), ({"enabled": False}, False), (None, False)])
+def test_release_off_on_unplug_survives_an_unavailable_shutdown(stored, expected) -> None:
+    async def run() -> None:
+        switches, _entry, _transport = await _switches()
+        switch = switches["release_off_on_unplug"]
+
+        async def extra():
+            return None if stored is None else RestoredExtraData(stored)
+
+        switch.async_get_last_extra_data = extra
+        switch.async_get_last_state = AsyncMock(return_value=SimpleNamespace(state="unavailable"))
+        await switch.async_added_to_hass()
+        assert switch.is_on is expected
+        assert switch.extra_restore_state_data.as_dict() == {"enabled": expected}
+
+    asyncio.run(run())

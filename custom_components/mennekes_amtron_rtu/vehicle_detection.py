@@ -16,8 +16,7 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
-from .device.registers import CP_STATE, EVSE_STATE
-from .device.vehicle import vehicle_connected
+from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .loss_attribution import confirm_automatic_vehicle
 from .vehicle_profiles import (
@@ -287,10 +286,7 @@ class VehicleDetectionObserver:
         if runtime is None or not runtime.coordinator.last_update_success:
             return None
         data = runtime.coordinator.current_data()
-        return vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=runtime.identity.layout_version >= CP_STATE.min_layout,
-        )
+        return snapshot_vehicle_connected(data.get, runtime.identity.layout_version)
 
     def _apply(self, selected: str | None) -> None:
         if selected is not None:

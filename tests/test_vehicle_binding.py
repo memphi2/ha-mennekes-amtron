@@ -321,6 +321,27 @@ def test_a_charge_level_that_does_not_rise_revokes_the_confirmation(tmp_path, ca
     asyncio.run(run())
 
 
+def test_a_lower_report_starts_the_charge_check_over(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        _entry, coordinator, binding = await confirmed_binding(hass, caplog)
+        # An old report of 50 % arrives first; the car really is at 40 %.
+        soc(hass, 50)
+        coordinator.charge(1.0)
+        soc(hass, 40)
+        coordinator.charge(6.0)
+        coordinator.charge(7.0)
+        soc(hass, 45)
+        coordinator.charge(8.0)
+        await settle(hass)
+        assert not binding.resting
+        assert "stayed at" not in caplog.text
+        binding.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
 def test_a_rising_or_full_or_missing_charge_level_keeps_the_confirmation(tmp_path, caplog):
     async def run():
         hass = HomeAssistant(str(tmp_path))
@@ -379,6 +400,21 @@ def test_a_confirmation_from_before_a_restart_is_checked_from_now_on(tmp_path, c
         assert not restarted.resting
         assert restarted._confirmed_at is not None
         restarted.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_selecting_another_car_is_judged_before_its_rules_start(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        entry, _coordinator, binding = await confirmed_binding(hass, caplog)
+        # The second car never reported itself plugged in.
+        entry.options = {**entry.options, "active_vehicle_profile": B}
+        assert not binding.resting
+        binding.refresh()
+        assert binding.resting
+        binding.stop()
         await hass.async_stop()
 
     asyncio.run(run())

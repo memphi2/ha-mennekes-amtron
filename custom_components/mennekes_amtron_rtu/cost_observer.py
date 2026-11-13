@@ -34,8 +34,8 @@ from .device.charging_cost import CostAccumulator, CostResult, TariffConfig
 from .device.charging_session import CompletedSession
 from .device.const import CONF_MEASUREMENT_INTERVAL_SECONDS, CONF_SCAN_INTERVAL_SECONDS
 from .device.data import WallboxData
-from .device.registers import CP_STATE, ENERGY_TOTAL, EVSE_STATE
-from .device.vehicle import vehicle_connected
+from .device.registers import ENERGY_TOTAL
+from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
 
@@ -243,10 +243,7 @@ class ChargingCostObserver:
             self._anchored = False
             return
         self._supported = data.session_summary_supported and (not self._remote or data.energy_observed_at is not None)
-        present = vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=self._entry.runtime_data.identity.layout_version >= CP_STATE.min_layout,
-        )
+        present = snapshot_vehicle_connected(data.get, self._entry.runtime_data.identity.layout_version)
         if present is None:
             self._anchored = False
         elif present:
