@@ -1,4 +1,4 @@
-"""Live polling configuration through the existing Supervisor save transaction."""
+"""Live runtime settings through the existing Supervisor save transaction."""
 
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ class RuntimeSettingsConsole(AppSettings):
             await self._persist_options(options, updated, "options_save_uncertain")
             try:
                 async with asyncio.timeout(2):
-                    await service.apply_polling_intervals(candidate.scan_interval, candidate.measurement_interval)
+                    await service.apply_runtime_settings(candidate)
             except (TimeoutError, DeviceError) as err:
                 # Saved state may already be durable. Report uncertainty rather
                 # than rolling back over another administrator's newer changes.

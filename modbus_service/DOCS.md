@@ -95,7 +95,7 @@ for details.
 | **Connection** | USB or LAN connection and optional LAN-adapter setup. Changes apply after an app restart. |
 | **Debug log** | Live Modbus recording for up to 10 minutes, in memory only. |
 | **Registers** | Every known register with raw and decoded value and its read quality. Read-only. |
-| **Runtime** | Polling intervals apply without restart; current cap and waits after the next restart. Preview before saving. |
+| **Runtime** | Polling intervals, current cap and waits apply without restart. Preview before saving. |
 | **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with an optional immediate reserve, early start and an estimated finish. |
 | **Guest charging** | An immediate, limited order for a visitor's car after local authorization. |
 | **Weekly plans** | Recurring departures for one car, activated for the plugged-in car for up to seven days. |

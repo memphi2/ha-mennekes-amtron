@@ -151,13 +151,13 @@ vehicle integrations. Calendar and manual departure inputs remain available.
 | Status and measurement polling | Integration options | App **Open Web UI → Runtime** (no restart) or app configuration |
 | How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
 | Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
-| Minimum time between state changes | Integration options, in seconds | App **Runtime** page or configuration, in seconds; applies after an app restart |
-| Extra wait before phase changes | Integration options, in seconds | App **Runtime** page or configuration, in seconds; applies after an app restart |
+| Minimum time between state changes | Integration options, in seconds | App **Runtime** page (no restart) or configuration, in seconds |
+| Extra wait before phase changes | Integration options, in seconds | App **Runtime** page (no restart) or configuration, in seconds |
 
 The app keeps connection settings under **Open Web UI → Connection**, live
 operating settings under **Runtime** and write permission under
-**Configuration**. Apart from the polling intervals, restart the app after a
-change. The web pages need Supervisor 2026.10.4 or newer; the native
+**Configuration**. **Runtime** applies its values without a restart; after a
+change under **Connection** or **Configuration**, restart the app. The web pages need Supervisor 2026.10.4 or newer; the native
 Configuration tab always works. See [the app's web pages](app-guide.md).
 
 The default status interval is **5 seconds** and the measurement interval is

@@ -34,7 +34,7 @@ test("initial load is read-only and displays saved and effective values",async()
 });
 test("preview requires explicit confirmation and input changes invalidate it",async()=>{
   const h=await harness();h.el("scan_interval").value="10";
-  h.responses.push(payload({changes:[{key:"scan_interval",effective:5,proposed:10,effect:"live"}]}));
+  h.responses.push(payload({changes:[{key:"scan_interval",effective:5,proposed:10,effect:"next_cycle"}]}));
   await h.el("runtime_form").emit("submit");assert.equal(h.calls.length,2);assert.equal(h.calls[1].url,"./api/runtime/preview");assert.equal(h.calls[1].options.headers["X-Amtron-CSRF"],"c");assert.equal(h.el("runtime_save").disabled,false);
   await h.el("runtime_form").emit("input");assert.equal(h.el("runtime_save").disabled,true);await h.el("runtime_save").emit("click");assert.equal(h.calls.length,2);
 });
@@ -44,13 +44,23 @@ test("fields and confirmation are disabled while a request is in flight",async()
   assert.ok(names.every(key=>h.el(key).disabled));assert.equal(h.el("runtime_save").disabled,true);
   await h.el("runtime_form").emit("submit");assert.equal(h.calls.length,2);finish(payload());await pending;
 });
-test("save reports pending restart and does not issue charging commands",async()=>{
+test("a lower cap saves without a restart and issues no charging command",async()=>{
   const h=await harness();h.el("current_cap").value="8";
-  const result=payload({saved:{...fields,current_cap:8},restart_fields:["current_cap"],restart_required:true});
-  h.responses.push(payload({changes:[{key:"current_cap",effective:16,proposed:8,effect:"restart"}],restart_fields:["current_cap"],restart_required:true}),result);
-  await h.el("runtime_form").emit("submit");await h.el("runtime_save").emit("click");
-  assert.equal(h.calls.length,3);assert.equal(JSON.parse(h.calls[2].options.body).confirm,true);assert.equal(h.el("runtime_save").disabled,true);assert.match(h.el("runtime_restart").textContent,/Neustart/);
+  const result=payload({active:{...fields,current_cap:8},saved:{...fields,current_cap:8}});
+  h.responses.push(payload({changes:[{key:"current_cap",effective:16,proposed:8,effect:"immediate"}]}),result);
+  await h.el("runtime_form").emit("submit");
+  assert.equal(h.el("runtime_changes").children[0].textContent,"Service-Stromobergrenze (A): 16 → 8 · Gilt sofort");
+  await h.el("runtime_save").emit("click");
+  assert.equal(h.calls.length,3);assert.equal(JSON.parse(h.calls[2].options.body).confirm,true);assert.equal(h.el("runtime_save").disabled,true);
+  assert.equal(h.el("runtime_restart").textContent,"Für diese Änderung ist kein Neustart nötig.");
   assert.ok(h.calls.every(call=>!call.url.includes("command")));
+});
+test("every effect is named in the page language",async()=>{
+  const changes=[["scan_interval","next_cycle"],["current_cap","immediate"],["phase_switch_grace_seconds","next_switch"]].map(([key,effect])=>({key,effective:1,proposed:2,effect}));
+  for(const [language,words] of [["en",["Next polling cycle","Applies at once","Next phase-switch wait"]],["de",["Nächster Pollzyklus","Gilt sofort","Nächste Wartezeit beim Phasenwechsel"]],["fr",["Prochain cycle d’interrogation","S’applique immédiatement","Prochaine attente de commutation de phase"]],["nl",["Volgende uitleescyclus","Geldt meteen","Volgende wachttijd voor faseomschakeling"]],["it",["Prossimo ciclo di lettura","Vale subito","Prossima attesa di commutazione di fase"]]]){
+    const h=await harness([payload(),payload({changes})],language);await h.el("runtime_form").emit("submit");
+    assert.deepEqual(h.el("runtime_changes").children.map(node=>node.textContent.split(" · ")[1]),words);
+  }
 });
 test("lost save response is not retried and requires reload",async()=>{
   const h=await harness();h.responses.push(payload(),new Error("lost response"));
@@ -65,13 +75,20 @@ test("uncertain prior save disables all editing",async()=>{
   const h=await harness([payload({write_blocked:true})]);assert.ok(names.every(key=>h.el(key).disabled));assert.equal(h.el("runtime_check").disabled,true);assert.match(h.el("runtime_notice").textContent,/ungewissen/);
 });
 
-test("a previously saved restart-required change is visible immediately",async()=>{
-  const h=await harness([payload({saved:{...fields,current_cap:8},restart_required:true,restart_fields:["current_cap"]})]);
-  assert.equal(h.el("runtime_preview").hidden,false);assert.equal(h.el("runtime_changes").children.length,0);assert.match(h.el("runtime_restart").textContent,/Neustart/);assert.equal(h.el("current_cap").value,"8");
+test("a connection change saved in the Supervisor form is visible immediately",async()=>{
+  const h=await harness([payload({restart_required:true,restart_fields:["connection"]})]);
+  assert.equal(h.el("runtime_preview").hidden,false);assert.equal(h.el("runtime_changes").children.length,0);assert.equal(h.el("runtime_restart").textContent,"Neustart erforderlich: Verbindung");
 });
 test("restart notes use the page language set by the server",async()=>{
-  for(const [language,note] of [["en",/^Requires restart: Service current cap/],["de",/^Neustart erforderlich: Service-Stromobergrenze/],["fr",/^Redémarrage requis: Limite/],["nl",/^Herstart vereist: Stroomgrens/],["it",/^Riavvio necessario: Limite/]]){
-    const h=await harness([payload({restart_required:true,restart_fields:["current_cap"]})],language);
-    assert.match(h.el("runtime_restart").textContent,note);
+  for(const [language,note] of [["en","Requires restart: Connection, Read-only mode"],["de","Neustart erforderlich: Verbindung, Nur-Lesen-Modus"],["fr","Redémarrage requis: Connexion, Mode lecture seule"],["nl","Herstart vereist: Verbinding, Alleen-lezenmodus"],["it","Riavvio necessario: Connessione, Modalità sola lettura"]]){
+    const h=await harness([payload({restart_required:true,restart_fields:["connection","read_only"]})],language);
+    assert.equal(h.el("runtime_restart").textContent,note);
   }
+});
+test("saved values that are not in use yet point to saving them here",async()=>{
+  for(const [language,start] of [["en","Some saved values"],["de","Einige gespeicherte Werte"],["fr","Certaines valeurs"],["nl","Sommige opgeslagen"],["it","Alcuni valori"]]){
+    const h=await harness([payload({saved:{...fields,current_cap:8}})],language);
+    assert.ok(h.el("runtime_notice").textContent.startsWith(start));assert.equal(h.el("current_cap").value,"8");
+  }
+  const h=await harness([payload({saved:{...fields,current_cap:8},write_blocked:true})]);assert.match(h.el("runtime_notice").textContent,/ungewissen/);
 });

@@ -91,6 +91,7 @@ class ModbusService:
         self._success = False
         self._attempts = 0
         self._retry_at = 0.0
+        self._cap_retry_at = 0.0
         self._updated_at: float | None = None
         self._energy_sample: dict[str, float | None] | None = None
         self._stopping = False
@@ -231,6 +232,7 @@ class ModbusService:
                 else:
                     await self.refresh()
                 await self._recover()
+                await self._enforce_current_cap()
                 await self._persist()
                 if self._logged_unavailable:
                     _LOGGER.info("Wallbox communication restored")
@@ -349,6 +351,26 @@ class ModbusService:
             self._retry_at = time.monotonic() + 30
         finally:
             await self._persist()
+
+    async def _enforce_current_cap(self) -> None:
+        """Never leave a confirmed charging current above a lowered cap."""
+        control = self.control
+        if control is None or self.config.read_only or time.monotonic() < self._cap_retry_at:
+            return
+        self._phase = "applying the current cap"
+        try:
+            async with self._command_lock:
+                lowered = await control.async_enforce_current_cap()
+        except (DeviceError, AmtronBusError) as err:
+            self._cap_retry_at = time.monotonic() + 30
+            _LOGGER.warning(
+                "Charging current above the %.1f A cap could not be lowered (%s); retrying in 30 seconds",
+                control.max_charging_current,
+                err.translation_key if isinstance(err, DeviceError) else type(err).__name__,
+            )
+            return
+        if lowered:
+            _LOGGER.info("Charging current lowered to the %.1f A cap", control.max_charging_current)
 
     async def _persist(self, *, include_session_history: bool = False) -> None:
         if self._store is not None:

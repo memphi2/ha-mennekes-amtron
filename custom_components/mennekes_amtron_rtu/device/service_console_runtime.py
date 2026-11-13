@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from .client import MennekesModbusClient
+from .control import ControlOptions
 from .errors import DeviceError
 from .register_monitor import RegisterMonitor
 from .service_config import ServerConfig, number
@@ -27,16 +28,33 @@ class ConsoleModbusService(ModbusService):
         self.register_monitor.clear()
         await super()._initialize()
 
-    async def apply_polling_intervals(self, scan: float, measurement: float) -> None:
+    async def apply_runtime_settings(self, candidate: ServerConfig) -> None:
         """Keep the bus owner, heartbeat, hold/backoff state and pending commands.
 
-        A running poll or sleep is not interrupted. The next ordinary polling
-        cycle uses the new intervals; this is not an immediate refresh command.
+        A running poll or sleep is not interrupted; the next ordinary cycle
+        uses the new intervals. New commands use the new limits at once, and
+        the polling loop lowers a charging current above a lowered cap.
         """
-        scan, measurement = number(scan, 2, 300), number(measurement, 2, 300)
-        async with self._poll_lock:
-            if self._stopping:
-                raise DeviceError("service_unavailable")
-            if self._poller is not None:
-                self._poller.update_measurement_interval(measurement)
-            self.config = replace(self.config, scan_interval=scan, measurement_interval=measurement)
+        control = self.control
+        if self._stopping or control is None:
+            raise DeviceError("service_unavailable")
+        cap = number(candidate.current_cap, 6, 32)
+        options = ControlOptions(
+            control.options.read_only, cap,
+            state_change_interval_seconds=candidate.state_change_interval_seconds,
+            phase_switch_grace_seconds=candidate.phase_switch_grace_seconds,
+        )
+        measurement = number(candidate.measurement_interval, 2, 300)
+        scan = number(candidate.scan_interval, 2, 300)
+        # The only wait. A command takes the control lock before it refreshes,
+        # so this one never waits for the poll lock while holding it, and a
+        # timeout here leaves nothing half applied.
+        await control.async_set_limits(options)
+        if self._poller is not None:
+            self._poller.update_measurement_interval(measurement)
+        self.config = replace(
+            self.config, scan_interval=scan, measurement_interval=measurement,
+            current_cap=cap,
+            state_change_interval_seconds=options.state_change_interval_seconds,
+            phase_switch_grace_seconds=options.phase_switch_grace_seconds,
+        )

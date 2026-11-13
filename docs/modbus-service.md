@@ -150,7 +150,7 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 | Set a charging-current limit | Use the current slider in HA. **0 A removes the EMS limit; it does not pause charging.** |
 | Enable or disable all writes | Change **Read-only**, save and restart the app. HA needs no restart. Read-only stops the heartbeat as well as writes. |
 | Change Modbus polling intervals | **Open Web UI → Runtime**: preview, confirm, applies at the next poll without restart. |
-| Change the service current cap or the waits between charging changes | **Open Web UI → Runtime** or the app configuration, then restart the app. **Minimum time between state changes** defaults to **300** seconds, range **0–3600**. |
+| Change the service current cap or the waits between charging changes | **Open Web UI → Runtime**: preview, confirm, applies without restart; a charge above a lower cap is lowered after the next poll. In the app configuration, a change applies after an app restart. **Minimum time between state changes** defaults to **300** seconds, range **0–3600**. |
 | Change USB/LAN connection settings | **Open Web UI → Connection**, save and restart the app. For LAN, use the adapter interface or optional [adapter setup](lan-adapters.md#service-app). |
 | Let the app charge on its own, or charge a guest's car | **Open Web UI → Charging jobs** or **Guest charging**; see [the app's web pages](app-guide.md). |
 | See what the app is doing | **Open Web UI → Overview**. |

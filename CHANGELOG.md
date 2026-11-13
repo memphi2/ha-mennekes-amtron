@@ -95,6 +95,10 @@ Update the app to 0.9.0b2 together with the integration.
 - While an app order runs, Home Assistant says that a charging job of the app
   controls charging, instead of naming a charge target. The command results
   use the new reason `service_job`.
+- The app's current cap, minimum time between state changes and extra wait
+  before phase changes apply without a restart from its **Runtime** page; a
+  queued start or stop is timed again. The app lowers a charging current above
+  its cap after the next poll, also after a restart with a lower cap.
 - All app pages are available in English, German, French, Dutch and Italian
   and share one navigation bar.
 - **Docs:** [the app's web pages](docs/app-guide.md) explains the overview,

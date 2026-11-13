@@ -81,6 +81,8 @@ PENDING_ACTIONS = CONTROL_ACTIONS
 _PHASE_PAUSE_TIMEOUT = 30.0
 # How long a read-back goal pause is trusted before it is read again.
 _GOAL_PAUSE_RECHECK_SECONDS = 60.0
+# A float32 read-back of the cap itself is not above it.
+_CAP_TOLERANCE_A = 0.05
 
 
 @dataclass(slots=True)
@@ -488,6 +490,55 @@ class AmtronControl:
         """Return the active control options."""
 
         return self._options
+
+    async def async_set_limits(self, options: ControlOptions) -> None:
+        """Use new limits without a restart; read-only mode still needs one.
+
+        New commands use them at once. A queued start or stop is timed again
+        with the new state-change interval; a phase-switch wait that already
+        runs keeps its length.
+        """
+        if options.read_only != self._options.read_only:
+            raise ValueError("read_only needs a restart")
+        async with self._current_lock:
+            retime = (
+                options.state_change_interval_seconds != self._options.state_change_interval_seconds
+                and self._pending is not None and self._phase_change is None
+            )
+            self._options = options
+            if retime:
+                # The retry recomputes the wait or runs; a write it cannot
+                # make yet raises before anything reaches the bus.
+                self._pending_due = self._monotonic()
+                self._pending_changed.set()
+
+    async def async_enforce_current_cap(self) -> bool:
+        """Lower a freshly read charging current above a lowered cap.
+
+        A queued command applies the cap when it runs and a service order
+        follows it on its own tick; a pause and 0 A stay as they are.
+        """
+        if self.read_only:
+            return False
+        async with self._current_lock:
+            snapshot = self._state()
+            current = (
+                snapshot.fresh(CHARGING_CURRENT_EMS.key)
+                if snapshot.current_write_generation == self._write_state.current_write_generation
+                else None
+            )
+            maximum = self.max_charging_current
+            if (
+                self._pending is not None or self._phase_change is not None
+                or self._active_command is not None or self.energy_goal_stop_requested
+                or self._service_permits(None, enabling=True) is False
+                or isinstance(current, bool) or not isinstance(current, (int, float))
+                or not math.isfinite(current) or current < CHARGING_CURRENT_MINIMUM
+                or current <= maximum + _CAP_TOLERANCE_A
+            ):
+                return False
+            await self._async_submit_locked(_PendingCommand("set_current", maximum))
+            return True
 
     @property
     def read_only(self) -> bool:

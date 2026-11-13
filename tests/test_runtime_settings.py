@@ -8,7 +8,8 @@ import pytest
 
 from custom_components.mennekes_amtron_rtu.device.connection import SerialConfig
 from custom_components.mennekes_amtron_rtu.device.runtime_settings import (
-    HOT_FIELDS,
+    EFFECTS,
+    INTEGER_FIELDS,
     RUNTIME_FIELDS,
     runtime_candidate,
     runtime_preview,
@@ -51,19 +52,20 @@ def test_invalid_values_fail_before_a_save(field, value):
     ("current_cap", 6, 32), ("state_change_interval_seconds", 0, 3600),
     ("phase_switch_grace_seconds", 0, 30),
 ])
-def test_exact_boundaries_and_restart_labels(field, low, high):
+def test_exact_boundaries_and_effect_labels(field, low, high):
     active = ServerConfig.from_dict({**SAVED, "token": TOKEN})
     for value in (low, high):
         _, candidate = runtime_candidate(SAVED, {field: value}, token=TOKEN)
         result = runtime_preview(active, active, candidate)
         assert result["proposed"][field] == value
-        expected = "live" if field in HOT_FIELDS else "restart"
+        expected = EFFECTS[field]
         # A boundary equal to the active value changes nothing; any other is
         # exactly one change with the right effect.
         changed = getattr(active, field) != value
         assert [(change["key"], change["effect"]) for change in result["changes"]] == (
             [(field, expected)] if changed else []
         )
+        assert not result["restart_required"]
     with pytest.raises(ValueError, match=field):
         runtime_candidate(SAVED, {field: high + 1}, token=TOKEN)
 
@@ -74,15 +76,23 @@ def test_native_pending_changes_remain_visible_and_noop_is_empty():
     saved = replace(active, connection=SerialConfig("/dev/other"), read_only=False, listen="127.0.0.2", port=8766, current_cap=16)
     result = runtime_preview(active, saved, saved)
     assert result["restart_required"]
-    assert result["restart_fields"] == ["current_cap", "connection", "read_only", "listen", "port"]
+    # The cap applies live; only the connection settings need a restart.
+    assert result["restart_fields"] == ["connection", "read_only", "listen", "port"]
+    assert result["changes"] == [{"key": "current_cap", "effective": 6, "saved": 16, "proposed": 16, "effect": "immediate"}]
     reverted = runtime_preview(active, saved, active)
     assert not reverted["restart_required"]
     assert reverted["changes"][0]["saved"] == 16
     assert reverted["changes"][0]["proposed"] == 6
 
 
-@pytest.mark.parametrize("field", sorted(HOT_FIELDS))
+@pytest.mark.parametrize("field", sorted(INTEGER_FIELDS))
 @pytest.mark.parametrize("value", [5.0, 5.5])
-def test_ingress_poll_intervals_match_the_supervisor_integer_schema(field, value):
-    with pytest.raises(ValueError, match=f"{field}: .*integer seconds"):
+def test_seconds_match_the_supervisor_integer_schema(field, value):
+    with pytest.raises(ValueError, match=f"{field}: must be whole seconds"):
         runtime_candidate(SAVED, {field: value}, token=TOKEN)
+
+
+def test_the_current_cap_keeps_tenths_of_an_ampere():
+    assert set(RUNTIME_FIELDS) - {"current_cap"} == INTEGER_FIELDS
+    _, candidate = runtime_candidate(SAVED, {"current_cap": 10.5}, token=TOKEN)
+    assert candidate.current_cap == 10.5

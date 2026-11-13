@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
+from dataclasses import replace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -29,7 +30,7 @@ async def edit_context(client):
     return {**HEADERS, "X-Amtron-CSRF": data["csrf"]}, data["revision"]
 
 
-def test_preview_and_save_apply_only_hot_intervals_without_bus_side_effects(tmp_path, monkeypatch):
+def test_preview_and_save_apply_every_runtime_setting_without_bus_side_effects(tmp_path, monkeypatch):
     async def run():
         service, transport = await console_fixture(tmp_path)
         try:
@@ -37,27 +38,41 @@ def test_preview_and_save_apply_only_hot_intervals_without_bus_side_effects(tmp_
             monkeypatch.setattr(ui, "SUPERVISOR_PEER", "127.0.0.1")
             async with TestClient(TestServer(create_console_app(settings))) as client:
                 headers, revision = await edit_context(client)
-                changes = {"scan_interval": 11, "measurement_interval": 45, "current_cap": 8}
+                changes = {
+                    "scan_interval": 11, "measurement_interval": 45, "current_cap": 8,
+                    "state_change_interval_seconds": 60, "phase_switch_grace_seconds": 10,
+                }
                 before = (list(transport.reads), list(transport.writes))
-                owner, heartbeat, poller = service.client, service.heartbeat, service._poller
+                owner, heartbeat, poller, control = service.client, service.heartbeat, service._poller, service.control
                 retry_history = deepcopy(poller._block_retries)
                 read_history = deepcopy(poller._block_read_at)
                 response = await client.post("/api/runtime/preview", headers=headers, json={"revision": revision, "changes": changes})
                 assert response.status == 200
                 preview = await response.json()
-                assert preview["restart_fields"] == ["current_cap"]
+                assert preview["restart_fields"] == []
+                assert {change["key"]: change["effect"] for change in preview["changes"]} == {
+                    "scan_interval": "next_cycle", "measurement_interval": "next_cycle", "current_cap": "immediate",
+                    "state_change_interval_seconds": "immediate", "phase_switch_grace_seconds": "next_switch",
+                }
                 assert service.config.scan_interval == 5
+                assert control.max_charging_current == 16
                 assert not any(method == "POST" for method, _path, _payload in settings.calls)
                 result = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": changes, "confirm": True})
                 assert result.status == 200
                 data = await result.json()
                 assert data["saved_ok"]
-                assert data["active"]["current_cap"] == 16
-                assert data["saved"]["current_cap"] == 8
-                assert data["restart_required"]
+                assert data["active"] == data["saved"] == {key: float(value) for key, value in changes.items()}
+                assert not data["restart_required"]
                 assert service.config.scan_interval == 11
                 assert service.config.measurement_interval == 45
-                assert service.config.current_cap == 16
+                assert service.config.current_cap == 8
+                assert service.control is control
+                assert control.max_charging_current == 8
+                assert control.options.state_change_interval_seconds == 60
+                assert control.options.phase_switch_grace_seconds == 10
+                assert control.read_only
+                published = service.snapshot()["control"]
+                assert (published["current_cap"], published["max_charging_current"], published["state_change_interval_seconds"]) == (8, 8, 60)
                 assert settings.options["current_cap"] == 8
                 assert settings.options["read_only"] is True
                 assert service.client is owner
@@ -111,8 +126,8 @@ def test_saved_but_not_applied_remains_visible_and_retry_requires_new_revision(t
         try:
             settings = settings_for(service)
             monkeypatch.setattr(ui, "SUPERVISOR_PEER", "127.0.0.1")
-            original = service.apply_polling_intervals
-            monkeypatch.setattr(service, "apply_polling_intervals", AsyncMock(side_effect=failure))
+            original = service.apply_runtime_settings
+            monkeypatch.setattr(service, "apply_runtime_settings", AsyncMock(side_effect=failure))
             async with TestClient(TestServer(create_console_app(settings))) as client:
                 headers, revision = await edit_context(client)
                 response = await client.post("/api/runtime", headers=headers, json={"revision": revision, "changes": {"scan_interval": 10}, "confirm": True})
@@ -122,7 +137,7 @@ def test_saved_but_not_applied_remains_visible_and_retry_requires_new_revision(t
                 assert result["active"]["scan_interval"] == 5
                 assert result["saved"]["scan_interval"] == 10
                 assert result["revision"] != revision
-                monkeypatch.setattr(service, "apply_polling_intervals", original)
+                monkeypatch.setattr(service, "apply_runtime_settings", original)
                 retry = await client.post("/api/runtime", headers=headers, json={"revision": result["revision"], "changes": {"scan_interval": 10}, "confirm": True})
                 assert retry.status == 200
                 assert service.config.scan_interval == 10
@@ -191,22 +206,32 @@ def test_lost_supervisor_reply_is_resolved_or_fenced_not_retried(tmp_path, monke
     asyncio.run(run())
 
 
-def test_polling_update_preserves_cadence_and_refuses_shutdown(tmp_path):
+def test_runtime_update_preserves_cadence_and_refuses_an_unready_or_stopping_service(tmp_path):
     async def run():
         service, _transport = await console_fixture(tmp_path)
         try:
-            poller = service._poller
+            poller, control = service._poller, service.control
             for invalid in (None, True, 1, 301, float("nan"), "5"):
                 with pytest.raises(ValueError, match="measurement interval"):
                     poller.update_measurement_interval(invalid)
                 with pytest.raises(ValueError, match="numeric value"):
-                    await service.apply_polling_intervals(invalid, 30)
+                    await service.apply_runtime_settings(replace(service.config, measurement_interval=invalid))
+            with pytest.raises(ValueError, match="numeric value"):
+                await service.apply_runtime_settings(replace(service.config, current_cap=5))
+            assert service.config.current_cap == 16
+            assert control.max_charging_current == 16
             service._poller = None
-            await service.apply_polling_intervals(7, 11)
+            await service.apply_runtime_settings(replace(service.config, scan_interval=7, measurement_interval=11))
             assert service.config.measurement_interval == 11
             service._poller = poller
+            # Before the first connection there is no control to update yet.
+            service.control = None
+            with pytest.raises(DeviceError):
+                await service.apply_runtime_settings(replace(service.config, current_cap=10))
+            service.control = control
+            assert service.config.current_cap == 16
         finally:
             await service.stop()
         with pytest.raises(DeviceError):
-            await service.apply_polling_intervals(7, 11)
+            await service.apply_runtime_settings(replace(service.config, scan_interval=7))
     asyncio.run(run())

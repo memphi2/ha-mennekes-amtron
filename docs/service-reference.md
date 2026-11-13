@@ -83,7 +83,14 @@ Supervisor roles. See [the app's web pages](app-guide.md).
 | `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
 | `/jobs`, `/guest`, `/api/jobs` | Charging jobs, boost and guest charging |
 
-Polling intervals saved on the **Runtime** page apply at the next poll cycle.
+Values saved on the **Runtime** page apply without a restart. Each previewed
+change names its `effect`: `next_cycle` for the polling intervals, `immediate`
+for the current cap and the state-change interval, `next_switch` for the
+phase-switch grace. After every poll the service lowers a charging current
+above its cap, unless a queued command, a phase switch, a goal or order stop or
+a holding charging job decides the current. `restart_fields` lists the
+connection, read-only mode, listen address and port when their saved value
+differs from the running one.
 All other service settings are read only at startup: save configuration changes
 and restart the service to apply them. This briefly interrupts the heartbeat; HA does not need
 restarting for permission changes. The service's own error-200 recovery can still
