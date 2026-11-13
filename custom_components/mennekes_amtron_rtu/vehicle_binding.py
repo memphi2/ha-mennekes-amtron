@@ -50,12 +50,18 @@ PLAUSIBLE_ENERGY_KWH = 4.0
 PLAUSIBLE_BELOW_PERCENT = 95.0
 
 
+# The rise that counts as charging once a lower report reset the level.
+_RISE_AFTER_DROP = 2.0
+
+
 class _ChargeCheck:
     """The charge level when the confirmed car started drawing energy."""
 
     def __init__(self, energy: float, soc: float) -> None:
         self.energy = energy
         self.soc = soc
+        # A lower report replaced the first level, which may have been old.
+        self.lowered = False
         # When the wallbox had delivered enough energy for the level to rise.
         self.due_at: datetime | None = None
 
@@ -284,13 +290,16 @@ class VehicleBinding:
             if level < PLAUSIBLE_BELOW_PERCENT:
                 self._check = _ChargeCheck(float(energy), level)
             return None
-        if level > check.soc:
+        # After a lower report, one point back up is only jitter.
+        if level >= check.soc + (_RISE_AFTER_DROP if check.lowered else 1e-9):
             # The car charges: this confirmation holds for the connection.
             self._plausible = True
             return None
         if level < check.soc:
-            # The first level was an older report; measure from this one.
-            self._check = _ChargeCheck(float(energy), level)
+            # The first level may have been an older report: measure the rise
+            # from this one. The energy keeps counting from the start, so a
+            # car that only drains still contradicts in time.
+            check.soc, check.lowered = level, True
             return None
         if check.due_at is None:
             if energy - check.energy >= PLAUSIBLE_ENERGY_KWH:

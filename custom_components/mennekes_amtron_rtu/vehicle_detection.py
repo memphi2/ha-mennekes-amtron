@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
@@ -34,6 +35,8 @@ from .vehicle_sources import (
     VehicleDetectionSource,
     resolve_detection_source,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 SETTLE_SECONDS = 3
 
@@ -166,7 +169,11 @@ class VehicleEvidence:
     @callback
     def _notify(self, event: object = None) -> None:
         for listener in list(self._listeners):
-            listener(event)
+            # One failing observer must not hide the event from the others.
+            try:
+                listener(event)
+            except Exception:
+                _LOGGER.exception("Vehicle evidence listener failed")
 
     def _track(self) -> None:
         on_change = self._notify

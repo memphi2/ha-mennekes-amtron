@@ -866,3 +866,52 @@ def test_only_another_car_ends_the_plans_pause_on_stop(monkeypatch, withdraw):
         assert resumed == ([True] if withdraw else [])
 
     asyncio.run(run())
+
+
+def test_a_failed_cancel_still_ends_the_plans_pause_for_another_car(monkeypatch, caplog):
+    async def run():
+        observer, control, _hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        resumed = []
+
+        async def resume():
+            resumed.append(True)
+
+        control.async_resume_charging = resume
+        observer.goal.set(NOW + timedelta(hours=16))
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+        control.pause_requested = True
+        control.async_cancel_timed_current = AsyncMock(side_effect=observer_module.HomeAssistantError("offline"))
+        await observer.async_stop(withdraw=True)
+        assert resumed == [True]
+        assert "Could not cancel timed charging" in caplog.text
+
+        # A failing resume is logged, never raised into the switch.
+        observer, control, _hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        observer.goal.set(NOW + timedelta(hours=16))
+        await observer._evaluate()
+        control.pause_requested = True
+        control.async_resume_charging = AsyncMock(side_effect=observer_module.HomeAssistantError("offline"))
+        await observer.async_stop(withdraw=True)
+        assert "Could not end the departure plan pause" in caplog.text
+
+    asyncio.run(run())
+
+
+def test_a_future_planned_start_is_planned_anew_after_a_gap(monkeypatch):
+    async def run():
+        observer, control, hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        observer.goal.set(NOW + timedelta(hours=16))
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+        assert observer.planned_start > NOW
+        hass.states.pop("sensor.soc")
+        await observer._evaluate()
+        assert observer.status == "waiting_for_soc"
+        # Not started yet: the refreshed inputs decide the start again.
+        assert observer.planned_start is None
+
+    asyncio.run(run())

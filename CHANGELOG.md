@@ -22,6 +22,9 @@ Integration only; the app stays at 0.9.0b1.
   value is in one place; **Current L1** to **L3** are gone and keep no
   statistics of their own. The Recorder profiles now exclude signaled current
   and temperature (less detail) and also session energy (statistics only).
+- **Breaking: Switch off charging release when unplugged starts switched
+  off once.** It now keeps its setting while the wallbox is offline or
+  read-only; switch it on again after the update.
 - A status block that briefly cannot be read no longer makes every poll
   re-read the measurement and counter blocks while its last value is held.
 - **Switch off charging release when unplugged** no longer writes to the

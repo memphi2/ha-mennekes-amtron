@@ -108,6 +108,12 @@ class PlugChargeObserver:
         """Explain waiting as well as blocking, without changing state enums."""
         return self._decision_reason
 
+    @staticmethod
+    def _gate_since(raw: object) -> datetime | None:
+        """When the gate saw the current plug-in; None unless timezone-aware."""
+        since = dt_util.parse_datetime(raw) if isinstance(raw, str) else None
+        return since if since is not None and since.tzinfo is not None else None
+
     def _detection_details(self, since: datetime | None) -> dict[str, Any]:
         active = active_profile(self._entry.options)
         return explain_detection([
@@ -119,10 +125,7 @@ class PlugChargeObserver:
     @property
     def decision_details(self) -> dict[str, Any]:
         """Read-only support snapshot; no VIN, location, token or raw exception."""
-        raw_since = self._control.plug_charge.get("since")
-        since = dt_util.parse_datetime(raw_since) if isinstance(raw_since, str) else None
-        if since is not None and since.tzinfo is None:
-            since = None
+        since = self._gate_since(self._control.plug_charge.get("since"))
         values = self._coordinator.current_data().values
         return {
             "reason": self._decision_reason,
@@ -228,10 +231,7 @@ class PlugChargeObserver:
             self._last_grant_error = None
             self._set_status("authorized")
             return None
-        raw_since = gate.get("since")
-        since = dt_util.parse_datetime(raw_since) if isinstance(raw_since, str) else None
-        if since is not None and since.tzinfo is None:
-            since = None
+        since = self._gate_since(gate.get("since"))
         selected = self._evidence.selected(since)
         if selected is None:
             self._set_status("waiting_detection", detail=self._detection_details(since)["reason"])

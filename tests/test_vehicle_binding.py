@@ -418,3 +418,28 @@ def test_selecting_another_car_is_judged_before_its_rules_start(tmp_path, caplog
         await hass.async_stop()
 
     asyncio.run(run())
+
+
+def test_charge_level_jitter_after_a_lower_report_does_not_confirm_the_car(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        _entry, coordinator, binding = await confirmed_binding(hass, caplog)
+        # Another car charges; the selected car's cached level jitters.
+        soc(hass, 50)
+        coordinator.charge(1.0)
+        soc(hass, 49)
+        coordinator.charge(2.0)
+        soc(hass, 50)
+        coordinator.charge(3.0)
+        coordinator.charge(6.5)
+        coordinator.charge(7.0)
+        assert not binding.resting
+        soc(hass, 50)
+        coordinator.charge(7.5)
+        await settle(hass)
+        assert binding.resting
+        assert "its charge level stayed at 50 %" in caplog.text
+        binding.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())

@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable
 from typing import Any, NoReturn
 
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
@@ -747,7 +748,9 @@ async def _async_switch_vehicle(
     except asyncio.CancelledError:
         # A cancelled switch leaves the observers half stopped and its caller
         # never sees the result: only a reload brings the car's rules back.
-        hass.config_entries.async_schedule_reload(entry.entry_id)
+        # An unload or HA shutdown cancels it too; those must stay down.
+        if entry.state is ConfigEntryState.LOADED and not hass.is_stopping:
+            hass.config_entries.async_schedule_reload(entry.entry_id)
         raise
     except Exception:
         # Any failure falls back to a full reload, which retries the setup.
@@ -830,8 +833,15 @@ async def async_unload_entry(
         handoff.client = runtime_data.client if retain_client else None
         handoff.sessions = runtime_data.sessions if retain_client else None
         handoff.charging_cost = runtime_data.charging_cost if retain_cost else None
+    # A reload that also selects another car must end the old car's plan
+    # pause, like an in-place switch; a plain reload or shutdown keeps it.
+    previous = runtime_data.vehicle_profile_id
+    withdraw = previous is not None and vehicle_options(entry.options).get(CONF_VEHICLE_PROFILE_ID) != previous
     try:
-        await _async_stop_runtime(runtime_data, close_client=not retain_client, retain_cost=retain_cost)
+        await _async_stop_runtime(
+            runtime_data, close_client=not retain_client, retain_cost=retain_cost,
+            withdraw_plan=withdraw,
+        )
     finally:
         if not runtime_data.retain_attribution_on_unload:
             forget_loss_attribution(hass, entry.entry_id)
@@ -840,6 +850,7 @@ async def async_unload_entry(
 
 async def _async_stop_runtime(
     runtime: MennekesAmtronRuntimeData, *, close_client: bool = True, retain_cost: bool = False,
+    withdraw_plan: bool = False,
 ) -> None:
     """Release the same owners after partial setup and ordinary unloading.
 
@@ -864,8 +875,10 @@ async def _async_stop_runtime(
         await runtime.charging_cost.async_stop()
     if runtime.sessions is not None and close_client:
         await runtime.sessions.async_close()
+    if runtime.timed_goal is not None:
+        await runtime.timed_goal.async_stop(withdraw=withdraw_plan)
     for owner in (
-        runtime.timed_goal, runtime.vehicle_soc, runtime.soc_goal,
+        runtime.vehicle_soc, runtime.soc_goal,
         runtime.goal, runtime.recovery, runtime.heartbeat,
     ):
         if owner is not None:

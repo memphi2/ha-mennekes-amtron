@@ -180,8 +180,6 @@ class TimedGoalObserver:
                 await self._task
         try:
             await self._cancel_command()
-            if withdraw:
-                await self._end_plan_pause()
         except (AmtronBusError, HomeAssistantError, OSError) as err:
             # The independent service still expires the queued command at its
             # deadline. A disconnected service must not abort HA teardown.
@@ -189,6 +187,16 @@ class TimedGoalObserver:
                 "Could not cancel timed charging during unload: %s",
                 getattr(err, "translation_key", None) or type(err).__name__,
             )
+        if withdraw:
+            # Only this observer knows the pause is its own; try even when the
+            # cancel failed, as no later observer can end it.
+            try:
+                await self._end_plan_pause()
+            except (AmtronBusError, HomeAssistantError, OSError) as err:
+                _LOGGER.warning(
+                    "Could not end the departure plan pause for the previous car: %s",
+                    getattr(err, "translation_key", None) or type(err).__name__,
+                )
 
     @callback
     def _source_changed(self, _event: object) -> None:
@@ -619,7 +627,9 @@ class TimedGoalObserver:
         return soc is not None and soc < goal.target_percent
 
     def _set_status(self, status: str, *, keep_start: bool = False) -> None:
-        if status not in _PLANNED and not keep_start:
+        # Only a start that already passed is kept; a future one is planned anew.
+        started = self.planned_start is not None and self.planned_start <= dt_util.utcnow()
+        if status not in _PLANNED and not (keep_start and started):
             self.planned_start = None
         if status != self.status:
             self.status = status
