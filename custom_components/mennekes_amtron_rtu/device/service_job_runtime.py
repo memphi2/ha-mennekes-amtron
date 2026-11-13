@@ -93,8 +93,9 @@ class JobModbusService(ConsoleModbusService):
             and control.charging_release_requested is not False
         )
         current_value = float(current) if valid_current and isinstance(current, (int, float)) else None
+        total_value = float(total) if fresh and isinstance(total, (int, float)) else None
         return JobInputs(
-            now, available, present, scope, float(total) if fresh else None, fresh,
+            now, available, present, scope, total_value, fresh,
             permitted, independent_stop, current_value,
             control.max_charging_current if control is not None else 6,
             control is not None and control.pending_action is not None,
