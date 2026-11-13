@@ -139,7 +139,7 @@ Update the app to 0.9.0b2 together with the integration.
 - **One lost poll no longer pauses a charge with a kWh target**, a small
   clock correction no longer pauses a running order, and a failing disk no
   longer shows the wallbox as unavailable. See the
-  [failures and restart audit](docs/audits/2026-11-failures-and-restart.md).
+  [failures and restart audit](docs/reviews/2026-11-failures-and-restart.md).
 - **A departure that ends no longer leaves the car paused.** When the
   departure is cleared, or passes while the plan still paused, the plan ends
   its own pause, with and without the app. A stop at the reached target stays
