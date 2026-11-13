@@ -31,9 +31,15 @@ async def job_operation(controller: ChargeJobController, payload: object) -> dic
         if action == "preview":
             return controller.preview(payload["request"], revision=payload["revision"], scope=payload["scope"])
         return await controller.create(payload["request"], revision=payload["revision"], scope=payload["scope"])
-    if action in ("stop", "clear") and payload.keys() == {"action", "revision", "confirm"} and payload["confirm"] is True:
+    if action == "preview_boost" and payload.keys() == {"action", "revision", "scope", "minutes"}:
+        return controller.preview_boost(payload["minutes"], revision=payload["revision"], scope=payload["scope"])
+    if action == "boost" and payload.keys() == {"action", "revision", "scope", "until"}:
+        return await controller.boost(payload["until"], revision=payload["revision"], scope=payload["scope"])
+    if action in ("stop", "clear", "cancel_boost") and payload.keys() == {"action", "revision", "confirm"} and payload["confirm"] is True:
         if action == "stop":
             return await controller.stop(revision=payload["revision"])
+        if action == "cancel_boost":
+            return await controller.cancel_boost(revision=payload["revision"])
         return await controller.clear(revision=payload["revision"])
     raise JobRequestError("invalid_job_request")
 

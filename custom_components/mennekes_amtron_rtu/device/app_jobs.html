@@ -28,6 +28,17 @@
       <button id="job_stop" type="button" data-text="stop">Stop automation for this connection</button>
       <button id="job_clear" type="button" class="secondary" data-text="clear">Clear stopped order without resuming</button>
     </div>
+    <section aria-labelledby="job_boost_title">
+      <h3 id="job_boost_title" data-text="boost_title">Temporary early charging</h3>
+      <p class="hint" data-text="boost_hint">Charge before the scheduled start, then return to the original plan. Current and energy limits stay unchanged.</p>
+      <p id="job_boost_until" role="status"></p>
+      <label for="job_boost_minutes" data-text="boost_minutes">Duration in minutes (1–120)</label>
+      <input id="job_boost_minutes" type="number" min="1" max="120" step="1" value="30" required>
+      <div class="actions">
+        <button id="job_boost_preview" type="button" data-text="boost_preview">Preview boost</button>
+        <button id="job_cancel_boost" type="button" class="secondary" data-text="boost_cancel">Return to plan now</button>
+      </div>
+    </section>
   </section>
   <section class="overview-card">
     <h2 data-text="new">New order</h2>

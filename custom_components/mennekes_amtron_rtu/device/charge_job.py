@@ -16,6 +16,7 @@ from .energy_goal import EnergyGoal
 
 _JOB_ID = re.compile(r"[0-9a-f]{32}")
 _BINDING = re.compile(r"[0-9a-f]{64}")
+MAX_BOOST_MINUTES = 120
 STATES = ("scheduled", "charging", "waiting_meter", "reached", "finished", "stopped", "interrupted")
 TERMINAL = frozenset({"reached", "finished", "stopped", "interrupted"})
 REASONS = frozenset({
@@ -65,6 +66,7 @@ class ChargeJob:
     reason: str = "scheduled"
     scope_ended: bool = False
     _last_now: datetime | None = None
+    boost_until: datetime | None = None
 
     @classmethod
     def create(cls, request: object, *, binding: str, total_kwh: object, now: datetime) -> ChargeJob:
@@ -98,15 +100,37 @@ class ChargeJob:
         """A job outside its charging state supplies no resume permission."""
         return self.state != "charging"
 
+    def allows_at(self, now: datetime) -> bool:
+        """A boost opens only an earlier part of the same bounded order."""
+        return not self.terminal and now < self.finish_at and (
+            now >= self.start_at or (self.boost_until is not None and now < self.boost_until)
+        )
+
+    def set_boost(self, until: object, *, now: datetime) -> None:
+        """Keep the original schedule, energy baseline and current ceiling."""
+        end = job_time(until)
+        now = job_time(now.isoformat())
+        if self.terminal or self.scope_ended or not now < end <= min(
+            self.start_at, self.finish_at, now + timedelta(minutes=MAX_BOOST_MINUTES),
+        ):
+            raise ValueError("boost must end before the original start and within two hours")
+        self.boost_until = end
+
+    def cancel_boost(self) -> None:
+        """Return to the current plan; never rearm a terminal order."""
+        self.boost_until = None
+
     def interrupt(self, reason: str) -> None:
         if reason not in _INTERRUPTIONS:
             raise ValueError("invalid job interruption reason")
         if not self.terminal:
             self.state, self.reason = "interrupted", reason
+            self.cancel_boost()
 
     def stop(self) -> None:
         if not self.terminal:
             self.state, self.reason = "stopped", "user_stop"
+            self.cancel_boost()
 
     def observe(
         self, *, now: datetime, present: bool | None, available: bool,
@@ -123,6 +147,8 @@ class ChargeJob:
             self.interrupt("clock_changed")
             return
         self._last_now = now
+        if self.boost_until is not None and now >= self.boost_until:
+            self.cancel_boost()
         if not available or present is None:
             self.interrupt("connection_lost")
         elif present is False or not matches:
@@ -139,10 +165,12 @@ class ChargeJob:
                 self.state, self.reason = "finished", "window_ended"
             elif self.energy.status == "meter_unavailable":
                 self.state, self.reason = "waiting_meter", "meter_unavailable"
-            elif now < self.start_at:
+            elif not self.allows_at(now):
                 self.state, self.reason = "scheduled", "scheduled"
             else:
                 self.state, self.reason = "charging", "charging"
+        if self.terminal:
+            self.cancel_boost()
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -150,12 +178,13 @@ class ChargeJob:
             "start_at": self.start_at.isoformat(), "finish_at": self.finish_at.isoformat(),
             "current_a": self.current_a, "energy": self.energy.snapshot(),
             "state": self.state, "reason": self.reason, "scope_ended": self.scope_ended,
+            **({"boost_until": self.boost_until.isoformat()} if self.boost_until is not None else {}),
         }
 
     @classmethod
     def restore(cls, raw: object, *, restarted: bool = True) -> ChargeJob:
         """Reject corrupt state rather than silently recovering a resume grant."""
-        if not isinstance(raw, dict) or raw.keys() != _FIELDS:
+        if not isinstance(raw, dict) or raw.keys() not in (_FIELDS, _FIELDS | {"boost_until"}):
             raise ValueError("invalid saved job fields")
         identifier, binding, state, reason = (raw[key] for key in ("id", "binding", "state", "reason"))
         if (
@@ -183,6 +212,11 @@ class ChargeJob:
         ):
             raise ValueError("inconsistent saved job state")
         job = cls(identifier, binding, start, finish, _current(raw["current_a"]), energy, state, reason, raw["scope_ended"])
+        if "boost_until" in raw:
+            end = job_time(raw["boost_until"])
+            if job.terminal or job.scope_ended or end > job.start_at:
+                raise ValueError("invalid saved boost")
+            job.boost_until = end
         if restarted:
             job.interrupt("service_restarted")
         return job

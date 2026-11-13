@@ -7,10 +7,10 @@ import hmac
 import secrets
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
-from .charge_job import ChargeJob
+from .charge_job import MAX_BOOST_MINUTES, ChargeJob
 from .charge_job_store import ChargeJobStore
 from .client_errors import AmtronBusError
 from .errors import DeviceError
@@ -108,7 +108,7 @@ class ChargeJobController:
             or not sample.available or sample.present is not True
             or sample.scope != job.binding or not sample.meter_fresh
             or sample.independent_stop or not sample.permitted
-            or not job.start_at <= sample.now < job.finish_at
+            or not job.allows_at(sample.now)
         )
 
     def current_policy(self, owner: str | None, enabling: bool) -> bool | None:
@@ -121,6 +121,56 @@ class ChargeJobController:
         if job is None or owner != f"service-job:{job.identifier}":
             return False if enabling else None
         return not self.stop_requested() if enabling else True
+
+    def _can_boost(self, sample: JobInputs) -> bool:
+        job = self.job
+        return (
+            self.ready and not self._closing and not self.storage_error
+            and job is not None and not job.terminal and not job.scope_ended
+            and sample.now < job.start_at and sample.available and sample.present is True
+            and sample.scope == job.binding and sample.meter_fresh and sample.permitted
+            and not sample.independent_stop and not sample.pending
+        )
+
+    def _boost_context(self, revision: object, scope: object) -> tuple[ChargeJob, JobInputs]:
+        self._check_revision(revision)
+        sample, job = self.inputs(), self.job
+        if job is None or scope != sample.scope or not self._can_boost(sample):
+            raise JobRequestError("job_boost_unavailable")
+        return job, sample
+
+    def preview_boost(self, minutes: object, *, revision: object, scope: object) -> dict[str, Any]:
+        job, sample = self._boost_context(revision, scope)
+        if type(minutes) is not int or not 1 <= minutes <= MAX_BOOST_MINUTES:
+            raise JobRequestError("invalid_boost_duration")
+        until = min(job.start_at, sample.now + timedelta(minutes=minutes))
+        return {
+            "schema": 1, "revision": self.revision, "scope": sample.scope,
+            "until": until.isoformat(), "current_a": job.current_a,
+            "energy_kwh": job.energy.target_kwh,
+        }
+
+    async def boost(self, until: object, *, revision: object, scope: object) -> dict[str, Any]:
+        async with self._lock:
+            job, sample = self._boost_context(revision, scope)
+            # Absolute preview expiry: retrying cannot slide a relative timer.
+            job.set_boost(until, now=sample.now)
+            self._changed()
+            await self._tick_locked()
+            if self.storage_error:
+                raise JobRequestError("job_storage_unavailable")
+            return self.snapshot()
+
+    async def cancel_boost(self, *, revision: object) -> dict[str, Any]:
+        async with self._lock:
+            self._check_revision(revision)
+            if self.job is None:
+                raise JobRequestError("job_boost_unavailable")
+            if self.job.boost_until is not None:
+                self.job.cancel_boost()
+                self._changed()
+            await self._tick_locked()
+            return self.snapshot()
 
     def _check_revision(self, revision: object) -> None:
         if not isinstance(revision, str) or not hmac.compare_digest(revision, self.revision):
@@ -280,6 +330,7 @@ class ChargeJobController:
             summary = {
                 **self._request(job), "state": job.state, "reason": job.reason,
                 "scope_ended": job.scope_ended, "delivered_kwh": progress,
+                "boost_until": job.boost_until.isoformat() if job.boost_until is not None else None,
             }
         return {
             "schema": 1, "revision": self.revision, "scope": sample.scope,
@@ -288,4 +339,5 @@ class ChargeJobController:
             "available": sample.available, "present": sample.present,
             "permitted": sample.permitted, "meter_fresh": sample.meter_fresh,
             "max_current_a": sample.current_cap, "now": sample.now.isoformat(),
+            "boost_available": self._can_boost(sample),
         }
