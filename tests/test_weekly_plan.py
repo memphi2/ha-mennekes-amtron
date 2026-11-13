@@ -64,7 +64,7 @@ def test_every_required_field_is_required(key):
 
 def test_unknown_fields_are_not_silently_ignored():
     with pytest.raises(ValueError, match="weekly plan fields"):
-        WeeklyPlan.parse(payload(token="must-not-be-accepted"))
+        WeeklyPlan.parse({**payload(), "token": None})
 
 
 @pytest.mark.parametrize("value", [None, 1, True, "", "A" * 32, "a" * 31, "b" * 33, "g" * 32])
@@ -91,7 +91,7 @@ def test_weekdays(value):
         plan(weekdays=value)
 
 
-@pytest.mark.parametrize("value", [None, 7, True, "7:40", "24:00", "07:60", "07:40:00", "07:40Z", " 07:40", "07:40\n", "０７:４０"])
+@pytest.mark.parametrize("value", [None, 7, True, "7:40", "24:00", "07:60", "07:40:00", "07:40Z", " 07:40", "07:40\n", "\uff10\uff17:\uff14\uff10"])
 def test_departure_format(value):
     with pytest.raises(ValueError, match="weekly departure"):
         plan(departure_time=value)
