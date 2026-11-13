@@ -12,17 +12,43 @@ class WeeklyChargeJobs(ChargeJobController):
     """Manual stop/clear intent also cancels recurrence after a completed job."""
 
     manual_stop_epoch = 0
+    _stop_unconfirmed = False
+
+    def stop_requested(self) -> bool:
+        """Fence an in-flight start before the stop obtains the owner lock."""
+        return self._stop_unconfirmed or super().stop_requested()
+
+    def current_policy(self, owner: str | None, enabling: bool) -> bool | None:
+        if enabling and self._stop_unconfirmed:
+            return False
+        return super().current_policy(owner, enabling)
+
+    def _candidate(self, request: object, revision: object, scope: object) -> ChargeJob:
+        if self._stop_unconfirmed:
+            raise JobRequestError("weekly_stop_unconfirmed")
+        return super()._candidate(request, revision, scope)
 
     async def stop(self, *, revision: object = None) -> dict[str, Any]:
         if revision is not None:
             self._check_revision(revision)
         self.manual_stop_epoch += 1
-        return await super().stop(revision=revision)
+        self._stop_unconfirmed = True
+        # Cancellation or a failed save must not withdraw the user's stop.
+        # A completed stop leaves the terminal job latch; an explicit clear
+        # can also remove this fence, but only after its existing pause checks.
+        await super().stop(revision=revision)
+        self._stop_unconfirmed = False
+        return self.snapshot()
 
     async def clear(self, *, revision: object) -> dict[str, Any]:
         self._check_revision(revision)
         self.manual_stop_epoch += 1
-        return await super().clear(revision=revision)
+        await super().clear(revision=revision)
+        self._stop_unconfirmed = False
+        return self.snapshot()
+
+    def snapshot(self) -> dict[str, Any]:
+        return {**super().snapshot(), "manual_stop_pending": self._stop_unconfirmed}
 
     async def successor(
         self, request: object, *, revision: object, scope: str,
@@ -38,7 +64,7 @@ class WeeklyChargeJobs(ChargeJobController):
             self._check_revision(revision)
             sample, old = self.inputs(), self.job
             if (
-                not self.ready or self.storage_error or self._closing
+                not self.ready or self.storage_error or self._closing or self._stop_unconfirmed
                 or self.manual_stop_epoch != stop_epoch
                 or old is None or old.identifier != predecessor
                 or old.kind != "scheduled" or old.state not in ("reached", "finished")
