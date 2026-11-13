@@ -254,3 +254,50 @@ def test_paused_release_changes_skip_and_keep_the_long_guard(current, released):
         await control.async_shutdown()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("released", [True, False])
+def test_a_release_change_decides_on_the_bus_right_before_its_write(released):
+    async def run():
+        harness = Harness(state_change_interval_seconds=300)
+        control = await harness.connect()
+        put(harness.transport.bank, R.EVSE_STATE, EvseState.CHARGING)
+        put(harness.transport.bank, R.CHARGING_RELEASE, int(not released))
+        before = len(harness.transport.reads)
+        await control.async_set_charging_release(released)
+        # The switch, then EVSE state and current once: no reading twice.
+        reads = [address for address, _count in harness.transport.reads[before:]]
+        for register in (R.CHARGING_RELEASE, R.EVSE_STATE, R.CHARGING_CURRENT_EMS):
+            assert reads.count(register.address) == 1
+        assert R.CP_STATE.address not in reads
+        # The change switched a charge, so the interval runs from here.
+        assert control._write_state.mode_change_at == harness.clock[0]
+        await control.async_shutdown()
+
+    asyncio.run(run())
+
+
+def test_a_car_plugged_in_before_the_release_write_keeps_the_guard():
+    async def run():
+        harness = Harness(state_change_interval_seconds=300)
+        control = await harness.connect()
+        _unplug(harness)
+        put(harness.transport.bank, R.CHARGING_RELEASE, 0)
+        control._write_state.mode_change_at = harness.clock[0]
+        read_switch = control._async_read_switch
+
+        async def plug_in_after_the_first_look(spec, **kwargs):
+            value = await read_switch(spec, **kwargs)
+            put(harness.transport.bank, R.EVSE_STATE, EvseState.EV_CONNECTED)
+            put(harness.transport.bank, R.CP_STATE, CpState.B1)
+            return value
+
+        control._async_read_switch = plug_in_after_the_first_look
+        await control.async_set_charging_release(True)
+        # The release waits for the interval instead of slipping through.
+        assert harness.transport.writes == []
+        assert control.pending_action == "enable_charging"
+        assert control.charging_release_requested is not True
+        await control.async_shutdown()
+
+    asyncio.run(run())

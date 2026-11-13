@@ -133,6 +133,10 @@ Update the app to 0.9.0b2 together with the integration.
   before phase changes apply without a restart from its **Runtime** page; a
   queued start or stop is timed again. The app lowers a charging current above
   its cap after the next poll, also after a restart with a lower cap.
+- **Switching the charging release reads less and cannot skip the wait.** The
+  check whether the change switches a charge runs on the bus right before the
+  write, so a car plugged in at that moment keeps the wait between charging
+  changes.
 - **A long command no longer makes the app's state unavailable.** While the
   app waits or retries on the bus, Home Assistant's poll gets the last
   published state after two seconds instead of running into its timeout.

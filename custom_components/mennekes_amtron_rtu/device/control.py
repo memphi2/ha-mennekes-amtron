@@ -904,16 +904,16 @@ class AmtronControl:
             return False
         return type(value) is int and value == 0
 
-    async def _async_release_switches_charge(self) -> bool:
+    async def _async_release_switches_charge(self, read: LockedRegisterReader | None = None) -> bool:
         """With no vehicle or a confirmed pause, 0x0D05 switches no charge.
 
         The pause holds the EV at 0 A whichever way the relay goes. The later
         resume is the real start and keeps the state-change interval.
         """
-        if await self._async_vehicle_absent():
+        if await self._async_vehicle_absent(read):
             return False
         try:
-            current = await self._client.async_read_register(CHARGING_CURRENT_EMS)
+            current = await (read or self._client.async_read_register)(CHARGING_CURRENT_EMS)
         except AmtronBusError:
             return True
         return not (
@@ -1048,22 +1048,38 @@ class AmtronControl:
         if released:
             self._plug_charge.check_release()
         current = await self._async_read_switch(CHARGING_RELEASE, stopping=not released)
-        changed = current != int(released)
-        # Only a change that can switch a charge waits for, and restarts,
-        # the state-change interval.
-        changed = changed and await self._async_release_switches_charge()
-        if changed:
-            await self._async_check_transition_interval()
+        switches = False
+
+        async def admit(read: LockedRegisterReader) -> None:
+            # Decided on the bus right before the write, so a car plugged in
+            # meanwhile counts: only a change that can switch a charge waits
+            # for, and restarts, the state-change interval.
+            nonlocal switches
+            switches = await self._async_release_switches_charge(read)
+            if switches and (remaining := self._mode_change_remaining()) > 0:
+                raise AmtronRateLimitedError("state_change", remaining)
+
         previous = self.charging_release_requested
         self.charging_release_requested = released
         try:
-            await self._async_transition_write(CHARGING_RELEASE, int(released), changed=changed)
+            await self._async_transition_write(
+                CHARGING_RELEASE, int(released), changed=False,
+                precondition=admit if current != int(released) else None,
+            )
+        except AmtronRateLimitedError:
+            # Nothing was sent; the request is not an intent yet.
+            self.charging_release_requested = previous
+            raise
         except (DeviceError, asyncio.CancelledError) as err:
+            if switches and self._uncertain(err):
+                self._write_state.mode_change_at = self._monotonic()
             # A failed block retains its intent unless identity verification
             # proves that no command could have reached the intended device.
             if released or isinstance(err.__cause__, AmtronIdentityError):
                 self.charging_release_requested = previous
             raise
+        if switches:
+            self._write_state.mode_change_at = self._monotonic()
 
     async def _async_apply_lock(self, locked: bool) -> None:
         current = await self._async_read_switch(LOCK_EVSE, stopping=locked)

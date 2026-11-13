@@ -395,7 +395,7 @@ def test_terminal_evidence_during_guarded_reads_is_rechecked_before_start(action
 
         control._async_check_transition_interval = wait_then_notice_goal
 
-        async def notice_goal_while_checking_release():
+        async def notice_goal_while_checking_release(_read=None):
             runner.observe(_snapshot(harness, 1247))
             return True
 
