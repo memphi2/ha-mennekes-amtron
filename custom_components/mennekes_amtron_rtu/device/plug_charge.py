@@ -168,14 +168,18 @@ class PlugChargeController:
     def observe(self, data: WallboxData | None, *, observed_at: datetime | None = None) -> None:
         if self._stopping:
             return
+        # Only values read in this poll decide: a held one is no evidence that
+        # the same car is still there.
         present = None if data is None else vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
+            data.fresh(EVSE_STATE.key), data.fresh(CP_STATE.key),
             cp_supported=self._control._identity.layout_version >= CP_STATE.min_layout,
         )
         self.state.observe(present, observed_at=observed_at)
         if present is False:
             self._end_manual_stop()
-        if self.state.blocked and (data is None or data.get(CHARGING_RELEASE.key) != 0):
+        # Without a poll there is no bus to close the release on; the first
+        # poll that answers does it.
+        if self.state.blocked and data is not None and data.get(CHARGING_RELEASE.key) != 0:
             self._schedule_deny()
 
     def _end_manual_stop(self) -> None:

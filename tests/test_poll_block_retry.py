@@ -42,6 +42,10 @@ def test_all_failed_reads_distinguish_missing_replies_from_device_exceptions(fai
         if failure == "mixed":
             h.transport.read_exceptions[R.EVSE_STATE.address] = 4
 
+        # One poll without a reply holds the last values; the next is a loss.
+        held = await poller.async_poll(data, last_success=True)
+        assert held.fresh("evse_state") is None
+        assert held.get("evse_state") == data.get("evse_state")
         for _ in range(2):
             with pytest.raises(AmtronConnectionError, match="no register block"):
                 await poller.async_poll(data, last_success=False)

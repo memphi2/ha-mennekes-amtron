@@ -32,6 +32,19 @@ Integration only; the app stays at 0.9.0b1.
   is reported as not changeable right now instead of as an unreachable service.
 - The plug and location signals of the configured cars are watched once per
   wallbox instead of once per feature using them.
+- A serial connection is reopened after an adapter change that was rolled
+  back; before, the wallbox stayed offline until the app restarted.
+- Virtual Plug & Charge no longer tries to close the release on a bus that
+  does not answer, decides on values read in the same poll only, and keeps a
+  release switched on by hand when only the refresh after its write failed.
+- One lost reply of the status block no longer marks the wallbox as
+  disconnected; its last values are held for that poll.
+- A reached energy target no longer adds bus reads to every poll while its
+  pause is confirmed.
+- Lost-reply messages of other Modbus integrations in Home Assistant are no
+  longer demoted to debug.
+- Includes the changes of #56 to #62: departure finishing window, Plug &
+  Charge decision reasons, and the app's overview, register and runtime pages.
 
 ## 0.9.0b1 — 2026-11-12
 

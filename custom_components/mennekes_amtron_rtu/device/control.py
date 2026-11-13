@@ -78,6 +78,8 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 PENDING_ACTIONS = CONTROL_ACTIONS
 _PHASE_PAUSE_TIMEOUT = 30.0
+# How long a read-back goal pause is trusted before it is read again.
+_GOAL_PAUSE_RECHECK_SECONDS = 60.0
 
 
 @dataclass(slots=True)
@@ -171,6 +173,8 @@ class AmtronControl:
         self._monotonic = monotonic
         self._pending: _PendingCommand | None = None
         self._phase_change: _PhaseChange | None = None
+        self._release_writes = 0
+        self._goal_pause_confirmed_at: float | None = None
         self._pending_due = 0.0
         self._pending_until: datetime | None = None
         self._pending_changed = asyncio.Event()
@@ -250,6 +254,11 @@ class AmtronControl:
             if not self.energy_goal_stop_requested:
                 return
             self._require_write_access()
+            confirmed_at = self._goal_pause_confirmed_at
+            if confirmed_at is not None and 0 <= self._monotonic() - confirmed_at < _GOAL_PAUSE_RECHECK_SECONDS:
+                # A latched stop stays for hours. The pause was read back a
+                # moment ago and only our own current write can end it.
+                return
             if await self._async_vehicle_absent():
                 # Nothing charges without a car; a later poll pauses once one
                 # is plugged in.
@@ -274,6 +283,7 @@ class AmtronControl:
                     self._write_state.confirmed_current = float(current)
                     if 0 < current < CHARGING_CURRENT_MINIMUM:
                         self.pause_requested = True
+                        self._goal_pause_confirmed_at = self._monotonic()
                         return
                 else:
                     self._write_state.confirmed_current = None
@@ -585,12 +595,16 @@ class AmtronControl:
                 # With Plug & Charge, a manual release opens the gate for the
                 # current or the next connection, for any car.
                 self._plug_charge.set_manual(released)
+            written = self._release_writes
             try:
                 await self._async_submit_locked(_PendingCommand(
                     "enable_charging" if released else "disable_charging", int(released),
                 ))
             except BaseException:
-                gate.manual = manual
+                # A failure after the acknowledged write, e.g. of the refresh,
+                # must not make the gate close what the user just opened.
+                if self._release_writes == written:
+                    gate.manual = manual
                 raise
 
     async def async_set_lock_evse(self, locked: bool) -> None:
@@ -912,6 +926,10 @@ class AmtronControl:
             if changed and self._uncertain(err):
                 self._write_state.mode_change_at = self._monotonic()
             raise
+        if spec == CHARGING_RELEASE:
+            self._release_writes += 1
+            if value == 1:
+                self._plug_charge.release_written()
         if changed:
             self._write_state.mode_change_at = self._monotonic()
         self._clear_pending()
@@ -932,8 +950,6 @@ class AmtronControl:
         self.charging_release_requested = released
         try:
             await self._async_transition_write(CHARGING_RELEASE, int(released), changed=changed)
-            if released:
-                self._plug_charge.release_written()
         except (DeviceError, asyncio.CancelledError) as err:
             # A failed block retains its intent unless identity verification
             # proves that no command could have reached the intended device.
@@ -1270,6 +1286,8 @@ class AmtronControl:
         recovery_release: bool = False,
         precondition: WritePrecondition | None = None,
     ) -> None:
+        if spec == CHARGING_CURRENT_EMS:
+            self._goal_pause_confirmed_at = None
         self._check_timed_command()
         if spec == CHARGING_RELEASE and value == 1:
             self._plug_charge.check_release(recovery=recovery_release)

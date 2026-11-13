@@ -18,7 +18,8 @@ import logging
 import time
 import weakref
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
+from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import partial
 
@@ -52,6 +53,9 @@ from .write_trace import WriteTrace
 
 _LOGGER = logging.getLogger(__name__)
 _PYMODBUS_LOGGER = logging.getLogger("pymodbus.logging")
+# pymodbus has one logger for every user in the process. Only records written
+# while one of this client's transactions runs in the current task are ours.
+_OWN_TRANSACTION: ContextVar[bool] = ContextVar("amtron_modbus_transaction", default=False)
 
 
 def _demote_lost_reply(record: logging.LogRecord) -> bool:
@@ -62,7 +66,10 @@ def _demote_lost_reply(record: logging.LogRecord) -> bool:
     holds the last values, and link quality counts the failure. A command
     that really failed is logged by its own caller.
     """
-    if record.levelno >= logging.ERROR and record.getMessage().startswith("No response received after"):
+    if (
+        _OWN_TRANSACTION.get() and record.levelno >= logging.ERROR
+        and record.getMessage().startswith("No response received after")
+    ):
         record.levelno, record.levelname = logging.DEBUG, "DEBUG"
         return _PYMODBUS_LOGGER.isEnabledFor(logging.DEBUG)
     return True
@@ -320,6 +327,7 @@ class MennekesModbusClient:
         whose reply was lost. Only a newly requested transaction reconnects.
         """
 
+        _OWN_TRANSACTION.set(True)
         client = self._require_client()
         if isinstance(self._config, NetworkConfig):
             await self._async_connect_locked(client)
@@ -357,6 +365,11 @@ class MennekesModbusClient:
             except BaseException:
                 if guard.reconnect_allowed:
                     self._configuration_pending_restart = was_pending
+                    if not was_pending and not isinstance(self._config, NetworkConfig) and self._client is not None:
+                        # Nothing reopens a serial port per transaction: the
+                        # restored connection would stay closed until a restart.
+                        with suppress(AmtronConnectionError):
+                            await self._async_connect_locked(self._client)
                 raise
 
     async def async_read_block(self, block: RegisterBlock) -> dict[str, RegisterValue]:

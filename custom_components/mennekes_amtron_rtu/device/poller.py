@@ -53,6 +53,7 @@ class DevicePoller:
         # meter reading must not wait for the next complete slow poll, while an
         # unsupported register must not occupy the bus on every status poll.
         self._block_retries: dict[str, tuple[float, float]] = {}
+        self._empty_polls = 0
         self._block_read_at: dict[str, float] = {}
         self._lost_blocks: set[str] = set()
 
@@ -180,7 +181,10 @@ class DevicePoller:
                     self._retry_later(block.name)
                 else:
                     self._block_retries.pop(block.name, None)
-        if not read:
+        # One poll that only held its values is a lost reply, not a lost
+        # connection; a second one in a row is.
+        empty_polls, self._empty_polls = self._empty_polls, 0 if read else self._empty_polls + 1
+        if not read and (not held or empty_polls):
             error = AmtronConnectionError("no register block could be read")
             if not answered:
                 self._log_unavailable(error)
