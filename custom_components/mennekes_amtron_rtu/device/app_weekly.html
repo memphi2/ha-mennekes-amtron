@@ -63,7 +63,7 @@
   </section>
   <section class="overview-card">
     <h2 data-text="activate_title">Activate saved plan for this vehicle</h2>
-    <p class="hint" data-text="consent_hint">Recurrence applies to this connection, for at most seven days. Each departure has its own energy ceiling; between departures Home Assistant controls charging. Restart, unplugging, a manual stop or editing the active recipe ends it. If Home Assistant has confirmed the selected car for this connection, the plan remembers the car and activates itself whenever Home Assistant confirms it again: after plugging in, after a restart and beyond seven days.</p>
+    <p class="hint" data-text="consent_hint">Recurrence applies to this connection, for at most seven days. Each departure has its own energy ceiling; between departures Home Assistant controls charging. Restart, unplugging, a manual stop or editing the active recipe ends it. If the car itself has reported this connection to Home Assistant, the plan remembers the car and activates itself whenever Home Assistant detects it again: after plugging in, after a restart and beyond seven days. It then waits for the next departure’s window.</p>
     <label class="check"><input id="confirm_vehicle" type="checkbox"><span data-text="confirm_vehicle">I have checked that the selected vehicle is connected.</span></label>
     <button id="preview_activation" type="button" disabled data-text="activate_preview">Preview activation</button>
     <div id="activation_preview" hidden><p id="activation_summary"></p><button id="activate" type="button" data-text="activate">Confirm activation</button></div>

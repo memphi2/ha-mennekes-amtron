@@ -248,26 +248,45 @@ moved; for a repeated time, choose the earlier or later occurrence.
 
 ### Automatic activation for a confirmed car
 
-If Home Assistant has [confirmed the selected car](vehicle-setup.md) for the
-plug-in at the moment you confirm the activation, the plan remembers that car.
-From then on it activates itself, without a new confirmation, as soon as Home
-Assistant confirms the same car for a plug-in:
+If Home Assistant has detected the selected car at the plug-in when you confirm
+the activation, the plan remembers that car. Detection means the car itself
+reported the plug-in, through the detection signals of its
+[vehicle profile](vehicle-setup.md); a profile without detection, or a car that
+is only selected, is never remembered.
+
+From then on the plan activates itself, without a new confirmation, as soon as
+Home Assistant detects the same car at a plug-in:
 
 - after the car is plugged in again
-- after an app restart; a job of the plan that continues is taken up again,
-  otherwise the next departure is planned
+- after an app restart, or a wallbox that was unreadable for more than a minute;
+  a job of the plan that continues is taken up again
 - after seven days, while the car stays plugged in
 
 The page shows **Activates itself for its confirmed car** for such a plan. A
-plan activates itself once per plug-in. After you edit the active plan, it waits
-for the next plug-in. While another order runs, or a stopped or interrupted
-order still needs clearing on **Charging jobs**, it waits as well.
+plan that activated itself only waits: Home Assistant keeps controlling
+charging, and the job for the next departure is created when its window opens,
+under the same conditions as every later departure. While another order holds
+the wallbox, the plan waits without using up the date. The
+[immediate reserve](#immediate-reserve) therefore charges at once only after an
+activation by hand; for a level the car should always have, use the
+[minimum charge level](departure-planning.md#minimum-charge-level) of departure
+planning.
 
-**Stop weekly automation**, and a stop or clear on **Charging jobs** while the
-plan is active, make the plan forget its car; so does removing the plan.
-Activate it again by hand to have it remembered once more. A car has one such
-plan: activating another plan for the same car moves the car to that plan.
-Without a car confirmed by Home Assistant, every activation stays a manual one.
+A departure whose job ended before its window opened, because the car left and
+came back or the app restarted, is charged at its window all the same. A
+departure whose window had already opened is not repeated.
+
+The plan forgets its car when you
+
+- select **Stop weekly automation**; without an active plan this makes every
+  plan forget its car
+- stop or clear the plan's job on **Charging jobs**, or pause charging, switch
+  off the release or lock the wallbox in Home Assistant while that job runs
+- remove the plan or change its vehicle profile reference
+
+Activate it again by hand to have the car remembered once more. A car has one
+such plan: activating another plan for the same car moves the car to that plan.
+After you edit the active plan, it activates itself again at the next plug-in.
 
 ## Registers
 

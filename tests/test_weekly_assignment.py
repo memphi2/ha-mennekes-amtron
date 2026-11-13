@@ -1,4 +1,4 @@
-"""A weekly plan follows the car Home Assistant confirmed, without a new consent."""
+"""A weekly plan follows the car Home Assistant detected, without a new consent."""
 
 from __future__ import annotations
 
@@ -18,10 +18,13 @@ from tests.test_weekly_controller import NOW, PLAN, SCOPE, Harness, recipe
 
 CAR = "profile:bmw:sensor.soc|"
 NEXT = "c" * 64
+TODAY, TOMORROW = NOW.date(), (NOW + timedelta(days=1)).date()
+# The window of today's departure at 08:00 opens at 06:00.
+OPEN = NOW.replace(hour=6)
 
 
 class Garage(Harness):
-    """The weekly harness with Home Assistant's confirmation beside it."""
+    """The weekly harness with Home Assistant's detection beside it."""
 
     def __init__(self, path):
         super().__init__(path)
@@ -34,14 +37,16 @@ class Garage(Harness):
         await self.activate()
         return self
 
+    async def both(self):
+        await self.jobs.tick()
+        await self.weekly.tick()
+
     async def replug(self, scope=NEXT, car=CAR, confirmed_for=NEXT):
         self.change(present=False, scope=None)
-        await self.jobs.tick()
-        await self.weekly.tick()
+        await self.both()
         self.change(present=True, scope=scope)
         self.car = None if car is None else (car, confirmed_for)
-        await self.jobs.tick()
-        await self.weekly.tick()
+        await self.both()
 
 
 def test_a_profile_is_the_same_car_whatever_its_source_reads():
@@ -51,26 +56,58 @@ def test_a_profile_is_the_same_car_whatever_its_source_reads():
     assert vehicle_key("profile:bmw") == "profile:bmw"
 
 
-def test_an_activation_remembers_the_confirmed_car_and_serves_its_next_plug_in(tmp_path):
+def test_a_car_that_returns_before_its_window_keeps_its_departure(tmp_path):
     async def run():
         h = await Garage(tmp_path).assigned()
         assert h.weekly.book.assigned == ((PLAN, "profile:bmw"),)
         assert h.weekly.snapshot()["plans"][0]["assigned"] is True
         first = h.jobs.job.identifier
-        await h.replug()
-        assert h.weekly.reason == "active"
-        assert (h.weekly.consent.scope, h.weekly.consent.plan_id) == (NEXT, PLAN)
-        # Today's departure was used; the next one is planned for the new plug-in.
-        assert h.jobs.job.identifier != first
-        assert h.jobs.job.binding == NEXT
-        assert h.weekly.book.used(PLAN, (NOW + timedelta(days=1)).date())
+        assert h.weekly.book.used(PLAN, TODAY)
+        writes = len(h.calls)
+        for scope in (NEXT, "d" * 64, "e" * 64):
+            await h.replug(scope, confirmed_for=scope)
+            # The plan waits for the window: no order, no date, no write.
+            assert (h.weekly.reason, h.weekly.consent.scope, h.weekly.consent.job_id) == (
+                "waiting_next_occurrence", scope, None,
+            )
+            assert not h.weekly.book.used(PLAN, TODAY)
+            assert h.jobs.job.identifier == first
+            assert len(h.calls) == writes
         revision = h.weekly.revision
         await h.weekly.tick()
         assert h.weekly.revision == revision
+        # At its window today's departure is charged for the new plug-in.
+        h.change(now=OPEN + timedelta(seconds=1))
+        await h.both()
+        await h.jobs.tick()
+        assert (h.weekly.reason, h.jobs.job.binding, h.jobs.job.state) == ("active", "e" * 64, "charging")
+        assert h.weekly.book.used(PLAN, TODAY)
+        assert not h.weekly.book.used(PLAN, TOMORROW)
     asyncio.run(run())
 
 
-def test_without_a_confirmed_car_an_activation_remembers_nothing(tmp_path):
+def test_a_departure_that_already_charged_is_not_repeated_after_a_replug(tmp_path):
+    async def run():
+        h = await Garage(tmp_path).assigned()
+        h.change(now=OPEN)
+        await h.both()
+        assert h.jobs.job.state == "charging"
+        h.change(now=OPEN + timedelta(minutes=10))
+        await h.replug()
+        assert h.weekly.consent.job_id is None
+        assert h.weekly.book.used(PLAN, TODAY)
+        h.change(now=OPEN + timedelta(minutes=20))
+        await h.both()
+        assert h.weekly.reason == "waiting_next_occurrence"
+        assert not h.weekly.book.used(PLAN, TOMORROW)
+        h.change(now=OPEN + timedelta(days=1))
+        await h.both()
+        assert h.weekly.reason == "active"
+        assert h.weekly.book.used(PLAN, TOMORROW)
+    asyncio.run(run())
+
+
+def test_without_a_detected_car_an_activation_remembers_nothing(tmp_path):
     async def run():
         h = Garage(tmp_path)
         h.car = (CAR, NEXT)
@@ -82,24 +119,54 @@ def test_without_a_confirmed_car_an_activation_remembers_nothing(tmp_path):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("case", ["other_car", "unconfirmed", "older_plug_in", "disabled", "busy"])
-def test_only_the_confirmed_car_of_this_plug_in_is_served(tmp_path, case):
+def test_an_activation_whose_order_failed_remembers_nothing(tmp_path, monkeypatch):
+    async def run():
+        h = Garage(tmp_path)
+        await h.initialize()
+        await h.save()
+
+        async def refuse(*_args, **_kwargs):
+            raise ValueError("fixture")
+
+        monkeypatch.setattr(h.jobs, "create", refuse)
+        with pytest.raises(ValueError, match="fixture"):
+            await h.activate()
+        assert (h.weekly.consent, h.weekly.book.assigned) == (None, ())
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("case", ["other_car", "undetected", "older_plug_in", "disabled"])
+def test_only_the_detected_car_of_this_plug_in_is_served(tmp_path, case):
     async def run():
         h = await Garage(tmp_path).assigned()
         if case == "disabled":
             await h.save(enabled=False)
-        if case == "busy":
-            h.change(pending=True)
         await h.replug(
-            car=None if case == "unconfirmed" else "profile:vw:sensor.vw|" if case == "other_car" else CAR,
+            car=None if case == "undetected" else "profile:vw:sensor.vw|" if case == "other_car" else CAR,
             confirmed_for=SCOPE if case == "older_plug_in" else NEXT,
         )
         assert h.weekly.consent is None
-        if case == "busy":
-            # The queued command went through: the plug-in is served after all.
-            h.change(pending=False)
-            await h.weekly.tick()
-            assert h.weekly.consent.scope == NEXT
+    asyncio.run(run())
+
+
+def test_at_its_window_the_plan_waits_for_another_order_without_using_the_date(tmp_path):
+    async def run():
+        h = await Garage(tmp_path).assigned()
+        await h.replug()
+        h.change(now=OPEN, pending=True)
+        await h.both()
+        assert (h.weekly.reason, h.weekly.consent.job_id) == ("waiting_next_occurrence", None)
+        # A queued command went through, but an order still holds the wallbox.
+        h.change(pending=False)
+        h.jobs.job.scope_ended = False
+        assert h.jobs.holding
+        await h.weekly.tick()
+        assert h.weekly.consent.job_id is None
+        assert not h.weekly.book.used(PLAN, TODAY)
+        h.jobs.job.scope_ended = True
+        await h.weekly.tick()
+        assert h.weekly.reason == "active"
+        assert h.weekly.book.used(PLAN, TODAY)
     asyncio.run(run())
 
 
@@ -129,28 +196,27 @@ def test_a_restart_takes_the_plans_running_order_up_again(tmp_path):
         # The suspended order decides first; the plan waits for it.
         await h.weekly.tick()
         assert h.weekly.consent is None
-        await h.jobs.tick()
-        await h.weekly.tick()
+        await h.both()
         assert (h.weekly.reason, h.weekly.consent.job_id, h.weekly.consent.scope) == ("active", job, NEXT)
         assert h.jobs.job.identifier == job
-        assert not h.weekly.book.used(PLAN, (NOW + timedelta(days=1)).date())
+        assert not h.weekly.book.used(PLAN, TOMORROW)
     asyncio.run(run())
 
 
-def test_a_restart_without_proof_of_the_plug_in_plans_the_next_departure(tmp_path):
+def test_a_restart_without_proof_of_the_plug_in_still_serves_the_departure(tmp_path):
     async def run():
         h, job = await restarted(tmp_path, count=43)
-        await h.jobs.tick()
+        await h.both()
         assert h.jobs.job.state == "interrupted"
-        # The interrupted order is cleared by hand first; no date is used up.
-        await h.weekly.tick()
-        assert h.weekly.consent is None
-        assert not h.weekly.book.used(PLAN, (NOW + timedelta(days=1)).date())
-        await h.jobs.clear(revision=h.jobs.revision)
-        await h.weekly.tick()
-        assert (h.weekly.reason, h.weekly.consent.scope) == ("active", NEXT)
-        assert h.jobs.job.identifier != job
-        assert h.weekly.book.used(PLAN, (NOW + timedelta(days=1)).date())
+        # The order ended before its window: its date is free again.
+        assert (h.weekly.reason, h.weekly.consent.job_id) == ("waiting_next_occurrence", None)
+        assert not h.weekly.book.used(PLAN, TODAY)
+        # At its window today's departure is charged for the new plug-in.
+        h.change(now=OPEN + timedelta(seconds=1))
+        await h.both()
+        await h.jobs.tick()
+        assert h.jobs.job.identifier == job
+        assert (h.weekly.reason, h.jobs.job.state, h.jobs.job.binding) == ("active", "charging", NEXT)
     asyncio.run(run())
 
 
@@ -161,7 +227,8 @@ def test_another_running_order_is_waited_for(tmp_path):
         assert not h.jobs.job.terminal
         # The running order is not one of this plan's departures.
         own = h.weekly.book
-        h.weekly.book = own.put(WeeklyPlan.parse(recipe(vehicle_profile="other")))
+        h.weekly.book = own.put(WeeklyPlan.parse(recipe(id="d" * 32, vehicle_profile="other"))).assign(
+            "d" * 32, "profile:bmw")
         await h.weekly.tick()
         assert h.weekly.consent is None
         h.weekly.book = own
@@ -192,6 +259,24 @@ def test_a_stop_by_hand_forgets_the_car(tmp_path, how):
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("own", [True, False])
+def test_a_stop_by_hand_before_the_plan_took_its_order_up_again_counts_too(tmp_path, own):
+    async def run():
+        h, _job = await restarted(tmp_path)
+        if not own:
+            h.weekly.book = h.weekly.book.put(WeeklyPlan.parse(recipe(id="d" * 32, vehicle_profile="other"))).assign(
+                "d" * 32, "profile:bmw")
+        await h.jobs.stop()
+        h.change(current_a=1)
+        await h.both()
+        await h.both()
+        # Only the plan whose order was stopped forgets its car.
+        assert (h.weekly.consent is None) is own
+        assert h.weekly.book.assigned == (() if own else (("d" * 32, "profile:bmw"),))
+        assert not h.weekly.book.used(PLAN, TOMORROW)
+    asyncio.run(run())
+
+
 def test_a_failed_save_after_a_stop_by_hand_fences_the_plan(tmp_path, monkeypatch):
     async def run():
         h = await Garage(tmp_path).assigned()
@@ -206,39 +291,57 @@ def test_a_failed_save_after_a_stop_by_hand_fences_the_plan(tmp_path, monkeypatc
     asyncio.run(run())
 
 
-def test_a_plug_in_is_served_once_and_a_failed_start_is_not_repeated(tmp_path, monkeypatch):
+def test_stopping_the_plan_ends_it_even_when_forgetting_the_car_fails(tmp_path, monkeypatch):
+    async def run():
+        h = await Garage(tmp_path).assigned()
+        monkeypatch.setattr(h.weekly.store, "save", lambda _book: (_ for _ in ()).throw(OSError("fixture")))
+        with pytest.raises(WeeklyError, match="weekly_storage_unavailable"):
+            await h.weekly.deactivate(revision=h.weekly.revision)
+        assert (h.weekly.consent, h.jobs.job.state) == (None, "stopped")
+    asyncio.run(run())
+
+
+def test_a_failed_release_or_start_is_not_repeated_for_the_plug_in(tmp_path, monkeypatch):
     async def run():
         h = await Garage(tmp_path).assigned()
 
         async def refuse(*_args, **_kwargs):
             raise ValueError("fixture")
 
-        h.change(present=False, scope=None)
-        await h.jobs.tick()
-        await h.weekly.tick()
+        await h.replug()
         monkeypatch.setattr(h.jobs, "create", refuse)
-        h.change(present=True, scope=NEXT)
-        h.car = (CAR, NEXT)
-        await h.jobs.tick()
-        await h.weekly.tick()
+        h.change(now=OPEN + timedelta(seconds=1))
+        await h.both()
         assert (h.weekly.consent, h.weekly.reason) == (None, "activation_unconfirmed")
         monkeypatch.undo()
         await h.weekly.tick()
         assert h.weekly.consent is None
+        # A date that cannot be freed leaves the plan inactive.
+        other = await Garage(tmp_path / "other").assigned()
+        other.change(present=False, scope=None)
+        await other.both()
+        monkeypatch.setattr(other.weekly.store, "save", lambda _book: (_ for _ in ()).throw(OSError("fixture")))
+        other.change(present=True, scope=NEXT)
+        other.car = (CAR, NEXT)
+        await other.both()
+        assert (other.weekly.consent, other.weekly.storage_error) == (None, True)
     asyncio.run(run())
 
 
-def test_an_edited_plan_waits_for_the_next_plug_in(tmp_path):
+def test_an_edited_plan_waits_for_the_next_plug_in_and_keeps_its_car(tmp_path):
     async def run():
         h = await Garage(tmp_path).assigned()
         await h.save(current_a=10)
         assert (h.weekly.consent, h.weekly.reason) == (None, "plan_changed")
+        await h.both()
+        # The plan's own stop is not a stop by hand.
         assert h.weekly.book.assigned == ((PLAN, "profile:bmw"),)
-        await h.jobs.tick()
-        await h.weekly.tick()
         assert h.weekly.consent is None
         await h.replug()
         assert h.weekly.consent.scope == NEXT
+        # A plan that now names another car no longer has the remembered one.
+        await h.save(vehicle_profile="zoe")
+        assert h.weekly.book.assigned == ()
     asyncio.run(run())
 
 
@@ -250,7 +353,7 @@ def test_an_assigned_car_that_stays_plugged_in_is_served_past_seven_days(tmp_pat
         await h.weekly.tick()
         assert (h.weekly.consent, h.weekly.reason) == (None, "session_ended")
         await h.weekly.tick()
-        assert (h.weekly.reason, h.weekly.consent.scope) == ("active", SCOPE)
+        assert (h.weekly.reason, h.weekly.consent.scope) == ("waiting_next_occurrence", SCOPE)
         assert h.weekly.consent.expires == NOW + timedelta(days=14, hours=1)
     asyncio.run(run())
 
@@ -265,10 +368,19 @@ def test_one_car_has_one_plan_and_a_removed_plan_loses_it():
     assert book.unassign(other).assigned == ((PLAN, "profile:bmw"),)
     assert book.unassign(None).assigned == ()
     assert book.remove(PLAN).assigned == ((other, "profile:vw"),)
+    assert book.put(WeeklyPlan.parse(recipe(current_a=10))).assigned == book.assigned
     assert WeeklyBook.parse(book.snapshot()) == book
     assert book.assigned_plan("profile:none") is None
     with pytest.raises(ValueError, match="not found"):
         book.assign("e" * 32, "profile:bmw")
+
+
+def test_only_the_latest_used_date_can_be_freed():
+    book = WeeklyBook().put(WeeklyPlan.parse(recipe())).reserve(PLAN, TOMORROW)
+    with pytest.raises(ValueError, match="latest"):
+        book.release(PLAN, TODAY)
+    freed = book.release(PLAN, TOMORROW)
+    assert (freed.used(PLAN, TODAY), freed.used(PLAN, TOMORROW)) == (True, False)
 
 
 @pytest.mark.parametrize("assigned", [

@@ -323,7 +323,7 @@ access no bus:
 | Command | Additional fields | Behavior |
 |---|---|---|
 | `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
-| `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
+| `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) and `detected` (whether the car itself reported this plug-in; a weekly plan activates itself only then) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
 
 The plan writes through the same guarded path as `timed_current`, with the
 owner `departure`. It is saved in `/data/departure-plan.json`, at most 8 KiB
@@ -486,16 +486,21 @@ date is marked as used before its job is created, so a date never runs twice,
 also after an edit or restart. Plans, used dates and remembered cars are kept
 in `/data/weekly-plans.json`, at most 128 KiB.
 
-An `activate` while Home Assistant has confirmed a car for the plug-in (see
-`departure_inputs` under [Departure plan](#departure-plan)) saves that car with
-the plan; each entry of `plans` then reports `assigned: true`. A car handed
-over as `profile:<id>:…` is remembered as `profile:<id>`, any other by its full
-source text. Once the same car is confirmed for the current plug-in and no
-activation exists, the service activates the plan itself, once per plug-in and
-again when seven days have passed. It takes up a job of the plan that is still
-running, or creates the job for the next unused date after the ordinary job
-admission succeeds. A manual job stop or clear during an activation, and
-`deactivate`, remove the remembered car.
+An `activate` while Home Assistant has detected a car at the plug-in
+(`departure_inputs` with `detected: true` and the current `scope`, see
+[Departure plan](#departure-plan)) saves that car with the plan once its job
+exists; each entry of `plans` then reports `assigned: true`. A car handed over
+as `profile:<id>:…` is remembered as `profile:<id>`, any other by its full
+source text. Saving a plan with another `vehicle_profile` removes its car.
+
+While no activation exists and the same car is detected for the current scope,
+the service activates the plan itself, once per scope and again when seven days
+have passed. It takes up a job of the plan that is still running. Otherwise
+`active.job_id` is `null` and `reason` is `waiting_next_occurrence` until the
+next unused date's window opens; the job is then created once the ordinary job
+admission succeeds. A date whose job was interrupted before its `start_at` is
+freed again first. A manual job stop or clear, also while no activation exists,
+and `deactivate` remove the remembered car.
 
 Errors return HTTP 409 with a key such as `weekly_changed`,
 `weekly_already_active`, `weekly_vehicle_not_confirmed`,

@@ -53,10 +53,11 @@ class WeeklyController:
     Assistant; the next one starts at its own window, never after a stopped or
     interrupted occurrence. A failed/uncertain claim is not silently replayed.
 
-    A plan activated by hand while Home Assistant had confirmed the car for
-    that plug-in remembers the car. Once Home Assistant confirms the same car
-    for a later plug-in, or again after a restart, the plan activates itself,
-    once per plug-in. Stopping the plan or its charge by hand forgets the car.
+    A plan activated by hand while Home Assistant had detected the car at
+    that plug-in remembers the car. Once Home Assistant detects the same car
+    at a later plug-in, or again after a restart, the plan activates itself
+    and waits for the next window. Stopping the plan or its order by hand
+    forgets the car.
     """
 
     def __init__(
@@ -69,6 +70,8 @@ class WeeklyController:
         self.confirmed = confirmed
         # The plug-in that already had its activation, by hand or by itself.
         self._served: str | None = None
+        # The manual stops seen so far, to notice one while no plan is active.
+        self._epoch = jobs.manual_stop_epoch
         self.book = WeeklyBook()
         self.ready = False
         self.storage_error = False
@@ -207,8 +210,11 @@ class WeeklyController:
             self._last_confirmation = signature
             self._changed()
             try:
-                await self._dispatch(frozen["request"], frozen["occurrence"]["date"], frozen["job_revision"],
-                                     vehicle=self._vehicle(frozen["scope"]))
+                await self._dispatch(frozen["request"], frozen["occurrence"]["date"], frozen["job_revision"])
+                # Only an activation whose order exists remembers the car.
+                vehicle = self._vehicle(frozen["scope"])
+                if vehicle is not None:
+                    await self._save(self.book.assign(frozen["plan_id"], vehicle))
             except BaseException:
                 await self._disarm("activation_unconfirmed")
                 raise
@@ -223,15 +229,11 @@ class WeeklyController:
         if candidate != self.book:
             await self._save(candidate)
 
-    async def _dispatch(
-        self, request: dict[str, Any], day: str, job_revision: str, *, vehicle: str | None = None,
-    ) -> None:
+    async def _dispatch(self, request: dict[str, Any], day: str, job_revision: str) -> None:
         consent = self.consent
         if consent is None:
             raise WeeklyError("weekly_inactive")
         candidate = self.book.reserve(consent.plan_id, date.fromisoformat(day))
-        if vehicle is not None:
-            candidate = candidate.assign(consent.plan_id, vehicle)
         await self._save(candidate)
         # A stop during the storage await invalidates this permission too.
         if self.jobs.manual_stop_epoch != consent.stop_epoch:
@@ -253,23 +255,62 @@ class WeeklyController:
         self.reason = reason
         self._changed()
         if stop and consent is not None and self.jobs.job is not None and self.jobs.job.identifier == consent.job_id:
-            await self.jobs.stop()
+            try:
+                await self.jobs.stop()
+            finally:
+                # The plan's own stop is not one by hand.
+                self._epoch = self.jobs.manual_stop_epoch
 
     async def deactivate(self, *, revision: object) -> dict[str, Any]:
         async with self._lock:
             self._check(revision)
             consent = self.consent
-            await self._disarm("user_stop")
-            # Without an active plan the stop ends every automatic activation.
-            await self._forget(None if consent is None else consent.plan_id)
+            try:
+                # Saved first, so an interrupted stop cannot leave the car
+                # remembered. Without an active plan every car is forgotten.
+                await self._forget(None if consent is None else consent.plan_id)
+            finally:
+                await self._disarm("user_stop")
             return self.snapshot()
 
-    async def _activate_assigned(self) -> None:
-        """Serve the car a plan was activated for, once per plug-in."""
+    def _occurrences(self, plan: WeeklyPlan, now: datetime) -> tuple[WeeklyOccurrence, ...]:
+        return plan.upcoming(now=now, horizon_days=7, limit=32)
+
+    async def _release_unstarted(self, plan: WeeklyPlan, now: datetime) -> None:
+        """Free a date whose order ended before its window opened.
+
+        An activation by hand creates the order for the next departure at
+        once. A car that leaves and returns before that window would
+        otherwise have lost the departure it was activated for.
+        """
+        job = self.jobs.job
+        latest = dict(self.book.consumed).get(plan.identifier)
+        if job is None or latest is None or job.state != "interrupted" or job.start_at <= now:
+            return
+        if any(row.identifier == job.identifier and row.local_date == latest for row in self._occurrences(plan, now)):
+            await self._save(self.book.release(plan.identifier, latest))
+
+    async def _activate_assigned(self, stopped: bool) -> None:
+        """Serve the car a plan was activated for, without a new consent.
+
+        The plan only waits: its order is created when the departure's window
+        opens, so Home Assistant controls charging until then and no date is
+        used up by plugging in.
+        """
         if self.storage_error or self._closing or not self.book.assigned:
             return
         sample = self.jobs.inputs()
-        scope = sample.scope
+        scope, job = sample.scope, self.jobs.job
+        if stopped:
+            # A stop by hand while no plan was active, as after a restart:
+            # the plan whose order it was forgets its car, like an active one.
+            for owner, _vehicle in self.book.assigned:
+                rows = self._occurrences(self.book.plan(owner), sample.now)
+                if job is not None and any(row.identifier == job.identifier for row in rows):
+                    self._served = scope
+                    with suppress(WeeklyError):
+                        await self._forget(owner)
+            return
         if not sample.available or sample.present is not True or scope is None or scope == self._served:
             return
         vehicle = self._vehicle(scope)
@@ -277,53 +318,38 @@ class WeeklyController:
         if plan_id is None:
             return
         plan = self.book.plan(plan_id)
-        until = sample.now + timedelta(days=7)
-        consent = SessionConsent(plan_id, plan.vehicle_profile, scope, until, self.jobs.manual_stop_epoch, sample.now)
-        job = self.jobs.job
-        row: WeeklyOccurrence | None = None
+        if not plan.enabled:
+            return
+        consent = SessionConsent(plan_id, plan.vehicle_profile, scope, sample.now + timedelta(days=7),
+                                 self.jobs.manual_stop_epoch, sample.now)
         if job is not None and not job.terminal:
             # After a restart the plan's own order may still run; any other
             # order is waited for.
-            rows = plan.upcoming(now=sample.now, horizon_days=7, limit=32)
-            if job.binding != scope or all(item.identifier != job.identifier for item in rows):
+            if job.binding != scope or all(row.identifier != job.identifier for row in self._occurrences(plan, sample.now)):
                 return
             consent.job_id = job.identifier
         else:
-            row = self._next(plan, sample.now, until)
-            if (
-                row is None or sample.pending or not sample.meter_fresh or not sample.permitted
-                or sample.independent_stop
-            ):
-                return
             try:
-                # The ordinary admission, without any write: an order that
-                # still needs clearing is waited for, and uses up no date.
-                proposal = self.jobs.preview(
-                    row.job_request(now=sample.now, vehicle_profile=plan.vehicle_profile),
-                    revision=self.jobs.revision, scope=scope,
-                )
-            except ValueError:
+                await self._release_unstarted(plan, sample.now)
+            except WeeklyError:
                 return
-        self.consent, self._served, self.reason = consent, scope, "active"
+        self.consent, self._served = consent, scope
+        self.reason = "active" if consent.job_id is not None else "waiting_next_occurrence"
         self._changed()
-        if row is None:
-            return
-        try:
-            await self._dispatch(proposal["request"], row.local_date.isoformat(), proposal["revision"])
-        except (OSError, ValueError, DeviceError):
-            await self._disarm("activation_unconfirmed")
 
     async def tick(self) -> None:
         async with self._lock:
+            epoch = self.jobs.manual_stop_epoch
+            stopped, self._epoch = epoch != self._epoch, epoch
             consent = self.consent
             if consent is None:
-                await self._activate_assigned()
+                await self._activate_assigned(stopped)
                 return
             sample = self.jobs.inputs()
             if self.storage_error or self._closing:
                 await self._disarm("weekly_storage_unavailable")
                 return
-            stopped = self.jobs.manual_stop_epoch != consent.stop_epoch
+            stopped = epoch != consent.stop_epoch
             if (
                 sample.present is False or stopped
                 or sample.now >= consent.expires or sample.now < consent.last_now - timedelta(seconds=5)
@@ -331,12 +357,14 @@ class WeeklyController:
                 if sample.now >= consent.expires:
                     # An assigned car that stays plugged in is served on.
                     self._served = None
-                await self._disarm("session_ended")
-                if stopped:
-                    # A stop by hand also ends the automatic activation. A
-                    # failed save already fences it.
-                    with suppress(WeeklyError):
-                        await self._forget(consent.plan_id)
+                try:
+                    if stopped:
+                        # A stop by hand also ends the automatic activation;
+                        # saved first, and a failed save fences the plan.
+                        with suppress(WeeklyError):
+                            await self._forget(consent.plan_id)
+                finally:
+                    await self._disarm("session_ended")
                 return
             if not sample.available or sample.present is None:
                 # A short gap: the order and the connection scope bound it.
@@ -352,16 +380,20 @@ class WeeklyController:
                 # The wallbox proved the same plug-in; the order continues.
                 consent.scope = sample.scope
             consent.last_now = sample.now
-            if job is None or not own or job.state in ("stopped", "interrupted"):
-                await self._disarm("job_stopped")
-                return
-            if not job.terminal:
-                # The running order stops for these as well; so does the plan.
-                if sample.independent_stop or not sample.permitted:
-                    await self._disarm("session_ended")
-                return
-            if sample.now < job.finish_at:
-                return
+            # Without an order yet, a plan that activated itself waits for
+            # its first window.
+            first = consent.job_id is None
+            if not first:
+                if job is None or not own or job.state in ("stopped", "interrupted"):
+                    await self._disarm("job_stopped")
+                    return
+                if not job.terminal:
+                    # The running order stops for these as well; so does the plan.
+                    if sample.independent_stop or not sample.permitted:
+                        await self._disarm("session_ended")
+                    return
+                if sample.now < job.finish_at:
+                    return
             # Between departures Home Assistant controls charging. The next
             # order starts at its window, once nothing requires a stop and no
             # queued action is pending; it never clears an independent stop.
@@ -375,9 +407,17 @@ class WeeklyController:
                 or sample.independent_stop
             ):
                 return
+            request, revision = row.job_request(now=sample.now, vehicle_profile=consent.profile), self.jobs.revision
+            if first:
+                try:
+                    # The ordinary admission, without any write: while another
+                    # order holds the wallbox the plan waits and uses no date.
+                    proposal = self.jobs.preview(request, revision=revision, scope=consent.scope)
+                except ValueError:
+                    return
+                request, revision = proposal["request"], proposal["revision"]
             try:
-                await self._dispatch(row.job_request(now=sample.now, vehicle_profile=consent.profile),
-                                     row.local_date.isoformat(), self.jobs.revision)
+                await self._dispatch(request, row.local_date.isoformat(), revision)
             except (OSError, ValueError, DeviceError):
                 await self._disarm("activation_unconfirmed")
 

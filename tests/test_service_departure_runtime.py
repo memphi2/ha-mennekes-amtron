@@ -33,7 +33,7 @@ def departure_service(tmp_path, monkeypatch):
     return lambda: runtime.job_service(tmp_path)
 
 
-async def hand_over(service, *, hours=2.0, soc=50.0):
+async def hand_over(service, *, hours=2.0, soc=50.0, detected=False):
     """Do what Home Assistant does: select the car, set the trip, confirm it."""
     service.control.soc_goal.configure_source(CAR)
     service.control.soc_goal.set_target(80)
@@ -45,7 +45,9 @@ async def hand_over(service, *, hours=2.0, soc=50.0):
         "command": "departure_trip", "deadline": deadline.isoformat(), "source": "manual",
         "expected_serial_number": serial,
     })
-    given = DepartureInputs(CAR, scope, 60.0, None, soc, datetime.now(UTC) - timedelta(minutes=1))
+    given = DepartureInputs(
+        CAR, scope, 60.0, None, soc, datetime.now(UTC) - timedelta(minutes=1), detected=detected,
+    )
     result = await service.command({
         "command": "departure_inputs", "value": given.snapshot(), "expected_serial_number": serial,
     })
@@ -229,7 +231,7 @@ def test_weekly_plans_learn_the_confirmed_car_from_the_departure_plan(departure_
     async def run():
         async with departure_service() as (s, _transport, _clock):
             assert s.weekly.confirmed() is None
-            given, _result = await hand_over(s)
+            given, _result = await hand_over(s, detected=True)
             assert s.weekly.confirmed() == (CAR, given.scope)
             # A service without a departure plan confirms no car.
             assert departure_runtime.ForecastModbusService._confirmed_vehicle(s) is None

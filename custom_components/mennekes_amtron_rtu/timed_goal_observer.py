@@ -614,6 +614,7 @@ class TimedGoalObserver:
             reading[0] if reading is not None else None,
             reading[1] if reading is not None else None,
             self._minimum(),
+            binding is not None and binding.detected is True,
         )
 
     async def _cancel_outdated_command(self, current: float | None, expected: TimedGoal) -> None:

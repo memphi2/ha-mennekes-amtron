@@ -109,6 +109,7 @@ def test_inputs_round_trip_and_digest_changes_with_any_field():
     assert DepartureInputs(CAR).snapshot() == {
         "vehicle": CAR, "scope": None, "capacity_kwh": None, "phases": None,
         "soc_percent": None, "soc_observed_at": None, "minimum_percent": 0.0,
+        "detected": False,
     }
 
 
@@ -122,6 +123,7 @@ def test_inputs_round_trip_and_digest_changes_with_any_field():
     ({"soc_observed_at": NOW.replace(tzinfo=None)}, "timezone"),
     ({"soc_observed_at": "2026-11-13T22:00:00+00:00"}, "timezone"),
     ({"minimum_percent": 101}, "percentage"), ({"minimum_percent": None}, "percentage"),
+    ({"detected": 1}, "detection"),
 ])
 def test_inputs_reject_anything_out_of_bounds(change, message):
     with pytest.raises(ValueError, match=message):
@@ -724,10 +726,13 @@ def test_the_confirmed_car_is_named_only_for_its_own_plug_in(tmp_path):
         box = Box(tmp_path)
         assert box.plan.confirmed_vehicle(box.state) is None
         plan = await box.start()
+        # A car that did not report the plug-in itself is only the selection.
+        assert plan.confirmed_vehicle(box.state) is None
+        await plan.set_inputs(inputs(detected=True))
         assert plan.confirmed_vehicle(box.state) == (CAR, SCOPE)
         assert plan.confirmed_vehicle(sample(scope=None)) is None
         assert plan.confirmed_vehicle(sample(scope=OTHER, session=None)) is None
-        await plan.set_inputs(inputs(scope=None))
+        await plan.set_inputs(inputs(scope=None, detected=True))
         assert plan.confirmed_vehicle(box.state) is None
     run(go())
 

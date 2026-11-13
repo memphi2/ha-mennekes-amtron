@@ -7,7 +7,7 @@ import os
 import re
 import tempfile
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -82,6 +82,9 @@ class WeeklyBook:
 
     def put(self, plan: WeeklyPlan) -> WeeklyBook:
         raw = self.snapshot()
+        if any(old.identifier == plan.identifier and old.vehicle_profile != plan.vehicle_profile for old in self.plans):
+            # The plan now names another car; the remembered one is not it.
+            raw["assigned"].pop(plan.identifier, None)
         raw["plans"] = [item for item in raw["plans"] if item["id"] != plan.identifier] + [plan.snapshot()]
         return self.parse(raw)
 
@@ -90,6 +93,14 @@ class WeeklyBook:
         raw = self.snapshot()
         raw["plans"] = [item for item in raw["plans"] if item["id"] != identifier]
         raw["assigned"].pop(identifier, None)
+        return self.parse(raw)
+
+    def release(self, identifier: str, day: date) -> WeeklyBook:
+        """Free the latest used date again; every earlier one stays used."""
+        if dict(self.consumed).get(identifier) != day:
+            raise ValueError("only the latest weekly date can be released")
+        raw = self.snapshot()
+        raw["consumed"][identifier] = (day - timedelta(days=1)).isoformat()
         return self.parse(raw)
 
     def assign(self, identifier: str, vehicle: str) -> WeeklyBook:
