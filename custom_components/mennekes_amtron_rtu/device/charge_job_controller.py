@@ -56,6 +56,9 @@ class JobInputs:
     current_cap: float
     pending: bool = False
     vehicle_target_active: bool = False
+    # Only the Plug & Charge release is missing, as after an app restart:
+    # an order waits for Home Assistant's grant instead of ending.
+    release_waiting: bool = False
     # The wallbox's record of the current plug-in, None until read in full.
     session: SessionMark | None = None
 
@@ -131,7 +134,10 @@ class ChargeJobController:
             now=sample.now, available=sample.available, present=sample.present,
             matches=sample.scope == job.binding, total_kwh=sample.total_kwh,
             meter_fresh=sample.meter_fresh,
-            independent_stop=sample.independent_stop or not sample.permitted or self._vehicle_conflict(sample),
+            independent_stop=(
+                sample.independent_stop or (not sample.permitted and not sample.release_waiting)
+                or self._vehicle_conflict(sample)
+            ),
             scope=None if closing else sample.scope, session=None if closing else sample.session,
         )
         if before != _decision(job.snapshot()):

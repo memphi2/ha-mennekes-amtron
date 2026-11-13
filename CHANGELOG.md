@@ -133,6 +133,13 @@ Update the app to 0.9.0b2 together with the integration.
   before phase changes apply without a restart from its **Runtime** page; a
   queued start or stop is timed again. The app lowers a charging current above
   its cap after the next poll, also after a restart with a lower cap.
+- **An app restart with Virtual Plug & Charge no longer ends a running
+  order.** The order waits for Home Assistant's new grant instead.
+- **Switching departure planning off also ends the app's plan** for that car.
+- **One lost poll no longer pauses a charge with a kWh target**, a small
+  clock correction no longer pauses a running order, and a failing disk no
+  longer shows the wallbox as unavailable. See the
+  [failures and restart audit](docs/audits/2026-11-failures-and-restart.md).
 - **A departure that ends no longer leaves the car paused.** When the
   departure is cleared, or passes while the plan still paused, the plan ends
   its own pause, with and without the app. A stop at the reached target stays

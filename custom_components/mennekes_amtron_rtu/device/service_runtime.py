@@ -44,6 +44,8 @@ API_VERSION = 2
 # A state poll waits this long for a running command, then takes the last
 # published state unless that is older than the second value.
 _PATIENCE_SECONDS = 2.0
+# A kWh goal pauses for a missing meter only after the bus failed this long.
+METER_GRACE_SECONDS = 60.0
 _PUBLISHED_SECONDS = 60.0
 
 
@@ -100,6 +102,11 @@ class ModbusService:
         self._cap_retry_at = 0.0
         self._updated_at: float | None = None
         self._energy_sample: dict[str, float | None] | None = None
+        # When the sample was taken, on the monotonic clock.
+        self._energy_sample_at: float | None = None
+        # Since when every poll failed; a goal pauses only after a while.
+        self._meter_failing_since: float | None = None
+        self._storage_warned_at: float | None = None
         self._stopping = False
         self._phase = f"opening {self._connection_name} connection"
         self.heartbeat.async_add_listener(self._log_heartbeat_health)
@@ -239,7 +246,7 @@ class ModbusService:
                     await self.refresh()
                 await self._recover()
                 await self._enforce_current_cap()
-                await self._persist()
+                await self._save_intent()
                 if self._logged_unavailable:
                     _LOGGER.info("Wallbox communication restored")
                 self._logged_unavailable = False
@@ -257,6 +264,16 @@ class ModbusService:
                     self._logged_unavailable = True
             await asyncio.sleep(self.config.scan_interval)
 
+    async def _save_intent(self) -> None:
+        """A disk that fails is not a lost wallbox: the state stays live."""
+        try:
+            await self._persist()
+        except (OSError, ValueError) as err:
+            now = time.monotonic()
+            if self._storage_warned_at is None or now - self._storage_warned_at >= 60:
+                _LOGGER.warning("Cannot save control intent (%s); the wallbox stays in use", type(err).__name__)
+                self._storage_warned_at = now
+
     async def refresh(self) -> None:
         async with self._poll_lock:
             self._phase = "polling the wallbox"
@@ -272,21 +289,28 @@ class ModbusService:
                 self._success = False
                 if self.control is not None:
                     self.control.observe_plug_charge(None)
-                self._energy_sample = None
+                self._energy_sample = self._energy_sample_at = None
                 self.data.energy_observed_at = None
                 if self.identity.layout_version >= ENERGY_TOTAL.min_layout:
                     self.client.write_state.session_history.observe(None, now=wall_clock())
-                if self.goal is not None:
+                now = time.monotonic()
+                if self._meter_failing_since is None:
+                    self._meter_failing_since = now
+                if self.goal is not None and now - self._meter_failing_since >= METER_GRACE_SECONDS:
+                    # One lost poll is no outage: pausing for it and resuming
+                    # five minutes later would cost more than it protects.
                     self.goal.observe(WallboxData(
                         energy_read=True, energy_goal_generation=goal_generation,
                     ))
                 raise
+            self._meter_failing_since = None
             self._success = True
             self._updated_at = time.monotonic()
             if self.data.energy_read:
                 energy = self.data.get(ENERGY_TOTAL.key)
                 # Keep the timestamp of a failed meter attempt as well. A
                 # cached value must never turn a measurement gap into energy.
+                self._energy_sample_at = time.monotonic()
                 self._energy_sample = {
                     "observed_at": wall_clock(),
                     "value": (

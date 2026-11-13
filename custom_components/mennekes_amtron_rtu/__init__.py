@@ -836,7 +836,14 @@ async def async_unload_entry(
     # A reload that also selects another car must end the old car's plan
     # pause, like an in-place switch; a plain reload or shutdown keeps it.
     previous = runtime_data.vehicle_profile_id
-    withdraw = previous is not None and vehicle_options(entry.options).get(CONF_VEHICLE_PROFILE_ID) != previous
+    options = vehicle_options(entry.options)
+    withdraw = previous is not None and options.get(CONF_VEHICLE_PROFILE_ID) != previous
+    # So does switching the car's departure planning off: the app would
+    # otherwise keep planning a trip that Home Assistant no longer shows.
+    withdraw = withdraw or (
+        runtime_data.timed_goal is not None
+        and not (vehicle_soc_is_configured(options) and timed_goal_is_enabled(options))
+    )
     try:
         await _async_stop_runtime(
             runtime_data, close_client=not retain_client, retain_cost=retain_cost,

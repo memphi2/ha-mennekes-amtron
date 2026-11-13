@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -11,6 +12,9 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device import (
+    service_job_runtime as job_runtime,
+)
 from custom_components.mennekes_amtron_rtu.device.charge_job_controller import (
     JobRequestError,
 )
@@ -166,6 +170,21 @@ def test_only_genuine_recent_meter_samples_reach_the_job(tmp_path, field, value)
             s._energy_sample[field] = value
             assert not s._job_inputs().meter_fresh
             assert s._job_inputs().total_kwh is None
+    asyncio.run(run())
+
+
+def test_meter_freshness_follows_the_monotonic_clock_not_a_clock_step(tmp_path, monkeypatch):
+    async def run():
+        async with job_service(tmp_path) as (s, _transport, _clock):
+            assert s._job_inputs().meter_fresh
+            # The wall clock steps back a little, or forward a few minutes:
+            # the reading is as recent as before.
+            for step in (-4, 300):
+                s._energy_sample["observed_at"] = time.time() + step
+                assert s._job_inputs().meter_fresh
+            # The reading itself aged on the monotonic clock.
+            monkeypatch.setattr(job_runtime.time, "monotonic", lambda: s._energy_sample_at + 91)
+            assert not s._job_inputs().meter_fresh
     asyncio.run(run())
 
 
@@ -456,4 +475,32 @@ def test_the_session_record_follows_only_fresh_reads_of_this_connection(tmp_path
             await s.refresh()
             assert s.jobs.inputs().session is None
             assert s._job_session is None
+    asyncio.run(run())
+
+
+def test_an_order_waits_for_the_plug_charge_grant_instead_of_ending(tmp_path):
+    async def run():
+        async with job_service(tmp_path) as (s, transport, _clock):
+            c = s.jobs
+            values = c.snapshot()
+            await c.create(request(), revision=values["revision"], scope=values["scope"])
+            await c.tick()
+            assert c.job.state == "charging"
+            # Virtual Plug & Charge is switched on, as after an app restart:
+            # the gate closes the release until Home Assistant grants it.
+            await s.control.async_configure_plug_charge(True, policy="")
+            await s.refresh()
+            sample = s._job_inputs()
+            assert (sample.permitted, sample.release_waiting) == (False, True)
+            c.observe()
+            assert c.job.state == "charging"
+            assert c.stop_requested()
+            writes = len(transport.writes)
+            await c.tick()
+            assert len(transport.writes) == writes
+            # The release switched off by hand still ends the order.
+            s.control.charging_release_requested = False
+            assert not s._job_inputs().release_waiting
+            c.observe()
+            assert (c.job.state, c.job.reason) == ("interrupted", "independent_stop")
     asyncio.run(run())

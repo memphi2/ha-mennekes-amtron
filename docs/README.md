@@ -57,3 +57,4 @@ them up.
 - [Service publication](service-releasing.md), [repository settings](repository-settings.md)
   and [November compatibility audit](ha-2026-11-validation.md)
 - [Legal information](legal.md) and [provenance evidence](audits/current-legal-provenance.md)
+- Audit: [failures and restart](audits/2026-11-failures-and-restart.md)

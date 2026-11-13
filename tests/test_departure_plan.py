@@ -593,6 +593,36 @@ def test_a_pause_someone_else_ended_is_no_longer_the_plans(tmp_path):
     run(go())
 
 
+def test_a_resume_that_is_only_queued_keeps_the_pause_the_plans(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        assert plan.plan_paused
+        resume = box.resume
+
+        async def queue_only():
+            # Rate-limited: the control queues the resume instead.
+            box.resumes += 1
+            box.set(pending=True)
+
+        plan._resume = queue_only
+        box.set(present=False)
+        await plan.tick()
+        assert (box.resumes, plan.plan_paused) == (1, True)
+        # While the resume is queued nothing is sent again.
+        await plan.tick()
+        assert box.resumes == 1
+        # The queue was lost, as after a restart: the plan asks again.
+        box.set(pending=False)
+        await plan.tick()
+        assert (box.resumes, plan.plan_paused) == (2, True)
+        plan._resume = resume
+        box.set(pending=False)
+        await plan.tick()
+        assert (box.resumes, plan.plan_paused) == (3, False)
+    run(go())
+
+
 def test_the_same_plug_in_is_recognised_after_a_restart(tmp_path):
     async def go():
         box = Box(tmp_path)

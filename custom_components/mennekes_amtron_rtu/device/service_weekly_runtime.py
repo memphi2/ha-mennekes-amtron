@@ -21,6 +21,7 @@ class WeeklyModbusService(JobModbusService):
     jobs: WeeklyChargeJobs | None = None
     weekly: WeeklyController | None = None
     job_controller_type: type[WeeklyChargeJobs] = WeeklyChargeJobs
+    _weekly_failed = False
 
     def _configure_control(self, control: AmtronControl) -> None:
         identity = self.identity.serial_number or f"{self.config.connection.port}:{self.config.connection.device_id}"
@@ -54,12 +55,20 @@ class WeeklyModbusService(JobModbusService):
                     # stop the bus owner; writes stay fenced by the policy.
                     _LOGGER.exception("Charge job tick failed")
                     self.jobs.action_error = "command_unconfirmed"
+            failed = False
             if self.weekly is not None:
                 try:
                     await self.weekly.tick()
                 except Exception:
-                    _LOGGER.exception("Weekly plan tick failed")
-            await asyncio.sleep(5 if self.jobs is not None and (self.jobs.storage_error or self.jobs.action_error) else 1)
+                    failed = True
+                    if not self._weekly_failed:
+                        _LOGGER.exception("Weekly plan tick failed")
+                    else:
+                        _LOGGER.debug("Weekly plan tick failed again", exc_info=True)
+            self._weekly_failed = failed
+            await asyncio.sleep(
+                5 if failed or (self.jobs is not None and (self.jobs.storage_error or self.jobs.action_error)) else 1
+            )
 
     async def stop(self) -> None:
         try:

@@ -70,8 +70,12 @@ def test_a_cancelled_switch_reloads_only_a_running_entry(monkeypatch, state, sto
     asyncio.run(run())
 
 
-@pytest.mark.parametrize(("selected", "withdraw"), [("a" * 32, False), ("b" * 32, True)])
-def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selected, withdraw):
+@pytest.mark.parametrize(("selected", "planning", "withdraw"), [
+    ("a" * 32, True, False), ("b" * 32, True, True),
+    # Switching the car's departure planning off withdraws the app's plan too.
+    ("a" * 32, False, True),
+])
+def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selected, planning, withdraw):
     from tests.test_vehicle_detection import detection_catalog
 
     async def run():
@@ -87,6 +91,7 @@ def test_a_reload_with_another_car_ends_the_old_plans_pause(monkeypatch, selecte
             client=SimpleNamespace(async_close=AsyncMock()),
         )
         options = {**detection_catalog(), "active_vehicle_profile": selected}
+        options["vehicle_profiles"]["a" * 32]["options"]["timed_goal_enabled"] = planning
         entry = SimpleNamespace(entry_id="entry", options=options, runtime_data=runtime)
         handoff = SimpleNamespace()
         hass = SimpleNamespace(

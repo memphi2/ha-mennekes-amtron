@@ -21,6 +21,8 @@ from .service_console_runtime import ConsoleModbusService
 from .vehicle import snapshot_vehicle_connected
 
 _LOGGER = logging.getLogger(__name__)
+# A meter stamp further from the wall clock than this is no reading of now.
+_STAMP_TOLERANCE_SECONDS = 24 * 3600.0
 # Goal metadata may still reduce a limit. Competing planners and enabling
 # manual writes must explicitly relinquish the local job before taking over.
 _COMPETING = frozenset({"set_current", "resume", "timed_current", "solar", "phases", "recover", "restart"})
@@ -67,11 +69,16 @@ class JobModbusService(ConsoleModbusService):
         now = datetime.now(UTC)
         total = sample.get("value") if isinstance(sample, dict) else None
         stamp = sample.get("observed_at") if isinstance(sample, dict) else None
+        # Judged on the monotonic clock: a wall-clock step must not pause an
+        # order for a meter reading that is not old at all. The stamp itself
+        # only has to be a plausible time.
+        age = time.monotonic() - self._energy_sample_at if self._energy_sample_at is not None else None
         fresh = (
             available and isinstance(total, (int, float)) and not isinstance(total, bool)
             and math.isfinite(total) and total >= 0
             and isinstance(stamp, (int, float)) and not isinstance(stamp, bool)
-            and 0 <= now.timestamp() - stamp <= max(90, self.config.scan_interval * 3)
+            and math.isfinite(stamp) and abs(now.timestamp() - stamp) <= _STAMP_TOLERANCE_SECONDS
+            and age is not None and 0 <= age <= max(90, self.config.scan_interval * 3)
         )
         scope = session = None
         independent_stop = False
@@ -92,13 +99,15 @@ class JobModbusService(ConsoleModbusService):
             and math.isfinite(current) and current >= 0
             and self.data.current_write_generation == self.client.write_state.current_write_generation
         )
-        permitted = (
+        sound = (
             control is not None and not control.read_only
             and self.data.fresh("error_code") == 0 and self.data.fresh("lock_evse") == 0
-            and self.data.fresh("charging_release") == 1
-            and not self.client.write_state.plug_charge.blocked
             and control.charging_release_requested is not False
         )
+        gate = self.client.write_state.plug_charge.blocked
+        permitted = sound and not gate and self.data.fresh("charging_release") == 1
+        # The gate closes the release itself; nobody switched it off.
+        release_waiting = sound and gate and not permitted
         current_value = float(current) if valid_current and isinstance(current, (int, float)) else None
         total_value = float(total) if fresh and isinstance(total, (int, float)) else None
         return JobInputs(
@@ -107,7 +116,7 @@ class JobModbusService(ConsoleModbusService):
             control.max_charging_current if control is not None else 6,
             control is not None and control.pending_action is not None,
             vehicle_target_active=control is not None and control.soc_goal.target_percent > 0,
-            session=session,
+            session=session, release_waiting=release_waiting,
         )
 
     def _note_session(self) -> None:

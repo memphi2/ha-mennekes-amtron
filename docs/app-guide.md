@@ -173,6 +173,10 @@ readable again, the order is interrupted as below. A wallbox without a session
 counter (register layout before v01.02) cannot prove it; there the order is
 always interrupted.
 
+With Virtual Plug & Charge the app closes the release when it starts, until
+Home Assistant has recognised the car again. A proven order waits for that
+grant and then continues; it is not interrupted meanwhile.
+
 ### When an order is interrupted
 
 The app ends an order and does not restart it by itself when:

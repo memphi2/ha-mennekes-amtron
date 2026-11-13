@@ -11,10 +11,12 @@ from aiohttp.test_utils import TestServer
 
 from custom_components.mennekes_amtron_rtu.control import ControlOptions
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device import service_runtime
 from custom_components.mennekes_amtron_rtu.device.client import (
     MennekesModbusClient,
     SerialConfig,
 )
+from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
 from custom_components.mennekes_amtron_rtu.device.data import (
     WallboxData,
     WriteDiagnostics,
@@ -31,7 +33,7 @@ from custom_components.mennekes_amtron_rtu.remote import (
     RemoteHeartbeat,
     server_url,
 )
-from tests.fakes import FakeModbusClient, device_bank, put
+from tests.fakes import FakeModbusClient, device_bank, put, raise_connection_error
 
 TOKEN = "service-test-credential-32-characters"  # noqa: S105 - test fixture
 
@@ -353,3 +355,51 @@ def test_intent_storage_is_bounded_private_and_does_not_write_unchanged_state(tm
 def test_service_url_has_no_embedded_credentials_or_ambiguous_paths(url):
     with pytest.raises(ValueError, match=r"."):
         server_url(url)
+
+
+def test_one_lost_poll_does_not_pause_a_kwh_goal(tmp_path, monkeypatch):
+    async def run():
+        service, transport, _clock = await service_fixture(tmp_path)
+        try:
+            serial = service.identity.serial_number
+            await service.command({"command": "energy_goal", "value": 5.0, "expected_serial_number": serial})
+            assert service.control.energy_goal.status == "active"
+            # The whole poll fails, not only the meter block.
+            transport.read_exceptions[R.EVSE_STATE.address] = raise_connection_error()
+            failing = [1000.0]
+            monkeypatch.setattr(service_runtime.time, "monotonic", lambda: failing[0])
+            with pytest.raises(AmtronBusError):
+                await service.refresh()
+            assert service.control.energy_goal.status == "active"
+            assert service._energy_sample is None
+            # After a minute of failures the goal is told about the outage.
+            failing[0] += 61
+            with pytest.raises(AmtronBusError):
+                await service.refresh()
+            for _ in range(20):
+                await asyncio.sleep(0)
+            assert service.control.energy_goal.status == "meter_unavailable"
+            transport.read_exceptions.clear()
+            await service.refresh()
+            assert service._meter_failing_since is None
+        finally:
+            await service.stop()
+    asyncio.run(run())
+
+
+def test_a_failing_intent_save_keeps_the_wallbox_available(tmp_path, monkeypatch, caplog):
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            async def fail(**_kwargs):
+                raise OSError("disk full")
+
+            monkeypatch.setattr(service, "_persist", fail)
+            await service._save_intent()
+            await service._save_intent()
+            assert caplog.text.count("Cannot save control intent") == 1
+            assert service._is_available()
+            monkeypatch.undo()
+        finally:
+            await service.stop()
+    asyncio.run(run())

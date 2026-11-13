@@ -812,9 +812,16 @@ class DepartureController:
                 # The pause intent is unknown for now; try again next time.
                 return
             if s.pause_requested:
+                # The resume may only be queued, and a queued command does
+                # not survive a restart: the pause stays the plan's to end
+                # until the wallbox shows it ended.
+                if s.pending:
+                    return
                 await self._resume()
                 _LOGGER.info("Departure plan pause ended: the plan no longer applies to the car")
-        self.plan_paused = False
+                if self.sample().pause_requested is not False:
+                    return
+        self.plan_paused = self._pause_seen = False
 
     async def _wait(self, status: str, s: DepartureSample, *, keep_start: bool = False) -> None:
         # Keep an applied charge unchanged, but do not let an older queued
