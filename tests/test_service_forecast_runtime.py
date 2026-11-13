@@ -15,7 +15,9 @@ from aiohttp.test_utils import TestClient, TestServer
 
 from custom_components.mennekes_amtron_rtu.device import server
 from custom_components.mennekes_amtron_rtu.device import service_forecast_runtime as m
-from custom_components.mennekes_amtron_rtu.device import service_job_runtime as job_runtime
+from custom_components.mennekes_amtron_rtu.device import (
+    service_job_runtime as job_runtime,
+)
 from custom_components.mennekes_amtron_rtu.device import service_runtime as bus_runtime
 from custom_components.mennekes_amtron_rtu.device.charge_rate_store import RateStore
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
@@ -62,6 +64,8 @@ def test_real_service_learns_without_extra_reads_writes_or_credentials(tmp_path,
             clock[0] += 1000
             runtime.put(transport.bank, runtime.R.EVSE_STATE, 5)
             runtime.put(transport.bank, runtime.R.DETECTED_EV_PHASES, 3)
+            runtime.put(transport.bank, runtime.R.SWITCHED_PHASES, 0)
+            runtime.put(transport.bank, runtime.R.GRID_PHASES_CONNECTED, 2)
             for index in range(4):
                 if index:
                     now[0] += timedelta(seconds=60)
@@ -224,7 +228,7 @@ def test_history_is_never_assigned_to_a_guest_or_an_old_connection(tmp_path):
 @pytest.mark.parametrize(("value", "expected"), [(None, 0), (True, 0), ("3", 0), (0, 0), (1, 1), (2.0, 2), (3, 3)])
 def test_unknown_phase_count_is_not_presented_as_three_phase(tmp_path, value, expected):
     s = bare(tmp_path)
-    s.data = WallboxData(values={"detected_ev_phases": value})
+    s.data = WallboxData(values={"detected_ev_phases": value, "switched_phases": 0, "grid_phases_connected": 2})
     assert s._rate_phases() == expected
 
 
@@ -274,3 +278,20 @@ def test_empty_identity_fallback_does_not_require_a_raw_serial(tmp_path, monkeyp
         assert s._rate_store.identity == "fixture-port:50"
         assert s.rates.history.snapshot() == []
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(("values", "expected"), [
+    ({"switched_phases": 1, "detected_ev_phases": 3}, 1),
+    ({"switched_phases": 0, "grid_phases_connected": 0, "detected_ev_phases": 3}, 1),
+    ({"switched_phases": 0, "grid_phases_connected": 2, "detected_ev_phases": 2}, 2),
+    ({"detected_ev_phases": 3}, 0),
+    ({"switched_phases": True}, 0),
+    ({"switched_phases": 0, "grid_phases_connected": True, "detected_ev_phases": 3}, 0),
+    ({"switched_phases": 0, "grid_phases_connected": 99, "detected_ev_phases": 3}, 0),
+])
+def test_actual_selected_phases_do_not_follow_the_vehicle_maximum(tmp_path, values, expected):
+    service = bare(tmp_path)
+    service.data = WallboxData(values=values)
+    assert service._rate_phases() == expected
+    service.data.held = frozenset({"switched_phases"})
+    assert service._rate_phases() == 0

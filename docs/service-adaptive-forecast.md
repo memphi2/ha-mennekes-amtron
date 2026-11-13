@@ -16,7 +16,9 @@ request or Recorder attribute.
 Learning uses actual changes in the lifetime meter, with the existing
 service-side observation timestamp and monotonic elapsed time. Valid intervals
 span 30–180 seconds. The connection, confirmed current setpoint, selected
-source and phase count must remain unchanged. At least three valid intervals
+source and effective phase context must remain unchanged. The latter combines
+the selected relay configuration, known grid wiring and the vehicle maximum;
+a single-phase selection is not mistaken for a three-phase vehicle maximum. At least three valid intervals
 are required; at most eight live intervals are retained.
 
 Repeated cached reports cannot renew freshness. Missing readings, changed

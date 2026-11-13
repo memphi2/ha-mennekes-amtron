@@ -15,7 +15,7 @@ from .charge_rate import ChargeRateLearner, RateHistory, charging_forecast, cont
 from .charge_rate_store import RateStore
 from .client import MennekesModbusClient
 from .control import AmtronControl
-from .enums import EvseState
+from .enums import EvseState, GridPhasesConnected, SwitchedPhases
 from .persistence import finish_goal_save
 from .service_config import ServerConfig
 from .service_weekly_runtime import WeeklyModbusService
@@ -86,8 +86,22 @@ class ForecastModbusService(WeeklyModbusService):
         return hashlib.sha256(reference.encode()).hexdigest() if reference is not None else None
 
     def _rate_phases(self) -> int:
-        phases = self.data.fresh("detected_ev_phases")
-        return int(phases) if isinstance(phases, (int, float)) and not isinstance(phases, bool) and phases in (1, 2, 3) else 0
+        switched = self.data.fresh("switched_phases")
+        grid = self.data.fresh("grid_phases_connected")
+        detected = self.data.fresh("detected_ev_phases")
+        # Detection is the vehicle maximum for the session, not the presently
+        # selected relay configuration. Never train single-phase data as three.
+        if isinstance(switched, bool):
+            return 0
+        if switched == SwitchedPhases.SINGLE_PHASE:
+            return 1
+        if switched != SwitchedPhases.ALL_AVAILABLE or isinstance(grid, bool):
+            return 0
+        if grid == GridPhasesConnected.L1:
+            return 1
+        if grid == GridPhasesConnected.L1_L2_L3 and isinstance(detected, (int, float)) and not isinstance(detected, bool) and detected in (1, 2, 3):
+            return int(detected)
+        return 0
 
     def _job_forecast(self, job: ChargeJob | None) -> dict[str, Any]:
         sample = self._job_inputs()
@@ -108,7 +122,7 @@ class ForecastModbusService(WeeklyModbusService):
         sample = self._job_inputs()
         job = self.jobs.job if self.jobs is not None else None
         key = context(sample.scope, self._rate_profile(job, sample.scope), sample.current_a, self._rate_phases())
-        charging = sample.available and sample.present is True and self.data.fresh("evse_state") == EvseState.CHARGING
+        charging = sample.available and sample.present is True and not sample.pending and self.data.fresh("evse_state") == EvseState.CHARGING
         self.rates.check_context(key, charging=charging)
         if self.data.energy_read:
             self.rates.observe(
