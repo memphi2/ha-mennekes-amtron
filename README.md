@@ -75,8 +75,8 @@ setting belongs and why a requested change may wait.
 ## Development and releases
 
 **Current beta: 0.9.0b2.** The app gets web pages for an overview, the registers
-and runtime settings, and runs charging jobs, early boosts and guest charging on
-its own. Total power carries the values of all three phases. Optional features
+and runtime settings, and runs charging jobs, weekly plans, early boosts and
+guest charging on its own. Total power carries the values of all three phases. Optional features
 stay off until you configure them. See the [release notes](CHANGELOG.md).
 
 [All documentation](docs/README.md) · [Compatibility](docs/compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)

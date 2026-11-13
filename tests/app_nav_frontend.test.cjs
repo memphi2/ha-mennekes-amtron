@@ -6,7 +6,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const root = path.join(__dirname, "../custom_components/mennekes_amtron_rtu/device");
 const source = fs.readFileSync(path.join(root, "app_nav.js"), "utf8");
-const pages = ["app_overview.html", "app_settings.html", "app_registers.html", "app_runtime.html", "app_jobs.html", "app_guest.html"];
+const pages = ["app_overview.html", "app_settings.html", "app_registers.html", "app_runtime.html", "app_jobs.html", "app_guest.html", "app_weekly.html"];
 
 function setup(language, current, {hash = "", debugTab = false} = {}) {
   const attributes = {}, events = {};
@@ -24,7 +24,7 @@ test("every page loads the shared navigation and names its own entry", () => {
   for (const page of pages) {
     const html = fs.readFileSync(path.join(root, page), "utf8");
     assert.match(html, /<script src="\.\/app_nav\.js" defer><\/script>/, page);
-    assert.match(html, /<nav class="overview-nav" aria-label="Service" data-nav="(overview|connection|registers|runtime|jobs|guest)"><\/nav>/, page);
+    assert.match(html, /<nav class="overview-nav" aria-label="Service" data-nav="(overview|connection|registers|runtime|jobs|guest|weekly)"><\/nav>/, page);
     assert.match(html, /<html lang="en">/, page);
   }
 });
@@ -36,10 +36,10 @@ test("the links follow the page language and mark the current page", () => {
     ["it", "Panoramica", "Ricarica ospite", "Pagine del servizio"], ["xx", "Overview", "Guest charging", "Service pages"],
   ]) {
     const h = setup(language, "jobs");
-    assert.equal(h.nav.children.length, 7);
+    assert.equal(h.nav.children.length, 8);
     assert.equal(h.nav.children[0].textContent, overview); assert.equal(h.nav.children[6].textContent, guest);
     assert.equal(h.attributes["aria-label"], label);
-    assert.deepEqual(h.nav.children.map(link => link.href), ["./", "./connection", "./connection#debug", "./registers", "./runtime", "./jobs", "./guest"]);
+    assert.deepEqual(h.nav.children.map(link => link.href), ["./", "./connection", "./connection#debug", "./registers", "./runtime", "./jobs", "./guest", "./weekly"]);
     assert.deepEqual(h.nav.children.filter(link => link.attributes["aria-current"] === "page").map(link => link.href), ["./jobs"]);
   }
 });

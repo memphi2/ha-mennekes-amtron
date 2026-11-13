@@ -129,7 +129,7 @@ class ChargeJobController:
             or not sample.available or sample.present is not True
             or sample.scope != job.binding or not sample.meter_fresh
             or sample.independent_stop or not sample.permitted or self._vehicle_conflict(sample)
-            or not job.allows_at(sample.now)
+            or not job.allows_at(sample.now, total_kwh=sample.total_kwh)
         )
 
     def current_policy(self, owner: str | None, enabling: bool) -> bool | None:
@@ -208,6 +208,7 @@ class ChargeJobController:
             "finish_at": job.finish_at.isoformat(), "current_a": job.current_a,
             "energy_kwh": job.energy.target_kwh,
             **({"kind": job.kind} if job.kind != "scheduled" else {}),
+            **({"reserve_kwh": job.reserve.target_kwh} if job.reserve is not None else {}),
         }
 
     def _candidate(self, request: object, revision: object, scope: object) -> ChargeJob:
@@ -277,7 +278,7 @@ class ChargeJobController:
             paused = sample.current_a is not None and 0 < sample.current_a < 6
             if not self.ready:
                 raise JobRequestError("job_clear_requires_pause")
-            if self.holding and (not sample.available or sample.pending or (
+            if self._clear_needs_pause() and (not sample.available or sample.pending or (
                 sample.present is not False and not paused
             )):
                 raise JobRequestError("job_clear_requires_pause")
@@ -297,6 +298,14 @@ class ChargeJobController:
             self.action_error = None
             self._changed()
             return self.snapshot()
+
+    def _keeps_finished(self) -> bool:
+        """Whether a finished order still holds its pause for a successor."""
+        return False
+
+    def _clear_needs_pause(self) -> bool:
+        """Only an order that still holds the car needs its pause first."""
+        return self.holding
 
     async def _save(self) -> None:
         job = self.job
@@ -363,6 +372,7 @@ class ChargeJobController:
         if (
             job is None or not job.terminal or job.scope_ended or self._settled
             or self.storage_error or self._durable != job.snapshot()
+            or self._keeps_finished()
         ):
             return
         try:
@@ -396,6 +406,7 @@ class ChargeJobController:
                 "scope_ended": job.scope_ended, "holding": self.holding,
                 "delivered_kwh": progress,
                 "boost_until": job.boost_until.isoformat() if job.boost_until is not None else None,
+                **({"reserve_reached": job.reserve.reached} if job.reserve is not None else {}),
             }
         return {
             "schema": 1, "revision": self.revision, "scope": sample.scope,

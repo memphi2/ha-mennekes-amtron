@@ -68,8 +68,14 @@ Update the app to 0.9.0b2 together with the integration.
   Assistant disconnects. A job can be boosted to charge early for up to two
   hours (#64), and guest charging gives a locally authorized guest a bounded
   order (#65). None of them grants a release or unlocks the wallbox.
+- Weekly plans in the app (#66): recurring departures for one car. An
+  activation for the plugged-in car creates the job for each departure for up
+  to seven days; each date runs at most once, also after an edit or restart.
+  A job or weekly plan can charge an immediate reserve of its energy amount at
+  once and then wait for the planned start (#67).
 - A finished, stopped or interrupted order hands control back to Home
-  Assistant once the wallbox confirms its pause. Charging stays paused until
+  Assistant once the wallbox confirms its pause; with a weekly plan, only after
+  its last departure. Charging stays paused until
   you resume it in Home Assistant; clearing the order is no longer needed, and
   a new order replaces a finished one.
 - While an app order runs, Home Assistant says that a charging job of the app

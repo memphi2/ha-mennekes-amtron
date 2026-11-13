@@ -16,6 +16,10 @@ Update the app together with integration 0.9.0b2.
 - **Guest charging:** a bounded order for a guest car that is already
   authorized at the wallbox, for example by RFID. It never grants a release,
   unlocks the wallbox or uses a saved vehicle target.
+- **Weekly plans:** recurring departures for one car. An activation for the
+  plugged-in car creates the job for each departure for up to seven days.
+- **Immediate reserve:** a job or weekly plan can charge part of its energy
+  amount at once, then wait for the planned start.
 - **Registers:** a read-only page with the raw register values, their age
   and read quality.
 - **Runtime:** preview new poll intervals and apply them without restarting

@@ -419,6 +419,9 @@ when permission was granted.
 | The order shows **Interrupted** | The app restarted, the car was unplugged, the wallbox was unreadable for over a minute, or another limit required a stop. To let the app charge again, create a new order. |
 | "Clearing requires a confirmed pause or unplug" | Wait until the overview shows the pause, then clear again. |
 | "Storage unavailable; no automatic start" | The app could not save the order. Check the app log; restarting the app resolves a temporary problem. |
+| Weekly plan: "No unconsumed valid departure within seven days" | Every departure in the next seven days is skipped, already used or does not exist on a clock change. Check the dates in the plan preview. |
+| A weekly plan stopped by itself | The car was unplugged, the app restarted, the plan was edited, a job was stopped or cleared, or seven days passed. Activate it again with the car plugged in. |
+| Charging stays paused between weekly departures | Intended while the plan is active: the next departure's job holds the pause. **Stop weekly automation** to control charging in Home Assistant. |
 
 See [charging jobs](app-guide.md#charging-jobs) for the full behavior.
 

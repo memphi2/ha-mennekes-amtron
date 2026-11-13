@@ -12,6 +12,7 @@
     ["runtime", "./runtime", ["Runtime", "Betrieb", "Fonctionnement", "Werking", "Funzionamento"]],
     ["jobs", "./jobs", ["Charging jobs", "Ladeaufträge", "Ordres de recharge", "Laadopdrachten", "Ordini di ricarica"]],
     ["guest", "./guest", ["Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite"]],
+    ["weekly", "./weekly", ["Weekly plans", "Wochenpläne", "Plans hebdomadaires", "Weekplannen", "Piani settimanali"]],
   ];
   const label = ["Service pages", "Service-Seiten", "Pages du service", "Servicepagina’s", "Pagine del servizio"][column];
   document.querySelectorAll("nav[data-nav]").forEach(nav => {

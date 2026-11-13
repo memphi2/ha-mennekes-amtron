@@ -214,7 +214,7 @@ recurring failures require their logged cause to be corrected.
 
 Pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. A charging job is saved in
-`charge-job.json` the same way. The file is atomically replaced with
+`charge-job.json` and weekly plans in `weekly-plans.json` the same way. The file is atomically replaced with
 owner-only permissions when those settings change. Both the file and directory
 are synced before a save is considered complete. This is bounded state rather
 than a growing history. Include the data directory in backups and protect its
@@ -362,6 +362,11 @@ An order `request` has this form:
  "finish_at": "2026-11-14T06:40:00+01:00", "current_a": 12, "energy_kwh": 10}
 ```
 
+An optional `reserve_kwh` (0.1 kWh steps, at most `energy_kwh`) charges that
+part at once and then waits for `start_at`; see
+[immediate reserve](app-guide.md#immediate-reserve). `GET` then also reports
+`reserve_reached`.
+
 Errors return HTTP 409 with a key such as `job_changed` (stale revision or
 scope), `job_exists`, `job_not_permitted`, `job_preview_expired`,
 `job_current_exceeds_cap`, `guest_vehicle_target_active`,
@@ -378,6 +383,37 @@ saved, `holding` turns `false` and commands work again; the finished order stays
 in `GET` until it is cleared or replaced by `create`. The order is saved in
 `/data/charge-job.json` before it may start charging; a service restart restores
 it as interrupted.
+
+## Weekly plan API
+
+The service also accepts `GET` and `POST` at `/v2/weekly`; Ingress uses
+`/api/weekly` with the same administrator check, CSRF token, size limit and
+no-retry rule as the job API. `GET` returns the saved plans with their upcoming
+dates, the active activation and the current job. Every `POST` names an
+`action`; changes need `confirm: true`:
+
+| Action | Fields besides `action` | Effect |
+|---|---|---|
+| `preview_plan` | `revision`, `plan` | Validates a plan and lists its next dates. Writes nothing. |
+| `save_plan`, `remove_plan` | `revision`, `plan` or `plan_id`, `confirm` | Saves or removes a plan. Editing or removing the active plan stops its job. |
+| `preview_activation` | `revision`, `plan_id`, `vehicle_profile`, `scope` | Returns a signed proposal for the first job and the activation end. |
+| `activate` | `proposal`, `confirm` | Starts the activation within 60 seconds of the preview. Repeating it returns the outcome without extending it. |
+| `deactivate` | `revision`, `confirm` | Ends the activation and stops its job. |
+
+A `plan` has `id`, `vehicle_profile`, `timezone` (IANA), `weekdays` (Monday is
+0), `departure_time`, `charge_minutes`, `current_a`, `energy_kwh`,
+`ambiguous_time` (`earlier` or `later`), `enabled`, up to 32 `exceptions`
+(`date` with `departure_time` or `null` to skip) and an optional `reserve_kwh`.
+The activation itself is never saved; a service restart ends it. Each local
+date is marked as used before its job is created, so a date never runs twice,
+also after an edit or restart. Plans and used dates are kept in
+`/data/weekly-plans.json`, at most 128 KiB.
+
+Errors return HTTP 409 with a key such as `weekly_changed`,
+`weekly_already_active`, `weekly_vehicle_not_confirmed`,
+`weekly_confirmation_expired`, `weekly_no_occurrence` or
+`weekly_storage_unavailable`; malformed input returns 400 with
+`invalid_weekly_request`.
 
 ## Transport security
 

@@ -13,6 +13,7 @@ token is needed in the browser. They need **Supervisor 2026.10.4 or newer**.
 | [Runtime](#runtime-settings) | Polling intervals and control limits, with a preview before saving. |
 | [Charging jobs](#charging-jobs) | A charging order the app runs on its own, with optional early start. |
 | [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
+| [Weekly plans](#weekly-plans) | Recurring departures for one car, turned into charging jobs for up to seven days. |
 
 Every page follows the browser language in English, German, French, Dutch and
 Italian, and every page has the same navigation bar.
@@ -63,7 +64,7 @@ reached, it stops the order.
 1. Open **Charging jobs** (German: **Ladeaufträge**).
 2. Enter **Start**, **Finish no later than**, the **additional energy** in kWh
    and the **current per phase** in A. The current cannot exceed the app's
-   current cap.
+   current cap. Optionally enter an [immediate reserve](#immediate-reserve).
 3. Select **Preview**, check the summary and select **Confirm this order**.
 
 Confirm soon after the preview. If the start time is already more than a minute
@@ -89,6 +90,18 @@ of the app controls charging. These Home Assistant actions **stop** the order:
 The meter is read at the normal polling interval, so a little more energy than
 the set amount can flow before the pause takes effect. The order is a limit, not
 a guarantee that the car receives this amount or finishes by the end time.
+
+### Immediate reserve
+
+An **immediate reserve** charges part of the energy amount right away, then
+pauses until the planned start. Example: with 20 kWh, a reserve of 5 kWh and a
+start tonight, the app charges 5 kWh now and the remaining 15 kWh in the window.
+The reserve is part of the amount, not extra, and 0 switches it off.
+
+The reserve is energy measured by the wallbox meter, not a battery percentage
+or driving range. It never overrides a stop, a switched-off release or a reached
+target. Once reached, it stays reached, also after an app restart interrupted
+the order. Guest orders have no reserve.
 
 ### Early start (boost)
 
@@ -144,6 +157,38 @@ first. If a battery target is switched on later, the guest order is interrupted.
 Otherwise a guest order behaves like a charging job: it stops at the energy
 amount or the end time, ends when the car is unplugged, and **Clear stopped
 order without resuming** never restarts charging.
+
+## Weekly plans
+
+**Weekly plans** (German: **Wochenpläne**) save a recurring schedule for one
+car: weekdays, departure time, charging window in minutes, current, energy per
+departure and an optional [immediate reserve](#immediate-reserve). Up to 16
+plans are stored, one per vehicle profile.
+
+1. Enter a **vehicle profile reference**, for example `bmw-i4`. It is a label
+   you choose; the app does not recognize the car by it.
+2. Choose the time zone, weekdays and the other values. **Date exceptions**
+   skip a day or move its departure, one line per date: `2026-12-24 = skip` or
+   `2026-12-25 = 09:00`.
+3. Select **Preview changes**, check the listed dates and select **Save this
+   recipe**. Saving alone never charges.
+4. With the car plugged in, select the saved plan, confirm **I have checked that
+   the selected vehicle is connected**, select **Preview activation** and
+   **Confirm activation** within one minute.
+
+The activation creates a charging job for the next departure. When it ends, the
+app replaces it with the job for the following departure; the car stays paused
+in between, so Home Assistant cannot resume meanwhile. After the last departure
+within the activation, control returns to Home Assistant as for any finished
+order.
+
+An activation covers only this connection and ends after seven days at the
+latest. Unplugging, an app restart, a stop or clear on **Charging jobs**,
+editing or removing the active plan, **Stop weekly automation** or another limit
+that requires a stop all end it; it never restarts by itself. Each departure
+date runs at most once, also after an edit or a restart. A local time that does
+not exist on a clock change is shown as invalid instead of being moved; for a
+repeated time, choose the earlier or later occurrence.
 
 ## Registers
 

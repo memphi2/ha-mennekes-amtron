@@ -96,8 +96,9 @@ for details.
 | **Debug log** | Live Modbus recording for up to 10 minutes, in memory only. |
 | **Registers** | Every known register with raw and decoded value and its read quality. Read-only. |
 | **Runtime** | Polling intervals apply without restart; current cap and waits after the next restart. Preview before saving. |
-| **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with optional early start. |
+| **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with an optional immediate reserve and early start. |
 | **Guest charging** | An immediate, limited order for a visitor's car after local authorization. |
+| **Weekly plans** | Recurring departures for one car, activated for the plugged-in car for up to seven days. |
 
 Every page is available in English, German, French, Dutch and Italian and has
 the same navigation bar.
@@ -137,6 +138,12 @@ release off or locking in HA stops the order. When an order ends, the app pauses
 charging; once the wallbox confirms the pause, HA controls charging again and
 you can resume there. Unplugging, an app restart or a wallbox that is unreadable
 for more than a minute interrupts an order; it never restarts by itself.
+
+A weekly plan creates one such job per departure. Between departures the car
+stays paused for the next one; after the last departure, or when the plan is
+stopped, HA controls charging again. An activation ends at unplugging, an app
+restart or after seven days at the latest. See
+[the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/app-guide.md#weekly-plans).
 
 ## Daily use
 

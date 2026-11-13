@@ -23,6 +23,9 @@ CONSOLE_ASSETS = {
     "/app_runtime.js": ("app_runtime.js", "text/javascript"),
     "/registers": ("app_registers.html", "text/html"),
     "/app_registers.js": ("app_registers.js", "text/javascript"),
+    "/weekly": ("app_weekly.html", "text/html"),
+    "/app_weekly.js": ("app_weekly.js", "text/javascript"),
+    "/app_weekly.css": ("app_weekly.css", "text/css"),
 }
 
 

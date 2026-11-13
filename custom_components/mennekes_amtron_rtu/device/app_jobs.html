@@ -48,6 +48,9 @@
           <div><label for="job_energy" data-text="energy">Additional energy, kWh</label><input id="job_energy" type="number" min="0.1" max="1000" step="0.1" value="10" required></div>
           <div><label for="job_current" data-text="current">Current per phase, A</label><input id="job_current" type="number" min="6" max="32" step="0.1" value="6" required></div>
         </div>
+        <label for="job_reserve" data-text="reserve">Immediate reserve, kWh</label>
+        <input id="job_reserve" type="number" min="0" max="1000" step="0.1" value="0" aria-describedby="job_reserve_hint" required>
+        <p id="job_reserve_hint" class="hint" data-text="reserve_hint">Charge this portion now, then wait for the planned start. Included in the total energy ceiling, not extra. Zero disables; AC meter energy, not battery percentage.</p>
         <p class="hint" data-text="scope">Applies only to this confirmed physical connection. The order does not identify or authorize the vehicle. Reconnection or service restart requires a new confirmation.</p>
         <button type="submit" id="job_preview" data-text="preview">Preview</button>
       </fieldset>

@@ -61,6 +61,6 @@ profile mennekes_amtron_modbus flags=(attach_disconnected,mediate_deleted) {
   # temporary files, fsync and atomic rename; no general /data or /tmp writes.
   /data/ r,
   /data/options.json r,
-  /data/{service-token,intent.json,charge-job.json} rw,
-  /data/.{token,intent,job}-* rw,
+  /data/{service-token,intent.json,charge-job.json,weekly-plans.json} rw,
+  /data/.{token,intent,job,weekly}-* rw,
 }
