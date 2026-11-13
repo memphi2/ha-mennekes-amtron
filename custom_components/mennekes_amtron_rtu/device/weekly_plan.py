@@ -14,6 +14,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from .charge_reserve import reserve_energy
 from .energy_goal import EnergyGoal
 
 MAX_EXCEPTIONS = 32
@@ -28,7 +29,7 @@ _REQUIRED = frozenset({
     "id", "vehicle_profile", "timezone", "weekdays", "departure_time",
     "charge_minutes", "current_a", "energy_kwh",
 })
-_OPTIONAL = frozenset({"enabled", "ambiguous_time", "exceptions"})
+_OPTIONAL = frozenset({"enabled", "ambiguous_time", "exceptions", "reserve_kwh"})
 
 
 def _aware_utc(value: object) -> datetime:
@@ -121,6 +122,7 @@ class WeeklyOccurrence:
     energy_kwh: float
     status: str
     reason: str | None
+    reserve_kwh: float = 0.0
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -133,6 +135,7 @@ class WeeklyOccurrence:
             "finish_at": self.finish_at.isoformat() if self.finish_at is not None else None,
             "current_a": self.current_a,
             "energy_kwh": self.energy_kwh,
+            **({"reserve_kwh": self.reserve_kwh} if self.reserve_kwh else {}),
             "status": self.status,
             "reason": self.reason,
         }
@@ -157,6 +160,7 @@ class WeeklyOccurrence:
             "finish_at": self.finish_at.isoformat(),
             "current_a": self.current_a,
             "energy_kwh": self.energy_kwh,
+            **({"reserve_kwh": self.reserve_kwh} if self.reserve_kwh else {}),
         }
 
 
@@ -180,6 +184,7 @@ class WeeklyPlan:
     enabled: bool
     ambiguous_time: str
     exceptions: tuple[WeeklyException, ...]
+    reserve_kwh: float = 0.0
 
     @classmethod
     def parse(cls, payload: object) -> WeeklyPlan:
@@ -210,6 +215,7 @@ class WeeklyPlan:
         energy.set_target(payload["energy_kwh"], 0.0)
         if energy.target_kwh == 0:
             raise ValueError("weekly energy ceiling must be positive")
+        reserve = reserve_energy(payload.get("reserve_kwh", 0), energy.target_kwh)
         enabled = payload.get("enabled", True)
         if type(enabled) is not bool:
             raise ValueError("weekly enabled must be a boolean")
@@ -233,7 +239,7 @@ class WeeklyPlan:
         return cls(
             identifier, profile, zone.key, tuple(sorted(days)), departure, duration,
             float(current), energy.target_kwh, enabled, ambiguous,
-            tuple(sorted(exceptions, key=lambda item: item.day)),
+            tuple(sorted(exceptions, key=lambda item: item.day)), reserve,
         )
 
     def snapshot(self) -> dict[str, Any]:
@@ -246,6 +252,7 @@ class WeeklyPlan:
             "charge_minutes": self.charge_minutes,
             "current_a": self.current_a,
             "energy_kwh": self.energy_kwh,
+            **({"reserve_kwh": self.reserve_kwh} if self.reserve_kwh else {}),
             "enabled": self.enabled,
             "ambiguous_time": self.ambiguous_time,
             "exceptions": [
@@ -317,5 +324,5 @@ class WeeklyPlan:
         identifier = hashlib.sha256(material.encode()).hexdigest()[:32]
         return WeeklyOccurrence(
             identifier, self.vehicle_profile, day, clock, self.timezone,
-            start, finish, self.current_a, self.energy_kwh, status, reason,
+            start, finish, self.current_a, self.energy_kwh, status, reason, self.reserve_kwh,
         )

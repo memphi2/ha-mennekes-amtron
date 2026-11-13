@@ -3,6 +3,7 @@
   "use strict";
   const de = (navigator.language || "").toLowerCase().startsWith("de");
   const words = {
+    reserve:["Immediate reserve per departure (kWh)","Sofortreserve je Abfahrt (kWh)"], reserve_hint:["Charge this portion immediately when each order is accepted, then return to its time window. Included in the total ceiling. Zero disables; AC energy, not a battery percentage.","Diese Teilmenge bei Annahme jedes Auftrags sofort laden, danach zum Zeitfenster zurückkehren. In der Gesamtobergrenze enthalten. Null deaktiviert; AC-Energie, kein Batterie-Prozentwert."],
     overview:["Overview","Übersicht"], jobs:["Charging jobs","Ladeaufträge"], guest:["Guest charging","Gastladen"], title:["Weekly plans","Wochenpläne"],
     intro:["Save a recipe, inspect its dates, then confirm the vehicle for this connection.","Plan speichern, Termine prüfen und das Fahrzeug für diesen Steckvorgang bestätigen."],
     loading:["Loading…","Wird geladen…"], activation:["Current activation","Aktuelle Aktivierung"], stop:["Stop weekly automation","Wochenautomatik stoppen"],
@@ -65,8 +66,8 @@
   }
   function fill(recipe) {
     loadedRecipe = JSON.stringify(recipe);
-    for (const id of ["vehicle_profile","timezone","departure_time","charge_minutes","current_a","energy_kwh","ambiguous_time"]) {
-      el(id).value = recipe ? recipe[id] : ({vehicle_profile:"",timezone:"Europe/Berlin",departure_time:"07:40",charge_minutes:240,current_a:6,energy_kwh:10,ambiguous_time:"earlier"})[id];
+    for (const id of ["vehicle_profile","timezone","departure_time","charge_minutes","current_a","energy_kwh","reserve_kwh","ambiguous_time"]) {
+      el(id).value = recipe ? (recipe[id] ?? (id === "reserve_kwh" ? 0 : "")) : ({vehicle_profile:"",timezone:"Europe/Berlin",departure_time:"07:40",charge_minutes:240,current_a:6,energy_kwh:10,reserve_kwh:0,ambiguous_time:"earlier"})[id];
     }
     dayInputs().forEach(node => { node.checked = (recipe?.weekdays || [0,3]).includes(Number(node.value)); });
     el("enabled").checked = recipe?.enabled ?? true;
@@ -118,6 +119,7 @@
       if(own===generation && visible()) { state=null; csrf=""; discard(); notice(`${t(error.message)}\n${t("unconfirmed")}`,true); }
     } finally { clearTimeout(timeout); busy=false; if(own===generation) controller=null; controls(); schedule(); }
   }
+  const reserveText = value => value.reserve_kwh ? ` · ${t("reserve")}: ${value.reserve_kwh}` : "";
   function inputRecipe() {
     if(!el("weekly_form").reportValidity()) throw new Error("invalid");
     const weekdays=dayInputs().filter(n=>n.checked).map(n=>Number(n.value));
@@ -128,8 +130,10 @@
       return {date:match[1],departure_time:match[2]==="skip" ? null : match[2]};
     });
     if(exceptions.length>32) throw new Error("invalid");
+    const reserve=Number(el("reserve_kwh").value);
+    if(!Number.isFinite(reserve)||reserve<0||reserve>Number(el("energy_kwh").value)||Math.abs(reserve*10-Math.round(reserve*10))>1e-8)throw new Error("invalid");
     const id=selected || crypto.randomUUID().replaceAll("-","");
-    return {id,vehicle_profile:el("vehicle_profile").value,timezone:el("timezone").value,weekdays,
+    return {id,...(reserve>0 ? {reserve_kwh:reserve} : {}),vehicle_profile:el("vehicle_profile").value,timezone:el("timezone").value,weekdays,
             departure_time:el("departure_time").value,charge_minutes:Number(el("charge_minutes").value),
             current_a:Number(el("current_a").value),energy_kwh:Number(el("energy_kwh").value),
             ambiguous_time:el("ambiguous_time").value,enabled:el("enabled").checked,exceptions};
@@ -142,7 +146,7 @@
     let recipe; try {recipe=inputRecipe();} catch (_) {notice(t("invalid"),true);return;}
     void post({action:"preview_plan",revision:state.revision,plan:recipe},data=>{
       planProposal=data;el("weekly_preview").hidden=false;
-      el("plan_summary").textContent=`${data.plan.vehicle_profile} · ${data.plan.current_a} A · ${data.plan.energy_kwh} kWh\n${data.plan.timezone} · ${data.plan.charge_minutes} min`;
+      el("plan_summary").textContent=`${data.plan.vehicle_profile} · ${data.plan.current_a} A · ${data.plan.energy_kwh} kWh${reserveText(data.plan)}\n${data.plan.timezone} · ${data.plan.charge_minutes} min`;
       el("plan_warning").textContent=data.will_stop_active ? t("edit_stop") : ""; rows(data.upcoming);
     });
   });
@@ -152,7 +156,7 @@
     const saved=plan(); if(!state || !saved || dirty || !el("confirm_vehicle").checked)return;
     void post({action:"preview_activation",revision:state.revision,scope:state.scope,plan_id:saved.id,vehicle_profile:saved.vehicle_profile},data=>{
       activation=data;el("activation_preview").hidden=false;
-      el("activation_summary").textContent=`${data.vehicle_profile}\n${t("first")}: ${stamp(data.request.finish_at)}\n${data.request.current_a} A · ${data.request.energy_kwh} kWh\n${t("until")}: ${stamp(data.active_until)}`;
+      el("activation_summary").textContent=`${data.vehicle_profile}\n${t("first")}: ${stamp(data.request.finish_at)}\n${data.request.current_a} A · ${data.request.energy_kwh} kWh${reserveText(data.request)}\n${t("until")}: ${stamp(data.active_until)}`;
     });
   });
   el("activate").addEventListener("click",()=>{if(!activation)return;const proposal=activation;void post({action:"activate",proposal,confirm:true},data=>{discard();receive(data);notice(t("active"));});});

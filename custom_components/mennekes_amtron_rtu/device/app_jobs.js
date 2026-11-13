@@ -4,6 +4,7 @@
   const de = (navigator.language || "").toLowerCase().startsWith("de");
   document.documentElement.lang = de ? "de" : "en";
   const words = {
+    reserve:["Immediate reserve, kWh","Sofortreserve in kWh"], reserve_hint:["Charge this portion now, then wait for the planned start. Included in the total energy ceiling, not extra. Zero disables; AC meter energy, not battery percentage.","Diese Teilmenge jetzt laden, danach auf den geplanten Start warten. In der Gesamtobergrenze enthalten, nicht zusätzlich. Null deaktiviert; AC-Zählerenergie, kein Batterie-Prozentwert."], reserve_done:["reserve reached","Reserve erreicht"], reserve_pending:["reserve not reached yet","Reserve noch nicht erreicht"],
     overview:["Overview","Übersicht"], jobs:["Charging jobs","Ladeaufträge"], runtime:["Runtime","Betrieb"], registers:["Registers","Register"], connection:["Connection","Verbindung"],
     intro:["A local time window with an additional-energy ceiling. Existing release and battery limits remain in force.","Ein lokales Zeitfenster mit zusätzlicher Energieobergrenze. Bestehende Freigabe- und Batteriegrenzen bleiben wirksam."],
     active:["Current order","Aktueller Auftrag"], stop:["Stop automation for this connection","Automatik für diesen Anschluss stoppen"], clear:["Clear stopped order without resuming","Gestoppten Auftrag löschen – ohne Ladestart"],
@@ -30,6 +31,7 @@
   let state = null, proposal = null, busy = false, timer = null, readAbort = null, generation = 0, hidden = false;
   el("job_start").value = local(new Date(Date.now()+60000));
   el("job_finish").value = local(new Date(Date.now()+8*3600000));
+  const reserveText = job => job?.reserve_kwh ? ` · ${t("reserve")}: ${job.reserve_kwh}${typeof job.reserve_reached === "boolean" ? ` (${t(job.reserve_reached ? "reserve_done" : "reserve_pending")})` : ""}` : "";
   function invalidate() { proposal=null; el("job_confirmation").hidden=true; }
   function render() {
     const good = state?.schema === 1 && state.ready && !state.storage_error;
@@ -45,7 +47,7 @@
     const job=state?.job;
     el("job_state").textContent=job ? t(job.state) : t("no_job");
     el("job_detail").textContent=job ? `${t(job.reason)} · ${date(job.start_at)} → ${date(job.finish_at)} · ${job.current_a} A${job.scope_ended ? ` · ${t("end_scope")}` : ""}` : "";
-    el("job_progress").textContent=job ? `${job.delivered_kwh == null ? "—" : Number(job.delivered_kwh).toLocaleString(undefined,{maximumFractionDigits:2})} / ${job.energy_kwh} kWh${state.action_error ? ` · ${t(state.action_error)}` : ""}` : "";
+    el("job_progress").textContent=job ? `${job.delivered_kwh == null ? "—" : Number(job.delivered_kwh).toLocaleString(undefined,{maximumFractionDigits:2})} / ${job.energy_kwh} kWh${reserveText(job)}${state.action_error ? ` · ${t(state.action_error)}` : ""}` : "";
     el("job_boost_until").textContent=job?.boost_until ? `${t("boost_until")} ${date(job.boost_until)}` : "";
   }
   function suspend() { generation++; clearTimeout(timer); timer=null; readAbort?.abort(); readAbort=null; }
@@ -84,8 +86,11 @@
     const start=new Date(el("job_start").value), finish=new Date(el("job_finish").value);
     if(!Number.isFinite(start.getTime())||!Number.isFinite(finish.getTime())||finish<=start){notice(t("invalid_job_request"));return;}
     const request={id:crypto.randomUUID().replaceAll("-",""),start_at:start.toISOString(),finish_at:finish.toISOString(),current_a:Number(el("job_current").value),energy_kwh:Number(el("job_energy").value)};
+    const reserve=Number(el("job_reserve")?.value || 0);
+    if(!Number.isFinite(reserve)||reserve<0||reserve>request.energy_kwh||Math.abs(reserve*10-Math.round(reserve*10))>1e-8){notice(t("invalid_job_request"));return;}
+    if(reserve>0)request.reserve_kwh=reserve;
     const result=await post({action:"preview",revision:state.revision,scope:state.scope,request});
-    if(result?.schema===1&&result.request){proposal={...result,kind:"create"};el("job_summary").textContent=`${date(result.request.start_at)} → ${date(result.request.finish_at)} · ${result.request.current_a} A · ${result.request.energy_kwh} kWh`;el("job_confirmation").hidden=false;render();}else{state=null;render();}
+    if(result?.schema===1&&result.request){proposal={...result,kind:"create"};el("job_summary").textContent=`${date(result.request.start_at)} → ${date(result.request.finish_at)} · ${result.request.current_a} A · ${result.request.energy_kwh} kWh${reserveText(result.request)}`;el("job_confirmation").hidden=false;render();}else{state=null;render();}
     timer=setTimeout(read,5000);
   });
   el("job_boost_preview").addEventListener("click",async()=>{

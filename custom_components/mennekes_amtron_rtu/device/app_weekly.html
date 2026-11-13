@@ -45,6 +45,9 @@
           <div><label for="current_a" data-text="current">Maximum current (A)</label><input id="current_a" type="number" min="6" max="32" step="0.1" value="6" required></div>
           <div><label for="energy_kwh" data-text="energy">Energy ceiling per departure (kWh)</label><input id="energy_kwh" type="number" min="0.1" max="1000" step="0.1" value="10" required></div>
         </div>
+        <label for="reserve_kwh" data-text="reserve">Immediate reserve per departure (kWh)</label>
+        <input id="reserve_kwh" type="number" min="0" max="1000" step="0.1" value="0" aria-describedby="reserve_hint" required>
+        <p id="reserve_hint" class="hint" data-text="reserve_hint">Charge this portion immediately when each order is accepted, then return to its time window. Included in the total ceiling. Zero disables; AC energy, not a battery percentage.</p>
         <label for="ambiguous_time" data-text="fold">Repeated clock time</label>
         <select id="ambiguous_time"><option value="earlier" data-text="earlier">Earlier occurrence</option><option value="later" data-text="later">Later occurrence</option></select>
         <label for="exceptions" data-text="exceptions">Date exceptions</label>

@@ -114,7 +114,7 @@ class ChargeJobController:
             or not sample.available or sample.present is not True
             or sample.scope != job.binding or not sample.meter_fresh
             or sample.independent_stop or not sample.permitted or self._vehicle_conflict(sample)
-            or not job.allows_at(sample.now)
+            or not job.allows_at(sample.now, total_kwh=sample.total_kwh)
         )
 
     def current_policy(self, owner: str | None, enabling: bool) -> bool | None:
@@ -189,6 +189,7 @@ class ChargeJobController:
             "finish_at": job.finish_at.isoformat(), "current_a": job.current_a,
             "energy_kwh": job.energy.target_kwh,
             **({"kind": job.kind} if job.kind != "scheduled" else {}),
+            **({"reserve_kwh": job.reserve.target_kwh} if job.reserve is not None else {}),
         }
 
     def _candidate(self, request: object, revision: object, scope: object) -> ChargeJob:
@@ -345,6 +346,7 @@ class ChargeJobController:
                 **self._request(job), "state": job.state, "reason": job.reason,
                 "scope_ended": job.scope_ended, "delivered_kwh": progress,
                 "boost_until": job.boost_until.isoformat() if job.boost_until is not None else None,
+                **({"reserve_reached": job.reserve.reached} if job.reserve is not None else {}),
             }
         return {
             "schema": 1, "revision": self.revision, "scope": sample.scope,

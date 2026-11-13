@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from .charge_reserve import ChargeReserve
 from .energy_goal import EnergyGoal
 
 _JOB_ID = re.compile(r"[0-9a-f]{32}")
@@ -68,12 +69,13 @@ class ChargeJob:
     _last_now: datetime | None = None
     boost_until: datetime | None = None
     kind: str = "scheduled"
+    reserve: ChargeReserve | None = None
 
     @classmethod
     def create(cls, request: object, *, binding: str, total_kwh: object, now: datetime) -> ChargeJob:
         """Validate all inputs before arming the energy ceiling."""
         fields = {"id", "start_at", "finish_at", "current_a", "energy_kwh"}
-        if not isinstance(request, dict) or request.keys() not in (fields, fields | {"kind"}):
+        if not isinstance(request, dict) or request.keys() - {"kind", "reserve_kwh"} != fields:
             raise ValueError("invalid job request fields")
         kind = request.get("kind", "scheduled")
         if not isinstance(kind, str) or kind not in ("scheduled", "guest"):
@@ -94,7 +96,8 @@ class ChargeJob:
         energy.set_target(request["energy_kwh"], total_kwh)
         if energy.target_kwh == 0:
             raise ValueError("job energy ceiling must be positive")
-        return cls(identifier, binding, start, finish, current, energy, _last_now=now, kind=kind)
+        reserve = ChargeReserve.create(request.get("reserve_kwh", 0), ceiling=energy.target_kwh, kind=kind, baseline=energy.baseline_kwh)
+        return cls(identifier, binding, start, finish, current, energy, _last_now=now, kind=kind, reserve=reserve)
 
     @property
     def terminal(self) -> bool:
@@ -105,10 +108,11 @@ class ChargeJob:
         """A job outside its charging state supplies no resume permission."""
         return self.state != "charging"
 
-    def allows_at(self, now: datetime) -> bool:
-        """A boost opens only an earlier part of the same bounded order."""
+    def allows_at(self, now: datetime, *, total_kwh: object = None) -> bool:
+        """Reserve and boost open only earlier portions of the same ceiling."""
         return not self.terminal and now < self.finish_at and (
             now >= self.start_at or (self.boost_until is not None and now < self.boost_until)
+            or (self.reserve is not None and self.reserve.needed(total_kwh, self.energy.baseline_kwh))
         )
 
     def set_boost(self, until: object, *, now: datetime) -> None:
@@ -162,6 +166,8 @@ class ChargeJob:
             self.interrupt("independent_stop")
         else:
             self.energy.observe(total_kwh, fresh=meter_fresh)
+            if self.reserve is not None:
+                self.reserve.observe(self.energy, total_kwh, fresh=meter_fresh)
             if self.energy.status == "reached":
                 self.state, self.reason = "reached", "energy_reached"
             elif self.energy.status == "meter_reset":
@@ -170,7 +176,7 @@ class ChargeJob:
                 self.state, self.reason = "finished", "window_ended"
             elif self.energy.status == "meter_unavailable":
                 self.state, self.reason = "waiting_meter", "meter_unavailable"
-            elif not self.allows_at(now):
+            elif not self.allows_at(now, total_kwh=total_kwh):
                 self.state, self.reason = "scheduled", "scheduled"
             else:
                 self.state, self.reason = "charging", "charging"
@@ -185,12 +191,13 @@ class ChargeJob:
             "state": self.state, "reason": self.reason, "scope_ended": self.scope_ended,
             **({"boost_until": self.boost_until.isoformat()} if self.boost_until is not None else {}),
             **({"kind": self.kind} if self.kind != "scheduled" else {}),
+            **({"reserve": self.reserve.snapshot()} if self.reserve is not None else {}),
         }
 
     @classmethod
     def restore(cls, raw: object, *, restarted: bool = True) -> ChargeJob:
         """Reject corrupt state rather than silently recovering a resume grant."""
-        if not isinstance(raw, dict) or raw.keys() - {"boost_until", "kind"} != _FIELDS:
+        if not isinstance(raw, dict) or raw.keys() - {"boost_until", "kind", "reserve"} != _FIELDS:
             raise ValueError("invalid saved job fields")
         kind = raw.get("kind", "scheduled")
         if not isinstance(kind, str) or kind not in ("scheduled", "guest"):
@@ -223,6 +230,8 @@ class ChargeJob:
         ):
             raise ValueError("inconsistent saved job state")
         job = cls(identifier, binding, start, finish, _current(raw["current_a"]), energy, state, reason, raw["scope_ended"], kind=kind)
+        if "reserve" in raw:
+            job.reserve = ChargeReserve.restore(raw["reserve"], ceiling=energy.target_kwh, kind=kind, energy_status=energy.status, baseline=energy.baseline_kwh)
         if "boost_until" in raw:
             end = job_time(raw["boost_until"])
             if job.kind == "guest" or job.terminal or job.scope_ended or end > job.start_at:
