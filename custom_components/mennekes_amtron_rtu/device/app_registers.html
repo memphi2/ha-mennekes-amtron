@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMTRON · Registers</title><link rel="stylesheet" href="./app_settings.css">
+<script src="./app_registers.js" defer></script></head>
+<body><main>
+<p class="eyebrow">Mennekes Amtron · Service</p>
+<nav class="overview-nav" aria-label="Service"><a href="./" data-text="overview">Overview</a><a href="./connection" data-text="connection">Connection</a><a href="./registers" aria-current="page" data-text="registers">Registers</a></nav>
+<h1 data-text="registers">Registers</h1>
+<p class="hint" data-text="explanation">Passive observations only. No extra Modbus transactions. Last valid values keep their original timestamps after failures.</p>
+<p id="register_notice" role="status" aria-live="polite"></p>
+<label for="register_search" data-text="search">Filter by address, name or value</label><input id="register_search" type="search" autocomplete="off">
+<div class="columns"><div><label for="register_status" data-text="status">Quality</label><select id="register_status"><option value="all" data-text="all">All</option><option value="problems" data-text="problems">Problems</option><option value="ok">OK</option><option value="degraded">Degraded</option><option value="error">Error</option><option value="unknown">Unknown</option><option value="unsupported">Unsupported</option><option value="write_only">Write only</option></select></div>
+<div><label for="register_order" data-text="sort">Sort</label><select id="register_order"><option value="address" data-text="address">Address</option><option value="status" data-text="status">Quality</option><option value="updated_at" data-text="updated">Last successful read</option></select></div></div>
+<label class="check"><input id="register_pause" type="checkbox"><span data-text="freeze">Freeze display (bus polling continues)</span></label>
+<p id="register_summary" class="hint"></p>
+<div class="debug-scroll modbus-debug" tabindex="0" role="region" aria-label="Register table"><table><thead><tr><th data-text="address">Address</th><th data-text="name">Register / type</th><th data-text="raw">Raw words</th><th data-text="value">Decoded / translated</th><th data-text="updated">Last successful read</th><th data-text="attempt">Last attempt</th><th data-text="status">Quality</th></tr></thead><tbody id="register_rows"></tbody></table></div>
+<p class="hint" data-text="quality">OK describes a successful read, not a fault-free wallbox. Writes are acknowledgements, not readbacks. Serial number redacted.</p>
+</main></body></html>
