@@ -206,6 +206,7 @@ class DevicePoller:
             connection_failures=self._client.link_quality.failures,
             connection_retries=self._client.link_quality.retries,
             energy_read="energy_total" in read or "energy_total" in stale,
+            session_read="session_duration" in read,
             energy_goal_generation=goal_generation,
         )
 

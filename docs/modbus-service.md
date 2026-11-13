@@ -195,8 +195,9 @@ register-write guards and heartbeat remain active.
 | App, host, power, USB or LAN/gateway connection fails | The heartbeat can stop. The wallbox's configured fallback applies. |
 | HA reconnects | HA reads the current app state; it does not restore old commands. |
 
-An app/service restart cancels pending commands and interrupts a running
-charging job; it does not cancel an already applied pause. HA Core restarts leave the independent
+An app/service restart cancels pending commands and pauses a running charging
+job, which continues only if the wallbox proves the car stayed plugged in; it
+does not cancel an already applied pause. HA Core restarts leave the independent
 service's queue running.
 
 Configure and understand the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
@@ -236,8 +237,10 @@ Update the app and the integration together. **Update the app first**, wait
 until it has started, then update the integration and restart Core. Use **Check
 for updates** in the app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
-**Updating the app briefly interrupts its heartbeat** and interrupts a running
-charging job. An existing app updates in place with its data intact.
+**Updating the app briefly interrupts its heartbeat** and pauses a running
+charging job until the wallbox proves the same plug-in; see
+[after an app restart](app-guide.md#after-an-app-restart-or-a-connection-loss).
+An existing app updates in place with its data intact.
 
 Stable releases use `#apps`; prereleases use `#apps-beta`, which also
 receives stable releases. Switching between stable and beta catalogs creates a different app in Supervisor.

@@ -136,13 +136,15 @@ While an order runs, HA cannot change the current, resume or switch phases; it
 reports that a charging job of the app controls charging. Pausing, switching the
 release off or locking in HA stops the order. When an order ends, the app pauses
 charging; once the wallbox confirms the pause, HA controls charging again and
-you can resume there. Unplugging, an app restart or a wallbox that is unreadable
-for more than a minute interrupts an order; it never restarts by itself.
+you can resume there. Unplugging interrupts an order. After an app restart or a
+wallbox that was unreadable for more than a minute, the order stays paused and
+continues only if the wallbox proves the car stayed plugged in; otherwise it is
+interrupted and HA controls charging again. It never restarts by itself.
 
-A weekly plan creates one such job per departure. Between departures the car
-stays paused for the next one; after the last departure, or when the plan is
-stopped, HA controls charging again. An activation ends at unplugging, an app
-restart or after seven days at the latest. See
+A weekly plan creates one such job per departure, each when its window opens.
+Between departures HA controls charging, for example for PV surplus. An
+activation ends at unplugging, an app restart or after seven days at the latest.
+See
 [the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/app-guide.md#weekly-plans).
 
 ## Daily use

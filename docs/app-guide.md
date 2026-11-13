@@ -100,8 +100,8 @@ The reserve is part of the amount, not extra, and 0 switches it off.
 
 The reserve is energy measured by the wallbox meter, not a battery percentage
 or driving range. It never overrides a stop, a switched-off release or a reached
-target. Once reached, it stays reached, also after an app restart interrupted
-the order. Guest orders have no reserve.
+target. Once reached, it stays reached, also across an app restart. Guest
+orders have no reserve.
 
 ### Early start (boost)
 
@@ -121,13 +121,29 @@ the boost. **Stop automation for this connection** ends the whole order.
   from the page. It never starts charging. While the pause is not yet
   confirmed, clearing needs a confirmed pause or an unplugged car.
 
+### After an app restart or a connection loss
+
+When the app restarts or the wallbox is unreadable for more than a minute, the
+order pauses charging and shows **Interrupted; checking whether the same plug-in
+continues**. It continues by itself only when the wallbox proves that the car
+stayed plugged in meanwhile:
+
+- the wallbox's session duration kept running with the clock (within two
+  minutes)
+- its session counter is unchanged and its session energy did not start over
+- the car is still plugged in and the same vehicle is selected in Home Assistant
+
+If any of this is missing or does not hold within a minute of the wallbox being
+readable again, the order is interrupted as below. A wallbox without a session
+counter (register layout before v01.02) cannot prove it; there the order is
+always interrupted.
+
 ### When an order is interrupted
 
 The app ends an order and does not restart it by itself when:
 
 - the car is unplugged; an order never carries over to the next car
-- the wallbox or the plug state is unreadable for more than a minute
-- the app restarts
+- the same plug-in could not be proven after an app restart or a connection loss
 - another limit requires a stop, for example a reached target
 - the clock jumps backwards or the meter is reset
 
@@ -176,16 +192,27 @@ plans are stored, one per vehicle profile.
    the selected vehicle is connected**, select **Preview activation** and
    **Confirm activation** within one minute.
 
-The activation creates a charging job for the next departure. When it ends, the
-app replaces it with the job for the following departure; the car stays paused
-in between, so Home Assistant cannot resume meanwhile. After the last departure
-within the activation, control returns to Home Assistant as for any finished
-order.
+The activation creates a charging job for the next departure right away, so an
+immediate reserve charges at once. When that job ends, control returns to Home
+Assistant as for any finished order: PV or other automations may charge until
+the next departure's window opens. Then the app creates the next job, which
+takes over charging, also from a car Home Assistant is charging. It waits while
+the meter is not current, a command is still queued, the release is off or
+another limit requires a stop. Later departures therefore have no separate
+reserve.
+
+Between departures, pausing, switching off the release or locking in Home
+Assistant does not end the plan; it only keeps the next job from starting while
+it lasts. A new order on **Charging jobs** or **Guest charging** ends the plan.
 
 An activation covers only this connection and ends after seven days at the
-latest. Unplugging, an app restart, a stop or clear on **Charging jobs**,
-editing or removing the active plan, **Stop weekly automation** or another limit
-that requires a stop all end it; it never restarts by itself. Each departure
+latest. Unplugging, an app restart, a wallbox unreadable for more than a minute
+between departures, a stop or clear on **Charging jobs**, editing or removing
+the active plan, **Stop weekly automation** or another limit that stops a
+running job all end it; it never restarts by itself. A running job of the plan
+continues after an app restart only as described under
+[After an app restart](#after-an-app-restart-or-a-connection-loss), and then
+without the plan. Each departure
 date runs at most once, also after an edit or a restart. A local time that does
 not exist on a clock change is shown as invalid instead of being moved; for a
 repeated time, choose the earlier or later occurrence.
@@ -242,8 +269,9 @@ extra bus traffic and hides serial numbers and login traffic. See
 
 - The pages show what the app knows. Vehicle identity, current battery level and
   the departure plan live in Home Assistant and are not shown here.
-- An app restart interrupts a running order. The app pauses charging after the
-  restart and then hands control back to Home Assistant.
+- An app restart pauses a running order. It continues only when the wallbox
+  proves the same plug-in; otherwise the app hands control back to Home
+  Assistant.
 - A stop you request is shown as requested until the wallbox confirms it. Check
   the overview and its command results.
 - The browser never repeats an order by itself. If a reply is lost, reload the

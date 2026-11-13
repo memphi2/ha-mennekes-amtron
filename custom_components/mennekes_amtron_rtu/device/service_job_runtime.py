@@ -12,7 +12,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from .charge_job import UNKNOWN_GRACE
+from .charge_job import UNKNOWN_GRACE, SessionMark
 from .charge_job_controller import ChargeJobController, JobInputs
 from .charge_job_store import ChargeJobStore
 from .control import AmtronControl, ServiceChargePolicy
@@ -27,12 +27,15 @@ _COMPETING = frozenset({"set_current", "resume", "timed_current", "solar", "phas
 
 
 class JobModbusService(ConsoleModbusService):
-    """Keep jobs local across HA disconnects; never assume continuity on boot."""
+    """Keep jobs local across HA disconnects; continuity needs wallbox proof."""
 
     jobs: ChargeJobController | None = None
     _job_scope: str | None = None
     # Since when the plug state is unreadable; a short gap keeps the scope.
     _job_unknown_since: float | None = None
+    # This connection's session clock and energy with their read time, and
+    # the lifetime session counter; cleared with the scope.
+    _job_session: dict[str, Any] | None = None
 
     def _configure_control(self, control: AmtronControl) -> None:
         identity = self.identity.serial_number or f"{self.config.connection.port}:{self.config.connection.device_id}"
@@ -45,6 +48,7 @@ class JobModbusService(ConsoleModbusService):
     async def _initialize(self) -> None:
         self._job_scope = None
         self._job_unknown_since = None
+        self._job_session = None
         await super()._initialize()
         if self.jobs is None:
             raise RuntimeError("job controller was not configured")
@@ -69,13 +73,18 @@ class JobModbusService(ConsoleModbusService):
             and isinstance(stamp, (int, float)) and not isinstance(stamp, bool)
             and 0 <= now.timestamp() - stamp <= max(90, self.config.scan_interval * 3)
         )
-        scope = None
+        scope = session = None
         independent_stop = False
         if control is not None:
             if self._job_scope is not None:
-                scope = hashlib.sha256(
-                    f"{self._job_scope}|{control.soc_goal.source}|{control.plug_charge['policy']}".encode()
-                ).hexdigest()
+                selection = f"{control.soc_goal.source}|{control.plug_charge['policy']}"
+                scope = hashlib.sha256(f"{self._job_scope}|{selection}".encode()).hexdigest()
+                reading = self._job_session
+                if available and reading is not None and reading.keys() >= {"at", "duration_s", "energy_kwh", "count"}:
+                    session = SessionMark(
+                        reading["at"], reading["duration_s"], reading["energy_kwh"], reading["count"],
+                        hashlib.sha256(selection.encode()).hexdigest(),
+                    )
             independent_stop = control.goal_stop_requested
         current = self.data.fresh("charging_current_ems")
         valid_current = (
@@ -98,11 +107,28 @@ class JobModbusService(ConsoleModbusService):
             control.max_charging_current if control is not None else 6,
             control is not None and control.pending_action is not None,
             vehicle_target_active=control is not None and control.soc_goal.target_percent > 0,
+            session=session,
         )
 
+    def _note_session(self) -> None:
+        """Keep the newest wallbox reading of this connection's plug-in."""
+        data, reading = self.data, dict(self._job_session or {})
+        duration, energy = data.fresh("session_duration"), data.fresh("session_energy")
+        if (
+            data.session_read and type(duration) is int and duration >= 0
+            and isinstance(energy, float) and math.isfinite(energy) and energy >= 0
+        ):
+            reading.update(at=datetime.now(UTC), duration_s=duration, energy_kwh=energy)
+        count = data.fresh("sessions_total")
+        if data.energy_read and type(count) is int and count >= 0:
+            reading["count"] = count
+        self._job_session = reading
+
     async def refresh(self) -> None:
+        polled = False
         try:
             await super().refresh()
+            polled = True
         finally:
             present = snapshot_vehicle_connected(
                 self.data.fresh, self.identity.layout_version,
@@ -116,8 +142,13 @@ class JobModbusService(ConsoleModbusService):
             elif self._job_unknown_since is None:
                 self._job_unknown_since = time.monotonic()
             elif time.monotonic() - self._job_unknown_since >= UNKNOWN_GRACE.total_seconds():
-                # Only a lasting gap could hide an unplug; a new car needs a new order.
+                # Only a lasting gap could hide an unplug; a new car needs
+                # a new order or the wallbox's proof of the same plug-in.
                 self._job_scope = None
+            if self._job_scope is None:
+                self._job_session = None
+            elif polled:
+                self._note_session()
             if self.jobs is not None:
                 self.jobs.observe()
 

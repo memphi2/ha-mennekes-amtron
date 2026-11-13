@@ -45,7 +45,7 @@
         </div>
         <label for="reserve_kwh" data-text="reserve">Immediate reserve per departure (kWh)</label>
         <input id="reserve_kwh" type="number" min="0" max="1000" step="0.1" value="0" aria-describedby="reserve_hint" required>
-        <p id="reserve_hint" class="hint" data-text="reserve_hint">Charge this portion immediately when each order is accepted, then return to its time window. Included in the total ceiling. Zero disables; AC energy, not a battery percentage.</p>
+        <p id="reserve_hint" class="hint" data-text="reserve_hint">Charge this portion immediately when the plan is activated, then return to the time window. Later departures start at their own window. Included in the total ceiling. Zero disables; AC energy, not a battery percentage.</p>
         <label for="ambiguous_time" data-text="fold">Repeated clock time</label>
         <select id="ambiguous_time"><option value="earlier" data-text="earlier">Earlier occurrence</option><option value="later" data-text="later">Later occurrence</option></select>
         <label for="exceptions" data-text="exceptions">Date exceptions</label>
@@ -63,7 +63,7 @@
   </section>
   <section class="overview-card">
     <h2 data-text="activate_title">Activate saved plan for this vehicle</h2>
-    <p class="hint" data-text="consent_hint">Recurrence applies only to this connection, for at most seven days. Each departure has its own energy ceiling. Restart, unplugging, a manual stop or editing the active recipe ends it.</p>
+    <p class="hint" data-text="consent_hint">Recurrence applies only to this connection, for at most seven days. Each departure has its own energy ceiling; between departures Home Assistant controls charging. Restart, unplugging, a manual stop or editing the active recipe ends it.</p>
     <label class="check"><input id="confirm_vehicle" type="checkbox"><span data-text="confirm_vehicle">I have checked that the selected vehicle is connected.</span></label>
     <button id="preview_activation" type="button" disabled data-text="activate_preview">Preview activation</button>
     <div id="activation_preview" hidden><p id="activation_summary"></p><button id="activate" type="button" data-text="activate">Confirm activation</button></div>

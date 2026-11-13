@@ -74,10 +74,20 @@ Update the app to 0.9.0b2 together with the integration.
   A job or weekly plan can charge an immediate reserve of its energy amount at
   once and then wait for the planned start (#67).
 - A finished, stopped or interrupted order hands control back to Home
-  Assistant once the wallbox confirms its pause; with a weekly plan, only after
-  its last departure. Charging stays paused until
+  Assistant once the wallbox confirms its pause. Charging stays paused until
   you resume it in Home Assistant; clearing the order is no longer needed, and
   a new order replaces a finished one.
+- Between weekly departures Home Assistant controls charging, for example for
+  PV surplus. The next departure's job is created when its window opens and
+  takes over then; pausing, release off or locking in Home Assistant meanwhile
+  no longer ends the plan. An immediate reserve applies to the first departure
+  only.
+- An app order survives an app restart or a wallbox unreadable for more than a
+  minute when the wallbox proves the same plug-in: its session duration kept
+  running, its session counter and the selected car are unchanged. Meanwhile
+  the order keeps charging paused; without proof within a minute it is
+  interrupted and hands control back. A weekly plan also survives a short
+  wallbox gap.
 - While an app order runs, Home Assistant says that a charging job of the app
   controls charging, instead of naming a charge target. The command results
   use the new reason `service_job`.

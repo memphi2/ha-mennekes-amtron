@@ -60,8 +60,8 @@ def request(*, future=False):
 
 
 @asynccontextmanager
-async def job_service(tmp_path, *, read_only=False):
-    transport = FakeModbusClient(device_bank(evse_state=2, charging_current=8))
+async def job_service(tmp_path, *, read_only=False, bank=None):
+    transport = FakeModbusClient(bank or device_bank(evse_state=2, charging_current=8))
     clock = [1000.0]
     client = MennekesModbusClient(SerialConfig("/dev/fake"), client_factory=lambda _: transport, monotonic=lambda: clock[0])
     service = JobModbusService(ServerConfig(client.config, TOKEN, read_only=read_only, current_cap=16), tmp_path / "intent.json", client=client)
@@ -399,4 +399,61 @@ def test_an_unforeseen_job_failure_does_not_stop_the_service(tmp_path, caplog):
         sleeping.assert_awaited_once_with(5)
         service.jobs = None
         await service.stop()
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("replugged", [False, True])
+def test_an_app_restart_continues_the_order_only_for_the_same_plug_in(tmp_path, replugged):
+    async def run():
+        bank = device_bank(evse_state=2, charging_current=8)
+        async with job_service(tmp_path, bank=bank) as (s, _transport, _clock):
+            await s.jobs.create(request(), revision=s.jobs.revision, scope=s.jobs.snapshot()["scope"])
+            assert s.jobs.job.state == "charging"
+            assert (s.jobs.job.session.duration_s, s.jobs.job.session.count) == (600, 42)
+            before = s.jobs.job.binding
+        if replugged:
+            # Unplugged and plugged in again while the app was away.
+            put(bank, R.SESSION_DURATION, 20)
+            put(bank, R.SESSIONS_TOTAL, 43)
+        async with job_service(tmp_path, bank=bank) as (s, transport, clock):
+            assert (s.jobs.job.state, s.jobs.job.reason) == ("suspended", "service_restarted")
+            clock[0] += 1000
+            await s.jobs.tick()
+            if replugged:
+                assert (s.jobs.job.state, s.jobs.job.reason) == ("interrupted", "service_restarted")
+                assert current_writes(transport)[-1] == 1
+                # Once the pause reads back, Home Assistant controls charging.
+                clock[0] += 10
+                await s.refresh()
+                await s.jobs.tick()
+                assert not s.jobs.holding
+            else:
+                assert s.jobs.job.state == "charging"
+                assert s.jobs.job.binding not in (before, None)
+                assert current_writes(transport)[-1] == 12
+    asyncio.run(run())
+
+
+def test_the_session_record_follows_only_fresh_reads_of_this_connection(tmp_path):
+    async def run():
+        async with job_service(tmp_path) as (s, transport, clock):
+            first = s.jobs.inputs().session
+            assert (first.duration_s, first.energy_kwh, first.count) == (600, 1.25, 42)
+            put(transport.bank, R.SESSION_DURATION, 660)
+            s._poller._active_read_at = None
+            clock[0] += 10
+            await s.refresh()
+            assert s.jobs.inputs().session.duration_s == 660
+            assert s.jobs.inputs().session.at > first.at
+            # A failed poll carries nothing forward under a new read time.
+            with patch.object(s._poller, "async_poll", AsyncMock(side_effect=DeviceError("service_unavailable"))), pytest.raises(DeviceError):
+                await s.refresh()
+            assert s._job_session["duration_s"] == 660
+            transport.bank[R.EVSE_STATE.address] = 1
+            transport.bank[R.CP_STATE.address] = 10
+            s._poller._active_read_at = s._poller._slow_read_at = None
+            clock[0] += 10
+            await s.refresh()
+            assert s.jobs.inputs().session is None
+            assert s._job_session is None
     asyncio.run(run())

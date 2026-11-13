@@ -343,7 +343,8 @@ most 4 KiB, reject query strings and extra fields, and never retry by themselves
 
 `GET` returns the current order, a `revision` and the connection `scope`. The
 scope is an opaque token for the current physical connection, not a vehicle
-identifier; it changes when the car is unplugged or the service restarts. Every
+identifier; it changes when the car is unplugged, the wallbox is unreadable for
+more than a minute or the service restarts. Every
 `POST` names an `action`:
 
 | Action | Fields besides `action` | Effect |
@@ -372,7 +373,9 @@ scope), `job_exists`, `job_not_permitted`, `job_preview_expired`,
 `job_current_exceeds_cap`, `guest_vehicle_target_active`,
 `job_clear_requires_pause` or `job_storage_unavailable`; malformed input returns
 400 with `invalid_job_request`. `job.state` is the order's intent, not a measured
-vehicle state.
+vehicle state: `scheduled`, `charging`, `waiting_meter`, `suspended`, or one of
+the final states `reached`, `finished`, `stopped` and `interrupted`; `job.reason`
+names why.
 
 While an order holds the connected car (`job.holding` is `true`),
 `/v2/command` refuses commands that set the current, resume, switch phases or
@@ -381,8 +384,18 @@ release off and lock on stop the order first. When an order ends, the service
 pauses charging. Once the wallbox confirms the pause and the finished order is
 saved, `holding` turns `false` and commands work again; the finished order stays
 in `GET` until it is cleared or replaced by `create`. The order is saved in
-`/data/charge-job.json` before it may start charging; a service restart restores
-it as interrupted.
+`/data/charge-job.json` before it may start charging.
+
+A service restart or a lasting connection loss turns a running order into
+`suspended` (reason `service_restarted` or `connection_lost`). It keeps holding
+the car paused and continues on the new `scope` only when the wallbox's session
+duration kept pace with the clock within two minutes, its session counter and
+the selected vehicle are unchanged and its session energy did not start over.
+Otherwise, or without such proof within a minute of a readable wallbox, it
+becomes `interrupted` with the same reason. For this proof the saved order
+also holds the last session duration, session energy, session counter and a
+digest of the vehicle selection; that record is saved only with the order's own
+changes.
 
 ## Weekly plan API
 
@@ -400,11 +413,16 @@ dates, the active activation and the current job. Every `POST` names an
 | `activate` | `proposal`, `confirm` | Starts the activation within 60 seconds of the preview. Repeating it returns the outcome without extending it. |
 | `deactivate` | `revision`, `confirm` | Ends the activation and stops its job. |
 
+The first job is created on activation. Each later job is created when its
+window opens, replacing the finished one; until then the finished job has handed
+control back (`holding` is `false`).
+
 A `plan` has `id`, `vehicle_profile`, `timezone` (IANA), `weekdays` (Monday is
 0), `departure_time`, `charge_minutes`, `current_a`, `energy_kwh`,
 `ambiguous_time` (`earlier` or `later`), `enabled`, up to 32 `exceptions`
 (`date` with `departure_time` or `null` to skip) and an optional `reserve_kwh`.
-The activation itself is never saved; a service restart ends it. Each local
+The activation itself is never saved; a service restart ends it. A running job
+of the plan may then continue on its own as described above. Each local
 date is marked as used before its job is created, so a date never runs twice,
 also after an edit or restart. Plans and used dates are kept in
 `/data/weekly-plans.json`, at most 128 KiB.

@@ -40,8 +40,9 @@ class WeeklyController:
     """Persist at-most-once occurrence claims, never persist vehicle consent.
 
     One activation covers only the currently confirmed connection for at most
-    seven days. Recipe edits, manual stops, restart or uncertain connection end
-    it. A completed occurrence can hand off to the next one, never a stopped or
+    seven days. Recipe edits, manual stops, restart, unplugging or a lasting
+    connection gap end it. A completed occurrence hands control back to Home
+    Assistant; the next one starts at its own window, never after a stopped or
     interrupted occurrence. A failed/uncertain claim is not silently replayed.
     """
 
@@ -209,19 +210,14 @@ class WeeklyController:
         else:
             await self.jobs.successor(request, revision=job_revision, scope=consent.scope,
                                       predecessor=previous, stop_epoch=consent.stop_epoch)
-        # Only an order with a later departure keeps its pause once finished;
-        # the last one hands control back to Home Assistant.
-        later = self._next(self.book.plan(consent.plan_id), self.jobs.inputs().now, consent.expires)
-        self.jobs.successor_for = request["id"] if later is not None else None
         self.reason = "active"
         self._changed()
 
-    async def _disarm(self, reason: str) -> None:
+    async def _disarm(self, reason: str, *, stop: bool = True) -> None:
         consent, self.consent = self.consent, None
-        self.jobs.successor_for = None
         self.reason = reason
         self._changed()
-        if consent is not None and self.jobs.job is not None and self.jobs.job.identifier == consent.job_id:
+        if stop and consent is not None and self.jobs.job is not None and self.jobs.job.identifier == consent.job_id:
             await self.jobs.stop()
 
     async def deactivate(self, *, revision: object) -> dict[str, Any]:
@@ -240,29 +236,47 @@ class WeeklyController:
                 await self._disarm("weekly_storage_unavailable")
                 return
             if (
-                not sample.available or sample.present is not True or sample.scope != consent.scope
-                or self.jobs.manual_stop_epoch != consent.stop_epoch
-                or sample.independent_stop or not sample.permitted
+                sample.present is False or self.jobs.manual_stop_epoch != consent.stop_epoch
                 or sample.now >= consent.expires or sample.now < consent.last_now - timedelta(seconds=5)
             ):
                 await self._disarm("session_ended")
                 return
-            consent.last_now = sample.now
+            if not sample.available or sample.present is None:
+                # A short gap: the order and the connection scope bound it.
+                return
             job = self.jobs.job
-            if job is None or job.identifier != consent.job_id or job.state in ("stopped", "interrupted"):
+            own = job is not None and job.identifier == consent.job_id
+            if sample.scope != consent.scope:
+                if own and job is not None and job.state == "suspended":
+                    return
+                if not (own and job is not None and not job.terminal and job.binding == sample.scope):
+                    await self._disarm("session_ended")
+                    return
+                # The wallbox proved the same plug-in; the order continues.
+                consent.scope = sample.scope
+            consent.last_now = sample.now
+            if job is None or not own or job.state in ("stopped", "interrupted"):
                 await self._disarm("job_stopped")
                 return
-            if not job.terminal or sample.now < job.finish_at:
+            if not job.terminal:
+                # The running order stops for these as well; so does the plan.
+                if sample.independent_stop or not sample.permitted:
+                    await self._disarm("session_ended")
                 return
-            # Wait for the existing stop's readback and write floor; never
-            # replace a queued action or silently clear an independent stop.
-            if sample.pending or sample.current_a is None or not 0 < sample.current_a < 6 or not sample.meter_fresh:
+            if sample.now < job.finish_at:
                 return
+            # Between departures Home Assistant controls charging. The next
+            # order starts at its window, once nothing requires a stop and no
+            # queued action is pending; it never clears an independent stop.
             plan = self.book.plan(consent.plan_id)
             row = self._next(plan, sample.now, consent.expires)
-            if row is None:
-                self.jobs.successor_for = None
+            if row is None or row.start_at is None or sample.now < row.start_at:
                 self.reason = "waiting_next_occurrence"
+                return
+            if (
+                sample.pending or not sample.meter_fresh or not sample.permitted
+                or sample.independent_stop
+            ):
                 return
             try:
                 await self._dispatch(row.job_request(now=sample.now, vehicle_profile=consent.profile),
@@ -273,7 +287,9 @@ class WeeklyController:
     async def shutdown(self) -> None:
         async with self._lock:
             self._closing = True
-            await self._disarm("service_restarted")
+            # The order is not stopped: the job owner suspends it, so it can
+            # continue after the restart if the wallbox proves the plug-in.
+            await self._disarm("service_restarted", stop=False)
 
     def _rows(self, plan: WeeklyPlan) -> list[dict[str, Any]]:
         return [{**row.snapshot(), "consumed": self.book.used(plan.identifier, row.local_date)}

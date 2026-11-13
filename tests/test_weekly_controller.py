@@ -11,6 +11,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from custom_components.mennekes_amtron_rtu.device.charge_job import SessionMark
 from custom_components.mennekes_amtron_rtu.device.charge_job_controller import (
     JobInputs,
     JobRequestError,
@@ -92,13 +93,17 @@ def test_recipe_is_not_permission_and_two_days_use_the_same_single_job_owner(tmp
         assert h.jobs.job.identifier == first
         h.change(now=NOW.replace(hour=8))
         await h.weekly.tick()
+        # The next order waits for its own window, not for the previous one.
+        assert h.jobs.job.identifier == first
+        assert h.weekly.reason == "waiting_next_occurrence"
+        assert not h.weekly.book.used(PLAN, (NOW + timedelta(days=1)).date())
+        h.change(now=(NOW + timedelta(days=1)).replace(hour=6))
+        await h.weekly.tick()
         second = h.jobs.job
         assert second.identifier != first
         assert second.energy.baseline_kwh == 110
-        assert second.state == "scheduled"
+        assert second.state == "charging"
         assert h.weekly.book.used(PLAN, (NOW + timedelta(days=1)).date())
-        h.change(now=(NOW + timedelta(days=1)).replace(hour=6))
-        await h.jobs.tick()
         assert h.calls[-1][0] == 12
         assert h.jobs.job.identifier == second.identifier
         # A replayed activation response reports the new outcome; it never
@@ -128,7 +133,7 @@ def test_manual_stop_even_after_completion_cancels_future_recurrence(tmp_path, a
 
 
 @pytest.mark.parametrize("change", [
-    {"scope": "c" * 64}, {"available": False}, {"present": False}, {"present": None},
+    {"scope": "c" * 64}, {"scope": None}, {"present": False},
     {"independent_stop": True}, {"permitted": False}, {"now": NOW - timedelta(seconds=6)},
     {"now": NOW + timedelta(days=7)},
 ])
@@ -142,6 +147,25 @@ def test_activation_never_outlives_its_session_permission(tmp_path, change):
         await h.weekly.tick()
         assert h.weekly.consent is None
         assert h.jobs.job.terminal
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("change", [{"available": False}, {"present": None}])
+def test_a_short_gap_keeps_the_activation(tmp_path, change):
+    async def run():
+        h = Harness(tmp_path)
+        await h.initialize()
+        await h.save()
+        await h.activate()
+        h.change(**change)
+        await h.weekly.tick()
+        # The order fences its writes meanwhile; only a lasting gap ends it,
+        # and that also ends the connection scope.
+        assert h.weekly.consent is not None
+        assert not h.jobs.job.terminal
+        h.change(available=True, present=True)
+        await h.weekly.tick()
+        assert h.weekly.consent is not None
     asyncio.run(run())
 
 
@@ -163,8 +187,15 @@ def test_edit_and_removal_stop_only_the_owned_job(tmp_path, action):
         else:
             await h.weekly.shutdown()
         assert h.weekly.consent is None
-        assert h.jobs.job.state == "stopped"
         assert h.weekly.book.used(PLAN, NOW.date())
+        if action != "shutdown":
+            assert h.jobs.job.state == "stopped"
+            return
+        # A restart is no stop: the job owner suspends or interrupts its order.
+        assert h.jobs.job.state == "scheduled"
+        await h.jobs.shutdown()
+        assert (h.jobs.job.state, h.jobs.job.reason) == ("interrupted", "service_restarted")
+        assert h.jobs.manual_stop_epoch == 0
     asyncio.run(run())
 
 
@@ -313,8 +344,10 @@ def test_concurrent_duplicate_confirmation_creates_one_baseline(tmp_path):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("change", [{"pending": True}, {"current_a": None}, {"current_a": 12}, {"meter_fresh": False}])
-def test_next_occurrence_waits_for_confirmed_pause_and_meter(tmp_path, change):
+@pytest.mark.parametrize("change", [
+    {"pending": True}, {"meter_fresh": False}, {"permitted": False}, {"independent_stop": True},
+])
+def test_next_window_waits_for_meter_queue_and_independent_stops(tmp_path, change):
     async def run():
         h = Harness(tmp_path)
         await h.initialize()
@@ -322,10 +355,18 @@ def test_next_occurrence_waits_for_confirmed_pause_and_meter(tmp_path, change):
         await h.activate()
         await h.complete()
         old = h.jobs.job.identifier
-        h.change(now=NOW.replace(hour=8), **change)
+        # Between departures Home Assistant may pause, stop or lock; that is
+        # its own control and neither ends the plan nor is overridden by it.
+        h.change(now=(NOW + timedelta(days=1)).replace(hour=6), **change)
         await h.weekly.tick()
         assert h.jobs.job.identifier == old
         assert h.weekly.consent is not None
+        assert not h.weekly.book.used(PLAN, (NOW + timedelta(days=1)).date())
+        h.change(pending=False, meter_fresh=True, permitted=True, independent_stop=False,
+                 now=(NOW + timedelta(days=1)).replace(hour=6, minute=30))
+        await h.weekly.tick()
+        assert h.jobs.job.identifier != old
+        assert h.calls[-1][0] == 12
     asyncio.run(run())
 
 
@@ -388,7 +429,7 @@ def test_successor_failure_consumes_the_date_and_disarms(tmp_path, monkeypatch):
         await h.save()
         await h.activate()
         await h.complete()
-        h.change(now=NOW.replace(hour=8), current_cap=6)
+        h.change(now=(NOW + timedelta(days=1)).replace(hour=6), current_cap=6)
         await h.weekly.tick()
         assert h.weekly.consent is None
         assert h.weekly.reason == "activation_unconfirmed"
@@ -428,8 +469,8 @@ def test_cancelled_storage_save_finishes_before_permission_is_discarded(tmp_path
 
 @pytest.mark.parametrize("change", [
     {"available": False}, {"present": False}, {"scope": "c" * 64}, {"meter_fresh": False},
-    {"permitted": False}, {"independent_stop": True}, {"pending": True}, {"current_a": 12},
-    {"current_a": None}, {"now": NOW.replace(hour=7)},
+    {"permitted": False}, {"independent_stop": True}, {"pending": True},
+    {"now": NOW.replace(hour=7)},
 ])
 def test_atomic_successor_rechecks_all_stop_and_readback_conditions(tmp_path, change):
     async def run():
@@ -485,7 +526,7 @@ def test_successor_is_not_an_alternate_general_create_api(tmp_path, monkeypatch,
     asyncio.run(run())
 
 
-def test_a_finished_weekly_order_keeps_its_pause_for_the_next_departure(tmp_path):
+def test_a_finished_weekly_order_hands_control_back_until_the_next_window(tmp_path):
     async def run():
         h = Harness(tmp_path)
         await h.initialize()
@@ -494,21 +535,29 @@ def test_a_finished_weekly_order_keeps_its_pause_for_the_next_departure(tmp_path
         first = h.jobs.job.identifier
         await h.complete()
         assert h.jobs.job.state == "reached"
-        # The service ticks every second: the paused order does not hand
-        # control back, because the next departure replaces it.
         await h.jobs.tick()
-        assert h.jobs.holding
-        assert h.jobs.stop_requested()
-        assert h.jobs.store.load().identifier == first
-        h.change(now=NOW.replace(hour=8))
+        assert not h.jobs.holding
+        assert not h.jobs.stop_requested()
+        assert h.jobs.current_policy("ha-solar", True) is None
+        assert h.jobs.store.load() is None
+        # Home Assistant charges with its own current meanwhile.
+        h.change(now=NOW.replace(hour=12), current_a=16)
+        await h.jobs.tick()
+        await h.weekly.tick()
+        assert h.jobs.job.identifier == first
+        assert h.weekly.consent is not None
+        h.change(now=(NOW + timedelta(days=1)).replace(hour=5, minute=59))
+        await h.weekly.tick()
+        assert h.jobs.job.identifier == first
+        # Its window opens: the next order takes over without a prior pause.
+        h.change(now=(NOW + timedelta(days=1)).replace(hour=6))
         await h.weekly.tick()
         second = h.jobs.job.identifier
         assert second != first
         assert h.jobs.holding
         assert h.jobs.store.load().identifier == second
-        h.change(now=(NOW + timedelta(days=1)).replace(hour=6))
-        await h.jobs.tick()
         assert h.calls[-1][0] == 12
+        assert h.jobs.current_policy("ha-solar", True) is False
     asyncio.run(run())
 
 
@@ -519,27 +568,26 @@ def test_the_last_weekly_order_and_a_stopped_plan_hand_control_back(tmp_path):
         # Only Mondays: the next one lies beyond the seven-day activation.
         await h.save(weekdays=[0])
         await h.activate()
-        assert h.jobs.successor_for is None
         await h.complete()
         await h.jobs.tick()
         assert not h.jobs.holding
         assert h.jobs.store.load() is None
+        h.change(now=NOW.replace(hour=8))
+        await h.weekly.tick()
+        assert h.weekly.reason == "waiting_next_occurrence"
         other = Harness(tmp_path / "other")
         await other.initialize()
         await other.save()
         await other.activate()
-        await other.complete()
-        await other.jobs.tick()
-        assert other.jobs.holding
         await other.weekly.deactivate(revision=other.weekly.revision)
-        assert other.jobs.successor_for is None
+        assert other.jobs.job.state == "stopped"
         await other.jobs.tick()
         assert not other.jobs.holding
         assert other.jobs.store.load() is None
     asyncio.run(run())
 
 
-def test_no_next_departure_releases_the_held_pause(tmp_path):
+def test_a_new_manual_order_between_departures_ends_the_plan(tmp_path):
     async def run():
         h = Harness(tmp_path)
         await h.initialize()
@@ -547,13 +595,54 @@ def test_no_next_departure_releases_the_held_pause(tmp_path):
         await h.activate()
         await h.complete()
         await h.jobs.tick()
-        assert h.jobs.holding
-        # Every later departure was consumed meanwhile, for example by an edit.
-        for day in range(1, 8):
-            h.weekly.book = h.weekly.book.reserve(PLAN, (NOW + timedelta(days=day)).date())
-        h.change(now=NOW.replace(hour=8))
+        h.change(now=NOW.replace(hour=9))
+        request = {"id": "d" * 32, "start_at": h.sample.now.isoformat(),
+                   "finish_at": (h.sample.now + timedelta(hours=1)).isoformat(), "current_a": 10, "energy_kwh": 5}
+        p = h.jobs.preview(request, revision=h.jobs.revision, scope=SCOPE)
+        await h.jobs.create(p["request"], revision=p["revision"], scope=SCOPE)
         await h.weekly.tick()
-        assert h.weekly.reason == "waiting_next_occurrence"
+        assert h.weekly.consent is None
+        assert h.weekly.reason == "job_stopped"
+        # The plan never stops an order it does not own.
+        assert h.jobs.job.state == "charging"
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("proven", [True, False])
+def test_a_lasting_gap_moves_the_plan_to_a_proven_plug_in_or_ends_it(tmp_path, proven):
+    def mark(after, count=42):
+        return SessionMark(NOW + after, 600 + int(after.total_seconds()), 2.0, count, "e" * 64)
+
+    async def run():
+        h = Harness(tmp_path)
+        await h.initialize()
+        await h.save()
+        h.change(session=mark(timedelta(0)))
+        await h.activate()
+        h.change(now=NOW.replace(hour=6))
         await h.jobs.tick()
-        assert not h.jobs.holding
+        assert h.jobs.job.state == "charging"
+        h.change(available=False, present=None, scope=None, session=None, now=NOW.replace(hour=6, minute=1))
+        await h.jobs.tick()
+        h.change(now=NOW.replace(hour=6, minute=2))
+        await h.jobs.tick()
+        assert (h.jobs.job.state, h.jobs.job.reason) == ("suspended", "connection_lost")
+        await h.weekly.tick()
+        assert h.weekly.consent is not None
+        later = timedelta(hours=1, minutes=3)
+        h.change(available=True, present=True, scope="c" * 64, now=NOW + later,
+                 session=mark(later, 42 if proven else 43))
+        # The suspended order decides first; the plan waits for it.
+        await h.weekly.tick()
+        assert h.weekly.consent is not None
+        await h.jobs.tick()
+        await h.weekly.tick()
+        if proven:
+            assert h.jobs.job.state == "charging"
+            assert h.weekly.consent.scope == "c" * 64
+            assert h.weekly.reason == "active"
+        else:
+            assert h.jobs.job.state == "interrupted"
+            assert h.weekly.consent is None
+            assert h.weekly.reason == "session_ended"
     asyncio.run(run())

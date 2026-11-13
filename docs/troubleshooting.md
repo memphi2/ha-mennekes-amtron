@@ -416,12 +416,14 @@ when permission was granted.
 | Guest order refused: battery target active | Set the battery (percentage) target in Home Assistant to 0, then preview again. |
 | HA reports that a charging job of the app controls charging | An order runs for the plugged-in car. Stop it on **Charging jobs**, or unplug the car. HA controls charging again once the pause is confirmed. |
 | Charging stays paused after the order ended | Intended: a finished order never resumes by itself. Resume in Home Assistant. |
-| The order shows **Interrupted** | The app restarted, the car was unplugged, the wallbox was unreadable for over a minute, or another limit required a stop. To let the app charge again, create a new order. |
+| The order shows **Interrupted; checking whether the same plug-in continues** | The app restarted or the wallbox was unreadable for over a minute. Charging stays paused for at most a minute after the wallbox is readable again, then the order continues or is interrupted. |
+| The order shows **Interrupted** after an app restart although the car stayed plugged in | The wallbox did not prove the same plug-in: its session duration did not keep running with the clock, its session counter changed, another vehicle was selected in HA, or the wallbox has no session counter (layout before v01.02). Check `session_duration` and `sessions_total` on **Registers** while charging is paused. Create a new order. |
+| The order shows **Interrupted** | The car was unplugged or another limit required a stop. To let the app charge again, create a new order. |
 | "Clearing requires a confirmed pause or unplug" | Wait until the overview shows the pause, then clear again. |
 | "Storage unavailable; no automatic start" | The app could not save the order. Check the app log; restarting the app resolves a temporary problem. |
 | Weekly plan: "No unconsumed valid departure within seven days" | Every departure in the next seven days is skipped, already used or does not exist on a clock change. Check the dates in the plan preview. |
-| A weekly plan stopped by itself | The car was unplugged, the app restarted, the plan was edited, a job was stopped or cleared, or seven days passed. Activate it again with the car plugged in. |
-| Charging stays paused between weekly departures | Intended while the plan is active: the next departure's job holds the pause. **Stop weekly automation** to control charging in Home Assistant. |
+| A weekly plan stopped by itself | The car was unplugged, the app restarted, the wallbox was unreadable for over a minute between departures, the plan was edited, a job was stopped or cleared, another order was created, or seven days passed. Activate it again with the car plugged in. |
+| The next weekly departure did not start | Its job starts when the window opens and waits while the meter is not current, a command is queued, the release is off or another limit (such as a reached target) requires a stop. It starts once that clears within the window. |
 
 See [charging jobs](app-guide.md#charging-jobs) for the full behavior.
 

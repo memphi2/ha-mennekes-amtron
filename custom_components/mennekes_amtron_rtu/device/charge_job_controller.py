@@ -10,7 +10,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from .charge_job import CURRENT_TOLERANCE_A, MAX_BOOST_MINUTES, ChargeJob, job_time
+from .charge_job import (
+    CURRENT_TOLERANCE_A,
+    MAX_BOOST_MINUTES,
+    ChargeJob,
+    SessionMark,
+    job_time,
+)
 from .charge_job_store import ChargeJobStore
 from .client_errors import AmtronBusError
 from .errors import DeviceError
@@ -29,6 +35,11 @@ def _preview_expired(request: object, now: datetime) -> bool:
     return start < now - timedelta(minutes=1)
 
 
+def _decision(raw: dict[str, Any]) -> dict[str, Any]:
+    """The saved part that matters; the session record refreshes in RAM."""
+    return {key: value for key, value in raw.items() if key != "session"}
+
+
 @dataclass(frozen=True, slots=True)
 class JobInputs:
     """A passive snapshot. ``scope`` is a per-connection opaque digest, not a VIN."""
@@ -45,6 +56,8 @@ class JobInputs:
     current_cap: float
     pending: bool = False
     vehicle_target_active: bool = False
+    # The wallbox's record of the current plug-in, None until read in full.
+    session: SessionMark | None = None
 
 
 class JobRequestError(ValueError):
@@ -106,14 +119,22 @@ class ChargeJobController:
         if not self.ready or job is None:
             return
         sample = self.inputs()
-        before = job.snapshot()
+        before = _decision(job.snapshot())
+        if (
+            sample.session is not None and sample.scope == job.binding
+            and not job.terminal and job.state != "suspended"
+        ):
+            job.session = sample.session
+        # A closing service must not continue its own suspended order.
+        closing = self._closing
         job.observe(
             now=sample.now, available=sample.available, present=sample.present,
             matches=sample.scope == job.binding, total_kwh=sample.total_kwh,
             meter_fresh=sample.meter_fresh,
             independent_stop=sample.independent_stop or not sample.permitted or self._vehicle_conflict(sample),
+            scope=None if closing else sample.scope, session=None if closing else sample.session,
         )
-        if before != job.snapshot():
+        if before != _decision(job.snapshot()):
             self._changed()
 
     def stop_requested(self) -> bool:
@@ -125,7 +146,7 @@ class ChargeJobController:
             return False
         sample = self.inputs()
         return (
-            job.stop_requested or self._durable != job.snapshot()
+            job.stop_requested or self._durable != _decision(job.snapshot())
             or not sample.available or sample.present is not True
             or sample.scope != job.binding or not sample.meter_fresh
             or sample.independent_stop or not sample.permitted or self._vehicle_conflict(sample)
@@ -152,7 +173,7 @@ class ChargeJobController:
         return (
             self.ready and not self._closing and not self.storage_error
             and job is not None and job.kind != "guest" and not job.terminal and not job.scope_ended
-            and sample.now < job.start_at and sample.available and sample.present is True
+            and job.state != "suspended" and sample.now < job.start_at and sample.available and sample.present is True
             and sample.scope == job.binding and sample.meter_fresh and sample.permitted
             and not sample.independent_stop and not sample.pending
         )
@@ -299,17 +320,13 @@ class ChargeJobController:
             self._changed()
             return self.snapshot()
 
-    def _keeps_finished(self) -> bool:
-        """Whether a finished order still holds its pause for a successor."""
-        return False
-
     def _clear_needs_pause(self) -> bool:
         """Only an order that still holds the car needs its pause first."""
         return self.holding
 
     async def _save(self) -> None:
         job = self.job
-        if job is None or self._settled or job.snapshot() == self._durable:
+        if job is None or self._settled or _decision(job.snapshot()) == self._durable:
             return
         raw = job.snapshot()
         frozen = ChargeJob.restore(raw, restarted=False)
@@ -320,7 +337,7 @@ class ChargeJobController:
             job.interrupt("storage_error")
             self._changed()
         else:
-            self._durable = raw
+            self._durable = _decision(raw)
             # A previous failed save is terminal for the job, even after retry.
             self.storage_error = False
 
@@ -371,8 +388,7 @@ class ChargeJobController:
         job = self.job
         if (
             job is None or not job.terminal or job.scope_ended or self._settled
-            or self.storage_error or self._durable != job.snapshot()
-            or self._keeps_finished()
+            or self.storage_error or self._durable != _decision(job.snapshot())
         ):
             return
         try:
@@ -387,7 +403,10 @@ class ChargeJobController:
         async with self._lock:
             self._closing = True
             if self.job is not None:
-                self.job.interrupt("service_restarted")
+                # Save the latest session record with the suspension, so a
+                # restart can prove the same plug-in and continue the order.
+                self.observe()
+                self.job.suspend("service_restarted")
             await self._tick_locked()
 
     def snapshot(self) -> dict[str, Any]:

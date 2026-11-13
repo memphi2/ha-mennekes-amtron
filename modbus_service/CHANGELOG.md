@@ -9,17 +9,18 @@ Update the app together with integration 0.9.0b2.
   the **Connection** page.
 - **Charging jobs:** an energy and time order for the car that is plugged in,
   with preview, confirmation and stop. It keeps running when Home Assistant
-  restarts or disconnects, ends at unplugging and never restarts after an app
-  restart.
+  restarts or disconnects and ends at unplugging. After an app restart it
+  continues only when the wallbox proves the car stayed plugged in.
 - **Boost:** charge early for up to two hours before a job's planned start,
   then return to the plan.
 - **Guest charging:** a bounded order for a guest car that is already
   authorized at the wallbox, for example by RFID. It never grants a release,
   unlocks the wallbox or uses a saved vehicle target.
 - **Weekly plans:** recurring departures for one car. An activation for the
-  plugged-in car creates the job for each departure for up to seven days.
-- **Immediate reserve:** a job or weekly plan can charge part of its energy
-  amount at once, then wait for the planned start.
+  plugged-in car creates the job for each departure, when its window opens, for
+  up to seven days. Between departures Home Assistant controls charging.
+- **Immediate reserve:** a job or the first departure of a weekly plan can
+  charge part of its energy amount at once, then wait for the planned start.
 - **Registers:** a read-only page with the raw register values, their age
   and read quality.
 - **Runtime:** preview new poll intervals and apply them without restarting

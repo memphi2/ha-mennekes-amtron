@@ -46,6 +46,7 @@
     reached:["Energy ceiling reached","Energieobergrenze erreicht","Plafond d’énergie atteint","Energiegrens bereikt","Tetto di energia raggiunto"],
     finished:["Deadline reached","Zeitende erreicht","Échéance atteinte","Eindtijd bereikt","Scadenza raggiunta"],
     stopped:["Stopped","Gestoppt","Arrêté","Gestopt","Fermato"],
+    suspended:["Interrupted; checking whether the same plug-in continues","Unterbrochen; prüft, ob derselbe Steckvorgang weiterläuft","Interrompu ; vérifie si le même branchement continue","Onderbroken; controleert of dezelfde aansluiting doorloopt","Interrotto; verifica se lo stesso collegamento prosegue"],
     interrupted:["Interrupted; no automatic restart","Unterbrochen; kein automatischer Neustart","Interrompu ; pas de redémarrage automatique","Onderbroken; geen automatische herstart","Interrotto; nessun riavvio automatico"],
     unconfirmed:["Command not yet confirmed","Befehl noch nicht bestätigt","Commande pas encore confirmée","Opdracht nog niet bevestigd","Comando non ancora confermato"],
     scope_ended:["Connection ended","Anschluss beendet","Connexion terminée","Verbinding beëindigd","Collegamento terminato"],

@@ -13,12 +13,6 @@ class WeeklyChargeJobs(ChargeJobController):
 
     manual_stop_epoch = 0
     _stop_unconfirmed = False
-    # The order a weekly successor will replace. It keeps its pause instead of
-    # handing control back, so the next departure starts from a paused car.
-    successor_for: str | None = None
-
-    def _keeps_finished(self) -> bool:
-        return self.job is not None and self.job.identifier == self.successor_for
 
     def stop_requested(self) -> bool:
         """Fence an in-flight start before the stop obtains the owner lock."""
@@ -64,10 +58,12 @@ class WeeklyChargeJobs(ChargeJobController):
         self, request: object, *, revision: object, scope: str,
         predecessor: str, stop_epoch: int,
     ) -> dict[str, Any]:
-        """Replace only a successfully finished, paused, same-session order.
+        """Replace only a successfully finished same-session order.
 
-        There is no clear/create gap in which a manual stop could be lost. The
-        weekly owner has already durably consumed the next local date. All new
+        The predecessor has handed control back, so Home Assistant may be
+        charging meanwhile; the new order takes over at its window. There is
+        no clear/create gap in which a manual stop could be lost. The weekly
+        owner has already durably consumed the next local date. All new
         enabling writes still traverse the normal job persistence and guards.
         """
         async with self._lock:
@@ -81,7 +77,7 @@ class WeeklyChargeJobs(ChargeJobController):
                 or old.scope_ended or old.binding != scope or old.finish_at > sample.now
                 or not sample.available or sample.present is not True or sample.scope != scope
                 or not sample.meter_fresh or not sample.permitted or sample.independent_stop
-                or sample.pending or sample.current_a is None or not 0 < sample.current_a < 6
+                or sample.pending
             ):
                 raise JobRequestError("weekly_successor_not_permitted")
             candidate = ChargeJob.create(request, binding=scope, total_kwh=sample.total_kwh, now=sample.now)
