@@ -318,8 +318,8 @@ class DepartureController:
         # The report a learned efficiency counts from, within one plug-in.
         self._learn_from: SocAnchor | None = None
         # Since when the car charges at the plan's full current: meter time,
-        # reading and phases.
-        self._full_from: tuple[float, float, int] | None = None
+        # reading, phases and that current.
+        self._full_from: tuple[float, float, int, float] | None = None
         self._at_full = False
         self.forecast: dict[str, Any] | None = None
         self._reset()
@@ -341,6 +341,8 @@ class DepartureController:
         self._last_write_at: float | None = None
         self._command_submitted = False
         self._command_current: float | None = None
+        # Whether the wallbox showed the plan's pause as applied.
+        self._pause_seen = False
 
     async def initialize(self) -> None:
         async with self._lock:
@@ -424,6 +426,10 @@ class DepartureController:
                 raise DeviceError("service_unavailable")
             candidate = TimedGoal.restore(self.trip.snapshot())
             if candidate.set(deadline, source):
+                if deadline is None and self.estimated_stop and not withdraw:
+                    # The car stands at its projected target: a cleared trip
+                    # ends as reached, so the stop holds until the car leaves.
+                    candidate.finish("reached")
                 await self._cancel_command()
                 self.trip = candidate
                 self._reached_target = self.planned_start = None
@@ -494,15 +500,17 @@ class DepartureController:
             self._full_from = None
             return
         start = self._full_from
-        if start is None or start[2] != s.phases:
-            self._full_from = (s.meter_at, s.total_kwh, s.phases)
+        if start is None or start[2:] != (s.phases, s.max_current_a):
+            self._full_from = (s.meter_at, s.total_kwh, s.phases, s.max_current_a)
             return
         seconds = s.meter_at - start[0]
         if seconds < POWER_WINDOW_SECONDS:
             return
-        car = self.model.car(inputs.vehicle).with_power(s.phases, (s.total_kwh - start[1]) * 3600 / seconds)
+        car = self.model.car(inputs.vehicle).with_power(
+            s.phases, (s.total_kwh - start[1]) * 3600 / seconds, s.max_current_a,
+        )
         self.model.learn(inputs.vehicle, car)
-        self._full_from = (s.meter_at, s.total_kwh, s.phases)
+        self._full_from = (s.meter_at, s.total_kwh, s.phases, s.max_current_a)
 
     def _learn_efficiency(self, new: SocAnchor) -> None:
         """Compare two reports of the car with the energy metered between them."""
@@ -579,10 +587,13 @@ class DepartureController:
         self.anchor = self._learn_from = None
 
     async def _evaluate(self, s: DepartureSample) -> None:
-        if self.plan_paused and self._command_current is not None and s.paused is False:
-            # The plan's own current ended its pause. A start that is still
-            # queued, or was lost, has not: the pause stays this plan's to end.
-            self.plan_paused = False
+        if self.plan_paused and s.paused is True:
+            self._pause_seen = True
+        if self.plan_paused and s.paused is False and (self._command_current is not None or self._pause_seen):
+            # The plan's own current ended its pause, or someone else ended
+            # it after it had applied. A pause that is still queued, or a
+            # start that was lost, has not: the pause stays this plan's to end.
+            self.plan_paused = self._pause_seen = False
         binding = self._binding(s)
         self.confirmed = binding == "confirmed"
         if binding == "confirmed":
@@ -668,7 +679,7 @@ class DepartureController:
             return
         vehicle = self.inputs.vehicle if self.inputs is not None else None
         phases = s.phases or (self.inputs.phases if self.inputs else None) or 3
-        efficiency, power = self.model.efficiency(vehicle), self.model.car(vehicle).power(phases)
+        efficiency, power = self.model.efficiency(vehicle), self.model.car(vehicle).power(phases, s.max_current_a)
         plan = plan_current(
             now=s.now, deadline=deadline, soc_percent=soc, target_percent=s.target_percent,
             capacity_kwh=capacity, phases=phases, max_current_a=s.max_current_a,
@@ -783,7 +794,7 @@ class DepartureController:
         self._command_submitted = True
         self._command_current = current
         if current is None:
-            self.plan_paused = True
+            self.plan_paused, self._pause_seen = True, False
         await self._apply(current, deadline)
 
     async def _cancel_command(self) -> None:

@@ -563,6 +563,36 @@ def test_a_departure_that_passes_during_the_pause_ends_it_unless_the_target_hold
     run(go())
 
 
+def test_a_trip_cleared_at_the_projected_target_keeps_the_stop(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start()
+        box.set(now=NOW + timedelta(hours=1), total_kwh=120.0, meter_at=(NOW + timedelta(hours=1)).timestamp())
+        await plan.tick()
+        assert (plan.status, plan.estimated_stop, plan.plan_paused) == ("estimated_reached", True, True)
+        await plan.set_trip(None, "manual")
+        await plan.tick()
+        assert plan.trip.snapshot() == {"deadline": None, "source": "manual", "finished": "reached"}
+        assert (plan.status, box.resumes, plan.plan_paused) == ("reached", 0, True)
+    run(go())
+
+
+def test_a_pause_someone_else_ended_is_no_longer_the_plans(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        await plan.tick()
+        assert plan.plan_paused
+        # The target is switched off and the user resumes, then pauses again.
+        box.set(goal_status="disabled", paused=False, pause_requested=False)
+        await plan.tick()
+        assert (plan.status, plan.plan_paused) == ("waiting_for_target", False)
+        box.set(paused=True, pause_requested=True, now=NOW + timedelta(hours=11))
+        await plan.tick()
+        assert (plan.status, box.resumes) == ("late", 0)
+    run(go())
+
+
 def test_the_same_plug_in_is_recognised_after_a_restart(tmp_path):
     async def go():
         box = Box(tmp_path)
@@ -825,8 +855,9 @@ def test_two_reports_of_the_car_teach_its_efficiency(tmp_path):
         await plan.tick()
         await plan.set_inputs(inputs(minimum_percent=100, soc_percent=68, soc_observed_at=end))
         await plan.tick()
-        assert plan.model.cars["profile:bmw"].efficiency == 0.8
-        assert plan.forecast["efficiency"] == 0.8
+        # The first sample of 0.8 moves the assumed 0.9 by a part only.
+        assert plan.model.cars["profile:bmw"].efficiency == 0.87
+        assert plan.forecast["efficiency"] == 0.87
         # A small rise is mostly rounding; a fall starts over.
         for percent, minutes in ((70, 10), (60, 20)):
             at = end + timedelta(minutes=minutes)
@@ -834,17 +865,17 @@ def test_two_reports_of_the_car_teach_its_efficiency(tmp_path):
             await plan.tick()
             await plan.set_inputs(inputs(minimum_percent=100, soc_percent=percent, soc_observed_at=at))
             await plan.tick()
-        assert plan.model.cars["profile:bmw"].efficiency == 0.8
+        assert plan.model.cars["profile:bmw"].efficiency == 0.87
         assert plan._learn_from.percent == 60
-        # The projection uses what was learned: 5 kWh x 0.8 / 60 kWh.
+        # The projection uses what was learned: 5 kWh x 0.87 / 60 kWh.
         at = end + timedelta(minutes=50)
         box.set(now=at, total_kwh=121.0, meter_at=at.timestamp())
         await plan.tick()
-        assert plan.snapshot()["estimated_soc"] == round(60 + 5 * 0.8 / 60 * 100, 1)
+        assert plan.snapshot()["estimated_soc"] == round(60 + 5 * 0.87 / 60 * 100, 1)
         # What was learned survives a restart, and unplugging ends the comparison.
         restarted = Box(tmp_path)
         await restarted.plan.initialize()
-        assert restarted.plan.model.cars["profile:bmw"].efficiency == 0.8
+        assert restarted.plan.model.cars["profile:bmw"].efficiency == 0.87
         box.set(present=False)
         await plan.tick()
         assert plan._learn_from is None
@@ -865,7 +896,7 @@ def test_the_power_at_full_current_is_metered_and_corrects_the_forecast(tmp_path
             at = NOW + timedelta(minutes=minutes)
             box.set(now=at, total_kwh=100.0 + 7.0 * minutes / 60, meter_at=at.timestamp())
             await plan.tick()
-        assert plan.model.cars["profile:bmw"].full_kw == (None, None, 7.0)
+        assert plan.model.cars["profile:bmw"].kw_per_a == (None, None, 0.4375)
         assert plan.status == "charging"
         # At 7 kW the rest takes about 2.7 h: the target is no longer reachable.
         await plan.tick()
@@ -890,11 +921,16 @@ def test_a_change_of_phases_starts_the_power_measurement_again(tmp_path):
     async def go():
         box = Box(tmp_path, applied_a=16.0)
         plan = await box.start(hours=2)
-        assert plan._full_from == (NOW.timestamp(), 100.0, 3)
+        assert plan._full_from == (NOW.timestamp(), 100.0, 3, 16.0)
         at = NOW + timedelta(minutes=5)
         box.set(now=at, total_kwh=100.5, meter_at=at.timestamp(), phases=1)
         await plan.tick()
-        assert plan._full_from == (at.timestamp(), 100.5, 1)
+        assert plan._full_from == (at.timestamp(), 100.5, 1, 16.0)
+        # So does another maximum current.
+        later = NOW + timedelta(minutes=8)
+        box.set(now=later, total_kwh=100.7, meter_at=later.timestamp(), max_current_a=10.0, applied_a=10.0)
+        await plan.tick()
+        assert plan._full_from == (later.timestamp(), 100.7, 1, 10.0)
         assert plan.model.cars == {}
     run(go())
 

@@ -229,11 +229,13 @@ the trip there as described above.
   90% until the app has learned it. Energy charged before a report is not
   counted twice, because every report carries its own time.
 - **The app learns each car.** From two reports of the car during one plug-in
-  that lie at least five percentage points apart, and the energy metered
+  that lie at least ten percentage points apart, and the energy metered
   between them, it learns how much of the metered energy reaches the battery
-  (60% to 100%; a slightly wrong capacity is absorbed as well). While the plan
-  charges at full current, it also meters the power the car really draws, per
-  number of phases. A car that draws less than the wallbox offers therefore
+  (60% to 100%; a slightly wrong capacity is absorbed as well). Every
+  comparison moves the value by a part only, so one late report cannot shift
+  the start by much. While the plan charges at full current, it also meters
+  the power the car really draws, per number of phases and per ampere offered,
+  so it stays valid when the maximum current changes. A car that draws less than the wallbox offers therefore
   gets an earlier start, and the 30-minute reserve stays for the unexpected.
   Both values are kept per vehicle profile for up to eight cars and survive a
   restart.

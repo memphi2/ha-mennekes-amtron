@@ -673,7 +673,11 @@ class TimedGoalObserver:
 
     async def _end_plan_pause(self) -> None:
         control = self._runtime.control
-        if self._plan_paused and control.pause_requested is True and not control.read_only:
+        if (
+            self._plan_paused and control.pause_requested is True and not control.read_only
+            # A goal's stop owns the pause by now; the control would refuse.
+            and not control.energy_goal_stop_requested
+        ):
             await control.async_resume_charging()
             _LOGGER.info("Departure plan pause ended: the plan no longer applies to the car")
         self._plan_paused = False
