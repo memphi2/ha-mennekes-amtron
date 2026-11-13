@@ -41,7 +41,13 @@ def bare(path):
     return service
 
 
-def test_real_service_learns_without_extra_reads_writes_or_credentials(tmp_path, monkeypatch):
+@pytest.mark.parametrize(("increment_kwh", "expected_kw"), [
+    pytest.param(0.125, 7.5, id="exact-float32"),
+    pytest.param(0.15, 9.001, id="quantized-float32"),
+])
+def test_real_service_learns_without_extra_reads_writes_or_credentials(
+    tmp_path, monkeypatch, increment_kwh, expected_kw,
+):
     async def run():
         monkeypatch.setattr(runtime, "JobModbusService", m.ForecastModbusService)
         async with runtime.job_service(tmp_path) as (s, transport, clock):
@@ -51,6 +57,11 @@ def test_real_service_learns_without_extra_reads_writes_or_credentials(tmp_path,
             await s.refresh()
             await s.jobs.create(runtime.request(), revision=s.jobs.revision, scope=s.jobs.inputs().scope)
             baseline = s.jobs.job.energy.baseline_kwh
+            assert baseline == 1234.5
+            # ENERGY_TOTAL is FLOAT32: 0.125 kWh increments are exact, whereas
+            # 0.15 kWh yields interval rates 9.00146484375, 9.00146484375 and
+            # 8.994140625 kW at this baseline. Their displayed median is 9.001,
+            # not the idealized 9.000. Keep exact assertions for both cases.
             now = [datetime.now(UTC)]
 
             class TestDateTime(datetime):
@@ -70,7 +81,7 @@ def test_real_service_learns_without_extra_reads_writes_or_credentials(tmp_path,
                 if index:
                     now[0] += timedelta(seconds=60)
                     clock[0] += 60
-                runtime.put(transport.bank, runtime.R.ENERGY_TOTAL, baseline + index * 0.15)
+                runtime.put(transport.bank, runtime.R.ENERGY_TOTAL, baseline + index * increment_kwh)
                 s._poller._slow_read_at = None
                 await s.refresh()
             before = (list(transport.reads), list(transport.writes), s.jobs.revision)
@@ -78,14 +89,16 @@ def test_real_service_learns_without_extra_reads_writes_or_credentials(tmp_path,
                 result = s.jobs.snapshot()["forecast"]
                 assert result["state"] == "estimate"
                 assert result["source"] == "live"
-                assert result["power_kw"] == 9
+                assert result["power_kw"] == expected_kw
                 assert "fixture-private-profile" not in json.dumps(result)
             assert (transport.reads, transport.writes, s.jobs.revision) == before
             async with TestClient(TestServer(create_weekly_app(s))) as client:
                 assert (await client.get("/v2/jobs")).status == 401
                 response = await client.get("/v2/jobs", headers={"Authorization": f"Bearer {runtime.TOKEN}"})
                 assert response.status == 200
-                assert (await response.json())["forecast"]["state"] == "estimate"
+                forecast = (await response.json())["forecast"]
+                assert forecast["state"] == "estimate"
+                assert forecast["power_kw"] == expected_kw
             assert (transport.reads, transport.writes, s.jobs.revision) == before
             s._start_rate_save(force=True)
             await s._rate_save
