@@ -35,3 +35,7 @@ button{border:1px solid var(--accent);border-radius:7px;background:var(--accent)
 #runtime table { min-width: 0; table-layout: fixed; }
 #runtime th:first-child { width: 50%; }
 #runtime th, #runtime td { padding: 9px 4px; }
+
+/* Let date/time fields shrink within narrow job cards instead of widening them. */
+#jobs fieldset { min-inline-size: 0; }
+#jobs input { min-width: 0; }
