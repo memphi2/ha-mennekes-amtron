@@ -65,6 +65,10 @@ Update the app to 0.9.0b2 together with the integration.
   Assistant disconnects. A job can be boosted to charge early for up to two
   hours (#64), and guest charging gives a locally authorized guest a bounded
   order (#65). None of them grants a release or unlocks the wallbox.
+- **Docs:** [the app's web pages](docs/app-guide.md) explains the overview,
+  charging jobs, boost, guest charging, registers and runtime settings in one
+  guide. The separate update guide is gone; the release notes name every
+  breaking change.
 
 ## 0.9.0b1 — 2026-11-12
 
@@ -763,7 +767,7 @@ or config-entry migration; older releases retain their documented upgrade steps.
   **MENNEKES AMTRON RTU (Unofficial)**. This avoids the domain collision with
   the separate MENNEKES AMTRON Modbus TCP integration.
 - Existing 0.1.0 installations require reconfiguration. Follow the
-  [upgrade guide](docs/upgrading.md) before updating; it covers config entries,
+  [upgrade guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.2.0/docs/upgrading.md) before updating; it covers config entries,
   entity/device references, action calls and blueprint automations.
 - The charging-current action is now
   `mennekes_amtron_rtu.set_charging_current`, and bundled blueprints install

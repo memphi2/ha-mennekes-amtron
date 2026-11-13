@@ -11,9 +11,7 @@ ordinary percentage and kWh targets work without a departure plan.
 when you want the vehicle to stay paused. A percentage target on its own never
 resumes charging.
 
-The steps follow **0.8.0**, where the departure belongs to a
-[vehicle profile](vehicle-setup.md); existing separate vehicle sources continue
-to work.
+The departure belongs to a car's [vehicle profile](vehicle-setup.md).
 
 ## Example: ready tomorrow at 07:30
 
@@ -141,6 +139,14 @@ known wallbox limits and phase information. It works in three steps:
 2. **Full current.** Charging runs at the wallbox's maximum current.
 3. **Finish at 6 A.** Once the rest fits the remaining time at 6 A, the plan
    reduces to 6 A and lands on the target at departure instead of early.
+
+Because the current changes at most every five minutes, the plan looks one such
+window ahead near the end. Instead of jumping straight from full current to
+6 A, it can set an intermediate current for that window, rounded up to whole
+amperes and never above the current cap, so that only the energy above the 6 A
+path is spent early. A last window shorter than five minutes uses the time that
+is actually left. A charge that is already ahead never goes below 6 A and does
+not pause again just to use up time.
 
 Each SoC report recalculates this. A charge that is faster than estimated never
 pauses again once it has started; it reaches the 6 A step sooner. A slower one

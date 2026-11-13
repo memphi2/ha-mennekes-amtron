@@ -29,7 +29,7 @@ before connecting software to the bus.
 Follow [Installation](installation.md) for the Marketplace or HACS, including
 the release channel and any required Home Assistant restart. The service app
 is installed separately; its steps are in the [service guide](modbus-service.md).
-For an existing installation, see [Updating](upgrading.md).
+For an existing installation, see [Updates](installation.md#updates).
 
 ## 3. Make the adapter available
 
@@ -57,10 +57,10 @@ Follow [Service setup](modbus-service.md) to install and start it in **Read-only
 mode. On Home Assistant OS, confirm the discovered wallbox under
 **Settings → Devices & services**; its URL and token are supplied automatically.
 
-Start the app, choose USB or LAN in **Open Web UI**, save and restart it. The
-guided page needs **Supervisor 2026.10.4+**; native **Configuration** also
-remains available. Until a connection is configured, the app stays in setup mode without
-Modbus or discovery. [Connection-page details](upgrading.md#app-connection-page).
+Start the app, choose USB or LAN under **Open Web UI → Connection**, save and
+restart it. The page needs **Supervisor 2026.10.4+**; native **Configuration**
+also remains available. Until a connection is configured, the app stays in setup
+mode without Modbus or discovery.
 
 For a standalone service, use **Add integration → Mennekes Amtron RTU →
 Connect to the Modbus service** and enter its URL and token as described in that
@@ -102,7 +102,8 @@ current cap, then enable control in the place that owns the USB or LAN connectio
 | Direct USB or LAN | Open **Configure → Wallbox → Current limit and polling** and change **Control mode** to **Modbus master**. The entry reloads, starts the heartbeat and adds controls. |
 
 For the service, HA's entry options offer an additional current cap. Resolve
-any repair messages and check the **Heartbeat** sensor before charging.
+any repair messages and check the `heartbeat` attribute of **Connection
+quality** before charging.
 
 ## 7. First charge
 

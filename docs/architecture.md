@@ -8,15 +8,11 @@ register map, USB/LAN transport, poll cadence, heartbeat and control rules.
 The same source is packaged as `amtron_device` for the independent service;
 there is no copied driver implementation to keep in sync.
 
-Integration and service versions are independent. The HTTP client checks API 2
-and a separate minimum service version (currently 0.6.1), not equality with the
-integration release. The minimum supplies service-owned expiry and cancellation
-of timed charging commands even during HA outages. Old API 2 snapshots without
-`service_version` identify the 0.5.0 baseline and fail this newer requirement.
-Current service snapshots report their own version.
-An integration-only release reuses the compatible published app, so updating
-HA does not restart the service or interrupt its heartbeat. Service changes
-have their own version and publication decision; see [publication](service-releasing.md).
+The HTTP client checks API 2 and a minimum service version reported in every
+snapshot. A release that changes no service input reuses the published app, so
+updating HA does not restart the service or interrupt its heartbeat. Service
+changes have their own version and publication decision; see
+[publication](service-releasing.md).
 
 ```mermaid
 flowchart LR
@@ -41,8 +37,6 @@ revision prevents buffered reports from stopping a subsequently replaced target.
 At most 64 reservations are retained in RAM, with a five-minute lifetime; tokens
 do not survive a service restart and are not Recorder attributes. A restarted
 service or an unknown storage outcome is never inferred to be a successful save.
-Older API 2 services remain usable for other controls; setting a percentage goal
-requires this capability and otherwise reports that the app needs an update.
 
 Explicit target saves finish before propagating cancellation, including time
 spent waiting for a storage lock. The corresponding in-memory model and command
@@ -88,26 +82,38 @@ retains a reversible receipt until caller validation/persistence completes.
 Cancellation runs a bounded, shielded restoration. A failed restoration leaves
 the old owner stopped. See [adapter setup and limitations](lan-adapters.md).
 
-Since **0.6.0b1**, an administrator connection page runs on a separate
-internal Ingress listener. The updated page requires stable Supervisor
-2026.10.4+; earlier app releases required 2026.11.0+. It enumerates only locally
-mapped serial adapters and saves connection fields through the
-Supervisor API for this app. It does not expose the service token to the browser.
+The app's web pages run on a separate internal Ingress listener and require
+Supervisor 2026.10.4+. The connection page enumerates only locally mapped
+serial adapters and saves connection fields through the Supervisor API for this
+app. It does not expose the service token to the browser.
 Ordinary connection saves take effect after an app restart. Explicit LAN-adapter
 setup stops the old connection before changing the adapter; local validation
 errors leave the existing connection running. The user restarts the app after
 a successful adapter change to resume Modbus with the saved settings.
-Other app settings remain in the native Configuration tab.
+The runtime page saves polling intervals through the same Supervisor
+transaction and applies them to the running poller; other settings wait for a
+restart. The overview and register pages only read in-memory snapshots and add
+no Modbus traffic.
 
 The [Supervisor 2026.10.4 ingress implementation](https://github.com/home-assistant/supervisor/blob/2026.10.4/supervisor/api/ingress.py)
 enforces `panel_admin`, removes incoming user and group headers regardless of
-case, and sets the groups from the authenticated user. Earlier Supervisor
-releases do not provide all of these checks and headers together.
+case, and sets the groups from the authenticated user.
 
 An app with missing connection fields starts only its setup interface and health
 endpoint, with no Modbus owner, heartbeat or discovery. A configured but missing
 adapter still follows the normal reconnect path. Standalone configuration remains
-strict and has no Ingress setup mode. See [connection setup](upgrading.md#app-connection-page).
+strict and has no Ingress setup mode.
+
+Charging jobs run in the service next to the bus owner. `ChargeJobController`
+decides from a fresh snapshot, saves the order atomically before it may enable
+charging and applies its current through the ordinary timed-current path under
+a `service-job:<id>` owner. `AmtronControl.set_service_policy` installs a
+`ServiceChargePolicy`: before every write, including a queued one, the control
+asks whether an enabling write belongs to the job's exact owner and whether the
+job requires a stop. Competing enabling commands from HA are refused while an
+order holds the connection; pause, release off and lock stop it. A job never
+writes release, lock or phases itself. See [charging jobs](app-guide.md#charging-jobs)
+and the [API](service-reference.md#charging-job-api).
 
 The driver binds a readable serial number to the client. Reconnection
 invalidates that verification; the next transaction checks it again under the
@@ -420,8 +426,7 @@ of them are dangerous. Centralising it means the minimum current, the
 `allow_unlimited` opt-in, the clamping, the rate limits and the diagnostics
 counters are written once and cannot be forgotten by a new platform.
 
-**Since 0.5.2b2:** current writes retain their five-second register
-floor. A separate `state_change_interval_seconds` option defaults to 300 and
+Current writes retain their five-second register floor. A separate `state_change_interval_seconds` option defaults to 300 and
 accepts 0–3600 seconds; zero disables the longer guard. The direct integration
 owns this option in direct mode, while the service configuration owns it in
 service mode. Remote HA commands use the service's policy.

@@ -17,7 +17,8 @@ connection and HA connects to the app's HTTP API.
 | Virtual Plug & Charge is waiting | [Vehicle recognition and charging permission](#virtual-plug--charge-is-waiting) |
 | A percentage target or departure time is missing or not followed | [Targets and departure planning](#targets-and-departure-planning) |
 | A loss or cost estimate is unknown | [Charging estimates](#loss-or-cost-estimates-are-unknown) |
-| A new menu or debug panel is absent | [Feature availability](#a-documented-feature-is-missing) |
+| An app charging job or guest order does not start, or blocks HA | [Charging jobs in the app](#charging-jobs-in-the-app) |
+| A menu, page or option described here is absent | [Feature availability](#a-documented-feature-is-missing) |
 | History keeps growing | [Database size](#the-database-keeps-growing) |
 
 Before restarting, note the current charging/pause state and download diagnostics
@@ -28,13 +29,11 @@ For installation, downloads and updates, see [Installation and updates](installa
 
 ## A documented feature is missing
 
-Check [versions and feature availability](README.md#versions-and-feature-availability).
-Vehicle profiles, automatic selection and Virtual Plug & Charge are new in
-**0.8.0**. In service mode, Virtual Plug & Charge and the app's **Debug log**
-tab also need **app 0.8.0**. Do not delete and recreate the wallbox to reveal
-a new feature.
+These pages describe the current release. Check that the integration and, in
+service mode, the app are both up to date; the app's web pages and charging jobs
+come with the app. Do not delete and recreate the wallbox to reveal a feature.
 
-For a released optional feature, enable it in its own configuration section.
+Optional features stay off until you enable them in their own configuration section.
 A percentage target needs a vehicle SoC source; departure planning also needs
 usable capacity. Some diagnostics and the running-cost entity are disabled by
 default and can be enabled in the entity's settings.
@@ -51,8 +50,7 @@ app. HA itself needs no restart for this switch. The app's switch is the only
 write-permission setting. After a fresh, healthy
 service status reaches HA, controls become available automatically. They keep
 their entity IDs while read-only, disconnected or not ready; no second HA switch
-is required. A routine integration
-update does not require updating or restarting a compatible app.
+is required.
 
 If just one feature is missing, check the [entity reference](entities.md):
 older register layouts provide fewer sensors, phase selection requires capable
@@ -74,6 +72,7 @@ distinguish a waiting interval from a device problem:
 | Service unavailable | Check the app log and its USB/LAN connection. HA reconnecting does not replay old commands. |
 | Device rejected a write | Check satellite configuration, supported hardware/registers, device state and whether another master is using the bus. |
 | Restart refused | The wallbox must report **idle** before its **Restart** button can be used. |
+| "A charging target requires a pause" although no target is set | An app charging job or guest order holds the connection. See [Charging jobs in the app](#charging-jobs-in-the-app). |
 
 See [service setup](modbus-service.md) or the [hardware guide](hardware.md) for
 the relevant connection.
@@ -92,18 +91,18 @@ itself, or configure those fields in the app when the service owns it.
 
 | Message or symptom | What to check |
 |---|---|
-| No discovery, or the integration asks for URL and token | Confirm the app is installed and running, then check Devices & services again. Check the integration’s minimum service/API requirements; the app and integration version numbers may differ. If you have multiple Modbus apps, select the matching discovered app. |
+| No discovery, or the integration asks for URL and token | Confirm the app is installed and running, then check Devices & services again. If you have multiple Modbus apps, select the matching discovered app. |
 | **App cannot be reached** | Check that the app stays running. For a separate service, also check its host, network and port 8765. |
 | **Token invalid / authentication failed** | During setup, confirm discovery again or check the standalone token. For an existing entry, follow [Renew service access](#renew-service-access). Do not post tokens in an issue. |
 | **Not ready** | Authentication succeeded, but usable wallbox data is not available yet. Check the app log for USB/LAN connection and initialization, then retry. Changing the token will not fix this. |
 | **No serial number yet** | The app has not read the serial number needed to match the wallbox. Check the wallbox connection and supported register layout. |
-| **Service API or minimum-version requirements are not met** | The integration needs **service 0.6.1 or newer with API 2** for service-side expiry of queued timed commands, even if timed planning is unused. Check the requirements in its release notes. Different version numbers alone are fine. If both need updating, update the app/service first, then the integration and restart Core. Keep existing data and entries; changing the token will not fix this. |
+| **Service API or minimum-version requirements are not met** | The app is too old for this integration. Update the app first, then the integration, and restart Core. Keep existing data and entries; changing the token will not fix this. |
 | **App responds, but its data was not accepted** / `invalid service snapshot` | Copy the field named in parentheses in the HA log, such as `identity.max_evse_current`, and download diagnostics before restarting the app. Include both component versions. This is a data-validation error; differing release numbers or a bad token are not implied. |
 | **Different wallbox / identity cannot be confirmed** | Check the Modbus address, gateway route and service configuration; see [wallbox identity](#a-different-wallbox-is-reported). |
 | App repeatedly stops, or reports **invalid or unreadable config** | Read the app log from startup and check its configuration against the [service reference](service-reference.md). If no app log is available, check the Supervisor log for its exit reason. A serial device that is temporarily absent is normally retried without stopping the app. |
-| Older app **0.5.2b2** rejects LAN settings because an old USB device no longer exists | Update to **0.6.1**, which includes the fix for this validation conflict. Before updating, clear the saved **Serial adapter** selection in the native Configuration tab, then save LAN settings and restart. LAN needs no local USB device. |
-| **Connection setup required** | Open the app's **Web UI**, choose USB or LAN, save and restart. Until then, the app runs only setup and health checks, without Modbus, heartbeat or discovery. |
-| Web UI requests Supervisor 2026.11.0 while Supervisor is 2026.10.x | Update the app to **0.8.0**, which supports **Supervisor 2026.10.4+**. Older apps had an overly strict version check. See [connection setup](upgrading.md#app-connection-page); the integration's HA minimum version is unchanged. |
+| **Connection setup required** | Select **Open Web UI → Connection**, choose USB or LAN, save and restart the app. Until then, the app runs only setup and health checks, without Modbus, heartbeat or discovery. |
+| The web page asks to update Supervisor | The app's pages need **Supervisor 2026.10.4 or newer**. Update Supervisor, or use the native **Configuration** tab meanwhile. |
+| The web page reports that administrator access is required | Sign in to Home Assistant with an administrator account. |
 
 An app that starts successfully can still be waiting for the wallbox. The log
 separates API startup, USB/LAN connection, heartbeat start/stop and shutdown.
@@ -216,7 +215,7 @@ Recovery keeps a deliberate pause, device lock, disabled charging release and
 current setting, including unlimited mode. It does not turn a deliberate pause
 into charging. There are at most three attempts, spaced 30 seconds apart while
 the fault persists. A confirmed healthy state resets the retry budget. Remove
-an older recovery automation if it is making duplicate attempts.
+your own recovery automation if it makes duplicate attempts.
 
 The repair disappears after a reading confirms the error has cleared. If
 recovery cannot complete, use **Recover from error** or the repair's **Fix**
@@ -254,8 +253,8 @@ of damaged packets.
 
 In `write_transactions`, a high `queue_wait_ms` means the request waited inside
 the client. `tx_packets: 1` with `rx_callbacks: 0` means no receive callback was
-observed during that transaction. From 0.5.2b1, these counters and timings
-also include any preceding identity check; a sent packet alone does not prove
+observed during that transaction. These counters and timings also include any
+preceding identity check; a sent packet alone does not prove
 that the actual write was sent. Received bytes do not necessarily form a valid
 response. `io_error` identifies a library I/O error, not its physical cause; a
 later `recovered` entry confirms a successful write to the same register.
@@ -289,15 +288,15 @@ firmware-specific limitation.
 | A pending change disappears after restart | A restart of the bus owner cancels queued commands. Request the action again if still wanted. HA Core restarting alone does not cancel a running service's queue. |
 | A pending change disappears without changing the wallbox | A newer charging command or stop can replace/cancel it. If no new command was sent, inspect connectivity, write permission and the integration/app log for an execution failure. |
 
-## PV automation stopped after an update
+## PV automation sends no commands
 
 Open the **Charge from PV surplus** automation and select its **Charging
 paused** input. The blueprint sends no commands until that input is configured.
 Ensure the entities belong to the same wallbox and the power sensor provides a
 numeric value in **W or kW**.
 
-See [Blueprint updates](blueprints.md#updating-existing-blueprint-automations)
-for edited copies and input changes. Inspect the automation trace for failed
+After a blueprint update, edited copies keep their old text; see
+[updating blueprint automations](blueprints.md#updating-existing-blueprint-automations). Inspect the automation trace for failed
 triggers or conditions. HA restarts and automation reloads reset threshold hold
 timers.
 
@@ -310,7 +309,7 @@ request replaces a phase change that is still waiting. Check your vehicle's
 support; some vehicles abort the session after a phase change. The selector
 exists only on capable wallbox hardware.
 
-Since 0.5.2b2, the phase command is sent only after live status confirms
+The phase command is sent only after live status confirms
 that the vehicle has paused. If confirmation fails or times out, the requested
 pause remains and no phase command is sent. Check the wallbox connection and
 vehicle state before trying again; a pause command being accepted does not by
@@ -324,8 +323,7 @@ and that extra wait.
 
 ## Vehicle profiles and automatic selection
 
-These optional functions are new in **0.8.0**. Check the installed
-integration version, then review the following before changing wallbox settings:
+Review the following before changing wallbox settings:
 
 | Symptom | What to do |
 |---|---|
@@ -346,8 +344,8 @@ complete signal and freshness rules.
 
 ## Virtual Plug & Charge is waiting
 
-This optional feature is new in **0.8.0** and off by default. In service
-mode it also requires app 0.8.0. Check its status on the wallbox device.
+This optional feature is off by default. Check the **Virtual Plug & Charge**
+status sensor on the wallbox device.
 
 | Symptom | What to check |
 |---|---|
@@ -357,6 +355,34 @@ mode it also requires app 0.8.0. Check its status on the wallbox device.
 | Permission is granted, but charging has not started | Check the manual pause, wallbox lock, Charging release, reached goals and local RFID requirement. Granting permission does not remove them. |
 | It waits again after the app restarted or the bus was lost | The previous connection grant was invalidated. Fresh physical connection and vehicle evidence are required. An HA-only restart leaves the running app's existing grant intact. |
 | Disabling the feature did not restart charging | Expected: use Charging release explicitly, and resume only if any remaining pause or lock is also unwanted. |
+
+The status sensor's `decision_reason` attribute names the current wait, also
+when it is not a wallbox fault. Read it in **Developer tools → States**, or with
+`state_attr('sensor.<wallbox>_virtual_plug_charge_status', 'decision_reason')`
+using your entity ID:
+
+| `decision_reason` | Meaning and next check |
+|---|---|
+| `detection_not_configured` | No vehicle profile has detection signals. Configure cable and home signals. |
+| `multiple_vehicles_match` | More than one car matches. Resolve the contradicting signals. |
+| `vehicle_evidence_unknown` | At least one participating car cannot be ruled out. Check all profiles, not only the selected one. |
+| `no_vehicle_matches` | No configured car matches the cable and home signals. |
+| `vehicle_binding_pending` | The selected car's targets are not ready for this connection yet. |
+| `session_time_unknown` | The wallbox connection time is not known yet. |
+| `plug_report_not_current` | The cable report is missing or older than this connection. |
+| `settling` | Recognition passed; the short settle time is running. |
+| `grant_retry` | The last attempt to grant failed; it is retried. |
+
+Other values match the status or the `blocked_reason` attribute, for example
+`connection_lost`, `departure_plan`, `release_off`, `energy_goal_stop`,
+`wallbox_locked`, `authorization_required` or `register_unavailable`.
+
+Downloaded diagnostics add a `plug_charge.decision` section: all blockers at
+once, missing registers, the departure-plan status, the category of the last
+failed grant and a cable/home check per profile. `slot` is only the position in
+that list; `selected` marks the active profile. It contains no VIN, position or
+entity IDs. It explains the current signals; it is not a record of what happened
+when permission was granted.
 
 [Full setup and limits](vehicle-setup.md#optional-virtual-plug--charge).
 
@@ -378,6 +404,23 @@ mode it also requires app 0.8.0. Check its status on the wallbox device.
 [Vehicle targets](vehicle-setup.md#optional-vehicle-percentage-target),
 [energy-target recovery](user-guide.md#energy-target) and
 [departure setup](departure-planning.md) explain each control's behavior.
+
+## Charging jobs in the app
+
+| Symptom | What to check |
+|---|---|
+| The order cannot be created: "connection or release changed" | A car must be plugged in, **Charging release** on, the wallbox not locked or faulted, app **Read-only** off and the meter reporting current values. |
+| "Current exceeds the service limit" | Use a current at or below the app's current cap. |
+| "Stop and clear the existing order first" | Only one order exists at a time. Stop it, then clear it. |
+| "Preview again" | The page changed meanwhile, or the start already lies more than a minute in the past. Preview again and confirm right away. |
+| Guest order refused: battery target active | Set the battery (percentage) target in Home Assistant to 0, then preview again. |
+| HA reports "A charging target requires a pause" | An order exists for the plugged-in car, also after it finished. Clear it on **Charging jobs**, or unplug the car. |
+| Charging stays paused after the order ended | Intended. **Clear stopped order without resuming** removes it; then resume in Home Assistant. |
+| The order shows **Interrupted** | The app restarted, the car was unplugged, the wallbox was unreadable for over a minute, or another limit required a stop. Clear it and create a new order. |
+| "Clearing requires a confirmed pause or unplug" | Wait until the overview shows the pause, then clear again. |
+| "Storage unavailable; no automatic start" | The app could not save the order. Check the app log; restarting the app resolves a temporary problem. |
+
+See [charging jobs](app-guide.md#charging-jobs) for the full behavior.
 
 ## Loss or cost estimates are unknown
 
@@ -422,15 +465,13 @@ its owning process restarts; it adds no Recorder rows.
 | `failed_blocks` | Register groups whose latest read failed. |
 
 Service event/write history is fetched only when downloading diagnostics; it is
-not included in regular status polling. The stable 0.5.0 service provides these
-fields; an integration-only update does not require an app restart to retain
-them. The histories omit packet contents, write values and arbitrary exception
+not included in regular status polling. The histories omit packet contents, write values and arbitrary exception
 messages. Diagnostics omit identifying register fields, the serial number and
 full serial-port path.
 
 ### Watch app Modbus communication live
 
-In **app 0.8.0**, select **Open Web UI → Debug log**
+In the app, select **Open Web UI → Debug log**
 (German: **Debugprotokoll**), then enable **Capture communication for 10 minutes**.
 It is a separate tab beside **Connection** (**Verbindung**), independent of the
 app's native Supervisor **Configuration** tab. Switching tabs preserves unsaved
@@ -452,8 +493,9 @@ Modbus requests, Recorder history or log files. Serial numbers and all text
 registers are masked, including inside block reads; network login traffic and
 exception-message contents are never captured.
 
-This view requires the app's administrator-only ingress page and a configured
-connection. It remains available when that connection is failing. Direct-mode
+This view requires a Home Assistant administrator and a configured
+connection. The **Registers** page shows the last value of every register; see
+[the app's web pages](app-guide.md#registers). It remains available when that connection is failing. Direct-mode
 integration users can use the diagnostics described above.
 
 ## Optional command-line bus check

@@ -29,6 +29,7 @@ Keep the vehicle disconnected during the first control setup.
 | Who uses the adapter? | Service app | Home Assistant |
 | During an HA Core restart | Heartbeat and last charging state continue | Heartbeat is interrupted; wallbox fallback applies |
 | Where are writes enabled? | App **Configuration → Read-only** off | Integration **Configure → Wallbox → Control mode: Modbus master** |
+| Charging orders while HA is offline | [Charging jobs and guest charging](app-guide.md#charging-jobs) in the app | Not available |
 
 Both support USB and LAN. A LAN adapter needs no local USB device. On HA
 Container, the service can run as a [separate container](service-standalone.md).
@@ -63,10 +64,7 @@ release and restart Home Assistant. If needed, add
 `https://github.com/memphi2/ha-mennekes-amtron` in **HACS → ⋮ → Custom
 repositories**, category **Integration**.
 
-When updating an existing installation, follow the
-[update guide](upgrading.md#updating-to-080).
-[Check feature availability](README.md#versions-and-feature-availability)
-before looking for a new option in an installed release.
+To update an existing installation, follow [Updates](#updates).
 
 ## 3. Connect the wallbox
 
@@ -82,9 +80,9 @@ TCP port** point to the LAN-to-RS-485 hardware. They are different fields for
 different connections. On HA OS, you normally type neither a service URL nor a
 token for the app.
 
-The app's **Open Web UI** provides guided connection setup on
-**Supervisor 2026.10.4+**. Native **Configuration** remains available for manual setup.
-[Connection-page details](upgrading.md#app-connection-page).
+The app's **Open Web UI → Connection** provides guided connection setup on
+**Supervisor 2026.10.4+**. Native **Configuration** remains available for manual
+setup. See [the app's web pages](app-guide.md).
 
 ## 4. Check readings and try a charge
 
@@ -101,45 +99,34 @@ required just to use the wallbox.
 
 ## Updates
 
-1. Back up HA and read the release notes. Keep the existing integration entry.
-2. Update the app **only if an app update is offered or the integration requires
-   a newer service**. If both need updating, update the app/service first and
-   wait for it to initialize. Its restart briefly interrupts the heartbeat.
-3. Update the integration through Marketplace/Settings → Updates or HACS, then
-   follow the required HA Core restart.
+1. Back up HA and read the release notes, especially the changes marked
+   **Breaking**. Keep the existing integration entry.
+2. In service mode, update the app or standalone service first and wait until it
+   has started. Its restart briefly interrupts the heartbeat.
+3. Update the integration through **Settings → Updates**, the Marketplace or
+   HACS, then complete the requested HA Core restart.
 4. Check current readings, heartbeat, pause/release and the intended current.
 
-The app and integration may have different version numbers. Integration 0.8.0
-requires **service 0.6.1+ with API 2** for ordinary service connections.
-A compatible app can keep running during an integration-only update. Virtual
-Plug & Charge and the separate **Debug log** tab need **app 0.8.0**. When
-updating both components, update the app first.
-
-Use **Check for updates** in the app store if an offered app update is missing.
+Install the integration and the app in the same version. Use **Check for
+updates** in the app store if an offered app update is missing.
 Moving between stable and beta app catalogs creates a separate app and requires
 [the channel handover](modbus-service.md#updates). Moving from HACS to Marketplace
 does not require adding the wallbox again. For changed blueprints,
 [update the existing automation](blueprints.md#updating-existing-blueprint-automations).
-
-## Updating to 0.8.0
-
-Update the **app/service to 0.8.0 before the integration**. Keep its data and
-existing HA entry. Check automations that use **Control result**: its event
-type now names the command. Follow the
-[version-specific update guide](upgrading.md#updating-to-080), including old app
-connection-choice changes when coming from 0.5.1 or older.
 
 ## Change settings later
 
 | Setting | Where to change it |
 |---|---|
 | Direct USB/LAN connection | Integration entry **Reconfigure** |
-| App USB/LAN connection | App **Open Web UI**, or native Configuration where needed |
-| App write permission, current cap and bus polling | App **Configuration**, then save and restart the app |
+| App USB/LAN connection | App **Open Web UI → Connection**, or native Configuration where needed |
+| App polling intervals | App **Open Web UI → Runtime**; applies without restart |
+| App current cap and charging waits | App **Open Web UI → Runtime** or **Configuration**, then restart the app |
+| App write permission | App **Configuration**, then save and restart the app |
 | HA options and optional vehicle features | Integration **Configure**, in the relevant section |
 
-Changing app settings requires an app restart; HA then receives the new status
-without an additional Core restart. Use [the settings map](user-guide.md#configuration-and-options)
+Apart from the polling intervals, app settings take effect after an app
+restart; HA then receives the new status without an additional Core restart. Use [the settings map](user-guide.md#configuration-and-options)
 for the full list. Keep device/entity IDs when changing connection; do not
 remove and re-add the wallbox.
 

@@ -1,13 +1,9 @@
 # Entity reference
 
 Use **Charging current limit** and **Charging paused** for everyday charging.
-**Total power**, **Total energy** and **Heartbeat** show power use, accumulated
-energy and connection health. The [User guide](user-guide.md) explains how to
+**Total power**, **Total energy** and **Connection quality** show power use,
+accumulated energy and connection health, including the heartbeat. The [User guide](user-guide.md) explains how to
 use these controls together; this page lists every entity and its state values.
-
-This reference follows **0.8.0**. Ordinary service connections require
-**app/service 0.6.1 or newer with API 2**; Virtual Plug & Charge and the retry
-count in service mode need **app 0.8.0**.
 
 The first column shows default **English** entity-ID patterns. `*` stands
 for the device prefix; it is not part of a literal entity ID. For example,
@@ -72,7 +68,7 @@ it is unknown; loss of the connection is still handled by normal availability.
 The attributes **Failed transactions** and **Retried transactions** count those
 failures and the recovered lost replies since the last start of HA (direct
 connection) or the app (service mode). They change only on those events, so a
-healthy bus records nothing. Older apps do not report them.
+healthy bus records nothing.
 
 The **Virtual Plug & Charge** status sensor is optional. Supported direct
 connections and services
@@ -148,8 +144,8 @@ pending target. See
 | `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure; the `planned_start` attribute holds when the plan starts charging for the next trip, or when it started, and is absent while the plan lacks its inputs or the trip is done. |
 | `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability | Shows recognition, permission and release status, or Disabled. **Charging blocked** carries a `blocked_reason` attribute (for example `release_off`, `wallbox_locked`, `authorization_required`, `pause_requested`, `energy_goal_stop` or `register_unavailable`). **Released by hand** shows a manual release for the current or next connection. No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. The raw wallbox states behind it are the `evse_state` and `cp_state` attributes (see [Attribute values](#attribute-values)). |
-| `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter; compatible service in service mode | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
-| `sensor.*_pending_change` | Pending change |  | enum | since 0.5.2b2; supporting service for service-owned queues | The queued action, or `none` when no action is reported, with the planned execution time as the `due` attribute. Older services do not report this feature. |
+| `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
+| `sensor.*_pending_change` | Pending change |  | enum | always | The queued action, or `none` when no action is reported, with the planned execution time as the `due` attribute. |
 | `sensor.*_authorization` | Authorization |  | enum | always | Whether RFID or the energy manager has released this session. The `enabled` attribute (layout v01.02) tells whether RFID authorization is switched on in the wallbox at all. |
 | `sensor.*_detected_vehicle_phases` | Detected vehicle phases |  | enum | layout v01.02 | How many phases the vehicle used in this session. The phases the wallbox itself will use are the `switched` attribute of **Requested phases**. |
 | `sensor.*_signaled_current` | Signaled current | A | current | layout v01.03 | What the wallbox offers the vehicle on the pilot line. This is the number that should follow your charging-current limit. |
@@ -214,9 +210,7 @@ outcomes.
 This is a live notification feed, not a durable audit log. It keeps at most 32
 outcomes in service memory. Startup, reconnect and service restart establish a
 new baseline without replaying historical outcomes. Heartbeats, polling and
-countdown ticks create no events. Older compatible services keep working;
-the event entity stays unavailable until their service supports this feature.
-See the [notification example](automations.md#react-to-command-results).
+countdown ticks create no events. See the [notification example](automations.md#react-to-command-results).
 
 The [energy-target guide](user-guide.md#energy-target)
 explains restart behavior, measurement failures and stopping accuracy.

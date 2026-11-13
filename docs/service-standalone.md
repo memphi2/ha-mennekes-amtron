@@ -4,11 +4,11 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-**Current service: 0.8.0.** The integration requires **service 0.6.1 or newer
-with API 2**; Virtual Plug & Charge and Waveshare TCP login need service 0.8.0.
-Update the service first. Use the **v0.8.0** release's container reference or
-source archive. Later integration and service versions can differ when the required
-minimum is met. See [Updates](#operation-and-updates).
+Run the service in the same version as the integration, here **0.9.0b2**, and
+update the service first. See [Updates](#operation-and-updates). The app's web
+pages, including charging jobs, are part of the Home Assistant app and need
+Supervisor Ingress; a standalone service offers the same charging jobs through
+its [API](service-reference.md#charging-job-api).
 
 ## 1. Prepare the serial handover
 
@@ -54,11 +54,10 @@ The service also accepts
 the wait between charging-state changes; early pause/resume, phase, release and
 lock changes are queued. A stop replaces older pending work and also waits for
 its due time. Zero disables the longer wait;
-technical write guards remain. Both timing options require service 0.5.2b2 or newer; older services reject
-these configuration fields. See
+technical write guards remain. See
 [Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
 
-Since 0.5.2b2, the service also accepts `"phase_switch_grace_seconds": 5` (whole seconds,
+The service also accepts `"phase_switch_grace_seconds": 5` (whole seconds,
 0–30). This is an additional wait after live pause confirmation, before the
 final status check and phase write. Zero disables only this grace time. It does
 not replace the state-change interval or the bounded pause-confirmation check.
@@ -89,9 +88,6 @@ See [LAN setup and network access](network-gateway.md).
 
 #### Optional TCP login
 
-This section requires **service 0.8.0 or newer**; older services do not perform
-the handshake even if the following fields are added.
-
 If a supported Waveshare adapter already has TCP login enabled, additionally
 set `tcp_authentication` to `true` and `tcp_auth_password` to its existing web
 password in your private service configuration. Leave these unset for ordinary
@@ -110,9 +106,8 @@ that runs independently of Home Assistant.
 
 Copy the **standalone container reference** from the
 [published app catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps)
-for **0.8.0**. Prereleases are in the
+for your release. Prereleases such as 0.9.0b2 are in the
 [beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta).
-The integration's minimum compatible service remains **0.6.1 with API 2**.
 Use the complete `ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference
 as the image. The digest selects the verified release even if a registry tag
 changes later. The same reference supports Linux amd64 and arm64.
@@ -183,19 +178,12 @@ permission and Modbus polling. Keep the state directory across restarts and
 updates. A Core restart leaves the service running; a service update interrupts
 its heartbeat briefly. Do not run the old and new service together on the bus.
 
-A normal integration update leaves a compatible service running. Its version
-number need not match the integration: **integration 0.8.0 requires service
-0.6.1 or newer with API 2**. Update the service when a service release is available or the
-integration's release notes require a newer minimum, not merely because a new
-integration version exists.
-
-If both need updating, replace the service first, retaining its data directory,
-and wait for initialization. Then update the integration and restart Core.
-Retaining the same data mount preserves saved intent and credentials; no new HA
-entry is needed. For any service older than 0.6.1, upgrade the service before the
-integration. An older integration may show unavailable controls between those
-updates because its API differs. With writes enabled, the updated service keeps
-its heartbeat and charging intent while HA updates.
+Update the service and the integration together. Replace the service first,
+retaining its data directory, and wait for initialization. Then update the
+integration and restart Core. Retaining the same data mount preserves saved
+intent, a charging job and the credentials; no new HA entry is needed. With
+writes enabled, the updated service keeps its heartbeat and charging intent
+while HA updates. A service restart interrupts a running charging job.
 
 [Everyday operation and troubleshooting](modbus-service.md#everyday-use) ·
 [API, diagnostics and local development](service-reference.md)

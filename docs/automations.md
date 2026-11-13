@@ -10,7 +10,7 @@ app's **Read-only** switch off in service mode, saving and restarting the app,
 or **Modbus master** in the integration options for a direct USB or LAN connection.
 Current writes retain a **five-second minimum interval**. For automatic
 pause/resume, use different start/stop thresholds and hold times; the PV blueprint
-defaults to six minutes. **Since 0.5.2b2:** early pause/resume, phase,
+defaults to six minutes. Early pause/resume, phase,
 release and lock changes are queued using the configurable state-change
 interval (default 300 seconds). A newer charging request replaces older pending
 work. A stop replaces a pending start and also waits for its due time. See
@@ -77,7 +77,7 @@ mode: single
 ```
 
 A fixed time trigger is missed if Home Assistant is stopped at that time.
-It does not restore the schedule when HA starts later. Since 0.5.2b2, a recent
+It does not restore the schedule when HA starts later. A recent
 pause can delay an accepted start: inspect **Pending change** and **Pending
 change due**, as well as the **automation trace**. A running service can execute an already queued
 command while HA is offline. Check the current state after a restart rather
@@ -92,7 +92,7 @@ Select **Requested phases** on the device page before automating a change.
 The integration pauses first when the wallbox reports charging and leaves it
 paused. Resume separately after the waiting interval, once the vehicle and
 wallbox are ready. The PV blueprints do not coordinate dynamic phase switching.
-Since 0.5.2b2, the phase command waits for live pause confirmation and the
+The phase command waits for live pause confirmation and the
 configured extra wait, then checks the state again. A failed confirmation leaves
 the phase command unsent and retains the pause.
 See [Phase switching](user-guide.md#phase-switching).
@@ -100,10 +100,9 @@ See [Phase switching](user-guide.md#phase-switching).
 ## Recovery and notifications
 
 Error 200 is recovered automatically when writes are enabled and the heartbeat
-is healthy. The service handles this independently of HA. Disable any older
-**Recover from a lost heartbeat** automation to avoid duplicate attempts.
-The blueprint remains available for existing installations. Its button action
-preserves a deliberate pause. If the error returns, investigate
+is healthy. The service handles this independently of HA. An automation from
+the **Recover from a lost heartbeat** blueprint is not needed and only adds
+duplicate attempts. Its button action preserves a deliberate pause. If the error returns, investigate
 [heartbeat failures](troubleshooting.md#error-200-energy-manager-unavailable).
 Repeated recovery is not a substitute for a functioning connection.
 

@@ -8,11 +8,8 @@ automatic charging permission. Existing Home Assistant entities work with any
 suitable vehicle integration; BavarianData
 can also supply supported data from one selected BMW vehicle.
 
-**Availability:** vehicle profiles, automatic selection and Virtual Plug &
-Charge are available from **0.8.0**. Every setting of a car is in its profile:
-open **Configure → Vehicles**, then the profile. Existing manual sources
-continue to work after updating.
-See [versions and feature availability](README.md#versions-and-feature-availability).
+Every setting of a car is in its profile: open **Configure → Vehicles**, then
+the profile.
 
 ## Choose the setup that fits
 
@@ -252,8 +249,7 @@ manually, but that choice alone never proves which car is connected.
    Every profile with detection signals takes part.
 2. Open the wallbox's device page and turn on **Virtual Plug & Charge** under
    **Configuration**. This switch controls the feature for the whole wallbox.
-   The feature requires
-   write access. Service mode needs **app 0.8.0**.
+   The feature requires write access.
 3. Connect the car and check the **Virtual Plug & Charge** status sensor. Allow time for
    the vehicle integration to report the new cable connection.
 
@@ -398,10 +394,7 @@ This also disables
 departure planning and clears its trip, because that plan needs the SoC source.
 The action is shown only when a vehicle charge-level source is configured. Vehicle profiles,
 detection and Plug & Charge permission remain; the kWh goal and charging state
-are unchanged. In service mode, changing a percentage target
-requires an app version that supports confirmed target updates. Update the
-Modbus service app if Home Assistant asks you to do so. Other service functions
-remain available with older compatible app versions.
+are unchanged.
 
 ## When data is missing
 

@@ -14,10 +14,6 @@ targets and schedules only when you want them:
 - [Charge for the next departure](departure-planning.md)
 - [Losses and costs](charging-estimates.md)
 
-Vehicle profiles, optional automatic selection, Virtual Plug & Charge and app
-live debugging are available from **0.8.0**; see
-[version availability](README.md#versions-and-feature-availability).
-
 ## Optional charging losses and costs
 
 Use an existing vehicle-energy source and a fixed or dynamic electricity price.
@@ -152,16 +148,17 @@ vehicle integrations. Calendar and manual departure inputs remain available.
 | Write permission | **Configure → Wallbox → Current limit and polling → Control mode** | App configuration: **Read-only** |
 | USB adapter, or LAN protocol/host/TCP port, and wallbox address | Integration entry: **Reconfigure** | App: **Open Web UI** |
 | Baud rate and frame | USB: **Reconfigure**; LAN: adapter interface or optional [adapter setup](lan-adapters.md) | USB: app **Open Web UI**; LAN: adapter interface or optional [adapter setup](lan-adapters.md#service-app) |
-| Status and measurement polling | Integration options | App configuration |
+| Status and measurement polling | Integration options | App **Open Web UI → Runtime** (no restart) or app configuration |
 | How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
 | Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
-| Minimum time between state changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
-| Extra wait before phase changes | Integration options, in seconds | App configuration or standalone service configuration, in seconds |
+| Minimum time between state changes | Integration options, in seconds | App **Runtime** page or configuration, in seconds; applies after an app restart |
+| Extra wait before phase changes | Integration options, in seconds | App **Runtime** page or configuration, in seconds; applies after an app restart |
 
-The app keeps connection settings under **Open Web UI** and operating settings
-under **Configuration**. Save and restart the app after changing those settings.
-If a published app refuses to open the guided page on Supervisor 2026.10.x,
-use its native Configuration tab; see [the connection-page version note](upgrading.md#app-connection-page).
+The app keeps connection settings under **Open Web UI → Connection**, live
+operating settings under **Runtime** and write permission under
+**Configuration**. Apart from the polling intervals, restart the app after a
+change. The web pages need Supervisor 2026.10.4 or newer; the native
+Configuration tab always works. See [the app's web pages](app-guide.md).
 
 The default status interval is **5 seconds** and the measurement interval is
 **30 seconds**. The available range is 2–300 seconds. In service mode, changing
@@ -183,6 +180,11 @@ through Home Assistant Core restarts. It keeps the heartbeat running and holds
 the last charging state while HA is offline, including an active pause. HA
 reconnects to that state without replaying old charging commands. HA automations
 are still offline during a Core restart.
+
+For a charge that must run while HA is offline, the app can hold one
+[charging job](app-guide.md#charging-jobs) itself: a time window, a current and
+a maximum amount of energy for the plugged-in car. While such an order exists,
+HA cannot change the current or resume; pausing in HA stops the order.
 
 With a **direct USB or LAN connection**, a Core restart or entry reload interrupts
 the heartbeat. Once communication returns, error 200 recovery runs
@@ -319,8 +321,7 @@ locks and release settings still apply. Read-only mode disables all writes,
 including goal enforcement.
 
 The goal requires the lifetime energy counter (Modbus layout v01.02 or later).
-An older compatible service keeps its existing functions; update the service to
-use the new goal controls. Switching an entry between direct and service mode
+Switching an entry between direct and service mode
 does not transfer an active goal: the new connection owner has its own stored
 state. Set the intended goal with that owner before continuing the charge.
 
@@ -385,5 +386,4 @@ cancellation does not undo a command that has already reached the wallbox.
 
 Direct-mode cancellation also works during a failed wallbox poll. Service mode
 requires the app to be reachable, authenticated and write-enabled, but its
-wallbox connection may be down. Older services need updating to support this
-button. It becomes unavailable again when there is no pending work.
+wallbox connection may be down. It becomes unavailable again when there is no pending work.

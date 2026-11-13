@@ -24,8 +24,7 @@ The HA client declares the required service API and minimum service version
 separately. The current requirement is **API 2 and service 0.6.1 or newer**,
 which supplies deadline expiry for queued timed charging commands. Raise the
 minimum only when the integration needs a newer service feature; a published
-or planned service release must satisfy that requirement. For this release,
-older apps must update before the integration.
+or planned service release must satisfy that requirement.
 
 PR checks run minimum/latest stable HA and native amd64/aarch64 container tests.
 Automatic code and security reviews remain enabled; assess their findings and
