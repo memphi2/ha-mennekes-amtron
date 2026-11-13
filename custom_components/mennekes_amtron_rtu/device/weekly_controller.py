@@ -275,8 +275,8 @@ class WeeklyController:
         """Free a date whose order ended before its window opened.
 
         An activation by hand creates the order for the next departure at
-        once. A car that leaves and returns before that window would
-        otherwise have lost the departure it was activated for.
+        once. A car that leaves before that window would otherwise have lost
+        the departure it was activated for, whenever it returns.
         """
         job = self.jobs.job
         latest = dict(self.book.consumed).get(plan.identifier)
@@ -306,6 +306,13 @@ class WeeklyController:
                     with suppress(WeeklyError):
                         await self._forget(owner)
             return
+        if job is not None and job.state == "interrupted" and job.start_at > sample.now:
+            # Decided while the window is still ahead, not when the car returns.
+            for owner, _vehicle in self.book.assigned:
+                try:
+                    await self._release_unstarted(self.book.plan(owner), sample.now)
+                except WeeklyError:
+                    return
         if not sample.available or sample.present is not True or scope is None or scope == self._served:
             return
         vehicle = self._vehicle(scope)
@@ -323,11 +330,6 @@ class WeeklyController:
             if job.binding != scope or all(row.identifier != job.identifier for row in self._occurrences(plan, sample.now)):
                 return
             consent.job_id = job.identifier
-        else:
-            try:
-                await self._release_unstarted(plan, sample.now)
-            except WeeklyError:
-                return
         self.consent, self._served = consent, scope
         self.reason = "active" if consent.job_id is not None else "waiting_next_occurrence"
         self._changed()
@@ -345,6 +347,11 @@ class WeeklyController:
                 await self._disarm("weekly_storage_unavailable")
                 return
             stopped = epoch != consent.stop_epoch
+            job = self.jobs.job
+            if stopped and consent.job_id is None:
+                # The plan only waits: another order was stopped or cleared,
+                # which does not concern it.
+                consent.stop_epoch, stopped = epoch, False
             if (
                 sample.present is False or stopped
                 or sample.now >= consent.expires or sample.now < consent.last_now - timedelta(seconds=5)
@@ -353,18 +360,22 @@ class WeeklyController:
                     # An assigned car that stays plugged in is served on.
                     self._served = None
                 try:
-                    if stopped:
-                        # A stop by hand also ends the automatic activation;
-                        # saved first, and a failed save fences the plan.
+                    if stopped and job is not None and job.identifier == consent.job_id and job.state == "stopped":
+                        # A stop of the plan's order by hand also ends the
+                        # automatic activation; saved first, and a failed
+                        # save fences the plan. Clearing a finished order
+                        # only ends this activation.
                         with suppress(WeeklyError):
                             await self._forget(consent.plan_id)
                 finally:
-                    await self._disarm("session_ended")
+                    # The order's owner ends an unplugged order itself, as
+                    # interrupted: stopping it here would look like a stop
+                    # by hand and keep its date used.
+                    await self._disarm("session_ended", stop=sample.present is not False)
                 return
             if not sample.available or sample.present is None:
                 # A short gap: the order and the connection scope bound it.
                 return
-            job = self.jobs.job
             own = job is not None and job.identifier == consent.job_id
             if sample.scope != consent.scope:
                 if own and job is not None and job.state == "suspended":

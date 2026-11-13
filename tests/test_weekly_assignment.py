@@ -396,3 +396,65 @@ def test_a_saved_assignment_needs_a_known_plan_and_one_car_each(assigned):
         WeeklyBook.parse({"plans": plans, "consumed": {}, "assigned": assigned})
     # A book saved without assignments still loads.
     assert WeeklyBook.parse({"plans": plans, "consumed": {}}).assigned == ()
+
+
+def test_a_car_that_left_before_its_window_is_charged_when_it_returns_inside_it(tmp_path):
+    async def run():
+        h = await Garage(tmp_path).assigned()
+        assert h.weekly.book.used(PLAN, TODAY)
+        h.change(present=False, scope=None)
+        # Even when the plan notices the unplugging first, the order ends as
+        # interrupted, not as stopped by hand.
+        await h.weekly.tick()
+        await h.both()
+        assert h.jobs.job.state == "interrupted"
+        await h.both()
+        # The date is free again while the window is still ahead.
+        assert not h.weekly.book.used(PLAN, TODAY)
+        assert h.weekly.book.assigned == ((PLAN, "profile:bmw"),)
+        revision = h.weekly.revision
+        await h.both()
+        assert h.weekly.revision == revision
+        h.change(now=OPEN + timedelta(minutes=10), present=True, scope=NEXT)
+        h.car = (CAR, NEXT)
+        await h.both()
+        await h.both()
+        await h.jobs.tick()
+        assert (h.weekly.reason, h.jobs.job.binding, h.jobs.job.state) == ("active", NEXT, "charging")
+        assert h.weekly.book.used(PLAN, TODAY)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("how", ["clear", "stop"])
+def test_a_waiting_plan_keeps_its_car_when_another_order_is_stopped_or_cleared(tmp_path, how):
+    async def run():
+        h = await Garage(tmp_path).assigned()
+        await h.replug()
+        assert (h.weekly.reason, h.weekly.consent.job_id) == ("waiting_next_occurrence", None)
+        if how == "clear":
+            # The old, interrupted order is dismissed.
+            await h.jobs.clear(revision=h.jobs.revision)
+        else:
+            h.jobs.manual_stop_epoch += 1
+        await h.both()
+        assert h.weekly.book.assigned == ((PLAN, "profile:bmw"),)
+        assert (h.weekly.reason, h.weekly.consent.job_id) == ("waiting_next_occurrence", None)
+        # At its window the plan still charges.
+        h.change(now=OPEN + timedelta(seconds=1))
+        await h.both()
+        await h.jobs.tick()
+        assert (h.weekly.reason, h.jobs.job.state) == ("active", "charging")
+    asyncio.run(run())
+
+
+def test_clearing_the_plans_finished_order_ends_the_activation_but_keeps_the_car(tmp_path):
+    async def run():
+        h = await Garage(tmp_path).assigned()
+        h.change(now=OPEN + timedelta(hours=3))
+        await h.both()
+        assert h.jobs.job.terminal
+        await h.jobs.clear(revision=h.jobs.revision)
+        await h.both()
+        assert (h.weekly.consent, h.weekly.reason) == (None, "session_ended")
+        assert h.weekly.book.assigned == ((PLAN, "profile:bmw"),)
+    asyncio.run(run())

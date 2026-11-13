@@ -146,6 +146,12 @@ def test_activation_never_outlives_its_session_permission(tmp_path, change):
         h.change(**change)
         await h.weekly.tick()
         assert h.weekly.consent is None
+        if change == {"present": False}:
+            # The order's owner ends an unplugged order itself, as interrupted
+            # rather than stopped by hand.
+            assert not h.jobs.job.terminal
+            await h.jobs.tick()
+            assert h.jobs.job.state == "interrupted"
         assert h.jobs.job.terminal
     asyncio.run(run())
 

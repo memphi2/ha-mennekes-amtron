@@ -285,9 +285,13 @@ The plan forgets its car when you
 
 - select **Stop weekly automation**; without an active plan this makes every
   plan forget its car
-- stop or clear the plan's job on **Charging jobs**, or pause charging, switch
-  off the release or lock the wallbox in Home Assistant while that job runs
+- stop the plan's job on **Charging jobs**, or pause charging, switch off the
+  release or lock the wallbox in Home Assistant while that job runs
 - remove the plan or change its vehicle profile reference
+
+Clearing the plan's ended job only ends the current activation; the car stays
+remembered for the next plug-in. Stopping or clearing another order does not
+concern a plan that waits for its window.
 
 Activate it again by hand to have the car remembered once more. A car has one
 such plan: activating another plan for the same car moves the car to that plan.
