@@ -16,17 +16,24 @@ from aiohttp import web
 
 from .app_settings import (
     INGRESS_PORT,
-    AppSettings,
     SetupConfig,
     app_configuration,
-    create_settings_app,
     create_setup_app,
 )
 from .connection import NetworkConfig, SerialConfig
 from .service_config import ServerConfig
+from .service_departure_runtime import DepartureModbusService as ModbusService
 from .service_discovery import app_token, publish_discovery
-from .service_http import create_app
-from .service_runtime import ModbusService
+from .service_overview import service_overview
+from .service_weekly_http import (
+    WeeklyConsole as ServiceConsole,
+)
+from .service_weekly_http import (
+    create_weekly_app as create_app,
+)
+from .service_weekly_http import (
+    create_weekly_console as create_console_app,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,8 +67,9 @@ async def run(config: ServerConfig | SetupConfig, state: Path, supervisor_token:
         _LOGGER.info("Service API ready on port %s", config.port)
         if supervisor_token:
             settings_runner = web.AppRunner(
-                create_settings_app(AppSettings(
-                    supervisor_token, config.token,
+                create_console_app(ServiceConsole(
+                    supervisor_token, config.token, service=service,
+                    overview=lambda: service_overview(service),
                     modbus_trace=service.client.modbus_trace if service is not None else None,
                     configuration_guard=(service.client.async_connection_configuration if service is not None else None),
                 )), access_log=None,

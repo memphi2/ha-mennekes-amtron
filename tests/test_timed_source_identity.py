@@ -7,7 +7,7 @@ from datetime import UTC, timedelta, timezone
 
 import pytest
 
-from custom_components.mennekes_amtron_rtu.timed_goal import (
+from custom_components.mennekes_amtron_rtu.device.timed_goal import (
     TimedGoal,
     matches_departure_source,
 )
@@ -60,6 +60,9 @@ def test_equivalent_timestamp_preserves_cancel_manual_or_completed_trip_after_re
         chosen = NOW + timedelta(hours=5)
         if selection == "clear":
             await observer.async_set_deadline(None)
+            # Without a trip the plan's own pause ends.
+            await observer._evaluate()
+            assert control.commands[-1] == ("resume", None)
         elif selection == "manual":
             await observer.async_set_deadline(chosen)
         else:

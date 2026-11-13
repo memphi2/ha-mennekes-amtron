@@ -150,6 +150,34 @@
       },
       "wallbox_settings": {
         "default": "mdi:tune-vertical"
+      },
+      "operation_controller": {
+        "default": "mdi:account-tie-hat-outline",
+        "state": {
+          "unavailable": "mdi:lan-disconnect",
+          "guest_order": "mdi:account-clock-outline",
+          "weekly_plan": "mdi:calendar-week",
+          "charging_job": "mdi:clipboard-clock-outline",
+          "departure_plan": "mdi:car-clock",
+          "direct": "mdi:gesture-tap"
+        }
+      },
+      "operation_waiting": {
+        "default": "mdi:timer-sand",
+        "state": {
+          "none": "mdi:check-circle-outline",
+          "no_vehicle": "mdi:car-off",
+          "wallbox_unavailable": "mdi:lan-disconnect",
+          "target_reached": "mdi:battery-check-outline",
+          "paused": "mdi:pause-circle-outline"
+        }
+      },
+      "operation_next": {
+        "default": "mdi:skip-next-circle-outline",
+        "state": {
+          "none": "mdi:calendar-blank-outline",
+          "departure": "mdi:car-arrow-right"
+        }
       }
     },
     "switch": {

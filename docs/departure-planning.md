@@ -11,9 +11,7 @@ ordinary percentage and kWh targets work without a departure plan.
 when you want the vehicle to stay paused. A percentage target on its own never
 resumes charging.
 
-The steps follow **0.8.0**, where the departure belongs to a
-[vehicle profile](vehicle-setup.md); existing separate vehicle sources continue
-to work.
+The departure belongs to a car's [vehicle profile](vehicle-setup.md).
 
 ## Example: ready tomorrow at 07:30
 
@@ -21,7 +19,8 @@ to work.
    target** to the percentage you want, for example **80%**.
 2. Enable departure planning and provide **usable** battery capacity. Choose
    a fixed value or a suitable HA entity; a configured BavarianData profile can
-   supply it when that source is available.
+   supply it when that source is available. Optionally set a
+   [minimum charge level](#minimum-charge-level) the car charges to at once.
 3. Set **Next departure** to tomorrow's full date and **07:30**, or copy that
    trip from a calendar or vehicle timer.
 4. Check the displayed date, time, target and planning status.
@@ -120,7 +119,8 @@ timestamp. A manual, calendar or vehicle selection takes priority over the sourc
 current timestamp; it can be replaced when that timestamp changes to a new
 trip. A different time-zone representation of the same instant is still the
 same trip and does not reactivate a cleared plan. **Clear departure time** cancels the selected plan without changing the
-percentage ceiling or immediately changing the wallbox.
+percentage ceiling. A pause the plan itself had set ends with it, so the car
+charges again; any other setting of the wallbox stays as it is.
 
 ## Change or cancel a trip
 
@@ -141,6 +141,29 @@ known wallbox limits and phase information. It works in three steps:
 2. **Full current.** Charging runs at the wallbox's maximum current.
 3. **Finish at 6 A.** Once the rest fits the remaining time at 6 A, the plan
    reduces to 6 A and lands on the target at departure instead of early.
+
+Because the current changes at most every five minutes, the plan looks one such
+window ahead near the end. Instead of jumping straight from full current to
+6 A, it can set an intermediate current for that window, rounded up to whole
+amperes and never above the current cap, so that only the energy above the 6 A
+path is spent early. A last window shorter than five minutes uses the time that
+is actually left. A charge that is already ahead never goes below 6 A and does
+not pause again just to use up time.
+
+### Minimum charge level
+
+Waiting for a late start leaves the car at its arrival level for hours. Set
+**Minimum charge level (%)** in the departure planning options to keep a
+reserve for an unplanned trip: while the car is below that level, the plan
+charges at once at full current and shows **Charging to the minimum level**.
+At the level it pauses and waits for the planned start as usual; the
+`planned_start` attribute keeps showing that start. The level is part of the
+target, not extra, and **0** switches it off. It applies per
+[vehicle profile](vehicle-setup.md), with and without the Modbus service app.
+
+The current still changes at most every five minutes, so charging can run a
+little past the level. A car whose charge level drops below it again while it
+waits charges back up to it.
 
 Each SoC report recalculates this. A charge that is faster than estimated never
 pauses again once it has started; it reaches the 6 A step sooner. A slower one
@@ -182,12 +205,62 @@ minimum, the wallbox's configured transition delay and HA outages can make
 the exact target time impossible. Missing SoC or capacity data leaves the
 current charging state unchanged.
 
-The plan needs HA running to recalculate current and start climate actions.
-With the independent service, a queued timed-plan command expires at its
-deadline even if HA is offline; it cannot resume charging later as an obsolete
-request. Expiry does not undo a command already applied or stop an ongoing
-charge. The service continues its heartbeat and last applied state, subject
-to its charging limits.
+With a direct serial connection the plan needs HA running to recalculate the
+current. Climate actions always need HA.
+
+## With the Modbus service app
+
+With the [Modbus service app](modbus-service.md) the app plans the trip
+itself. Home Assistant hands over the departure time, the selected car with
+its usable capacity and remembered phases, and every charge level together with
+the time the car reported it. The percentage target reaches the app as before.
+The entities in Home Assistant show the app's plan; you set, change and clear
+the trip there as described above.
+
+- **The plan keeps running without Home Assistant.** A restart or outage of HA
+  changes nothing. After an app restart the plan continues when the wallbox
+  proves that the car stayed plugged in; otherwise it waits until Home
+  Assistant confirms the car again.
+- **The plan starts only for a confirmed car with a known charge level.** Home
+  Assistant confirms the selected car for each plug-in. Without a charge level
+  the status is **Waiting for vehicle charge level**.
+- **Between two reports the app projects the charge level**: the last reported
+  level plus the metered energy since then at the car's transfer efficiency,
+  90% until the app has learned it. Energy charged before a report is not
+  counted twice, because every report carries its own time.
+- **The app learns each car.** From two reports of the car during one plug-in
+  that lie at least ten percentage points apart, and the energy metered
+  between them, it learns how much of the metered energy reaches the battery
+  (60% to 100%; a slightly wrong capacity is absorbed as well). Every
+  comparison moves the value by a part only, so one late report cannot shift
+  the start by much. While the plan charges at full current, it also meters
+  the power the car really draws, per number of phases and per ampere offered,
+  so it stays valid when the maximum current changes. A car that draws less than the wallbox offers therefore
+  gets an earlier start, and the 30-minute reserve stays for the unexpected.
+  Both values are kept per vehicle profile for up to eight cars and survive a
+  restart.
+- **The forecast runs to the percentage target.** **Timed charging status**
+  shows it as attributes: `estimated_finish`, `estimated_level_at_departure`,
+  `learned_efficiency` and, once metered, `measured_power_kw`. As long as the
+  target is reachable, the plan lands on it at departure. Once it is not, the
+  finish time lies after the departure and the level below the target.
+- **At the projected target the app pauses** and shows **Charged to the
+  estimated target**. This stop is provisional: a later report more than one
+  percentage point below the target charges again, a report at or above it
+  ends the trip as **Target reached**. Without another report the trip counts
+  as reached at departure. A target at the car's own charge limit is not paused
+  on an estimate, because the car ends that charge itself.
+- **Manual and PV commands act at once.** The plan sets its current again five
+  minutes after its last change at the earliest, and only when it differs by
+  at least 1 A.
+- **An order from the app has priority.** While a charging job, weekly plan or
+  guest order holds the wallbox, the status is **An order from the app has
+  priority** and the plan writes nothing.
+
+The plan's pause ends when the car is unplugged or another car is selected, so
+the next car is not left paused. It also ends when the departure is cleared or
+passes while the plan still paused. Only a stop at the reached target is kept
+until the car is unplugged.
 
 The bus owner also checks for a disconnected vehicle before
 applying a planned command. Confirmed unplugging cancels that command, including

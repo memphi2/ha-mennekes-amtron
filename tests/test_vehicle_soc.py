@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 from copy import copy
+from datetime import UTC, datetime
 from itertools import product
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -23,6 +25,7 @@ from custom_components.mennekes_amtron_rtu.vehicle_soc import (
     _Observations,
     vehicle_percentage,
 )
+from custom_components.mennekes_amtron_rtu.vehicle_sources.types import VehicleTelemetry
 
 
 class Coordinator:
@@ -499,4 +502,30 @@ def test_failed_target_keeps_unsent_evidence_and_unload_cancels_the_worker(tmp_p
             await observer.async_stop()
             await hass.async_stop()
 
+    asyncio.run(run())
+
+
+def test_a_reading_carries_the_time_its_source_reported_it(tmp_path):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        hass.states.async_set("sensor.car", "50", {"unit_of_measurement": "%"})
+        reported = hass.states.get("sensor.car").last_changed
+        binding = SimpleNamespace(resting=False)
+        observer = VehicleSocObserver(hass, Control(), Coordinator(), "sensor.car", binding=binding)
+        assert observer.latest_soc_reading == (50.0, reported)
+        hass.states.async_set("sensor.car", "unavailable")
+        assert observer.latest_soc_reading is None
+        hass.states.async_set("sensor.car", "60", {"unit_of_measurement": "%"})
+        # Another car may be plugged in: this car's level has no say.
+        binding.resting = True
+        assert observer.latest_soc_reading is None
+        assert VehicleSocObserver(hass, Control(), Coordinator(), None).latest_soc_reading is None
+        at = datetime(2026, 11, 13, 22, 0, tzinfo=UTC)
+        telemetry = SimpleNamespace(source_key="car", snapshot=VehicleTelemetry(40.0, soc_reported_at=at))
+        car = VehicleSocObserver(hass, Control(), Coordinator(), None, telemetry=telemetry, use_vehicle_soc=True)
+        assert car.latest_soc_reading == (40.0, at)
+        telemetry.snapshot = VehicleTelemetry(40.0)
+        assert car.latest_soc_reading is None
+        missing = VehicleSocObserver(hass, Control(), Coordinator(), None, use_vehicle_soc=True)
+        assert missing.latest_soc_reading is None
     asyncio.run(run())

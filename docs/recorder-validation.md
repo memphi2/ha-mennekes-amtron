@@ -17,15 +17,15 @@ sensors. Hourly rows per day are calculated from those counts, not a new
 
 | Profile | Exclusions | Statistics series | Hourly rows per day |
 |---|---|---:|---:|
-| Full history | Keep all default sensors recorded | 8 | 192 |
-| Less detail | Exclude the three phase currents | 5 | 120 |
-| Energy and power statistics only | Also exclude signaled current, session energy and temperature | 2 | 48 |
+| Full history | Keep all default sensors recorded | 5 | 120 |
+| Less detail | Exclude signaled current and temperature | 3 | 72 |
+| Energy and power statistics only | Also exclude session energy | 2 | 48 |
 
 Counts assume one wallbox on layout v01.03, default enabled sensors and valid
 values throughout the day. They are statistics-row counts, **not disk-space
 limits**. State history for other entities can still be recorded in the smaller
 profiles. Phase voltages, session duration and the installation settings are
-attributes of other sensors since 0.9.0 and add no statistics series.
+attributes of other sensors and add no statistics series.
 
 Recorder exclusion leaves enabled sensors available live; sensors disabled in
 the entity registry must first be enabled to expose live readings. Exclusion

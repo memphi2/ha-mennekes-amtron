@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from .client_errors import AmtronBusError, AmtronRateLimitedError
 from .data import WallboxData
+from .decode import is_hex32
 from .errors import DeviceError, DeviceValidationError, validation_error
 from .registers import (
     AUTHORIZATION_ENABLED,
@@ -32,7 +33,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _POLICY = re.compile(r"(?:[0-9a-f]{64})?")
-_SESSION = re.compile(r"[0-9a-f]{32}")
 # An unknown vehicle state is not an unplug. Brief read gaps and transient
 # EVSE/CP combinations keep the grant; a longer one withdraws it.
 UNKNOWN_GRACE = timedelta(seconds=60)
@@ -168,14 +168,18 @@ class PlugChargeController:
     def observe(self, data: WallboxData | None, *, observed_at: datetime | None = None) -> None:
         if self._stopping:
             return
+        # Only values read in this poll decide: a held one is no evidence that
+        # the same car is still there.
         present = None if data is None else vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
+            data.fresh(EVSE_STATE.key), data.fresh(CP_STATE.key),
             cp_supported=self._control._identity.layout_version >= CP_STATE.min_layout,
         )
         self.state.observe(present, observed_at=observed_at)
         if present is False:
             self._end_manual_stop()
-        if self.state.blocked and (data is None or data.get(CHARGING_RELEASE.key) != 0):
+        # Without a poll there is no bus to close the release on; the first
+        # poll that answers does it.
+        if self.state.blocked and data is not None and data.get(CHARGING_RELEASE.key) != 0:
             self._schedule_deny()
 
     def _end_manual_stop(self) -> None:
@@ -228,6 +232,11 @@ class PlugChargeController:
             self.state.configure(enabled, policy)
             self._end_manual_stop()
             await self.async_sync_locked()
+
+    @property
+    def authorizing(self) -> bool:
+        """Home Assistant's grant is being written."""
+        return self._authorizing is not None
 
     def check_release(self, *, recovery: bool = False) -> None:
         if self._authorizing is not None:
@@ -291,7 +300,7 @@ class PlugChargeController:
 
     async def async_authorize(self, session: str, deadline: datetime) -> None:
         self._control._require_write_access()
-        if not isinstance(session, str) or _SESSION.fullmatch(session) is None:
+        if not is_hex32(session):
             raise validation_error("plug_charge_session_changed")
         if (
             not isinstance(deadline, datetime) or deadline.tzinfo is None or deadline.utcoffset() is None
@@ -300,8 +309,8 @@ class PlugChargeController:
             raise validation_error("plug_charge_authorization_expired")
         async with self._control.energy_goal_guard:
             self._check_request(session, deadline)
-            if self._control.energy_goal_stop_requested:
-                raise validation_error("energy_goal_stop_active")
+            if self._control.release_stop_requested:
+                raise self._control.stop_error()
             await self._live_presence(self._control._client.async_read_register)
             self._check_request(session, deadline)
             current = await self._control._async_read_switch(CHARGING_RELEASE)

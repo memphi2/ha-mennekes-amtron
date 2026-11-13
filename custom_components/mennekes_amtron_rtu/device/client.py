@@ -17,10 +17,12 @@ import asyncio
 import logging
 import time
 import weakref
-from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
+from contextlib import asynccontextmanager, suppress
+from contextvars import ContextVar
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, wraps
+from typing import Any, Concatenate
 
 from pymodbus import FramerType
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
@@ -52,6 +54,15 @@ from .write_trace import WriteTrace
 
 _LOGGER = logging.getLogger(__name__)
 _PYMODBUS_LOGGER = logging.getLogger("pymodbus.logging")
+# pymodbus has one logger for every user in the process. Only records written
+# while one of this client's transactions runs in the current task are ours.
+_OWN_TRANSACTION: ContextVar[bool] = ContextVar("amtron_modbus_transaction", default=False)
+
+
+# pymodbus replaces a message equal to the one before by "Repeating....",
+# once, so a second lost reply arrives under that text.
+_REPEATED = "Repeating...."
+_last_was_lost_reply = False
 
 
 def _demote_lost_reply(record: logging.LogRecord) -> bool:
@@ -62,7 +73,14 @@ def _demote_lost_reply(record: logging.LogRecord) -> bool:
     holds the last values, and link quality counts the failure. A command
     that really failed is logged by its own caller.
     """
-    if record.levelno >= logging.ERROR and record.getMessage().startswith("No response received after"):
+    # Mirrors pymodbus's own module-wide last-message state.
+    global _last_was_lost_reply
+    message = record.getMessage()
+    if message == _REPEATED:
+        lost_reply = _last_was_lost_reply
+    else:
+        lost_reply = _last_was_lost_reply = message.startswith("No response received after")
+    if _OWN_TRANSACTION.get() and record.levelno >= logging.ERROR and lost_reply:
         record.levelno, record.levelname = logging.DEBUG, "DEBUG"
         return _PYMODBUS_LOGGER.isEnabledFor(logging.DEBUG)
     return True
@@ -70,6 +88,26 @@ def _demote_lost_reply(record: logging.LogRecord) -> bool:
 
 if _demote_lost_reply not in _PYMODBUS_LOGGER.filters:
     _PYMODBUS_LOGGER.addFilter(_demote_lost_reply)
+
+
+def _own_transaction[C, **P, R](
+    method: Callable[Concatenate[C, P], Coroutine[Any, Any, R]],
+) -> Callable[Concatenate[C, P], Coroutine[Any, Any, R]]:
+    """Mark pymodbus records as ours only while this transaction runs.
+
+    The mark is reset afterwards, so tasks started later from the same
+    context never inherit it.
+    """
+
+    @wraps(method)
+    async def run(self: C, /, *args: P.args, **kwargs: P.kwargs) -> R:
+        token = _OWN_TRANSACTION.set(True)
+        try:
+            return await method(self, *args, **kwargs)
+        finally:
+            _OWN_TRANSACTION.reset(token)
+
+    return run
 
 type ClientFactory = Callable[[ConnectionConfig], ModbusTransport]
 type LockedRegisterReader = Callable[[RegisterSpec], Awaitable[RegisterValue]]
@@ -357,6 +395,11 @@ class MennekesModbusClient:
             except BaseException:
                 if guard.reconnect_allowed:
                     self._configuration_pending_restart = was_pending
+                    if not was_pending and not isinstance(self._config, NetworkConfig) and self._client is not None:
+                        # Nothing reopens a serial port per transaction: the
+                        # restored connection would stay closed until a restart.
+                        with suppress(AmtronConnectionError):
+                            await self._async_connect_locked(self._client)
                 raise
 
     async def async_read_block(self, block: RegisterBlock) -> dict[str, RegisterValue]:
@@ -379,6 +422,7 @@ class MennekesModbusClient:
                 raise AmtronIdentityError("wallbox identity changed or is unavailable")
             return result
 
+    @_own_transaction
     async def _async_read_words_locked(
         self, address: int, count: int, *, verify_identity: bool = False,
     ) -> list[int]:
@@ -493,6 +537,7 @@ class MennekesModbusClient:
         if remaining > 0:
             raise AmtronRateLimitedError(spec.key, remaining)
 
+    @_own_transaction
     async def _async_write_locked(
         self,
         spec: RegisterSpec,

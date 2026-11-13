@@ -42,10 +42,10 @@ def test_profiles_use_actual_ids_and_read_permissions_without_writes(tmp_path):
                 entries = hass.config_entries.async_entries(DOMAIN)
                 assert len(entries) == 2
                 registry = er.async_get(hass)
-                original = registry.async_get_entity_id("sensor", DOMAIN, entry_entity_unique_id(entries[0], "current_l1"))
+                original = registry.async_get_entity_id("sensor", DOMAIN, entry_entity_unique_id(entries[0], "signaled_current"))
                 registry.async_update_entity(original, new_entity_id="sensor.garage_custom_current")
                 devices = [dr.async_entries_for_config_entry(dr.async_get(hass), e.entry_id)[0].id for e in entries]
-                for profile, count in (("full", 0), ("detail", 6), ("lean", 12)):
+                for profile, count in (("full", 0), ("detail", 4), ("lean", 6)):
                     response = await hass.services.async_call(DOMAIN, "get_recorder_exclusions", {
                         "device_id": devices + devices[:1], "profile": profile,
                     }, blocking=True, return_response=True)
@@ -60,7 +60,7 @@ def test_profiles_use_actual_ids_and_read_permissions_without_writes(tmp_path):
                 single = await hass.services.async_call(DOMAIN, "get_recorder_exclusions", {
                     "device_id": devices[0], "profile": "lean",
                 }, blocking=True, return_response=True)
-                assert len(single["entities"]) == 6
+                assert len(single["entities"]) == 3
                 assert all(not transport.writes for transport in transports)
                 assert not hass.services.has_service("recorder", "purge")
                 denied = SimpleNamespace(id="denied", permissions=SimpleNamespace(check_entity=lambda *_: False))
@@ -100,8 +100,8 @@ def test_profile_ignores_other_integrations_and_missing_registry_entries(monkeyp
         }
         registry = SimpleNamespace(
             async_get_entity_id=lambda _kind, _domain, key: (
-                "sensor.wrong_device" if key.endswith("current_l1") else
-                "sensor.deleted" if key.endswith("current_l2") else None
+                "sensor.wrong_device" if key.endswith("signaled_current") else
+                "sensor.deleted" if key.endswith("temperature") else None
             ),
             async_get=lambda entity: SimpleNamespace(device_id="other") if entity == "sensor.wrong_device" else None,
         )

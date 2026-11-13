@@ -26,11 +26,24 @@ class IntentStore:
         self.identity = identity
         self._last: dict[str, Any] | None = None
 
-    def load(self, state: WriteState) -> None:
+    def load(self, state: WriteState) -> bool:
+        """Apply the saved intent; False when the file was rejected.
+
+        A file of another wallbox or format, or a damaged one, counts as none:
+        the app starts as on its first run, takes the wallbox's own state and
+        replaces the file with its next save.
+        """
         try:
-            payload = json.loads(self.path.read_text())
+            raw = self.path.read_bytes()
         except FileNotFoundError:
-            return
+            return True
+        try:
+            self._apply(json.loads(raw), state)
+        except (ValueError, TypeError, ArithmeticError, RecursionError):
+            return False
+        return True
+
+    def _apply(self, payload: Any, state: WriteState) -> None:
         if (
             not isinstance(payload, dict)
             or payload.get("version") != 1

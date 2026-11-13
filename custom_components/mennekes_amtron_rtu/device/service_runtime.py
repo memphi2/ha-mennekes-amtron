@@ -41,6 +41,12 @@ from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
 API_VERSION = 2
+# A state poll waits this long for a running command, then takes the last
+# published state unless that is older than the second value.
+_PATIENCE_SECONDS = 2.0
+# A kWh goal pauses for a missing meter only after the bus failed this long.
+METER_GRACE_SECONDS = 60.0
+_PUBLISHED_SECONDS = 60.0
 
 
 class ModbusService:
@@ -81,6 +87,8 @@ class ModbusService:
         self._session_history_error_logged = False
         self._logged_unavailable = False
         self._command_lock = asyncio.Lock()
+        # The last state published after a completed command, and when.
+        self._published: tuple[float, dict[str, Any]] | None = None
         # A fresh boot changes the revision, so a client cannot mistake an old
         # cached command outcome for a goal restored after a service restart.
         self._soc_goal_revision = secrets.token_hex(16)
@@ -91,8 +99,15 @@ class ModbusService:
         self._success = False
         self._attempts = 0
         self._retry_at = 0.0
+        self._cap_retry_at = 0.0
         self._updated_at: float | None = None
         self._energy_sample: dict[str, float | None] | None = None
+        # When the sample was taken, on the monotonic clock.
+        self._energy_sample_at: float | None = None
+        # Since when every poll failed; a goal pauses only after a while.
+        self._meter_failing_since: float | None = None
+        self._storage_warned_at: float | None = None
+        self._intent_rejected = False
         self._stopping = False
         self._phase = f"opening {self._connection_name} connection"
         self.heartbeat.async_add_listener(self._log_heartbeat_health)
@@ -124,7 +139,11 @@ class ModbusService:
             or f"{self.config.connection.port}:{self.config.connection.device_id}",
         )
         self._phase = "loading saved control intent"
-        await asyncio.to_thread(store.load, self.client.write_state)
+        if not await asyncio.to_thread(store.load, self.client.write_state) and not self._intent_rejected:
+            self._intent_rejected = True
+            _LOGGER.warning(
+                "Saved control intent belongs to another wallbox or is damaged; starting without it"
+            )
         self._saved_session_history = self.client.write_state.session_history.snapshot()
         self.identity = identity
         self._store = store
@@ -149,6 +168,7 @@ class ModbusService:
             request_refresh=self._control_updated,
             validate_deferred=self._validate_deferred,
         )
+        self._configure_control(control)
         goal = EnergyGoalController(control, self.client, self._persist)
         soc_goal = SocGoalController(control, self._persist)
         try:
@@ -167,7 +187,7 @@ class ModbusService:
                 control.charging_setpoint = (
                     float(current) if current == 0 or current >= 6 else 6.0
                 )
-        await self._persist()
+        await self._save_intent()
         self.control = control
         self.goal = goal
         self.soc_goal = soc_goal
@@ -183,6 +203,9 @@ class ModbusService:
             _LOGGER.info("Heartbeat started")
         else:
             _LOGGER.info("Heartbeat disabled in read-only mode")
+
+    def _configure_control(self, control: AmtronControl) -> None:
+        """Allow an in-process service owner to install guards before first use."""
 
     async def _run(self) -> None:
         """Fail the service if its independent heartbeat writer exits."""
@@ -227,7 +250,8 @@ class ModbusService:
                 else:
                     await self.refresh()
                 await self._recover()
-                await self._persist()
+                await self._enforce_current_cap()
+                await self._save_intent()
                 if self._logged_unavailable:
                     _LOGGER.info("Wallbox communication restored")
                 self._logged_unavailable = False
@@ -245,6 +269,16 @@ class ModbusService:
                     self._logged_unavailable = True
             await asyncio.sleep(self.config.scan_interval)
 
+    async def _save_intent(self) -> None:
+        """A disk that fails is not a lost wallbox: the state stays live."""
+        try:
+            await self._persist()
+        except (OSError, ValueError) as err:
+            now = time.monotonic()
+            if self._storage_warned_at is None or now - self._storage_warned_at >= 60:
+                _LOGGER.warning("Cannot save control intent (%s); the wallbox stays in use", type(err).__name__)
+                self._storage_warned_at = now
+
     async def refresh(self) -> None:
         async with self._poll_lock:
             self._phase = "polling the wallbox"
@@ -260,21 +294,28 @@ class ModbusService:
                 self._success = False
                 if self.control is not None:
                     self.control.observe_plug_charge(None)
-                self._energy_sample = None
+                self._energy_sample = self._energy_sample_at = None
                 self.data.energy_observed_at = None
                 if self.identity.layout_version >= ENERGY_TOTAL.min_layout:
                     self.client.write_state.session_history.observe(None, now=wall_clock())
-                if self.goal is not None:
+                now = time.monotonic()
+                if self._meter_failing_since is None:
+                    self._meter_failing_since = now
+                if self.goal is not None and now - self._meter_failing_since >= METER_GRACE_SECONDS:
+                    # One lost poll is no outage: pausing for it and resuming
+                    # five minutes later would cost more than it protects.
                     self.goal.observe(WallboxData(
                         energy_read=True, energy_goal_generation=goal_generation,
                     ))
                 raise
+            self._meter_failing_since = None
             self._success = True
             self._updated_at = time.monotonic()
             if self.data.energy_read:
                 energy = self.data.get(ENERGY_TOTAL.key)
                 # Keep the timestamp of a failed meter attempt as well. A
                 # cached value must never turn a measurement gap into energy.
+                self._energy_sample_at = time.monotonic()
                 self._energy_sample = {
                     "observed_at": wall_clock(),
                     "value": (
@@ -345,6 +386,26 @@ class ModbusService:
             self._retry_at = time.monotonic() + 30
         finally:
             await self._persist()
+
+    async def _enforce_current_cap(self) -> None:
+        """Never leave a confirmed charging current above a lowered cap."""
+        control = self.control
+        if control is None or self.config.read_only or time.monotonic() < self._cap_retry_at:
+            return
+        self._phase = "applying the current cap"
+        try:
+            async with self._command_lock:
+                lowered = await control.async_enforce_current_cap()
+        except (DeviceError, AmtronBusError) as err:
+            self._cap_retry_at = time.monotonic() + 30
+            _LOGGER.warning(
+                "Charging current above the %.1f A cap could not be lowered (%s); retrying in 30 seconds",
+                control.max_charging_current,
+                err.translation_key if isinstance(err, DeviceError) else type(err).__name__,
+            )
+            return
+        if lowered:
+            _LOGGER.info("Charging current lowered to the %.1f A cap", control.max_charging_current)
 
     async def _persist(self, *, include_session_history: bool = False) -> None:
         if self._store is not None:
@@ -483,10 +544,38 @@ class ModbusService:
             "write_errors": sorted(self.diagnostics.write_errors),
         }
 
-    async def stable_snapshot(self) -> dict[str, Any]:
-        """Publish a goal only after its enclosing command has completed."""
+    async def stable_snapshot(self, *, patient: bool = False) -> dict[str, Any]:
+        """Publish a goal only after its enclosing command has completed.
+
+        A ``patient`` reader waits two seconds for a running command and
+        then gets the last published state instead, as long as that is recent:
+        a long command must not make a poll time out, and a hanging one must
+        not hide behind an old state.
+        """
+        published = self._published
+        if (
+            patient and published is not None and self._command_lock.locked()
+            and time.monotonic() - published[0] <= _PUBLISHED_SECONDS
+        ):
+            try:
+                await asyncio.wait_for(self._command_lock.acquire(), _PATIENCE_SECONDS)
+            except TimeoutError:
+                # A command that ended meanwhile may have replaced or
+                # withdrawn the state; only the current one is served.
+                if self._published is not None:
+                    return self._published[1]
+                return await self.stable_snapshot()
+            try:
+                return self._publish()
+            finally:
+                self._command_lock.release()
         async with self._command_lock:
-            return self.snapshot()
+            return self._publish()
+
+    def _publish(self) -> dict[str, Any]:
+        result = self.snapshot()
+        self._published = (time.monotonic(), result)
+        return result
 
     async def command(
         self, payload: dict[str, Any], *,
@@ -645,7 +734,7 @@ class ModbusService:
                         _soc_outcome(initial_revision, self._soc_goal_revision, failure)
             if not cancelling and not metadata:
                 await self.refresh()
-            return self.snapshot()
+            return self._publish()
 
     async def read(self, payload: dict[str, Any]) -> dict[str, Any]:
         # An allowlist of known reads, never a raw Modbus write tunnel.

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import math
-import re
 from collections.abc import Awaitable, Callable
 from copy import copy
 from datetime import UTC, datetime
@@ -33,13 +32,15 @@ from .device.const import (
 )
 from .device.control import PENDING_ACTIONS
 from .device.data import DeviceIdentity, WallboxData, WriteDiagnostics
-from .device.decode import RegisterValue
+from .device.decode import RegisterValue, is_hex32
+from .device.departure_plan import DepartureInputs, DepartureState
 from .device.energy_goal import EnergyGoal
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
 from .device.heartbeat import HeartbeatTask
 from .device.identity import usable_max_evse_current
 from .device.link_quality import CONNECTION_QUALITY_STATES
+from .device.operation import Operation
 from .device.register_blocks import REGISTER_BLOCKS
 from .device.registers import ERROR_CODE, RegisterSpec
 from .device.soc_goal import SocGoal
@@ -107,6 +108,10 @@ class RemoteClient(MennekesModbusClient):
         self.on_auth_failed: Callable[[], None] | None = None
         self.on_auth_error: Callable[[bool], None] | None = None
         self._snapshot_lock = asyncio.Lock()
+        # The service's departure plan from the last valid snapshot.
+        self.departure: DepartureState | None = None
+        # The service's summary of who controls the charge, None for a service without one.
+        self.operation: Operation | None = None
         self.pending_until: datetime | None = None
         self.events = CommandEvents(supported=False)
         self._last_energy_observed_at: float | None = None
@@ -326,9 +331,17 @@ class RemoteClient(MennekesModbusClient):
                 raise ValueError("invalid percentage transaction capability")
             revision = control.get("soc_goal_revision")
             if transactions and (
-                not isinstance(revision, str) or re.fullmatch(r"[0-9a-f]{32}", revision) is None
+                not is_hex32(revision)
             ):
                 raise ValueError("invalid percentage goal revision")
+            section = "control.departure"
+            if type(control.get("supports_departure_plan", False)) is not bool:
+                raise ValueError("invalid departure plan capability")
+            departure_raw = control.get("departure")
+            departure = None if departure_raw is None else DepartureState.restore(departure_raw)
+            section = "control.operation"
+            operation_raw = control.get("operation")
+            operation = None if operation_raw is None else Operation.restore(operation_raw)
             section = "control.state_change_interval_seconds"
             interval = control.get("state_change_interval_seconds")
             if interval is not None and (
@@ -503,6 +516,8 @@ class RemoteClient(MennekesModbusClient):
         self.write_state.confirmed_current = values.get("charging_current_ems")
         self.write_state.energy_goal = goal
         self.write_state.soc_goal = soc_goal
+        self.departure = departure if control.get("supports_departure_plan") is True else None
+        self.operation = operation
         if self.on_update is not None:
             self.on_update()
         if require_available and payload.get("available") is not True:
@@ -546,7 +561,8 @@ class RemoteClient(MennekesModbusClient):
                 # already queued command before it reaches the service.
                 cancelling = command in {"cancel_pending", "cancel_timed_current"}
                 soc_metadata = command in {"soc_source", "soc_observation"}
-                metadata = soc_metadata or (
+                departure = command in {"departure_trip", "departure_inputs"}
+                metadata = soc_metadata or departure or (
                     command == "plug_charge_config" and values.get("value") is False
                 )
                 if not self._connected or (
@@ -559,6 +575,8 @@ class RemoteClient(MennekesModbusClient):
                     raise DeviceValidationError("read_only_mode")
                 if soc_metadata and self.snapshot.get("control", {}).get("supports_soc_goal") is not True:
                     raise DeviceValidationError("soc_goal_not_supported")
+                if departure and self.snapshot.get("control", {}).get("supports_departure_plan") is not True:
+                    raise DeviceError("service_unavailable")
                 self.apply_snapshot(
                     await self.request(
                         "POST", "/v2/command", {
@@ -601,7 +619,8 @@ class RemoteClient(MennekesModbusClient):
         )
         if block is None:
             raise AmtronConnectionError("unsupported diagnostic block")
-        response = await self.request("POST", "/v2/read", {"block": block.name})
+        # Diagnostics reads must not mark the entry unavailable.
+        response = await self.request("POST", "/v2/read", {"block": block.name}, update_connection=False)
         words = response.get("words")
         if (
             not isinstance(words, list)
@@ -904,7 +923,7 @@ class RemoteControl(AmtronControl):
             previous_revision = self.soc_goal_revision
             reservation = await self._soc_transaction_request("/v2/soc-goal/reserve", {})
             token = reservation.get("token")
-            if not isinstance(token, str) or re.fullmatch(r"[0-9a-f]{32}", token) is None:
+            if not is_hex32(token):
                 raise DeviceError("service_unavailable")
             self._soc_transaction = (token, previous_revision)
             self._soc_transaction_fenced = False
@@ -913,6 +932,10 @@ class RemoteControl(AmtronControl):
                 "value": value, "source": source, "soc": soc, "maximum": maximum,
             })
             outcome = self._apply_soc_transaction_result(result, previous_revision)
+            if outcome in ("rejected", "superseded"):
+                # The service answered: it refused the target, or another
+                # command changed it first. That is not an unreachable service.
+                raise DeviceValidationError("soc_goal_unavailable")
             if outcome != "applied":
                 raise DeviceError("service_unavailable")
         if self._notify_pending is not None:
@@ -927,6 +950,38 @@ class RemoteControl(AmtronControl):
         if expected_soc_revision is not None:
             values["expected_soc_revision"] = expected_soc_revision
         await self._soc_command("soc_observation", **values)
+
+    @property
+    def supports_departure_plan(self) -> bool:
+        return self._remote.snapshot.get("control", {}).get("supports_departure_plan") is True
+
+    @property
+    def departure(self) -> DepartureState | None:
+        return self._remote.departure
+
+    @property
+    def operation(self) -> Operation | None:
+        return self._remote.operation
+
+    async def _departure_command(self, command: str, **values: Any) -> None:
+        await self._remote.execute(command, **values)
+        # As with the charge level: the reply is the service's own state and
+        # needs no further wallbox read.
+        if self._notify_pending is not None:
+            self._notify_pending()
+
+    @ha_command
+    async def async_set_departure_trip(
+        self, deadline: datetime | None, source: str | None, *, withdraw: bool = False,
+    ) -> None:
+        await self._departure_command(
+            "departure_trip", deadline=None if deadline is None else deadline.isoformat(),
+            source=source, withdraw=withdraw,
+        )
+
+    @ha_command
+    async def async_set_departure_inputs(self, inputs: DepartureInputs) -> None:
+        await self._departure_command("departure_inputs", value=inputs.snapshot())
 
     @property
     def pending_action(self) -> str | None:

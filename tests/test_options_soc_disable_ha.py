@@ -12,8 +12,8 @@ from homeassistant.util import dt as dt_util
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
+from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
-from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
 from tests.fakes import FakeModbusClient, device_bank
 from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot

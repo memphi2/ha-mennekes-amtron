@@ -156,7 +156,7 @@ A partial report cannot pass validation.
 
 ## AppArmor enforcement
 
-App 0.5.2b1 and newer include a custom profile for the Supervisor app. Syntax validation and
+The Supervisor app includes a custom AppArmor profile. Syntax validation and
 runtime enforcement are separate checks. A parser run must accept the pinned
 ABI and rules without warnings; it does not prove that the service can operate
 under those rules.

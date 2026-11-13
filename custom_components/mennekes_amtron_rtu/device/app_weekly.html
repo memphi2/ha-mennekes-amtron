@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mennekes Amtron · Weekly plans</title>
+  <link rel="stylesheet" href="./app_settings.css"><link rel="stylesheet" href="./app_weekly.css">
+  <script src="./app_nav.js" defer></script>
+  <script src="./app_weekly.js" defer></script>
+</head>
+<body><main>
+  <p class="eyebrow">Mennekes Amtron</p>
+  <nav class="overview-nav" aria-label="Service" data-nav="weekly"></nav>
+  <header><h1 data-text="title">Weekly plans</h1><p data-text="intro">Save a recipe, inspect its dates, then confirm the vehicle for this connection.</p></header>
+  <p id="weekly_notice" role="status" aria-live="polite" data-text="loading">Loading…</p>
+  <noscript>JavaScript is required for this local service page.</noscript>
+  <section class="overview-card" id="weekly_active" hidden>
+    <h2 data-text="activation">Current activation</h2><p id="active_description"></p>
+    <button id="deactivate" type="button" data-text="stop">Stop weekly automation</button>
+    <p class="hint" data-text="stop_hint">Stops its own job and recurrence, and the plan no longer activates itself for its car. An independent guest or manual job is not changed.</p>
+  </section>
+  <section class="overview-card">
+    <label for="plan_select" data-text="saved_plans">Saved vehicle plans</label>
+    <select id="plan_select"><option value="" data-text="new_plan">New plan</option></select>
+    <form id="weekly_form">
+      <fieldset id="weekly_fields" disabled>
+        <legend data-text="recipe">Recipe — not charging permission</legend>
+        <label for="vehicle_profile" data-text="profile">Vehicle profile reference</label>
+        <input id="vehicle_profile" maxlength="64" pattern="[A-Za-z0-9_-]{1,64}" required autocomplete="off">
+        <p class="hint" data-text="profile_hint">Use a stable reference such as bmw-i4. This label does not identify a vehicle automatically.</p>
+        <label for="timezone" data-text="timezone">Timezone</label><input id="timezone" maxlength="128" value="Europe/Berlin" required>
+        <fieldset class="weekdays"><legend data-text="weekdays">Weekdays</legend>
+          <label><input type="checkbox" name="weekday" value="0" checked><span data-day="0">Mon</span></label>
+          <label><input type="checkbox" name="weekday" value="1"><span data-day="1">Tue</span></label>
+          <label><input type="checkbox" name="weekday" value="2"><span data-day="2">Wed</span></label>
+          <label><input type="checkbox" name="weekday" value="3" checked><span data-day="3">Thu</span></label>
+          <label><input type="checkbox" name="weekday" value="4"><span data-day="4">Fri</span></label>
+          <label><input type="checkbox" name="weekday" value="5"><span data-day="5">Sat</span></label>
+          <label><input type="checkbox" name="weekday" value="6"><span data-day="6">Sun</span></label>
+        </fieldset>
+        <div class="columns">
+          <div><label for="departure_time" data-text="departure">Departure</label><input id="departure_time" type="time" value="07:40" required></div>
+          <div><label for="charge_minutes" data-text="window">Charging window (minutes)</label><input id="charge_minutes" type="number" min="1" max="1440" step="1" value="240" required></div>
+          <div><label for="current_a" data-text="current">Maximum current (A)</label><input id="current_a" type="number" min="6" max="32" step="0.1" value="6" required></div>
+          <div><label for="energy_kwh" data-text="energy">Energy ceiling per departure (kWh)</label><input id="energy_kwh" type="number" min="0.1" max="1000" step="0.1" value="10" required></div>
+        </div>
+        <label for="reserve_kwh" data-text="reserve">Immediate reserve per departure (kWh)</label>
+        <input id="reserve_kwh" type="number" min="0" max="1000" step="0.1" value="0" aria-describedby="reserve_hint" required>
+        <p id="reserve_hint" class="hint" data-text="reserve_hint">Charge this portion immediately when the plan is activated, then return to the time window. Later departures start at their own window. Included in the total ceiling. Zero disables; AC energy, not a battery percentage.</p>
+        <label for="ambiguous_time" data-text="fold">Repeated clock time</label>
+        <select id="ambiguous_time"><option value="earlier" data-text="earlier">Earlier occurrence</option><option value="later" data-text="later">Later occurrence</option></select>
+        <label for="exceptions" data-text="exceptions">Date exceptions</label>
+        <textarea id="exceptions" rows="3" maxlength="1024" placeholder="2026-12-24 = skip&#10;2026-12-25 = 09:00"></textarea>
+        <p class="hint" data-text="exception_hint">One line per date: YYYY-MM-DD = skip or HH:MM. Up to 32 dates. Overrides can also add a departure.</p>
+        <label class="check"><input id="enabled" type="checkbox" checked><span data-text="enabled">Enable recipe</span></label>
+        <div class="actions"><button id="preview_plan" type="submit" data-text="preview">Preview changes</button><button id="remove_plan" type="button" class="secondary" data-text="remove">Remove saved plan</button></div>
+      </fieldset>
+    </form>
+  </section>
+  <section class="overview-card" id="weekly_preview" hidden>
+    <h2 data-text="proposal">Confirm recipe</h2><p id="plan_summary"></p><p id="plan_warning"></p>
+    <ul id="upcoming_rows" class="overview-commands"></ul>
+    <button id="save_plan" type="button" data-text="save">Save this recipe</button>
+  </section>
+  <section class="overview-card">
+    <h2 data-text="activate_title">Activate saved plan for this vehicle</h2>
+    <p class="hint" data-text="consent_hint">Recurrence applies to this connection, for at most seven days. Each departure has its own energy ceiling; between departures Home Assistant controls charging. Restart, unplugging, a manual stop or editing the active recipe ends it. If the car itself has reported this connection to Home Assistant, the plan remembers the car and activates itself whenever Home Assistant detects it again: after plugging in, after a restart and beyond seven days. It then waits for the next departure’s window.</p>
+    <label class="check"><input id="confirm_vehicle" type="checkbox"><span data-text="confirm_vehicle">I have checked that the selected vehicle is connected.</span></label>
+    <button id="preview_activation" type="button" disabled data-text="activate_preview">Preview activation</button>
+    <div id="activation_preview" hidden><p id="activation_summary"></p><button id="activate" type="button" data-text="activate">Confirm activation</button></div>
+    <p><a href="./jobs" data-text="open_job">View or stop the accepted charging job</a></p>
+  </section>
+  <footer data-text="footer">No automatic authorization or unlocking. Missing local clock times are not silently moved. Actual starts and stops remain subject to wallbox timing.</footer>
+</main></body></html>

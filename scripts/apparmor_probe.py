@@ -17,13 +17,18 @@ import stat
 import sys
 from collections.abc import Callable
 from contextlib import suppress
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from aiohttp import ClientError, ClientSession, ClientTimeout, web
 from amtron_device import registers
 from amtron_device.app_settings import serial_adapters
+from amtron_device.charge_job import ChargeJob
+from amtron_device.charge_job_store import ChargeJobStore
+from amtron_device.charge_rate_store import RateStore
 from amtron_device.decode import encode_register
+from amtron_device.departure_store import DepartureStore
 from pymodbus import FramerType
 from pymodbus.server import ModbusSerialServer, ModbusTcpServer
 from pymodbus.simulator import SimData, SimDevice
@@ -178,22 +183,110 @@ def check_environment(profile: str) -> None:
     require(Path("/proc/self/attr/current").read_text().strip() == f"{profile} (enforce)", "probe is not enforcing the expected profile")
     require(not (DATA / "service-token").exists(), "token fixture must start empty")
     require(not (DATA / "intent.json").exists(), "intent fixture must start empty")
+    require(not (DATA / "charge-job.json").exists(), "charge job fixture must start empty")
+    require(not (DATA / "charge-rates.json").exists(), "rate history fixture must start empty")
+    require(not (DATA / "departure-plan.json").exists(), "departure plan fixture must start empty")
 
 
 def check_temporary_files() -> None:
-    require(not list(DATA.glob(".token-*")) and not list(DATA.glob(".intent-*")), "atomic save left temporary files")
+    require(
+        not list(DATA.glob(".token-*")) and not list(DATA.glob(".intent-*"))
+        and not list(DATA.glob(".job-*")) and not list(DATA.glob(".rates-*"))
+        and not list(DATA.glob(".departure-*")),
+        "atomic save left temporary files",
+    )
+
+
+def check_charge_job_storage() -> None:
+    """Save, read back and clear a charging job with the real store under the profile.
+
+    The simulated wallbox has no car, so the service never saves a job on its
+    own; this process runs confined by the same profile.
+    """
+    now = datetime.now(UTC)
+    job = ChargeJob.create({
+        "id": "b" * 32, "start_at": now.isoformat(), "finish_at": (now + timedelta(hours=1)).isoformat(),
+        "current_a": 6, "energy_kwh": 1,
+    }, binding="a" * 64, total_kwh=100, now=now)
+    path = DATA / "charge-job.json"
+    try:
+        ChargeJobStore(path, SERIAL).save(job)
+        restored = ChargeJobStore(path, SERIAL).load()
+        require(restored is not None and restored.identifier == job.identifier, "saved charge job could not be read back")
+        require(stat.S_IMODE(path.stat().st_mode) == 0o600, "charge job file is not private")
+        ChargeJobStore(path, SERIAL).save(None)
+        require(ChargeJobStore(path, SERIAL).load() is None, "cleared charge job could not be saved")
+    except OSError as error:
+        raise ProbeError("charge job storage was denied") from error
+
+
+def check_rate_storage() -> None:
+    """Save and read back the optional rate history with the real store.
+
+    The simulated wallbox never charges, so the service learns nothing and
+    the store is exercised here, confined by the same profile.
+    """
+    path = DATA / "charge-rates.json"
+    rates = [{"source": "c" * 64, "current_ma": 12000, "phases": 3,
+              "rates_kw": [8.0, 8.1, 8.2], "updated_at": float(int(datetime.now(UTC).timestamp()))}]
+    try:
+        RateStore(path, SERIAL).save(rates)
+        require(RateStore(path, SERIAL).load().snapshot() == rates, "saved rate history could not be read back")
+        require(stat.S_IMODE(path.stat().st_mode) == 0o600, "rate history file is not private")
+        RateStore(path, SERIAL).save([])
+        require(RateStore(path, SERIAL).load().snapshot() == [], "cleared rate history could not be saved")
+    except OSError as error:
+        raise ProbeError("rate history storage was denied") from error
+
+
+def check_departure_storage() -> None:
+    """Save and read back a departure plan with the real store under the profile.
+
+    Home Assistant hands no trip to the probe, so the service never saves one
+    on its own; this process runs confined by the same profile.
+    """
+    path = DATA / "departure-plan.json"
+    plan = {"trip": {"deadline": None, "source": "probe", "finished": None}}
+    try:
+        DepartureStore(path, SERIAL).save(plan)
+        require(DepartureStore(path, SERIAL).load() == plan, "saved departure plan could not be read back")
+        require(stat.S_IMODE(path.stat().st_mode) == 0o600, "departure plan file is not private")
+        DepartureStore(path, SERIAL).save(None)
+        require(DepartureStore(path, SERIAL).load() is None, "cleared departure plan could not be saved")
+    except OSError as error:
+        raise ProbeError("departure plan storage was denied") from error
 
 
 async def check_connection_page(session: ClientSession, mode: str, original: dict[str, Any]) -> None:
     """Exercise installed assets, local enumeration and the self API under policy."""
     headers = {"X-Remote-User-Id": "a" * 32, "X-Remote-User-Groups": "system-admin"}
-    for path, expected_type in (("/", "text/html"), ("/app_settings.js", "text/javascript"), ("/app_settings.css", "text/css")):
+    for path, expected_type in (
+        ("/", "text/html"), ("/connection", "text/html"),
+        ("/app_overview.js", "text/javascript"), ("/app_nav.js", "text/javascript"),
+        ("/app_settings.js", "text/javascript"), ("/app_settings.css", "text/css"),
+        ("/jobs", "text/html"),
+    ):
         async with session.get(SETTINGS_API + path, headers={"Accept-Language": "de-DE"}) as response:
             require(response.status == 200 and response.content_type == expected_type, "connection asset was not served")
             content = await response.text()
             require(bool(content) and SUPERVISOR_TOKEN not in content, "connection asset was empty or exposed a credential")
             if path == "/":
+                require('lang="de"' in content and 'id="overview"' in content, "translated overview page missing")
+            elif path == "/jobs":
+                require('lang="de"' in content and 'id="job_form"' in content, "translated charging job page missing")
+            elif path == "/connection":
                 require('lang="de"' in content and 'id="serial_port"' in content, "translated connection page or adapter selector missing")
+    async with session.get(SETTINGS_API + "/api/overview") as response:
+        require(response.status == 403, "overview accepted a non-admin request")
+    async with session.get(SETTINGS_API + "/api/overview", headers=headers) as response:
+        # A denial answers in plain text; check the status before parsing.
+        require(response.status == 200, "overview could not be read")
+        overview = await response.json()
+        require(overview.get("schema") == 1, "overview could not be read")
+        require(overview.get("state") == "no_vehicle", "overview differs from the simulated wallbox")
+        require(SERIAL not in json.dumps(overview) and SUPERVISOR_TOKEN not in json.dumps(overview), "overview exposed private identity or credentials")
+    async with session.post(SETTINGS_API + "/api/overview", headers=headers, json={}) as response:
+        require(response.status == 405, "overview accepted a write")
     async with session.get(SETTINGS_API + "/api/config") as response:
         require(response.status == 403, "connection settings accepted a non-admin request")
     async with session.get(SETTINGS_API + "/api/config", headers=headers) as response:
@@ -330,6 +423,9 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
             require([(address, values) for address, values in writes if address != registers.HEARTBEAT.address] == controls_before, "restart replayed a charging command")
             await denied_access()
             await child.stop()
+            check_charge_job_storage()
+            check_rate_storage()
+            check_departure_storage()
             check_temporary_files()
             for instance in children:
                 require(token.encode() not in instance.output and SUPERVISOR_TOKEN.encode() not in instance.output, "service logs exposed a credential")
@@ -337,7 +433,8 @@ async def probe(profile: str, mode: str) -> dict[str, object]:
         return {"status": "passed", "mode": mode, "profile": profile, "enforcing": True,
                 "discovery": True, "heartbeat": True, "pause_restart": True,
                 "token_preserved": True, "denials": 4, "shutdown": True,
-                "serial_settings": True, "connection_ui": True}
+                "serial_settings": True, "connection_ui": True, "charge_job_storage": True,
+                "rate_storage": True, "departure_storage": True}
     finally:
         for instance in children:
             await instance.stop(clean=False)

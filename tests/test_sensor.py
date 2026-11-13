@@ -43,7 +43,12 @@ def test_the_voltages_ride_on_the_total_power_only_under_load() -> None:
     assert power.extra_state_attributes is None
     values["power_total"] = 3680.0
     values["voltage_l2"] = 229.4
-    assert power.extra_state_attributes == {"voltage_l1": 230, "voltage_l2": 229, "voltage_l3": 230}
+    values["power_l1"] = 1226.6
+    assert power.extra_state_attributes == {
+        "current_l1": 0.0, "current_l2": 0.0, "current_l3": 0.0,
+        "voltage_l1": 230, "voltage_l2": 229, "voltage_l3": 230,
+        "power_l1": 1227, "power_l2": 0, "power_l3": 0,
+    }
     values["power_total"] = True
     assert power.extra_state_attributes is None
 
@@ -74,7 +79,7 @@ def test_a_missing_value_yields_no_state() -> None:
         await async_setup_entry(hass, entry, lambda items: added.update(collect(items)))
         values = entry.runtime_data.coordinator.data.values
         values["power_total"] = 1000.0
-        for key in ("voltage_l1", "voltage_l2", "voltage_l3"):
+        for key in [f"{kind}_l{n}" for kind in ("current", "voltage", "power") for n in (1, 2, 3)]:
             values[key] = None
         assert added["power_total"].extra_state_attributes is None
         values["power_total"] = None
@@ -111,7 +116,10 @@ def test_a_bool_or_text_never_becomes_an_attribute_number() -> None:
         values["voltage_l2"] = "230"
         values["session_duration"] = -5
         values["sessions_total"] = True
-        assert sensors["power_total"].extra_state_attributes == {"voltage_l3": 230}
+        assert sensors["power_total"].extra_state_attributes == {
+            "current_l1": 0.0, "current_l2": 0.0, "current_l3": 0.0,
+            "voltage_l3": 230, "power_l1": 0, "power_l2": 0, "power_l3": 0,
+        }
         assert sensors["session_energy"].extra_state_attributes == {"maximum_current": 16.0}
 
     asyncio.run(run())

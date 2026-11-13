@@ -98,6 +98,7 @@ from .timed_goal_const import (
     CONF_TIMED_CAPACITY_ENTITY,
     CONF_TIMED_CAPACITY_KWH,
     CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_MINIMUM_SOC,
     CONF_TIMED_TIMER1_DAYS,
     CONF_TIMED_TIMER2_DAYS,
     CONF_TIMED_VEHICLE_TIME_ZONE,
@@ -380,6 +381,15 @@ def departure_configure_schema(
                     bool(current.get(CONF_TIMED_DEPARTURE_ENTITY)),
                 ),
             ): BooleanSelector(),
+            probatio.Required(
+                CONF_TIMED_MINIMUM_SOC,
+                default=current.get(CONF_TIMED_MINIMUM_SOC, 0),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=0, max=100, step=1, unit_of_measurement="%",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
     }
     # A car offers its timers only when it sends them; one in use stays visible.
     if (profile and profile_timer) or "vehicle_profile_id" not in current or vehicle_timer:

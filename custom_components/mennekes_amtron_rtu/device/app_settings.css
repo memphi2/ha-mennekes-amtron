@@ -12,3 +12,30 @@ button{border:1px solid var(--accent);border-radius:7px;background:var(--accent)
 
 .tabs{display:flex;gap:8px;margin:18px 0 26px;border-bottom:1px solid var(--border)}.tabs button{flex:1;min-width:0;border:0;border-bottom:3px solid transparent;border-radius:7px 7px 0 0;background:transparent;color:var(--muted);padding:12px 8px;overflow-wrap:anywhere}.tabs button[aria-selected="true"]{border-bottom-color:var(--accent);color:var(--accent)}[role="tabpanel"]:focus-visible{outline:3px solid #00a1d155;outline-offset:4px;border-radius:7px}
 .debug-scroll{overflow:auto;max-height:480px;margin-top:20px}.modbus-debug table{border-collapse:collapse;font-size:.8rem;width:100%;min-width:620px}.modbus-debug caption{text-align:left;color:var(--muted);padding:0 0 10px}.modbus-debug th,.modbus-debug td{padding:9px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border);white-space:pre-line;overflow-wrap:anywhere}.modbus-debug th{position:sticky;top:0;background:var(--surface)}
+
+/* The passive overview shares the native light/dark palette. */
+.overview-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
+.overview-nav a { padding: 9px 14px; border-radius: 8px; text-decoration: none; color: inherit; border: 1px solid var(--border); }
+.overview-nav a[aria-current="page"] { font-weight: 700; border-color: var(--accent); }
+.overview-card { border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin: 18px 0; }
+.overview-card h2 { margin-top: 0; font-size: 1.05rem; }
+.overview-state { font-size: 1.65rem; font-weight: 650; margin: 12px 0; }
+.overview-notice { padding: 10px 0; }
+.overview-badges { display: flex; gap: 8px 20px; flex-wrap: wrap; font-size: .9rem; }
+.overview-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; margin: 22px 0 0; }
+.overview-values dt { font-size: .85rem; opacity: .8; }
+.overview-values dd { margin: 6px 0 0; font-size: 1.2rem; font-weight: 600; }
+.overview-commands { list-style: none; padding: 0; margin-bottom: 0; }
+.overview-commands li { border-top: 1px solid var(--border); padding: 12px 0; overflow-wrap: anywhere; }
+.overview-commands small { display: block; margin-top: 5px; }
+@media (max-width: 550px) { .overview-card { padding: 16px; } }
+
+/* Runtime settings use three short columns, not the wide telegram table. */
+#runtime h1 { overflow-wrap: anywhere; }
+#runtime table { min-width: 0; table-layout: fixed; }
+#runtime th:first-child { width: 50%; }
+#runtime th, #runtime td { padding: 9px 4px; }
+
+/* Let date/time fields shrink within narrow job cards instead of widening them. */
+#jobs fieldset { min-inline-size: 0; }
+#jobs input { min-width: 0; }

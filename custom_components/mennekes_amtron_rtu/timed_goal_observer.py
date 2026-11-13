@@ -18,8 +18,17 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
-from .charging_plan import ChargePlan, plan_current, usable_capacity
+from .device.charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
+from .device.departure_plan import DepartureForecast, DepartureInputs
+from .device.departure_step import (
+    MIN_WRITE_INTERVAL,
+    keeps_start,
+    minimum_level,
+    needs_current,
+    plan_step,
+    same_command,
+)
 from .device.enums import (
     DetectedEvPhases,
     EvseState,
@@ -27,17 +36,18 @@ from .device.enums import (
     SwitchedPhases,
 )
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
-from .device.registers import CP_STATE, EVSE_STATE
-from .device.vehicle import vehicle_connected
+from .device.registers import EVSE_STATE
+from .device.timed_goal import TimedGoal, matches_departure_source
+from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
-from .goal_store import TimedGoalStore
-from .timed_goal import TimedGoal, matches_departure_source
+from .goal_store import PlanPause, PlanPauseStore, TimedGoalStore
 from .timed_goal_const import (
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
     CONF_TIMED_CAPACITY_ENTITY,
     CONF_TIMED_CAPACITY_KWH,
     CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_MINIMUM_SOC,
 )
 from .vehicle_phases import VehiclePhaseMemory
 from .vehicle_profiles import (
@@ -54,9 +64,8 @@ if TYPE_CHECKING:
     from .entry_types import MennekesAmtronConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
-_MIN_CHANGE_A = 1.0
-_MIN_WRITE_INTERVAL = 300.0
-_PAUSE_MARGIN = timedelta(seconds=360)
+# A service on another host may finish a trip slightly before this clock does.
+_CLOCK_TOLERANCE = timedelta(minutes=5)
 
 
 def departure_time(state: State | None) -> datetime | None:
@@ -93,13 +102,6 @@ def capacity_from_state(state: State | None) -> float | None:
     return usable_capacity(value, state.attributes.get("unit_of_measurement", ""))
 
 
-# Statuses of a computed plan; a pending command keeps its start time.
-_PLANNED = frozenset({
-    "queued", "write_pending", "paused_until_start", "charging",
-    "finishing", "unreachable", "late",
-})
-
-
 class TimedGoalObserver:
     """Own one departure and issue only meaningful, bounded current changes."""
 
@@ -109,10 +111,13 @@ class TimedGoalObserver:
         self._options = vehicle_options(entry.options)
         self._runtime = entry.runtime_data
         self._store = TimedGoalStore(hass, entry.entry_id, entry.runtime_data.identity.serial_number or "")
+        self._pause_store = PlanPauseStore(hass, entry.entry_id, entry.runtime_data.identity.serial_number or "")
         self.goal = TimedGoal()
         self.status = "disabled"
         # When the plan starts, or started, charging for the open trip.
         self.planned_start: datetime | None = None
+        # The service's forecast for the trip; a plan made here has none.
+        self.forecast: DepartureForecast | None = None
         # The target a reached trip met; only a higher one plans it again.
         self._reached_target: float | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
@@ -129,8 +134,15 @@ class TimedGoalObserver:
         self._command_current: float | None = None
         # The selected car's phases from its last charge, if it had one.
         self._known_phases: int | None = None
-        # This plan paused the wallbox until its late start.
+        # This plan paused the wallbox until its late start; saved, so the
+        # plan still ends that pause after a restart.
         self._plan_paused = False
+        # Whether the wallbox showed the plan's pause as applied.
+        self._pause_seen = False
+        # Whether the saved pause matches the one in memory.
+        self._pause_store_current = True
+        # The trip changed here and the service has not taken it over yet.
+        self._trip_dirty = False
 
     async def async_start(self) -> None:
         # The service may retain a queued command after an unreachable unload
@@ -138,6 +150,10 @@ class TimedGoalObserver:
         self._command_submitted = True
         await self._cancel_command()
         self.goal = await self._store.async_load()
+        try:
+            self._plan_paused = (await self._pause_store.async_load()).paused
+        except (OSError, ValueError) as err:
+            _LOGGER.warning("Saved departure plan pause unavailable: %s", type(err).__name__)
         if (profile := self._options.get(CONF_VEHICLE_PROFILE_ID)) is not None:
             self._known_phases = await self._phase_memory().async_phases(profile)
         options = self._options
@@ -164,7 +180,12 @@ class TimedGoalObserver:
             self._unsubs.append(binding.subscribe(self.request_evaluate))
         self.request_evaluate()
 
-    async def async_stop(self) -> None:
+    async def async_stop(self, *, withdraw: bool = False) -> None:
+        """Stop following the trip; ``withdraw`` also ends this plan's pause.
+
+        A reload keeps the pause, as the same car's plan takes it over again.
+        Another car, or none, must not stay paused by this car's plan.
+        """
         self._stopping = True
         for unsub in self._unsubs:
             unsub()
@@ -182,6 +203,21 @@ class TimedGoalObserver:
                 "Could not cancel timed charging during unload: %s",
                 getattr(err, "translation_key", None) or type(err).__name__,
             )
+        if withdraw:
+            # Only this observer knows the pause is its own; try even when the
+            # cancel failed, as no later observer can end it.
+            try:
+                if self._runtime.control.supports_departure_plan is True:
+                    # The service plans this car's trip: it ends its own pause.
+                    await self._runtime.control.async_set_departure_trip(
+                        None, self.goal.source, withdraw=True,
+                    )
+                await self._end_plan_pause()
+            except (AmtronBusError, HomeAssistantError, OSError) as err:
+                _LOGGER.warning(
+                    "Could not end the departure plan pause for the previous car: %s",
+                    getattr(err, "translation_key", None) or type(err).__name__,
+                )
 
     @callback
     def _source_changed(self, _event: object) -> None:
@@ -251,6 +287,7 @@ class TimedGoalObserver:
             if not changed and not self._save_dirty:
                 return
             await self._cancel_command()
+            self._trip_dirty = True
             await self._save_goal(candidate)
             self._reached_target = None
             # A new trip plans its own start; the old one no longer applies.
@@ -381,6 +418,10 @@ class TimedGoalObserver:
             return capacity_from_state(self._hass.states.get(entity))
         return usable_capacity(options.get(CONF_TIMED_CAPACITY_KWH))
 
+    def _minimum(self) -> float:
+        """The level below which the car charges at once; zero is off."""
+        return minimum_level(self._options.get(CONF_TIMED_MINIMUM_SOC))
+
     def _phases(self) -> int:
         data = self._runtime.coordinator.current_data()
         switched = data.get("switched_phases")
@@ -429,13 +470,23 @@ class TimedGoalObserver:
                 source = f"entity:{source_entity}:{value.isoformat()}"
                 if not matches_departure_source(self.goal.source, source_entity, value):
                     await self._set_deadline(value, source=source, expected=self.goal)
+        if self._runtime.control.supports_departure_plan is True:
+            await self._follow_service()
+            return
+        await self._observe_plan_pause()
         trip = self.goal
         deadline = trip.deadline
         if deadline is None:
+            if trip.finished != "reached":
+                # Without a trip the plan's pause has nothing left to wait for.
+                await self._end_plan_pause()
             self._set_status(trip.finished or "disabled")
             return
         if deadline <= dt_util.utcnow():
-            await self._finish(trip.finished or "late", trip, clear_deadline=True)
+            reason = trip.finished or "late"
+            await self._finish(reason, trip, clear_deadline=True)
+            if reason != "reached":
+                await self._end_plan_pause()
             return
         binding = getattr(self._runtime, "vehicle_binding", None)
         if binding is not None and binding.resting:
@@ -469,24 +520,24 @@ class TimedGoalObserver:
         soc = observer.latest_soc if observer is not None else vehicle_percentage(
             self._hass.states.get(soc_entity) if isinstance(soc_entity, str) else None
         )
+        # A charge level or poll that drops out for a moment keeps the plan's
+        # start: forgetting it would pause a charge that already runs.
         if soc is None:
-            await self._wait_for_input("waiting_for_soc")
+            await self._wait_for_input("waiting_for_soc", keep_start=True)
             return
         if not self._runtime.coordinator.last_update_success:
-            await self._wait_for_input("waiting_for_device")
+            await self._wait_for_input("waiting_for_device", keep_start=True)
             return
         if control.read_only:
             await self._wait_for_input("read_only")
             return
         data = self._runtime.coordinator.current_data()
-        if vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=self._runtime.identity.layout_version >= CP_STATE.min_layout,
-        ) is not True:
+        if snapshot_vehicle_connected(data.get, self._runtime.identity.layout_version) is not True:
             await self._wait_for_input("waiting_for_device")
             return
+        now = dt_util.utcnow()
         plan: ChargePlan = plan_current(
-            now=dt_util.utcnow(), deadline=deadline,
+            now=now, deadline=deadline,
             soc_percent=soc, target_percent=goal.target_percent,
             capacity_kwh=capacity, phases=self._phases(),
             max_current_a=control.max_charging_current,
@@ -499,48 +550,98 @@ class TimedGoalObserver:
             # block commands without proving that either target was reached.
             await self._wait_for_input("waiting_for_device")
             return
-        now = dt_util.utcnow()
-        # A started charge keeps going: a faster charge than estimated moves
-        # the computed start later, and pausing for it would only cost relay
-        # switching. The minimum current at the end absorbs the lead instead.
-        started = self.planned_start is not None and self.planned_start <= now
-        pause_until_start = (
-            not started and plan.start_at is not None and plan.start_at - now > _PAUSE_MARGIN
+        step = plan_step(
+            plan, self.planned_start, now,
+            minimum_current_a=control.max_charging_current if soc < self._minimum() else None,
         )
-        if pause_until_start:
-            self.planned_start = plan.start_at
-        elif not started:
-            # The plan charges now; keep when it began.
-            self.planned_start = now
-        desired_current = None if pause_until_start else plan.current_a
+        self.planned_start = step.planned_start
         if control.pending_action is not None:
-            await self._cancel_outdated_command(desired_current, trip)
+            await self._cancel_outdated_command(step.current_a, trip)
         if control.pending_action is not None:
             self._set_status("queued")
             return
-        if pause_until_start:
+        if step.pauses:
             self._set_status("paused_until_start")
             if control.is_paused is False:
                 await self._write(None, trip)
             return
-        self._set_status(plan.status)
-        if plan.current_a is None or control.is_paused is None:
+        self._set_status(step.status)
+        if step.current_a is None or control.is_paused is None:
             return
-        current = self._runtime.coordinator.current_data().get("charging_current_ems")
-        if control.is_paused or not isinstance(current, (int, float)) or (
-            current == 0 or abs(float(current) - plan.current_a) >= _MIN_CHANGE_A
-        ):
-            await self._write(plan.current_a, trip)
+        applied = self._runtime.coordinator.current_data().get("charging_current_ems")
+        if needs_current(step.current_a, paused=control.is_paused, applied=applied):
+            await self._write(step.current_a, trip)
+
+    async def _follow_service(self) -> None:
+        """Hand trip and car data to the service, which plans; show its state."""
+        control = self._runtime.control
+        # A command of this observer from before the service took over.
+        await self._cancel_command()
+        if (remote := control.departure) is not None:
+            await self._sync_trip(remote.trip)
+        if (remote := control.departure) is not None:
+            inputs = self._departure_inputs(remote.scope)
+            if inputs is not None and inputs.digest != remote.inputs:
+                await control.async_set_departure_inputs(inputs)
+        remote = control.departure
+        # The service is still loading its plan.
+        status = remote.status if remote is not None else "waiting_for_device"
+        start = remote.planned_start if remote is not None else None
+        forecast = remote.forecast if remote is not None else None
+        if (status, start, forecast) != (self.status, self.planned_start, self.forecast):
+            self.status, self.planned_start, self.forecast = status, start, forecast
+            self._notify()
+
+    async def _sync_trip(self, service: TimedGoal) -> None:
+        trip = self.goal
+        same = (trip.deadline, trip.source) == (service.deadline, service.source)
+        if not self._trip_dirty:
+            if (trip.deadline is None and service.deadline is None) or (
+                same and trip.finished == service.finished
+            ):
+                return
+            # The service decides how a trip ends: it finishes the trip it
+            # was given, and clears its time once that has passed.
+            ended = (
+                service.deadline is None and service.finished is not None
+                and trip.deadline is not None
+                and trip.deadline <= dt_util.utcnow() + _CLOCK_TOLERANCE
+            )
+            if same or ended:
+                async with self._goal_lock:
+                    if self.goal is trip and not self._stopping:
+                        await self._save_goal(TimedGoal.restore(service.snapshot()))
+                        self._notify()
+                return
+        # The trip was set here, or the service lost its plan.
+        await self._runtime.control.async_set_departure_trip(trip.deadline, trip.source)
+        if self.goal is trip:
+            self._trip_dirty = False
+
+    def _departure_inputs(self, scope: str | None) -> DepartureInputs | None:
+        observer = self._runtime.vehicle_soc
+        if observer is None or observer.source is None:
+            return None
+        binding = getattr(self._runtime, "vehicle_binding", None)
+        reading = observer.latest_soc_reading
+        # Keep learning the car's phases while it charges.
+        self._phases()
+        return DepartureInputs(
+            observer.source,
+            # The plug-in this car is confirmed for, as the service names it.
+            None if binding is not None and binding.resting else scope,
+            self._capacity(), self._known_phases,
+            reading[0] if reading is not None else None,
+            reading[1] if reading is not None else None,
+            self._minimum(),
+            binding is not None and binding.detected is True,
+        )
 
     async def _cancel_outdated_command(self, current: float | None, expected: TimedGoal) -> None:
         async with self._goal_lock:
             if self.goal is not expected or self._stopping or not self._command_submitted:
                 return
-            previous = self._command_current
-            if previous == current or (
-                previous is not None and current is not None
-                and abs(previous - current) < _MIN_CHANGE_A
-            ):
+            if same_command(self._command_current, current):
                 return
             # Fresh valid SoC/capacity/phase data can make our queued start or
             # pause obsolete. Cancellation checks the owner at the service,
@@ -558,13 +659,16 @@ class TimedGoalObserver:
         if deadline is None or deadline <= dt_util.utcnow():
             return
         now = time.monotonic()
-        if self._last_write_at is not None and now - self._last_write_at < _MIN_WRITE_INTERVAL:
+        if self._last_write_at is not None and now - self._last_write_at < MIN_WRITE_INTERVAL:
             return
         # Record even uncertain writes, so reconnect churn cannot flood the bus.
         self._last_write_at = now
         self._command_submitted = True
         self._command_current = current
-        self._plan_paused = current is None
+        if current is None:
+            self._pause_seen = False
+        # Saved first: after a restart in between, the plan still ends it.
+        await self._set_plan_paused(current is None)
         await self._runtime.control.async_set_timed_current(
             current, deadline=deadline, owner=self._command_owner,
         )
@@ -578,18 +682,57 @@ class TimedGoalObserver:
     async def _rest(self) -> None:
         """Another car may be plugged in: withdraw this car's plan, pause included."""
         await self._cancel_command()
-        control = self._runtime.control
-        if self._plan_paused and control.pause_requested is True and not control.read_only:
-            await control.async_resume_charging()
-            _LOGGER.info("Departure plan pause ended: the car at the wallbox is not confirmed")
-        self._plan_paused = False
+        await self._end_plan_pause()
         self._set_status("vehicle_unconfirmed")
 
-    async def _wait_for_input(self, status: str) -> None:
+    async def _end_plan_pause(self) -> None:
+        control = self._runtime.control
+        if (
+            self._plan_paused and control.pause_requested is True and not control.read_only
+            # A goal's stop owns the pause by now; the control would refuse.
+            and not control.energy_goal_stop_requested
+        ):
+            await control.async_resume_charging()
+            _LOGGER.info("Departure plan pause ended: the plan no longer applies to the car")
+        await self._set_plan_paused(False)
+
+    async def _observe_plan_pause(self) -> None:
+        """Keep only a pause that is still the plan's own."""
+        if not self._plan_paused:
+            return
+        control = self._runtime.control
+        if control.is_paused is True:
+            self._pause_seen = True
+        elif control.is_paused is False and self._pause_seen:
+            # Someone ended the plan's pause after it had applied.
+            await self._set_plan_paused(False)
+        elif (
+            not self._pause_seen and control.pending_action is not None
+            and control.pending_owner != self._command_owner
+        ):
+            # Another command replaced the plan's queued pause: a pause that
+            # applies now is not the plan's to end.
+            self._command_submitted = False
+            await self._set_plan_paused(False)
+
+    async def _set_plan_paused(self, paused: bool) -> None:
+        if paused == self._plan_paused and self._pause_store_current:
+            return
+        self._plan_paused = paused
+        try:
+            await self._pause_store.async_save(PlanPause(paused))
+        except (OSError, ValueError) as err:
+            # The plan keeps it in memory; it is lost only with a restart.
+            self._pause_store_current = False
+            _LOGGER.warning("Departure plan pause could not be saved: %s", type(err).__name__)
+        else:
+            self._pause_store_current = True
+
+    async def _wait_for_input(self, status: str, *, keep_start: bool = False) -> None:
         # Keep an already applied charge unchanged, but do not let an older
         # queued start run after the plan's target or input became unavailable.
         await self._cancel_command()
-        self._set_status(status)
+        self._set_status(status, keep_start=keep_start)
 
     def _target_raised(self) -> bool:
         """The percentage target lies above the car's current charge level."""
@@ -609,8 +752,9 @@ class TimedGoalObserver:
         )
         return soc is not None and soc < goal.target_percent
 
-    def _set_status(self, status: str) -> None:
-        if status not in _PLANNED:
+    def _set_status(self, status: str, *, keep_start: bool = False) -> None:
+        # Only a start that already passed is kept; a future one is planned anew.
+        if not keeps_start(status, self.planned_start, dt_util.utcnow(), keep_start=keep_start):
             self.planned_start = None
         if status != self.status:
             self.status = status

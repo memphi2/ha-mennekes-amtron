@@ -24,6 +24,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout, web
 
 from .app_adapter_setup import AdapterSetup
 from .connection import validate_network_host
+from .decode import is_hex32
 from .modbus_trace import ModbusTrace
 from .service_config import ServerConfig
 from .waveshare_gateway import (
@@ -47,13 +48,15 @@ _TRANSPORT_LABELS = {
 }
 _TRANSPORTS = {**{label: key for key, label in _TRANSPORT_LABELS.items()}, **{key: key for key in _TRANSPORT_LABELS}}
 _SERIAL_PATH = re.compile(r"/dev/(?:tty(?:USB|ACM|AMA|S|SC|THS|XRUSB)[0-9]+|serial/(?:by-id|by-path)/[^/\x00]+)")
-_USER_ID = re.compile(r"[0-9a-f]{32}")
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"([0-9]{4})\.([0-9]{1,2})\.([0-9]+)")
 _FIELDS = {"connection_type", "serial_port", "host", "tcp_port", "device_id", "baudrate", "frame", "tcp_authentication"}
 _NETWORK_EXTRAS = {"tcp_authentication", "tcp_auth_password", "adapter_token", "adapter_baudrate", "adapter_frame"}
 _ASSETS = {
-    "/": ("app_settings.html", "text/html"),
+    "/": ("app_overview.html", "text/html"),
+    "/connection": ("app_settings.html", "text/html"),
+    "/app_overview.js": ("app_overview.js", "text/javascript"),
+    "/app_nav.js": ("app_nav.js", "text/javascript"),
     "/app_settings.js": ("app_settings.js", "text/javascript"),
     "/app_settings.css": ("app_settings.css", "text/css"),
 }
@@ -66,6 +69,11 @@ def _language(header: str) -> str:
         if tag in {"de", "en", "fr", "nl", "it"}:
             return tag
     return "en"
+
+
+def localize_page(content: bytes, accept_language: str) -> bytes:
+    """Set a page's language from the browser; every page script reads it."""
+    return content.replace(b'lang="en"', f'lang="{_language(accept_language)}"'.encode(), 1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,12 +179,14 @@ class AppSettings:
     def __init__(
         self, supervisor_token: str, service_token: str,
         *, modbus_trace: ModbusTrace | None = None,
+        overview: Callable[[], Awaitable[dict[str, Any]]] | None = None,
         configuration_guard: Callable[[], AbstractAsyncContextManager[ConnectionConfigurationGuard]] | None = None,
     ) -> None:
         self._supervisor_token = supervisor_token
         self._service_token = service_token
         self._secret = secrets.token_bytes(32)
         self._modbus_trace = modbus_trace
+        self._overview = overview
         self._session: ClientSession | None = None
         self._lock = asyncio.Lock()
         self._slots = asyncio.Semaphore(2)
@@ -228,7 +238,7 @@ class AppSettings:
             raise SettingsError("supervisor_update_required", 503)
         user = request.headers.get("X-Remote-User-Id", "")
         groups = request.headers.get("X-Remote-User-Groups", "").split(",")
-        if not _USER_ID.fullmatch(user) or "system-admin" not in groups:
+        if not is_hex32(user) or "system-admin" not in groups:
             raise SettingsError("admin_required", 403)
         return user
 
@@ -244,6 +254,20 @@ class AppSettings:
         if not isinstance(options, dict):
             raise SettingsError("supervisor_unavailable", 503)
         return options
+
+    async def read_overview(self, request: web.Request) -> web.Response:
+        """Authorize every passive overview read; never proxy a raw snapshot."""
+        await self._authorize(request)
+        if request.query:
+            raise SettingsError("invalid_request")
+        if self._overview is None:
+            raise SettingsError("overview_unavailable", 503)
+        try:
+            async with asyncio.timeout(2):
+                snapshot = await self._overview()
+        except TimeoutError as err:
+            raise SettingsError("overview_unavailable", 503) from err
+        return web.json_response(snapshot)
 
     async def read(self, request: web.Request) -> web.Response:
         user = await self._authorize(request)
@@ -513,10 +537,14 @@ class AppSettings:
         if request.headers.get("Sec-Fetch-Site") == "cross-site":
             raise web.HTTPForbidden
         try:
-            if self._slots.locked():
-                raise SettingsError("busy", 503)
-            async with self._slots:
+            if not request.path.startswith("/api/"):
+                # Packaged page assets load in parallel and never call the Supervisor.
                 response = await handler(request)
+            elif self._slots.locked():
+                raise SettingsError("busy", 503)
+            else:
+                async with self._slots:
+                    response = await handler(request)
         except SettingsError as err:
             response = web.json_response({"error": err.key}, status=err.status)
         except (ClientError, TimeoutError, OSError, ValueError, TypeError):
@@ -537,8 +565,7 @@ def add_settings_asset_routes(app: web.Application) -> None:
         resource = files(__package__).joinpath(filename)
         content = await asyncio.to_thread(resource.read_bytes)
         if content_type == "text/html":
-            language = _language(request.headers.get("Accept-Language", ""))
-            content = content.replace(b'lang="en"', f'lang="{language}"'.encode(), 1)
+            content = localize_page(content, request.headers.get("Accept-Language", ""))
         return web.Response(body=content, content_type=content_type)
 
     for path in _ASSETS:
@@ -550,6 +577,7 @@ def create_settings_app(settings: AppSettings) -> web.Application:
     app = web.Application(middlewares=[settings.guard], client_max_size=4096)
     app.cleanup_ctx.append(settings.lifecycle)
     add_settings_asset_routes(app)
+    app.router.add_get("/api/overview", settings.read_overview)
     app.router.add_get("/api/config", settings.read)
     app.router.add_post("/api/config", settings.save)
     app.router.add_post("/api/adapter", settings.inspect_adapter)

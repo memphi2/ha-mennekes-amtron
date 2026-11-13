@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import STATE_ON, EntityCategory
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,11 +18,9 @@ from .device.errors import DeviceError
 from .device.registers import (
     CHARGING_CURRENT_EMS,
     CHARGING_RELEASE,
-    CP_STATE,
-    EVSE_STATE,
     LOCK_EVSE,
 )
-from .device.vehicle import vehicle_connected
+from .device.vehicle import snapshot_vehicle_connected
 from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
@@ -89,6 +87,16 @@ class AmtronPlugChargeSwitch(MennekesAmtronControlEntity, SwitchEntity):
         await self._async_set_enabled(False)
 
 
+@dataclass(frozen=True)
+class SettingRestoreData(ExtraStoredData):
+    """Persist an HA-side setting even while its entity is unavailable."""
+
+    enabled: bool
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"enabled": self.enabled}
+
+
 class AmtronReleaseOffOnUnplugSwitch(MennekesAmtronControlEntity, SwitchEntity, RestoreEntity):
     """Switch the charging release off whenever a vehicle is unplugged.
 
@@ -113,18 +121,21 @@ class AmtronReleaseOffOnUnplugSwitch(MennekesAmtronControlEntity, SwitchEntity, 
             not self.runtime_data.control.read_only or self.is_on is True
         )
 
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData:
+        return SettingRestoreData(self._attr_is_on is True)
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        if (state := await self.async_get_last_state()) is not None:
-            self._attr_is_on = state.state == STATE_ON
+        # The shown state reads "unavailable" while the wallbox is offline or
+        # read-only; the stored setting keeps what the user chose.
+        if (extra := await self.async_get_last_extra_data()) is not None:
+            self._attr_is_on = extra.as_dict().get("enabled") is True
         self._connected = self._vehicle_connected()
 
     def _vehicle_connected(self) -> bool | None:
         data = self.wallbox_data
-        return vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=self.runtime_data.identity.layout_version >= CP_STATE.min_layout,
-        )
+        return snapshot_vehicle_connected(data.get, self.runtime_data.identity.layout_version)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -138,7 +149,11 @@ class AmtronReleaseOffOnUnplugSwitch(MennekesAmtronControlEntity, SwitchEntity, 
             unplugged and self.is_on and not control.read_only
             and control.plug_charge.get("enabled") is not True
         ):
-            self.hass.async_create_task(self._after_unplug())
+            # Tied to the entry: an unload cancels it before it can write to
+            # a control that has been shut down or replaced.
+            self._entry.async_create_background_task(
+                self.hass, self._after_unplug(), "amtron_release_off_on_unplug",
+            )
         super()._handle_coordinator_update()
 
     async def _after_unplug(self) -> None:

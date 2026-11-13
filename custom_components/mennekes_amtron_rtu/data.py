@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from .session_observer import SessionObserver
     from .timed_goal_observer import TimedGoalObserver
     from .vehicle_binding import VehicleBinding
-    from .vehicle_detection import VehicleDetectionObserver
+    from .vehicle_detection import VehicleDetectionObserver, VehicleEvidence
     from .vehicle_soc import VehicleSocObserver
     from .vehicle_sources import VehicleTelemetrySource
 
@@ -64,6 +64,7 @@ class MennekesAmtronRuntimeData:
     vehicle_telemetry: VehicleTelemetrySource | None = None
     vehicle_detection: VehicleDetectionObserver | None = None
     vehicle_binding: VehicleBinding | None = None
+    vehicle_evidence: VehicleEvidence | None = None
     plug_charge: PlugChargeObserver | None = None
     timed_goal: TimedGoalObserver | None = None
     sessions: SessionObserver | None = None

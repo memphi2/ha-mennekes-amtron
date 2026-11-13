@@ -64,7 +64,7 @@ counter.
 | Profile | History retained |
 |---|---|
 | **Full history** | All default enabled sensors. |
-| **Less detail** | Excludes the three phase currents. |
+| **Less detail** | Excludes signaled current and temperature. |
 | **Energy and power statistics only** | Retains statistics for total energy and total power; other retained states still have history. |
 
 Exclusion stops new history and statistics for the selected sensors. They stay

@@ -4,8 +4,8 @@ A LAN-to-RS-485 adapter lets the supported RTU wallbox connect without a USB
 adapter on your HA or service host. The wallbox still uses the same RS-485
 register interface; only the connection to its bus changes.
 
-**Available from 0.5.0.** Physical testing of particular gateways remains separate
-from automated protocol tests.
+Particular gateway models still need testing on real hardware; automated tests
+cover the protocol only.
 
 ## Choose the adapter protocol
 
@@ -54,20 +54,16 @@ can still interrupt delivery; configure the wallbox's
 
 ### Service app
 
-App **0.6.1** includes **Open Web UI**. Older app 0.5.2b2 uses the native
-Configuration tab described below.
-
 1. Follow the [service installation](modbus-service.md) and prepare any existing
    connection for handover before starting a second bus owner.
-2. If the app offers **Open Web UI**, start it and open that page. It requires an
+2. Start the app and open **Open Web UI → Connection**. It requires an
    administrator and **Supervisor 2026.10.4+**. Select **LAN: Modbus RTU
    (TCP)** or **LAN: Modbus TCP**, matching the gateway. Enter the adapter's host/IP
    without `http://` or a URL path, and its TCP port. The page shows the LAN fields
    and removes any saved USB path when you save.
-3. On older apps, use the native **Configuration** tab instead. The host field is
-   always visible from app 0.5.1; those older apps may require clearing an obsolete
-   USB selection before saving. USB baud/frame fields are ignored for LAN;
-   configure those on the gateway instead. Keep **Read-only** on initially.
+3. Without the web page, use the native **Configuration** tab instead. USB
+   baud/frame fields are ignored for LAN; configure those on the gateway instead.
+   Keep **Read-only** on initially.
 4. Save and restart the app. Confirm its HA discovery and compare readings.
    When ready, disable **Read-only**, save and restart the app again.
 
@@ -75,22 +71,6 @@ No local USB device is required. The app's read-only switch still controls HA
 write permission. No additional write switch is needed in HA.
 
 For a standalone service, use the [LAN configuration example](service-standalone.md#lan-adapter-configuration).
-
-### App 0.5.0 configuration
-
-If you are still on app 0.5.0, update it to 0.6.1 before updating the
-integration. That older app lists the values
-`serial`, `rtu_over_tcp` and `modbus_tcp`. App 0.5.1 shows those values alongside
-the readable choices. App 0.5.2b1 and newer keep only the readable choices; before updating from
-0.5.1, select the matching readable choice once. See
-[Updating the connection choice](upgrading.md#app-connection-choice).
-
-If 0.5.0 shows the TCP port without a host field, enable **Show unused optional
-configuration options** on the app's Configuration tab. Alternatively, open its
-YAML editor and add `host: "192.168.1.123"`, replacing that example with your
-adapter's address. Save and restart the app to apply it. Changing the connection
-choice alone does not reveal the field. An app restart briefly interrupts the
-heartbeat; HA does not need a restart for this setting.
 
 ### Direct Home Assistant connection
 

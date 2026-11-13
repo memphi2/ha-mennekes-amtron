@@ -199,7 +199,8 @@ class EnergyGoalController:
                     self._pending_generation = self._client.write_state.energy_goal_generation
                     self._ensure_task()
                 _LOGGER.error("Cannot save cancelled goal recovery (%s)", type(err).__name__)
-        self._control.cancel_goal_resume()
+        # The deliberate command takes the place of a queued automatic one.
+        self._control.cancel_goal_resume(replaced=True)
 
     def observe(self, snapshot: WallboxData | None) -> None:
         """Fold new evidence and arrange one worker; cached meter data is ignored."""

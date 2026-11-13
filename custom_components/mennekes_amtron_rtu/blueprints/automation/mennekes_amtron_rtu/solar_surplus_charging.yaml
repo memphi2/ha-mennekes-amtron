@@ -7,6 +7,7 @@ blueprint:
     vehicle connects, or charging resumes. It is divided by one or three
     phases and clamped to the configured current range.
     This assumes a three-phase installation when all phases are selected.
+    A wallbox without phase switching uses the configured phase count.
     It only writes while a vehicle is connected and charging is not paused.
     Select the Charging paused input when updating an existing automation;
     without it, the automation leaves the current unchanged.
@@ -67,12 +68,25 @@ blueprint:
         wallbox really uses. This blueprint assumes a three-phase supply: single
         phase uses one phase and all available uses three. It does not detect
         the vehicle's actual phase use. An unknown state leaves the current
-        unchanged.
+        unchanged. Leave it empty on a wallbox without phase switching, which
+        has no such entity.
+      default: ""
       selector:
         entity:
           filter:
             - integration: mennekes_amtron_rtu
               domain: select
+    fixed_phases:
+      name: Phases without switching
+      description: >-
+        The phases the vehicle charges on when Requested phases is empty.
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 3
+          step: 1
+          mode: box
     grid_voltage:
       name: Grid voltage
       description: The voltage used to convert watts into amps.
@@ -117,10 +131,11 @@ max_exceeded: silent
 
 trigger_variables:
   paused_entity: !input charging_paused
+  phases_entity: !input switched_phases
 
 variables:
   surplus_entity: !input surplus_power
-  phases_entity: !input switched_phases
+  fixed_phases: !input fixed_phases
   current_entity: !input charging_current
   volts: !input grid_voltage
   minimum: !input minimum_current
@@ -129,9 +144,12 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input surplus_power
-  - trigger: state
-    entity_id: !input switched_phases
-    attribute: switched
+  # Templates keep an empty phase selection valid; each fires on a change
+  # to its phase use.
+  - trigger: template
+    value_template: "{{ state_attr(phases_entity, 'switched') == 'single_phase' }}"
+  - trigger: template
+    value_template: "{{ state_attr(phases_entity, 'switched') == 'all_available' }}"
   - trigger: state
     entity_id: !input vehicle_connected
     to: "on"
@@ -149,7 +167,8 @@ conditions:
       {{ paused_entity != '' and is_state(paused_entity, 'off')
          and is_number(states(surplus_entity))
          and state_attr(surplus_entity, 'unit_of_measurement') in ['W', 'kW']
-         and state_attr(phases_entity, 'switched') in ['single_phase', 'all_available']
+         and (phases_entity == ''
+              or state_attr(phases_entity, 'switched') in ['single_phase', 'all_available'])
          and not is_state(current_entity, 'unavailable')
          and is_number(state_attr(current_entity, 'max'))
          and minimum | float >= 6
@@ -162,7 +181,9 @@ actions:
       entity_id: !input charging_current
     data:
       value: >-
-        {% set phases = 1 if state_attr(phases_entity, 'switched') == 'single_phase' else 3 %}
+        {% set switched = state_attr(phases_entity, 'switched') if phases_entity != '' else none %}
+        {% set phases = 1 if switched == 'single_phase'
+           else 3 if switched == 'all_available' else fixed_phases | int(3) %}
         {% set factor = 1000 if state_attr(surplus_entity, 'unit_of_measurement') == 'kW' else 1 %}
         {% set amps = states(surplus_entity) | float * factor / (volts | float) / phases %}
         {{ [[amps | round(1), minimum | float] | max,

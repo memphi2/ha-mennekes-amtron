@@ -19,12 +19,8 @@ are unchanged. It sends no HA commands or restored values to the service.
 Direct USB and LAN entries retain their separate HA control-mode option.
 
 For standalone configuration, `connection_type` selects `serial` (the default),
-`rtu_over_tcp` or `modbus_tcp`. App 0.6.0b1 offers exactly **USB / RS-485** (default),
-**LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP**. The service normalizes these
-names to the same three protocols. Standalone JSON keeps accepting the technical
-names. Saved app choices using those names need a one-time
-[selection of the matching readable choice](upgrading.md#app-connection-choice);
-no automatic connection change is performed.
+`rtu_over_tcp` or `modbus_tcp`. The app offers the same three protocols as
+**USB / RS-485** (default), **LAN: Modbus RTU (TCP)** and **LAN: Modbus TCP**.
 USB uses `serial_port`, `baudrate` and `frame`. LAN uses `host` and `tcp_port`
 (default 502); UART settings belong on the adapter. `device_id` remains the
 wallbox address from 10 to 50. The HTTP API's `port` is independent and defaults
@@ -64,32 +60,40 @@ before trying again. Supervisor has no atomic compare-and-save API, so an edit
 made elsewhere between the final check and the save can still race. Use one
 configuration page at a time, including the native app Configuration tab.
 
-In older apps **0.5.1–0.5.2b2**, the native Configuration tab has an optional
-serial-device selector with no default device path. It keeps the host field
-visible, accepts an empty host for USB and does not hide fields when changing
-protocol. A stale saved USB device can prevent Supervisor from saving LAN
-settings; clear that serial selection first. A LAN-only installation needs no
-local serial device.
+`serial_port` is an optional string in the native schema. The **Connection**
+page under **Open Web UI** supplies a USB dropdown and only the fields relevant
+to the selected transport. It prefers stable adapter paths and removes the
+serial path when saving LAN. USB runtime validation restricts paths to
+supported serial devices. A LAN-only installation needs no local serial device.
 
-In **0.6.0b1**, `serial_port` is an optional string in the native
-schema. A separate **Open Web UI** page supplies a USB dropdown and only the
-fields relevant to the selected transport. It prefers stable adapter paths and
-removes the serial path when saving LAN. USB runtime validation still restricts
-paths to supported serial devices; the schema change grants no additional device
-access. See [connection setup](upgrading.md#app-connection-page).
+The web pages use a separate internal Ingress listener on port 8099 and need
+Supervisor **2026.10.4+**. They accept requests only from Supervisor, require a
+Home Assistant administrator and protect writes with a CSRF token, a revision
+check and a strict content security policy. They read only locally mapped serial
+devices, save through Supervisor's own-app API and never send the service token
+to the browser. There is no host-published settings port or need for additional
+Supervisor roles. See [the app's web pages](app-guide.md).
 
-The new page uses a separate internal Ingress listener on port 8099 and requires
-an administrator. App **0.8.0** supports Supervisor **2026.10.4+**; older apps
-required 2026.11.0. It accepts requests only
-from Supervisor, validates administrator identity and protects writes against
-cross-site requests and concurrent option changes. It reads only locally mapped
-serial devices, saves through Supervisor's own-app API and never sends the
-service token to the browser. There is no host-published settings port or need
-for additional Supervisor roles. Native Configuration remains available for
-read-only mode, current limits, intervals and manual configuration.
+| Ingress route | Purpose |
+|---|---|
+| `/`, `GET /api/overview` | Overview page and its read-only snapshot |
+| `/connection`, `/api/config`, `/api/adapter` | Connection settings and LAN-adapter setup |
+| `/api/modbus-debug` | Debug log, in RAM only |
+| `/registers`, `GET /api/registers` | Register explorer, from passive observations |
+| `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
+| `/jobs`, `/guest`, `/api/jobs` | Charging jobs, boost and guest charging |
+| `/weekly`, `/api/weekly` | Weekly plans; see [Weekly plan API](#weekly-plan-api) |
 
-Service settings are read only at startup: save configuration changes and restart
-the service to apply them. This briefly interrupts the heartbeat; HA does not need
+Values saved on the **Runtime** page apply without a restart. Each previewed
+change names its `effect`: `next_cycle` for the polling intervals, `immediate`
+for the current cap and the state-change interval, `next_switch` for the
+phase-switch grace. After every poll the service lowers a charging current
+above its cap, unless a queued command, a phase switch, a goal or order stop or
+a holding charging job decides the current. `restart_fields` lists the
+connection, read-only mode, listen address and port when their saved value
+differs from the running one.
+All other service settings are read only at startup: save configuration changes
+and restart the service to apply them. This briefly interrupts the heartbeat; HA does not need
 restarting for permission changes. The service's own error-200 recovery can still
 reassert its saved charging state, including a deliberate pause. The absence of
 HA command replay does not disable that recovery.
@@ -153,12 +157,8 @@ fresh credentials for the same app or asks for a new token for a standalone
 service, checks the entry's existing identity binding and reloads the entry.
 Serial-bound entries require the same serial number; standalone entries added
 without a readable serial number retain their URL binding.
-Integration and service releases are independent. The current integration
-requires **service 0.6.1 or newer with API 2**, including service-owned expiry
-of queued timed charging commands. A future integration-only update can leave
-that compatible service running. If both
-need updating, update the app/service first, then the integration and restart
-Core. Keep existing app data and the HA entry; see [Updates](modbus-service.md#updates).
+Update the app/service first, then the integration, and restart Core. Keep the
+app data and the HA entry; see [Updates](modbus-service.md#updates).
 
 The internal API port is 8765. Host publication is disabled by default.
 Integration discovery checks the app slug and restricts connections to its
@@ -203,10 +203,10 @@ and invalid option. A missing serial adapter is retried while the API remains
 running. An unexpected worker exit is logged and closes the Modbus connection;
 a fatal process failure reports its error class and errno.
 
-In **0.6.0b1**, an app missing the selected transport's serial
+An app missing the selected transport's serial
 path or LAN host stays in setup mode after validating all other options. Its
 health endpoint reports `configured: false`; Modbus, heartbeat and discovery do
-not start. Save the connection in **Open Web UI** or native Configuration, then
+not start. Save the connection on the **Connection** page or in native Configuration, then
 restart the app. A configured but temporarily absent adapter still uses normal
 retries. Invalid values and standalone configuration errors remain fatal rather
 than being silently converted into setup mode.
@@ -220,19 +220,31 @@ recurring failures require their logged cause to be corrected.
 
 ## Saved state and database traffic
 
-Only pause intent, charging-release intent and the resume current are saved in
-`intent.json`, bound to the wallbox identity. The file is atomically replaced with
+Pause intent, charging-release intent and the resume current are saved in
+`intent.json`, bound to the wallbox identity. A charging job is saved in
+`charge-job.json`, weekly plans in `weekly-plans.json`, learned charging power
+in `charge-rates.json` and the departure plan in `departure-plan.json` the same
+way. The file is atomically replaced with
 owner-only permissions when those settings change. Both the file and directory
 are synced before a save is considered complete. This is bounded state rather
 than a growing history. Include the data directory in backups and protect its
 configuration/token.
+
+A file of another wallbox or format, or a damaged one, is not used. For
+`intent.json` and `weekly-plans.json` the service then starts as on its first
+run, keeps the wallbox's own state, logs a warning and replaces the file with
+its next save. The weekly plans start empty then and need to be created again.
+A save that fails is logged; the wallbox stays in use. After a failed save of
+the weekly plans their changes are refused with `weekly_storage_unavailable`
+until the file reads back, which is tried every ten seconds while no plan is
+active.
 
 Heartbeats and polls do not create entries in that state file. The heartbeat
 sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
 use the [Recorder guide](recorder.md) to control that traffic.
 
-Since 0.5.2b2, the pending action and its UTC due time, when known, are kept in
+The pending action and its UTC due time, when known, are kept in
 memory. These fields change on scheduling, replacement or completion, not on
 every second of the wait. The frontend can display the due time relatively;
 the database does not need a changing countdown value. Pending work is not
@@ -240,20 +252,13 @@ added to `intent.json` and is cancelled on service restart.
 
 ## Commands and API boundary
 
-Service **0.5.0 introduced API 2**. Snapshots report `api_version: 2`, and
-authenticated endpoints use `/v2/`. The beta API 1 and `/v1/` routes are
-intentionally unsupported; there are no compatibility aliases.
+Snapshots report `api_version: 2`, and authenticated endpoints use `/v2/`.
+The integration checks the API version and the snapshot's `service_version`.
+An unsupported API or a too old service produces the compatibility error; a
+malformed version or snapshot produces the data-validation error. Neither
+condition asks for new credentials. See [Updates](modbus-service.md#updates).
 
-The integration checks the supported API and its separate minimum service
-version, currently **0.6.1**. Release numbers do not have to match: compatible
-newer service versions are accepted. Snapshots must report `service_version`
-meeting that minimum. Old API 2 snapshots without this field correspond to the
-0.5.0 baseline and do not satisfy the current requirement.
-An unsupported API or a service below the minimum produces the compatibility
-error. A malformed version or snapshot produces the data-validation error.
-Neither condition asks for new credentials. See [Updates](modbus-service.md#updates).
-
-Since 0.5.2b2, these fields are included in the snapshot's `control` object:
+The snapshot's `control` object includes:
 
 | Field | Meaning |
 |---|---|
@@ -265,18 +270,19 @@ Since 0.5.2b2, these fields are included in the snapshot's `control` object:
 No pending action means no due timestamp. An ordinary pending action has a due
 timestamp; `single_phase` and `all_phases` may instead have `null` while waiting
 for vehicle pause confirmation. Once confirmed, a fixed timestamp identifies
-the end of the grace period. These additions are optional for older API 2
-services. Their absence does not enable the new queue in that service; its
-existing control behavior remains. HA derives the two pending-change sensors
-from the service data rather than maintaining a second queue.
+the end of the grace period. HA derives the two pending-change sensors from the
+service data rather than maintaining a second queue.
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | Public process-liveness check; no wallbox data. |
-| `GET /v2/state` | Authenticated cached wallbox state and service status. |
+| `GET /v2/state` | Authenticated cached wallbox state and service status. While a command runs, the request waits up to two seconds and then returns the state published after the last completed command or poll, if that is at most a minute old. |
 | `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |
+| `GET`/`POST /v2/jobs` | Authenticated charging-job state and operations; see [Charging job API](#charging-job-api). |
+| `GET`/`POST /v2/weekly` | Authenticated weekly-plan state and operations; see [Weekly plan API](#weekly-plan-api). |
+| `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number
 already bound to the client's configured wallbox. For example, a pause request
@@ -290,7 +296,7 @@ identity:
 }
 ```
 
-Timed plans use two additional API 2 commands from service **0.6.1**:
+Timed plans use two additional commands:
 
 | Command | Additional fields | Behavior |
 |---|---|---|
@@ -302,8 +308,56 @@ the service, so an obsolete queued request expires even while HA is offline.
 Expiry and cancellation do not reverse a command already applied or alter the
 last charging state. The integration cancels its owned pending work when a plan
 is cleared, replaced, completed or unloaded. Pending work remains volatile and
-is not restored after a service restart. The service still maintains heartbeat;
-HA must be running to recalculate the departure plan and start climate actions.
+is not restored after a service restart. The integration uses these two
+commands only with a service that does not plan departures itself.
+
+### Departure plan
+
+The service plans a departure itself; see
+[departure planning](departure-planning.md#with-the-modbus-service-app). The
+snapshot's `control` object reports `supports_departure_plan: true` and
+`departure`, which is `null` while the saved plan loads:
+
+| Field | Meaning |
+|---|---|
+| `trip` | `deadline` (ISO timestamp or `null`), `source` and `finished` (`reached`, `late` or `null`) |
+| `status` | The plan's state, as shown by **Timed charging status** |
+| `planned_start` | When charging starts or started for this trip, or `null` |
+| `estimated_soc` | The projected charge level in percent, or `null` |
+| `inputs` | Digest of the car data last handed over, or `null` |
+| `scope` | Opaque digest of the current plug-in, or `null` without a car |
+| `confirmed` | Whether the handed-over car is confirmed for this plug-in |
+| `forecast` | `null` unless a plan is computed; otherwise `finish_at` (when the target is reached: the departure, or later when it is unreachable, rounded up to five minutes), `level_at_departure` (percent), `efficiency` (learned share of the metered energy that reaches the battery, 0.9 until learned) and `full_power_kw` (metered power at full current for the current phases, or `null`) |
+
+`control.operation` summarizes all controllers of the service for a reader. It
+is derived from their published state and decides nothing:
+
+| Field | Meaning |
+|---|---|
+| `controller` | `unavailable`, `guest_order`, `weekly_plan`, `charging_job`, `departure_plan` or `direct`. An order that holds the wallbox comes before an open departure, a departure before a weekly plan that waits for its window |
+| `waiting` | The first reason that keeps the car from charging, or `none`: `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, then the controller's reason (`until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `until_weekly_window`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`), then `target_reached`, `command_pending` or `paused` |
+| `next` | `event` (`none`, `queued_command`, `job_start`, `job_end`, `weekly_window`, `plan_start`, `target_reached`, `departure`) and `at`, an ISO timestamp that is `null` exactly for `none`. A queued command is named when it comes first |
+| `target` | `kind` (`none`, `level` in percent, `energy` in kWh), `value` and `deadline` (ISO timestamp or `null`) |
+| `vehicle` | `unknown`, `none`, `connected`, or `confirmed` once Home Assistant confirmed its car for this plug-in |
+
+The overview page receives the same object as `operation` from
+`/api/overview`, or `null` when it does not validate.
+
+Two commands hand the plan over. Both need `expected_serial_number`, reject
+other fields and are accepted while the wallbox is unreachable, because they
+access no bus:
+
+| Command | Additional fields | Behavior |
+|---|---|---|
+| `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
+| `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) and `detected` (whether the car itself reported this plug-in; a weekly plan activates itself only then) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
+
+The plan writes through the same guarded path as `timed_current`, with the
+owner `departure`. It is saved in `/data/departure-plan.json`, together with
+what the plan learned about up to eight cars, at most 8 KiB and bound to the
+wallbox identity. An unreadable file only clears the plan, and what it learned,
+until Home Assistant hands it over again. HA must be running to start climate
+actions.
 
 The service compares this precondition with its initialized wallbox identity
 while holding the command lock, before writing. A missing field or mismatched
@@ -312,9 +366,8 @@ no readable serial number; it is **not a wildcard**. Such endpoint-bound setups
 cannot independently verify the physical wallbox. Clients with a known serial
 number must retain that binding instead of accepting a newly observed device.
 
-The older 0.5.1 service compares the identity read during initialization.
-Since 0.5.2b2, the driver additionally verifies a known serial over Modbus after a
-reconnection and before control writes. This also detects a changed wallbox
+The driver also verifies a known serial over Modbus after a reconnection and
+before control writes. This also detects a changed wallbox
 behind a gateway whose TCP connection stayed open. A missing or different
 serial blocks the write without changing saved intent; the service reports
 unavailable until the original device can be verified again. Direct mode uses
@@ -332,7 +385,7 @@ is unavailable or older than the greater of 30 seconds and three status-poll
 intervals. This is checked after waiting for the command lock; a queued request
 cannot use readiness that expired while it waited. Rejected commands are not
 replayed later, and this check does not stop the heartbeat or change saved pause
-intent. Since 0.5.2b2, an accepted command can instead be queued for its
+intent. An accepted command can instead be queued for its
 state-change deadline; execution rechecks its prerequisites, and an execution
 failure clears pending work rather than retrying an uncertain write indefinitely.
 Failed or timed-out commands are not automatically
@@ -349,6 +402,143 @@ authentication and version checks. It has no arbitrary register-write or
 remote-shutdown endpoint. `/health` exposes process liveness only. An unreachable
 service or wallbox makes HA readings unavailable; reconnecting does not replay
 HA restore values.
+
+## Charging job API
+
+The [charging job pages](app-guide.md#charging-jobs) use the same operations as
+the authenticated `/v2/jobs` endpoint. Ingress uses `/api/jobs` with the
+administrator check and the CSRF token from its `GET` response. Both accept at
+most 4 KiB, reject query strings and extra fields, and never retry by themselves.
+
+`GET` returns the current order, a `revision` and the connection `scope`. The
+scope is an opaque token for the current physical connection, not a vehicle
+identifier; it changes when the car is unplugged, the wallbox is unreadable for
+more than a minute or the service restarts. Every
+`POST` names an `action`:
+
+| Action | Fields besides `action` | Effect |
+|---|---|---|
+| `preview` | `revision`, `scope`, `request` | Validates an order and returns its canonical form. Writes nothing. |
+| `create` | `revision`, `scope`, `request` | Saves the previewed order. Repeating the same request returns its result without resetting it. |
+| `preview_guest` | `revision`, `scope`, `request` | Turns `id`, `duration_minutes`, `energy_kwh` and `current_a` into an absolute guest order to confirm with `create`. |
+| `preview_boost` | `revision`, `scope`, `minutes` | Returns the absolute `until` for an early start of 1 to 120 minutes. |
+| `boost` | `revision`, `scope`, `until` | Starts the previewed boost. |
+| `cancel_boost`, `stop`, `clear` | `revision`, `confirm: true` | Ends the boost, stops the order, or removes a stopped or finished order without resuming. |
+
+An order `request` has this form:
+
+```json
+{"id": "32 lowercase hexadecimal characters", "start_at": "2026-11-13T22:00:00+01:00",
+ "finish_at": "2026-11-14T06:40:00+01:00", "current_a": 12, "energy_kwh": 10}
+```
+
+An optional `reserve_kwh` (0.1 kWh steps, at most `energy_kwh`) charges that
+part at once and then waits for `start_at`; see
+[immediate reserve](app-guide.md#immediate-reserve). `GET` then also reports
+`reserve_reached`.
+
+`GET` also returns a `forecast` for the [finish estimate](app-guide.md#finish-estimate),
+computed from the meter readings the service polls anyway; it adds no Modbus
+reads and changes nothing. `state` is `estimate` when `earliest_finish` and
+`latest_finish` hold a range; otherwise it names why there is none, for
+example `learning`, `scheduled`, `waiting_vehicle`, `awaiting_meter`, `stale`,
+`unstable`, `beyond_horizon`, `unavailable`, `complete` or `stopped`. `source`
+is `live` or `history`, `power_kw` the median measured power, `samples` the
+number of intervals and `deadline_status` one of `likely`, `at_risk`,
+`unlikely` and `unknown`. `history_storage` is `unavailable` while learned
+values cannot be saved.
+
+Learned powers are kept per hashed vehicle reference, current and phase count in
+`/data/charge-rates.json`: at most 64 of them with 16 values each, for 30 days,
+at most 64 KiB, bound to the wallbox identity like the other files. The file
+holds no vehicle identifier and no charging permission. It is written at most
+every ten minutes and at shutdown; an unreadable or unwritable file only stops
+the history, never charging.
+
+Errors return HTTP 409 with a key such as `job_changed` (stale revision or
+scope), `job_exists`, `job_not_permitted`, `job_preview_expired`,
+`job_current_exceeds_cap`, `guest_vehicle_target_active`,
+`job_clear_requires_pause` or `job_storage_unavailable`; malformed input returns
+400 with `invalid_job_request`. `job.state` is the order's intent, not a measured
+vehicle state: `scheduled`, `charging`, `waiting_meter`, `suspended`, or one of
+the final states `reached`, `finished`, `stopped` and `interrupted`; `job.reason`
+names why.
+
+While an order holds the connected car (`job.holding` is `true`),
+`/v2/command` refuses commands that set the current, resume, switch phases or
+start another planner with `service_job_active`. `pause`, `cancel_pending`,
+release off and lock on stop the order first. When an order ends, the service
+pauses charging. Once the wallbox confirms the pause and the finished order is
+saved, `holding` turns `false` and commands work again; the finished order stays
+in `GET` until it is cleared or replaced by `create`. The order is saved in
+`/data/charge-job.json` before it may start charging.
+
+A service restart or a lasting connection loss turns a running order into
+`suspended` (reason `service_restarted` or `connection_lost`). It keeps holding
+the car paused and continues on the new `scope` only when the wallbox's session
+duration kept pace with the clock within two minutes, its session counter and
+the selected vehicle are unchanged and its session energy did not start over.
+Otherwise, or without such proof within a minute of a readable wallbox, it
+becomes `interrupted` with the same reason. For this proof the saved order
+also holds the last session duration, session energy, session counter and a
+digest of the vehicle selection; that record is saved only with the order's own
+changes.
+
+## Weekly plan API
+
+The service also accepts `GET` and `POST` at `/v2/weekly`; Ingress uses
+`/api/weekly` with the same administrator check, CSRF token, size limit and
+no-retry rule as the job API. `GET` returns the saved plans with their upcoming
+dates, the active activation and the current job. Every `POST` names an
+`action`; changes need `confirm: true`:
+
+| Action | Fields besides `action` | Effect |
+|---|---|---|
+| `preview_plan` | `revision`, `plan` | Validates a plan and lists its next dates. Writes nothing. |
+| `save_plan`, `remove_plan` | `revision`, `plan` or `plan_id`, `confirm` | Saves or removes a plan. Editing or removing the active plan stops its job. |
+| `preview_activation` | `revision`, `plan_id`, `vehicle_profile`, `scope` | Returns a signed proposal for the first job and the activation end. |
+| `activate` | `proposal`, `confirm` | Starts the activation within 60 seconds of the preview. Repeating it returns the outcome without extending it. |
+| `deactivate` | `revision`, `confirm` | Ends the activation, stops its job and forgets the plan's remembered car. Without an activation it forgets every remembered car. |
+
+The first job is created on activation. Each later job is created when its
+window opens, replacing the finished one; until then the finished job has handed
+control back (`holding` is `false`).
+
+A `plan` has `id`, `vehicle_profile`, `timezone` (IANA), `weekdays` (Monday is
+0), `departure_time`, `charge_minutes`, `current_a`, `energy_kwh`,
+`ambiguous_time` (`earlier` or `later`), `enabled`, up to 32 `exceptions`
+(`date` with `departure_time` or `null` to skip) and an optional `reserve_kwh`.
+The activation itself is never saved; a service restart ends it. A running job
+of the plan may then continue on its own as described above. Each local
+date is marked as used before its job is created, so a date never runs twice,
+also after an edit or restart. Plans, used dates and remembered cars are kept
+in `/data/weekly-plans.json`, at most 128 KiB. The latest used date of up to
+128 plans is kept; when that is full, the oldest one of a deleted plan makes
+room.
+
+An `activate` while Home Assistant has detected a car at the plug-in
+(`departure_inputs` with `detected: true` and the current `scope`, see
+[Departure plan](#departure-plan)) saves that car with the plan once its job
+exists; each entry of `plans` then reports `assigned: true`. A car handed over
+as `profile:<id>:…` is remembered as `profile:<id>`, any other by its full
+source text. Saving a plan with another `vehicle_profile` removes its car.
+
+While no activation exists and the same car is detected for the current scope,
+the service activates the plan itself, once per scope and again when seven days
+have passed. It takes up a job of the plan that is still running. Otherwise
+`active.job_id` is `null` and `reason` is `waiting_next_occurrence` until the
+next unused date's window opens; the job is then created once the ordinary job
+admission succeeds. A date whose job was interrupted before its `start_at` is
+freed again first. A manual job stop or clear, also while no activation exists,
+and `deactivate` remove the remembered car.
+
+Errors return HTTP 409 with a key such as `weekly_changed`,
+`weekly_already_active`, `weekly_vehicle_not_confirmed`,
+`weekly_confirmation_expired`, `weekly_no_occurrence` or
+`weekly_storage_unavailable`; malformed input returns 400 with
+`invalid_weekly_request`.
+
+## Transport security
 
 The service uses plain HTTP. Use a trusted private network or an HTTPS reverse
 proxy outside that network. The client does not follow redirects and does not

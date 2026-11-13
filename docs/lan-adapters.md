@@ -1,8 +1,5 @@
 # Set up a compatible LAN adapter
 
-**Available from 0.8.0.** Service connections need app/service 0.8.0 for
-these adapter features.
-
 You can optionally configure a supported Waveshare adapter from the integration
 or the service app. The setup reads the adapter you specify, shows its identity
 and settings, and applies changes only when you confirm them.

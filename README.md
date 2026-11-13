@@ -37,7 +37,7 @@ families.
 
 | Connection | Why choose it? |
 |---|---|
-| **Service app — recommended, optional** | Keeps the heartbeat and last charging state running through HA Core restarts. On HA OS, its URL and token are discovered automatically. |
+| **Service app — recommended, optional** | Keeps the heartbeat and last charging state running through HA Core restarts and can run charging orders on its own. On HA OS, its URL and token are discovered automatically. |
 | **Direct USB or LAN** | Uses the same charging controls without an extra app. HA restarts interrupt its heartbeat. |
 
 The service app is installed separately from the integration:
@@ -49,9 +49,8 @@ directly. Both connection owners support USB and LAN. Only one owner may use the
 bus, including in read-only mode. An app/host restart or a connection failure can
 still interrupt the heartbeat; prepare the wallbox's [fallback](docs/safety.md).
 
-Already installed? **Keep the existing entry.** The integration and app update
-independently and can have different version numbers. A compatible app need not
-restart for an integration-only update. Follow [Updates](docs/installation.md#updates).
+Already installed? **Keep the existing entry** and follow
+[Updates](docs/installation.md#updates): update the app first, then the integration.
 
 ## Everyday charging
 
@@ -65,6 +64,7 @@ restart for an integration-only update. Follow [Updates](docs/installation.md#up
 | Add targets, a trip time or vehicle data | [Optional functions and examples](docs/features.md) |
 | Estimate costs or charging losses | [Charging estimates](docs/charging-estimates.md) |
 | Charge from solar surplus | [PV blueprints](docs/blueprints.md) |
+| Let the app charge on its own, or charge a guest's car | [The app's web pages](docs/app-guide.md) |
 | Keep history manageable | [Recorder settings](docs/recorder.md) |
 
 Write permission has one owner: disable **Read-only** in the service app, or
@@ -74,13 +74,10 @@ setting belongs and why a requested change may wait.
 
 ## Development and releases
 
-**Current release: 0.8.0.** It adds vehicle profiles with manual or automatic
-selection, optional Virtual Plug & Charge, departure planning that starts late
-and finishes on time, guided LAN-adapter setup and a live Modbus debug log in
-the app. Optional features stay off until you configure them. In service mode,
-update the app first. See [the update guide](docs/upgrading.md#updating-to-080),
-[feature availability](docs/README.md#versions-and-feature-availability) and
-[release notes](CHANGELOG.md).
+**Current beta: 0.9.0b2.** The app gets web pages for an overview, the registers
+and runtime settings, and runs charging jobs, weekly plans, early boosts and
+guest charging on its own. Total power carries the values of all three phases. Optional features
+stay off until you configure them. See the [release notes](CHANGELOG.md).
 
 [All documentation](docs/README.md) · [Compatibility](docs/compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)
 

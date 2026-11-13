@@ -222,6 +222,7 @@ def _plug_charge_diagnostics(runtime_data: MennekesAmtronRuntimeData) -> dict[st
     return {
         "status": observer.status,
         "blocked_reason": observer.blocked_reason,
+        "decision": getattr(observer, "decision_details", None),
         "gate_enabled": gate.get("enabled"),
         "gate_authorized": gate.get("authorized"),
         "session_active": isinstance(gate.get("session"), str),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, Self
 
@@ -16,7 +17,7 @@ from .device.const import DOMAIN
 from .device.energy_goal import EnergyGoal
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
 from .device.soc_goal import SocGoal
-from .timed_goal import TimedGoal
+from .device.timed_goal import TimedGoal
 
 
 class _GoalModel(Protocol):
@@ -179,6 +180,29 @@ class SessionHistoryStore(ModelStore[SessionHistory]):
 
     def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
         super().__init__(hass, entry_id, identity, kind="charging_session", model=SessionHistory)
+
+
+@dataclass(frozen=True, slots=True)
+class PlanPause:
+    """Whether the departure plan paused the wallbox itself."""
+
+    paused: bool = False
+
+    def snapshot(self) -> dict[str, Any]:
+        return {"paused": self.paused}
+
+    @classmethod
+    def restore(cls, raw: object) -> PlanPause:
+        if not isinstance(raw, dict) or raw.keys() != {"paused"} or type(raw["paused"]) is not bool:
+            raise ValueError("invalid departure plan pause")
+        return cls(raw["paused"])
+
+
+class PlanPauseStore(ModelStore[PlanPause]):
+    """Keep the plan's own pause across a restart, so the plan can end it."""
+
+    def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
+        super().__init__(hass, entry_id, identity, kind="timed_pause", model=PlanPause)
 
 
 class TimedGoalStore(ModelStore[TimedGoal]):

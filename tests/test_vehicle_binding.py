@@ -97,10 +97,12 @@ def test_a_plug_in_binds_only_after_the_cars_own_fresh_report(tmp_path, caplog):
         coordinator.plug(False)
         await settle(hass)
         assert not binding.resting
+        assert not binding.detected
         # A plug-in after the car's last report is not proven to be that car.
         coordinator.plug(True)
         await settle(hass)
         assert binding.resting
+        assert not binding.detected
         assert "not confirmed as First car" in caplog.text
         # An unreadable wallbox neither confirms the car nor releases its rules.
         coordinator.last_update_success = False
@@ -112,6 +114,7 @@ def test_a_plug_in_binds_only_after_the_cars_own_fresh_report(tmp_path, caplog):
         report(hass)
         await settle(hass)
         assert not binding.resting
+        assert binding.detected
         assert "First car confirmed at the wallbox" in caplog.text
         assert changes == [True, False]
         # The unplug ends the binding; an old report cannot renew it.
@@ -151,6 +154,7 @@ def test_the_binding_survives_a_restart_but_not_a_car_change(tmp_path):
         assert not restarted.resting
         # Another selected car needs its own confirmation.
         entry.options["active_vehicle_profile"] = B
+        restarted._changed()
         assert restarted.resting
         report(hass, name="second")
         await settle(hass)
@@ -283,6 +287,7 @@ def test_a_fresh_unplug_report_revokes_the_confirmation(tmp_path, caplog):
         assert not binding.resting
         assert "does not behave like" not in caplog.text
         with patch.object(m, "UNPLUG_GRACE", timedelta(0)):
+            binding._changed()
             assert binding.resting
         assert "does not behave like First car: it reports itself unplugged" in caplog.text
         # Only a new plug-in report confirms it again.
@@ -313,6 +318,27 @@ def test_a_charge_level_that_does_not_rise_revokes_the_confirmation(tmp_path, ca
         await settle(hass)
         assert binding.resting
         assert "its charge level stayed at 50 % while the wallbox delivered 5.5 kWh" in caplog.text
+        binding.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_a_lower_report_starts_the_charge_check_over(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        _entry, coordinator, binding = await confirmed_binding(hass, caplog)
+        # An old report of 50 % arrives first; the car really is at 40 %.
+        soc(hass, 50)
+        coordinator.charge(1.0)
+        soc(hass, 40)
+        coordinator.charge(6.0)
+        coordinator.charge(7.0)
+        soc(hass, 45)
+        coordinator.charge(8.0)
+        await settle(hass)
+        assert not binding.resting
+        assert "stayed at" not in caplog.text
         binding.stop()
         await hass.async_stop()
 
@@ -377,6 +403,46 @@ def test_a_confirmation_from_before_a_restart_is_checked_from_now_on(tmp_path, c
         assert not restarted.resting
         assert restarted._confirmed_at is not None
         restarted.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_selecting_another_car_is_judged_before_its_rules_start(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        entry, _coordinator, binding = await confirmed_binding(hass, caplog)
+        # The second car never reported itself plugged in.
+        entry.options = {**entry.options, "active_vehicle_profile": B}
+        assert not binding.resting
+        binding.refresh()
+        assert binding.resting
+        binding.stop()
+        await hass.async_stop()
+
+    asyncio.run(run())
+
+
+def test_charge_level_jitter_after_a_lower_report_does_not_confirm_the_car(tmp_path, caplog):
+    async def run():
+        hass = HomeAssistant(str(tmp_path))
+        _entry, coordinator, binding = await confirmed_binding(hass, caplog)
+        # Another car charges; the selected car's cached level jitters.
+        soc(hass, 50)
+        coordinator.charge(1.0)
+        soc(hass, 49)
+        coordinator.charge(2.0)
+        soc(hass, 50)
+        coordinator.charge(3.0)
+        coordinator.charge(6.5)
+        coordinator.charge(7.0)
+        assert not binding.resting
+        soc(hass, 50)
+        coordinator.charge(7.5)
+        await settle(hass)
+        assert binding.resting
+        assert "its charge level stayed at 50 %" in caplog.text
+        binding.stop()
         await hass.async_stop()
 
     asyncio.run(run())

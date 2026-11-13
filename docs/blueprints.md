@@ -1,6 +1,6 @@
 # Ready-made automations
 
-The integration includes six blueprints. Adding the wallbox installs them
+The integration includes five blueprints. Adding the wallbox installs them
 under **Settings → Automations & scenes → Blueprints**. Choose a blueprint,
 select **Create automation**, then choose the entities for the same wallbox.
 The PV sensor comes from your inverter or energy-management setup.
@@ -9,7 +9,6 @@ The PV sensor comes from your inverter or energy-management setup.
 |---|---|
 | **Charge from PV surplus** | Adjust the current while a vehicle is connected and charging is not paused |
 | **Pause and resume on PV surplus** | Pause below one power threshold and resume above a higher one, after a hold time |
-| **Recover from a lost heartbeat** | Legacy manual-button automation; recovery is now built in. Disable existing instances to avoid duplicate attempts. |
 | **Notify on a grid-operator downgrade** | Notify when a downgrade starts and ends |
 | **Plan the next trip from a calendar** | Copy one matching departure into the timed charging plan |
 | **Precondition before the next trip** | Run your vehicle climate action once before the selected departure |
@@ -102,12 +101,14 @@ therefore draw from the grid when the available solar power is too low.
    increases; using it directly can make the current oscillate. Verify your
    sensor's definition before enabling the automation.
 2. For **Charge from PV surplus**, select **Charging current limit**,
-   **Charging paused**, **Vehicle connected** and **Requested phases** (whose `switched` attribute is the wallbox's answer; before 0.9.0 this was the **Wallbox phase selection** sensor) from
-   the same wallbox. Set the maximum current to suit the installation. The
-   automation also respects the number entity's configured maximum.
-3. Check the phase assumption: `single_phase` divides the power by one phase;
-   `all_available` divides it by three. This blueprint assumes a three-phase
-   installation and does not detect how many phases your vehicle actually uses.
+   **Charging paused** and **Vehicle connected** from the same wallbox. Set the
+   maximum current to suit the installation. The automation also respects the
+   number entity's configured maximum.
+3. Choose the phases. With phase switching, select **Requested phases**; its
+   `switched` attribute tells the blueprint whether the wallbox uses one phase
+   or all three. Without phase switching, leave it empty and set **Phases
+   without switching** to the number of phases your car charges on (default 3).
+   The blueprint does not detect how many phases your car actually uses.
 4. For **Pause and resume on PV surplus**, select the same power sensor and
    pause switch. Match the thresholds to your chosen phase count and minimum
    current; the defaults are for **one phase**, not three.
@@ -125,7 +126,7 @@ current needs correspondingly higher thresholds. The default hold time is
 six minutes; keep it longer than five minutes. These examples do not switch
 phases automatically.
 
-Since 0.5.2b2, the bus owner's configurable state-change interval adds a
+The bus owner's configurable state-change interval adds a
 separate guard (default 300 seconds). It does not replace these power thresholds
 or their hold times. Early pause and resume requests can be queued; a later
 pause replaces the pending resume and also waits for its due time. See
@@ -158,6 +159,9 @@ pause replaces the pending resume and also waits for its due time. See
   [Home Assistant trigger documentation](https://www.home-assistant.io/docs/automation/trigger/#template-trigger).
 - Avoid competing automations that write the current or pause switch. A
   tariff schedule, manual command or phase change can conflict with PV control.
+- While an [order of the app](app-guide.md#charging-jobs) charges, the app
+  refuses the current blueprint's writes, and a pause from the pause/resume
+  blueprint stops the order; a weekly plan then forgets its car.
 
 These are convenience automations, not house-connection overload protection.
 Review [Safety and limitations](safety.md) and test the behavior with your
@@ -165,20 +169,13 @@ vehicle before leaving an automation unattended.
 
 ## Updating existing blueprint automations
 
-When upgrading from **0.2.1 or earlier**, open each existing **Charge from PV
-surplus** automation and select the **Charging paused** input added in 0.2.2. Until you
-select it, that automation deliberately sends no current commands. Existing
-automations still load. Review the power sensor, phase assumption and thresholds
-above; re-save your selections and reload automations after the blueprint files
-have been updated. The six-minute hold-time default applies unless you saved
-an explicit value previously.
+The integration updates unchanged bundled blueprint files on setup. Reload
+automations afterwards and check the inputs of your automations: a new required
+input stays empty until you select it, and **Charge from PV surplus** sends no
+commands until **Charging paused** is selected.
 
-For **0.2.3**, reload existing PV surplus automations after installing the
-updated blueprint to use the latest surplus value during overlapping updates.
-Existing 0.2.2 input selections remain valid.
-
-The integration updates unchanged bundled files on setup. It preserves files
-you have edited, so those copies do **not** receive these fixes automatically.
+Files you have edited are preserved, so those copies do **not** receive fixes
+automatically.
 Back up custom edits, compare with the updated bundled blueprint and apply the
 changes to your copy. Prefer a separate filename for custom blueprints.
 

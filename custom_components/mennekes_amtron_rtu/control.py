@@ -9,8 +9,10 @@ from typing import Any
 
 from .device.control import AmtronControl as DeviceControl
 from .device.control import ControlOptions as ControlOptions
+from .device.departure_plan import DepartureInputs, DepartureState
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
+from .device.operation import Operation
 from .exceptions import home_assistant_error, service_validation_error
 
 
@@ -38,6 +40,28 @@ def ha_command[**P, T](
 
 class AmtronControl(DeviceControl):
     """The direct serial backend, with translated Home Assistant errors."""
+
+    @property
+    def supports_departure_plan(self) -> bool:
+        """Only a service plans a departure itself; here Home Assistant does."""
+        return False
+
+    @property
+    def departure(self) -> DepartureState | None:
+        return None
+
+    @property
+    def operation(self) -> Operation | None:
+        """Only a service summarizes its controllers."""
+        return None
+
+    async def async_set_departure_trip(
+        self, deadline: datetime | None, source: str | None, *, withdraw: bool = False,
+    ) -> None:
+        raise DeviceError("service_unavailable")
+
+    async def async_set_departure_inputs(self, inputs: DepartureInputs) -> None:
+        raise DeviceError("service_unavailable")
 
     @ha_command
     async def async_configure_plug_charge(self, enabled: bool, *, policy: str = "") -> None:

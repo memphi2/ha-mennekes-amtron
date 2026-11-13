@@ -15,7 +15,7 @@ from enum import IntEnum
 from typing import Any
 
 from .data import WallboxData
-from .decode import RegisterValue
+from .decode import RegisterValue, as_integer, as_number
 from .enums import (
     AuthorizationStatus,
     CableLockStatus,
@@ -65,19 +65,9 @@ class WallboxEvent:
     attributes: Mapping[str, Any] = field(default_factory=dict)
 
 
-def _code(value: RegisterValue) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
-
-
 def _option(enum: type[IntEnum], value: RegisterValue) -> str | None:
-    code = _code(value)
+    code = as_integer(value)
     return enum_option(enum(code)) if code is not None and code in enum else None
-
-
-def _number(value: RegisterValue) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(value)
 
 
 class WallboxChanges:
@@ -98,7 +88,7 @@ class WallboxChanges:
             self._known.clear()
             return []
         cp = _option(CpState, data.get(CP_STATE.key))
-        evse = _code(data.get(EVSE_STATE.key))
+        evse = as_integer(data.get(EVSE_STATE.key))
         connected = vehicle_connected(
             data.get(EVSE_STATE.key), data.get(CP_STATE.key), cp_supported=self._cp_supported,
         )
@@ -106,13 +96,13 @@ class WallboxChanges:
         if connected or charging:
             self._session = {
                 key: number for key in _SESSION_KEYS
-                if (number := _number(data.get(key))) is not None
+                if (number := as_number(data.get(key))) is not None
             }
-        code = _code(data.get(ERROR_CODE.key))
+        code = as_integer(data.get(ERROR_CODE.key))
         if code:
             self._error = {"error_code": code, "error_category": enum_option(error_category(code))}
-        downgrade = _code(data.get(DOWNGRADE_STATUS.key))
-        lock = _code(data.get(CABLE_LOCK_STATUS.key))
+        downgrade = as_integer(data.get(DOWNGRADE_STATUS.key))
+        lock = as_integer(data.get(CABLE_LOCK_STATUS.key))
         authorization = _option(AuthorizationStatus, data.get(AUTHORIZATION_STATUS.key))
         phases = _option(SwitchedPhases, data.get(SWITCHED_PHASES.key))
         # A charge that ends with the unplug is reported before the unplug.
@@ -143,7 +133,7 @@ class WallboxChanges:
                 downgrade == DowngradeStatus.DOWNGRADED if downgrade in DowngradeStatus else None,
                 lambda: WallboxEvent(
                     "downgrade_started",
-                    {"downgrade_current": _number(data.get(DOWNGRADE_CURRENT.key))},
+                    {"downgrade_current": as_number(data.get(DOWNGRADE_CURRENT.key))},
                 ),
                 lambda: WallboxEvent("downgrade_ended"),
             ),

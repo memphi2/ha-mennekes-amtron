@@ -302,15 +302,6 @@
           "unlocked": "Entriegelt"
         }
       },
-      "current_l1": {
-        "name": "Strom L1"
-      },
-      "current_l2": {
-        "name": "Strom L2"
-      },
-      "current_l3": {
-        "name": "Strom L3"
-      },
       "detected_ev_phases": {
         "name": "Erkannte Fahrzeugphasen",
         "state": {
@@ -458,12 +449,15 @@
           "waiting_for_device": "Wartet auf Wallbox",
           "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
           "read_only": "Nur lesen",
+          "order_active": "Auftrag aus der App hat Vorrang",
           "queued": "Änderung vorgemerkt",
           "paused_until_start": "Pausiert bis zum Start",
+          "minimum_level": "Lädt bis zum Mindestladestand",
           "charging": "Lädt mit vollem Strom",
           "finishing": "Lädt mit Mindeststrom bis zur Abfahrt",
           "unreachable": "Ziel eventuell nicht erreichbar",
           "late": "Zielzeit überschritten",
+          "estimated_reached": "Bis zum errechneten Ziel geladen",
           "reached": "Ziel erreicht",
           "write_pending": "Schreibbefehl ausstehend",
           "error": "Fehler"
@@ -497,6 +491,85 @@
               "authorization_required": "Autorisierung an der Wallbox aktiv",
               "register_unavailable": "Registerwert nicht verfügbar"
             }
+          }
+        }
+      },
+      "operation_controller": {
+        "name": "Ladesteuerung",
+        "state": {
+          "unavailable": "Wallbox nicht erreichbar",
+          "guest_order": "Gastauftrag",
+          "weekly_plan": "Wochenplan",
+          "charging_job": "Ladeauftrag",
+          "departure_plan": "Abfahrtsplanung",
+          "direct": "Direkte Steuerung"
+        },
+        "state_attributes": {
+          "vehicle": {
+            "name": "Fahrzeug",
+            "state": {
+              "unknown": "Unbekannt",
+              "none": "Nicht angeschlossen",
+              "connected": "Angeschlossen",
+              "confirmed": "Bestätigt"
+            }
+          },
+          "target": {
+            "name": "Ziel",
+            "state": {
+              "level": "Ladestand",
+              "energy": "Energie"
+            }
+          },
+          "target_value": {
+            "name": "Zielwert"
+          },
+          "target_deadline": {
+            "name": "Zielzeit"
+          }
+        }
+      },
+      "operation_waiting": {
+        "name": "Wartegrund beim Laden",
+        "state": {
+          "none": "Nichts hält das Laden auf",
+          "wallbox_unavailable": "Wallbox nicht erreichbar",
+          "no_vehicle": "Kein Fahrzeug angeschlossen",
+          "release_off": "Ladefreigabe ausgeschaltet",
+          "plug_charge_waiting": "Virtuelles Plug & Charge hat das Fahrzeug nicht freigegeben",
+          "until_job_start": "Wartet auf den Start des Auftrags",
+          "meter_unavailable": "Wartet auf den Energiezähler",
+          "job_suspended": "Auftrag wartet auf den Nachweis desselben Steckvorgangs",
+          "job_ended": "Auftrag beendet, pausiert bis zum Abstecken",
+          "until_weekly_window": "Wartet auf das Fenster des Wochenplans",
+          "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
+          "until_planned_start": "Pausiert bis zum geplanten Start",
+          "estimated_target_reached": "Bis zum errechneten Ziel geladen",
+          "waiting_for_device": "Wartet auf Wallbox",
+          "waiting_for_soc": "Wartet auf Fahrzeugladestand",
+          "waiting_for_capacity": "Wartet auf Akkukapazität",
+          "waiting_for_target": "Wartet auf Prozentziel",
+          "read_only": "Nur lesen",
+          "command_pending": "Änderung vorgemerkt",
+          "target_reached": "Ziel erreicht",
+          "paused": "Laden pausiert"
+        }
+      },
+      "operation_next": {
+        "name": "Nächster Ladeschritt",
+        "state": {
+          "none": "Nichts geplant",
+          "queued_command": "Vorgemerkte Änderung wird ausgeführt",
+          "job_start": "Auftrag startet",
+          "job_end": "Auftrag endet",
+          "weekly_window": "Fenster des Wochenplans öffnet",
+          "plan_start": "Geplantes Laden startet",
+          "target_reached": "Ziel voraussichtlich erreicht",
+          "departure": "Abfahrt"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Zeitpunkt"
           }
         }
       }
@@ -618,6 +691,7 @@
               "unknown": "Unbekannter Grund",
               "user_cancelled": "Vom Benutzer abgebrochen",
               "energy_goal": "Ladestopp durch ein Ladeziel",
+              "service_job": "Ladestopp durch einen Ladeauftrag der App",
               "deadline_expired": "Abfahrtszeit abgelaufen"
             }
           }
@@ -755,6 +829,9 @@
     },
     "energy_goal_stop_active": {
       "message": "Ein Ladeziel erfordert eine Pause. Prüfe seinen Status. Nach Erreichen des Ziels oder einem Zählerreset kannst du ein neues Ziel setzen oder es mit 0 deaktivieren, bevor du weiterlädst. Eine Zieländerung startet das Laden nicht."
+    },
+    "service_job_active": {
+      "message": "Ein Ladeauftrag der Modbus-App steuert gerade das Laden. Stoppe ihn auf der Seite Ladeaufträge der App oder stecke das Auto ab. Sobald die Wallbox die Pause bestätigt, kannst du hier wieder den Strom ändern oder weiterladen."
     },
     "energy_goal_state_invalid": {
       "message": "Das gespeicherte Ladeziel konnte nicht wiederhergestellt werden. Prüfe das Protokoll, bevor du das Laden erneut freigibst."
@@ -983,6 +1060,7 @@
           "capacity_source": "Quelle der Akkukapazität",
           "use_calendar": "Kalender verwenden",
           "use_departure_entity": "Entität für Abfahrtszeit verwenden",
+          "timed_minimum_soc": "Mindestladestand (%)",
           "use_vehicle_timer": "Abfahrtszeiten des Fahrzeugs verwenden"
         },
         "description": "Profil: **{vehicle}**.\n\nDatum und Uhrzeit lassen sich immer manuell eingeben. Aktiviere nur gewünschte Zusatzquellen; deren Einstellungen folgen anschließend. Ein aktiver Plan kann eine manuelle Pause aufheben, um das Abfahrtsziel zu erreichen.",
@@ -990,6 +1068,7 @@
           "capacity_source": "Verwende die nutzbare Akkukapazität: als festen Wert, kWh-/Wh-Sensor oder unterstützten Profilwert. Fehlt die gewählte Kapazität oder der Ladestand, wartet die Planung.",
           "use_calendar": "Ergänzt einen Button zum Übernehmen des nächsten passenden Kalendereintrags. Jeder Druck wählt eine Fahrt; für zeitgesteuerte Kalenderübernahmen kannst du die mitgelieferte Blaupause nutzen.",
           "use_departure_entity": "Übernimmt ein neues Datum mit Uhrzeit in der Zukunft automatisch aus der gewählten Entität. Manuelle Auswahl bleibt möglich; ein neuer zukünftiger Zeitstempel dieser Quelle kann sie ersetzen.",
+          "timed_minimum_soc": "Unter diesem Ladestand lädt das Auto sofort mit vollem Strom und wartet danach auf den geplanten Start. 0 schaltet das aus.",
           "use_vehicle_timer": "Ergänzt einen Button zum Übernehmen eines aktiven Abfahrts-/Klimatimers aus der Fahrzeugintegration. Er liest den gemeldeten Timer; die Klimaanlage des Autos schaltet er nicht ein."
         }
       },

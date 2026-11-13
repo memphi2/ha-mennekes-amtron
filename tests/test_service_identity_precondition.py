@@ -187,3 +187,23 @@ def test_removed_api_v1_has_no_aliases_or_write_access(tmp_path, method, path):
             await service.stop()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("path", ["/v2/command", "/v2/read"])
+def test_deeply_nested_body_is_a_bad_request_not_a_server_error(tmp_path, path):
+    async def run():
+        service, transport, _clock = await service_fixture(tmp_path)
+        try:
+            async with (
+                TestServer(create_app(service)) as server,
+                ClientSession(headers={"Authorization": f"Bearer {TOKEN}"}) as session,
+                session.post(server.make_url(path), data="[" * 2000 + "]" * 2000,
+                             headers={"Content-Type": "application/json"}) as response,
+            ):
+                assert response.status == 400
+                assert await response.json() == {"error": "invalid_request"}
+                assert not current_writes(transport)
+        finally:
+            await service.stop()
+
+    asyncio.run(run())

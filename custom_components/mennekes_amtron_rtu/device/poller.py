@@ -53,8 +53,15 @@ class DevicePoller:
         # meter reading must not wait for the next complete slow poll, while an
         # unsupported register must not occupy the bus on every status poll.
         self._block_retries: dict[str, tuple[float, float]] = {}
+        self._empty_polls = 0
         self._block_read_at: dict[str, float] = {}
         self._lost_blocks: set[str] = set()
+
+    def update_measurement_interval(self, interval: float) -> None:
+        """Update cadence without discarding block freshness or retry history."""
+        if isinstance(interval, bool) or not isinstance(interval, (int, float)) or not 2 <= interval <= 300:
+            raise ValueError("measurement interval must be between 2 and 300 seconds")
+        self._measurement_interval = float(interval)
 
     def _retry_due(self, name: str) -> bool:
         retry = self._block_retries.get(name)
@@ -101,7 +108,11 @@ class DevicePoller:
             key=lambda block: order[block.cadence],
         )
         for block in blocks:
-            state_changed = read.get("evse_state") != values.get("evse_state")
+            # A missing/undecodable status is not an observed transition. In
+            # particular, a failed fast block must not force unrelated active
+            # measurements and statistics onto an already disturbed bus.
+            observed_state = read.get("evse_state")
+            state_changed = observed_state is not None and observed_state != values.get("evse_state")
             if block.cadence is BlockCadence.SLOW and not (
                 slow_due or (block.name == "statistics" and state_changed)
                 or (block.name == "statistics" and not last_success)
@@ -170,7 +181,10 @@ class DevicePoller:
                     self._retry_later(block.name)
                 else:
                     self._block_retries.pop(block.name, None)
-        if not read:
+        # One poll that only held its values is a lost reply, not a lost
+        # connection; a second one in a row is.
+        empty_polls, self._empty_polls = self._empty_polls, 0 if read else self._empty_polls + 1
+        if not read and (not held or empty_polls):
             error = AmtronConnectionError("no register block could be read")
             if not answered:
                 self._log_unavailable(error)
@@ -192,6 +206,7 @@ class DevicePoller:
             connection_failures=self._client.link_quality.failures,
             connection_retries=self._client.link_quality.retries,
             energy_read="energy_total" in read or "energy_total" in stale,
+            session_read="session_duration" in read,
             energy_goal_generation=goal_generation,
         )
 

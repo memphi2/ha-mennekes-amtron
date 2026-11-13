@@ -28,6 +28,7 @@ from homeassistant.const import (
 from .device.charging_status import CHARGING_STATUS_OPTIONS
 from .device.control import PENDING_ACTIONS
 from .device.decode import RegisterValue
+from .device.departure_plan import DEPARTURE_STATES
 from .device.energy_goal import ENERGY_GOAL_STATES
 from .device.enums import (
     AuthorizationStatus,
@@ -35,6 +36,7 @@ from .device.enums import (
     DetectedEvPhases,
     enum_options,
 )
+from .device.operation import CONTROLLERS, EVENTS, WAITING
 from .device.registers import layout_label
 from .device.soc_goal import SOC_GOAL_STATES
 from .entity_attributes import (
@@ -47,7 +49,27 @@ from .entity_attributes import (
     under_load,
 )
 
+OPERATION_SENSOR_KEYS = frozenset({"operation_controller", "operation_waiting", "operation_next"})
+
 CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="operation_controller",
+        translation_key="operation_controller",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(CONTROLLERS),
+    ),
+    SensorEntityDescription(
+        key="operation_waiting",
+        translation_key="operation_waiting",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(WAITING),
+    ),
+    SensorEntityDescription(
+        key="operation_next",
+        translation_key="operation_next",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(EVENTS),
+    ),
     SensorEntityDescription(
         key="virtual_plug_charge_status",
         translation_key="virtual_plug_charge_status",
@@ -61,12 +83,7 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         key="timed_goal_status",
         translation_key="timed_goal_status",
         device_class=SensorDeviceClass.ENUM,
-        options=[
-            "disabled", "waiting_for_target", "waiting_for_capacity",
-            "waiting_for_soc", "waiting_for_device", "vehicle_unconfirmed", "read_only", "queued",
-            "paused_until_start", "charging", "finishing", "unreachable",
-            "late", "reached", "write_pending", "error",
-        ],
+        options=list(DEPARTURE_STATES),
     ),
     SensorEntityDescription(
         key="soc_goal_status",
@@ -150,9 +167,6 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
     ),
     _enum("detected_ev_phases", DetectedEvPhases),
     _current("signaled_current"),
-    _current("current_l1"),
-    _current("current_l2"),
-    _current("current_l3"),
     AmtronSensorEntityDescription(
         key="power_total",
         translation_key="power_total",
@@ -161,12 +175,13 @@ SENSOR_DESCRIPTIONS: tuple[AmtronSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
-        # The voltages under load, in whole volts: while charging, the power
-        # changes with every poll anyway, so they add no history rows.
+        # The phase details under load, in whole volts and watts and tenths
+        # of an ampere: while charging, the power changes with every poll
+        # anyway, so they add no history rows.
         attributes={
-            "voltage_l1": under_load(number_attribute("voltage_l1", 0)),
-            "voltage_l2": under_load(number_attribute("voltage_l2", 0)),
-            "voltage_l3": under_load(number_attribute("voltage_l3", 0)),
+            **{f"current_l{n}": under_load(number_attribute(f"current_l{n}", 1)) for n in (1, 2, 3)},
+            **{f"voltage_l{n}": under_load(number_attribute(f"voltage_l{n}", 0)) for n in (1, 2, 3)},
+            **{f"power_l{n}": under_load(number_attribute(f"power_l{n}", 0)) for n in (1, 2, 3)},
         },
     ),
     AmtronSensorEntityDescription(

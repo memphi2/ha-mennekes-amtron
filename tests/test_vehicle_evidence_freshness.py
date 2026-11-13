@@ -75,15 +75,14 @@ def test_bavarian_measurement_timestamp_is_not_renewed_by_new_ha_reports(tmp_pat
     asyncio.run(run())
 
 
-def test_bavarian_without_measurement_timestamp_uses_ha_report_time(tmp_path):
+def test_bavarian_without_measurement_timestamp_is_no_cable_evidence(tmp_path):
     async def run():
         hass = local_hass(tmp_path)
         try:
-            plug(hass)
+            plug(hass, timestamp=None)
             tracker(hass)
             evidence = BavarianDetectionSource(hass, "car").snapshot
-            assert evidence.connected is True
-            assert evidence.connected_at == hass.states.get("binary_sensor.car_plug").last_reported
+            assert evidence.connected is None
         finally:
             await hass.async_stop()
     asyncio.run(run())

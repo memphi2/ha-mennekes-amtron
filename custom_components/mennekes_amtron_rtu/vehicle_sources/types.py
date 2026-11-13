@@ -76,6 +76,9 @@ class VehicleTelemetry:
     soc_percent: float | None = None
     maximum_percent: float | None = None
     capacity_kwh: float | None = None
+    # Since when the source reports this charge level; only a direct read of
+    # the source carries it.
+    soc_reported_at: datetime | None = field(default=None, kw_only=True)
 
 
 class VehicleTelemetrySource(Protocol):

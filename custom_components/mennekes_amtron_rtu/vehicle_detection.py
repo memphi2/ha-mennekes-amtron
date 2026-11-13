@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
@@ -16,8 +17,7 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
-from .device.registers import CP_STATE, EVSE_STATE
-from .device.vehicle import vehicle_connected
+from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .loss_attribution import confirm_automatic_vehicle
 from .vehicle_profiles import (
@@ -35,6 +35,8 @@ from .vehicle_sources import (
     VehicleDetectionSource,
     resolve_detection_source,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 SETTLE_SECONDS = 3
 
@@ -74,6 +76,8 @@ class VehicleEvidence:
             if profile.detection is not None and profile.detection.source == "profile":
                 effective = vehicle_options({**entry.options, CONF_ACTIVE_VEHICLE_PROFILE: key})
                 self._sources[key] = resolve_detection_source(hass, effective)
+        self._listeners: list[Callable[..., None]] = []
+        self._unsubs: list[CALLBACK_TYPE] = []
 
     def _snapshot(self, profile: VehicleProfile) -> VehicleDetection:
         detection = profile.detection
@@ -143,8 +147,37 @@ class VehicleEvidence:
         return active
 
     def subscribe(self, on_change: Callable[..., None]) -> CALLBACK_TYPE:
-        """Watch configured sources; callers decide what a match may do."""
-        unsubs: list[CALLBACK_TYPE] = []
+        """Watch configured sources; callers decide what a match may do.
+
+        The sources are tracked once, however many observers listen.
+        """
+        if not self._listeners:
+            self._track()
+        self._listeners.append(on_change)
+
+        @callback
+        def unsubscribe() -> None:
+            if on_change in self._listeners:
+                self._listeners.remove(on_change)
+            if not self._listeners:
+                for unsub in self._unsubs:
+                    unsub()
+                self._unsubs.clear()
+
+        return unsubscribe
+
+    @callback
+    def _notify(self, event: object = None) -> None:
+        for listener in list(self._listeners):
+            # One failing observer must not hide the event from the others.
+            try:
+                listener(event)
+            except Exception:
+                _LOGGER.exception("Vehicle evidence listener failed")
+
+    def _track(self) -> None:
+        on_change = self._notify
+        unsubs = self._unsubs
         entities = {
             entity
             for profile in self._profiles.values()
@@ -161,20 +194,35 @@ class VehicleEvidence:
         )
         unsubs.append(async_track_time_interval(self._hass, on_change, timedelta(minutes=1)))
 
-        @callback
-        def unsubscribe() -> None:
-            for unsub in unsubs:
-                unsub()
-            unsubs.clear()
 
-        return unsubscribe
+def vehicle_evidence(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> VehicleEvidence:
+    """The entry's evidence for its current vehicle catalog, shared by its observers.
+
+    An observer keeps the instance it started with, so a changed catalog still
+    shows as ``current() is False`` there while new callers get a fresh one.
+    """
+    runtime = getattr(entry, "runtime_data", None)
+    cached = getattr(runtime, "vehicle_evidence", None)
+    if isinstance(cached, VehicleEvidence) and cached.current():
+        return cached
+    evidence = VehicleEvidence(hass, entry)
+    if runtime is not None:
+        runtime.vehicle_evidence = evidence
+    return evidence
 
 
-class VehicleDetectionObserver(VehicleEvidence):
+class VehicleDetectionObserver:
     """Optional automatic profile selection, without charging commands."""
 
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
-        super().__init__(hass, entry)
+        self._hass = hass
+        self._entry = entry
+        self._evidence = vehicle_evidence(hass, entry)
+        self.subscribe = self._evidence.subscribe
+        self.snapshot = self._evidence.snapshot
+        self.current = self._evidence.current
+        self.selected = self._evidence.selected
+        self.effective = self._evidence.effective
         self._unsubs: list[CALLBACK_TYPE] = []
         self._pending: CALLBACK_TYPE | None = None
         self._candidate: str | None = None
@@ -245,10 +293,7 @@ class VehicleDetectionObserver(VehicleEvidence):
         if runtime is None or not runtime.coordinator.last_update_success:
             return None
         data = runtime.coordinator.current_data()
-        return vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=runtime.identity.layout_version >= CP_STATE.min_layout,
-        )
+        return snapshot_vehicle_connected(data.get, runtime.identity.layout_version)
 
     def _apply(self, selected: str | None) -> None:
         if selected is not None:
@@ -277,9 +322,8 @@ class VehicleDetectionObserver(VehicleEvidence):
 def prepare_vehicle_selection(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
     """Recheck persisted automatic selection before restoring any vehicle goal."""
     if entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True:
-        detector = VehicleDetectionObserver(hass, entry)
         active = entry.options.get(CONF_ACTIVE_VEHICLE_PROFILE)
-        if active != detector.effective(active):
+        if active != vehicle_evidence(hass, entry).effective(active):
             updated = activate_profile(entry.options, None)
             if updated != dict(entry.options):
                 hass.config_entries.async_update_entry(entry, options=updated)
@@ -305,5 +349,5 @@ def vehicle_selection_matches(
     return (
         expected is None
         or entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is not True
-        or VehicleDetectionObserver(hass, entry).effective(expected) == expected
+        or vehicle_evidence(hass, entry).effective(expected) == expected
     )

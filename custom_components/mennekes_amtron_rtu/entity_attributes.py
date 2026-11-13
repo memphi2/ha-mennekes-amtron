@@ -12,23 +12,17 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from .data import WallboxData
-from .device.decode import RegisterValue, enum_option
+from .device.decode import as_integer, as_number, enum_option
 from .device.registers import REGISTERS_BY_KEY
 
 type AttributeReader = Callable[[WallboxData], Any]
 type AttributeReaders = Mapping[str, AttributeReader]
 
 
-def _number(value: RegisterValue) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(value)
-
-
 def number_attribute(key: str, precision: int) -> AttributeReader:
     """A measurement or setting, rounded like a sensor state would be."""
     def read(data: WallboxData) -> float | None:
-        number = _number(data.get(key))
+        number = as_number(data.get(key))
         return None if number is None else round(number, precision)
     return read
 
@@ -36,8 +30,7 @@ def number_attribute(key: str, precision: int) -> AttributeReader:
 def integer_attribute(key: str) -> AttributeReader:
     """A count or a code."""
     def read(data: WallboxData) -> int | None:
-        value = data.get(key)
-        return value if isinstance(value, int) and not isinstance(value, bool) else None
+        return as_integer(data.get(key))
     return read
 
 
@@ -45,7 +38,7 @@ def minutes_attribute(key: str) -> AttributeReader:
     """A duration in seconds, shown in whole minutes: a ticking attribute would
     otherwise write a history row every poll."""
     def read(data: WallboxData) -> int | None:
-        number = _number(data.get(key))
+        number = as_number(data.get(key))
         return None if number is None or number < 0 else int(number // 60)
     return read
 
@@ -59,8 +52,8 @@ def enum_attribute(key: str) -> AttributeReader:
 def flag_attribute(key: str) -> AttributeReader:
     """A 0/1 setting as a boolean."""
     def read(data: WallboxData) -> bool | None:
-        value = data.get(key)
-        return value == 1 if isinstance(value, int) and not isinstance(value, bool) else None
+        value = as_integer(data.get(key))
+        return None if value is None else value == 1
     return read
 
 
@@ -71,7 +64,7 @@ def under_load(reader: AttributeReader) -> AttributeReader:
     that wobble would write a history row every poll for nothing.
     """
     def read(data: WallboxData) -> Any:
-        power = _number(data.get("power_total"))
+        power = as_number(data.get("power_total"))
         return reader(data) if power is not None and power > 0 else None
     return read
 

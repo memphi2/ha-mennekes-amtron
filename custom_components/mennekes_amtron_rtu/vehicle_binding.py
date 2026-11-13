@@ -22,11 +22,11 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
 from .device.enums import EvseState
-from .device.registers import CP_STATE, EVSE_STATE, SESSION_ENERGY
-from .device.vehicle import vehicle_connected
+from .device.registers import EVSE_STATE, SESSION_ENERGY
+from .device.vehicle import snapshot_vehicle_connected
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import ModelStore
-from .vehicle_detection import VehicleEvidence
+from .vehicle_detection import vehicle_evidence
 from .vehicle_profiles import (
     CONF_VEHICLE_SOC_USE_PROFILE,
     VehicleProfile,
@@ -50,12 +50,18 @@ PLAUSIBLE_ENERGY_KWH = 4.0
 PLAUSIBLE_BELOW_PERCENT = 95.0
 
 
+# The rise that counts as charging once a lower report reset the level.
+_RISE_AFTER_DROP = 2.0
+
+
 class _ChargeCheck:
     """The charge level when the confirmed car started drawing energy."""
 
     def __init__(self, energy: float, soc: float) -> None:
         self.energy = energy
         self.soc = soc
+        # A lower report replaced the first level, which may have been old.
+        self.lowered = False
         # When the wallbox had delivered enough energy for the level to rise.
         self.due_at: datetime | None = None
 
@@ -106,7 +112,7 @@ class VehicleBinding:
     def __init__(self, hass: HomeAssistant, entry: MennekesAmtronConfigEntry) -> None:
         self._hass = hass
         self._entry = entry
-        self._evidence = VehicleEvidence(hass, entry)
+        self._evidence = vehicle_evidence(hass, entry)
         runtime = entry.runtime_data
         self._store = VehicleBindingStore(hass, entry.entry_id, runtime.identity.serial_number or "")
         self._state = VehicleBindingState()
@@ -115,6 +121,7 @@ class VehicleBinding:
         self._first_empty: datetime | None = None
         self._stale_warned = False
         self._resting: bool | None = None
+        self._detected = False
         # When this process saw the binding confirmed, and its charge check.
         self._confirmed_at: datetime | None = None
         self._check: _ChargeCheck | None = None
@@ -157,8 +164,21 @@ class VehicleBinding:
 
     @property
     def resting(self) -> bool:
-        """A car is plugged in, but the selected car has not confirmed it is that car."""
-        return self._update()
+        """A car is plugged in, but the selected car has not confirmed it is that car.
+
+        A plain read: the state moves only in the subscribed callbacks.
+        """
+        return self._resting is True
+
+    @property
+    def detected(self) -> bool:
+        """The selected car itself reported this plug-in; a car without detection never does."""
+        return self._detected
+
+    @callback
+    def refresh(self) -> None:
+        """Judge the newly selected car before its rules start."""
+        self._update()
 
     @callback
     def _changed(self, _event: object = None) -> None:
@@ -169,10 +189,7 @@ class VehicleBinding:
         if not runtime.coordinator.last_update_success:
             return None
         data = runtime.coordinator.current_data()
-        return vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=runtime.identity.layout_version >= CP_STATE.min_layout,
-        )
+        return snapshot_vehicle_connected(data.get, runtime.identity.layout_version)
 
     def _update(self) -> bool:
         now = dt_util.utcnow()
@@ -225,10 +242,9 @@ class VehicleBinding:
         if wallbox is None and self._resting is not None:
             # An unreadable wallbox neither confirms the car nor releases its rules.
             return self._resting
-        resting = (
-            wallbox is True and profile is not None and profile.detection is not None
-            and self._state.vehicle != profile.id
-        )
+        watched = wallbox is True and profile is not None and profile.detection is not None
+        self._detected = watched and profile is not None and self._state.vehicle == profile.id
+        resting = watched and not self._detected
         if resting != self._resting:
             if resting and profile is not None:
                 _LOGGER.info(
@@ -279,9 +295,16 @@ class VehicleBinding:
             if level < PLAUSIBLE_BELOW_PERCENT:
                 self._check = _ChargeCheck(float(energy), level)
             return None
-        if level > check.soc:
+        # After a lower report, one point back up is only jitter.
+        if level >= check.soc + (_RISE_AFTER_DROP if check.lowered else 1e-9):
             # The car charges: this confirmation holds for the connection.
             self._plausible = True
+            return None
+        if level < check.soc:
+            # The first level may have been an older report: measure the rise
+            # from this one. The energy keeps counting from the start, so a
+            # car that only drains still contradicts in time.
+            check.soc, check.lowered = level, True
             return None
         if check.due_at is None:
             if energy - check.energy >= PLAUSIBLE_ENERGY_KWH:

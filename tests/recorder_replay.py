@@ -24,11 +24,11 @@ from tests.fakes import FakeModbusClient, device_bank, put
 from tests.test_home_assistant_smoke import _boot
 
 DEFAULT_STATISTICS = {
-    "current_l1", "current_l2", "current_l3", "signaled_current", "total_power",
+    "signaled_current", "total_power",
     "session_energy", "total_energy", "temperature",
 }
-DETAILS = ["current_l1", "current_l2", "current_l3"]
-EXTRAS = ["signaled_current", "session_energy", "temperature"]
+DETAILS = ["signaled_current", "temperature"]
+EXTRAS = ["session_energy"]
 PROFILES = {"full": [], "detail": DETAILS, "lean": DETAILS + EXTRAS}
 SCENARIOS = ("constant", "idle", "connected_idle", "mixed", "charging")
 

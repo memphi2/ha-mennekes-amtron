@@ -52,6 +52,8 @@ def _expand(name: str, inputs: dict) -> dict:
         ("off", "6900", "W", "unknown", None, "6"),
         ("off", "6900", "W", "all_available", 10, "unknown"),
         ("off", "6900", "W", "all_available", None, "unavailable"),
+        # A wallbox without phase switching has no Requested phases.
+        ("off", "6900", "W", None, 10, "6"),
     ],
 )
 def test_current_blueprint_respects_pause_and_power_units(
@@ -59,7 +61,7 @@ def test_current_blueprint_respects_pause_and_power_units(
     pause: str | None,
     power: str,
     unit: str,
-    phases: str,
+    phases: str | None,
     expected: float | None,
     current: str,
 ) -> None:
@@ -79,10 +81,11 @@ def test_current_blueprint_respects_pause_and_power_units(
             hass.states.async_set("switch.paused", pause or "off")
             inputs = {
                 "surplus_power": "sensor.surplus",
-                "switched_phases": "select.phases",
                 "vehicle_connected": "binary_sensor.vehicle",
                 "charging_current": "number.current",
             }
+            if phases is not None:
+                inputs["switched_phases"] = "select.phases"
             if pause is not None:
                 inputs["charging_paused"] = "switch.paused"
             config = _expand("solar_surplus_charging.yaml", inputs)

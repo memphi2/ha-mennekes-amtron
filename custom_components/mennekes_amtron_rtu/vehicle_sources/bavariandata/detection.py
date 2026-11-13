@@ -41,31 +41,17 @@ from .identity import (
     bavarian_vehicle_vin,
 )
 
-PLUG_DESCRIPTOR = "vehicle.powertrain.tractionBattery.charging.port.anyPosition.isPlugged"
 CHARGING_CABLE = "charging_cable"
-# BavarianData's derived "Charging Cable" plug sensor comes first: since 0.9.30
-# it names the plug reading that decided it and carries BMW's time for it, so it
-# proves a fresh plug-in and covers every car, whichever plug field it streams.
-# An older BavarianData's cable sensor has neither and is passed over for the
-# reading itself: the most direct one wins, and an i4 or i5 streams only the
-# port status. The DC-only and non-streamed port fields say nothing here.
-PLUG_SOURCES = (
-    ("binary_sensor", CHARGING_CABLE),
-    ("binary_sensor", PLUG_DESCRIPTOR),
-    ("sensor", "vehicle.body.chargingPort.status"),
-    ("sensor", "vehicle.body.chargingPort.statusClearText"),
-)
-_PLUG_DESCRIPTORS = frozenset(
-    descriptor for _domain, descriptor in PLUG_SOURCES if descriptor != CHARGING_CABLE
-)
-# The readings the cable sensor may name, including one we do not bind directly.
-_CABLE_READINGS = _PLUG_DESCRIPTORS | {"vehicle.drivetrain.electricEngine.charging.connectorStatus"}
-
-
-def _dated_cable(hass: HomeAssistant, entity_id: str) -> bool:
-    """Only a cable sensor that says which reading decided it, and when, counts."""
-    state = hass.states.get(entity_id)
-    return state is not None and {"source", "timestamp"} <= state.attributes.keys()
+# BavarianData's derived "Charging Cable" plug sensor is the only cable source:
+# from 0.9.30 it names the plug reading that decided it and carries BMW's time
+# for it, so it proves a fresh plug-in for every car, whichever plug field the
+# car streams. Without that source and time its state is not evidence.
+_CABLE_READINGS = frozenset({
+    "vehicle.powertrain.tractionBattery.charging.port.anyPosition.isPlugged",
+    "vehicle.body.chargingPort.status",
+    "vehicle.body.chargingPort.statusClearText",
+    "vehicle.drivetrain.electricEngine.charging.connectorStatus",
+})
 _PLUG_STATES = {"on": True, "off": False, "connected": True, "disconnected": False}
 HOME_ENTITY = "zone.home"
 _TRACKER = ("device_tracker", "tracker")
@@ -81,15 +67,7 @@ def _entity(hass: HomeAssistant, device_id: str, vin: str, domain: str, suffix: 
 
 
 def _entities(hass: HomeAssistant, device_id: str, vin: str) -> tuple[str | None, str | None]:
-    plug = next(
-        (
-            entity for domain, descriptor in PLUG_SOURCES
-            if (entity := _entity(hass, device_id, vin, domain, descriptor)) is not None
-            and (descriptor != CHARGING_CABLE or _dated_cable(hass, entity))
-        ),
-        None,
-    )
-    return plug, _entity(hass, device_id, vin, *_TRACKER)
+    return _entity(hass, device_id, vin, "binary_sensor", CHARGING_CABLE), _entity(hass, device_id, vin, *_TRACKER)
 
 
 def detection_entities(hass: HomeAssistant, device_id: str) -> tuple[str | None, str | None]:
@@ -134,20 +112,14 @@ def _connected(observation: _Observation, now: datetime) -> bool | None:
     state = _fresh(observation, now)
     if state is None:
         return None
-    if "source" in state.attributes:
-        # The cable sensor: trusted only with a named reading and BMW's time.
-        if state.attributes["source"] not in _CABLE_READINGS or state.attributes.get("timestamp") is None:
-            return None
-    elif state.attributes.get("descriptor") not in _PLUG_DESCRIPTORS:
+    # Trusted only with a named reading and BMW's time for it. That time can be
+    # older than the HA report; an unrelated entity write must not renew it.
+    if state.attributes.get("source") not in _CABLE_READINGS:
         return None
-    # The actual BMW descriptor timestamp, when exposed, can be older than the
-    # HA report. Do not let an unrelated entity write renew this cable evidence.
     timestamp = state.attributes.get("timestamp")
-    if timestamp is not None:
-        stamp = dt_util.parse_datetime(timestamp) if isinstance(timestamp, str) else None
-        if stamp is None or stamp.tzinfo is None or not 0 <= (now - stamp).total_seconds() <= DETECTION_MAX_AGE_SECONDS:
-            return None
-    # A restored port status may come back in lower or upper case.
+    stamp = dt_util.parse_datetime(timestamp) if isinstance(timestamp, str) else None
+    if stamp is None or stamp.tzinfo is None or not 0 <= (now - stamp).total_seconds() <= DETECTION_MAX_AGE_SECONDS:
+        return None
     return _PLUG_STATES.get(state.state.strip().lower())
 
 

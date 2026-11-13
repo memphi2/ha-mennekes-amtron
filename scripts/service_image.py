@@ -27,11 +27,9 @@ ROOT = Path(__file__).resolve().parents[1]
 ARCHITECTURES = {"amd64", "aarch64"}
 OCI_ARCH = {"amd64": "amd64", "aarch64": "arm64"}
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
-APP_ASSETS = {
-    "/": "app_settings.html",
-    "/app_settings.js": "app_settings.js",
-    "/app_settings.css": "app_settings.css",
-}
+# Every page, script and style of the app's Web UI; the image probe checks
+# that each one has a route and is served byte for byte.
+APP_ASSET_PATTERN = re.compile(r"app_\w+\.(?:html|js|css)")
 
 
 def release_info(repository: str, tag: str) -> dict[str, str]:
@@ -61,8 +59,9 @@ def check_installed_assets(container: str) -> None:
     """Exercise packaged UI handlers in an isolated process in the running image."""
     asset_directory = ROOT / "custom_components/mennekes_amtron_rtu/device"
     expected_assets = {
-        path: hashlib.sha256((asset_directory / filename).read_bytes()).hexdigest()
-        for path, filename in APP_ASSETS.items()
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(asset_directory.iterdir())
+        if APP_ASSET_PATTERN.fullmatch(path.name)
     }
     run(
         "docker", "exec", container, "python", "-c",

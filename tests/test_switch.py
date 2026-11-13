@@ -229,7 +229,8 @@ def test_release_is_switched_off_after_a_confirmed_unplug(enabled, plug_charge, 
         switches, entry, _transport = await _switches()
         switch = switches["release_off_on_unplug"]
         tasks: list[object] = []
-        switch.hass = SimpleNamespace(async_create_task=lambda coro: tasks.append(asyncio.ensure_future(coro)))
+        switch.hass = SimpleNamespace()
+        tasks = entry.background_tasks
         switch.async_write_ha_state = lambda: None
         control = entry.runtime_data.control
         control.async_set_charging_release = AsyncMock()
@@ -259,7 +260,8 @@ def test_a_failed_release_off_is_logged_not_raised(caplog) -> None:
         switches, entry, _transport = await _switches()
         switch = switches["release_off_on_unplug"]
         tasks: list[object] = []
-        switch.hass = SimpleNamespace(async_create_task=lambda coro: tasks.append(asyncio.ensure_future(coro)))
+        switch.hass = SimpleNamespace()
+        tasks = entry.background_tasks
         switch.async_write_ha_state = lambda: None
         entry.runtime_data.control.async_set_charging_release = AsyncMock(side_effect=HomeAssistantError("busy"))
         await switch.async_turn_on()
@@ -282,7 +284,8 @@ def test_unplugging_also_ends_a_manual_pause(monkeypatch, release, paused, goal_
         switches, entry, _transport = await _switches()
         switch = switches["release_off_on_unplug"]
         tasks: list[object] = []
-        switch.hass = SimpleNamespace(async_create_task=lambda coro: tasks.append(asyncio.ensure_future(coro)))
+        switch.hass = SimpleNamespace()
+        tasks = entry.background_tasks
         switch.async_write_ha_state = lambda: None
         control = entry.runtime_data.control
         control.async_set_charging_release = AsyncMock()
@@ -298,5 +301,23 @@ def test_unplugging_also_ends_a_manual_pause(monkeypatch, release, paused, goal_
         await asyncio.gather(*tasks)
         assert control.async_set_charging_release.await_count == release
         assert control.async_resume_charging.await_count == int(resumed)
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(("stored", "expected"), [({"enabled": True}, True), ({"enabled": False}, False), (None, False)])
+def test_release_off_on_unplug_survives_an_unavailable_shutdown(stored, expected) -> None:
+    async def run() -> None:
+        switches, _entry, _transport = await _switches()
+        switch = switches["release_off_on_unplug"]
+
+        async def extra():
+            return None if stored is None else RestoredExtraData(stored)
+
+        switch.async_get_last_extra_data = extra
+        switch.async_get_last_state = AsyncMock(return_value=SimpleNamespace(state="unavailable"))
+        await switch.async_added_to_hass()
+        assert switch.is_on is expected
+        assert switch.extra_restore_state_data.as_dict() == {"enabled": expected}
 
     asyncio.run(run())

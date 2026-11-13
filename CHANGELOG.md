@@ -5,15 +5,188 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.9.0b1 — unreleased
+## 0.9.0b2 — unreleased
+
+Update the app to 0.9.0b2 together with the integration.
+
+- **Breaking: automatic vehicle selection and Virtual Plug & Charge with
+  BavarianData need BavarianData 0.9.30 or newer.** Its dated **Charging
+  Cable** sensor is now the only cable source; the plug boolean and the port
+  status of older versions are no longer read.
+- **Breaking: no automatic cleanup of the entities folded in 0.9.0b1.**
+  Delete their leftover entries under **Settings → Devices & services →
+  Entities**. No compatibility code is kept before 1.0.
+- **Breaking: the three phase-current sensors are attributes too.** While
+  power flows, **Total power** carries `current_l1` to `current_l3`,
+  `voltage_l1` to `voltage_l3` and `power_l1` to `power_l3`, so every phase
+  value is in one place; **Current L1** to **L3** are gone and keep no
+  statistics of their own. The Recorder profiles now exclude signaled current
+  and temperature (less detail) and also session energy (statistics only).
+- **Breaking: the "Recover from a lost heartbeat" blueprint is gone.** The
+  integration and the app recover error 200 by themselves. An unchanged
+  installed copy is removed at the next start; delete automations made from it.
+- **Breaking: Switch off charging release when unplugged starts switched
+  off once.** It now keeps its setting while the wallbox is offline or
+  read-only; switch it on again after the update.
+- A status block that briefly cannot be read no longer makes every poll
+  re-read the measurement and counter blocks while its last value is held.
+- **Departure planning runs in the app.** With the Modbus service app, Home
+  Assistant hands over the next departure, the selected car's capacity and
+  every charge level with its report time. The app plans start and current
+  itself, also while Home Assistant is offline, and continues after its own
+  restart when the wallbox proves the car stayed plugged in. Between the car's
+  reports it projects the charge level from the metered energy and pauses at
+  the target; a later report below the target charges again. **Timed charging
+  status** shows the app's plan and gains the states **Charged to the
+  estimated target** and **An order from the app has priority**. See
+  [departure planning](docs/departure-planning.md#with-the-modbus-service-app).
+- **The app learns each car and forecasts to the percentage target.** With
+  the Modbus service app the departure plan learns per vehicle profile how
+  much of the metered energy reaches the battery and what power the car
+  really draws at full current, and uses both for the start time, the
+  projected charge level and the forecast. **Timed charging status** shows
+  `estimated_finish`, `estimated_level_at_departure`, `learned_efficiency`
+  and `measured_power_kw` as attributes.
+- **Who controls the charge, why it waits and what comes next.** With the
+  Modbus service app three new sensors show the app's own summary: **Charging
+  control** (guest order, charging job, weekly plan, departure planning or
+  direct control, with the target and the car's state as attributes),
+  **Charging wait reason** and **Next charging step** with its time as the
+  `at` attribute. The app's overview page shows the same card. See
+  [charging control at a glance](docs/entities.md#charging-control-at-a-glance),
+  which includes a Mushroom card example.
+- **Minimum charge level for departure planning.** A new option per vehicle
+  profile: below this percentage the car charges at once at full current and
+  then waits for the planned start. **Timed charging status** shows **Charging
+  to the minimum level** meanwhile. See
+  [departure planning](docs/departure-planning.md#minimum-charge-level).
+- **Switch off charging release when unplugged** no longer writes to the
+  wallbox after its entry was reloaded or unloaded in the same moment.
+- A vehicle change that is cancelled halfway reloads the entry instead of
+  leaving the car's target, trip and loss features stopped.
+- A percentage target the service refuses, or that another command overtook,
+  is reported as not changeable right now instead of as an unreachable service.
+- The plug and location signals of the configured cars are watched once per
+  wallbox instead of once per feature using them.
+- A serial connection is reopened after an adapter change that was rolled
+  back; before, the wallbox stayed offline until the app restarted.
+- Virtual Plug & Charge no longer tries to close the release on a bus that
+  does not answer, decides on values read in the same poll only, and keeps a
+  release switched on by hand when only the refresh after its write failed.
+- One lost reply of the status block no longer marks the wallbox as
+  disconnected; its last values are held for that poll.
+- A reached energy target no longer adds bus reads to every poll while its
+  pause is confirmed.
+- Lost-reply messages of other Modbus integrations in Home Assistant are no
+  longer demoted to debug.
+- The PV surplus blueprint works on wallboxes without phase switching: leave
+  Requested phases empty and set the phase count instead.
+- Selecting another car ends the old car's departure-plan pause, and a
+  dropped charge level or poll no longer pauses a plan that already started.
+- Release off after unplugging keeps its setting through a restart while the
+  wallbox is offline or read-only; before, it came back switched off.
+- A selected car is judged at once, so a car that has not confirmed the
+  plug-in gets no charge target or departure plan, not even until the next poll.
+- An older, higher charge level no longer makes the plausibility check end a
+  confirmed car's rules while it charges.
+- Virtual Plug & Charge on a read-only wallbox now loads with a warning instead
+  of retrying the setup forever.
+- Includes the changes of #56 to #62: departure finishing window, Plug &
+  Charge decision reasons, and the app's overview, register and runtime pages.
+- The app runs charging jobs on its own (#63): an energy and time order for
+  the current connection, with preview, confirmation and stop, kept when Home
+  Assistant disconnects. A job can be boosted to charge early for up to two
+  hours (#64), and guest charging gives a locally authorized guest a bounded
+  order (#65). None of them grants a release or unlocks the wallbox.
+- Weekly plans in the app (#66): recurring departures for one car. An
+  activation for the plugged-in car creates the job for each departure for up
+  to seven days; each date runs at most once, also after an edit or restart.
+  A plan activated while Home Assistant had detected the car at the plug-in
+  remembers it and activates itself whenever Home Assistant detects that car
+  again: at the next plug-in, after an app restart and beyond seven days. It
+  then waits for the next departure's window.
+  A job or weekly plan can charge an immediate reserve of its energy amount at
+  once and then wait for the planned start (#67).
+- Charging jobs estimate when they reach their energy amount (#68): a time
+  range from the power the wallbox meter measured, and from earlier charges of
+  the same car, current and phases while an order waits for its window. The
+  estimate never changes charging; the learned values stay in the app.
+- A finished, stopped or interrupted order hands control back to Home
+  Assistant once the wallbox confirms its pause. Charging stays paused until
+  you resume it in Home Assistant; clearing the order is no longer needed, and
+  a new order replaces a finished one.
+- Between weekly departures Home Assistant controls charging, for example for
+  PV surplus. The next departure's job is created when its window opens and
+  takes over then; pausing, release off or locking in Home Assistant meanwhile
+  no longer ends the plan. An immediate reserve applies to the first departure
+  only.
+- An app order survives an app restart or a wallbox unreadable for more than a
+  minute when the wallbox proves the same plug-in: its session duration kept
+  running, its session counter and the selected car are unchanged. Meanwhile
+  the order keeps charging paused; without proof within a minute it is
+  interrupted and hands control back. A weekly plan also survives a short
+  wallbox gap.
+- While an app order runs, Home Assistant says that a charging job of the app
+  controls charging, instead of naming a charge target. The command results
+  use the new reason `service_job`.
+- The app's current cap, minimum time between state changes and extra wait
+  before phase changes apply without a restart from its **Runtime** page; a
+  queued start or stop is timed again. The app lowers a charging current above
+  its cap after the next poll, also after a restart with a lower cap.
+- **An app restart with Virtual Plug & Charge no longer ends a running
+  order.** The order waits for Home Assistant's new grant instead.
+- **Switching departure planning off also ends the app's plan** for that car.
+- **One lost poll no longer pauses a charge with a kWh target**, a small
+  clock correction no longer pauses a running order, and a failing disk no
+  longer shows the wallbox as unavailable.
+- **An order of the app continues after Home Assistant's Plug & Charge grant.**
+  Before, an order that waited for the grant, as after an app restart,
+  refused it and stayed paused, and a weekly plan ended. One lost reply of the
+  wallbox's status no longer ends an order either.
+- **Home Assistant's own departure plan still ends its pause after a restart**
+  of Home Assistant, and no departure plan ends a pause made by hand that
+  replaced its queued pause.
+- **A saved app state of another wallbox, or a damaged one, no longer keeps
+  the app from starting.** The app starts as on its first run and replaces the
+  file. After a failed save the weekly plans work again once their file reads
+  back, and charging to a minimum level no longer rewrites the plan file with
+  every meter reading.
+- **A departure that ends no longer leaves the car paused.** When the
+  departure is cleared, or passes while the plan still paused, the plan ends
+  its own pause, with and without the app. A stop at the reached target stays
+  until the car is unplugged.
+- **Switching the charging release reads less and cannot skip the wait.** The
+  check whether the change switches a charge runs on the bus right before the
+  write, so a car plugged in at that moment keeps the wait between charging
+  changes.
+- **A long command no longer makes the app's state unavailable.** While the
+  app waits or retries on the bus, Home Assistant's poll gets the last
+  published state after two seconds instead of running into its timeout.
+- All app pages are available in English, German, French, Dutch and Italian
+  and share one navigation bar.
+- **The app pages load completely and name their refusals.** Page files no
+  longer count against the limit of two parallel requests, which could leave
+  a page without its script or style. A refused action on the Charging jobs
+  page stays visible until the next action, read-only mode is named as the
+  cause, and the Runtime page says why a save failed. Weekly plans saved for
+  another wallbox, or a damaged plan file, no longer block the weekly plans;
+  they start empty. Downloading diagnostics no longer marks a remote wallbox
+  unavailable.
+- **Docs:** [the app's web pages](docs/app-guide.md) explains the overview,
+  charging jobs, boost, guest charging, registers and runtime settings in one
+  guide. The separate update guide is gone; the release notes name every
+  breaking change.
+
+## 0.9.0b1 — 2026-11-12
 
 Beta of the integration and the app. The app update only renames its sidebar
 entry; the integration also works with app 0.8.2.
 
 - **Breaking: fewer entities, more attributes.** Each sensor now answers one
   question; a register that only details or explains another sensor's state is
-  an attribute of that sensor. 32 entities are gone and are removed from the
-  entity registry on the first start, so no orphans stay behind:
+  an attribute of that sensor. 32 entities are gone; delete their leftover
+  entries under **Settings → Devices & services → Entities**. No compatibility
+  shim is kept before 1.0:
   - **Charging status** carries `evse_state` and `cp_state`; the sensors
     **EVSE state** and **CP state** are gone.
   - **Error** (binary sensor) carries `code` and `category`; **Error code** is
@@ -53,8 +226,7 @@ entry; the integration also works with app 0.8.2.
   **Error**, **Downgrade notification** the `current` attribute of
   **Downgrade active**; re-select those inputs in automations made from them.
   Templates that read a removed entity need its attribute instead, for example
-  `state_attr('sensor.<wallbox>_session_energy', 'duration_minutes')`. See
-  [Updating to 0.9.0](docs/upgrading.md#updating-to-090).
+  `state_attr('sensor.<wallbox>_session_energy', 'duration_minutes')`.
 - **App:** the sidebar entry is now called **Modbus RTU** instead of the full
   app name.
 - **BavarianData's Charging Cable sensor** is the first cable source for
@@ -702,7 +874,7 @@ or config-entry migration; older releases retain their documented upgrade steps.
   **MENNEKES AMTRON RTU (Unofficial)**. This avoids the domain collision with
   the separate MENNEKES AMTRON Modbus TCP integration.
 - Existing 0.1.0 installations require reconfiguration. Follow the
-  [upgrade guide](docs/upgrading.md) before updating; it covers config entries,
+  [upgrade guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.2.0/docs/upgrading.md) before updating; it covers config entries,
   entity/device references, action calls and blueprint automations.
 - The charging-current action is now
   `mennekes_amtron_rtu.set_charging_current`, and bundled blueprints install

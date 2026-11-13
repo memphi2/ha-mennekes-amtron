@@ -302,15 +302,6 @@
           "unlocked": "Sbloccato"
         }
       },
-      "current_l1": {
-        "name": "Corrente L1"
-      },
-      "current_l2": {
-        "name": "Corrente L2"
-      },
-      "current_l3": {
-        "name": "Corrente L3"
-      },
       "detected_ev_phases": {
         "name": "Fasi del veicolo rilevate",
         "state": {
@@ -458,12 +449,15 @@
           "waiting_for_device": "In attesa wallbox",
           "vehicle_unconfirmed": "Veicolo non confermato",
           "read_only": "Sola lettura",
+          "order_active": "Un ordine dall’app ha la priorità",
           "queued": "Modifica in coda",
           "paused_until_start": "In pausa fino all’avvio",
+          "minimum_level": "Ricarica fino al livello minimo",
           "charging": "Ricarica alla corrente massima",
           "finishing": "Completa alla corrente minima",
           "unreachable": "Obiettivo forse irraggiungibile",
           "late": "Scadenza superata",
+          "estimated_reached": "Caricato fino all’obiettivo stimato",
           "reached": "Obiettivo raggiunto",
           "write_pending": "Scrittura in attesa",
           "error": "Errore"
@@ -497,6 +491,85 @@
               "authorization_required": "Autorizzazione attiva sulla wallbox",
               "register_unavailable": "Valore del registro non disponibile"
             }
+          }
+        }
+      },
+      "operation_controller": {
+        "name": "Controllo della ricarica",
+        "state": {
+          "unavailable": "Wallbox non raggiungibile",
+          "guest_order": "Ordine ospite",
+          "weekly_plan": "Piano settimanale",
+          "charging_job": "Ordine di ricarica",
+          "departure_plan": "Pianificazione della partenza",
+          "direct": "Controllo diretto"
+        },
+        "state_attributes": {
+          "vehicle": {
+            "name": "Veicolo",
+            "state": {
+              "unknown": "Sconosciuto",
+              "none": "Non collegato",
+              "connected": "Collegato",
+              "confirmed": "Confermato"
+            }
+          },
+          "target": {
+            "name": "Obiettivo",
+            "state": {
+              "level": "Livello di carica",
+              "energy": "Energia"
+            }
+          },
+          "target_value": {
+            "name": "Valore obiettivo"
+          },
+          "target_deadline": {
+            "name": "Orario obiettivo"
+          }
+        }
+      },
+      "operation_waiting": {
+        "name": "Motivo di attesa della ricarica",
+        "state": {
+          "none": "Nulla trattiene la ricarica",
+          "wallbox_unavailable": "Wallbox non raggiungibile",
+          "no_vehicle": "Nessun veicolo collegato",
+          "release_off": "Abilitazione alla ricarica disattivata",
+          "plug_charge_waiting": "Il Plug & Charge virtuale non ha abilitato il veicolo",
+          "until_job_start": "In attesa dell’avvio dell’ordine",
+          "meter_unavailable": "In attesa del contatore di energia",
+          "job_suspended": "L’ordine attende la prova dello stesso collegamento",
+          "job_ended": "Ordine terminato, in pausa fino allo scollegamento",
+          "until_weekly_window": "In attesa della finestra del piano settimanale",
+          "vehicle_unconfirmed": "Veicolo non confermato",
+          "until_planned_start": "In pausa fino all’avvio pianificato",
+          "estimated_target_reached": "Caricato fino all’obiettivo stimato",
+          "waiting_for_device": "In attesa wallbox",
+          "waiting_for_soc": "In attesa livello di carica",
+          "waiting_for_capacity": "In attesa capacità",
+          "waiting_for_target": "In attesa obiettivo %",
+          "read_only": "Sola lettura",
+          "command_pending": "Modifica in coda",
+          "target_reached": "Obiettivo raggiunto",
+          "paused": "Ricarica in pausa"
+        }
+      },
+      "operation_next": {
+        "name": "Prossimo passo della ricarica",
+        "state": {
+          "none": "Nulla in programma",
+          "queued_command": "La modifica in coda viene eseguita",
+          "job_start": "L’ordine inizia",
+          "job_end": "L’ordine termina",
+          "weekly_window": "Si apre la finestra del piano settimanale",
+          "plan_start": "Inizia la ricarica pianificata",
+          "target_reached": "Obiettivo previsto",
+          "departure": "Partenza"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Orario"
           }
         }
       }
@@ -618,6 +691,7 @@
               "unknown": "Motivo sconosciuto",
               "user_cancelled": "Annullato dall’utente",
               "energy_goal": "Arresto richiesto da un obiettivo di ricarica",
+              "service_job": "Arresto da un ordine di ricarica dell’app",
               "deadline_expired": "Ora di partenza trascorsa"
             }
           }
@@ -755,6 +829,9 @@
     },
     "energy_goal_stop_active": {
       "message": "Un obiettivo di ricarica richiede una pausa. Controllane lo stato. Dopo aver raggiunto l’obiettivo o un azzeramento del contatore, imposta un nuovo obiettivo o disattivalo con 0 prima di riprendere. Modificare l’obiettivo non avvia la ricarica."
+    },
+    "service_job_active": {
+      "message": "Un ordine di ricarica dell’app Modbus controlla ora la ricarica. Interrompilo nella pagina Ordini di ricarica dell’app oppure scollega l’auto. Appena la wallbox conferma la pausa, puoi di nuovo modificare la corrente o riprendere qui."
     },
     "energy_goal_state_invalid": {
       "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."
@@ -983,6 +1060,7 @@
           "capacity_source": "Fonte della capacità della batteria",
           "use_calendar": "Usa un calendario",
           "use_departure_entity": "Usa un’entità per l’orario di partenza",
+          "timed_minimum_soc": "Livello di carica minimo (%)",
           "use_vehicle_timer": "Usa gli orari di partenza del veicolo"
         },
         "description": "Profilo: **{vehicle}**.\n\nData e ora restano sempre inseribili manualmente. Attiva solo le fonti aggiuntive desiderate; seguiranno le relative impostazioni. Un piano attivo può annullare una pausa manuale per raggiungere l’obiettivo di partenza.",
@@ -990,6 +1068,7 @@
           "capacity_source": "Usa la capacità utile: valore fisso, sensore in kWh/Wh o valore del profilo se supportato. Il piano attende se la capacità scelta o il livello di carica non sono disponibili.",
           "use_calendar": "Aggiunge un pulsante per copiare il prossimo evento corrispondente. Ogni pressione sceglie un viaggio; usa il blueprint fornito per importazioni pianificate.",
           "use_departure_entity": "Adotta automaticamente una nuova data e ora future dall’entità scelta. La selezione manuale resta possibile; un nuovo orario futuro di questa fonte può sostituirla.",
+          "timed_minimum_soc": "Sotto questo livello l’auto si ricarica subito a piena corrente, poi attende l’avvio pianificato. 0 disattiva la funzione.",
           "use_vehicle_timer": "Aggiunge un pulsante per copiare un timer attivo di partenza/climatizzazione dall’integrazione del veicolo. Legge il timer riportato; non accende il climatizzatore."
         }
       },

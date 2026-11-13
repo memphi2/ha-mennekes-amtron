@@ -20,9 +20,9 @@ from custom_components.mennekes_amtron_rtu.device.persistence import (
 )
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
+from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
-from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.timed_goal_observer import departure_time
 from tests.ha_fakes import FakeHass
 from tests.test_control import Harness
@@ -205,9 +205,22 @@ def test_planned_start_follows_the_plan_and_clears_without_one(monkeypatch: pyte
         assert observer.planned_start is None
         await observer._evaluate()
         assert observer.planned_start is not None
-        del hass.states["sensor.soc"]
+        started = observer.planned_start
+        # A charge level or poll that drops out keeps the started plan.
+        soc = hass.states.pop("sensor.soc")
         await observer._evaluate()
         assert observer.status == "waiting_for_soc"
+        assert observer.planned_start == started
+        hass.states["sensor.soc"] = soc
+        observer._runtime.coordinator.last_update_success = False
+        await observer._evaluate()
+        assert observer.status == "waiting_for_device"
+        assert observer.planned_start == started
+        observer._runtime.coordinator.last_update_success = True
+        # A missing target ends it.
+        observer._runtime.control.soc_goal.status = "inactive"
+        await observer._evaluate()
+        assert observer.status == "waiting_for_target"
         assert observer.planned_start is None
 
     asyncio.run(run())
@@ -829,5 +842,76 @@ def test_an_unconfirmed_car_ends_the_plans_pause_and_gets_no_plan(monkeypatch):
         binding.resting = False
         await observer._evaluate()
         assert observer.status == "paused_until_start"
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("withdraw", [False, True])
+def test_only_another_car_ends_the_plans_pause_on_stop(monkeypatch, withdraw):
+    async def run():
+        observer, control, _hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        resumed = []
+
+        async def resume():
+            resumed.append(True)
+
+        control.async_resume_charging = resume
+        observer.goal.set(NOW + timedelta(hours=16))
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+        control.pause_requested = True
+        # A reload keeps the pause for the same car's plan.
+        await observer.async_stop(withdraw=withdraw)
+        assert resumed == ([True] if withdraw else [])
+
+    asyncio.run(run())
+
+
+def test_a_failed_cancel_still_ends_the_plans_pause_for_another_car(monkeypatch, caplog):
+    async def run():
+        observer, control, _hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        resumed = []
+
+        async def resume():
+            resumed.append(True)
+
+        control.async_resume_charging = resume
+        observer.goal.set(NOW + timedelta(hours=16))
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+        control.pause_requested = True
+        control.async_cancel_timed_current = AsyncMock(side_effect=observer_module.HomeAssistantError("offline"))
+        await observer.async_stop(withdraw=True)
+        assert resumed == [True]
+        assert "Could not cancel timed charging" in caplog.text
+
+        # A failing resume is logged, never raised into the switch.
+        observer, control, _hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        observer.goal.set(NOW + timedelta(hours=16))
+        await observer._evaluate()
+        control.pause_requested = True
+        control.async_resume_charging = AsyncMock(side_effect=observer_module.HomeAssistantError("offline"))
+        await observer.async_stop(withdraw=True)
+        assert "Could not end the departure plan pause" in caplog.text
+
+    asyncio.run(run())
+
+
+def test_a_future_planned_start_is_planned_anew_after_a_gap(monkeypatch):
+    async def run():
+        observer, control, hass = setup_observer(monkeypatch)
+        control.data.values.update(evse_state=EvseState.EV_CONNECTED, cp_state=CpState.B1)
+        observer.goal.set(NOW + timedelta(hours=16))
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+        assert observer.planned_start > NOW
+        hass.states.pop("sensor.soc")
+        await observer._evaluate()
+        assert observer.status == "waiting_for_soc"
+        # Not started yet: the refreshed inputs decide the start again.
+        assert observer.planned_start is None
 
     asyncio.run(run())

@@ -302,15 +302,6 @@
           "unlocked": "Déverrouillé"
         }
       },
-      "current_l1": {
-        "name": "Courant L1"
-      },
-      "current_l2": {
-        "name": "Courant L2"
-      },
-      "current_l3": {
-        "name": "Courant L3"
-      },
       "detected_ev_phases": {
         "name": "Phases détectées du véhicule",
         "state": {
@@ -458,12 +449,15 @@
           "waiting_for_device": "En attente de la borne",
           "vehicle_unconfirmed": "Véhicule non confirmé",
           "read_only": "Lecture seule",
+          "order_active": "Un ordre de l’application a la priorité",
           "queued": "Modification en attente",
           "paused_until_start": "En pause jusqu’au démarrage",
+          "minimum_level": "Recharge jusqu’au niveau minimal",
           "charging": "Charge au courant maximal",
           "finishing": "Termine au courant minimal",
           "unreachable": "Cible peut-être inaccessible",
           "late": "Heure cible dépassée",
+          "estimated_reached": "Chargé jusqu’à l’objectif estimé",
           "reached": "Cible atteinte",
           "write_pending": "Écriture en attente",
           "error": "Erreur"
@@ -497,6 +491,85 @@
               "authorization_required": "Authentification activée sur la borne",
               "register_unavailable": "Valeur de registre indisponible"
             }
+          }
+        }
+      },
+      "operation_controller": {
+        "name": "Pilotage de la recharge",
+        "state": {
+          "unavailable": "Borne injoignable",
+          "guest_order": "Ordre invité",
+          "weekly_plan": "Plan hebdomadaire",
+          "charging_job": "Ordre de recharge",
+          "departure_plan": "Planification du départ",
+          "direct": "Commande directe"
+        },
+        "state_attributes": {
+          "vehicle": {
+            "name": "Véhicule",
+            "state": {
+              "unknown": "Inconnu",
+              "none": "Non connecté",
+              "connected": "Connecté",
+              "confirmed": "Confirmé"
+            }
+          },
+          "target": {
+            "name": "Cible",
+            "state": {
+              "level": "Niveau de charge",
+              "energy": "Énergie"
+            }
+          },
+          "target_value": {
+            "name": "Valeur cible"
+          },
+          "target_deadline": {
+            "name": "Heure cible"
+          }
+        }
+      },
+      "operation_waiting": {
+        "name": "Motif d’attente de la recharge",
+        "state": {
+          "none": "Rien ne retient la recharge",
+          "wallbox_unavailable": "Borne injoignable",
+          "no_vehicle": "Aucun véhicule connecté",
+          "release_off": "Autorisation de recharge désactivée",
+          "plug_charge_waiting": "Le Plug & Charge virtuel n’a pas autorisé le véhicule",
+          "until_job_start": "En attente du début de l’ordre",
+          "meter_unavailable": "En attente du compteur d’énergie",
+          "job_suspended": "L’ordre attend la preuve du même branchement",
+          "job_ended": "Ordre terminé, en pause jusqu’au débranchement",
+          "until_weekly_window": "En attente de la fenêtre du plan hebdomadaire",
+          "vehicle_unconfirmed": "Véhicule non confirmé",
+          "until_planned_start": "En pause jusqu’au démarrage prévu",
+          "estimated_target_reached": "Chargé jusqu’à l’objectif estimé",
+          "waiting_for_device": "En attente de la borne",
+          "waiting_for_soc": "En attente du niveau de charge",
+          "waiting_for_capacity": "En attente de la capacité",
+          "waiting_for_target": "En attente de la cible en %",
+          "read_only": "Lecture seule",
+          "command_pending": "Modification en attente",
+          "target_reached": "Cible atteinte",
+          "paused": "Recharge en pause"
+        }
+      },
+      "operation_next": {
+        "name": "Prochaine étape de recharge",
+        "state": {
+          "none": "Rien de prévu",
+          "queued_command": "La modification en attente s’exécute",
+          "job_start": "L’ordre démarre",
+          "job_end": "L’ordre se termine",
+          "weekly_window": "La fenêtre du plan hebdomadaire s’ouvre",
+          "plan_start": "La recharge planifiée démarre",
+          "target_reached": "Cible attendue",
+          "departure": "Départ"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Heure"
           }
         }
       }
@@ -618,6 +691,7 @@
               "unknown": "Motif inconnu",
               "user_cancelled": "Annulé par l’utilisateur",
               "energy_goal": "Arrêt demandé par un objectif de recharge",
+              "service_job": "Arrêt par un ordre de recharge de l’app",
               "deadline_expired": "Heure de départ dépassée"
             }
           }
@@ -755,6 +829,9 @@
     },
     "energy_goal_stop_active": {
       "message": "Un objectif de recharge impose une pause. Vérifiez son état. Une fois l’objectif atteint ou après une remise à zéro du compteur, définissez un nouvel objectif ou désactivez-le avec 0 avant de reprendre. Modifier l’objectif ne démarre pas la recharge."
+    },
+    "service_job_active": {
+      "message": "Un ordre de recharge de l’app Modbus pilote actuellement la recharge. Arrêtez-le sur la page Ordres de recharge de l’app ou débranchez le véhicule. Dès que la borne confirme la pause, vous pouvez de nouveau modifier le courant ou reprendre ici."
     },
     "energy_goal_state_invalid": {
       "message": "L’objectif énergétique enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
@@ -983,6 +1060,7 @@
           "capacity_source": "Source de la capacité de batterie",
           "use_calendar": "Utiliser un calendrier",
           "use_departure_entity": "Utiliser une entité d’heure de départ",
+          "timed_minimum_soc": "Niveau de charge minimal (%)",
           "use_vehicle_timer": "Utiliser les départs programmés du véhicule"
         },
         "description": "Profil : **{vehicle}**.\n\nLa date et l’heure restent saisissables manuellement. Activez uniquement les sources supplémentaires souhaitées ; leurs réglages suivront. Un plan actif peut lever une pause manuelle pour atteindre l’objectif de départ.",
@@ -990,6 +1068,7 @@
           "capacity_source": "Utilisez la capacité utile : valeur fixe, capteur en kWh/Wh ou valeur du profil si disponible. Le plan attend si la capacité choisie ou le niveau de charge est indisponible.",
           "use_calendar": "Ajoute un bouton pour copier le prochain événement correspondant. Chaque appui choisit un trajet ; utilisez le blueprint fourni pour des imports programmés.",
           "use_departure_entity": "Reprend automatiquement une nouvelle date et heure futures de l’entité choisie. Le choix manuel reste possible ; un autre horodatage futur de cette source peut le remplacer.",
+          "timed_minimum_soc": "En dessous de ce niveau, la voiture se recharge immédiatement à pleine intensité, puis attend le départ planifié de la recharge. 0 désactive cette fonction.",
           "use_vehicle_timer": "Ajoute un bouton pour copier un minuteur de départ/climatisation actif de l’intégration du véhicule. Il lit le minuteur signalé ; il n’active pas la climatisation."
         }
       },

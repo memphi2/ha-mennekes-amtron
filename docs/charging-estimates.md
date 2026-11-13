@@ -1,9 +1,5 @@
 # Charging losses and costs
 
-The setup steps follow **0.8.0**, where charging losses belong to a vehicle
-profile. Existing separate sources continue to work.
-[Check feature availability](README.md#versions-and-feature-availability).
-
 Both features are optional. Open **Settings → Devices & services → Mennekes
 Amtron RTU → Configure**, then **Charging costs**. Charging losses belong to a
 car: open its profile under **Vehicles**, then **Charging losses**.
@@ -13,9 +9,7 @@ direct USB/LAN connection and with the Modbus app/service. No extra Modbus
 polling, vehicle commands or electricity-provider login is needed.
 
 The wallbox must provide its lifetime energy counter (register layout v01.02
-or newer). In service mode, the service must support charging summaries and,
-for costs, timestamped meter observations. An older compatible service still
-supports its existing functions, but cannot supply these estimates.
+or newer).
 
 A completed charge here means **one connection cycle, ending when you unplug**.
 Pauses remain part of that cycle. Observe the wallbox while unplugged before

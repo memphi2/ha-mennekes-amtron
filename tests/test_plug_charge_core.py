@@ -763,7 +763,12 @@ def test_unknown_vehicle_state_keeps_the_grant_until_the_grace_ends(caplog):
         assert h.written(R.CHARGING_RELEASE) == [[0], [1]]
         # A longer gap withdraws the grant but keeps the connection and its start.
         c.observe_plug_charge(None, observed_at=start + timedelta(seconds=100))
-        c.observe_plug_charge(None, observed_at=start + timedelta(seconds=161))
+        # A held status is no fresh evidence either; the poll that answers
+        # closes the release.
+        c.observe_plug_charge(WallboxData(
+            values={"evse_state": int(EvseState.EV_CONNECTED), "cp_state": int(CpState.B1), "charging_release": 1},
+            held=frozenset({"evse_state", "cp_state"}),
+        ), observed_at=start + timedelta(seconds=161))
         await c._plug_charge._task
         assert "vehicle state unknown for 61 seconds" in caplog.text
         assert not c.plug_charge["authorized"]

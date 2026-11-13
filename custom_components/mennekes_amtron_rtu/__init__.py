@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable
 from typing import Any, NoReturn
 
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
@@ -90,11 +91,11 @@ from .device.identity import async_read_identity
 from .device.soc_goal_controller import SocGoalController
 from .device.waveshare_auth import WaveshareAuthenticationRejectedError
 from .device.write_state import WriteState
-from .entity import async_remove_retired_entities
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import (
     GoalStore,
     ModelStore,
+    PlanPauseStore,
     SessionHistoryStore,
     SocGoalStore,
     TimedGoalStore,
@@ -361,7 +362,11 @@ async def async_setup_entry(
         # Configure the gate before starting heartbeat/recovery. The app owns
         # the previous grant; an unchanged policy survives this HA reload.
         plug_enabled = entry.options.get(CONF_VIRTUAL_PLUG_CHARGE) is True
-        if plug_enabled or (
+        if plug_enabled and control.read_only:
+            # Enabling needs write access; retrying setup would never get it.
+            # The gate keeps its last state until writing is allowed again.
+            _LOGGER.warning("Virtual Plug & Charge is not applied while the wallbox is read-only")
+        elif plug_enabled or (
             CONF_VIRTUAL_PLUG_CHARGE in entry.options and control.supports_plug_charge
             and control.plug_charge.get("enabled") is True
         ):
@@ -507,7 +512,6 @@ async def async_setup_entry(
             await SocGoalStore(hass, entry.entry_id, "").async_remove()
             await SessionHistoryStore(hass, entry.entry_id, "").async_remove()
         platforms = tuple(_entry_platforms(entry))
-        async_remove_retired_entities(hass, entry)
         await hass.config_entries.async_forward_entry_setups(
             entry, platforms
         )
@@ -673,13 +677,20 @@ async def _async_start_vehicle(
     runtime.vehicle_profile_id = options.get(CONF_VEHICLE_PROFILE_ID)
 
 
-async def _async_stop_vehicle(runtime: MennekesAmtronRuntimeData) -> None:
-    """Stop the selected vehicle's observers; the wallbox keeps running."""
+async def _async_stop_vehicle(
+    runtime: MennekesAmtronRuntimeData, *, withdraw: bool = False,
+) -> None:
+    """Stop the selected vehicle's observers; the wallbox keeps running.
+
+    ``withdraw`` ends the car's plan pause when another car takes over.
+    """
     runtime.vehicle_profile_id = None
     timed, soc, loss = runtime.timed_goal, runtime.vehicle_soc, runtime.charge_loss
     runtime.timed_goal = runtime.vehicle_soc = runtime.charge_loss = None
     runtime.vehicle_telemetry = None
-    for owner in (timed, soc, loss):
+    if timed is not None:
+        await timed.async_stop(withdraw=withdraw)
+    for owner in (soc, loss):
         if owner is not None:
             await owner.async_stop()
 
@@ -719,7 +730,7 @@ async def _async_switch_vehicle(
     runtime.vehicle_switching = True
     try:
         await _async_park_trip(hass, entry)
-        await _async_stop_vehicle(runtime)
+        await _async_stop_vehicle(runtime, withdraw=True)
         auto = entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True
         if not auto and runtime.vehicle_detection is not None:
             runtime.vehicle_detection.stop()
@@ -728,10 +739,20 @@ async def _async_switch_vehicle(
         await _async_resume_trip(hass, entry, timed_reset_complete)
         await _async_cancel_old_trip(hass, entry, timed_reset_complete)
         options = vehicle_options(entry.options)
+        if runtime.vehicle_binding is not None:
+            # Its rest state still judges the previous car until the next poll.
+            runtime.vehicle_binding.refresh()
         await _async_start_vehicle(hass, entry, options, timed_reset_complete, lambda: None)
         if auto and runtime.vehicle_detection is None:
             runtime.vehicle_detection = VehicleDetectionObserver(hass, entry)
             runtime.vehicle_detection.start()
+    except asyncio.CancelledError:
+        # A cancelled switch leaves the observers half stopped and its caller
+        # never sees the result: only a reload brings the car's rules back.
+        # An unload or HA shutdown cancels it too; those must stay down.
+        if entry.state is ConfigEntryState.LOADED and not hass.is_stopping:
+            hass.config_entries.async_schedule_reload(entry.entry_id)
+        raise
     except Exception:
         # Any failure falls back to a full reload, which retries the setup.
         _LOGGER.debug("Vehicle switch needs a reload", exc_info=True)
@@ -813,8 +834,22 @@ async def async_unload_entry(
         handoff.client = runtime_data.client if retain_client else None
         handoff.sessions = runtime_data.sessions if retain_client else None
         handoff.charging_cost = runtime_data.charging_cost if retain_cost else None
+    # A reload that also selects another car must end the old car's plan
+    # pause, like an in-place switch; a plain reload or shutdown keeps it.
+    previous = runtime_data.vehicle_profile_id
+    options = vehicle_options(entry.options)
+    withdraw = previous is not None and options.get(CONF_VEHICLE_PROFILE_ID) != previous
+    # So does switching the car's departure planning off: the app would
+    # otherwise keep planning a trip that Home Assistant no longer shows.
+    withdraw = withdraw or (
+        runtime_data.timed_goal is not None
+        and not (vehicle_soc_is_configured(options) and timed_goal_is_enabled(options))
+    )
     try:
-        await _async_stop_runtime(runtime_data, close_client=not retain_client, retain_cost=retain_cost)
+        await _async_stop_runtime(
+            runtime_data, close_client=not retain_client, retain_cost=retain_cost,
+            withdraw_plan=withdraw,
+        )
     finally:
         if not runtime_data.retain_attribution_on_unload:
             forget_loss_attribution(hass, entry.entry_id)
@@ -823,6 +858,7 @@ async def async_unload_entry(
 
 async def _async_stop_runtime(
     runtime: MennekesAmtronRuntimeData, *, close_client: bool = True, retain_cost: bool = False,
+    withdraw_plan: bool = False,
 ) -> None:
     """Release the same owners after partial setup and ordinary unloading.
 
@@ -847,8 +883,10 @@ async def _async_stop_runtime(
         await runtime.charging_cost.async_stop()
     if runtime.sessions is not None and close_client:
         await runtime.sessions.async_close()
+    if runtime.timed_goal is not None:
+        await runtime.timed_goal.async_stop(withdraw=withdraw_plan)
     for owner in (
-        runtime.timed_goal, runtime.vehicle_soc, runtime.soc_goal,
+        runtime.vehicle_soc, runtime.soc_goal,
         runtime.goal, runtime.recovery, runtime.heartbeat,
     ):
         if owner is not None:
@@ -941,6 +979,7 @@ async def async_remove_entry(
     await SocGoalStore(hass, entry.entry_id, "").async_remove()
     await VehicleTargetStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()
+    await PlanPauseStore(hass, entry.entry_id, "").async_remove()
     await VehicleTripStore(hass, entry.entry_id, "").async_remove()
     await VehiclePhaseStore(hass, entry.entry_id, "").async_remove()
     await VehicleBindingStore(hass, entry.entry_id, "").async_remove()

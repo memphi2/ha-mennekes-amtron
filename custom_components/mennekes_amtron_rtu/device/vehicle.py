@@ -1,7 +1,10 @@
 """Conservative vehicle presence from EVSE and control-pilot observations."""
 
+from collections.abc import Callable
+
 from .decode import RegisterValue
 from .enums import CpState, EvseState
+from .registers import CP_STATE, EVSE_STATE
 
 CONNECTED_EVSE_STATES = frozenset({
     EvseState.EV_CONNECTED, EvseState.PRECONDITIONS_VALID,
@@ -31,3 +34,14 @@ def vehicle_connected(
     if cp in CONNECTED_CP_STATES:
         return None if evse == EvseState.IDLE else True
     return True if connected else None
+
+
+def snapshot_vehicle_connected(
+    get: Callable[[str], RegisterValue], layout_version: int,
+) -> bool | None:
+    """Vehicle presence from one snapshot's ``get``, on this register layout."""
+
+    return vehicle_connected(
+        get(EVSE_STATE.key), get(CP_STATE.key),
+        cp_supported=layout_version >= CP_STATE.min_layout,
+    )

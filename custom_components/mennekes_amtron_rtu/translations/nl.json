@@ -302,15 +302,6 @@
           "unlocked": "Ontgrendeld"
         }
       },
-      "current_l1": {
-        "name": "Stroom L1"
-      },
-      "current_l2": {
-        "name": "Stroom L2"
-      },
-      "current_l3": {
-        "name": "Stroom L3"
-      },
       "detected_ev_phases": {
         "name": "Gedetecteerde voertuigfasen",
         "state": {
@@ -458,12 +449,15 @@
           "waiting_for_device": "Wacht op laadpaal",
           "vehicle_unconfirmed": "Voertuig niet bevestigd",
           "read_only": "Alleen lezen",
+          "order_active": "Een opdracht uit de app heeft voorrang",
           "queued": "Wijziging in wachtrij",
           "paused_until_start": "Gepauzeerd tot start",
+          "minimum_level": "Laadt tot het minimumniveau",
           "charging": "Laadt met volle stroom",
           "finishing": "Rondt af met minimale stroom",
           "unreachable": "Doel mogelijk onhaalbaar",
           "late": "Streeftijd verstreken",
+          "estimated_reached": "Geladen tot het berekende doel",
           "reached": "Doel bereikt",
           "write_pending": "Schrijfopdracht wacht",
           "error": "Fout"
@@ -497,6 +491,85 @@
               "authorization_required": "Autorisatie op de wallbox ingeschakeld",
               "register_unavailable": "Registerwaarde niet beschikbaar"
             }
+          }
+        }
+      },
+      "operation_controller": {
+        "name": "Laadsturing",
+        "state": {
+          "unavailable": "Wallbox niet bereikbaar",
+          "guest_order": "Gastopdracht",
+          "weekly_plan": "Weekplan",
+          "charging_job": "Laadopdracht",
+          "departure_plan": "Vertrekplanning",
+          "direct": "Directe bediening"
+        },
+        "state_attributes": {
+          "vehicle": {
+            "name": "Voertuig",
+            "state": {
+              "unknown": "Onbekend",
+              "none": "Niet aangesloten",
+              "connected": "Aangesloten",
+              "confirmed": "Bevestigd"
+            }
+          },
+          "target": {
+            "name": "Doel",
+            "state": {
+              "level": "Laadniveau",
+              "energy": "Energie"
+            }
+          },
+          "target_value": {
+            "name": "Doelwaarde"
+          },
+          "target_deadline": {
+            "name": "Streeftijd"
+          }
+        }
+      },
+      "operation_waiting": {
+        "name": "Wachtreden bij het laden",
+        "state": {
+          "none": "Niets houdt het laden tegen",
+          "wallbox_unavailable": "Wallbox niet bereikbaar",
+          "no_vehicle": "Geen voertuig aangesloten",
+          "release_off": "Laadvrijgave uitgeschakeld",
+          "plug_charge_waiting": "Virtueel Plug & Charge heeft het voertuig niet vrijgegeven",
+          "until_job_start": "Wacht op de start van de opdracht",
+          "meter_unavailable": "Wacht op de energiemeter",
+          "job_suspended": "Opdracht wacht op bewijs van dezelfde aansluiting",
+          "job_ended": "Opdracht beëindigd, gepauzeerd tot loskoppelen",
+          "until_weekly_window": "Wacht op het venster van het weekplan",
+          "vehicle_unconfirmed": "Voertuig niet bevestigd",
+          "until_planned_start": "Gepauzeerd tot de geplande start",
+          "estimated_target_reached": "Geladen tot het berekende doel",
+          "waiting_for_device": "Wacht op laadpaal",
+          "waiting_for_soc": "Wacht op laadniveau",
+          "waiting_for_capacity": "Wacht op accucapaciteit",
+          "waiting_for_target": "Wacht op procentdoel",
+          "read_only": "Alleen lezen",
+          "command_pending": "Wijziging in wachtrij",
+          "target_reached": "Doel bereikt",
+          "paused": "Laden gepauzeerd"
+        }
+      },
+      "operation_next": {
+        "name": "Volgende laadstap",
+        "state": {
+          "none": "Niets gepland",
+          "queued_command": "Wijziging in wachtrij wordt uitgevoerd",
+          "job_start": "Opdracht start",
+          "job_end": "Opdracht eindigt",
+          "weekly_window": "Venster van het weekplan opent",
+          "plan_start": "Gepland laden start",
+          "target_reached": "Doel verwacht",
+          "departure": "Vertrek"
+        },
+        "state_attributes": {
+          "at": {
+            "name": "Tijdstip"
           }
         }
       }
@@ -618,6 +691,7 @@
               "unknown": "Onbekende reden",
               "user_cancelled": "Geannuleerd door de gebruiker",
               "energy_goal": "Stop door een laaddoel",
+              "service_job": "Stop door een laadopdracht van de app",
               "deadline_expired": "Vertrektijd verstreken"
             }
           }
@@ -755,6 +829,9 @@
     },
     "energy_goal_stop_active": {
       "message": "Een laaddoel vereist een pauze. Controleer de status. Stel na het bereiken van het doel of een meterreset een nieuw doel in of schakel het uit met 0 voordat je hervat. Het wijzigen van een doel start het laden niet."
+    },
+    "service_job_active": {
+      "message": "Een laadopdracht van de Modbus-app bestuurt nu het laden. Stop deze op de pagina Laadopdrachten van de app of koppel de auto los. Zodra de wallbox de pauze bevestigt, kun je hier weer de stroom wijzigen of hervatten."
     },
     "energy_goal_state_invalid": {
       "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."
@@ -983,6 +1060,7 @@
           "capacity_source": "Bron van accucapaciteit",
           "use_calendar": "Kalender gebruiken",
           "use_departure_entity": "Entiteit voor vertrektijd gebruiken",
+          "timed_minimum_soc": "Minimaal laadniveau (%)",
           "use_vehicle_timer": "Vertrektijden van het voertuig gebruiken"
         },
         "description": "Profiel: **{vehicle}**.\n\nDatum en tijd kun je altijd handmatig invoeren. Kies alleen gewenste extra bronnen; hun instellingen volgen hierna. Een actief plan kan een handmatige pauze opheffen om het vertrekdoel te halen.",
@@ -990,6 +1068,7 @@
           "capacity_source": "Gebruik de bruikbare capaciteit: een vaste waarde, kWh/Wh-sensor of ondersteunde profielwaarde. De planning wacht als de gekozen capaciteit of laadtoestand ontbreekt.",
           "use_calendar": "Voegt een knop toe om de volgende passende kalenderafspraak over te nemen. Elke druk kiest één rit; gebruik de meegeleverde blauwdruk voor geplande kalenderimports.",
           "use_departure_entity": "Neemt automatisch een nieuwe toekomstige datum en tijd over uit de gekozen entiteit. Handmatige selectie blijft mogelijk; een ander toekomstig tijdstip uit deze bron kan die vervangen.",
+          "timed_minimum_soc": "Onder dit laadniveau laadt de auto meteen op volle stroom en wacht daarna op de geplande start. 0 schakelt dit uit.",
           "use_vehicle_timer": "Voegt een knop toe om een actieve vertrek-/klimaattimer uit de voertuigintegratie over te nemen. De knop leest de gemelde timer en schakelt de klimaatregeling niet in."
         }
       },

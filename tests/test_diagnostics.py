@@ -9,6 +9,7 @@ from custom_components.mennekes_amtron_rtu.device.client_errors import (
     AmtronConnectionError,
 )
 from custom_components.mennekes_amtron_rtu.device.connection import NetworkConfig
+from custom_components.mennekes_amtron_rtu.device.register_blocks import REGISTER_BLOCKS
 from custom_components.mennekes_amtron_rtu.device.runtime_events import EventType
 from custom_components.mennekes_amtron_rtu.diagnostics import (
     async_get_config_entry_diagnostics,
@@ -161,5 +162,17 @@ def test_remote_write_diagnostics_are_optional_and_allowlisted(monkeypatch, fail
         assert "private-token" not in repr(dump)
         remote.request.assert_awaited_once_with("GET", "/v2/diagnostics", update_connection=False)
         await original.async_close()
+
+    asyncio.run(run())
+
+
+def test_remote_diagnostic_reads_leave_the_connection_state_alone():
+    async def run():
+        block = REGISTER_BLOCKS[0]
+        remote = RemoteClient(None, "http://service.invalid:8765", "private-token")
+        remote.request = AsyncMock(return_value={"words": [0] * block.count})
+        assert await remote.async_read_words(address=block.address, count=block.count) == [0] * block.count
+        # A failed diagnostics download must not mark the entry unavailable.
+        remote.request.assert_awaited_once_with("POST", "/v2/read", {"block": block.name}, update_connection=False)
 
     asyncio.run(run())

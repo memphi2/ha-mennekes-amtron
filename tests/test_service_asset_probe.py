@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -17,7 +18,11 @@ from scripts import check_service_assets as probe
 from scripts import service_image as images
 
 
-@pytest.mark.parametrize("broken", [None, "app_settings.html", "app_settings.js", "app_settings.css", "modified"])
+@pytest.mark.parametrize("broken", [
+    None, "app_settings.html", "app_settings.js", "app_settings.css", "app_overview.html",
+    "app_overview.js", "app_nav.js", "app_jobs.js", "app_guest.html", "app_registers.js", "modified",
+    "unrouted",
+])
 def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_changed_assets(
     tmp_path, monkeypatch, broken,
 ):
@@ -37,6 +42,9 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
     ))
     if broken == "modified":
         (package / "app_settings.js").write_text("/* incomplete or wrong build */")
+    elif broken == "unrouted":
+        # A source asset that no route serves must fail too.
+        monkeypatch.setattr(images, "APP_ASSET_PATTERN", re.compile(r"app_\w+\.(?:html|js|css)|app_settings\.py"))
     elif broken is not None:
         (package / broken).unlink()
     commands = []
@@ -58,7 +66,11 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
     else:
         with pytest.raises(subprocess.CalledProcessError) as error:
             images.check_installed_assets("isolated-test-image")
-        assert b"installed app asset differs or cannot be served" in error.value.stderr
+        expected = (
+            b"expected hashes for all registered app assets" if broken == "unrouted"
+            else b"installed app asset differs or cannot be served"
+        )
+        assert expected in error.value.stderr
     assert len(commands) == 1
 
 
@@ -67,6 +79,7 @@ def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_ch
     ("127.0.0.1", "/", "POST"),
     ("127.0.0.1", "/api/modbus-debug", "GET"),
     ("127.0.0.1", "/api/modbus-debug", "POST"),
+    ("127.0.0.1", "/api/overview", "GET"),
 ])
 def test_probe_guard_never_allows_remote_clients_or_configuration(remote, path, method):
     async def run():
@@ -81,4 +94,4 @@ def test_probe_guard_never_allows_remote_clients_or_configuration(remote, path, 
 def test_probe_requires_all_assets_before_loading_the_installed_package(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["asset-probe", "{}"])
     assert probe.main() == 1
-    assert "expected hashes for all three app assets" in capsys.readouterr().err
+    assert "expected hashes for all registered app assets" in capsys.readouterr().err

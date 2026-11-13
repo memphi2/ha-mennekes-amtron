@@ -6,10 +6,12 @@
   <title>Mennekes Amtron</title>
   <link rel="stylesheet" href="./app_settings.css">
   <script src="./app_settings.js" defer></script>
+  <script src="./app_nav.js" defer></script>
 </head>
 <body>
   <main>
     <p class="eyebrow">Mennekes Amtron</p>
+    <nav class="overview-nav" aria-label="Service" data-nav="connection"></nav>
     <div class="tabs" role="tablist" aria-label="Mennekes Amtron">
       <button id="connection_tab" type="button" role="tab" aria-selected="true" aria-controls="connection_panel" data-i18n="connection_tab">Connection</button>
       <button id="debug_tab" type="button" role="tab" aria-selected="false" aria-controls="modbus_debug" tabindex="-1" data-i18n="debug_tab">Debug log</button>

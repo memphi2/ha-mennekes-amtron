@@ -234,3 +234,18 @@ def test_the_active_car_stays_until_an_unknown_car_is_at_the_wallbox(tmp_path):
             await hass.async_stop()
 
     asyncio.run(run())
+
+
+def test_one_failing_evidence_listener_does_not_hide_the_event(tmp_path, caplog):
+    from custom_components.mennekes_amtron_rtu.vehicle_detection import VehicleEvidence
+
+    evidence = VehicleEvidence.__new__(VehicleEvidence)
+    seen = []
+
+    def broken(_event):
+        raise RuntimeError("boom")
+
+    evidence._listeners = [broken, seen.append]
+    evidence._notify("event")
+    assert seen == ["event"]
+    assert "Vehicle evidence listener failed" in caplog.text

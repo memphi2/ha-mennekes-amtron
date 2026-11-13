@@ -30,8 +30,7 @@ from .charge_loss_const import (
 from .device.charge_loss import LossStatistics
 from .device.charging_session import CompletedSession
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
-from .device.registers import CP_STATE, EVSE_STATE
-from .device.vehicle import vehicle_connected
+from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
 from .goal_store import _finish_atomic
 from .loss_attribution import attributed_session, loss_vehicle_options
@@ -130,10 +129,7 @@ class ChargeLossObserver:
 
     def _unplugged(self) -> bool:
         data = self._coordinator.current_data()
-        return self._coordinator.last_update_success and vehicle_connected(
-            data.get(EVSE_STATE.key), data.get(CP_STATE.key),
-            cp_supported=self._entry.runtime_data.identity.layout_version >= CP_STATE.min_layout,
-        ) is False
+        return self._coordinator.last_update_success and snapshot_vehicle_connected(data.get, self._entry.runtime_data.identity.layout_version) is False
 
     async def async_start(self) -> None:
         try:

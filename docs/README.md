@@ -11,14 +11,15 @@ account, calendar, tariff import or YAML configuration.
 3. [Use current control and pause/resume](user-guide.md).
 4. [Add optional functions](features.md) only when you need them.
 
-Already installed? Keep your device and entity IDs. Use
-[Updates and connection changes](upgrading.md) instead of adding the wallbox again.
+Already installed? Keep your device and entity IDs and follow
+[Updates](installation.md#updates) instead of adding the wallbox again.
 
 ## Find the right guide
 
 | Your task | Guide |
 |---|---|
 | Install the recommended service app | [Modbus service](modbus-service.md) |
+| Use the app's overview, charging jobs or guest charging | [The app's web pages](app-guide.md) |
 | Use a LAN-to-RS-485 adapter | [LAN connection](network-gateway.md) |
 | Select one car, several cars or optional automatic detection | [Vehicle setup](vehicle-setup.md) |
 | Automatically release charging for a recognized profile | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) |
@@ -30,23 +31,12 @@ Already installed? Keep your device and entity IDs. Use
 | Resolve a missing control, heartbeat fault or unclear vehicle match | [Troubleshooting](troubleshooting.md) |
 | Understand wiring, supported models and operating limits | [Hardware](hardware.md), [compatibility](compatibility.md), [safety](safety.md) |
 
-## Versions and feature availability
+## Version
 
-These pages cover **0.9.0b1**. Check your installed integration and app versions
-before looking for a new option.
-
-| Version | Added functionality |
-|---|---|
-| **0.6.1** | USB/LAN, optional service app, normal controls, kWh/percentage targets, next-trip planning, calendar/BavarianData timer import, costs and losses. |
-| **0.8.0** | Vehicle profiles with guided setup, manual or automatic selection, optional Virtual Plug & Charge, departure planning that starts late, Waveshare setup/TCP login and a live app Modbus debug log. |
-
-Virtual Plug & Charge and the app's **Debug log** tab need app **0.8.0** in
-service mode; both are optional and off by default. The app's guided page needs
-**Supervisor 2026.10.4+**. See [the update guide](upgrading.md#updating-to-080).
-
-The integration and app do not need matching version numbers. Follow the
-release's minimum-service requirement and [update instructions](installation.md#updates).
-Switching app catalogs creates a separate app and requires a controlled handover.
+These pages describe **0.9.0b2** of the integration and the app. Install both
+in the same version; in service mode, update the app first. The app's web pages
+need **Supervisor 2026.10.4 or newer**. Optional features stay off until you set
+them up.
 
 ## Three settings to remember
 
@@ -62,7 +52,8 @@ Switching app catalogs creates a separate app and requires a controlled handover
   and [LAN adapter configuration](lan-adapters.md)
 - [Automation actions](automations.md) and [Modbus register map](modbus-registers.md)
 - [Architecture](architecture.md), [quality scale](quality-scale.md),
-  [maintenance validation](validation.md) and [Recorder validation](recorder-validation.md)
+  [maintenance validation](validation.md), [Recorder validation](recorder-validation.md)
+  and the [charging conflict matrix](charging-conflict-matrix.md)
 - [Service publication](service-releasing.md), [repository settings](repository-settings.md)
   and [November compatibility audit](ha-2026-11-validation.md)
 - [Legal information](legal.md) and [provenance evidence](audits/current-legal-provenance.md)

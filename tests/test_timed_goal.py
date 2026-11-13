@@ -19,10 +19,11 @@ from custom_components.mennekes_amtron_rtu.datetime import (
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.energy_goal import EnergyGoal
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
+from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
+from custom_components.mennekes_amtron_rtu.goal_store import PlanPause
 from custom_components.mennekes_amtron_rtu.options_flow import (
     _timed_errors,
 )
-from custom_components.mennekes_amtron_rtu.timed_goal import TimedGoal
 from custom_components.mennekes_amtron_rtu.timed_goal_observer import (
     TimedGoalObserver,
     capacity_from_state,
@@ -115,26 +116,47 @@ class FakeStore:
         return TimedGoal()
 
 
+class FakePauseStore:
+    """The plan's own pause, as a restart reads it back."""
+
+    def __init__(self, *_args: object) -> None:
+        self.saved: list[bool] = []
+
+    async def async_save(self, pause: PlanPause) -> None:
+        self.saved.append(pause.paused)
+
+    async def async_load(self) -> PlanPause:
+        return PlanPause(self.saved[-1] if self.saved else False)
+
+
 class FakeControl:
     def __init__(self, data: WallboxData) -> None:
         self.soc_goal = SimpleNamespace(status="active", target_percent=80.0)
         self.energy_goal = EnergyGoal()
         self.max_charging_current = 16.0
         self.read_only = False
+        self.supports_departure_plan = False
+        self.departure = None
         self.energy_goal_stop_requested = False
         self.pending_action = None
+        self.pending_owner: str | None = None
         self.is_paused: bool | None = False
+        self.pause_requested: bool | None = False
         self.commands: list[tuple[str, float | None]] = []
         self.data = data
 
+    async def async_resume_charging(self) -> None:
+        self.commands.append(("resume", None))
+        self.is_paused = self.pause_requested = False
+
     async def async_pause_charging(self) -> None:
         self.commands.append(("pause", None))
-        self.is_paused = True
+        self.is_paused = self.pause_requested = True
         self.data.values["charging_current_ems"] = 1.0
 
     async def async_set_charging_current(self, value: float) -> None:
         self.commands.append(("current", value))
-        self.is_paused = False
+        self.is_paused = self.pause_requested = False
         self.data.values["charging_current_ems"] = value
 
     async def async_cancel_timed_current(self, _owner: str) -> None:
@@ -176,6 +198,7 @@ def setup_observer(monkeypatch: pytest.MonkeyPatch) -> tuple[TimedGoalObserver, 
     )
     hass.async_create_task = lambda coro, _name, **_kwargs: asyncio.create_task(coro)
     monkeypatch.setattr(observer_module, "TimedGoalStore", FakeStore)
+    monkeypatch.setattr(observer_module, "PlanPauseStore", FakePauseStore)
     observer = TimedGoalObserver(hass, entry)
     # Unit cases configure this observer's captured options. A real HA options
     # update replaces the entry mapping and creates a new observer on reload.
@@ -212,6 +235,29 @@ def test_timed_goal_source_updates_and_explicit_clear(monkeypatch: pytest.Monkey
     asyncio.run(run())
 
 
+def test_a_departure_that_passes_during_the_pause_ends_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, _hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=24))
+        await observer._evaluate()
+        assert control.commands == [("pause", None)]
+        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: NOW + timedelta(hours=25))
+        await observer._evaluate()
+        assert observer.status == "late"
+        assert control.commands == [("pause", None), ("resume", None)]
+        await observer._evaluate()
+        assert len(control.commands) == 2
+        # A trip that ended with its target reached leaves charging alone.
+        observer.goal.set(NOW + timedelta(hours=48))
+        observer.goal.finish("reached")
+        observer._plan_paused = control.pause_requested = True
+        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: NOW + timedelta(hours=49))
+        await observer._evaluate()
+        assert len(control.commands) == 2
+
+    asyncio.run(run())
+
+
 def test_timed_plan_pauses_then_resumes_even_a_manual_pause(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, control, _hass = setup_observer(monkeypatch)
@@ -228,6 +274,28 @@ def test_timed_plan_pauses_then_resumes_even_a_manual_pause(monkeypatch: pytest.
         await observer._evaluate()
         assert control.commands[-1] == ("current", 16.0)
         assert observer.status == "charging"
+
+    asyncio.run(run())
+
+
+def test_below_the_minimum_level_the_plan_charges_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, hass = setup_observer(monkeypatch)
+        observer._options["timed_minimum_soc"] = 30
+        observer._runtime.coordinator.current_data().values["charging_current_ems"] = 8.0
+        observer.goal.set(NOW + timedelta(hours=24))
+        await observer._evaluate()
+        assert observer.status == "minimum_level"
+        assert control.commands == [("current", 16.0)]
+        assert observer.planned_start > NOW + timedelta(hours=18)
+        # At the level the plan waits for its start.
+        hass.states["sensor.soc"] = state("sensor.soc", "30", unit_of_measurement="%")
+        monkeypatch.setattr(observer_module.time, "monotonic", lambda: 3600.0)
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+        assert control.commands[-1] == ("pause", None)
+        observer._options["timed_minimum_soc"] = "high"
+        assert observer._minimum() == 0.0
 
     asyncio.run(run())
 
@@ -541,4 +609,96 @@ def test_the_selected_car_remembers_its_detected_phases(monkeypatch: pytest.Monk
         assert observer._phases() == 3
         assert remembered == [("car", 1)]
 
+    asyncio.run(run())
+
+
+async def _restart(monkeypatch: pytest.MonkeyPatch, observer: TimedGoalObserver) -> TimedGoalObserver:
+    """Home Assistant restarts: a new plan with the saved trip and pause."""
+    monkeypatch.setattr(observer_module, "async_track_state_change_event", lambda *_args: lambda: None)
+    monkeypatch.setattr(observer_module, "async_track_time_interval", lambda *_args: lambda: None)
+    restarted = TimedGoalObserver(observer._hass, observer._entry)
+    restarted.request_evaluate = lambda: None
+    restarted._pause_store = observer._pause_store
+    restarted._store.async_load = AsyncMock(return_value=TimedGoal.restore(observer.goal.snapshot()))
+    await restarted.async_start()
+    return restarted
+
+
+@pytest.mark.parametrize("ending", ["clear", "other_car"])
+def test_the_plan_still_ends_its_own_pause_after_a_restart(monkeypatch: pytest.MonkeyPatch, ending: str) -> None:
+    async def run() -> None:
+        observer, control, _hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=24), "manual")
+        await observer._evaluate()
+        assert (control.commands, observer._pause_store.saved) == ([("pause", None)], [True])
+        restarted = await _restart(monkeypatch, observer)
+        await restarted._evaluate()
+        assert control.commands == [("pause", None)]
+        if ending == "clear":
+            await restarted.async_set_deadline(None)
+        else:
+            # Another car: the binding rests this car's plan.
+            observer._runtime.vehicle_binding = SimpleNamespace(resting=True, subscribe=lambda _f: lambda: None)
+        await restarted._evaluate()
+        assert control.commands[-1] == ("resume", None)
+        assert observer._pause_store.saved[-1] is False
+    asyncio.run(run())
+
+
+def test_a_pause_by_hand_is_not_the_plans_to_end(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, _hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=24), "manual")
+        await observer._evaluate()
+        await observer._evaluate()
+        assert observer._pause_seen
+        # The user resumes and then pauses by hand: that pause is the user's.
+        await control.async_resume_charging()
+        await observer._observe_plan_pause()
+        await control.async_pause_charging()
+        await observer.async_set_deadline(None)
+        await observer._evaluate()
+        assert control.commands[-1] == ("pause", None)
+        assert control.pause_requested is True
+    asyncio.run(run())
+
+
+def test_a_command_that_replaced_the_plans_queued_pause_keeps_its_pause(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, _hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=24), "manual")
+
+        async def queue(current: float | None, *, deadline: datetime, owner: str) -> None:
+            control.pending_action, control.pending_owner = "pause", owner
+
+        control.async_set_timed_current = queue
+        await observer._evaluate()
+        assert observer._plan_paused
+        # A pause by hand replaces the plan's queued one and then applies.
+        control.pending_owner = None
+        await observer._observe_plan_pause()
+        assert not observer._plan_paused
+        control.pending_action = None
+        await control.async_pause_charging()
+        await observer.async_set_deadline(None)
+        await observer._evaluate()
+        assert control.commands == [("pause", None)]
+    asyncio.run(run())
+
+
+def test_an_unreadable_saved_pause_counts_as_none(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    async def run() -> None:
+        observer, _control, _hass = setup_observer(monkeypatch)
+        observer._pause_store.async_load = AsyncMock(side_effect=ValueError("damaged"))
+        restarted = await _restart(monkeypatch, observer)
+        assert not restarted._plan_paused
+        assert "Saved departure plan pause unavailable" in caplog.text
+        # A failing save keeps the pause in memory and is tried again.
+        restarted._pause_store.async_save = AsyncMock(side_effect=OSError("disk"))
+        await restarted._set_plan_paused(True)
+        assert restarted._plan_paused
+        assert not restarted._pause_store_current
+        restarted._pause_store.async_save = AsyncMock()
+        await restarted._set_plan_paused(True)
+        restarted._pause_store.async_save.assert_awaited_once()
     asyncio.run(run())

@@ -11,6 +11,7 @@ import pytest
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.control import _PendingCommand
 from custom_components.mennekes_amtron_rtu.device.data import (
     ConnectionState,
     WallboxData,
@@ -220,6 +221,45 @@ def test_reached_goal_confirms_current_pause_without_an_unneeded_write():
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("change", ["none", "poll", "held", "reconnect", "pending"])
+def test_a_confirmed_goal_pause_is_reread_once_the_poll_or_link_changes(change):
+    async def run():
+        harness, control, runner, _saved = await _runner(paused=True)
+        await runner.async_set_target(0.1)
+        runner.observe(_snapshot(harness, 1234.8))
+        await _settle(runner)
+        assert control.energy_goal.status == "reached"
+        harness.transport.reads.clear()
+        writes_before = current_writes(harness.transport)
+        if change == "poll":
+            # A wallbox reboot or fallback shows up in the next poll.
+            harness.snapshot = WallboxData(values={"charging_current_ems": 16.0})
+        elif change == "held":
+            harness.snapshot = WallboxData(
+                values={"charging_current_ems": 1.0}, held=frozenset({"charging_current_ems"}),
+            )
+        elif change == "reconnect":
+            harness.client._connection_generation += 1
+        elif change == "pending":
+            control._pending = _PendingCommand("set_current", 12)
+        harness.clock[0] += 10
+        await control.async_pause_for_energy_goal()
+        read = (R.CHARGING_CURRENT_EMS.address, R.CHARGING_CURRENT_EMS.count) in harness.transport.reads
+        if change == "poll":
+            # The poll already shows charging: the pause is written again at once.
+            assert current_writes(harness.transport) == [*writes_before, 1]
+            assert control.pending_action is None
+        else:
+            assert read is (change != "none")
+            # A confirmed pause read back again needs no second write.
+            assert current_writes(harness.transport) == writes_before
+        if change == "pending":
+            assert control._pending is None
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("applied", [False, True])
 def test_uncertain_goal_pause_checks_actual_state_before_retrying(applied):
     async def run():
@@ -355,7 +395,7 @@ def test_terminal_evidence_during_guarded_reads_is_rechecked_before_start(action
 
         control._async_check_transition_interval = wait_then_notice_goal
 
-        async def notice_goal_while_checking_release():
+        async def notice_goal_while_checking_release(_read=None):
             runner.observe(_snapshot(harness, 1247))
             return True
 
@@ -860,8 +900,7 @@ def test_store_rejects_corrupt_goal_before_replacing_existing_intent(tmp_path):
     payload["pause_requested"] = False
     payload["energy_goal"] = {"target_kwh": 12, "status": "active"}
     store.path.write_text(json.dumps(payload))
-    with pytest.raises(ValueError, match="energy goal"):
-        store.load(state)
+    assert store.load(state) is False
     assert state.pause_requested is True
     assert state.charging_setpoint == 8
 

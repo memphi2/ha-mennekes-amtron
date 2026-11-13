@@ -304,8 +304,7 @@ def test_optional_history_recovery_never_accepts_invalid_control_state(tmp_path,
     } | broken
     path.write_text(json.dumps(payload))
     state = WriteState(pause_requested=True, charging_setpoint=6)
-    with pytest.raises(ValueError, match=r"."):
-        IntentStore(path, "wallbox").load(state)
+    assert IntentStore(path, "wallbox").load(state) is False
     assert state.pause_requested is True
     assert state.charging_setpoint == 6
     assert caplog.messages == []
@@ -315,8 +314,7 @@ def test_invalid_json_is_not_treated_as_optional_history_failure(tmp_path, caplo
     path = tmp_path / "intent.json"
     path.write_text('{"version": 1, "charging_session_history":')
     state = WriteState(pause_requested=True, charging_setpoint=6)
-    with pytest.raises(json.JSONDecodeError):
-        IntentStore(path, "wallbox").load(state)
+    assert IntentStore(path, "wallbox").load(state) is False
     assert state.pause_requested is True
     assert state.charging_setpoint == 6
     assert caplog.messages == []

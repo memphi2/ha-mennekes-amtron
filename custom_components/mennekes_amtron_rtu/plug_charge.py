@@ -10,7 +10,7 @@ import time
 from collections.abc import Mapping
 from contextlib import suppress
 from copy import deepcopy
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -23,7 +23,8 @@ from .device.const import DOMAIN
 from .device.errors import DeviceError
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
-from .vehicle_detection import SETTLE_SECONDS, VehicleEvidence
+from .plug_charge_explanation import explain_detection
+from .vehicle_detection import SETTLE_SECONDS, vehicle_evidence
 from .vehicle_profiles import (
     CONF_VIRTUAL_PLUG_CHARGE,
     active_profile,
@@ -67,7 +68,7 @@ class PlugChargeObserver:
         self._entry = entry
         self._control = entry.runtime_data.control
         self._coordinator = entry.runtime_data.coordinator
-        self._evidence = VehicleEvidence(hass, entry)
+        self._evidence = vehicle_evidence(hass, entry)
         self._policy = plug_charge_policy(entry.options)
         self._configured_options = deepcopy(dict(entry.options))
         self._switch_applied = False
@@ -89,6 +90,8 @@ class PlugChargeObserver:
         self._generation = 0
         self._status = "waiting_vehicle"
         self._blocked_reason: str | None = None
+        self._decision_reason = "waiting_vehicle"
+        self._last_grant_error: str | None = None
 
     @property
     def status(self) -> str:
@@ -99,6 +102,42 @@ class PlugChargeObserver:
     def blocked_reason(self) -> str | None:
         """The first failed release condition while the status is blocked."""
         return self._blocked_reason
+
+    @property
+    def decision_reason(self) -> str:
+        """Explain waiting as well as blocking, without changing state enums."""
+        return self._decision_reason
+
+    @staticmethod
+    def _gate_since(raw: object) -> datetime | None:
+        """When the gate saw the current plug-in; None unless timezone-aware."""
+        since = dt_util.parse_datetime(raw) if isinstance(raw, str) else None
+        return since if since is not None and since.tzinfo is not None else None
+
+    def _detection_details(self, since: datetime | None) -> dict[str, Any]:
+        active = active_profile(self._entry.options)
+        return explain_detection([
+            (active is not None and active.id == key, self._evidence.snapshot(key))
+            for key, profile in profiles(self._entry.options).items()
+            if profile.detection is not None
+        ], since)
+
+    @property
+    def decision_details(self) -> dict[str, Any]:
+        """Read-only support snapshot; no VIN, location, token or raw exception."""
+        since = self._gate_since(self._control.plug_charge.get("since"))
+        values = self._coordinator.current_data().values
+        return {
+            "reason": self._decision_reason,
+            "last_grant_error": self._last_grant_error,
+            "release_blockers": list(self._release_blockers()),
+            "unavailable_registers": [
+                key for key in ("lock_evse", "error_code", "authorization_enabled")
+                if values.get(key) is None
+            ],
+            "departure_plan": self._plan_status(),
+            "detection": self._detection_details(since),
+        }
 
     @callback
     def start(self) -> None:
@@ -172,6 +211,7 @@ class PlugChargeObserver:
                 self._fresh_session = session
             self._session = session
             self._retry_at = 0.0
+            self._last_grant_error = None
         self._unplugged = session is None
         if gate.get("manual") is True and (
             self._coordinator.current_data().values.get("charging_release") == 1
@@ -188,15 +228,13 @@ class PlugChargeObserver:
         # Once accepted, stale cloud data cannot interrupt this physical cycle.
         # A policy change or lost physical connection is revoked by the owner.
         if gate.get("authorized"):
+            self._last_grant_error = None
             self._set_status("authorized")
             return None
-        raw_since = gate.get("since")
-        since = dt_util.parse_datetime(raw_since) if isinstance(raw_since, str) else None
-        if since is not None and since.tzinfo is None:
-            since = None
+        since = self._gate_since(gate.get("since"))
         selected = self._evidence.selected(since)
         if selected is None:
-            self._set_status("waiting_detection")
+            self._set_status("waiting_detection", detail=self._detection_details(since)["reason"])
             return None
         profile = active_profile(self._entry.options)
         if profile is None or profile.id != selected:
@@ -210,25 +248,31 @@ class PlugChargeObserver:
             # The car's target and departure plan are still being started,
             # or wait for the car to confirm this plug-in.
             # Grant nothing before they apply; the switch ends with an update.
-            self._set_status("waiting_detection")
+            self._set_status("waiting_detection", detail="vehicle_binding_pending")
             return None
         evidence = self._evidence.snapshot(selected)
         if (
             evidence.connected_at is None or evidence.connected_at.tzinfo is None
             or since is None or evidence.connected_at < since - PLUG_WINDOW
         ):
-            self._set_status("waiting_detection")
+            detail = "session_time_unknown" if since is None else "plug_report_not_current"
+            self._set_status("waiting_detection", detail=detail)
             return None
         self._adopt_vehicle_target(session)
         reason = self._release_blocker()
         if reason is not None:
             self._set_status("blocked", reason)
             return None
-        self._set_status("waiting_release")
+        self._set_status("waiting_release", detail="grant_retry" if self._last_grant_error else "settling")
         return selected, session
 
     def _release_blocker(self) -> str | None:
-        """Name the first condition that keeps the release closed."""
+        """Keep the existing first-blocker priority for automations."""
+        reasons = self._release_blockers()
+        return reasons[0] if reasons else None
+
+    def _release_blockers(self) -> tuple[str, ...]:
+        """List simultaneous blockers without changing any control intent."""
         values = self._coordinator.current_data().values
         checks = (
             ("read_only", self._control.read_only),
@@ -237,19 +281,17 @@ class PlugChargeObserver:
             ("release_off", self._control.charging_release_requested is False),
             ("energy_goal_stop", bool(self._control.energy_goal_stop_requested)),
         )
-        for reason, failed in checks:
-            if failed:
-                return reason
+        reasons = [reason for reason, failed in checks if failed]
         for key, reason in (
             ("lock_evse", "wallbox_locked"), ("error_code", "error_code"),
             ("authorization_enabled", "authorization_required"),
         ):
             value = values.get(key)
             if value is None:
-                return "register_unavailable"
-            if value != 0:
-                return reason
-        return None
+                reasons.append("register_unavailable")
+            elif value != 0:
+                reasons.append(reason)
+        return tuple(dict.fromkeys(reasons))
 
     def _plan_status(self) -> str | None:
         """The status of an armed departure plan that controls the current."""
@@ -300,10 +342,12 @@ class PlugChargeObserver:
 
         self._target_task = self._hass.async_create_task(adopt())
 
-    def _set_status(self, status: str, reason: str | None = None) -> None:
-        if (self._status, self._blocked_reason) != (status, reason):
+    def _set_status(self, status: str, reason: str | None = None, *, detail: str | None = None) -> None:
+        detail = detail or reason or status
+        if (self._status, self._blocked_reason, self._decision_reason) != (status, reason, detail):
             self._status = status
             self._blocked_reason = reason
+            self._decision_reason = detail
             # Defer listeners to avoid recursion through our own subscription.
             self._hass.loop.call_soon(self._notify)
 
@@ -371,6 +415,17 @@ class PlugChargeObserver:
         except (AmtronBusError, HomeAssistantError, DeviceError, OSError) as err:
             # The owner may still be in its configured switching interval.
             # Retry on a later ordinary poll/report, never spin or force polls.
+            # Stable categories only: raw errors may include an adapter address.
+            key = getattr(err, "translation_key", None)
+            failure = key if key in {
+                "write_rate_limited", "control_state_unknown", "plug_charge_blocked",
+                "plug_charge_session_changed", "plug_charge_authorization_expired",
+                "energy_goal_stop_active", "service_job_active", "read_only_mode",
+            } else "command_failed"
+            if not self._stopped and self._session == candidate[1]:
+                self._last_grant_error = failure
+                if self._status == "waiting_release":
+                    self._set_status("waiting_release", detail="grant_retry")
             _LOGGER.debug("Virtual charging release deferred: %s", err)
         finally:
             self._retry_at = time.monotonic() + 5

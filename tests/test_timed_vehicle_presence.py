@@ -378,7 +378,8 @@ def test_gateway_configuration_during_timed_guard_prevents_stale_write(rollback)
             await asyncio.wait_for(configuration, 2)
             with pytest.raises(HomeAssistantError):
                 await asyncio.wait_for(timed, 2)
-            assert not harness.client.connected
+            # A confirmed rollback reopens the serial port; nothing else does.
+            assert harness.client.connected is rollback
             assert current_writes(harness.transport) == []
             assert harness.client.write_state.current_write_generation == 0
         finally:

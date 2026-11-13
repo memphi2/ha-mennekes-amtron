@@ -7,7 +7,7 @@ import json
 import threading
 from copy import deepcopy
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from aiohttp import ClientConnectionError, web
@@ -340,6 +340,13 @@ def test_guard_limits_requests_and_sanitizes_failures(settings, monkeypatch):
             result = await settings.guard(request(), settings.read)
             assert result.status == 503
             assert body(result) == {"error": "busy"}
+            # Page assets load in parallel and are not limited.
+            transport = Mock()
+            transport.get_extra_info.return_value = (ui.SUPERVISOR_PEER, 1234)
+            asset = make_mocked_request("GET", "/app_overview.js", headers=HEADERS, transport=transport)
+            result = await settings.guard(asset, AsyncMock(return_value=web.Response(text="ok")))
+            assert result.status == 200
+            assert result.headers["Cache-Control"] == "no-store"
         finally:
             settings._slots.release()
             settings._slots.release()
