@@ -67,7 +67,7 @@ explicit skip/override controls in the service UI/API. Test the complete flow,
 including restarts, connection changes, same-day edits and lost HTTP replies.
 These are not implemented by this foundation patch.
 
-## Validation actually performed
+## Validation scope
 
 158 focused pytest cases passed under Python 3.13.5 using the actual new module
 and the unchanged `EnergyGoal` source from the repository artifact. The new
@@ -75,6 +75,8 @@ module reached 189/189 statements and 60/60 branches in that isolated run.
 This is neither whole-project coverage nor an HA/service integration test.
 Python compilation and patch-application checks also passed.
 
-The repository requires Python 3.14; its full CI, Ruff and strict mypy gates
-have not been run for this patch. No physical wallbox, Supervisor or browser
-runtime test has been performed for the new weekly-plan foundation.
+The repository's Python 3.14 CI separately runs the complete validation suite,
+including Ruff and strict mypy gates. Commit-specific outcomes are recorded in
+the pull request, rather than treating a focused local run as a full CI result.
+No physical wallbox, Supervisor or browser runtime test has been performed for
+the new weekly-plan foundation.
