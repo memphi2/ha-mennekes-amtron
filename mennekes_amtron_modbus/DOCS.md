@@ -1,147 +1,154 @@
 # Mennekes Amtron Modbus Service
 
 Keep the wallbox heartbeat running through Home Assistant Core restarts.
-This optional app is the preferred way to operate the integration: it holds
-the last charging state, including a deliberate pause, while HA is offline.
+This optional app is the preferred way to operate the integration: it owns the
+USB or LAN connection, sends the heartbeat and holds the last charging state,
+including a deliberate pause, while HA is offline. It can also run a charging
+order on its own.
 
 **amd64 and aarch64 · separate integration required**
 
-Version **0.8.2** is available through **#apps** and also updates existing
-**#apps-beta** installations in place. Keep the app data and HA entry, and
-update this app before integration **0.8.0**. Switching catalogs creates a
-separate app and requires a handover. See [Updates](#updates).
-
-New in 0.8.0: optional Virtual Plug & Charge with a manual release for any car,
-a live **Debug log** tab, guided setup on Supervisor **2026.10.4+**, Waveshare
-TCP login, and steadier values when a single bus read fails. A reached target
-pauses only with a car plugged in; a target at the car's own limit lets the car
-end the charge. Existing connections keep their settings until you change them.
-
-LAN-to-RS-485 adapters are supported without local USB.
-See the [LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/network-gateway.md)
+LAN-to-RS-485 adapters are supported without local USB. See the
+[LAN guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/network-gateway.md)
 for transparent RTU over TCP versus translating Modbus TCP. Supported Waveshare
-models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/lan-adapters.md#service-app).
+models also offer optional [LAN adapter setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/lan-adapters.md#service-app).
 
-[First setup](#first-setup) · [Daily use](#daily-use) ·
+[First setup](#first-setup) · [Web pages](#web-pages) · [Daily use](#daily-use) ·
 [Updates](#updates) · [Help](#help)
 
 ## First setup
 
-Install **Mennekes Amtron RTU integration 0.8.2**. Complete any requested Home Assistant Core restart.
-See [Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/installation.md).
-The integration and this app are
-separate installations. Already using the app? Follow [Updates](#updates)
-instead: the app and integration can be updated independently.
+Install the **Mennekes Amtron RTU** integration in the same version as this app
+and complete any requested Home Assistant Core restart. See
+[Installation](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/installation.md).
 
 1. **Prepare an existing wallbox.** Note its pause, current limit, resume current
    and charging-release settings. Disconnect the vehicle for the first handover.
-   Disable the existing direct USB or LAN integration entry to release its connection;
-   keep the entry so its device and entity IDs are retained.
-2. **Start and configure the app.** Leave **Read-only on**, start the app and
-   choose **Open Web UI**. Select **USB / RS-485** or the matching LAN protocol.
-   USB shows a dropdown of detected adapters; LAN shows the host/IP and TCP port.
-   Enter the wallbox address and save. For LAN, set baud rate/frame on the adapter
-   or use the optional compatible-adapter setup in the connection page.
-   With no connection configured, the app stays running for setup without opening
-   a Modbus connection or publishing discovery.
-3. **Restart the app.** Return to its **Info** tab and restart to apply the saved
+   Disable an existing direct USB or LAN integration entry to release its
+   connection; keep the entry so its device and entity IDs are retained.
+2. **Configure the connection.** Leave **Read-only on**, start the app and select
+   **Open Web UI → Connection**. Choose **USB / RS-485** or the matching LAN
+   protocol. USB shows a dropdown of detected adapters; LAN shows the host/IP
+   and TCP port. Enter the wallbox address and save. For LAN, set baud rate and
+   frame on the adapter, or use the optional compatible-adapter setup on the same
+   page. Without a saved connection, the app only waits for setup; it opens no
+   Modbus connection and publishes no discovery.
+3. **Restart the app.** Restart it from its **Info** tab to apply the saved
    connection. Enable **Start on boot** and **Watchdog**. Check the log for the
    USB/LAN connection. Read-only mode deliberately leaves the heartbeat off.
 4. **Connect HA.** Under **Settings → Devices & services**, configure the
    discovered **Mennekes Amtron** entry. Address and token are automatic; there is
-   nothing to copy. The existing entry is reused for the same wallbox. Re-enable
-   it if it remains disabled. Keep the app **Read-only** while doing this and
-   comparing readings with the wallbox.
-5. **Enable control.** Set the permitted current cap, turn **Read-only off in the
-   app**, save and restart the app. Its settings are read at startup. HA enables
-   its controls after fresh writable status; there is no second HA write switch
-   and no HA restart is needed. The app restart briefly interrupts its heartbeat.
-6. **Check the handover.** Reapply and verify the noted pause/current/release
-   settings before reconnecting the vehicle. Test a deliberate pause and an HA
-   Core restart: the app should stay running and the pause should remain active.
+   nothing to copy. An existing entry for the same wallbox is reused; re-enable
+   it if it stays disabled. Keep the app **Read-only** while you compare the
+   readings with the wallbox.
+5. **Enable control.** Set the permitted current cap, turn **Read-only off** in
+   the app's **Configuration** tab, save and restart the app. HA enables its
+   controls after fresh writable status; there is no second HA write switch and
+   no HA restart is needed. The app restart briefly interrupts the heartbeat.
+6. **Check the handover.** Reapply and verify the noted pause, current and
+   release settings before reconnecting the vehicle. Test a deliberate pause and
+   an HA Core restart: the app should stay running and the pause should remain.
 
 | App option | Initial setting |
 |---|---|
 | Wallbox connection | **USB / RS-485** (default), **LAN: Modbus RTU (TCP)** (transparent adapter), or **LAN: Modbus TCP** (translating gateway). |
-| Serial adapter | USB only: choose the adapter in **Open Web UI**; stable `/dev/serial/by-id/...` names are preferred automatically. Switching to LAN removes the old USB selection when saved. |
-| Adapter host / IP + TCP port | LAN: hostname/IP without a URL scheme, and gateway port; default **502**. For USB, leave the host empty. |
+| Serial adapter | USB only: choose it on the **Connection** page; stable `/dev/serial/by-id/...` names are preferred. Saving LAN removes the old USB selection. |
+| Adapter host / IP + TCP port | LAN: hostname/IP without a URL scheme, and gateway port; default **502**. |
 | Wallbox address | Match the wallbox; factory default **50**. |
-| Baud rate / frame | USB only: match the wallbox, factory defaults **57600 / 8n2**. For LAN, configure these on the adapter or use compatible-adapter setup. |
+| Baud rate / frame | USB only: match the wallbox, factory defaults **57600 / 8n2**. For LAN, set these on the adapter. |
 | Read-only | **On** until readings are checked. |
 | Current cap | Default **6 A**; set within your installation's permitted current. |
 | Status / measurement interval | Keep **5 / 30 seconds** initially. |
 
-**Minimum time between state changes** defaults to
-**300 seconds**, with a range of **0–3600 seconds**. Zero disables the longer wait; the technical write guards
-remain. Save changes and restart this app. HA does not apply a second interval.
+**Minimum time between state changes** defaults to **300 seconds**, range
+**0–3600 seconds**. Zero disables the longer wait; the five-second write guards
+remain. HA does not add a second interval.
 
-**Extra wait before phase changes** defaults to **5 seconds** and is
-configurable from **0 to 30 seconds**. After the vehicle confirms a pause, the
-app waits this extra time and checks the state again before changing phases.
-Zero skips only the extra delay; pause confirmation and the state-change
-interval still apply.
+**Extra wait before phase changes** defaults to **5 seconds**, range **0–30
+seconds**. After the vehicle confirms a pause, the app waits this extra time and
+checks the state again before changing phases. Zero skips only the extra delay.
 
 With no vehicle connected, fresh EVSE Idle and CP A1/A2 readings skip the long
-state-change wait and vehicle grace time. Pending waits check for unplugging
-every five seconds. Unknown or inconsistent status retains the wait;
-five-second register-write guards and heartbeat remain active.
-
-### Connection page
-
-**Open Web UI** provides exactly three connection choices and shows only the
-fields needed for that connection. A disconnected USB adapter is marked missing;
-another adapter is never selected automatically. Reconnect it or explicitly
-choose its replacement. Switching to LAN does not require the old USB adapter
-to exist. Ordinary connection changes take effect when you restart the app;
-that restart briefly interrupts the heartbeat.
-
-Optional **LAN adapter setup** detects only the host you enter and lets you
-review compatible adapter settings before applying them. This also selects
-TCP-server mode and disables storage polling, autonomous preambles and old
-serial-buffer replay. Unknown custom payloads are refused. Applying these settings
-restarts the adapter and stops the app's old Modbus connection immediately.
-After successful saving, restart the app to connect using the new settings.
-Detection alone changes nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/lan-adapters.md).
-
-The native **Configuration** tab contains manual connection fields; it does
-not have an adapter detection button. To detect and configure a compatible
-adapter, go to the app's **Info** tab, select **Open Web UI**, choose the LAN
-protocol and enter the adapter's host. Select **Read LAN adapter settings**,
-then select **Apply adapter settings when saving** and save. Reading inspects
-only the entered host. Applying changes the adapter immediately; restart the
-app afterwards to resume the connection. The native TCP-login switch changes
-the app connection only; it does not enable login on the adapter.
-
-The page requires a Home Assistant administrator and **Supervisor 2026.10.4+**.
-You can also save LAN settings in the native **Configuration** tab, including
-when an old USB adapter is absent. Use **Open Web UI** for the USB dropdown.
-Read-only, current limits and polling intervals remain in the native Configuration
-tab. Avoid editing both forms at once; reload the connection page after changing
-native options.
-
-The native Configuration form cannot show fields conditionally or require a
-dropdown for its device selector; see the [Supervisor option schema](https://contributors.home-assistant.io/apps/guides/options/).
-The separate [Ingress page](https://contributors.home-assistant.io/apps/guides/ingress/)
-does not require a host port, an API token in your browser or extra Supervisor
-roles. Supervisor 2026.10.4 supplies the required server-side administrator check.
-
-App **0.6.0b1** shows exactly three connection choices. If an older app still has
-a technical name saved, select its matching readable choice once:
-`serial` → **USB / RS-485**, `rtu_over_tcp` → **LAN: Modbus RTU (TCP)**,
-`modbus_tcp` → **LAN: Modbus TCP**. App 0.5.1 already lets you save this choice
-before updating. Keep your existing adapter/IP and other settings. If an update
-rejects an old choice, select and save the matching choice in Configuration,
-then start the app. No invalid choice falls back to USB. For a missing host field
-in 0.5.0, use the [older-app workaround](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.5.1/docs/network-gateway.md#app-050-configuration).
+state-change wait and the vehicle grace time. Pending waits check for unplugging
+every five seconds. Unknown or inconsistent status keeps the wait.
 
 Leave the app's API settings at their defaults: HTTP port **8765** is separate
 from a LAN adapter's Modbus port. No host port needs publishing and no service
 token needs configuring. Use a trusted private LAN for gateways. Only this app
-may control the bus through its USB or LAN adapter, even when read-only.
+may use the bus through its USB or LAN adapter, even when read-only.
 
-On first installation, the app reads the wallbox's current state. If fallback
-changed that state during handover, it cannot infer your earlier intention.
-A paused wallbox without saved app state uses **6 A** as its first resume target.
+On first installation, the app reads the wallbox's current state. If the
+fallback changed that state during handover, it cannot infer your earlier
+intention. A paused wallbox without saved app state uses **6 A** as its first
+resume target.
+
+## Web pages
+
+**Open Web UI** opens the app's pages for Home Assistant administrators. They
+need **Supervisor 2026.10.4 or newer**. See
+[the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/app-guide.md)
+for details.
+
+| Page | Purpose |
+|---|---|
+| **Overview** | Which controller decides about the charge, why the car waits and what comes next; observed charging state, heartbeat, power, the next queued action and recent command results. Read-only. |
+| **Connection** | USB or LAN connection and optional LAN-adapter setup. Changes apply after an app restart. |
+| **Debug log** | Live Modbus recording for up to 10 minutes, in memory only. |
+| **Registers** | Every known register with raw and decoded value and its read quality. Read-only. |
+| **Runtime** | Polling intervals, current cap and waits apply without restart. Preview before saving. |
+| **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with an optional immediate reserve, early start and an estimated finish. |
+| **Guest charging** | An immediate, limited order for a visitor's car after local authorization. |
+| **Weekly plans** | Recurring departures for one car, activated for the plugged-in car for up to seven days. |
+
+Every page is available in English, German, French, Dutch and Italian and has
+the same navigation bar.
+
+**Read-only** and the basic connection fields stay in the native
+**Configuration** tab. Avoid editing the native tab and a web page at the same
+time; the page asks you to reload when the settings changed meanwhile.
+
+### Connection page
+
+The page offers exactly three connection choices and shows only the fields
+needed for the selected one. A disconnected USB adapter is marked missing;
+another adapter is never selected automatically. Reconnect it or choose its
+replacement explicitly. Switching to LAN does not need the old USB adapter.
+
+Optional **LAN adapter setup** inspects only the host you enter. Select **Read
+LAN adapter settings**, review the proposed changes, select **Apply adapter
+settings when saving** and save. This selects TCP-server mode and turns off
+storage polling, autonomous preambles and old serial-buffer replay; unknown
+custom payloads are refused. Applying restarts the adapter and closes the app's
+Modbus connection immediately; restart the app afterwards. Reading alone changes
+nothing. See [supported models, TCP login and recovery](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/lan-adapters.md).
+The native TCP-login switch changes the app connection only; it does not enable
+login on the adapter.
+
+### Charging jobs and guest charging
+
+A charging job runs inside the app, so it continues while Home Assistant
+restarts or is offline. It charges with the chosen current inside its window
+and pauses outside it, after the energy amount or when you stop it. It never
+switches the charging release on, unlocks the wallbox or authorizes a car;
+battery and energy targets in HA still stop it.
+
+While an order runs, HA cannot change the current, resume or switch phases; it
+reports that a charging job of the app controls charging. Pausing, switching the
+release off or locking in HA stops the order. When an order ends, the app pauses
+charging; once the wallbox confirms the pause, HA controls charging again and
+you can resume there. Unplugging interrupts an order. After an app restart or a
+wallbox that was unreadable for more than a minute, the order stays paused and
+continues only if the wallbox proves the car stayed plugged in; otherwise it is
+interrupted and HA controls charging again. It never restarts by itself.
+
+A weekly plan creates one such job per departure, each when its window opens.
+Between departures HA controls charging, for example for PV surplus. An
+activation ends at unplugging, an app restart or after seven days at the latest.
+A plan activated while HA had detected the car at the plug-in remembers it and
+then activates itself whenever HA detects that car again, until you stop the
+plan. It then waits for the next departure's window.
+See
+[the app's web pages](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/app-guide.md#weekly-plans).
 
 ## Daily use
 
@@ -152,151 +159,112 @@ A paused wallbox without saved app state uses **6 A** as its first resume target
 - **Write permission:** change the app's **Read-only** switch, save and restart
   the app. No HA restart is needed. HA controls remain registered but unavailable
   while read-only or while the app is not ready. HA does not send old commands
-  when permission changes. The service may still recover error 200 automatically
-  by reasserting its saved state, including a deliberate pause.
+  when permission changes. The app can still recover error 200 by reasserting
+  its saved state, including a deliberate pause.
 - **Heartbeat status:** check the `heartbeat` attribute of HA's **Connection
-  quality** diagnostic sensor. It records health changes rather than every beat.
+  quality** diagnostic sensor, or the **Overview** page.
 - **Charging targets:** set an **Energy target** in kWh, or configure an optional
   vehicle percentage target through the integration. Targets only limit charging.
-  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/user-guide.md#energy-target).
-- **Next departure:** select a one-trip charging deadline in HA. This optional
-  plan may resume a pause to meet the time; ordinary kWh/percentage limits alone
-  never do. The service discards queued timed-plan commands after their deadline.
-  Open the car's profile under **Configure → Vehicles**, set up its charge
-  level, then enable **Next departure → Configure departure planning** and
-  choose its battery-capacity source.
-  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/departure-planning.md).
+  See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/user-guide.md#energy-target).
+- **Next departure:** set a charging deadline for one trip in HA. This optional
+  plan may resume a pause to meet the time; ordinary kWh or percentage limits
+  never do. HA hands the trip and the car's data to the app, which plans start
+  and current itself and keeps doing so while HA is offline.
+  See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/departure-planning.md).
 - **Loss and cost estimates:** choose optional vehicle and price sources in the
-  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/charging-estimates.md).
+  integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/charging-estimates.md).
 
-Early pause/resume, phase, release and lock changes are queued.
-HA's **Pending change** and its `due` attribute show the request and its
-scheduled time. The latest charging request replaces the old one. **A stop
-request also waits**, replacing any pending start. A pause within the five-second
-current-write interval is queued too and does not need to be requested again.
-A fixed due timestamp supplies the remaining-time display during timed waits,
-without database updates every second. While a phase change waits for vehicle
-pause confirmation, its action stays visible but the due time is unknown. Once
-confirmed, the timestamp shows the end of the extra wait.
-Pause/release/lock/phase readback still shows the
-actual wallbox state; the slider while paused shows the remembered resume
-target, which may already reflect a queued request. Heartbeat and recovery that
-preserves the existing intent keep running during a wait.
+Early pause/resume, phase, release and lock changes are queued. HA's **Pending
+change** and its `due` attribute show the request and its scheduled time. The
+latest charging request replaces the old one. **A stop request also waits**,
+replacing any pending start. A pause within the five-second current-write
+interval is queued too and does not need to be requested again. While a phase
+change waits for the vehicle to confirm its pause, the action stays visible but
+the due time is unknown. Pause, release, lock and phase readback always show the
+actual wallbox state; while paused, the slider shows the remembered resume
+current.
 
 Before changing phases, the app waits up to 30 seconds for live confirmation
-that the vehicle has paused, followed by the configured grace time. If the
-confirmation or the final state check fails, the phase command is not sent and
-the requested pause remains in place. Resume separately after a successful
-phase change.
-An idle wallbox without a connected vehicle does not need pause confirmation or
-the extra wait. Fresh EVSE Idle and CP A1/A2 also skip the longer state-change
-interval; the five-second register-write guards remain.
+that the vehicle has paused, followed by the configured extra wait. If either
+check fails, the phase command is not sent and the pause remains. Resume
+separately after a successful phase change. An idle wallbox without a vehicle
+needs neither confirmation nor the extra wait.
 
 HA can remain offline indefinitely while the app holds the last charging state.
-Automations cannot produce new settings during that outage. The running app can
-still execute a command queued before HA stopped, but timed-plan commands expire
-at their departure deadline. Expiry cancels only unsent work; it does not undo a
-current or pause already applied.
-Restarting the app itself cancels pending commands, while retaining accepted
-charging intent. **App, host, power
-or USB/LAN/gateway failures still interrupt the heartbeat** and use the wallbox's configured
-fallback. Switching the app to read-only also stops the heartbeat.
+Automations cannot produce new settings during that outage. The app still runs
+a command queued before HA stopped and continues a handed-over departure plan;
+without new charge levels from the car it projects them from the metered
+energy. Restarting the app cancels pending commands but keeps the accepted
+charging state; the departure plan continues when the wallbox proves the car
+stayed plugged in. **App, host, power or USB/LAN/gateway failures
+still interrupt the heartbeat** and the wallbox's configured fallback applies.
+Switching the app to read-only also stops the heartbeat.
 
-To give the serial bus to another master, stop the app. Disabling the HA entry
-or selecting read-only does not release it. Include app data in backups; it
-contains the saved charging intent and private access token. Saved settings
-replace a small file rather than accumulating a history.
+To give the bus to another master, stop the app. Disabling the HA entry or
+selecting read-only does not release it. Include the app data in backups: it
+contains the saved charging state, a charging job, weekly plans, learned
+charging power and the private access token.
 
 ### Virtual Plug & Charge
 
 This feature is **optional and off by default**. Configure vehicle profiles and
 fresh cable/home detection in each car's profile in HA, then switch on
 **Virtual Plug & Charge** under **Configuration** on the wallbox device page.
-That switch is the only permission: every profile
-with detection signals takes part. Automatic selection is chosen in the
-**Active vehicle** entity; selecting a profile manually does not replace the
-detection check. See the
-[vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/vehicle-setup.md#optional-virtual-plug--charge).
+That switch is the only permission: every profile with detection signals takes
+part. Automatic selection is chosen in the **Active vehicle** entity; selecting
+a profile manually does not replace the detection check. See the
+[vehicle setup guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/vehicle-setup.md#optional-virtual-plug--charge).
 
-The app initially withholds charging release until HA recognizes the selected
-vehicle unambiguously. A grant is valid only for the current physical
-connection. The app keeps it through HA Core restarts, even if cloud vehicle
-signals later become unavailable. Unplugging or restarting the app clears it;
-a new grant needs fresh recognition from HA. A briefly
-unreadable or contradictory wallbox state keeps the grant. After 60 seconds of
-unknown state the release is switched off, and HA grants the same connection
-again once the car is reported connected, without replugging. The log names
-the reason whenever a grant ends, and warns when the wallbox status cannot be
-read for over 30 seconds.
-Changing the vehicle's identity or detection sources also invalidates
-its grant. Deliberate pauses, locks and reached targets remain effective. Local
-RFID authorization must be disabled for this EMS-based feature.
+The app withholds charging release until HA recognizes the selected vehicle
+unambiguously. A grant is valid only for the current physical connection. The
+app keeps it through HA Core restarts, even if cloud vehicle signals later
+become unavailable. Unplugging or restarting the app clears it; a new grant
+needs fresh recognition from HA. A briefly unreadable or contradictory wallbox
+state keeps the grant. After 60 seconds of unknown state the release is switched
+off, and HA grants the same connection again once the car is reported
+connected, without replugging. The log names the reason whenever a grant ends.
+Changing the vehicle's identity or detection sources also ends its grant.
+Deliberate pauses, locks and reached targets remain effective. Local RFID
+authorization must be disabled for this feature.
 
 Enabling the feature can stop an ongoing charge while it waits for recognition.
-Disabling it does not resume charging: explicitly enable **Charging release**
-afterwards if you want to allow charging. HA's **Virtual Plug & Charge** sensor
-shows whether recognition, permission or release is still missing.
+Disabling it does not resume charging: switch **Charging release** on explicitly
+if you want to allow charging. HA's **Virtual Plug & Charge** sensor shows
+whether recognition, permission or release is still missing.
 
 This is a convenience check based on vehicle-integration signals, not ISO 15118
-or cryptographic vehicle authentication. It needs app **0.8.0**;
-ordinary service connections keep their lower minimum version.
+or cryptographic vehicle authentication.
 
 ## Updates
 
-**The app does not need an update whenever the integration changes.** Their
-version numbers may differ. Integration 0.8.0 needs **service 0.6.1
-or newer with API 2** so timed commands expire in the service even while HA is offline.
-Update older apps first, including 0.6.0b1. Future integration-only updates can
-reuse a compatible service without restarting its heartbeat.
-
-Virtual Plug & Charge, the **Debug log** tab and all app fixes need app
-**0.8.0**. Changing a vehicle percentage target also needs its confirmed-update
-capability; HA requests an app update
-if that capability is missing. Other controls remain available with an older
-compatible service. The general minimum has not changed; it does not imply
-that an older app already contains the new features or fixes.
-
-Update the app when its own update is offered or the integration's release notes
-require a newer service. Use **Check for updates** in the app store. **If both
-components need updating, update the app first**, wait for initialization, then
-update the integration and restart Core. **Updating the app itself briefly
-interrupts the heartbeat.** Keep its data and the existing HA entry.
-
-**From an older version:** update this app to **0.8.0 first**, then the
-integration. No intermediate installation of 0.6.1 is needed. An older
-integration may show unavailable controls between updates because its API
-differs. Keep the existing app and its data; no reinstall is needed. If an older technical connection choice is rejected,
-select its matching readable name as described above before starting the app.
-The token, saved charging state and USB settings are retained; switching to LAN
-is optional.
+Update this app and the integration together. **Update the app first**, wait
+until it has started, then update the integration and restart Core. **Updating
+the app briefly interrupts the heartbeat.** Keep its data and the existing HA
+entry; do not reinstall the app or add the wallbox again.
 
 Stable releases are offered through `#apps`; prereleases through `#apps-beta`,
-which also receives stable updates. Keep an existing app and update normally. Switching catalogs is optional and
-creates a different app in Supervisor. For that change, back up the data, note
-the charging settings and disconnect the vehicle. Copy the options, set the new
-app to **Read-only**, stop the old app before starting the new one, and confirm
-its discovery. Keep the old app and backup until the handover is verified.
-The new app has separate saved state: note and verify pause, current and release
-settings as in the first setup before reconnecting the vehicle.
+which also receives stable releases. The two catalogs create different apps in
+Supervisor. To change catalogs, back up the app data, note the charging settings
+and disconnect the vehicle. Copy the options, set the new app to **Read-only**,
+stop the old app before starting the new one and confirm its discovery. The new
+app has separate saved state: verify pause, current and release as in the first
+setup before reconnecting the vehicle.
 
 ## AppArmor protection
 
-App **0.6.1** includes a custom AppArmor profile. Supervisor loads it automatically
-when installing the app. Older stable 0.5.1 did not include this profile.
-Keep **Protection mode on**. The profile allows USB/LAN communication, heartbeat
-and the service's own token and saved charging state. The options file remains
-read-only; the authenticated connection page saves through Supervisor's own-app
-API. Adapter names are read locally without requesting host-wide hardware access.
+The app ships its own AppArmor profile, which Supervisor loads when installing
+the app. Keep **Protection mode on**. The profile allows USB/LAN communication,
+the heartbeat and the app's own files: token, saved charging state and charging
+job. The options file is read-only; the web pages save through Supervisor's
+own-app API. Adapter names are read locally without host-wide hardware access.
 
-With default settings, **8/8** is possible after the installed custom profile
-has loaded. **7/8 before installation** is normal; the store rating is not
-proof of hardware testing. See [Supervisor's rating rules](https://contributors.home-assistant.io/apps/reference/security-rating/).
+With default settings, a rating of **8/8** is possible after the profile has
+loaded; **7/8 before installation** is normal. The rating is not proof of
+hardware testing. See [Supervisor's rating rules](https://contributors.home-assistant.io/apps/reference/security-rating/).
 
-If AppArmor denies an operation, inspect Supervisor logs and the host kernel
+If AppArmor denies an operation, check the Supervisor log and the host kernel
 log for `apparmor="DENIED"`. Report the operation and path with private details
-removed. Keep protection enabled while investigating the rejected access.
-Standalone Docker needs explicit host/profile configuration; direct HA mode
-uses HA's own security policy and does not automatically use this service profile.
+removed, and keep protection enabled while investigating.
 
 ## Help
 
@@ -304,40 +272,33 @@ uses HA's own security policy and does not automatically use this service profil
 |---|---|
 | No discovered entry | Confirm the app is running. In HA, choose **Add integration → Mennekes Amtron RTU → Connect to the Modbus service** to look it up again. |
 | Not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
-| Token rejected | During setup, retry discovery confirmation. For an existing connection, HA first tries to refresh access automatically. If an authentication prompt remains in Devices & services, confirm it; no token entry is needed. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/troubleshooting.md#renew-service-access). |
-| Service API or minimum version is incompatible | Check the API and minimum service version required in the integration’s release notes. Version numbers do not need to match. Follow [Updates](#updates) if needed; changing the token does not fix this. |
-| Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls remain unavailable. |
+| Token rejected | During setup, confirm discovery again. For an existing connection, HA refreshes access automatically; confirm a remaining prompt in Devices & services. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/troubleshooting.md#renew-service-access). |
+| Service API or version incompatible | Update the app and the integration to the same release, app first. Changing the token does not fix this. |
+| Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls stay unavailable. |
+| HA reports that a charging job of the app controls charging | A charging job or guest order runs for the plugged-in car. Stop it on **Charging jobs**, or unplug the car; HA controls charging again once the pause is confirmed. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
-| Connection setup required | Open **Web UI**, configure USB or LAN, save and restart the app. Setup mode is running but does not advertise ready wallbox data. |
-| Web UI asks for Supervisor 2026.11.0 | Update the app to **0.8.0** and reopen the page. It accepts Supervisor **2026.10.4+**; the integration's HA minimum version is unchanged. |
+| Connection setup required | Select **Open Web UI → Connection**, configure USB or LAN, save and restart the app. |
+| The web page asks to update Supervisor | Update Supervisor to **2026.10.4 or newer**, or use the native **Configuration** tab meanwhile. |
 | Serial adapter marked missing | Reconnect the saved adapter or choose its replacement from the dropdown. For LAN, change the connection type and save; the old serial path is removed. |
-| Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. A managed heartbeat or HA-to-app link failing continuously for 60 seconds raises a repair that clears on recovery; a connection fault has no Fix button. |
+| Heartbeat or write fault | Download integration diagnostics before restarting the app, then check the log. A heartbeat or HA-to-app link failing continuously for 60 seconds raises a repair that clears on recovery. |
 
 The log shows service startup, the USB/LAN connection and heartbeat start/stop.
 Diagnostics include the last 20 failed write/recovery records in RAM, with timing
-information and no packet contents or credentials. They add no Recorder rows and
-are lost when the app restarts.
+and no packet contents or credentials. They add no Recorder rows and are lost
+when the app restarts.
 
-For optional live troubleshooting, open **Web UI → Debug log**
-(German: **Debugprotokoll**) and enable capture. The separate **Connection** tab
-(**Verbindung**) contains connection settings, preserving unsaved inputs when
-you switch tabs. The app's native Supervisor **Configuration** tab remains
-unchanged.
-
-Existing reads, writes, retries and heartbeats appear with
+For live troubleshooting, open **Debug log** (German: **Debugprotokoll**) and
+enable capture. It shows the app's own reads, writes, retries and heartbeats with
 register addresses, decoded values, duration and outcome. A failed write shows
 the requested value, not proof that it was applied. Capture is off by default,
-keeps at most **200 transactions in RAM** and automatically stops and erases
-itself after **10 minutes**, including when the browser is closed. Turning it off
-also erases entries; clearing entries does not extend the deadline. Switching
-back to **Connection** or hiding the browser tab stops UI polling while capture
-continues until its deadline. There are no extra Modbus requests,
-Recorder entries or log files. Serial numbers and text registers are hidden;
-network login traffic and exception messages are never captured. In setup-only
-mode, first save a connection and restart the app.
+keeps at most **200 transactions in RAM** and stops and erases itself after
+**10 minutes**, also when the browser is closed. Turning it off erases the
+entries. It adds no Modbus requests, Recorder entries or log files. Serial
+numbers and text registers are hidden; network login traffic and exception
+messages are never captured. The **Registers** page shows the last value and
+read quality of every register.
 
 Verify deliberate pause, HA restart, app restart and reconnection on your own
-hardware. Error-200 recovery while paused and particular LAN gateways still need
-confirmation on the actual hardware; automated tests do not establish that.
+hardware. Automated tests do not replace that check.
 
-[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.8.2/docs/modbus-service.md)
+[Full setup, fallback and troubleshooting guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/modbus-service.md)
