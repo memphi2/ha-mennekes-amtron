@@ -12,11 +12,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from .decode import is_hex32
 from .energy_goal import EnergyGoal
 
-_JOB_ID = re.compile(r"[0-9a-f]{32}")
 _BINDING = re.compile(r"[0-9a-f]{64}")
 MAX_BOOST_MINUTES = 120
+# How long an unreadable wallbox or plug state may last, as for Plug & Charge,
+# before the order counts the connection as lost. One lost reply is routine.
+UNKNOWN_GRACE = timedelta(seconds=60)
+# The current register holds a float32: 10.1 A reads back as 10.1000004 A.
+CURRENT_TOLERANCE_A = 0.05
 STATES = ("scheduled", "charging", "waiting_meter", "reached", "finished", "stopped", "interrupted")
 TERMINAL = frozenset({"reached", "finished", "stopped", "interrupted"})
 REASONS = frozenset({
@@ -66,6 +71,7 @@ class ChargeJob:
     reason: str = "scheduled"
     scope_ended: bool = False
     _last_now: datetime | None = None
+    _unknown_since: datetime | None = None
     boost_until: datetime | None = None
     kind: str = "scheduled"
 
@@ -79,7 +85,7 @@ class ChargeJob:
         if not isinstance(kind, str) or kind not in ("scheduled", "guest"):
             raise ValueError("invalid job kind")
         identifier = request["id"]
-        if not isinstance(identifier, str) or _JOB_ID.fullmatch(identifier) is None:
+        if not is_hex32(identifier):
             raise ValueError("invalid job id")
         if not isinstance(binding, str) or _BINDING.fullmatch(binding) is None:
             raise ValueError("invalid job binding")
@@ -155,8 +161,14 @@ class ChargeJob:
         if self.boost_until is not None and now >= self.boost_until:
             self.cancel_boost()
         if not available or present is None:
-            self.interrupt("connection_lost")
-        elif present is False or not matches:
+            # The owner fences every write meanwhile; only a lasting gap ends it.
+            if self._unknown_since is None:
+                self._unknown_since = now
+            if now - self._unknown_since >= UNKNOWN_GRACE:
+                self.interrupt("connection_lost")
+            return
+        self._unknown_since = None
+        if present is False or not matches:
             self.interrupt("vehicle_changed")
         elif independent_stop:
             self.interrupt("independent_stop")
@@ -197,7 +209,7 @@ class ChargeJob:
             raise ValueError("invalid saved job kind")
         identifier, binding, state, reason = (raw[key] for key in ("id", "binding", "state", "reason"))
         if (
-            not isinstance(identifier, str) or _JOB_ID.fullmatch(identifier) is None
+            not is_hex32(identifier)
             or not isinstance(binding, str) or _BINDING.fullmatch(binding) is None
             or not isinstance(state, str) or state not in STATES
             or not isinstance(reason, str) or reason not in REASONS

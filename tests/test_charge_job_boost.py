@@ -205,6 +205,11 @@ def test_all_terminal_stops_cancel_boost_and_never_return_to_the_plan(tmp_path, 
             }
             h.change(**changes[ending])
             await c.tick()
+            if ending == "connection":
+                # Only a gap that outlasts the grace ends the order.
+                assert not c.job.terminal
+                h.change(now=h.sample.now + timedelta(seconds=60))
+                await c.tick()
         assert c.job.terminal
         assert c.job.boost_until is None
         h.change(now=NOW + timedelta(hours=3), available=True, present=True, independent_stop=False)

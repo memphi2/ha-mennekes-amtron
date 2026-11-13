@@ -188,7 +188,8 @@ class AmtronControl:
         self._pending: _PendingCommand | None = None
         self._phase_change: _PhaseChange | None = None
         self._release_writes = 0
-        self._goal_pause_confirmed_at: float | None = None
+        # When, and on which connection, a goal pause was last read back.
+        self._goal_pause_confirmed: tuple[float, int] | None = None
         self._pending_due = 0.0
         self._pending_until: datetime | None = None
         self._pending_changed = asyncio.Event()
@@ -250,15 +251,20 @@ class AmtronControl:
         return self._identity.layout_version >= ENERGY_TOTAL.min_layout
 
     @property
-    def energy_goal_stop_requested(self) -> bool:
-        """Include already observed stop evidence waiting for the command lock."""
+    def goal_stop_requested(self) -> bool:
+        """The energy and SoC goals' stop, including evidence awaiting the lock."""
         return (
             self.goal_controller.stop_requested if self.goal_controller is not None
             else self.energy_goal.stop_requested
         ) or (
             self.soc_goal_controller.stop_requested if self.soc_goal_controller is not None
             else self.soc_goal.stop_requested
-        ) or (
+        )
+
+    @property
+    def energy_goal_stop_requested(self) -> bool:
+        """Every stop that fences starts: the goals' and a service order's."""
+        return self.goal_stop_requested or (
             self._service_policy is not None and self._service_policy.stop_requested()
         )
 
@@ -279,10 +285,18 @@ class AmtronControl:
             if not self.energy_goal_stop_requested:
                 return
             self._require_write_access()
-            confirmed_at = self._goal_pause_confirmed_at
-            if confirmed_at is not None and 0 <= self._monotonic() - confirmed_at < _GOAL_PAUSE_RECHECK_SECONDS:
+            confirmed = self._goal_pause_confirmed
+            polled = self._state().fresh(CHARGING_CURRENT_EMS.key)
+            if (
+                confirmed is not None and self._pending is None
+                and confirmed[1] == self._client.connection_generation
+                and 0 <= self._monotonic() - confirmed[0] < _GOAL_PAUSE_RECHECK_SECONDS
+                and isinstance(polled, (int, float)) and not isinstance(polled, bool)
+                and 0 < polled < CHARGING_CURRENT_MINIMUM
+            ):
                 # A latched stop stays for hours. The pause was read back a
-                # moment ago and only our own current write can end it.
+                # moment ago on this connection, and this poll still reads it;
+                # a reboot or fallback shows up in the poll or the reconnect.
                 return
             if await self._async_vehicle_absent():
                 # Nothing charges without a car; a later poll pauses once one
@@ -308,7 +322,9 @@ class AmtronControl:
                     self._write_state.confirmed_current = float(current)
                     if 0 < current < CHARGING_CURRENT_MINIMUM:
                         self.pause_requested = True
-                        self._goal_pause_confirmed_at = self._monotonic()
+                        self._goal_pause_confirmed = (
+                            self._monotonic(), self._client.connection_generation,
+                        )
                         return
                 else:
                     self._write_state.confirmed_current = None
@@ -1312,7 +1328,7 @@ class AmtronControl:
         precondition: WritePrecondition | None = None,
     ) -> None:
         if spec == CHARGING_CURRENT_EMS:
-            self._goal_pause_confirmed_at = None
+            self._goal_pause_confirmed = None
         self._check_timed_command()
         if spec == CHARGING_RELEASE and value == 1:
             self._plug_charge.check_release(recovery=recovery_release)

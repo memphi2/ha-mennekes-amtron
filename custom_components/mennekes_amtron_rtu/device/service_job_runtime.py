@@ -7,17 +7,18 @@ import hashlib
 import logging
 import math
 import secrets
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
+from .charge_job import UNKNOWN_GRACE
 from .charge_job_controller import ChargeJobController, JobInputs
 from .charge_job_store import ChargeJobStore
 from .control import AmtronControl, ServiceChargePolicy
 from .errors import DeviceError
-from .registers import CP_STATE
 from .service_console_runtime import ConsoleModbusService
-from .vehicle import vehicle_connected
+from .vehicle import snapshot_vehicle_connected
 
 _LOGGER = logging.getLogger(__name__)
 # Goal metadata may still reduce a limit. Competing planners and enabling
@@ -30,6 +31,8 @@ class JobModbusService(ConsoleModbusService):
 
     jobs: ChargeJobController | None = None
     _job_scope: str | None = None
+    # Since when the plug state is unreadable; a short gap keeps the scope.
+    _job_unknown_since: float | None = None
 
     def _configure_control(self, control: AmtronControl) -> None:
         identity = self.identity.serial_number or f"{self.config.connection.port}:{self.config.connection.device_id}"
@@ -41,6 +44,7 @@ class JobModbusService(ConsoleModbusService):
 
     async def _initialize(self) -> None:
         self._job_scope = None
+        self._job_unknown_since = None
         await super()._initialize()
         if self.jobs is None:
             raise RuntimeError("job controller was not configured")
@@ -51,11 +55,11 @@ class JobModbusService(ConsoleModbusService):
     def _job_inputs(self) -> JobInputs:
         control = self.control
         available = self._is_available() and not self._stopping
-        present = vehicle_connected(
-            self.data.fresh("evse_state"), self.data.fresh("cp_state"),
-            cp_supported=self.identity.layout_version >= CP_STATE.min_layout,
+        present = snapshot_vehicle_connected(
+            self.data.fresh, self.identity.layout_version,
         ) if available else None
-        sample = self.snapshot().get("energy_sample")
+        # Policy checks run before every write; read the sample, not a snapshot.
+        sample = self._energy_sample
         now = datetime.now(UTC)
         total = sample.get("value") if isinstance(sample, dict) else None
         stamp = sample.get("observed_at") if isinstance(sample, dict) else None
@@ -72,11 +76,7 @@ class JobModbusService(ConsoleModbusService):
                 scope = hashlib.sha256(
                     f"{self._job_scope}|{control.soc_goal.source}|{control.plug_charge['policy']}".encode()
                 ).hexdigest()
-            independent_stop = (
-                control.goal_controller.stop_requested if control.goal_controller is not None else control.energy_goal.stop_requested
-            ) or (
-                control.soc_goal_controller.stop_requested if control.soc_goal_controller is not None else control.soc_goal.stop_requested
-            )
+            independent_stop = control.goal_stop_requested
         current = self.data.fresh("charging_current_ems")
         valid_current = (
             available and isinstance(current, (int, float)) and not isinstance(current, bool)
@@ -104,14 +104,20 @@ class JobModbusService(ConsoleModbusService):
         try:
             await super().refresh()
         finally:
-            present = vehicle_connected(
-                self.data.fresh("evse_state"), self.data.fresh("cp_state"),
-                cp_supported=self.identity.layout_version >= CP_STATE.min_layout,
+            present = snapshot_vehicle_connected(
+                self.data.fresh, self.identity.layout_version,
             ) if self._is_available() else None
-            if present is not True:
+            if present is True:
+                self._job_unknown_since = None
+                if self._job_scope is None:
+                    self._job_scope = secrets.token_hex(32)
+            elif present is False:
+                self._job_scope = self._job_unknown_since = None
+            elif self._job_unknown_since is None:
+                self._job_unknown_since = time.monotonic()
+            elif time.monotonic() - self._job_unknown_since >= UNKNOWN_GRACE.total_seconds():
+                # Only a lasting gap could hide an unplug; a new car needs a new order.
                 self._job_scope = None
-            elif self._job_scope is None:
-                self._job_scope = secrets.token_hex(32)
             if self.jobs is not None:
                 self.jobs.observe()
 
@@ -161,7 +167,14 @@ class JobModbusService(ConsoleModbusService):
     async def _jobs_loop(self) -> None:
         while True:
             if self.jobs is not None:
-                await self.jobs.tick()
+                try:
+                    await self.jobs.tick()
+                except Exception:
+                    # The bus owner shares this task group. An order failing
+                    # in an unforeseen way must not stop the whole service;
+                    # its writes stay fenced by the policy meanwhile.
+                    _LOGGER.exception("Charge job tick failed")
+                    self.jobs.action_error = "command_unconfirmed"
             await asyncio.sleep(5 if self.jobs is not None and (self.jobs.storage_error or self.jobs.action_error) else 1)
 
     async def stop(self) -> None:

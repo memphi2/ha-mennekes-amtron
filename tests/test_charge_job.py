@@ -57,6 +57,12 @@ def test_schedule_start_finish_and_terminal_latch():
 def test_unusable_scope_never_rearms(fields, reason):
     value = job()
     observe(value, **fields)
+    if reason == "connection_lost":
+        # One unreadable poll is routine; only a lasting gap ends the order.
+        assert value.state != "interrupted"
+        observe(value, **fields, now=NOW + timedelta(hours=1, seconds=59))
+        assert value.state != "interrupted"
+        observe(value, **fields, now=NOW + timedelta(hours=1, seconds=60))
     assert value.state == "interrupted"
     assert value.reason == reason
     observe(value)
@@ -180,3 +186,17 @@ def test_corrupt_saved_job_is_rejected(field, value):
 def test_saved_shape_is_exact(raw):
     with pytest.raises(ValueError, match="saved job fields"):
         ChargeJob.restore(raw)
+
+
+def test_a_short_unknown_gap_keeps_the_order_and_restarts_the_grace():
+    value = job()
+    observe(value)
+    assert value.state == "charging"
+    observe(value, present=None, now=NOW + timedelta(hours=1, seconds=30))
+    assert value.state == "charging"
+    # A readable poll ends the gap; the next one starts a new grace.
+    observe(value, now=NOW + timedelta(hours=1, seconds=40))
+    observe(value, available=False, now=NOW + timedelta(hours=1, seconds=80))
+    assert value.state == "charging"
+    observe(value, available=False, now=NOW + timedelta(hours=1, seconds=140))
+    assert (value.state, value.reason) == ("interrupted", "connection_lost")

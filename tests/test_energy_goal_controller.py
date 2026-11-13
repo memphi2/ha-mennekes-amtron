@@ -11,6 +11,7 @@ import pytest
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu.device import registers as R
+from custom_components.mennekes_amtron_rtu.device.control import _PendingCommand
 from custom_components.mennekes_amtron_rtu.device.data import (
     ConnectionState,
     WallboxData,
@@ -215,6 +216,41 @@ def test_reached_goal_confirms_current_pause_without_an_unneeded_write():
         assert (R.CHARGING_CURRENT_EMS.address, R.CHARGING_CURRENT_EMS.count) in harness.transport.reads
         assert current_writes(harness.transport) == []
         assert control.pause_requested is True
+        await runner.async_stop()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("change", ["none", "poll", "held", "reconnect", "pending"])
+def test_a_confirmed_goal_pause_is_reread_once_the_poll_or_link_changes(change):
+    async def run():
+        harness, control, runner, _saved = await _runner(paused=True)
+        await runner.async_set_target(0.1)
+        runner.observe(_snapshot(harness, 1234.8))
+        await _settle(runner)
+        assert control.energy_goal.status == "reached"
+        harness.transport.reads.clear()
+        if change == "poll":
+            # A wallbox reboot or fallback shows up in the next poll.
+            harness.snapshot = WallboxData(values={"charging_current_ems": 16.0})
+        elif change == "held":
+            harness.snapshot = WallboxData(
+                values={"charging_current_ems": 1.0}, held=frozenset({"charging_current_ems"}),
+            )
+        elif change == "reconnect":
+            harness.client._connection_generation += 1
+        elif change == "pending":
+            control._pending = _PendingCommand("set_current", 12)
+        harness.clock[0] += 10
+        await control.async_pause_for_energy_goal()
+        read = (R.CHARGING_CURRENT_EMS.address, R.CHARGING_CURRENT_EMS.count) in harness.transport.reads
+        if change == "poll":
+            # The poll already shows charging: the pause is enforced again.
+            assert control.pending_action == "pause" or current_writes(harness.transport) == [1]
+        else:
+            assert read is (change != "none")
+        if change == "pending":
+            assert control._pending is None
         await runner.async_stop()
 
     asyncio.run(run())

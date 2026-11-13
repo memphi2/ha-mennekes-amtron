@@ -519,3 +519,30 @@ def test_a_lost_reply_is_demoted_but_other_pymodbus_errors_stay(caplog) -> None:
         assert [record.levelname for record in caplog.records] == ["DEBUG"]
     finally:
         _OWN_TRANSACTION.reset(token)
+
+
+def test_the_lost_reply_mark_ends_with_its_transaction(monkeypatch) -> None:
+    from custom_components.mennekes_amtron_rtu.device import _client_read
+    from custom_components.mennekes_amtron_rtu.device import client as client_module
+
+    async def run() -> None:
+        transport = FakeModbusClient(device_bank())
+        client = MennekesModbusClient(CONFIG, client_factory=lambda _config: transport)
+        await client.async_connect()
+        seen: list[bool] = []
+        original = _client_read.read_words
+
+        async def read_words(*args, **kwargs):
+            seen.append(client_module._OWN_TRANSACTION.get())
+            return await original(*args, **kwargs)
+
+        monkeypatch.setattr(_client_read, "read_words", read_words)
+        await client.async_read_register(R.EVSE_STATE)
+        assert seen
+        assert all(seen)
+        # Neither this task nor one it starts later inherits the mark.
+        assert client_module._OWN_TRANSACTION.get() is False
+        assert await asyncio.create_task(asyncio.sleep(0, client_module._OWN_TRANSACTION.get())) is False
+        await client.async_close()
+
+    asyncio.run(run())

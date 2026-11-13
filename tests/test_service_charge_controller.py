@@ -350,11 +350,68 @@ def test_transitions_during_save_cannot_publish_stale_resume_permission(tmp_path
         loop = asyncio.get_running_loop()
         def save(job):
             # The observation runs on the event loop while the worker saves a copy.
-            loop.call_soon_threadsafe(lambda: (h.change(available=False), c.observe()))
+            loop.call_soon_threadsafe(lambda: (h.change(independent_stop=True), c.observe()))
             original(job)
         monkeypatch.setattr(h.store, "save", save)
         await h.create()
-        assert c.job.reason == "connection_lost"
+        assert c.job.reason == "independent_stop"
         assert c.stop_requested()
+        # Only the stop is applied, never the start the save would have allowed.
+        assert [value for value, _owner, _deadline in h.calls] == [None]
+    asyncio.run(run())
+
+
+def test_a_float32_readback_counts_as_the_applied_job_current(tmp_path):
+    async def run():
+        h = Harness(tmp_path)
+        c = h.controller
+        await c.initialize()
+        await h.create(current_a=10.1)
+        assert h.calls[-1][0] == 10.1
+        # The register stores float32; 10.1 A reads back slightly higher.
+        h.change(current_a=10.100000381469727)
+        before = list(h.calls)
+        await c.tick()
+        await c.tick()
+        assert h.calls == before
+        h.change(current_a=10.2)
+        await c.tick()
+        assert h.calls[-1][0] == 10.1
+    asyncio.run(run())
+
+
+def test_an_old_preview_asks_for_a_new_one(tmp_path):
+    async def run():
+        h = Harness(tmp_path)
+        c = h.controller
+        await c.initialize()
+        with pytest.raises(JobRequestError, match="job_preview_expired"):
+            await h.create(delay=-61)
+        # Other invalid requests keep their generic error.
+        with pytest.raises(ValueError, match="current") as error:
+            await h.create(current_a=40)
+        assert not isinstance(error.value, JobRequestError)
+        with pytest.raises(ValueError, match="time") as error:
+            await h.create(start_at="not a time")
+        assert not isinstance(error.value, JobRequestError)
         assert not h.calls
+    asyncio.run(run())
+
+
+def test_a_failed_store_fences_only_starts(tmp_path, monkeypatch):
+    async def run():
+        h = Harness(tmp_path)
+        c = h.controller
+        # Before the store is read, and after it failed, a pause still runs.
+        assert c.current_policy("ha-departure", False) is None
+        assert c.current_policy("ha-departure", True) is False
+
+        def nested():
+            raise RecursionError
+
+        monkeypatch.setattr(h.store, "load", nested)
+        await c.initialize()
+        assert c.storage_error
+        assert c.current_policy("ha-departure", False) is None
+        assert c.current_policy(None, True) is False
     asyncio.run(run())

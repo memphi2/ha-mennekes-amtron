@@ -6,7 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -334,4 +334,51 @@ def test_ha_planner_detach_does_not_cancel_a_service_order(tmp_path):
             clock[0] += 1000
             await s.command({"command": "cancel_timed_current", "owner": f"service-job:{s.jobs.job.identifier}", "expected_serial_number": s.identity.serial_number})
             assert s.jobs.job.state == "stopped"
+    asyncio.run(run())
+
+
+def test_one_unreadable_plug_state_keeps_the_order_and_its_scope(tmp_path, monkeypatch):
+    import custom_components.mennekes_amtron_rtu.device.service_job_runtime as runtime
+
+    async def run():
+        async with job_service(tmp_path) as (s, _transport, clock):
+            await s.jobs.create(request(), revision=s.jobs.revision, scope=s.jobs.snapshot()["scope"])
+            scope = s._job_scope
+            real = runtime.snapshot_vehicle_connected
+            monkeypatch.setattr(runtime, "snapshot_vehicle_connected", lambda *_args: None)
+            clock[0] += 10
+            await s.refresh()
+            await s.jobs.tick()
+            assert s._job_scope == scope
+            assert not s.jobs.job.terminal
+            # Starts stay fenced while the plug state is unknown.
+            assert s.jobs.stop_requested()
+            monkeypatch.setattr(runtime, "snapshot_vehicle_connected", real)
+            clock[0] += 10
+            await s.refresh()
+            await s.jobs.tick()
+            assert s._job_scope == scope
+            assert s.jobs.job.state == "charging"
+            # A lasting gap could hide an unplug: the scope goes.
+            monkeypatch.setattr(runtime, "snapshot_vehicle_connected", lambda *_args: None)
+            await s.refresh()
+            s._job_unknown_since -= runtime.UNKNOWN_GRACE.total_seconds()
+            await s.refresh()
+            assert s._job_scope is None
+    asyncio.run(run())
+
+
+def test_an_unforeseen_job_failure_does_not_stop_the_service(tmp_path, caplog):
+    async def run():
+        service = JobModbusService(ServerConfig(SerialConfig("/dev/fake"), TOKEN), tmp_path / "intent.json")
+        service.jobs = Mock(storage_error=False, action_error=None)
+        service.jobs.tick = AsyncMock(side_effect=RuntimeError("boom"))
+        sleeping = AsyncMock(side_effect=asyncio.CancelledError())
+        with patch.object(asyncio, "sleep", sleeping), pytest.raises(asyncio.CancelledError):
+            await service._jobs_loop()
+        assert "Charge job tick failed" in caplog.text
+        assert service.jobs.action_error == "command_unconfirmed"
+        sleeping.assert_awaited_once_with(5)
+        service.jobs = None
+        await service.stop()
     asyncio.run(run())

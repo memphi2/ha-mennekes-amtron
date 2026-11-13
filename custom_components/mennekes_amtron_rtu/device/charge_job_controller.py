@@ -10,12 +10,23 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from .charge_job import MAX_BOOST_MINUTES, ChargeJob
+from .charge_job import CURRENT_TOLERANCE_A, MAX_BOOST_MINUTES, ChargeJob, job_time
 from .charge_job_store import ChargeJobStore
 from .client_errors import AmtronBusError
 from .errors import DeviceError
 from .guest_charge import guest_request
 from .persistence import finish_goal_save
+
+
+def _preview_expired(request: object, now: datetime) -> bool:
+    """The request starts more than the accepted minute before ``now``."""
+    if not isinstance(request, dict):
+        return False
+    try:
+        start = job_time(request.get("start_at"))
+    except ValueError:
+        return False
+    return start < now - timedelta(minutes=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +83,8 @@ class ChargeJobController:
         async with self._lock:
             try:
                 self.job = await asyncio.to_thread(self.store.load)
-            except (OSError, ValueError):
+            except (OSError, ValueError, RecursionError):
+                # A deeply nested file is as corrupt as an invalid one.
                 self.storage_error = True
             self.ready = True
             # A restored job is interrupted. Do not claim the old disk state is
@@ -118,9 +130,13 @@ class ChargeJobController:
         )
 
     def current_policy(self, owner: str | None, enabling: bool) -> bool | None:
-        """None keeps legacy control unchanged; True names our exact owner."""
+        """None keeps legacy control unchanged; True names our exact owner.
+
+        An unready, failed or closing store fences only starts. A pause or a
+        lower limit from another owner always runs.
+        """
         if not self.ready or self.storage_error or self._closing:
-            return False
+            return False if enabling else None
         if not self.holding:
             return None
         job = self.job
@@ -205,7 +221,13 @@ class ChargeJobController:
             or sample.independent_stop or sample.pending
         ):
             raise JobRequestError("job_not_permitted")
-        candidate = ChargeJob.create(request, binding=sample.scope, total_kwh=sample.total_kwh, now=sample.now)
+        try:
+            candidate = ChargeJob.create(request, binding=sample.scope, total_kwh=sample.total_kwh, now=sample.now)
+        except ValueError as err:
+            if _preview_expired(request, sample.now):
+                # A preview fixes absolute times; an old one needs a new preview.
+                raise JobRequestError("job_preview_expired") from err
+            raise
         if candidate.kind == "guest" and sample.vehicle_target_active:
             raise JobRequestError("guest_vehicle_target_active")
         if candidate.current_a > sample.current_cap:
@@ -311,7 +333,7 @@ class ChargeJobController:
             if current is not None and 0 < current < 6 and not sample.pending:
                 self.action_error = None
                 return
-        elif current == target:
+        elif current is not None and abs(current - target) < CURRENT_TOLERANCE_A:
             self.action_error = None
             return
         elif sample.pending:
