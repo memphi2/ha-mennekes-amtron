@@ -119,7 +119,8 @@ timestamp. A manual, calendar or vehicle selection takes priority over the sourc
 current timestamp; it can be replaced when that timestamp changes to a new
 trip. A different time-zone representation of the same instant is still the
 same trip and does not reactivate a cleared plan. **Clear departure time** cancels the selected plan without changing the
-percentage ceiling or immediately changing the wallbox.
+percentage ceiling. A pause the plan itself had set ends with it, so the car
+charges again; any other setting of the wallbox stays as it is.
 
 ## Change or cancel a trip
 
@@ -255,7 +256,9 @@ the trip there as described above.
   priority** and the plan writes nothing.
 
 The plan's pause ends when the car is unplugged or another car is selected, so
-the next car is not left paused.
+the next car is not left paused. It also ends when the departure is cleared or
+passes while the plan still paused. Only a stop at the reached target is kept
+until the car is unplugged.
 
 The bus owner also checks for a disconnected vehicle before
 applying a planned command. Confirmed unplugging cancels that command, including

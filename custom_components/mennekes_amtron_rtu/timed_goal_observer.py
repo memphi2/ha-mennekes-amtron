@@ -466,10 +466,16 @@ class TimedGoalObserver:
         trip = self.goal
         deadline = trip.deadline
         if deadline is None:
+            if trip.finished != "reached":
+                # Without a trip the plan's pause has nothing left to wait for.
+                await self._end_plan_pause()
             self._set_status(trip.finished or "disabled")
             return
         if deadline <= dt_util.utcnow():
-            await self._finish(trip.finished or "late", trip, clear_deadline=True)
+            reason = trip.finished or "late"
+            await self._finish(reason, trip, clear_deadline=True)
+            if reason != "reached":
+                await self._end_plan_pause()
             return
         binding = getattr(self._runtime, "vehicle_binding", None)
         if binding is not None and binding.resting:

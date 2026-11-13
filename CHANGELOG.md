@@ -133,6 +133,10 @@ Update the app to 0.9.0b2 together with the integration.
   before phase changes apply without a restart from its **Runtime** page; a
   queued start or stop is timed again. The app lowers a charging current above
   its cap after the next poll, also after a restart with a lower cap.
+- **A departure that ends no longer leaves the car paused.** When the
+  departure is cleared, or passes while the plan still paused, the plan ends
+  its own pause, with and without the app. A stop at the reached target stays
+  until the car is unplugged.
 - **Switching the charging release reads less and cannot skip the wait.** The
   check whether the change switches a charge runs on the bus right before the
   write, so a car plugged in at that moment keeps the wait between charging

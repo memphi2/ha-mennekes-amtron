@@ -595,11 +595,17 @@ class DepartureController:
         trip = self.trip
         deadline = trip.deadline
         if deadline is None:
+            if trip.finished != "reached":
+                # Without a trip the plan's pause has nothing left to wait
+                # for. At a reached target it holds until the car leaves.
+                await self._rest(s)
             self._set_status(trip.finished or "disabled", s.now)
             return
         if deadline <= s.now:
             reason = trip.finished or ("reached" if self.estimated_stop else "late")
             await self._finish(reason, s, clear_deadline=True)
+            if reason != "reached":
+                await self._rest(s)
             return
         if binding != "confirmed":
             await self._cancel_command()

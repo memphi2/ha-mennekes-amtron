@@ -126,17 +126,22 @@ class FakeControl:
         self.energy_goal_stop_requested = False
         self.pending_action = None
         self.is_paused: bool | None = False
+        self.pause_requested: bool | None = False
         self.commands: list[tuple[str, float | None]] = []
         self.data = data
 
+    async def async_resume_charging(self) -> None:
+        self.commands.append(("resume", None))
+        self.is_paused = self.pause_requested = False
+
     async def async_pause_charging(self) -> None:
         self.commands.append(("pause", None))
-        self.is_paused = True
+        self.is_paused = self.pause_requested = True
         self.data.values["charging_current_ems"] = 1.0
 
     async def async_set_charging_current(self, value: float) -> None:
         self.commands.append(("current", value))
-        self.is_paused = False
+        self.is_paused = self.pause_requested = False
         self.data.values["charging_current_ems"] = value
 
     async def async_cancel_timed_current(self, _owner: str) -> None:
@@ -210,6 +215,29 @@ def test_timed_goal_source_updates_and_explicit_clear(monkeypatch: pytest.Monkey
             await observer.async_set_deadline(NOW.replace(tzinfo=None))
         with pytest.raises(Exception, match="source"):
             await observer.async_set_deadline(NOW + timedelta(hours=1), source="")
+
+    asyncio.run(run())
+
+
+def test_a_departure_that_passes_during_the_pause_ends_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, _hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=24))
+        await observer._evaluate()
+        assert control.commands == [("pause", None)]
+        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: NOW + timedelta(hours=25))
+        await observer._evaluate()
+        assert observer.status == "late"
+        assert control.commands == [("pause", None), ("resume", None)]
+        await observer._evaluate()
+        assert len(control.commands) == 2
+        # A trip that ended with its target reached leaves charging alone.
+        observer.goal.set(NOW + timedelta(hours=48))
+        observer.goal.finish("reached")
+        observer._plan_paused = control.pause_requested = True
+        monkeypatch.setattr(observer_module.dt_util, "utcnow", lambda: NOW + timedelta(hours=49))
+        await observer._evaluate()
+        assert len(control.commands) == 2
 
     asyncio.run(run())
 

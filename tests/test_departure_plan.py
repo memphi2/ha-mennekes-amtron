@@ -520,6 +520,49 @@ def test_a_withdrawn_trip_ends_the_plans_pause(tmp_path):
     run(go())
 
 
+def test_a_trip_that_ends_while_the_plan_pauses_ends_the_pause(tmp_path):
+    async def go():
+        # The departure is cleared: nothing is left to wait for.
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        assert plan.plan_paused
+        await plan.set_trip(None, "manual")
+        await plan.tick()
+        assert (plan.status, box.resumes, plan.plan_paused) == ("disabled", 1, False)
+        await plan.tick()
+        assert box.resumes == 1
+    run(go())
+
+
+def test_a_departure_that_passes_during_the_pause_ends_it_unless_the_target_holds(tmp_path):
+    async def go():
+        # The car's level went missing while the plan paused; the trip ends late.
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        box.set(now=NOW + timedelta(hours=11))
+        await plan.tick()
+        assert (plan.status, box.resumes, plan.plan_paused) == ("late", 1, False)
+        # A stop at the estimated target is kept until the car leaves.
+        other = Box(tmp_path / "other")
+        (tmp_path / "other").mkdir()
+        plan = await other.start()
+        other.set(now=NOW + timedelta(hours=1), total_kwh=120.0, meter_at=(NOW + timedelta(hours=1)).timestamp())
+        await plan.tick()
+        assert plan.plan_paused
+        other.set(now=NOW + timedelta(hours=3))
+        await plan.tick()
+        await plan.tick()
+        assert (plan.status, other.resumes, plan.plan_paused) == ("reached", 0, True)
+        # A goal's stop or an order owns a pause; the ended trip leaves it alone.
+        third = Box(tmp_path / "third")
+        (tmp_path / "third").mkdir()
+        plan = await third.start(hours=10)
+        third.set(now=NOW + timedelta(hours=11), order_active=True)
+        await plan.tick()
+        assert (plan.status, third.resumes) == ("late", 0)
+    run(go())
+
+
 def test_the_same_plug_in_is_recognised_after_a_restart(tmp_path):
     async def go():
         box = Box(tmp_path)
