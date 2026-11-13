@@ -27,6 +27,8 @@ async def job_operation(controller: ChargeJobController, payload: object) -> dic
     if not isinstance(payload, dict):
         raise JobRequestError("invalid_job_request")
     action = payload.get("action")
+    if action == "preview_guest" and payload.keys() == {"action", "revision", "scope", "request"}:
+        return controller.preview_guest(payload["request"], revision=payload["revision"], scope=payload["scope"])
     if action in ("create", "preview") and payload.keys() == {"action", "revision", "scope", "request"}:
         if action == "preview":
             return controller.preview(payload["request"], revision=payload["revision"], scope=payload["scope"])

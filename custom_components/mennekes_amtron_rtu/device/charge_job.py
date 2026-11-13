@@ -67,14 +67,17 @@ class ChargeJob:
     scope_ended: bool = False
     _last_now: datetime | None = None
     boost_until: datetime | None = None
+    kind: str = "scheduled"
 
     @classmethod
     def create(cls, request: object, *, binding: str, total_kwh: object, now: datetime) -> ChargeJob:
         """Validate all inputs before arming the energy ceiling."""
-        if not isinstance(request, dict) or request.keys() != {
-            "id", "start_at", "finish_at", "current_a", "energy_kwh",
-        }:
+        fields = {"id", "start_at", "finish_at", "current_a", "energy_kwh"}
+        if not isinstance(request, dict) or request.keys() not in (fields, fields | {"kind"}):
             raise ValueError("invalid job request fields")
+        kind = request.get("kind", "scheduled")
+        if not isinstance(kind, str) or kind not in ("scheduled", "guest"):
+            raise ValueError("invalid job kind")
         identifier = request["id"]
         if not isinstance(identifier, str) or _JOB_ID.fullmatch(identifier) is None:
             raise ValueError("invalid job id")
@@ -85,11 +88,13 @@ class ChargeJob:
         now = job_time(now.isoformat())
         if not now - timedelta(minutes=1) <= start < finish <= now + timedelta(days=7):
             raise ValueError("job window must end within seven days and start no more than one minute ago")
+        if kind == "guest" and (start > now or finish - start > timedelta(days=1)):
+            raise ValueError("guest window must start now and last at most 24 hours")
         energy = EnergyGoal()
         energy.set_target(request["energy_kwh"], total_kwh)
         if energy.target_kwh == 0:
             raise ValueError("job energy ceiling must be positive")
-        return cls(identifier, binding, start, finish, current, energy, _last_now=now)
+        return cls(identifier, binding, start, finish, current, energy, _last_now=now, kind=kind)
 
     @property
     def terminal(self) -> bool:
@@ -110,7 +115,7 @@ class ChargeJob:
         """Keep the original schedule, energy baseline and current ceiling."""
         end = job_time(until)
         now = job_time(now.isoformat())
-        if self.terminal or self.scope_ended or not now < end <= min(
+        if self.kind == "guest" or self.terminal or self.scope_ended or not now < end <= min(
             self.start_at, self.finish_at, now + timedelta(minutes=MAX_BOOST_MINUTES),
         ):
             raise ValueError("boost must end before the original start and within two hours")
@@ -179,13 +184,17 @@ class ChargeJob:
             "current_a": self.current_a, "energy": self.energy.snapshot(),
             "state": self.state, "reason": self.reason, "scope_ended": self.scope_ended,
             **({"boost_until": self.boost_until.isoformat()} if self.boost_until is not None else {}),
+            **({"kind": self.kind} if self.kind != "scheduled" else {}),
         }
 
     @classmethod
     def restore(cls, raw: object, *, restarted: bool = True) -> ChargeJob:
         """Reject corrupt state rather than silently recovering a resume grant."""
-        if not isinstance(raw, dict) or raw.keys() not in (_FIELDS, _FIELDS | {"boost_until"}):
+        if not isinstance(raw, dict) or raw.keys() - {"boost_until", "kind"} != _FIELDS:
             raise ValueError("invalid saved job fields")
+        kind = raw.get("kind", "scheduled")
+        if not isinstance(kind, str) or kind not in ("scheduled", "guest"):
+            raise ValueError("invalid saved job kind")
         identifier, binding, state, reason = (raw[key] for key in ("id", "binding", "state", "reason"))
         if (
             not isinstance(identifier, str) or _JOB_ID.fullmatch(identifier) is None
@@ -197,6 +206,8 @@ class ChargeJob:
         start, finish = job_time(raw["start_at"]), job_time(raw["finish_at"])
         if not start < finish or finish - start > timedelta(days=7, minutes=1):
             raise ValueError("invalid saved job window")
+        if kind == "guest" and finish - start > timedelta(days=1):
+            raise ValueError("invalid saved guest window")
         energy = EnergyGoal.restore(raw["energy"])
         if energy.target_kwh == 0:
             raise ValueError("invalid saved job energy ceiling")
@@ -211,10 +222,10 @@ class ChargeJob:
             or (raw["scope_ended"] and state not in TERMINAL)
         ):
             raise ValueError("inconsistent saved job state")
-        job = cls(identifier, binding, start, finish, _current(raw["current_a"]), energy, state, reason, raw["scope_ended"])
+        job = cls(identifier, binding, start, finish, _current(raw["current_a"]), energy, state, reason, raw["scope_ended"], kind=kind)
         if "boost_until" in raw:
             end = job_time(raw["boost_until"])
-            if job.terminal or job.scope_ended or end > job.start_at:
+            if job.kind == "guest" or job.terminal or job.scope_ended or end > job.start_at:
                 raise ValueError("invalid saved boost")
             job.boost_until = end
         if restarted:

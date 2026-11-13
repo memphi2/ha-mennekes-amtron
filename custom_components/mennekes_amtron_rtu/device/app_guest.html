@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mennekes Amtron · Guest charging</title>
+  <link rel="stylesheet" href="./app_settings.css">
+  <script src="./app_guest.js" defer></script>
+</head>
+<body>
+  <main id="guest">
+    <p class="eyebrow">Mennekes Amtron</p>
+    <nav class="overview-nav" aria-label="Service">
+      <a href="./" data-text="overview">Overview</a>
+      <a href="./jobs" data-text="jobs">Charging jobs</a>
+      <a href="./guest" aria-current="page" data-text="title">Guest charging</a>
+      <a href="./registers" data-text="registers">Registers</a>
+    </nav>
+    <h1 data-text="title">Guest charging</h1>
+    <p data-text="intro">One immediate energy/time order for the connected guest vehicle. No battery data or saved vehicle target is used.</p>
+    <p id="guest_notice" role="status" aria-live="polite"></p>
+    <noscript>JavaScript is required to read the current service state.</noscript>
+    <section class="overview-card" id="guest_status" hidden>
+      <h2 data-text="status">Current order</h2>
+      <p id="guest_state"></p><p id="guest_detail"></p>
+      <div class="actions">
+        <button id="guest_stop" type="button" data-text="stop" disabled>Stop guest order</button>
+        <button id="guest_clear" type="button" class="secondary" data-text="clear" disabled>Clear stopped order without resuming</button>
+      </div>
+    </section>
+    <form id="guest_form">
+      <fieldset id="guest_fields" disabled>
+        <legend data-text="new">New guest order</legend>
+        <label for="guest_energy" data-text="energy">Additional energy ceiling, kWh</label>
+        <input id="guest_energy" type="number" min="0.1" max="1000" step="0.1" value="15" required>
+        <label for="guest_duration" data-text="duration">Maximum duration, minutes</label>
+        <input id="guest_duration" type="number" min="1" max="1440" step="1" value="120" required>
+        <label for="guest_current" data-text="current">Current per phase, A</label>
+        <input id="guest_current" type="number" min="6" max="32" step="0.1" value="6" required>
+        <p class="hint" data-text="permission">Authorize locally first, for example by RFID. This order cannot unlock the wallbox, grant release or override a battery target.</p>
+        <button type="submit" data-text="preview">Preview</button>
+      </fieldset>
+    </form>
+    <section class="overview-card" id="guest_confirmation" hidden>
+      <h2 data-text="confirm_title">Confirm guest order</h2>
+      <p id="guest_summary"></p>
+      <p class="hint" data-text="scope">Only this physical connection. Stops at the energy ceiling or deadline, subject to polling and hardware timing. Reconnection requires a new order.</p>
+      <button id="guest_confirm" type="button" data-text="confirm">Confirm and start when permitted</button>
+    </section>
+    <footer data-text="footer">No guaranteed delivered amount. A requested stop is not a confirmed hardware stop. Check the overview and command results.</footer>
+  </main>
+</body>
+</html>

@@ -14,6 +14,7 @@ from .charge_job import MAX_BOOST_MINUTES, ChargeJob
 from .charge_job_store import ChargeJobStore
 from .client_errors import AmtronBusError
 from .errors import DeviceError
+from .guest_charge import guest_request
 from .persistence import finish_goal_save
 
 
@@ -32,6 +33,7 @@ class JobInputs:
     current_a: float | None
     current_cap: float
     pending: bool = False
+    vehicle_target_active: bool = False
 
 
 class JobRequestError(ValueError):
@@ -81,6 +83,9 @@ class ChargeJobController:
     def _changed(self) -> None:
         self.revision = secrets.token_hex(16)
 
+    def _vehicle_conflict(self, sample: JobInputs) -> bool:
+        return self.job is not None and self.job.kind == "guest" and sample.vehicle_target_active
+
     def observe(self) -> None:
         job = self.job
         if not self.ready or job is None:
@@ -90,7 +95,8 @@ class ChargeJobController:
         job.observe(
             now=sample.now, available=sample.available, present=sample.present,
             matches=sample.scope == job.binding, total_kwh=sample.total_kwh,
-            meter_fresh=sample.meter_fresh, independent_stop=sample.independent_stop or not sample.permitted,
+            meter_fresh=sample.meter_fresh,
+            independent_stop=sample.independent_stop or not sample.permitted or self._vehicle_conflict(sample),
         )
         if before != job.snapshot():
             self._changed()
@@ -107,7 +113,7 @@ class ChargeJobController:
             job.stop_requested or self._durable != job.snapshot()
             or not sample.available or sample.present is not True
             or sample.scope != job.binding or not sample.meter_fresh
-            or sample.independent_stop or not sample.permitted
+            or sample.independent_stop or not sample.permitted or self._vehicle_conflict(sample)
             or not job.allows_at(sample.now)
         )
 
@@ -126,7 +132,7 @@ class ChargeJobController:
         job = self.job
         return (
             self.ready and not self._closing and not self.storage_error
-            and job is not None and not job.terminal and not job.scope_ended
+            and job is not None and job.kind != "guest" and not job.terminal and not job.scope_ended
             and sample.now < job.start_at and sample.available and sample.present is True
             and sample.scope == job.binding and sample.meter_fresh and sample.permitted
             and not sample.independent_stop and not sample.pending
@@ -182,6 +188,7 @@ class ChargeJobController:
             "id": job.identifier, "start_at": job.start_at.isoformat(),
             "finish_at": job.finish_at.isoformat(), "current_a": job.current_a,
             "energy_kwh": job.energy.target_kwh,
+            **({"kind": job.kind} if job.kind != "scheduled" else {}),
         }
 
     def _candidate(self, request: object, revision: object, scope: object) -> ChargeJob:
@@ -199,6 +206,8 @@ class ChargeJobController:
         ):
             raise JobRequestError("job_not_permitted")
         candidate = ChargeJob.create(request, binding=sample.scope, total_kwh=sample.total_kwh, now=sample.now)
+        if candidate.kind == "guest" and sample.vehicle_target_active:
+            raise JobRequestError("guest_vehicle_target_active")
         if candidate.current_a > sample.current_cap:
             raise JobRequestError("job_current_exceeds_cap")
         return candidate
@@ -206,6 +215,11 @@ class ChargeJobController:
     def preview(self, request: object, *, revision: object, scope: object) -> dict[str, Any]:
         candidate = self._candidate(request, revision, scope)
         return {"schema": 1, "revision": self.revision, "scope": candidate.binding, "request": self._request(candidate)}
+
+    def preview_guest(self, request: object, *, revision: object, scope: object) -> dict[str, Any]:
+        """Produce one absolute proposal; confirmation reuses normal creation."""
+        absolute = guest_request(request, now=self.inputs().now)
+        return self.preview(absolute, revision=revision, scope=scope)
 
     async def create(self, request: object, *, revision: object, scope: object) -> dict[str, Any]:
         async with self._lock:
@@ -340,4 +354,5 @@ class ChargeJobController:
             "permitted": sample.permitted, "meter_fresh": sample.meter_fresh,
             "max_current_a": sample.current_cap, "now": sample.now.isoformat(),
             "boost_available": self._can_boost(sample),
+            "vehicle_target_active": sample.vehicle_target_active,
         }

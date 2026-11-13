@@ -99,6 +99,7 @@ class JobModbusService(ConsoleModbusService):
             permitted, independent_stop, current_value,
             control.max_charging_current if control is not None else 6,
             control is not None and control.pending_action is not None,
+            vehicle_target_active=control is not None and control.soc_goal.target_percent > 0,
         )
 
     async def refresh(self) -> None:
