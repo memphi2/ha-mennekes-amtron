@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import secrets
+import time
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -22,6 +23,9 @@ from .weekly_store import WeeklyBook, WeeklyStore
 
 if TYPE_CHECKING:
     from .weekly_jobs import WeeklyChargeJobs
+
+# How often the file is read again after a failed save.
+_RELOAD_SECONDS = 10.0
 
 
 class WeeklyError(ValueError):
@@ -77,6 +81,10 @@ class WeeklyController:
         self._last_confirmation: str | None = None
         self._lock = asyncio.Lock()
         self._closing = False
+        # When the file may be read again after a failed save.
+        self._reload_at = 0.0
+        # Cars to forget whose save failed; None stands for every car.
+        self._forgets: set[str | None] = set()
 
     def _changed(self) -> None:
         self.revision = secrets.token_hex(16)
@@ -220,9 +228,13 @@ class WeeklyController:
         return vehicle_key(found[0]) if found is not None and scope is not None and found[1] == scope else None
 
     async def _forget(self, plan_id: str | None) -> None:
+        # Kept until saved: after a failed save the car is forgotten once
+        # the file can be written again, before any plan is served.
+        self._forgets.add(plan_id)
         candidate = self.book.unassign(plan_id)
         if candidate != self.book:
             await self._save(candidate)
+        self._forgets.discard(plan_id)
 
     async def _dispatch(self, request: dict[str, Any], day: str, job_revision: str) -> None:
         consent = self.consent
@@ -334,12 +346,32 @@ class WeeklyController:
         self.reason = "active" if consent.job_id is not None else "waiting_next_occurrence"
         self._changed()
 
+    async def _reload(self) -> None:
+        """A failed save fences the plans until their file reads back."""
+        if not self.storage_error or not self.ready or self._closing or time.monotonic() < self._reload_at:
+            return
+        self._reload_at = time.monotonic() + _RELOAD_SECONDS
+        try:
+            book = await asyncio.to_thread(self.store.load)
+        except (OSError, ValueError):
+            return
+        self.book, self.storage_error, self.reason = book, False, "inactive"
+        self._changed()
+        for plan_id in sorted(self._forgets, key=str):
+            try:
+                await self._forget(plan_id)
+            except WeeklyError:
+                return
+
     async def tick(self) -> None:
         async with self._lock:
             epoch = self.jobs.manual_stop_epoch
             stopped, self._epoch = epoch != self._epoch, epoch
             consent = self.consent
             if consent is None:
+                # An active plan ends at a failed save; without one, what the
+                # file holds counts again once it reads back.
+                await self._reload()
                 await self._activate_assigned(stopped)
                 return
             sample = self.jobs.inputs()

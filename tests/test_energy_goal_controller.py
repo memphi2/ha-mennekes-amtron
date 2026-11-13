@@ -900,8 +900,7 @@ def test_store_rejects_corrupt_goal_before_replacing_existing_intent(tmp_path):
     payload["pause_requested"] = False
     payload["energy_goal"] = {"target_kwh": 12, "status": "active"}
     store.path.write_text(json.dumps(payload))
-    with pytest.raises(ValueError, match="energy goal"):
-        store.load(state)
+    assert store.load(state) is False
     assert state.pause_requested is True
     assert state.charging_setpoint == 8
 

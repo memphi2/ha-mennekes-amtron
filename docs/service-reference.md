@@ -229,6 +229,14 @@ are synced before a save is considered complete. This is bounded state rather
 than a growing history. Include the data directory in backups and protect its
 configuration/token.
 
+A file of another wallbox or format, or a damaged one, is not used. For
+`intent.json` the service then starts as on its first run, keeps the
+wallbox's own state, logs a warning and replaces the file with its next save.
+A save that fails is logged; the wallbox stays in use. After a failed save of
+the weekly plans their changes are refused with `weekly_storage_unavailable`
+until the file reads back, which is tried every ten seconds while no plan is
+active.
+
 Heartbeats and polls do not create entries in that state file. The heartbeat
 sensor records health transitions, not timestamps for every beat. Measurement
 entities keep their existing cadence and can still create Recorder history;
@@ -500,7 +508,9 @@ The activation itself is never saved; a service restart ends it. A running job
 of the plan may then continue on its own as described above. Each local
 date is marked as used before its job is created, so a date never runs twice,
 also after an edit or restart. Plans, used dates and remembered cars are kept
-in `/data/weekly-plans.json`, at most 128 KiB.
+in `/data/weekly-plans.json`, at most 128 KiB. The latest used date of up to
+128 plans is kept; when that is full, the oldest one of a deleted plan makes
+room.
 
 An `activate` while Home Assistant has detected a car at the plug-in
 (`departure_inputs` with `detected: true` and the current `scope`, see

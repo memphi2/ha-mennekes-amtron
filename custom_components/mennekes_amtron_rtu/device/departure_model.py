@@ -108,23 +108,29 @@ class CarModel:
 
 @dataclass(slots=True)
 class DepartureModel:
-    """The cars the plan has learned from; the longest unused one makes room."""
+    """The cars the plan has learned from; the longest unused one makes room.
+
+    Saved as a list, longest unused first, so a restart keeps that order.
+    """
 
     cars: dict[str, CarModel] = field(default_factory=dict)
 
     @classmethod
     def restore(cls, raw: object) -> DepartureModel:
-        if not isinstance(raw, dict) or len(raw) > MAX_CARS:
+        if not isinstance(raw, list) or len(raw) > MAX_CARS:
             raise ValueError("invalid learned cars")
         cars: dict[str, CarModel] = {}
-        for key, value in raw.items():
-            if not isinstance(key, str) or not 1 <= len(key) <= MAX_VEHICLE_LENGTH:
+        for item in raw:
+            if not isinstance(item, list) or len(item) != 2:
+                raise ValueError("invalid learned car entry")
+            key, value = item
+            if not isinstance(key, str) or not 1 <= len(key) <= MAX_VEHICLE_LENGTH or key in cars:
                 raise ValueError("invalid learned car name")
             cars[key] = CarModel.restore(value)
         return cls(cars)
 
-    def snapshot(self) -> dict[str, Any]:
-        return {key: car.snapshot() for key, car in self.cars.items()}
+    def snapshot(self) -> list[list[Any]]:
+        return [[key, car.snapshot()] for key, car in self.cars.items()]
 
     def car(self, vehicle: str | None) -> CarModel:
         return self.cars.get(vehicle_key(vehicle), CarModel()) if vehicle else CarModel()

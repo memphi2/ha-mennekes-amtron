@@ -82,7 +82,10 @@ def instant(raw: object) -> datetime:
     value = datetime.fromisoformat(raw)
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("timestamp needs a timezone")
-    return value.astimezone(UTC)
+    try:
+        return value.astimezone(UTC)
+    except OverflowError as err:
+        raise ValueError("timestamp out of range") from err
 
 
 @dataclass(frozen=True, slots=True)
@@ -313,6 +316,8 @@ class DepartureController:
         self._trail_scope: str | None = None
         self._estimate: float | None = None
         self._last_error: str | None = None
+        # The time of the latest tick's sample.
+        self._now: datetime | None = None
         # What this wallbox's cars taught the plan; kept across trips.
         self.model = DepartureModel()
         # The report a learned efficiency counts from, within one plug-in.
@@ -350,9 +355,9 @@ class DepartureController:
                 raw = await asyncio.to_thread(self.store.load)
                 if raw is not None:
                     self._restore(raw)
-            except (OSError, ValueError, RecursionError) as err:
+            except (OSError, ValueError, ArithmeticError, RecursionError) as err:
                 # Home Assistant hands the trip over again; nothing is
-                # planned until then.
+                # planned until then. An oversized number is as damaged.
                 _LOGGER.warning("Saved departure plan unavailable (%s); waiting for Home Assistant", type(err).__name__)
                 self._reset()
             self._durable = self._decision()
@@ -379,11 +384,19 @@ class DepartureController:
             "inputs": None if self.inputs is None else self.inputs.snapshot(),
             "anchor": None if self.anchor is None else self.anchor.snapshot(),
             "session": None if self._session is None else self._session.snapshot(),
-            "planned_start": None if self.planned_start is None else self.planned_start.isoformat(),
+            "planned_start": self._saved_start(),
             "plan_paused": self.plan_paused,
             "estimated_stop": self.estimated_stop,
             "learned": self.model.snapshot(),
         }
+
+    def _saved_start(self) -> str | None:
+        """A start still ahead moves with every reading and is planned anew
+        after a restart; only one that passed must survive it."""
+        start = self.planned_start
+        if start is None or (self._now is not None and start > self._now):
+            return None
+        return start.isoformat()
 
     def _decision(self) -> dict[str, Any]:
         """The saved part that matters; the session record refreshes in RAM."""
@@ -478,6 +491,7 @@ class DepartureController:
             if not self.ready or self._closing:
                 return
             sample = self.sample()
+            self._now = sample.now
             self._observe(sample)
             self._at_full, self.forecast = False, None
             try:
@@ -795,6 +809,9 @@ class DepartureController:
         self._command_current = current
         if current is None:
             self.plan_paused, self._pause_seen = True, False
+            # Saved first: after a restart in between, the plan still ends a
+            # pause it set. A saved pause that never applied ends harmlessly.
+            await self._save()
         await self._apply(current, deadline)
 
     async def _cancel_command(self) -> None:

@@ -294,6 +294,25 @@ def test_a_failed_save_after_a_stop_by_hand_fences_the_plan(tmp_path, monkeypatc
     asyncio.run(run())
 
 
+def test_once_the_disk_works_again_the_stop_is_saved_and_the_plans_work(tmp_path, monkeypatch):
+    async def run():
+        h = await Garage(tmp_path).assigned()
+        await h.jobs.stop()
+        monkeypatch.setattr(h.weekly.store, "save", lambda _book: (_ for _ in ()).throw(OSError("fixture")))
+        await h.weekly.tick()
+        assert h.weekly.storage_error
+        monkeypatch.undo()
+        await h.replug()
+        # The file reads back; the stop by hand is saved before any plan is
+        # served, so the car is not served again.
+        assert not h.weekly.storage_error
+        assert h.weekly.book.assigned == () == h.weekly.store.load().assigned
+        assert h.weekly.consent is None
+        await h.save(charge_minutes=90)
+        assert h.weekly.book.plan(PLAN).charge_minutes == 90
+    asyncio.run(run())
+
+
 def test_stopping_the_plan_ends_it_even_when_forgetting_the_car_fails(tmp_path, monkeypatch):
     async def run():
         h = await Garage(tmp_path).assigned()

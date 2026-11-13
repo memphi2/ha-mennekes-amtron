@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import stat
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -79,6 +79,18 @@ def test_duplicate_plan_or_profile_cannot_compete(other):
 def test_ledger_is_bounded_without_silent_pruning(ledger):
     with pytest.raises(ValueError, match="ledger count"):
         m.WeeklyBook.parse({"plans": [], "consumed": ledger})
+
+
+def test_a_full_ledger_makes_room_only_with_a_removed_plans_oldest_date():
+    live, new = "a" * 32, "b" * 32
+    removed = {f"{index:032x}": (DAY - timedelta(days=index)).isoformat() for index in range(1, m.MAX_LEDGER)}
+    book = m.WeeklyBook.parse({"plans": [recipe().snapshot()], "consumed": {live: DAY.isoformat()} | removed})
+    book = book.put(recipe(id=new, vehicle_profile="other")).reserve(new, DAY)
+    ledger = dict(book.consumed)
+    assert len(ledger) == m.MAX_LEDGER
+    assert f"{m.MAX_LEDGER - 1:032x}" not in ledger
+    assert ledger[live] == ledger[new] == DAY
+    assert f"{1:032x}" in ledger
 
 
 @pytest.mark.parametrize(("key", "value"), [

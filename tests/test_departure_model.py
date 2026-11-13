@@ -66,7 +66,22 @@ def test_the_cars_are_bounded_and_keyed_by_profile():
     assert len(model.cars) == MAX_CARS
     assert "profile:bmw" not in model.cars
     assert DepartureModel.restore(model.snapshot()).cars == model.cars
-    for raw in (None, [], {"": CarModel().snapshot()}, {5: CarModel().snapshot()}, {"x" * 513: CarModel().snapshot()},
-                {f"car{index}": CarModel().snapshot() for index in range(MAX_CARS + 1)}):
+    car = CarModel().snapshot()
+    for raw in (None, {}, {"car": car}, [["", car]], [[5, car]], [["x" * 513, car]], [["car"]], ["car"],
+                [["car", car], ["car", car]], [[f"car{index}", car] for index in range(MAX_CARS + 1)]):
         with pytest.raises(ValueError, match="learned"):
             DepartureModel.restore(raw)
+
+
+def test_a_restart_keeps_which_car_was_used_longest_ago():
+    model = DepartureModel()
+    for name in ("zeta", "alpha", "mid"):
+        model.learn(name, CarModel(0.8))
+    model.learn("zeta", CarModel(0.7))
+    restored = DepartureModel.restore(model.snapshot())
+    assert list(restored.cars) == ["alpha", "mid", "zeta"]
+    for index in range(MAX_CARS - 2):
+        restored.learn(f"car{index}", CarModel(0.8))
+    # The car unused for longest makes room, not the first name.
+    assert "alpha" not in restored.cars
+    assert {"mid", "zeta"} <= restored.cars.keys()

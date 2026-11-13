@@ -26,7 +26,8 @@ class WeeklyBook:
     """Keep consumption tombstones when a recipe is edited or removed.
 
     A high-water local date prevents replay across same-day edits and clock
-    rollback. Entries are never silently pruned; exhaustion fails closed.
+    rollback. A full ledger makes room only with a removed plan's oldest
+    entry; the existing plans keep theirs.
     """
 
     plans: tuple[WeeklyPlan, ...] = ()
@@ -128,7 +129,13 @@ class WeeklyBook:
         if self.used(identifier, day):
             raise ValueError("weekly occurrence already consumed")
         raw = self.snapshot()
-        raw["consumed"][identifier] = day.isoformat()
+        ledger = raw["consumed"]
+        if identifier not in ledger and len(ledger) >= MAX_LEDGER:
+            present = {plan.identifier for plan in self.plans}
+            removed = sorted((used, key) for key, used in self.consumed if key not in present)
+            if removed:
+                del ledger[removed[0][1]]
+        ledger[identifier] = day.isoformat()
         return self.parse(raw)
 
 

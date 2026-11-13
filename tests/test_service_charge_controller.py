@@ -417,7 +417,8 @@ def test_an_old_preview_asks_for_a_new_one(tmp_path):
     asyncio.run(run())
 
 
-def test_a_failed_store_fences_only_starts(tmp_path, monkeypatch):
+@pytest.mark.parametrize("error", [RecursionError, OverflowError])
+def test_a_failed_store_fences_only_starts(tmp_path, monkeypatch, error):
     async def run():
         h = Harness(tmp_path)
         c = h.controller
@@ -426,7 +427,8 @@ def test_a_failed_store_fences_only_starts(tmp_path, monkeypatch):
         assert c.current_policy("ha-departure", True) is False
 
         def nested():
-            raise RecursionError
+            # A deeply nested file, or a number too large for a float.
+            raise error
 
         monkeypatch.setattr(h.store, "load", nested)
         await c.initialize()

@@ -107,6 +107,7 @@ class ModbusService:
         # Since when every poll failed; a goal pauses only after a while.
         self._meter_failing_since: float | None = None
         self._storage_warned_at: float | None = None
+        self._intent_rejected = False
         self._stopping = False
         self._phase = f"opening {self._connection_name} connection"
         self.heartbeat.async_add_listener(self._log_heartbeat_health)
@@ -138,7 +139,11 @@ class ModbusService:
             or f"{self.config.connection.port}:{self.config.connection.device_id}",
         )
         self._phase = "loading saved control intent"
-        await asyncio.to_thread(store.load, self.client.write_state)
+        if not await asyncio.to_thread(store.load, self.client.write_state) and not self._intent_rejected:
+            self._intent_rejected = True
+            _LOGGER.warning(
+                "Saved control intent belongs to another wallbox or is damaged; starting without it"
+            )
         self._saved_session_history = self.client.write_state.session_history.snapshot()
         self.identity = identity
         self._store = store
@@ -182,7 +187,7 @@ class ModbusService:
                 control.charging_setpoint = (
                     float(current) if current == 0 or current >= 6 else 6.0
                 )
-        await self._persist()
+        await self._save_intent()
         self.control = control
         self.goal = goal
         self.soc_goal = soc_goal

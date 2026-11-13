@@ -58,3 +58,4 @@ them up.
   and [November compatibility audit](ha-2026-11-validation.md)
 - [Legal information](legal.md) and [provenance evidence](audits/current-legal-provenance.md)
 - Review: [failures and restart](reviews/2026-11-failures-and-restart.md)
+- Review: [storage and data integrity](reviews/2026-11-storage-and-integrity.md)

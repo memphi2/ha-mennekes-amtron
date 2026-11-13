@@ -130,6 +130,11 @@ def test_inputs_reject_anything_out_of_bounds(change, message):
         inputs(**change)
 
 
+def test_a_time_beyond_the_calendar_is_invalid():
+    with pytest.raises(ValueError, match="out of range"):
+        instant("0001-01-01T00:00:00+01:00")
+
+
 @pytest.mark.parametrize(("raw", "message"), [
     (None, "fields"), ({}, "fields"), ({**inputs().snapshot(), "extra": 1}, "fields"),
     ({**inputs().snapshot(), "soc_observed_at": "2026-11-13T22:00:00"}, "timezone"),
@@ -204,6 +209,62 @@ def test_a_late_start_pauses_until_it_then_charges_at_full_current(tmp_path):
         # The start that passed stays the plan's start.
         assert plan.planned_start == start
         assert box.writes == [None, 16.0]
+    run(go())
+
+
+def test_the_plan_saves_its_pause_before_the_wallbox_pauses(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        saved = []
+
+        async def apply(value, deadline):
+            saved.append(DepartureStore(box.path, "fixture").load()["plan_paused"])
+            await Box.apply(box, value, deadline)
+
+        box.plan._apply = apply
+        await box.start(hours=10)
+        assert (box.writes, saved) == ([None], [True])
+        # A restart right after the pause: withdrawing the trip still ends it.
+        restored = box.controller()
+        await restored.initialize()
+        assert restored.plan_paused
+        await restored.set_trip(None, None, withdraw=True)
+        assert (box.resumes, restored.plan_paused) == (1, False)
+    run(go())
+
+
+def test_only_a_start_that_passed_is_saved(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        start = plan.planned_start
+        assert plan.status == "paused_until_start"
+        assert DepartureStore(box.path, "fixture").load()["planned_start"] is None
+        box.set(now=start + timedelta(seconds=1), meter_at=(start + timedelta(seconds=1)).timestamp())
+        box.clock[0] += 300
+        await plan.tick()
+        assert DepartureStore(box.path, "fixture").load()["planned_start"] == start.isoformat()
+    run(go())
+
+
+def test_charging_to_the_minimum_level_does_not_save_every_reading(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=12, given=inputs(minimum_percent=60.0))
+        assert plan.status == "minimum_level"
+        saves = []
+        original = plan.store.save
+        plan.store.save = lambda raw: (saves.append(raw), original(raw))
+        starts = set()
+        for minute in range(1, 6):
+            at = NOW + timedelta(minutes=minute)
+            box.set(now=at, meter_at=at.timestamp(), total_kwh=100.0 + minute * 0.18)
+            await plan.tick()
+            starts.add(plan.planned_start)
+        # The start ahead moves with every reading; the file stays as it is.
+        assert plan.status == "minimum_level"
+        assert len(starts) == 5
+        assert saves == []
     run(go())
 
 
@@ -793,7 +854,14 @@ def test_the_plan_survives_storage_failures(tmp_path, caplog, monkeypatch):
     b'"inputs":null,"anchor":null,"session":null,"planned_start":null,"plan_paused":1,"estimated_stop":false,"learned":{}}}'),
     (b'{"version":1,"identity":"fixture","plan":{"trip":{"deadline":null,"source":null,"finished":null},'
     b'"inputs":null,"anchor":null,"session":null,"planned_start":null,"plan_paused":false,"estimated_stop":false,'
+    b'"learned":{}}}'),
+    (b'{"version":1,"identity":"fixture","plan":{"trip":{"deadline":null,"source":null,"finished":null},'
+    b'"inputs":null,"anchor":{"percent":50,"observed_at":"2026-11-13T21:50:00+00:00","meter_kwh":1'
+    + b"0" * 400 + b'},"session":null,"planned_start":null,"plan_paused":false,"estimated_stop":false,'
     b'"learned":[]}}'),
+    (b'{"version":1,"identity":"fixture","plan":{"trip":{"deadline":null,"source":null,"finished":null},'
+    b'"inputs":null,"anchor":null,"session":null,"planned_start":"0001-01-01T00:00:00+01:00","plan_paused":false,'
+    b'"estimated_stop":false,"learned":[]}}'),
 ])
 def test_an_unreadable_plan_waits_for_home_assistant(tmp_path, caplog, content):
     async def go():

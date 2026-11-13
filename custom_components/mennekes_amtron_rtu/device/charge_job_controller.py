@@ -102,8 +102,9 @@ class ChargeJobController:
         async with self._lock:
             try:
                 self.job = await asyncio.to_thread(self.store.load)
-            except (OSError, ValueError, RecursionError):
-                # A deeply nested file is as corrupt as an invalid one.
+            except (OSError, ValueError, ArithmeticError, RecursionError):
+                # A deeply nested file or an oversized number is as corrupt
+                # as an invalid one.
                 self.storage_error = True
             self.ready = True
             # A restored job is interrupted. Do not claim the old disk state is

@@ -306,20 +306,56 @@ def test_service_config_defaults_and_credential_redaction():
 
 
 @pytest.mark.parametrize(
-    "payload",
+    "content",
     [
-        [],
-        {"version": 2, "identity": "wallbox"},
-        {"version": 1, "identity": "other"},
-        {"version": 1, "identity": "wallbox", "pause_requested": 1},
-        {"version": 1, "identity": "wallbox", "charging_setpoint": 3},
+        b"[]", b"", b"{", b"\xff\xfe",
+        json.dumps({"version": 2, "identity": "wallbox"}).encode(),
+        json.dumps({"version": 1, "identity": "other"}).encode(),
+        json.dumps({"version": 1, "identity": "wallbox", "pause_requested": 1}).encode(),
+        json.dumps({"version": 1, "identity": "wallbox", "charging_setpoint": 3}).encode(),
+        b'{"version":1,"identity":"wallbox","charging_setpoint":1' + b"0" * 400 + b"}",
+        b"[" * 100000 + b"]" * 100000,
     ],
 )
-def test_saved_state_is_validated_before_control_starts(tmp_path, payload):
+def test_a_rejected_saved_state_counts_as_none(tmp_path, content):
     path = tmp_path / "intent.json"
-    path.write_text(json.dumps(payload))
-    with pytest.raises(ValueError, match=r"."):
-        IntentStore(path, "wallbox").load(WriteState())
+    path.write_bytes(content)
+    state = WriteState(pause_requested=True, charging_setpoint=8)
+    assert IntentStore(path, "wallbox").load(state) is False
+    # Nothing of a rejected file applies.
+    assert (state.pause_requested, state.charging_setpoint) == (True, 8)
+
+
+def test_a_rejected_saved_state_does_not_keep_the_service_down(tmp_path, caplog):
+    async def run():
+        path = tmp_path / "intent.json"
+        path.write_text(json.dumps({"version": 1, "identity": "another-wallbox", "pause_requested": True}))
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            assert service.control is not None
+            assert service.client.write_state.pause_requested is None
+            assert caplog.text.count("belongs to another wallbox or is damaged") == 1
+            # The first save replaces the file with this wallbox's intent.
+            assert json.loads(path.read_text())["identity"] == "ABC123456789"
+        finally:
+            await service.stop()
+    asyncio.run(run())
+
+
+def test_a_failing_disk_does_not_block_the_start(tmp_path, monkeypatch, caplog):
+    async def run():
+        def fail(_self, _state):
+            raise OSError("read-only file system")
+
+        monkeypatch.setattr(IntentStore, "save", fail)
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            assert service.control is not None
+            assert "Cannot save control intent" in caplog.text
+        finally:
+            monkeypatch.undo()
+            await service.stop()
+    asyncio.run(run())
 
 
 def test_intent_storage_is_bounded_private_and_does_not_write_unchanged_state(tmp_path):
