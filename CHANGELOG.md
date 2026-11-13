@@ -40,6 +40,11 @@ Update the app to 0.9.0b2 together with the integration.
   status** shows the app's plan and gains the states **Charged to the
   estimated target** and **An order from the app has priority**. See
   [departure planning](docs/departure-planning.md#with-the-modbus-service-app).
+- **Minimum charge level for departure planning.** A new option per vehicle
+  profile: below this percentage the car charges at once at full current and
+  then waits for the planned start. **Timed charging status** shows **Charging
+  to the minimum level** meanwhile. See
+  [departure planning](docs/departure-planning.md#minimum-charge-level).
 - **Switch off charging release when unplugged** no longer writes to the
   wallbox after its entry was reloaded or unloaded in the same moment.
 - A vehicle change that is cancelled halfway reloads the entry instead of

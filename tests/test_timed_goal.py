@@ -234,6 +234,28 @@ def test_timed_plan_pauses_then_resumes_even_a_manual_pause(monkeypatch: pytest.
     asyncio.run(run())
 
 
+def test_below_the_minimum_level_the_plan_charges_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run() -> None:
+        observer, control, hass = setup_observer(monkeypatch)
+        observer._options["timed_minimum_soc"] = 30
+        observer._runtime.coordinator.current_data().values["charging_current_ems"] = 8.0
+        observer.goal.set(NOW + timedelta(hours=24))
+        await observer._evaluate()
+        assert observer.status == "minimum_level"
+        assert control.commands == [("current", 16.0)]
+        assert observer.planned_start > NOW + timedelta(hours=18)
+        # At the level the plan waits for its start.
+        hass.states["sensor.soc"] = state("sensor.soc", "30", unit_of_measurement="%")
+        monkeypatch.setattr(observer_module.time, "monotonic", lambda: 3600.0)
+        await observer._evaluate()
+        assert observer.status == "paused_until_start"
+        assert control.commands[-1] == ("pause", None)
+        observer._options["timed_minimum_soc"] = "high"
+        assert observer._minimum() == 0.0
+
+    asyncio.run(run())
+
+
 def test_missing_data_and_reached_goal_never_issue_a_current(monkeypatch: pytest.MonkeyPatch) -> None:
     async def run() -> None:
         observer, control, hass = setup_observer(monkeypatch)

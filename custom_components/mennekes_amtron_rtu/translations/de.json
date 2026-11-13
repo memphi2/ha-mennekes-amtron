@@ -452,6 +452,7 @@
           "order_active": "Auftrag aus der App hat Vorrang",
           "queued": "Änderung vorgemerkt",
           "paused_until_start": "Pausiert bis zum Start",
+          "minimum_level": "Lädt bis zum Mindestladestand",
           "charging": "Lädt mit vollem Strom",
           "finishing": "Lädt mit Mindeststrom bis zur Abfahrt",
           "unreachable": "Ziel eventuell nicht erreichbar",
@@ -980,6 +981,7 @@
           "capacity_source": "Quelle der Akkukapazität",
           "use_calendar": "Kalender verwenden",
           "use_departure_entity": "Entität für Abfahrtszeit verwenden",
+          "timed_minimum_soc": "Mindestladestand (%)",
           "use_vehicle_timer": "Abfahrtszeiten des Fahrzeugs verwenden"
         },
         "description": "Profil: **{vehicle}**.\n\nDatum und Uhrzeit lassen sich immer manuell eingeben. Aktiviere nur gewünschte Zusatzquellen; deren Einstellungen folgen anschließend. Ein aktiver Plan kann eine manuelle Pause aufheben, um das Abfahrtsziel zu erreichen.",
@@ -987,6 +989,7 @@
           "capacity_source": "Verwende die nutzbare Akkukapazität: als festen Wert, kWh-/Wh-Sensor oder unterstützten Profilwert. Fehlt die gewählte Kapazität oder der Ladestand, wartet die Planung.",
           "use_calendar": "Ergänzt einen Button zum Übernehmen des nächsten passenden Kalendereintrags. Jeder Druck wählt eine Fahrt; für zeitgesteuerte Kalenderübernahmen kannst du die mitgelieferte Blaupause nutzen.",
           "use_departure_entity": "Übernimmt ein neues Datum mit Uhrzeit in der Zukunft automatisch aus der gewählten Entität. Manuelle Auswahl bleibt möglich; ein neuer zukünftiger Zeitstempel dieser Quelle kann sie ersetzen.",
+          "timed_minimum_soc": "Unter diesem Ladestand lädt das Auto sofort mit vollem Strom und wartet danach auf den geplanten Start. 0 schaltet das aus.",
           "use_vehicle_timer": "Ergänzt einen Button zum Übernehmen eines aktiven Abfahrts-/Klimatimers aus der Fahrzeugintegration. Er liest den gemeldeten Timer; die Klimaanlage des Autos schaltet er nicht ein."
         }
       },

@@ -19,7 +19,8 @@ The departure belongs to a car's [vehicle profile](vehicle-setup.md).
    target** to the percentage you want, for example **80%**.
 2. Enable departure planning and provide **usable** battery capacity. Choose
    a fixed value or a suitable HA entity; a configured BavarianData profile can
-   supply it when that source is available.
+   supply it when that source is available. Optionally set a
+   [minimum charge level](#minimum-charge-level) the car charges to at once.
 3. Set **Next departure** to tomorrow's full date and **07:30**, or copy that
    trip from a calendar or vehicle timer.
 4. Check the displayed date, time, target and planning status.
@@ -147,6 +148,21 @@ amperes and never above the current cap, so that only the energy above the 6 A
 path is spent early. A last window shorter than five minutes uses the time that
 is actually left. A charge that is already ahead never goes below 6 A and does
 not pause again just to use up time.
+
+### Minimum charge level
+
+Waiting for a late start leaves the car at its arrival level for hours. Set
+**Minimum charge level (%)** in the departure planning options to keep a
+reserve for an unplanned trip: while the car is below that level, the plan
+charges at once at full current and shows **Charging to the minimum level**.
+At the level it pauses and waits for the planned start as usual; the
+`planned_start` attribute keeps showing that start. The level is part of the
+target, not extra, and **0** switches it off. It applies per
+[vehicle profile](vehicle-setup.md), with and without the Modbus service app.
+
+The current still changes at most every five minutes, so charging can run a
+little past the level. A car whose charge level drops below it again while it
+waits charges back up to it.
 
 Each SoC report recalculates this. A charge that is faster than estimated never
 pauses again once it has started; it reaches the 6 A step sooner. A slower one

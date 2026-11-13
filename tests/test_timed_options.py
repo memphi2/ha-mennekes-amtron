@@ -103,9 +103,10 @@ def test_departure_manual_target_needs_only_capacity_and_saves_scoped(dynamic):
             "use_calendar",
             "use_departure_entity",
             "use_vehicle_timer",
+            "timed_minimum_soc",
         }
         result = await flow.async_step_departure_configure(
-            {"capacity_source": "entity" if dynamic else "fixed"}
+            {"capacity_source": "entity" if dynamic else "fixed", "timed_minimum_soc": 30}
         )
         key = "timed_capacity_entity" if dynamic else "timed_capacity_kwh"
         assert set(fields(result)) == {key}
@@ -120,6 +121,7 @@ def test_departure_manual_target_needs_only_capacity_and_saves_scoped(dynamic):
         assert saved["timed_goal_enabled"] is True
         assert saved["timed_goal_reset_pending"] is True
         assert saved["timed_vehicle_provider"] == "none"
+        assert saved["timed_minimum_soc"] == 30
         assert saved["charging_price"] == 0.3
         assert (
             not {
@@ -132,6 +134,13 @@ def test_departure_manual_target_needs_only_capacity_and_saves_scoped(dynamic):
             & saved.keys()
         )
         entry.options = saved
+        # Zero switches the minimum level off again.
+        again = Flow(entry)
+        await again.async_step_departure()
+        await again.async_step_departure_configure(
+            {"capacity_source": "entity" if dynamic else "fixed", "timed_minimum_soc": 0}
+        )
+        assert "timed_minimum_soc" not in (await getattr(again, method.__name__)({key: saved[key]}))["data"]
         await flow.async_step_departure()
         disabled = (await flow.async_step_departure_disable())["data"]
         assert disabled["timed_goal_enabled"] is False

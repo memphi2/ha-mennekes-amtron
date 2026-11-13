@@ -452,6 +452,7 @@
           "order_active": "An order from the app has priority",
           "queued": "Change queued",
           "paused_until_start": "Paused until start",
+          "minimum_level": "Charging to the minimum level",
           "charging": "Charging at full current",
           "finishing": "Finishing at minimum current",
           "unreachable": "Target may be unreachable",
@@ -980,6 +981,7 @@
           "capacity_source": "Battery capacity source",
           "use_calendar": "Use a calendar",
           "use_departure_entity": "Use a departure time entity",
+          "timed_minimum_soc": "Minimum charge level (%)",
           "use_vehicle_timer": "Use vehicle departure timers"
         },
         "description": "Profile: **{vehicle}**.\n\nManual date and time entry is always available. Enable only the additional sources you want; their settings appear next. An active plan can resume a manual pause to meet departure.",
@@ -987,6 +989,7 @@
           "capacity_source": "Use usable battery capacity: a fixed value, a kWh/Wh sensor, or the profile value when supported. The plan waits if its chosen capacity or charge level is unavailable.",
           "use_calendar": "Adds a button to copy the next matching calendar event. Each press chooses one trip; use the supplied blueprint if you want scheduled calendar imports.",
           "use_departure_entity": "Automatically adopts a new future date and time from the selected entity. Manual selection remains possible; a different future timestamp from this source can replace it.",
+          "timed_minimum_soc": "Below this charge level the car charges at once at full current, then waits for the planned start. 0 switches it off.",
           "use_vehicle_timer": "Adds a button to copy one active departure/climate timer from the vehicle integration. It reads the reported timer; it does not switch on the car’s climate control."
         }
       },

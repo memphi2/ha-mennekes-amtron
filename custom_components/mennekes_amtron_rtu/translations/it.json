@@ -452,6 +452,7 @@
           "order_active": "Un ordine dall’app ha la priorità",
           "queued": "Modifica in coda",
           "paused_until_start": "In pausa fino all’avvio",
+          "minimum_level": "Ricarica fino al livello minimo",
           "charging": "Ricarica alla corrente massima",
           "finishing": "Completa alla corrente minima",
           "unreachable": "Obiettivo forse irraggiungibile",
@@ -980,6 +981,7 @@
           "capacity_source": "Fonte della capacità della batteria",
           "use_calendar": "Usa un calendario",
           "use_departure_entity": "Usa un’entità per l’orario di partenza",
+          "timed_minimum_soc": "Livello di carica minimo (%)",
           "use_vehicle_timer": "Usa gli orari di partenza del veicolo"
         },
         "description": "Profilo: **{vehicle}**.\n\nData e ora restano sempre inseribili manualmente. Attiva solo le fonti aggiuntive desiderate; seguiranno le relative impostazioni. Un piano attivo può annullare una pausa manuale per raggiungere l’obiettivo di partenza.",
@@ -987,6 +989,7 @@
           "capacity_source": "Usa la capacità utile: valore fisso, sensore in kWh/Wh o valore del profilo se supportato. Il piano attende se la capacità scelta o il livello di carica non sono disponibili.",
           "use_calendar": "Aggiunge un pulsante per copiare il prossimo evento corrispondente. Ogni pressione sceglie un viaggio; usa il blueprint fornito per importazioni pianificate.",
           "use_departure_entity": "Adotta automaticamente una nuova data e ora future dall’entità scelta. La selezione manuale resta possibile; un nuovo orario futuro di questa fonte può sostituirla.",
+          "timed_minimum_soc": "Sotto questo livello l’auto si ricarica subito a piena corrente, poi attende l’avvio pianificato. 0 disattiva la funzione.",
           "use_vehicle_timer": "Aggiunge un pulsante per copiare un timer attivo di partenza/climatizzazione dall’integrazione del veicolo. Legge il timer riportato; non accende il climatizzatore."
         }
       },

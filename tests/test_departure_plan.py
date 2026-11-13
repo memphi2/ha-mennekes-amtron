@@ -108,7 +108,7 @@ def test_inputs_round_trip_and_digest_changes_with_any_field():
     assert inputs(capacity_kwh=61).digest != given.digest
     assert DepartureInputs(CAR).snapshot() == {
         "vehicle": CAR, "scope": None, "capacity_kwh": None, "phases": None,
-        "soc_percent": None, "soc_observed_at": None,
+        "soc_percent": None, "soc_observed_at": None, "minimum_percent": 0.0,
     }
 
 
@@ -121,6 +121,7 @@ def test_inputs_round_trip_and_digest_changes_with_any_field():
     ({"soc_percent": 101}, "percentage"),
     ({"soc_observed_at": NOW.replace(tzinfo=None)}, "timezone"),
     ({"soc_observed_at": "2026-11-13T22:00:00+00:00"}, "timezone"),
+    ({"minimum_percent": 101}, "percentage"), ({"minimum_percent": None}, "percentage"),
 ])
 def test_inputs_reject_anything_out_of_bounds(change, message):
     with pytest.raises(ValueError, match=message):
@@ -728,4 +729,28 @@ def test_the_confirmed_car_is_named_only_for_its_own_plug_in(tmp_path):
         assert plan.confirmed_vehicle(sample(scope=OTHER, session=None)) is None
         await plan.set_inputs(inputs(scope=None))
         assert plan.confirmed_vehicle(box.state) is None
+    run(go())
+
+
+def test_below_its_minimum_level_the_car_charges_at_once_then_waits_for_the_start(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10, given=inputs(minimum_percent=55))
+        assert (plan.status, box.writes) == ("minimum_level", [16.0])
+        start = plan.planned_start
+        assert start > NOW + timedelta(hours=7)
+        assert not plan.plan_paused
+        # 3 kWh metered x 0.9 / 60 kWh are 4.5 %: still below the level.
+        later = NOW + timedelta(minutes=20)
+        box.set(now=later, total_kwh=103.0, meter_at=later.timestamp())
+        await plan.tick()
+        assert (plan.status, box.writes) == ("minimum_level", [16.0])
+        # At the level the plan pauses for its start, which moved later.
+        later = NOW + timedelta(minutes=30)
+        box.set(now=later, total_kwh=103.4, meter_at=later.timestamp())
+        box.clock[0] += 300
+        await plan.tick()
+        assert (plan.status, box.writes) == ("paused_until_start", [16.0, None])
+        assert plan.planned_start > start
+        assert DepartureInputs.restore(inputs(minimum_percent=55).snapshot()).minimum_percent == 55.0
     run(go())

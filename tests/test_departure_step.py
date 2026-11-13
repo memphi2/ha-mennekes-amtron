@@ -10,6 +10,7 @@ from custom_components.mennekes_amtron_rtu.device.charging_plan import ChargePla
 from custom_components.mennekes_amtron_rtu.device.departure_step import (
     PAUSE_MARGIN,
     keeps_start,
+    minimum_level,
     needs_current,
     plan_step,
     same_command,
@@ -24,6 +25,25 @@ def test_a_distant_start_pauses_until_it():
     assert (step.status, step.current_a, step.planned_start, step.pauses) == (
         "paused_until_start", None, start, True,
     )
+
+
+def test_below_the_minimum_level_a_distant_start_charges_and_stays_ahead():
+    start = NOW + PAUSE_MARGIN + timedelta(seconds=1)
+    step = plan_step(ChargePlan(6, "finishing", start), None, NOW, minimum_current_a=16.0)
+    assert (step.status, step.current_a, step.planned_start, step.pauses) == ("minimum_level", 16.0, start, False)
+    # A plan that charges anyway keeps its own current.
+    close = plan_step(ChargePlan(6, "finishing", NOW + PAUSE_MARGIN), None, NOW, minimum_current_a=16.0)
+    assert (close.status, close.current_a) == ("finishing", 6)
+    began = plan_step(ChargePlan(6, "finishing", start), NOW, NOW, minimum_current_a=16.0)
+    assert (began.status, began.current_a) == ("finishing", 6)
+
+
+@pytest.mark.parametrize(("value", "level"), [
+    (30, 30.0), (100, 100.0), (0.5, 0.5), (0, 0.0), (None, 0.0), (True, 0.0), ("30", 0.0), (101, 0.0), (-1, 0.0),
+    (float("nan"), 0.0),
+])
+def test_only_a_real_percentage_is_a_minimum_level(value, level):
+    assert minimum_level(value) == level
 
 
 def test_a_close_start_charges_now_and_remembers_when():

@@ -42,6 +42,7 @@ PROFILE_OPTION_KEYS: Final = frozenset(
         "timed_goal_enabled",
         "timed_capacity_entity",
         "timed_capacity_kwh",
+        "timed_minimum_soc",
         CONF_TIMED_USE_VEHICLE_CAPACITY,
         "timed_calendar_entity",
         "timed_calendar_title",

@@ -24,6 +24,7 @@ from .device.departure_plan import DepartureInputs
 from .device.departure_step import (
     MIN_WRITE_INTERVAL,
     keeps_start,
+    minimum_level,
     needs_current,
     plan_step,
     same_command,
@@ -46,6 +47,7 @@ from .timed_goal_const import (
     CONF_TIMED_CAPACITY_ENTITY,
     CONF_TIMED_CAPACITY_KWH,
     CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_MINIMUM_SOC,
 )
 from .vehicle_phases import VehiclePhaseMemory
 from .vehicle_profiles import (
@@ -404,6 +406,10 @@ class TimedGoalObserver:
             return capacity_from_state(self._hass.states.get(entity))
         return usable_capacity(options.get(CONF_TIMED_CAPACITY_KWH))
 
+    def _minimum(self) -> float:
+        """The level below which the car charges at once; zero is off."""
+        return minimum_level(self._options.get(CONF_TIMED_MINIMUM_SOC))
+
     def _phases(self) -> int:
         data = self._runtime.coordinator.current_data()
         switched = data.get("switched_phases")
@@ -525,7 +531,10 @@ class TimedGoalObserver:
             # block commands without proving that either target was reached.
             await self._wait_for_input("waiting_for_device")
             return
-        step = plan_step(plan, self.planned_start, now)
+        step = plan_step(
+            plan, self.planned_start, now,
+            minimum_current_a=control.max_charging_current if soc < self._minimum() else None,
+        )
         self.planned_start = step.planned_start
         if control.pending_action is not None:
             await self._cancel_outdated_command(step.current_a, trip)
@@ -537,12 +546,12 @@ class TimedGoalObserver:
             if control.is_paused is False:
                 await self._write(None, trip)
             return
-        self._set_status(plan.status)
-        if plan.current_a is None or control.is_paused is None:
+        self._set_status(step.status)
+        if step.current_a is None or control.is_paused is None:
             return
         applied = self._runtime.coordinator.current_data().get("charging_current_ems")
-        if needs_current(plan.current_a, paused=control.is_paused, applied=applied):
-            await self._write(plan.current_a, trip)
+        if needs_current(step.current_a, paused=control.is_paused, applied=applied):
+            await self._write(step.current_a, trip)
 
     async def _follow_service(self) -> None:
         """Hand trip and car data to the service, which plans; show its state."""
@@ -604,6 +613,7 @@ class TimedGoalObserver:
             self._capacity(), self._known_phases,
             reading[0] if reading is not None else None,
             reading[1] if reading is not None else None,
+            self._minimum(),
         )
 
     async def _cancel_outdated_command(self, current: float | None, expected: TimedGoal) -> None:

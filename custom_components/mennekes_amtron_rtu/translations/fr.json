@@ -452,6 +452,7 @@
           "order_active": "Un ordre de l’application a la priorité",
           "queued": "Modification en attente",
           "paused_until_start": "En pause jusqu’au démarrage",
+          "minimum_level": "Recharge jusqu’au niveau minimal",
           "charging": "Charge au courant maximal",
           "finishing": "Termine au courant minimal",
           "unreachable": "Cible peut-être inaccessible",
@@ -980,6 +981,7 @@
           "capacity_source": "Source de la capacité de batterie",
           "use_calendar": "Utiliser un calendrier",
           "use_departure_entity": "Utiliser une entité d’heure de départ",
+          "timed_minimum_soc": "Niveau de charge minimal (%)",
           "use_vehicle_timer": "Utiliser les départs programmés du véhicule"
         },
         "description": "Profil : **{vehicle}**.\n\nLa date et l’heure restent saisissables manuellement. Activez uniquement les sources supplémentaires souhaitées ; leurs réglages suivront. Un plan actif peut lever une pause manuelle pour atteindre l’objectif de départ.",
@@ -987,6 +989,7 @@
           "capacity_source": "Utilisez la capacité utile : valeur fixe, capteur en kWh/Wh ou valeur du profil si disponible. Le plan attend si la capacité choisie ou le niveau de charge est indisponible.",
           "use_calendar": "Ajoute un bouton pour copier le prochain événement correspondant. Chaque appui choisit un trajet ; utilisez le blueprint fourni pour des imports programmés.",
           "use_departure_entity": "Reprend automatiquement une nouvelle date et heure futures de l’entité choisie. Le choix manuel reste possible ; un autre horodatage futur de cette source peut le remplacer.",
+          "timed_minimum_soc": "En dessous de ce niveau, la voiture se recharge immédiatement à pleine intensité, puis attend le départ planifié de la recharge. 0 désactive cette fonction.",
           "use_vehicle_timer": "Ajoute un bouton pour copier un minuteur de départ/climatisation actif de l’intégration du véhicule. Il lit le minuteur signalé ; il n’active pas la climatisation."
         }
       },

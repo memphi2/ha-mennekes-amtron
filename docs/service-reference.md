@@ -323,7 +323,7 @@ access no bus:
 | Command | Additional fields | Behavior |
 |---|---|---|
 | `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
-| `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent` and `soc_observed_at` | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
+| `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
 
 The plan writes through the same guarded path as `timed_current`, with the
 owner `departure`. It is saved in `/data/departure-plan.json`, at most 8 KiB

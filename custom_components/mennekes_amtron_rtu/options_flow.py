@@ -42,6 +42,7 @@ from .timed_goal_const import (
     CONF_TIMED_DEPARTURE_ENTITY,
     CONF_TIMED_GOAL_ENABLED,
     CONF_TIMED_GOAL_RESET_PENDING,
+    CONF_TIMED_MINIMUM_SOC,
     CONF_TIMED_TIMER1_DAYS,
     CONF_TIMED_TIMER2_DAYS,
     CONF_TIMED_VEHICLE_TIME_ZONE,
@@ -97,6 +98,7 @@ DEPARTURE_KEYS = {
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
     CONF_TIMED_DEPARTURE_ENTITY,
+    CONF_TIMED_MINIMUM_SOC,
     CONF_TIMED_BAVARIAN_DEVICE,
     CONF_TIMED_VEHICLE_PROVIDER,
     CONF_TIMED_VEHICLE_DEVICE,
@@ -409,6 +411,11 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
                     )
                     if user_input.get(key) is True
                 ]
+                minimum = self._details.pop(CONF_TIMED_MINIMUM_SOC, 0)
+                if minimum:
+                    draft.values[CONF_TIMED_MINIMUM_SOC] = minimum
+                else:
+                    draft.clear({CONF_TIMED_MINIMUM_SOC})
                 if user_input.get("use_calendar") is not True:
                     draft.clear({CONF_TIMED_CALENDAR_ENTITY, CONF_TIMED_CALENDAR_TITLE})
                 if user_input.get("use_departure_entity") is not True:

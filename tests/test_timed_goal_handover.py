@@ -93,12 +93,16 @@ def test_the_trip_and_car_are_handed_over_once_and_the_service_state_is_shown(mo
         await observer._evaluate()
         assert service.trips == [(deadline, "manual", False)]
         assert service.inputs == [DepartureInputs(CAR, SCOPE, 80.0, None, 20.0, REPORTED)]
+        # A changed minimum level is handed over as well.
+        observer._options["timed_minimum_soc"] = 30
+        await observer._evaluate()
+        assert service.inputs[-1] == DepartureInputs(CAR, SCOPE, 80.0, None, 20.0, REPORTED, 30.0)
         start = NOW + timedelta(hours=5)
         service.state = {**service.state, "status": "paused_until_start", "planned_start": start.isoformat()}
         await observer._evaluate()
         assert (observer.status, observer.planned_start) == ("paused_until_start", start)
         # Nothing changed: nothing is sent again.
-        assert (len(service.trips), len(service.inputs)) == (1, 1)
+        assert (len(service.trips), len(service.inputs)) == (1, 2)
     asyncio.run(run())
 
 

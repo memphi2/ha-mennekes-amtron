@@ -452,6 +452,7 @@
           "order_active": "Een opdracht uit de app heeft voorrang",
           "queued": "Wijziging in wachtrij",
           "paused_until_start": "Gepauzeerd tot start",
+          "minimum_level": "Laadt tot het minimumniveau",
           "charging": "Laadt met volle stroom",
           "finishing": "Rondt af met minimale stroom",
           "unreachable": "Doel mogelijk onhaalbaar",
@@ -980,6 +981,7 @@
           "capacity_source": "Bron van accucapaciteit",
           "use_calendar": "Kalender gebruiken",
           "use_departure_entity": "Entiteit voor vertrektijd gebruiken",
+          "timed_minimum_soc": "Minimaal laadniveau (%)",
           "use_vehicle_timer": "Vertrektijden van het voertuig gebruiken"
         },
         "description": "Profiel: **{vehicle}**.\n\nDatum en tijd kun je altijd handmatig invoeren. Kies alleen gewenste extra bronnen; hun instellingen volgen hierna. Een actief plan kan een handmatige pauze opheffen om het vertrekdoel te halen.",
@@ -987,6 +989,7 @@
           "capacity_source": "Gebruik de bruikbare capaciteit: een vaste waarde, kWh/Wh-sensor of ondersteunde profielwaarde. De planning wacht als de gekozen capaciteit of laadtoestand ontbreekt.",
           "use_calendar": "Voegt een knop toe om de volgende passende kalenderafspraak over te nemen. Elke druk kiest één rit; gebruik de meegeleverde blauwdruk voor geplande kalenderimports.",
           "use_departure_entity": "Neemt automatisch een nieuwe toekomstige datum en tijd over uit de gekozen entiteit. Handmatige selectie blijft mogelijk; een ander toekomstig tijdstip uit deze bron kan die vervangen.",
+          "timed_minimum_soc": "Onder dit laadniveau laadt de auto meteen op volle stroom en wacht daarna op de geplande start. 0 schakelt dit uit.",
           "use_vehicle_timer": "Voegt een knop toe om een actieve vertrek-/klimaattimer uit de voertuigintegratie over te nemen. De knop leest de gemelde timer en schakelt de klimaatregeling niet in."
         }
       },

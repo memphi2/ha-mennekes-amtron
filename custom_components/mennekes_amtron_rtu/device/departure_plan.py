@@ -52,6 +52,7 @@ _TRAIL_LIMIT = 2048
 _SCOPE = re.compile(r"[0-9a-f]{64}")
 _INPUT_KEYS = frozenset({
     "vehicle", "scope", "capacity_kwh", "phases", "soc_percent", "soc_observed_at",
+    "minimum_percent",
 })
 _PLAN_KEYS = frozenset({
     "trip", "inputs", "anchor", "session", "planned_start", "plan_paused", "estimated_stop",
@@ -59,7 +60,7 @@ _PLAN_KEYS = frozenset({
 DEPARTURE_STATES = (
     "disabled", "waiting_for_target", "waiting_for_capacity", "waiting_for_soc",
     "waiting_for_device", "vehicle_unconfirmed", "read_only", "order_active", "queued",
-    "paused_until_start", "charging", "finishing", "unreachable", "late",
+    "paused_until_start", "minimum_level", "charging", "finishing", "unreachable", "late",
     "estimated_reached", "reached", "write_pending", "error",
 )
 Binding = Literal["confirmed", "unconfirmed", "unknown"]
@@ -80,7 +81,9 @@ class DepartureInputs:
     """What Home Assistant knows about the selected car, as one value.
 
     ``scope`` names the plug-in Home Assistant confirmed the car for, as the
-    service reported it; None means it confirms no car now.
+    service reported it; None means it confirms no car now. Below
+    ``minimum_percent`` the car charges at once instead of waiting for the
+    plan's start; zero switches that off.
     """
 
     vehicle: str
@@ -89,8 +92,10 @@ class DepartureInputs:
     phases: int | None = None
     soc_percent: float | None = None
     soc_observed_at: datetime | None = None
+    minimum_percent: float = 0.0
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "minimum_percent", percentage(self.minimum_percent))
         if not isinstance(self.vehicle, str) or not 1 <= len(self.vehicle) <= 512:
             raise ValueError("invalid departure vehicle")
         if self.scope is not None and (not isinstance(self.scope, str) or _SCOPE.fullmatch(self.scope) is None):
@@ -120,6 +125,7 @@ class DepartureInputs:
         return cls(
             raw["vehicle"], raw["scope"], raw["capacity_kwh"], raw["phases"],
             raw["soc_percent"], None if observed is None else instant(observed),
+            raw["minimum_percent"],
         )
 
     def snapshot(self) -> dict[str, Any]:
@@ -128,6 +134,7 @@ class DepartureInputs:
             "capacity_kwh": self.capacity_kwh, "phases": self.phases,
             "soc_percent": self.soc_percent,
             "soc_observed_at": None if self.soc_observed_at is None else self.soc_observed_at.isoformat(),
+            "minimum_percent": self.minimum_percent,
         }
 
     @property
@@ -540,7 +547,11 @@ class DepartureController:
             capacity_kwh=capacity, phases=s.phases or (self.inputs.phases if self.inputs else None) or 3,
             max_current_a=s.max_current_a,
         )
-        step = plan_step(plan, self.planned_start, s.now)
+        minimum = self.inputs.minimum_percent if self.inputs is not None else 0.0
+        step = plan_step(
+            plan, self.planned_start, s.now,
+            minimum_current_a=s.max_current_a if soc < minimum else None,
+        )
         self.planned_start = step.planned_start
         if s.pending:
             await self._cancel_outdated(step.current_a)
@@ -552,11 +563,11 @@ class DepartureController:
             if s.paused is False:
                 await self._write(None, deadline)
             return
-        self._set_status(plan.status, s.now)
-        if plan.current_a is None or s.paused is None:
+        self._set_status(step.status, s.now)
+        if step.current_a is None or s.paused is None:
             return
-        if needs_current(plan.current_a, paused=s.paused, applied=s.applied_a):
-            await self._write(plan.current_a, deadline)
+        if needs_current(step.current_a, paused=s.paused, applied=s.applied_a):
+            await self._write(step.current_a, deadline)
 
     async def _stop_at_estimate(self, s: DepartureSample, deadline: datetime) -> None:
         """Hold at the projected target until the car reports or departs."""
