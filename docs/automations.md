@@ -100,9 +100,8 @@ See [Phase switching](user-guide.md#phase-switching).
 ## Recovery and notifications
 
 Error 200 is recovered automatically when writes are enabled and the heartbeat
-is healthy. The service handles this independently of HA. An automation from
-the **Recover from a lost heartbeat** blueprint is not needed and only adds
-duplicate attempts. Its button action preserves a deliberate pause. If the error returns, investigate
+is healthy. The service handles this independently of HA; no automation is
+needed. If the error returns, investigate
 [heartbeat failures](troubleshooting.md#error-200-energy-manager-unavailable).
 Repeated recovery is not a substitute for a functioning connection.
 

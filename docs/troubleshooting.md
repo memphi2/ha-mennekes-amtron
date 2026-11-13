@@ -72,7 +72,7 @@ distinguish a waiting interval from a device problem:
 | Service unavailable | Check the app log and its USB/LAN connection. HA reconnecting does not replay old commands. |
 | Device rejected a write | Check satellite configuration, supported hardware/registers, device state and whether another master is using the bus. |
 | Restart refused | The wallbox must report **idle** before its **Restart** button can be used. |
-| "A charging target requires a pause" although no target is set | An app charging job or guest order holds the connection. See [Charging jobs in the app](#charging-jobs-in-the-app). |
+| "A charging job of the Modbus app controls charging now" | An app charging job or guest order runs for the plugged-in car. See [Charging jobs in the app](#charging-jobs-in-the-app). |
 
 See [service setup](modbus-service.md) or the [hardware guide](hardware.md) for
 the relevant connection.
@@ -411,12 +411,12 @@ when permission was granted.
 |---|---|
 | The order cannot be created: "connection or release changed" | A car must be plugged in, **Charging release** on, the wallbox not locked or faulted, app **Read-only** off and the meter reporting current values. |
 | "Current exceeds the service limit" | Use a current at or below the app's current cap. |
-| "Stop and clear the existing order first" | Only one order exists at a time. Stop it, then clear it. |
+| "Another order is still running" | Only one order runs at a time. Stop it; once its pause is confirmed, create the new order. |
 | "Preview again" | The page changed meanwhile, or the start already lies more than a minute in the past. Preview again and confirm right away. |
 | Guest order refused: battery target active | Set the battery (percentage) target in Home Assistant to 0, then preview again. |
-| HA reports "A charging target requires a pause" | An order exists for the plugged-in car, also after it finished. Clear it on **Charging jobs**, or unplug the car. |
-| Charging stays paused after the order ended | Intended. **Clear stopped order without resuming** removes it; then resume in Home Assistant. |
-| The order shows **Interrupted** | The app restarted, the car was unplugged, the wallbox was unreadable for over a minute, or another limit required a stop. Clear it and create a new order. |
+| HA reports that a charging job of the app controls charging | An order runs for the plugged-in car. Stop it on **Charging jobs**, or unplug the car. HA controls charging again once the pause is confirmed. |
+| Charging stays paused after the order ended | Intended: a finished order never resumes by itself. Resume in Home Assistant. |
+| The order shows **Interrupted** | The app restarted, the car was unplugged, the wallbox was unreadable for over a minute, or another limit required a stop. To let the app charge again, create a new order. |
 | "Clearing requires a confirmed pause or unplug" | Wait until the overview shows the pause, then clear again. |
 | "Storage unavailable; no automatic start" | The app could not save the order. Check the app log; restarting the app resolves a temporary problem. |
 

@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AMTRON · Runtime settings</title><link rel="stylesheet" href="./app_settings.css"><script src="./app_runtime.js" defer></script></head>
+<title>AMTRON · Runtime settings</title><link rel="stylesheet" href="./app_settings.css"><script src="./app_nav.js" defer></script><script src="./app_runtime.js" defer></script></head>
 <body><main id="runtime"><p class="eyebrow">Mennekes Amtron · Service</p>
-<nav class="overview-nav" aria-label="Service"><a href="./" data-text="overview">Overview</a><a href="./registers" data-text="registers">Registers</a><a href="./connection" data-text="connection">Connection</a><a href="./runtime" aria-current="page" data-text="title">Runtime settings</a></nav>
+<nav class="overview-nav" aria-label="Service" data-nav="runtime"></nav>
 <h1 data-text="title">Runtime settings</h1>
 <p data-text="intro">Preview every change before saving. Polling intervals apply at the next ordinary cycle; the current poll or wait is not interrupted. Control limits require a service restart.</p>
 <p id="runtime_notice" role="status" aria-live="polite"></p><p id="runtime_error" role="alert" hidden></p>

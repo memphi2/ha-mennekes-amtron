@@ -183,8 +183,9 @@ are still offline during a Core restart.
 
 For a charge that must run while HA is offline, the app can hold one
 [charging job](app-guide.md#charging-jobs) itself: a time window, a current and
-a maximum amount of energy for the plugged-in car. While such an order exists,
-HA cannot change the current or resume; pausing in HA stops the order.
+a maximum amount of energy for the plugged-in car. While such an order runs, HA
+cannot change the current or resume; pausing in HA stops the order. When it
+ends, charging stays paused and HA controls charging again.
 
 With a **direct USB or LAN connection**, a Core restart or entry reload interrupts
 the heartbeat. Once communication returns, error 200 recovery runs

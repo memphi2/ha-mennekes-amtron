@@ -420,7 +420,7 @@ class PlugChargeObserver:
             failure = key if key in {
                 "write_rate_limited", "control_state_unknown", "plug_charge_blocked",
                 "plug_charge_session_changed", "plug_charge_authorization_expired",
-                "energy_goal_stop_active", "read_only_mode",
+                "energy_goal_stop_active", "service_job_active", "read_only_mode",
             } else "command_failed"
             if not self._stopped and self._session == candidate[1]:
                 self._last_grant_error = failure

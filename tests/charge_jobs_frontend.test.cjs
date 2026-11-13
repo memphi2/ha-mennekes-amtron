@@ -6,7 +6,7 @@ const vm=require("node:vm");
 const path=require("node:path");
 const source=fs.readFileSync(path.join(__dirname,"../custom_components/mennekes_amtron_rtu/device/app_jobs.js"),"utf8");
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPreview=false, language="de-DE"}={}){
+function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPreview=false, language="de"}={}){
   const elements=new Map(),docEvents={},winEvents={},timers=new Map(),calls=[];let next=0, finishBoostPreview=null;
   const el=id=>{
     if(!elements.has(id))elements.set(id,{value:"",textContent:"",disabled:false,hidden:false,max:"",events:{},addEventListener(name,fn){this.events[name]=fn;},reportValidity(){return true;}});
@@ -14,7 +14,7 @@ function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPr
   };
   el("job_energy").value="10";el("job_current").value="12";el("job_boost_minutes").value="30";
   let state={schema:1,revision:"revision-1",csrf:"test-csrf",scope:"scope-1",ready:true,storage_error:false,available:true,present:true,permitted:true,meter_fresh:true,max_current_a:16,job:null};
-  const document={hidden:false,documentElement:{lang:""},getElementById:el,querySelectorAll:()=>[],addEventListener:(k,f)=>{docEvents[k]=f;}};
+  const document={hidden:false,documentElement:{lang:language},getElementById:el,querySelectorAll:()=>[],addEventListener:(k,f)=>{docEvents[k]=f;}};
   const fetch=async(url,options={})=>{
     calls.push({url,options});
     if(!options.method){if(failRead)throw new Error("offline");return {ok:true,json:async()=>structuredClone(state)};}
@@ -26,7 +26,7 @@ function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPr
       return response;
     }
     if(body.action==="create"){
-      state={...state,revision:"revision-2",job:{...body.request,state:"charging",reason:"charging",delivered_kwh:0,scope_ended:false}};
+      state={...state,revision:"revision-2",job:{...body.request,state:"charging",reason:"charging",delivered_kwh:0,scope_ended:false,holding:true}};
       if(lostCreate)throw new Error("reply lost");
     }else if(body.action==="boost"){
       state={...state,revision:"boost-2",job:{...state.job,state:"charging",reason:"charging",boost_until:body.until}};
@@ -36,12 +36,12 @@ function harness({failRead=false, lostCreate=false, lostBoost=false, holdBoostPr
     else if(body.action==="clear")state={...state,revision:"revision-4",job:null};
     return {ok:true,json:async()=>structuredClone(state)};
   };
-  vm.runInNewContext(source,{document,navigator:{language},crypto:{randomUUID:()=>"12345678-1234-1234-1234-123456789012"},Date,Number,String,JSON,Error,AbortController,fetch,setTimeout:(fn)=>{const id=++next;timers.set(id,()=>{timers.delete(id);return fn();});return id;},clearTimeout:id=>timers.delete(id),addEventListener:(k,f)=>{winEvents[k]=f;}});
+  vm.runInNewContext(source,{document,crypto:{randomUUID:()=>"12345678-1234-1234-1234-123456789012"},Date,Number,String,JSON,Error,AbortController,fetch,setTimeout:(fn)=>{const id=++next;timers.set(id,()=>{timers.delete(id);return fn();});return id;},clearTimeout:id=>timers.delete(id),addEventListener:(k,f)=>{winEvents[k]=f;}});
   return {el,calls,document,docEvents,winEvents,timers,setState:nextState=>{state={...state,...nextState};},submit:()=>el("job_form").events.submit({preventDefault(){}}),click:id=>el(id).events.click(),finishBoostPreview:()=>finishBoostPreview()};
 }
 
 test("initial rendering is passive and never sends a command",async()=>{
-  const h=harness();await flush();assert.equal(h.document.documentElement.lang,"de");assert.equal(h.el("job_fields").disabled,false);assert.equal(h.calls.length,1);assert.equal(h.calls[0].options.method,undefined);
+  const h=harness();await flush();assert.match(h.el("job_notice").textContent,/^Bereit/);assert.equal(h.el("job_fields").disabled,false);assert.equal(h.calls.length,1);assert.equal(h.calls[0].options.method,undefined);
 });
 test("a preview and a separate confirmation precede creation; stop and clear do not resume",async()=>{
   const h=harness();await flush();await h.submit();assert.equal(h.el("job_confirmation").hidden,false);assert.equal(h.calls.filter(c=>c.options.method==="POST").length,1);
@@ -66,12 +66,12 @@ test("background tabs invalidate previews and do not poll",async()=>{
   const h=harness();await flush();await h.submit();const before=h.calls.length;h.document.hidden=true;h.docEvents.visibilitychange();await flush();assert.equal(h.calls.length,before);assert.equal(h.el("job_confirmation").hidden,true);h.document.hidden=false;h.docEvents.visibilitychange();await flush();assert.equal(h.calls.length,before+1);h.winEvents.pagehide();assert.equal(h.timers.size,0);const shown=h.calls.length;h.winEvents.pageshow();await flush();assert.equal(h.calls.length,shown+1);assert.equal(h.timers.size,1);
 });
 test("English labels and changed server revision invalidate old confirmation",async()=>{
-  const h=harness({language:"en-US"});await flush();await h.submit();h.setState({revision:"new-revision"});for(const callback of [...h.timers.values()])callback();await flush();assert.equal(h.el("job_confirmation").hidden,true);assert.equal(h.document.documentElement.lang,"en");
+  const h=harness({language:"en"});await flush();await h.submit();h.setState({revision:"new-revision"});for(const callback of [...h.timers.values()])callback();await flush();assert.equal(h.el("job_confirmation").hidden,true);assert.match(h.el("job_notice").textContent,/^Ready/);
 });
 
 async function futureOrder(h){
   await flush();
-  h.setState({boost_available:true,job:{id:"job-1",state:"scheduled",reason:"scheduled",start_at:new Date(Date.now()+3*3600000).toISOString(),finish_at:new Date(Date.now()+4*3600000).toISOString(),current_a:12,energy_kwh:10,delivered_kwh:0,scope_ended:false,boost_until:null}});
+  h.setState({boost_available:true,job:{id:"job-1",state:"scheduled",reason:"scheduled",start_at:new Date(Date.now()+3*3600000).toISOString(),finish_at:new Date(Date.now()+4*3600000).toISOString(),current_a:12,energy_kwh:10,delivered_kwh:0,scope_ended:false,holding:true,boost_until:null}});
   for(const callback of [...h.timers.values()])callback();
   await flush();
 }
@@ -106,4 +106,20 @@ test("a preview response arriving after the tab is hidden cannot restore confirm
   h.document.hidden=true;h.docEvents.visibilitychange();h.finishBoostPreview();await waiting;
   assert.equal(h.el("job_confirmation").hidden,true);assert.equal(h.el("job_status").hidden,true);
   assert.equal(h.calls.filter(c=>c.options.method==="POST").length,1);
+});
+test("the page language set by the server picks the text column",async()=>{
+  for(const [language,ready] of [["fr",/^Prêt/],["nl",/^Gereed/],["it",/^Pronto/],["xx",/^Ready/]]){
+    const h=harness({language});await flush();assert.match(h.el("job_notice").textContent,ready);
+  }
+});
+test("a finished order whose pause was confirmed allows a new order but no stop",async()=>{
+  const h=harness();await flush();
+  h.setState({job:{id:"job-1",state:"reached",reason:"energy_reached",start_at:new Date().toISOString(),finish_at:new Date(Date.now()+3600000).toISOString(),current_a:12,energy_kwh:10,delivered_kwh:10,scope_ended:false,holding:false,boost_until:null}});
+  for(const callback of [...h.timers.values()])callback();await flush();
+  assert.equal(h.el("job_fields").disabled,false);assert.equal(h.el("job_stop").disabled,true);assert.equal(h.el("job_clear").disabled,false);
+  assert.match(h.el("job_detail").textContent,/Home Assistant steuert/);
+  h.setState({job:{id:"job-1",state:"reached",reason:"energy_reached",start_at:new Date().toISOString(),finish_at:new Date(Date.now()+3600000).toISOString(),current_a:12,energy_kwh:10,delivered_kwh:10,scope_ended:false,holding:true,boost_until:null}});
+  for(const callback of [...h.timers.values()])callback();await flush();
+  assert.equal(h.el("job_fields").disabled,true);assert.equal(h.el("job_stop").disabled,true);
+  assert.doesNotMatch(h.el("job_detail").textContent,/Home Assistant/);
 });

@@ -221,7 +221,11 @@ def test_failed_save_never_enables_and_recovery_never_rearms(tmp_path, monkeypat
         await c.tick()
         assert not c.storage_error
         assert c.job.terminal
-        assert c.stop_requested()
+        # Once durable and paused, the order hands control back; it never
+        # writes a charging current itself.
+        assert not c.stop_requested()
+        assert h.store.load() is None
+        assert all(call[0] is None for call in h.calls)
     asyncio.run(run())
 
 
@@ -339,8 +343,16 @@ def test_readback_clears_error_and_shutdown_never_creates_a_restart_permission(t
         loaded = ChargeJobController(h.store, lambda: h.sample, h.apply)
         await loaded.initialize()
         assert loaded.job.terminal
+        # The restored order pauses first and hands control back only after
+        # the wallbox confirmed that pause.
+        h.change(current_a=12)
+        before = len(h.calls)
         await loaded.tick()
         assert loaded.stop_requested()
+        assert [call[0] for call in h.calls[before:]] == [None]
+        await loaded.tick()
+        assert not loaded.stop_requested()
+        assert h.store.load() is None
         empty = Harness(tmp_path / "other").controller
         await empty.initialize()
         await empty.stop()
@@ -421,4 +433,85 @@ def test_a_failed_store_fences_only_starts(tmp_path, monkeypatch):
         assert c.storage_error
         assert c.current_policy("ha-departure", False) is None
         assert c.current_policy(None, True) is False
+    asyncio.run(run())
+
+
+def test_finished_order_hands_control_back_once_its_pause_is_confirmed(tmp_path):
+    async def run():
+        h = Harness(tmp_path)
+        c = h.controller
+        await c.initialize()
+        await h.create()
+        assert c.snapshot()["job"]["holding"] is True
+        h.change(total_kwh=110)
+        await c.tick()
+        assert c.job.state == "reached"
+        assert h.calls[-1][0] is None
+        # The tick that pauses only requests it; the next one sees the pause.
+        assert c.stop_requested()
+        assert h.store.load().state == "reached"
+        await c.tick()
+        assert not c.holding
+        assert not c.stop_requested()
+        assert c.current_policy(None, True) is None
+        assert h.store.load() is None
+        job = c.snapshot()["job"]
+        assert (job["state"], job["holding"]) == ("reached", False)
+        # HA resumes; the finished order neither pauses again nor saves.
+        h.change(current_a=16.0)
+        calls = list(h.calls)
+        await c.tick()
+        assert h.calls == calls
+        assert h.store.load() is None
+        restarted = ChargeJobController(h.store, lambda: h.sample, h.apply)
+        await restarted.initialize()
+        assert restarted.job is None
+        assert not restarted.stop_requested()
+        # A finished order is cleared without a pause, or replaced directly.
+        replaced = await c.create(h.request(id="c" * 32), revision=c.revision, scope=SCOPE)
+        assert replaced["job"]["id"] == "c" * 32
+        assert replaced["job"]["holding"] is True
+        assert h.store.load().identifier == "c" * 32
+        h.change(total_kwh=125)
+        await c.tick()
+        await c.tick()
+        h.change(current_a=16.0)
+        assert not c.holding
+        assert (await c.clear(revision=c.revision))["job"] is None
+        assert h.calls[-1][0] is None
+    asyncio.run(run())
+
+
+def test_finished_order_keeps_holding_until_the_pause_is_confirmed_and_saved(tmp_path, monkeypatch):
+    async def run():
+        h = Harness(tmp_path)
+        c = h.controller
+        await c.initialize()
+        await h.create()
+        await c.stop()
+        assert c.job.state == "stopped"
+        # While it holds the pause, a stopped order blocks a new one.
+        with pytest.raises(JobRequestError, match="job_exists"):
+            await h.create(id="c" * 32)
+        h.change(pending=True)
+        await c.tick()
+        assert c.holding
+        h.change(pending=False, current_a=12.0)
+        h.error = AmtronBusError("busy")
+        await c.tick()
+        assert c.holding
+        h.error = None
+        h.change(current_a=1.0)
+        original = h.store.save
+        monkeypatch.setattr(h.store, "save", Mock(side_effect=OSError("disk")))
+        await c.tick()
+        assert c.holding
+        assert c.stop_requested()
+        # The finished order was already durable, so the failed hand-back
+        # does not count as a storage error; the next tick tries again.
+        assert not c.storage_error
+        monkeypatch.setattr(h.store, "save", original)
+        await c.tick()
+        assert not c.holding
+        assert h.store.load() is None
     asyncio.run(run())

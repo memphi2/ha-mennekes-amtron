@@ -609,6 +609,7 @@
               "unknown": "Unknown reason",
               "user_cancelled": "Cancelled by user",
               "energy_goal": "Charge target stop",
+              "service_job": "Stop by a charging job of the app",
               "deadline_expired": "Departure time expired"
             }
           }
@@ -746,6 +747,9 @@
     },
     "energy_goal_stop_active": {
       "message": "A charging target requires a pause. Check its status. After reaching a target or a meter reset, set a new target or disable it with 0 before resuming. Changing a target does not start charging."
+    },
+    "service_job_active": {
+      "message": "A charging job of the Modbus app controls charging now. Stop it on the app's Charging jobs page or unplug the car. Once the wallbox confirms the pause, you can change the current or resume here again."
     },
     "energy_goal_state_invalid": {
       "message": "The saved energy target could not be restored. Check the logs before allowing charging again."

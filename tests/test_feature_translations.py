@@ -35,7 +35,7 @@ def test_new_status_options_and_control_errors_are_translated_in_all_languages()
         assert entity["number"]["soc_goal"]["name"]
         assert entity["button"]["cancel_pending_change"]["name"]
         for key in (
-            "energy_goal_invalid", "energy_goal_unavailable", "energy_goal_stop_active",
+            "energy_goal_invalid", "energy_goal_unavailable", "energy_goal_stop_active", "service_job_active",
             "energy_goal_state_invalid", "energy_goal_not_supported", "cancel_pending_not_supported",
             "soc_goal_invalid", "soc_goal_unavailable", "soc_goal_source_changed",
             "soc_goal_state_invalid", "soc_goal_not_supported", "soc_goal_limit_unavailable",

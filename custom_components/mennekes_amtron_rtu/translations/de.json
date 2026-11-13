@@ -609,6 +609,7 @@
               "unknown": "Unbekannter Grund",
               "user_cancelled": "Vom Benutzer abgebrochen",
               "energy_goal": "Ladestopp durch ein Ladeziel",
+              "service_job": "Ladestopp durch einen Ladeauftrag der App",
               "deadline_expired": "Abfahrtszeit abgelaufen"
             }
           }
@@ -746,6 +747,9 @@
     },
     "energy_goal_stop_active": {
       "message": "Ein Ladeziel erfordert eine Pause. Prüfe seinen Status. Nach Erreichen des Ziels oder einem Zählerreset kannst du ein neues Ziel setzen oder es mit 0 deaktivieren, bevor du weiterlädst. Eine Zieländerung startet das Laden nicht."
+    },
+    "service_job_active": {
+      "message": "Ein Ladeauftrag der Modbus-App steuert gerade das Laden. Stoppe ihn auf der Seite Ladeaufträge der App oder stecke das Auto ab. Sobald die Wallbox die Pause bestätigt, kannst du hier wieder den Strom ändern oder weiterladen."
     },
     "energy_goal_state_invalid": {
       "message": "Das gespeicherte Ladeziel konnte nicht wiederhergestellt werden. Prüfe das Protokoll, bevor du das Laden erneut freigibst."

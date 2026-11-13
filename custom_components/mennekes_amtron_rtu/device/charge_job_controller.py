@@ -74,10 +74,13 @@ class ChargeJobController:
         self._durable: dict[str, Any] | None = None
         self._lock = asyncio.Lock()
         self._closing = False
+        # A finished order whose pause the wallbox confirmed hands control
+        # back; the pause stays as ordinary charging intent.
+        self._settled = False
 
     @property
     def holding(self) -> bool:
-        return self.job is not None and not self.job.scope_ended
+        return self.job is not None and not self.job.scope_ended and not self._settled
 
     async def initialize(self) -> None:
         async with self._lock:
@@ -118,7 +121,7 @@ class ChargeJobController:
         if not self.ready or self.storage_error or self._closing:
             return True
         job = self.job
-        if job is None or job.scope_ended:
+        if job is None or job.scope_ended or self._settled:
             return False
         sample = self.inputs()
         return (
@@ -250,6 +253,7 @@ class ChargeJobController:
                 return self.snapshot()
             self.job = self._candidate(request, revision, scope)
             self._durable = None
+            self._settled = False
             self._changed()
             await self._tick_locked()
             if self.storage_error:
@@ -271,9 +275,11 @@ class ChargeJobController:
             self._check_revision(revision)
             sample = self.inputs()
             paused = sample.current_a is not None and 0 < sample.current_a < 6
-            if not self.ready or not sample.available or sample.pending or (
+            if not self.ready:
+                raise JobRequestError("job_clear_requires_pause")
+            if self.holding and (not sample.available or sample.pending or (
                 sample.present is not False and not paused
-            ):
+            )):
                 raise JobRequestError("job_clear_requires_pause")
             if self.job is not None and not self.job.terminal:
                 raise JobRequestError("job_stop_first")
@@ -286,6 +292,7 @@ class ChargeJobController:
                 raise JobRequestError("job_storage_unavailable") from err
             self.job = None
             self._durable = None
+            self._settled = False
             self.storage_error = False
             self.action_error = None
             self._changed()
@@ -293,7 +300,7 @@ class ChargeJobController:
 
     async def _save(self) -> None:
         job = self.job
-        if job is None or job.snapshot() == self._durable:
+        if job is None or self._settled or job.snapshot() == self._durable:
             return
         raw = job.snapshot()
         frozen = ChargeJob.restore(raw, restarted=False)
@@ -332,6 +339,7 @@ class ChargeJobController:
         if target is None:
             if current is not None and 0 < current < 6 and not sample.pending:
                 self.action_error = None
+                await self._settle()
                 return
         elif current is not None and abs(current - target) < CURRENT_TOLERANCE_A:
             self.action_error = None
@@ -344,6 +352,26 @@ class ChargeJobController:
             self.action_error = "command_unconfirmed"
         else:
             self.action_error = None
+
+    async def _settle(self) -> None:
+        """Release a finished order once its pause is confirmed and saved.
+
+        The pause is then ordinary charging intent, so HA may resume. Saving
+        "no job" keeps a restart from restoring the order and pausing again.
+        """
+        job = self.job
+        if (
+            job is None or not job.terminal or job.scope_ended or self._settled
+            or self.storage_error or self._durable != job.snapshot()
+        ):
+            return
+        try:
+            await finish_goal_save(asyncio.to_thread(self.store.save, None))
+        except (OSError, ValueError):
+            # Keep holding; the next tick tries again.
+            return
+        self._settled = True
+        self._changed()
 
     async def shutdown(self) -> None:
         async with self._lock:
@@ -365,7 +393,8 @@ class ChargeJobController:
             )
             summary = {
                 **self._request(job), "state": job.state, "reason": job.reason,
-                "scope_ended": job.scope_ended, "delivered_kwh": progress,
+                "scope_ended": job.scope_ended, "holding": self.holding,
+                "delivered_kwh": progress,
                 "boost_until": job.boost_until.isoformat() if job.boost_until is not None else None,
             }
         return {

@@ -609,6 +609,7 @@
               "unknown": "Motivo sconosciuto",
               "user_cancelled": "Annullato dall’utente",
               "energy_goal": "Arresto richiesto da un obiettivo di ricarica",
+              "service_job": "Arresto da un ordine di ricarica dell’app",
               "deadline_expired": "Ora di partenza trascorsa"
             }
           }
@@ -746,6 +747,9 @@
     },
     "energy_goal_stop_active": {
       "message": "Un obiettivo di ricarica richiede una pausa. Controllane lo stato. Dopo aver raggiunto l’obiettivo o un azzeramento del contatore, imposta un nuovo obiettivo o disattivalo con 0 prima di riprendere. Modificare l’obiettivo non avvia la ricarica."
+    },
+    "service_job_active": {
+      "message": "Un ordine di ricarica dell’app Modbus controlla ora la ricarica. Interrompilo nella pagina Ordini di ricarica dell’app oppure scollega l’auto. Appena la wallbox conferma la pausa, puoi di nuovo modificare la corrente o riprendere qui."
     },
     "energy_goal_state_invalid": {
       "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."

@@ -199,8 +199,16 @@ def test_guest_completion_retries_and_restart_never_extend_permission(tmp_path, 
         before = list(h.calls)
         await h.confirm(preview)
         assert h.calls == before
+        # A confirmed pause hands control back and leaves nothing to restore;
+        # an unplugged connection keeps its terminal record.
+        await c.tick()
         restored = ChargeJobController(h.store, lambda: h.sample, h.apply)
         await restored.initialize()
-        assert restored.job.terminal
-        assert restored.job.kind == "guest"
+        if finish == "unplug":
+            assert restored.job.terminal
+            assert restored.job.kind == "guest"
+        else:
+            assert not c.holding
+            assert restored.job is None
+            assert not restored.stop_requested()
     asyncio.run(run())

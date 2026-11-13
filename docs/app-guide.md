@@ -14,9 +14,8 @@ token is needed in the browser. They need **Supervisor 2026.10.4 or newer**.
 | [Charging jobs](#charging-jobs) | A charging order the app runs on its own, with optional early start. |
 | [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
 
-Overview, Connection and Debug log follow the browser language in English,
-German, French, Dutch and Italian. Registers, Runtime, Charging jobs and Guest
-charging are available in English and German.
+Every page follows the browser language in English, German, French, Dutch and
+Italian, and every page has the same navigation bar.
 
 Everyday charging stays in Home Assistant: the current slider, **Charging
 paused**, targets and departure planning. The app pages add a view of the
@@ -76,16 +75,16 @@ in the past, the app asks for a new preview.
 |---|---|
 | Before the start | Keeps charging paused. |
 | In the window | Charges with the chosen current until the energy amount is reached. |
-| Energy reached or window ended | Pauses charging and keeps it paused. |
+| Energy reached or window ended | Pauses charging. Once the wallbox confirms the pause, Home Assistant controls charging again. |
 
-Charging stays paused after the order ends until you **clear** it or unplug the
-car. This is intended: a finished order never restarts charging by itself.
+A finished order never restarts charging by itself. Charging stays paused until
+you resume it in Home Assistant or an automation does. The finished order stays
+on the page until you clear it or create a new one.
 
-While an order exists for the plugged-in car, Home Assistant cannot change the
-current, resume charging, switch phases or start PV or departure charging. It
-reports that a charging target requires a pause. These Home Assistant actions
-**stop** the order: **Charging paused** on, **Charging release** off, and
-locking the wallbox.
+While an order runs, Home Assistant cannot change the current, resume charging,
+switch phases or start PV or departure charging. It reports that a charging job
+of the app controls charging. These Home Assistant actions **stop** the order:
+**Charging paused** on, **Charging release** off, and locking the wallbox.
 
 The meter is read at the normal polling interval, so a little more energy than
 the set amount can flow before the pause takes effect. The order is a limit, not
@@ -104,9 +103,10 @@ the boost. **Stop automation for this connection** ends the whole order.
 ### Stop and clear
 
 - **Stop automation for this connection** stops the order and pauses charging.
-- **Clear stopped order without resuming** removes a stopped or finished order.
-  It needs a confirmed pause or an unplugged car and never starts charging.
-  Afterwards, Home Assistant controls the current and pause again.
+  Once the wallbox confirms the pause, Home Assistant controls charging again.
+- **Clear stopped order without resuming** removes a stopped or finished order
+  from the page. It never starts charging. While the pause is not yet
+  confirmed, clearing needs a confirmed pause or an unplugged car.
 
 ### When an order is interrupted
 
@@ -118,9 +118,9 @@ The app ends an order and does not restart it by itself when:
 - another limit requires a stop, for example a reached target
 - the clock jumps backwards or the meter is reset
 
-A short gap in meter readings only pauses the order; it continues once readings
-return. To charge again after an interruption, clear the order and create a new
-one.
+An interrupted order pauses charging like a finished one and then hands control
+back to Home Assistant. A short gap in meter readings only pauses the order; it
+continues once readings return. To let the app charge again, create a new order.
 
 The order belongs to the physical connection, not to a particular car. The app
 does not identify vehicles; it only knows that the plug stayed connected.
@@ -197,8 +197,8 @@ extra bus traffic and hides serial numbers and login traffic. See
 
 - The pages show what the app knows. Vehicle identity, current battery level and
   the departure plan live in Home Assistant and are not shown here.
-- An app restart interrupts a running order. It is shown as interrupted
-  afterwards and charging stays paused until you clear it.
+- An app restart interrupts a running order. The app pauses charging after the
+  restart and then hands control back to Home Assistant.
 - A stop you request is shown as requested until the wallbox confirms it. Check
   the overview and its command results.
 - The browser never repeats an order by itself. If a reply is lost, reload the

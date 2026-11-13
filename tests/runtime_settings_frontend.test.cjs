@@ -17,10 +17,10 @@ class Element {
   reportValidity(){return true;}
   async emit(event){await this.listeners[event]?.({preventDefault(){}});}
 }
-async function harness(responses=[payload()]) {
+async function harness(responses=[payload()], language="de") {
   const nodes=new Map();const el=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   const calls=[];const timers=new Map();let next=0;
-  const context={navigator:{language:"de-DE"},document:{documentElement:{lang:"en"},getElementById:el,querySelectorAll:()=>[],createElement:()=>new Element()},AbortController,
+  const context={document:{documentElement:{lang:language},getElementById:el,querySelectorAll:()=>[],createElement:()=>new Element()},AbortController,
     setTimeout:(fn,delay)=>{const id=++next;timers.set(id,{fn:()=>{timers.delete(id);return fn();},delay});return id;},clearTimeout:id=>timers.delete(id),
     fetch:async(url,options)=>{calls.push({url,options});const item=responses.shift();if(item instanceof Error)throw item;const data=typeof item==="function"?await item():item;return {ok:true,json:async()=>data};}};
   vm.runInNewContext(source,context);
@@ -68,4 +68,10 @@ test("uncertain prior save disables all editing",async()=>{
 test("a previously saved restart-required change is visible immediately",async()=>{
   const h=await harness([payload({saved:{...fields,current_cap:8},restart_required:true,restart_fields:["current_cap"]})]);
   assert.equal(h.el("runtime_preview").hidden,false);assert.equal(h.el("runtime_changes").children.length,0);assert.match(h.el("runtime_restart").textContent,/Neustart/);assert.equal(h.el("current_cap").value,"8");
+});
+test("restart notes use the page language set by the server",async()=>{
+  for(const [language,note] of [["en",/^Requires restart: Service current cap/],["de",/^Neustart erforderlich: Service-Stromobergrenze/],["fr",/^Redémarrage requis: Limite/],["nl",/^Herstart vereist: Stroomgrens/],["it",/^Riavvio necessario: Limite/]]){
+    const h=await harness([payload({restart_required:true,restart_fields:["current_cap"]})],language);
+    assert.match(h.el("runtime_restart").textContent,note);
+  }
 });

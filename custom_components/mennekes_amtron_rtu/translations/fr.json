@@ -609,6 +609,7 @@
               "unknown": "Motif inconnu",
               "user_cancelled": "Annulé par l’utilisateur",
               "energy_goal": "Arrêt demandé par un objectif de recharge",
+              "service_job": "Arrêt par un ordre de recharge de l’app",
               "deadline_expired": "Heure de départ dépassée"
             }
           }
@@ -746,6 +747,9 @@
     },
     "energy_goal_stop_active": {
       "message": "Un objectif de recharge impose une pause. Vérifiez son état. Une fois l’objectif atteint ou après une remise à zéro du compteur, définissez un nouvel objectif ou désactivez-le avec 0 avant de reprendre. Modifier l’objectif ne démarre pas la recharge."
+    },
+    "service_job_active": {
+      "message": "Un ordre de recharge de l’app Modbus pilote actuellement la recharge. Arrêtez-le sur la page Ordres de recharge de l’app ou débranchez le véhicule. Dès que la borne confirme la pause, vous pouvez de nouveau modifier le courant ou reprendre ici."
     },
     "energy_goal_state_invalid": {
       "message": "L’objectif énergétique enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."

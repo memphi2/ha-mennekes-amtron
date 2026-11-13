@@ -115,7 +115,7 @@ def test_competing_clients_cannot_take_over_an_accepted_job(tmp_path, command, v
         async with job_service(tmp_path) as (s, transport, _clock):
             await s.jobs.create(request(), revision=s.jobs.revision, scope=s.jobs.snapshot()["scope"])
             before = list(transport.writes)
-            with pytest.raises(DeviceError, match="energy_goal_stop_active"):
+            with pytest.raises(DeviceError, match="service_job_active"):
                 await s.command({"command": command, "value": value, "expected_serial_number": s.identity.serial_number})
             assert transport.writes == before
             assert s.jobs.job.state == "charging"
@@ -279,16 +279,34 @@ def test_policy_hooks_preserve_legacy_owners_and_gate_all_enabling_writes():
     assert c._timed_cancellation_reason(command) is None
     assert c._timed_cancellation_reason(replace(command, deadline=datetime.now(UTC) - timedelta(seconds=1))) == "deadline_expired"
     c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: False, lambda: True))
-    assert c._timed_cancellation_reason(command) == "energy_goal"
-    with pytest.raises(DeviceError, match="energy_goal_stop_active"):
+    assert c._timed_cancellation_reason(command) == "service_job"
+    # A stop that only the app's order requests names the order, not a target.
+    with pytest.raises(DeviceError, match="service_job_active"):
         c._check_write_allowed(R.CHARGING_CURRENT_EMS, 12, recovery_release=False)
     c._active_command = command
-    with pytest.raises(DeviceError, match="energy_goal_stop_active"):
+    with pytest.raises(DeviceError, match="service_job_active"):
         c._check_write_allowed(R.LOCK_EVSE, 0, recovery_release=False)
     c._active_command = None
     c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: None, lambda: False))
     c._check_write_allowed(R.CHARGING_CURRENT_EMS, 1, recovery_release=False)
     c._check_write_allowed(R.CHARGING_CURRENT_EMS, 12, recovery_release=False)
+
+
+def test_stop_error_names_a_charge_target_before_the_service_order():
+    c = control()
+    c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: None, lambda: True))
+    with pytest.raises(DeviceError, match="service_job_active"):
+        raise c.stop_error()
+    c.goal_controller = Mock(stop_requested=True)
+    with pytest.raises(DeviceError, match="energy_goal_stop_active"):
+        raise c.stop_error()
+    c.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: False, lambda: True))
+    command = _PendingCommand("set_current", 12, owner="job", deadline=datetime.now(UTC) + timedelta(hours=1))
+    assert c._timed_cancellation_reason(command) == "energy_goal"
+    c.set_service_policy(None)
+    c.goal_controller = None
+    with pytest.raises(DeviceError, match="energy_goal_stop_active"):
+        raise c.stop_error()
 
 
 @pytest.mark.parametrize(("bad_register", "bad_value"), [

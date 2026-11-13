@@ -353,7 +353,7 @@ identifier; it changes when the car is unplugged or the service restarts. Every
 | `preview_guest` | `revision`, `scope`, `request` | Turns `id`, `duration_minutes`, `energy_kwh` and `current_a` into an absolute guest order to confirm with `create`. |
 | `preview_boost` | `revision`, `scope`, `minutes` | Returns the absolute `until` for an early start of 1 to 120 minutes. |
 | `boost` | `revision`, `scope`, `until` | Starts the previewed boost. |
-| `cancel_boost`, `stop`, `clear` | `revision`, `confirm: true` | Ends the boost, stops the order, or removes a stopped order without resuming. |
+| `cancel_boost`, `stop`, `clear` | `revision`, `confirm: true` | Ends the boost, stops the order, or removes a stopped or finished order without resuming. |
 
 An order `request` has this form:
 
@@ -369,11 +369,15 @@ scope), `job_exists`, `job_not_permitted`, `job_preview_expired`,
 400 with `invalid_job_request`. `job.state` is the order's intent, not a measured
 vehicle state.
 
-While an order exists for the connected car, `/v2/command` refuses commands
-that set the current, resume, switch phases or start another planner
-with `energy_goal_stop_active`. `pause`, `cancel_pending`, release off and lock
-on stop the order first. The order is saved in `/data/charge-job.json` before it
-may start charging; a service restart restores it as interrupted.
+While an order holds the connected car (`job.holding` is `true`),
+`/v2/command` refuses commands that set the current, resume, switch phases or
+start another planner with `service_job_active`. `pause`, `cancel_pending`,
+release off and lock on stop the order first. When an order ends, the service
+pauses charging. Once the wallbox confirms the pause and the finished order is
+saved, `holding` turns `false` and commands work again; the finished order stays
+in `GET` until it is cleared or replaced by `create`. The order is saved in
+`/data/charge-job.json` before it may start charging; a service restart restores
+it as interrupted.
 
 ## Transport security
 

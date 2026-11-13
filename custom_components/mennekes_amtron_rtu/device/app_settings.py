@@ -56,6 +56,7 @@ _ASSETS = {
     "/": ("app_overview.html", "text/html"),
     "/connection": ("app_settings.html", "text/html"),
     "/app_overview.js": ("app_overview.js", "text/javascript"),
+    "/app_nav.js": ("app_nav.js", "text/javascript"),
     "/app_settings.js": ("app_settings.js", "text/javascript"),
     "/app_settings.css": ("app_settings.css", "text/css"),
 }
@@ -68,6 +69,11 @@ def _language(header: str) -> str:
         if tag in {"de", "en", "fr", "nl", "it"}:
             return tag
     return "en"
+
+
+def localize_page(content: bytes, accept_language: str) -> bytes:
+    """Set a page's language from the browser; every page script reads it."""
+    return content.replace(b'lang="en"', f'lang="{_language(accept_language)}"'.encode(), 1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -555,8 +561,7 @@ def add_settings_asset_routes(app: web.Application) -> None:
         resource = files(__package__).joinpath(filename)
         content = await asyncio.to_thread(resource.read_bytes)
         if content_type == "text/html":
-            language = _language(request.headers.get("Accept-Language", ""))
-            content = content.replace(b'lang="en"', f'lang="{language}"'.encode(), 1)
+            content = localize_page(content, request.headers.get("Accept-Language", ""))
         return web.Response(body=content, content_type=content_type)
 
     for path in _ASSETS:

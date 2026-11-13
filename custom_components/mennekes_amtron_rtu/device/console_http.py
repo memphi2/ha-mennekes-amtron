@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
-from .app_settings import SettingsError, create_settings_app
+from .app_settings import SettingsError, create_settings_app, localize_page
 from .console_runtime_settings import RuntimeSettingsConsole
 
 if TYPE_CHECKING:
@@ -55,7 +55,10 @@ def add_console_asset_routes(app: web.Application) -> None:
     async def asset(request: web.Request) -> web.Response:
         filename, content_type = CONSOLE_ASSETS[request.path]
         resource = files(__package__).joinpath(filename)
-        return web.Response(body=await asyncio.to_thread(resource.read_bytes), content_type=content_type)
+        content = await asyncio.to_thread(resource.read_bytes)
+        if content_type == "text/html":
+            content = localize_page(content, request.headers.get("Accept-Language", ""))
+        return web.Response(body=content, content_type=content_type)
 
     for path in CONSOLE_ASSETS:
         app.router.add_get(path, asset)

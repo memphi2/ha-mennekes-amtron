@@ -268,6 +268,22 @@ class AmtronControl:
             self._service_policy is not None and self._service_policy.stop_requested()
         )
 
+    def _stop_reason(self) -> str:
+        """Name the stop that refuses a start, so the user knows where to look.
+
+        A charge target wins: its stop stays after the app's order ends.
+        """
+        if not self.goal_stop_requested and (
+            self._service_policy is not None and self._service_policy.stop_requested()
+        ):
+            return "service_job"
+        return "energy_goal"
+
+    def stop_error(self) -> DeviceValidationError:
+        return validation_error(
+            "service_job_active" if self._stop_reason() == "service_job" else "energy_goal_stop_active"
+        )
+
     @property
     def energy_goal_guard(self) -> asyncio.Lock:
         """Serialize the goal owner with ordinary and deferred commands."""
@@ -302,7 +318,7 @@ class AmtronControl:
                 # Nothing charges without a car; a later poll pauses once one
                 # is plugged in.
                 return
-            self._clear_pending(outcome="cancelled", reason="energy_goal")
+            self._clear_pending(outcome="cancelled", reason=self._stop_reason())
             if self.is_paused is not False:
                 try:
                     # A former acknowledgement or cached poll is not proof of
@@ -632,7 +648,7 @@ class AmtronControl:
             manual = gate.manual
             if gate.enabled:
                 if released and self.energy_goal_stop_requested:
-                    raise validation_error("energy_goal_stop_active")
+                    raise self.stop_error()
                 # With Plug & Charge, a manual release opens the gate for the
                 # current or the next connection, for any car.
                 self._plug_charge.set_manual(released)
@@ -884,7 +900,7 @@ class AmtronControl:
         if transition and not phase_preparation and not energy_goal_stop:
             await self._async_check_transition_interval(current_change=True)
         if not paused and self.energy_goal_stop_requested:
-            raise validation_error("energy_goal_stop_active")
+            raise self.stop_error()
         try:
             await self._async_write(
                 CHARGING_CURRENT_EMS, value,
@@ -958,7 +974,7 @@ class AmtronControl:
             (spec == CHARGING_RELEASE and value == 1)
             or (spec == LOCK_EVSE and value == 0)
         ):
-            raise validation_error("energy_goal_stop_active")
+            raise self.stop_error()
         try:
             await self._async_write(
                 spec, value, min_interval=min_interval, refresh=False, precondition=precondition,
@@ -1116,7 +1132,7 @@ class AmtronControl:
         if self.energy_goal_stop_requested and command.action in (
             "set_current", "resume", "enable_charging", "unlock",
         ):
-            raise validation_error("energy_goal_stop_active")
+            raise self.stop_error()
         if command.action == "pause":
             await self._async_apply_current(
                 CHARGING_PAUSE_CURRENT, energy_goal_stop=command.energy_goal_stop,
@@ -1156,6 +1172,7 @@ class AmtronControl:
                 "phase_state_unknown": "phase_unconfirmed",
                 "read_only_mode": "permission_denied",
                 "energy_goal_stop_active": "energy_goal",
+                "service_job_active": "service_job",
             }.get(key, "write_rejected" if not self._uncertain(err) else "connection_error")
             if self._command_acknowledged:
                 self.events.record("executed", command.action, "status_refresh_failed")
@@ -1406,7 +1423,7 @@ class AmtronControl:
         if self._write_enables_charging(spec, value):
             owner = self._active_command.owner if self._active_command is not None else None
             if self._service_permits(owner, enabling=True) is False:
-                raise validation_error("energy_goal_stop_active")
+                raise validation_error("service_job_active")
         self._check_timed_command()
         if spec == CHARGING_RELEASE and value == 1:
             self._plug_charge.check_release(recovery=recovery_release)
@@ -1414,7 +1431,7 @@ class AmtronControl:
             self._write_enables_charging(spec, value) and self.energy_goal_stop_requested
             and not (recovery_release and spec == CHARGING_RELEASE)
         ):
-            raise validation_error("energy_goal_stop_active")
+            raise self.stop_error()
 
     async def _async_check_timed_vehicle(self, read: LockedRegisterReader) -> None:
         """Cancel a trip's command if live EVSE and CP both prove unplugging.
@@ -1449,7 +1466,9 @@ class AmtronControl:
         permission = self._service_permits(command.owner, enabling=command.action != "pause")
         if permission is not None:
             # A service order does not depend on HA's charge target.
-            return None if permission and not self.energy_goal_stop_requested else "energy_goal"
+            if permission and not self.energy_goal_stop_requested:
+                return None
+            return "energy_goal" if self.goal_stop_requested else "service_job"
         if self.soc_goal.status != "active" or self.soc_goal.target_percent <= 0 or self.energy_goal_stop_requested:
             return "energy_goal"
         return None

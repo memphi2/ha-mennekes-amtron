@@ -16,7 +16,7 @@ from .charge_job import UNKNOWN_GRACE
 from .charge_job_controller import ChargeJobController, JobInputs
 from .charge_job_store import ChargeJobStore
 from .control import AmtronControl, ServiceChargePolicy
-from .errors import DeviceError
+from .errors import DeviceError, validation_error
 from .service_console_runtime import ConsoleModbusService
 from .vehicle import snapshot_vehicle_connected
 
@@ -143,7 +143,7 @@ class JobModbusService(ConsoleModbusService):
         if jobs is not None and jobs.holding and "expected_serial_number" in payload and payload["expected_serial_number"] == self.identity.serial_number:
             command, value = payload.get("command"), payload.get("value")
             if (isinstance(command, str) and command in _COMPETING) or (command == "release" and value is True) or (command == "lock" and value is False):
-                raise DeviceError("energy_goal_stop_active")
+                raise validation_error("service_job_active")
             if command in ("pause", "cancel_pending") or (
                 command == "cancel_timed_current" and jobs.job is not None
                 and payload.get("owner") == f"service-job:{jobs.job.identifier}"

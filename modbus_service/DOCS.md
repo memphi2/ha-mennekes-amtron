@@ -99,8 +99,8 @@ for details.
 | **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with optional early start. |
 | **Guest charging** | An immediate, limited order for a visitor's car after local authorization. |
 
-Overview, Connection and Debug log are available in English, German, French,
-Dutch and Italian; the other pages in English and German.
+Every page is available in English, German, French, Dutch and Italian and has
+the same navigation bar.
 
 **Read-only** and the basic connection fields stay in the native
 **Configuration** tab. Avoid editing the native tab and a web page at the same
@@ -131,12 +131,12 @@ and pauses outside it, after the energy amount or when you stop it. It never
 switches the charging release on, unlocks the wallbox or authorizes a car;
 battery and energy targets in HA still stop it.
 
-While an order exists for the plugged-in car, HA cannot change the current,
-resume or switch phases; it reports that a charging target requires a pause.
-Pausing, switching the release off or locking in HA stops the order. After it
-ends, charging stays paused until you **clear** the order or unplug the car.
-Unplugging, an app restart or a wallbox that is unreadable for more than a
-minute interrupts an order; it never restarts by itself.
+While an order runs, HA cannot change the current, resume or switch phases; it
+reports that a charging job of the app controls charging. Pausing, switching the
+release off or locking in HA stops the order. When an order ends, the app pauses
+charging; once the wallbox confirms the pause, HA controls charging again and
+you can resume there. Unplugging, an app restart or a wallbox that is unreadable
+for more than a minute interrupts an order; it never restarts by itself.
 
 ## Daily use
 
@@ -260,7 +260,7 @@ removed, and keep protection enabled while investigating.
 | Token rejected | During setup, confirm discovery again. For an existing connection, HA refreshes access automatically; confirm a remaining prompt in Devices & services. See [renew service access](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/troubleshooting.md#renew-service-access). |
 | Service API or version incompatible | Update the app and the integration to the same release, app first. Changing the token does not fix this. |
 | Controls unavailable | Check **Read-only**. After changing it, save and restart the app, then wait for fresh status. Check the USB/LAN connection if controls stay unavailable. |
-| HA reports "A charging target requires a pause" | A charging job or guest order exists for the plugged-in car. Clear it on **Charging jobs**, or unplug the car. |
+| HA reports that a charging job of the app controls charging | A charging job or guest order runs for the plugged-in car. Stop it on **Charging jobs**, or unplug the car; HA controls charging again once the pause is confirmed. |
 | App stops immediately | The log's **Invalid or unreadable service configuration** message names the invalid setting or startup phase. |
 | Connection setup required | Select **Open Web UI → Connection**, configure USB or LAN, save and restart the app. |
 | The web page asks to update Supervisor | Update Supervisor to **2026.10.4 or newer**, or use the native **Configuration** tab meanwhile. |

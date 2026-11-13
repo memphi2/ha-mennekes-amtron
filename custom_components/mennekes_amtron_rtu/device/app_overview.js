@@ -5,9 +5,6 @@
   const language = languages.indexOf(document.documentElement.lang.split("-")[0]);
   const column = language < 0 ? 0 : language;
   const words = {
-    overview: ["Overview", "Übersicht", "Vue d’ensemble", "Overzicht", "Panoramica"],
-    connection: ["Connection", "Verbindung", "Connexion", "Verbinding", "Connessione"],
-    debug: ["Debug log", "Debug-Protokoll", "Journal de débogage", "Debuglog", "Registro di debug"],
     title: ["Charging overview", "Ladeübersicht", "Vue de la recharge", "Laadoverzicht", "Panoramica ricarica"],
     intro: ["Observed state and service decisions. This page does not change charging.", "Messzustand und Entscheidungen des Services. Diese Seite verändert die Ladung nicht.", "État observé et décisions du service. Cette page ne modifie pas la recharge.", "Gemeten toestand en beslissingen van de service. Deze pagina wijzigt het laden niet.", "Stato osservato e decisioni del servizio. Questa pagina non modifica la ricarica."],
     loading: ["Loading service state…", "Service-Zustand wird geladen…", "Chargement de l’état…", "Servicestatus laden…", "Caricamento dello stato…"],
@@ -87,15 +84,13 @@
     error_still_active: ["Fault still active", "Fehler weiterhin aktiv", "Défaut toujours actif", "Storing nog actief", "Guasto ancora attivo"],
     user_cancelled: ["Cancelled by user", "Vom Benutzer verworfen", "Annulé par l’utilisateur", "Door gebruiker geannuleerd", "Annullato dall’utente"],
     energy_goal: ["Charge target prevents command", "Ladeziel verhindert Befehl", "Objectif empêchant la commande", "Laaddoel voorkomt opdracht", "Obiettivo impedisce comando"],
+    service_job: ["Charging job prevents command", "Ladeauftrag verhindert Befehl", "Ordre de recharge empêchant la commande", "Laadopdracht voorkomt opdracht", "Ordine di ricarica impedisce comando"],
     deadline_expired: ["Deadline expired", "Gültigkeit abgelaufen", "Échéance dépassée", "Deadline verstreken", "Scadenza superata"]
   };
   const text = key => words[key]?.[column] ?? words.unknown[column];
   document.querySelectorAll("[data-overview]").forEach(node => { node.textContent = text(node.dataset.overview); });
   const el = id => document.getElementById(id);
-  if (!el("overview")) {
-    if (location.hash === "#debug") el("debug_tab")?.click();
-    return;
-  }
+  if (!el("overview")) return;
   const number = value => typeof value === "number" && Number.isFinite(value) && value >= 0;
   const format = (value, unit, digits = 1) => number(value)
     ? `${value.toLocaleString(languages[column], { maximumFractionDigits: digits })} ${unit}` : "—";

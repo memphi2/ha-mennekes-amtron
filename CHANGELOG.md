@@ -22,6 +22,9 @@ Update the app to 0.9.0b2 together with the integration.
   value is in one place; **Current L1** to **L3** are gone and keep no
   statistics of their own. The Recorder profiles now exclude signaled current
   and temperature (less detail) and also session energy (statistics only).
+- **Breaking: the "Recover from a lost heartbeat" blueprint is gone.** The
+  integration and the app recover error 200 by themselves. An unchanged
+  installed copy is removed at the next start; delete automations made from it.
 - **Breaking: Switch off charging release when unplugged starts switched
   off once.** It now keeps its setting while the wallbox is offline or
   read-only; switch it on again after the update.
@@ -65,6 +68,15 @@ Update the app to 0.9.0b2 together with the integration.
   Assistant disconnects. A job can be boosted to charge early for up to two
   hours (#64), and guest charging gives a locally authorized guest a bounded
   order (#65). None of them grants a release or unlocks the wallbox.
+- A finished, stopped or interrupted order hands control back to Home
+  Assistant once the wallbox confirms its pause. Charging stays paused until
+  you resume it in Home Assistant; clearing the order is no longer needed, and
+  a new order replaces a finished one.
+- While an app order runs, Home Assistant says that a charging job of the app
+  controls charging, instead of naming a charge target. The command results
+  use the new reason `service_job`.
+- All app pages are available in English, German, French, Dutch and Italian
+  and share one navigation bar.
 - **Docs:** [the app's web pages](docs/app-guide.md) explains the overview,
   charging jobs, boost, guest charging, registers and runtime settings in one
   guide. The separate update guide is gone; the release notes name every

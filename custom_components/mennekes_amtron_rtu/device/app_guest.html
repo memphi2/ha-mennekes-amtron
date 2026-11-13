@@ -5,17 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mennekes Amtron · Guest charging</title>
   <link rel="stylesheet" href="./app_settings.css">
+  <script src="./app_nav.js" defer></script>
   <script src="./app_guest.js" defer></script>
 </head>
 <body>
   <main id="guest">
     <p class="eyebrow">Mennekes Amtron</p>
-    <nav class="overview-nav" aria-label="Service">
-      <a href="./" data-text="overview">Overview</a>
-      <a href="./jobs" data-text="jobs">Charging jobs</a>
-      <a href="./guest" aria-current="page" data-text="title">Guest charging</a>
-      <a href="./registers" data-text="registers">Registers</a>
-    </nav>
+    <nav class="overview-nav" aria-label="Service" data-nav="guest"></nav>
     <h1 data-text="title">Guest charging</h1>
     <p data-text="intro">One immediate energy/time order for the connected guest vehicle. No battery data or saved vehicle target is used.</p>
     <p id="guest_notice" role="status" aria-live="polite"></p>

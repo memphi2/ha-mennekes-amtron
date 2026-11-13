@@ -5,18 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mennekes Amtron · Charging jobs</title>
   <link rel="stylesheet" href="./app_settings.css">
+  <script src="./app_nav.js" defer></script>
   <script src="./app_jobs.js" defer></script>
 </head>
 <body>
 <main id="jobs">
   <p class="eyebrow">Mennekes Amtron</p>
-  <nav class="overview-nav" aria-label="Service">
-    <a href="./" data-text="overview">Overview</a>
-    <a href="./jobs" aria-current="page" data-text="jobs">Charging jobs</a>
-    <a href="./runtime" data-text="runtime">Runtime</a>
-    <a href="./registers" data-text="registers">Registers</a>
-    <a href="./connection" data-text="connection">Connection</a>
-  </nav>
+  <nav class="overview-nav" aria-label="Service" data-nav="jobs"></nav>
   <h1 data-text="jobs">Charging jobs</h1>
   <p data-text="intro">A local time window with an additional-energy ceiling. Existing release and battery limits remain in force.</p>
   <p id="job_notice" role="status" aria-live="polite"></p>

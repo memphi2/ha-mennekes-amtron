@@ -20,6 +20,10 @@ Update the app together with integration 0.9.0b2.
   and read quality.
 - **Runtime:** preview new poll intervals and apply them without restarting
   the app.
+- A finished order hands control back to Home Assistant once the wallbox
+  confirms its pause; charging stays paused until you resume it there.
+- All pages are available in English, German, French, Dutch and Italian and
+  share one navigation bar.
 
 ## 0.9.0b1
 

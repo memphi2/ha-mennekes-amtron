@@ -455,16 +455,6 @@ def test_the_bundled_blueprints_run_as_automations(
                         },
                     },
                     {
-                        "alias": "recover",
-                        "use_blueprint": {
-                            "path": f"{DOMAIN}/recover_from_lost_heartbeat.yaml",
-                            "input": {
-                                "error_code": pick("binary_sensor.", "_error"),
-                                "recover_button": pick("_recover_from_error"),
-                            },
-                        },
-                    },
-                    {
                         "alias": "downgrade",
                         "use_blueprint": {
                             "path": f"{DOMAIN}/downgrade_notification.yaml",
@@ -478,7 +468,7 @@ def test_the_bundled_blueprints_run_as_automations(
             assert await async_setup_component(hass, "automation", config)
             await hass.async_block_till_done()
             automations = hass.states.async_all("automation")
-            assert len(automations) == 4
+            assert len(automations) == 3
             assert all(state.state == "on" for state in automations)
 
             # and the surplus one really drives the wallbox

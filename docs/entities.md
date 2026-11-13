@@ -204,7 +204,8 @@ when it runs, is replaced, or is cancelled; the pending sensors show the wait.
 The feed covers current, pause/resume, phase selection, release, locking and
 error recovery. Cancelling a queued action reports `cancelled` with reason
 `user_cancelled`; a kWh or percentage goal can cancel queued work with reason
-`energy_goal`. Solar display selection and restart do not publish command
+`energy_goal`. When a charging job of the app cancels queued work or refuses a
+queued command, the reason is `service_job`. Solar display selection and restart do not publish command
 outcomes.
 
 This is a live notification feed, not a durable audit log. It keeps at most 32

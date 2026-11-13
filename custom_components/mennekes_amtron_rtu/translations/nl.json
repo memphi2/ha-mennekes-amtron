@@ -609,6 +609,7 @@
               "unknown": "Onbekende reden",
               "user_cancelled": "Geannuleerd door de gebruiker",
               "energy_goal": "Stop door een laaddoel",
+              "service_job": "Stop door een laadopdracht van de app",
               "deadline_expired": "Vertrektijd verstreken"
             }
           }
@@ -746,6 +747,9 @@
     },
     "energy_goal_stop_active": {
       "message": "Een laaddoel vereist een pauze. Controleer de status. Stel na het bereiken van het doel of een meterreset een nieuw doel in of schakel het uit met 0 voordat je hervat. Het wijzigen van een doel start het laden niet."
+    },
+    "service_job_active": {
+      "message": "Een laadopdracht van de Modbus-app bestuurt nu het laden. Stop deze op de pagina Laadopdrachten van de app of koppel de auto los. Zodra de wallbox de pauze bevestigt, kun je hier weer de stroom wijzigen of hervatten."
     },
     "energy_goal_state_invalid": {
       "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."

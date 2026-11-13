@@ -219,8 +219,9 @@ async def check_connection_page(session: ClientSession, mode: str, original: dic
     headers = {"X-Remote-User-Id": "a" * 32, "X-Remote-User-Groups": "system-admin"}
     for path, expected_type in (
         ("/", "text/html"), ("/connection", "text/html"),
-        ("/app_overview.js", "text/javascript"),
+        ("/app_overview.js", "text/javascript"), ("/app_nav.js", "text/javascript"),
         ("/app_settings.js", "text/javascript"), ("/app_settings.css", "text/css"),
+        ("/jobs", "text/html"),
     ):
         async with session.get(SETTINGS_API + path, headers={"Accept-Language": "de-DE"}) as response:
             require(response.status == 200 and response.content_type == expected_type, "connection asset was not served")
@@ -228,6 +229,8 @@ async def check_connection_page(session: ClientSession, mode: str, original: dic
             require(bool(content) and SUPERVISOR_TOKEN not in content, "connection asset was empty or exposed a credential")
             if path == "/":
                 require('lang="de"' in content and 'id="overview"' in content, "translated overview page missing")
+            elif path == "/jobs":
+                require('lang="de"' in content and 'id="job_form"' in content, "translated charging job page missing")
             elif path == "/connection":
                 require('lang="de"' in content and 'id="serial_port"' in content, "translated connection page or adapter selector missing")
     async with session.get(SETTINGS_API + "/api/overview") as response:

@@ -1,6 +1,6 @@
 # Ready-made automations
 
-The integration includes six blueprints. Adding the wallbox installs them
+The integration includes five blueprints. Adding the wallbox installs them
 under **Settings → Automations & scenes → Blueprints**. Choose a blueprint,
 select **Create automation**, then choose the entities for the same wallbox.
 The PV sensor comes from your inverter or energy-management setup.
@@ -9,7 +9,6 @@ The PV sensor comes from your inverter or energy-management setup.
 |---|---|
 | **Charge from PV surplus** | Adjust the current while a vehicle is connected and charging is not paused |
 | **Pause and resume on PV surplus** | Pause below one power threshold and resume above a higher one, after a hold time |
-| **Recover from a lost heartbeat** | Not needed for normal use: the integration and app recover error 200 by themselves. An active copy only adds duplicate attempts. |
 | **Notify on a grid-operator downgrade** | Notify when a downgrade starts and ends |
 | **Plan the next trip from a calendar** | Copy one matching departure into the timed charging plan |
 | **Precondition before the next trip** | Run your vehicle climate action once before the selected departure |

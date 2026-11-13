@@ -305,7 +305,7 @@ class PlugChargeController:
         async with self._control.energy_goal_guard:
             self._check_request(session, deadline)
             if self._control.energy_goal_stop_requested:
-                raise validation_error("energy_goal_stop_active")
+                raise self._control.stop_error()
             await self._live_presence(self._control._client.async_read_register)
             self._check_request(session, deadline)
             current = await self._control._async_read_switch(CHARGING_RELEASE)

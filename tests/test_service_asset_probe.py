@@ -20,7 +20,8 @@ from scripts import service_image as images
 
 @pytest.mark.parametrize("broken", [
     None, "app_settings.html", "app_settings.js", "app_settings.css", "app_overview.html",
-    "app_overview.js", "app_jobs.js", "app_guest.html", "app_registers.js", "modified", "unrouted",
+    "app_overview.js", "app_nav.js", "app_jobs.js", "app_guest.html", "app_registers.js", "modified",
+    "unrouted",
 ])
 def test_image_probe_serves_isolated_installed_package_and_rejects_missing_or_changed_assets(
     tmp_path, monkeypatch, broken,
