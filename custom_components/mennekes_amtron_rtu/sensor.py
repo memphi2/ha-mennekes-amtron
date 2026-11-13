@@ -157,7 +157,10 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
             attributes = {"planned_start": observer.planned_start if observer is not None else None}
         elif key == "virtual_plug_charge_status":
             plug_charge = self.runtime_data.plug_charge
-            attributes = {"blocked_reason": plug_charge.blocked_reason if plug_charge is not None else None}
+            attributes = {
+                "blocked_reason": plug_charge.blocked_reason if plug_charge is not None else None,
+                "decision_reason": getattr(plug_charge, "decision_reason", None),
+            }
         return {name: value for name, value in attributes.items() if value is not None} or None
 
 
