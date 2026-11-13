@@ -280,6 +280,8 @@ class DepartureSample:
     order_active: bool
     # The phases the car draws on, None while the wallbox cannot tell.
     phases: int | None
+    # A command of another owner is queued, e.g. one by hand.
+    pending_foreign: bool = False
 
 
 class DepartureController:
@@ -608,6 +610,10 @@ class DepartureController:
             # it after it had applied. A pause that is still queued, or a
             # start that was lost, has not: the pause stays this plan's to end.
             self.plan_paused = self._pause_seen = False
+        elif self.plan_paused and not self._pause_seen and self._command_current is None and s.pending_foreign:
+            # Another command replaced the plan's queued pause: a pause that
+            # applies now is not the plan's to end.
+            self.plan_paused = self._command_submitted = False
         binding = self._binding(s)
         self.confirmed = binding == "confirmed"
         if binding == "confirmed":

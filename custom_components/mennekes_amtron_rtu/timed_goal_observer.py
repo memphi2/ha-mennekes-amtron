@@ -40,7 +40,7 @@ from .device.registers import EVSE_STATE
 from .device.timed_goal import TimedGoal, matches_departure_source
 from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
-from .goal_store import TimedGoalStore
+from .goal_store import PlanPause, PlanPauseStore, TimedGoalStore
 from .timed_goal_const import (
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
@@ -111,6 +111,7 @@ class TimedGoalObserver:
         self._options = vehicle_options(entry.options)
         self._runtime = entry.runtime_data
         self._store = TimedGoalStore(hass, entry.entry_id, entry.runtime_data.identity.serial_number or "")
+        self._pause_store = PlanPauseStore(hass, entry.entry_id, entry.runtime_data.identity.serial_number or "")
         self.goal = TimedGoal()
         self.status = "disabled"
         # When the plan starts, or started, charging for the open trip.
@@ -133,8 +134,13 @@ class TimedGoalObserver:
         self._command_current: float | None = None
         # The selected car's phases from its last charge, if it had one.
         self._known_phases: int | None = None
-        # This plan paused the wallbox until its late start.
+        # This plan paused the wallbox until its late start; saved, so the
+        # plan still ends that pause after a restart.
         self._plan_paused = False
+        # Whether the wallbox showed the plan's pause as applied.
+        self._pause_seen = False
+        # Whether the saved pause matches the one in memory.
+        self._pause_store_current = True
         # The trip changed here and the service has not taken it over yet.
         self._trip_dirty = False
 
@@ -144,6 +150,10 @@ class TimedGoalObserver:
         self._command_submitted = True
         await self._cancel_command()
         self.goal = await self._store.async_load()
+        try:
+            self._plan_paused = (await self._pause_store.async_load()).paused
+        except (OSError, ValueError) as err:
+            _LOGGER.warning("Saved departure plan pause unavailable: %s", type(err).__name__)
         if (profile := self._options.get(CONF_VEHICLE_PROFILE_ID)) is not None:
             self._known_phases = await self._phase_memory().async_phases(profile)
         options = self._options
@@ -463,6 +473,7 @@ class TimedGoalObserver:
         if self._runtime.control.supports_departure_plan is True:
             await self._follow_service()
             return
+        await self._observe_plan_pause()
         trip = self.goal
         deadline = trip.deadline
         if deadline is None:
@@ -654,7 +665,10 @@ class TimedGoalObserver:
         self._last_write_at = now
         self._command_submitted = True
         self._command_current = current
-        self._plan_paused = current is None
+        if current is None:
+            self._pause_seen = False
+        # Saved first: after a restart in between, the plan still ends it.
+        await self._set_plan_paused(current is None)
         await self._runtime.control.async_set_timed_current(
             current, deadline=deadline, owner=self._command_owner,
         )
@@ -680,7 +694,39 @@ class TimedGoalObserver:
         ):
             await control.async_resume_charging()
             _LOGGER.info("Departure plan pause ended: the plan no longer applies to the car")
-        self._plan_paused = False
+        await self._set_plan_paused(False)
+
+    async def _observe_plan_pause(self) -> None:
+        """Keep only a pause that is still the plan's own."""
+        if not self._plan_paused:
+            return
+        control = self._runtime.control
+        if control.is_paused is True:
+            self._pause_seen = True
+        elif control.is_paused is False and self._pause_seen:
+            # Someone ended the plan's pause after it had applied.
+            await self._set_plan_paused(False)
+        elif (
+            not self._pause_seen and control.pending_action is not None
+            and control.pending_owner != self._command_owner
+        ):
+            # Another command replaced the plan's queued pause: a pause that
+            # applies now is not the plan's to end.
+            self._command_submitted = False
+            await self._set_plan_paused(False)
+
+    async def _set_plan_paused(self, paused: bool) -> None:
+        if paused == self._plan_paused and self._pause_store_current:
+            return
+        self._plan_paused = paused
+        try:
+            await self._pause_store.async_save(PlanPause(paused))
+        except (OSError, ValueError) as err:
+            # The plan keeps it in memory; it is lost only with a restart.
+            self._pause_store_current = False
+            _LOGGER.warning("Departure plan pause could not be saved: %s", type(err).__name__)
+        else:
+            self._pause_store_current = True
 
     async def _wait_for_input(self, status: str, *, keep_start: bool = False) -> None:
         # Keep an already applied charge unchanged, but do not let an older

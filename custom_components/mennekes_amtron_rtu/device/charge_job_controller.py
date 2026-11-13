@@ -59,6 +59,8 @@ class JobInputs:
     # Only the Plug & Charge release is missing, as after an app restart:
     # an order waits for Home Assistant's grant instead of ending.
     release_waiting: bool = False
+    # False while the error, lock or release value is held from a lost reply.
+    status_known: bool = True
     # The wallbox's record of the current plug-in, None until read in full.
     session: SessionMark | None = None
 
@@ -132,7 +134,8 @@ class ChargeJobController:
         # A closing service must not continue its own suspended order.
         closing = self._closing
         job.observe(
-            now=sample.now, available=sample.available, present=sample.present,
+            # A held status is a short gap: it cannot prove a stop.
+            now=sample.now, available=sample.available and sample.status_known, present=sample.present,
             matches=sample.scope == job.binding, total_kwh=sample.total_kwh,
             meter_fresh=sample.meter_fresh,
             independent_stop=(
@@ -144,19 +147,24 @@ class ChargeJobController:
         if before != _decision(job.snapshot()):
             self._changed()
 
-    def stop_requested(self) -> bool:
-        """Recheck time/freshness even between the scheduler's ordinary ticks."""
+    def stop_requested(self, *, gate: bool = True) -> bool:
+        """Recheck time/freshness even between the scheduler's ordinary ticks.
+
+        ``gate=False`` leaves out a release that only Plug & Charge keeps
+        closed: the order waits for that grant, which may then open it.
+        """
         if not self.ready or self.storage_error or self._closing:
             return True
         job = self.job
         if job is None or job.scope_ended or self._settled:
             return False
         sample = self.inputs()
+        permitted = sample.permitted or (not gate and sample.release_waiting)
         return (
             job.stop_requested or self._durable != _decision(job.snapshot())
             or not sample.available or sample.present is not True
             or sample.scope != job.binding or not sample.meter_fresh
-            or sample.independent_stop or not sample.permitted or self._vehicle_conflict(sample)
+            or sample.independent_stop or not permitted or self._vehicle_conflict(sample)
             or not job.allows_at(sample.now, total_kwh=sample.total_kwh)
         )
 
@@ -358,7 +366,7 @@ class ChargeJobController:
         self.observe()
         await self._save()
         sample = self.inputs()
-        if not sample.available or sample.present is not True:
+        if not sample.available or sample.present is not True or not sample.status_known:
             return
         job = self.job
         if not self.holding and not self.storage_error:

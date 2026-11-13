@@ -14,9 +14,9 @@ class WeeklyChargeJobs(ChargeJobController):
     manual_stop_epoch = 0
     _stop_unconfirmed = False
 
-    def stop_requested(self) -> bool:
+    def stop_requested(self, *, gate: bool = True) -> bool:
         """Fence an in-flight start before the stop obtains the owner lock."""
-        return self._stop_unconfirmed or super().stop_requested()
+        return self._stop_unconfirmed or super().stop_requested(gate=gate)
 
     def current_policy(self, owner: str | None, enabling: bool) -> bool | None:
         if enabling and self._stop_unconfirmed:

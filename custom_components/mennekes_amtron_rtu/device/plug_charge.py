@@ -233,6 +233,11 @@ class PlugChargeController:
             self._end_manual_stop()
             await self.async_sync_locked()
 
+    @property
+    def authorizing(self) -> bool:
+        """Home Assistant's grant is being written."""
+        return self._authorizing is not None
+
     def check_release(self, *, recovery: bool = False) -> None:
         if self._authorizing is not None:
             self._check_request(*self._authorizing)
@@ -304,7 +309,7 @@ class PlugChargeController:
             raise validation_error("plug_charge_authorization_expired")
         async with self._control.energy_goal_guard:
             self._check_request(session, deadline)
-            if self._control.energy_goal_stop_requested:
+            if self._control.release_stop_requested:
                 raise self._control.stop_error()
             await self._live_presence(self._control._client.async_read_register)
             self._check_request(session, deadline)

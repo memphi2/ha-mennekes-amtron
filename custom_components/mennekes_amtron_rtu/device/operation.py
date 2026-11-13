@@ -124,7 +124,7 @@ def summarize(
         elif state == "suspended":
             waits = "job_suspended"
         elif state in TERMINAL:
-            # The order keeps its pause until the car is unplugged.
+            # A finished order holds until its pause is confirmed or the car leaves.
             waits = "job_ended"
     elif planning:
         controller = "departure_plan"

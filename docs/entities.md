@@ -91,7 +91,7 @@ nothing from it. They are absent with a direct serial or LAN connection.
 
 | State | Meaning |
 |---|---|
-| Guest order, Charging job, Weekly plan | An [order from the app](app-guide.md#charging-jobs) holds the wallbox until it ends and the car is unplugged or the order is cleared. A weekly plan also shows here while it waits for its next window. |
+| Guest order, Charging job, Weekly plan | An [order from the app](app-guide.md#charging-jobs) holds the wallbox until it ends and the wallbox confirms its last pause, or until the car is unplugged. A weekly plan also shows here while it waits for its next window. |
 | Departure planning | A [departure](departure-planning.md#with-the-modbus-service-app) is set and not finished. |
 | Direct control | No plan or order: your switches, numbers, targets and automations apply. |
 | Wallbox unavailable | The app has no current reading. |

@@ -277,9 +277,10 @@ charging, and the job for the next departure is created when its window opens,
 under the same conditions as every later departure. While another order holds
 the wallbox, the plan waits without using up the date. The
 [immediate reserve](#immediate-reserve) therefore charges at once only after an
-activation by hand; for a level the car should always have, use the
+activation by hand. The
 [minimum charge level](departure-planning.md#minimum-charge-level) of departure
-planning.
+planning also charges at once, but only while a departure is set and no order
+of the app holds the wallbox.
 
 A departure whose job ended before its window opened, because the car left and
 came back or the app restarted, is charged at its window all the same. A

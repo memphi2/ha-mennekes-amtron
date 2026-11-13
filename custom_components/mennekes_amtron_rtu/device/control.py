@@ -123,11 +123,14 @@ class ServiceChargePolicy:
 
     ``permits(owner, enabling)`` answers for commands the order owns: True
     lets them run, False refuses them, None leaves them to the ordinary
-    rules. ``stop_requested`` adds the order's own stop to the goal stops.
+    rules. ``stop_requested`` adds the order's own stop to the goal stops;
+    ``release_stop_requested`` is that stop without a release that only
+    Plug & Charge keeps closed, and ``stop_requested`` when not given.
     """
 
     permits: Callable[[str | None, bool], bool | None]
     stop_requested: Callable[[], bool]
+    release_stop_requested: Callable[[], bool] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +273,19 @@ class AmtronControl:
             self._service_policy is not None and self._service_policy.stop_requested()
         )
 
+    @property
+    def release_stop_requested(self) -> bool:
+        """The stops that refuse Plug & Charge its grant.
+
+        An order that waits only for that grant is none: the grant opens the
+        release for it.
+        """
+        policy = self._service_policy
+        if policy is None:
+            return self.goal_stop_requested
+        check = policy.release_stop_requested or policy.stop_requested
+        return self.goal_stop_requested or check()
+
     def _stop_reason(self) -> str:
         """Name the stop that refuses a start, so the user knows where to look.
 
@@ -379,12 +395,18 @@ class AmtronControl:
             raise validation_error("soc_goal_not_supported")
         await self.soc_goal_controller.async_observe(soc, maximum, source=source)
 
-    def cancel_goal_resume(self) -> None:
-        """Invalidate automatic requests calculated for a previous goal."""
+    def cancel_goal_resume(self, *, replaced: bool = False) -> None:
+        """Invalidate automatic requests calculated for a previous goal.
+
+        ``replaced``: a command by hand takes the queued one's place.
+        """
         if self._pending is not None and (
             self._pending.recovery_generation is not None or self._pending.owner is not None
         ):
-            self._clear_pending(outcome="cancelled", reason="energy_goal")
+            self._clear_pending(
+                outcome="replaced" if replaced else "cancelled",
+                reason="replaced" if replaced else "energy_goal",
+            )
             if self._notify_pending is not None:
                 self._notify_pending()
 
@@ -431,6 +453,11 @@ class AmtronControl:
     def pending_action(self) -> str | None:
         """Return the latest queued command without changing actual readback."""
         return self._pending.action if self._pending else None
+
+    @property
+    def pending_owner(self) -> str | None:
+        """The owner of the queued command; None for a command by hand."""
+        return self._pending.owner if self._pending else None
 
     @property
     def pending_until(self) -> datetime | None:
@@ -1493,7 +1520,12 @@ class AmtronControl:
         # Observations can latch a stop while this command awaits the bus or
         # physical identity. Recheck under the bus lock, immediately before
         # sending, so a refused start neither writes nor consumes the 5s floor.
-        if self._write_enables_charging(spec, value):
+        # Home Assistant's grant opens a release that an order waits for.
+        grant = (
+            spec == CHARGING_RELEASE and value == 1 and self._plug_charge.authorizing
+            and not self.release_stop_requested
+        )
+        if self._write_enables_charging(spec, value) and not grant:
             owner = self._active_command.owner if self._active_command is not None else None
             if self._service_permits(owner, enabling=True) is False:
                 raise validation_error("service_job_active")
@@ -1502,7 +1534,7 @@ class AmtronControl:
             self._plug_charge.check_release(recovery=recovery_release)
         if (
             self._write_enables_charging(spec, value) and self.energy_goal_stop_requested
-            and not (recovery_release and spec == CHARGING_RELEASE)
+            and not (recovery_release and spec == CHARGING_RELEASE) and not grant
         ):
             raise self.stop_error()
 

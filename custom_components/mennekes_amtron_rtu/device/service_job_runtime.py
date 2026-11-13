@@ -26,6 +26,8 @@ _STAMP_TOLERANCE_SECONDS = 24 * 3600.0
 # Goal metadata may still reduce a limit. Competing planners and enabling
 # manual writes must explicitly relinquish the local job before taking over.
 _COMPETING = frozenset({"set_current", "resume", "timed_current", "solar", "phases", "recover", "restart"})
+# The wallbox state an order's stop is judged on.
+_STATUS_KEYS = ("error_code", "lock_evse", "charging_release")
 
 
 class JobModbusService(ConsoleModbusService):
@@ -38,6 +40,9 @@ class JobModbusService(ConsoleModbusService):
     # This connection's session clock and energy with their read time, and
     # the lifetime session counter; cleared with the scope.
     _job_session: dict[str, Any] | None = None
+    # Whether Plug & Charge held the release closed during the latest poll:
+    # a grant opens it before a poll can show that.
+    _gate_read = False
 
     def _configure_control(self, control: AmtronControl) -> None:
         identity = self.identity.serial_number or f"{self.config.connection.port}:{self.config.connection.device_id}"
@@ -45,12 +50,16 @@ class JobModbusService(ConsoleModbusService):
             ChargeJobStore(self.state_path.with_name("charge-job.json"), identity),
             self._job_inputs, self._apply_job_current,
         )
-        control.set_service_policy(ServiceChargePolicy(self.jobs.current_policy, self.jobs.stop_requested))
+        jobs = self.jobs
+        control.set_service_policy(ServiceChargePolicy(
+            jobs.current_policy, jobs.stop_requested, lambda: jobs.stop_requested(gate=False),
+        ))
 
     async def _initialize(self) -> None:
         self._job_scope = None
         self._job_unknown_since = None
         self._job_session = None
+        self._gate_read = False
         await super()._initialize()
         if self.jobs is None:
             raise RuntimeError("job controller was not configured")
@@ -106,8 +115,11 @@ class JobModbusService(ConsoleModbusService):
         )
         gate = self.client.write_state.plug_charge.blocked
         permitted = sound and not gate and self.data.fresh("charging_release") == 1
-        # The gate closes the release itself; nobody switched it off.
-        release_waiting = sound and gate and not permitted
+        # The gate closes the release itself; nobody switched it off. Until a
+        # poll ran with the gate open, a closed release is still the gate's.
+        release_waiting = sound and (gate or self._gate_read) and not permitted
+        # One lost reply holds these values: no stop can be told from a gap.
+        status_known = not any(key in self.data.held for key in _STATUS_KEYS)
         current_value = float(current) if valid_current and isinstance(current, (int, float)) else None
         total_value = float(total) if fresh and isinstance(total, (int, float)) else None
         return JobInputs(
@@ -116,7 +128,7 @@ class JobModbusService(ConsoleModbusService):
             control.max_charging_current if control is not None else 6,
             control is not None and control.pending_action is not None,
             vehicle_target_active=control is not None and control.soc_goal.target_percent > 0,
-            session=session, release_waiting=release_waiting,
+            session=session, release_waiting=release_waiting, status_known=status_known,
         )
 
     def _note_session(self) -> None:
@@ -135,10 +147,13 @@ class JobModbusService(ConsoleModbusService):
 
     async def refresh(self) -> None:
         polled = False
+        gate = self.client.write_state.plug_charge.blocked
         try:
             await super().refresh()
             polled = True
         finally:
+            if polled:
+                self._gate_read = gate or self.client.write_state.plug_charge.blocked
             present = snapshot_vehicle_connected(
                 self.data.fresh, self.identity.layout_version,
             ) if self._is_available() else None

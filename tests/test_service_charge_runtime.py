@@ -504,3 +504,61 @@ def test_an_order_waits_for_the_plug_charge_grant_instead_of_ending(tmp_path):
             c.observe()
             assert (c.job.state, c.job.reason) == ("interrupted", "independent_stop")
     asyncio.run(run())
+
+
+def test_home_assistant_grants_the_release_an_order_waits_for(tmp_path):
+    async def run():
+        async with job_service(tmp_path) as (s, transport, clock):
+            c = s.jobs
+            values = c.snapshot()
+            await c.create(request(), revision=values["revision"], scope=values["scope"])
+            await c.tick()
+            clock[0] += 1000
+            await s.control.async_configure_plug_charge(True, policy="")
+            clock[0] += 10
+            await s.refresh()
+            await c.tick()
+            assert (c.job.state, current_writes(transport)[-1]) == ("charging", 1)
+            # Only the gate waits: the order does not refuse Home Assistant its
+            # grant, a target's stop still would.
+            assert c.stop_requested()
+            assert not s.control.release_stop_requested
+            clock[0] += 1000
+            await s.control.async_authorize_plug_charge(
+                s.control.plug_charge["session"], deadline=datetime.now(UTC) + timedelta(seconds=10),
+            )
+            assert transport.bank[R.CHARGING_RELEASE.address] == 1
+            # Until a poll shows the open release, the order keeps waiting.
+            assert s._job_inputs().release_waiting
+            c.observe()
+            assert c.job.state == "charging"
+            clock[0] += 10
+            await s.refresh()
+            assert s._job_inputs().permitted
+            await c.tick()
+            assert (c.job.state, current_writes(transport)[-1]) == ("charging", 12)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("block", [R.CABLE_LOCK_STATUS.address, R.ERROR_CODE.address])
+def test_one_lost_reply_of_the_wallbox_status_does_not_end_an_order(tmp_path, block):
+    async def run():
+        async with job_service(tmp_path) as (s, transport, clock):
+            c = s.jobs
+            values = c.snapshot()
+            await c.create(request(), revision=values["revision"], scope=values["scope"])
+            await c.tick()
+            writes = current_writes(transport)
+            clock[0] += 10
+            # An exception reply: the poll holds the block's values.
+            transport.read_exceptions[block] = 4
+            await s.refresh()
+            assert not s._job_inputs().status_known
+            await c.tick()
+            assert (c.job.state, current_writes(transport)) == ("charging", writes)
+            transport.read_exceptions.pop(block)
+            clock[0] += 10
+            await s.refresh()
+            await c.tick()
+            assert (c.job.state, current_writes(transport)) == ("charging", writes)
+    asyncio.run(run())

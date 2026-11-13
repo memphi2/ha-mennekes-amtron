@@ -405,7 +405,7 @@ class WeeklyController:
                     # by hand and keep its date used.
                     await self._disarm("session_ended", stop=sample.present is not False)
                 return
-            if not sample.available or sample.present is None:
+            if not sample.available or sample.present is None or not sample.status_known:
                 # A short gap: the order and the connection scope bound it.
                 return
             own = job is not None and job.identifier == consent.job_id
@@ -426,8 +426,9 @@ class WeeklyController:
                     await self._disarm("job_stopped")
                     return
                 if not job.terminal:
-                    # The running order stops for these as well; so does the plan.
-                    if sample.independent_stop or not sample.permitted:
+                    # The running order stops for these as well; so does the
+                    # plan. It waits with its order for Plug & Charge's grant.
+                    if sample.independent_stop or not (sample.permitted or sample.release_waiting):
                         await self._disarm("session_ended")
                     return
                 if sample.now < job.finish_at:

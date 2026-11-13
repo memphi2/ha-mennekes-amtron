@@ -81,6 +81,10 @@ class DepartureModbusService(ForecastModbusService):
             goal_stop=control is not None and control.energy_goal_stop_requested,
             order_active=self.jobs is not None and self.jobs.holding,
             phases=self._rate_phases() or None,
+            pending_foreign=(
+                control is not None and control.pending_action is not None
+                and control.pending_owner != DEPARTURE_OWNER
+            ),
         )
 
     async def _apply_departure(self, value: float | None, deadline: datetime) -> None:
@@ -200,7 +204,8 @@ class DepartureModbusService(ForecastModbusService):
             control=snapshot["control"], departure=snapshot["control"]["departure"],
             job=jobs.snapshot()["job"] if jobs is not None and ready else None,
             weekly=weekly.waiting() if weekly is not None and weekly.ready else None,
-            goal_stop=control is not None and control.energy_goal_stop_requested,
+            # Only a charge target's stop is a reached target; an order names its own.
+            goal_stop=control is not None and control.goal_stop_requested,
         )
 
     async def stop(self) -> None:

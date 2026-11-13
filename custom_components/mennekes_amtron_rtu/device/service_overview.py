@@ -144,5 +144,6 @@ async def service_overview(service: ModbusService | None) -> dict[str, Any]:
     control = service.control
     return overview_snapshot(
         snapshot, ready=control is not None, held=service.data.held,
-        goal_stop=control.energy_goal_stop_requested if control is not None else False,
+        # An order that waits for Plug & Charge shows as waiting for it.
+        goal_stop=control.release_stop_requested if control is not None else False,
     )

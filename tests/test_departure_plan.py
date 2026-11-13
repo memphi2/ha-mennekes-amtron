@@ -233,6 +233,37 @@ def test_the_plan_saves_its_pause_before_the_wallbox_pauses(tmp_path):
     run(go())
 
 
+def test_a_pause_by_hand_that_replaced_the_plans_queued_pause_stays(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        await plan.tick()
+        assert plan.plan_paused
+        # The user resumes by hand; the plan queues its pause again.
+        box.set(paused=False, pause_requested=False)
+        await plan.tick()
+        assert not plan.plan_paused
+
+        async def queue(value, _deadline):
+            box.writes.append(value)
+            box.set(pending=True)
+
+        plan._apply = queue
+        box.clock[0] += 300
+        await plan.tick()
+        assert plan.plan_paused
+        # A pause by hand replaces the queued one and then applies.
+        box.set(pending_foreign=True)
+        await plan.tick()
+        assert not plan.plan_paused
+        box.set(pending=False, pending_foreign=False, paused=True, pause_requested=True)
+        await plan.tick()
+        await plan.set_trip(None, None)
+        await plan.tick()
+        assert (box.resumes, box.state.paused) == (0, True)
+    run(go())
+
+
 def test_only_a_start_that_passed_is_saved(tmp_path):
     async def go():
         box = Box(tmp_path)

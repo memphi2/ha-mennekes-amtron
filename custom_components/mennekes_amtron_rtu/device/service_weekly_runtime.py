@@ -29,7 +29,10 @@ class WeeklyModbusService(JobModbusService):
             ChargeJobStore(self.state_path.with_name("charge-job.json"), identity),
             self._job_inputs, self._apply_job_current,
         )
-        control.set_service_policy(ServiceChargePolicy(self.jobs.current_policy, self.jobs.stop_requested))
+        jobs = self.jobs
+        control.set_service_policy(ServiceChargePolicy(
+            jobs.current_policy, jobs.stop_requested, lambda: jobs.stop_requested(gate=False),
+        ))
         self.weekly = WeeklyController(
             WeeklyStore(self.state_path.with_name("weekly-plans.json"), identity), self.jobs,
             lambda: self._confirmed_vehicle(),

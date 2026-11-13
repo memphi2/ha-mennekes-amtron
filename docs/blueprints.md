@@ -159,6 +159,9 @@ pause replaces the pending resume and also waits for its due time. See
   [Home Assistant trigger documentation](https://www.home-assistant.io/docs/automation/trigger/#template-trigger).
 - Avoid competing automations that write the current or pause switch. A
   tariff schedule, manual command or phase change can conflict with PV control.
+- While an [order of the app](app-guide.md#charging-jobs) charges, the app
+  refuses the current blueprint's writes, and a pause from the pause/resume
+  blueprint stops the order; a weekly plan then forgets its car.
 
 These are convenience automations, not house-connection overload protection.
 Review [Safety and limitations](safety.md) and test the behavior with your

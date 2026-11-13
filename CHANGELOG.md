@@ -139,6 +139,13 @@ Update the app to 0.9.0b2 together with the integration.
 - **One lost poll no longer pauses a charge with a kWh target**, a small
   clock correction no longer pauses a running order, and a failing disk no
   longer shows the wallbox as unavailable.
+- **An order of the app continues after Home Assistant's Plug & Charge grant.**
+  Before, an order that waited for the grant, as after an app restart,
+  refused it and stayed paused, and a weekly plan ended. One lost reply of the
+  wallbox's status no longer ends an order either.
+- **Home Assistant's own departure plan still ends its pause after a restart**
+  of Home Assistant, and no departure plan ends a pause made by hand that
+  replaced its queued pause.
 - **A saved app state of another wallbox, or a damaged one, no longer keeps
   the app from starting.** The app starts as on its first run and replaces the
   file. After a failed save the weekly plans work again once their file reads

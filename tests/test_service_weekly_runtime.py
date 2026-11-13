@@ -47,6 +47,36 @@ def test_weekly_activation_runs_through_the_existing_guarded_service(tmp_path, m
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("cause", ["plug_charge", "lost_reply"])
+def test_a_weekly_order_survives_the_gate_and_one_lost_reply(tmp_path, monkeypatch, cause):
+    async def run():
+        monkeypatch.setattr(runtime, "JobModbusService", m.WeeklyModbusService)
+        async with runtime.job_service(tmp_path) as (service, transport, clock):
+            now = datetime.now(UTC)
+            finish = now + timedelta(hours=2)
+            w = service.weekly
+            await w.save_plan(recipe(departure_time=finish.strftime("%H:%M"), charge_minutes=30), revision=w.revision)
+            await w.activate(w.preview_activation(PLAN, "fixture", revision=w.revision, scope=service.jobs.inputs().scope))
+            original = service.jobs.inputs
+            service.jobs.inputs = lambda: replace(original(), now=finish - timedelta(minutes=15))
+            clock[0] += 1000
+            await service.jobs.tick()
+            assert service.jobs.job.state == "charging"
+            clock[0] += 1000
+            if cause == "plug_charge":
+                # As after an app restart: the gate waits for Home Assistant.
+                await service.control.async_configure_plug_charge(True, policy="")
+            else:
+                transport.read_exceptions[runtime.R.ERROR_CODE.address] = 4
+            clock[0] += 10
+            await service.refresh()
+            await service.jobs.tick()
+            await w.tick()
+            assert service.jobs.job.state == "charging"
+            assert (w.consent is not None, w.reason) == (True, "active")
+    asyncio.run(run())
+
+
 def test_bad_weekly_storage_does_not_restart_the_working_bus(tmp_path, monkeypatch):
     async def run():
         (tmp_path / "weekly-plans.json").write_text("{")

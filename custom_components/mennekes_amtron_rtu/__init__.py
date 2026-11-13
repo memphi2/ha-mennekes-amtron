@@ -95,6 +95,7 @@ from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import (
     GoalStore,
     ModelStore,
+    PlanPauseStore,
     SessionHistoryStore,
     SocGoalStore,
     TimedGoalStore,
@@ -978,6 +979,7 @@ async def async_remove_entry(
     await SocGoalStore(hass, entry.entry_id, "").async_remove()
     await VehicleTargetStore(hass, entry.entry_id, "").async_remove()
     await TimedGoalStore(hass, entry.entry_id, "").async_remove()
+    await PlanPauseStore(hass, entry.entry_id, "").async_remove()
     await VehicleTripStore(hass, entry.entry_id, "").async_remove()
     await VehiclePhaseStore(hass, entry.entry_id, "").async_remove()
     await VehicleBindingStore(hass, entry.entry_id, "").async_remove()
