@@ -57,6 +57,11 @@ Integration only; the app stays at 0.9.0b1.
   of retrying the setup forever.
 - Includes the changes of #56 to #62: departure finishing window, Plug &
   Charge decision reasons, and the app's overview, register and runtime pages.
+- The app runs charging jobs on its own (#63): an energy and time order for
+  the current connection, with preview, confirmation and stop, kept when Home
+  Assistant disconnects. A job can be boosted to charge early for up to two
+  hours (#64), and guest charging gives a locally authorized guest a bounded
+  order (#65). None of them grants a release or unlocks the wallbox.
 
 ## 0.9.0b1 — 2026-11-12
 
