@@ -221,8 +221,9 @@ recurring failures require their logged cause to be corrected.
 
 Pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. A charging job is saved in
-`charge-job.json`, weekly plans in `weekly-plans.json` and learned charging power
-in `charge-rates.json` the same way. The file is atomically replaced with
+`charge-job.json`, weekly plans in `weekly-plans.json`, learned charging power
+in `charge-rates.json` and the departure plan in `departure-plan.json` the same
+way. The file is atomically replaced with
 owner-only permissions when those settings change. Both the file and directory
 are synced before a save is considered complete. This is bounded state rather
 than a growing history. Include the data directory in backups and protect its
@@ -295,8 +296,40 @@ the service, so an obsolete queued request expires even while HA is offline.
 Expiry and cancellation do not reverse a command already applied or alter the
 last charging state. The integration cancels its owned pending work when a plan
 is cleared, replaced, completed or unloaded. Pending work remains volatile and
-is not restored after a service restart. The service still maintains heartbeat;
-HA must be running to recalculate the departure plan and start climate actions.
+is not restored after a service restart. The integration uses these two
+commands only with a service that does not plan departures itself.
+
+### Departure plan
+
+The service plans a departure itself; see
+[departure planning](departure-planning.md#with-the-modbus-service-app). The
+snapshot's `control` object reports `supports_departure_plan: true` and
+`departure`, which is `null` while the saved plan loads:
+
+| Field | Meaning |
+|---|---|
+| `trip` | `deadline` (ISO timestamp or `null`), `source` and `finished` (`reached`, `late` or `null`) |
+| `status` | The plan's state, as shown by **Timed charging status** |
+| `planned_start` | When charging starts or started for this trip, or `null` |
+| `estimated_soc` | The projected charge level in percent, or `null` |
+| `inputs` | Digest of the car data last handed over, or `null` |
+| `scope` | Opaque digest of the current plug-in, or `null` without a car |
+| `confirmed` | Whether the handed-over car is confirmed for this plug-in |
+
+Two commands hand the plan over. Both need `expected_serial_number`, reject
+other fields and are accepted while the wallbox is unreachable, because they
+access no bus:
+
+| Command | Additional fields | Behavior |
+|---|---|---|
+| `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
+| `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent` and `soc_observed_at` | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
+
+The plan writes through the same guarded path as `timed_current`, with the
+owner `departure`. It is saved in `/data/departure-plan.json`, at most 8 KiB
+and bound to the wallbox identity. An unreadable file only clears the plan
+until Home Assistant hands it over again. HA must be running to start climate
+actions.
 
 The service compares this precondition with its initialized wallbox identity
 while holding the command lock, before writing. A missing field or mismatched

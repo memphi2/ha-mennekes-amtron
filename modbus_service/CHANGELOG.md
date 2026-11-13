@@ -19,6 +19,11 @@ Update the app together with integration 0.9.0b2.
 - **Weekly plans:** recurring departures for one car. An activation for the
   plugged-in car creates the job for each departure, when its window opens, for
   up to seven days. Between departures Home Assistant controls charging.
+- **Departure planning in the app:** Home Assistant hands over the next
+  departure, the car's capacity and its charge levels; the app plans start and
+  current itself, also while Home Assistant is offline. Without new reports
+  from the car it projects the charge level from the metered energy and pauses
+  at the target.
 - **Immediate reserve:** a job or the first departure of a weekly plan can
   charge part of its energy amount at once, then wait for the planned start.
 - **Finish estimate:** the Charging jobs page shows when an order will

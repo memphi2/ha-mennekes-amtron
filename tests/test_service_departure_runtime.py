@@ -120,7 +120,7 @@ def test_departure_commands_are_validated_before_the_plan_sees_them(departure_se
             plan, s.departure = s.departure, None
             with pytest.raises(DeviceError, match="service_unavailable"):
                 await s.command(trip)
-            assert s.snapshot()["control"]["supports_departure_plan"] is False
+            assert s.snapshot()["control"]["supports_departure_plan"] is True
             assert s.snapshot()["control"]["departure"] is None
             s.departure = plan
     asyncio.run(run())

@@ -190,7 +190,7 @@ register-write guards and heartbeat remain active.
 
 | Event | What happens |
 |---|---|
-| HA Core restarts or stays offline | The running app keeps heartbeat and accepted charging intent, and a charging job keeps running. An already queued command can execute while HA is offline, up to its expiry if it belongs to a timed departure plan. |
+| HA Core restarts or stays offline | The running app keeps heartbeat and accepted charging intent; a charging job and a handed-over [departure plan](departure-planning.md#with-the-modbus-service-app) keep running. An already queued command can execute while HA is offline. |
 | HA automation is unavailable | No new schedule or surplus calculation runs; the app holds the last chosen state. |
 | App, host, power, USB or LAN/gateway connection fails | The heartbeat can stop. The wallbox's configured fallback applies. |
 | HA reconnects | HA reads the current app state; it does not restore old commands. |

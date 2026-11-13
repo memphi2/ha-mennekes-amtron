@@ -165,7 +165,8 @@ See
   See [target behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/user-guide.md#energy-target).
 - **Next departure:** set a charging deadline for one trip in HA. This optional
   plan may resume a pause to meet the time; ordinary kWh or percentage limits
-  never do. The app discards queued timed-plan commands after their deadline.
+  never do. HA hands the trip and the car's data to the app, which plans start
+  and current itself and keeps doing so while HA is offline.
   See [departure planning](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/departure-planning.md).
 - **Loss and cost estimates:** choose optional vehicle and price sources in the
   integration options. See [charging estimates](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b2/docs/charging-estimates.md).
@@ -188,10 +189,11 @@ needs neither confirmation nor the extra wait.
 
 HA can remain offline indefinitely while the app holds the last charging state.
 Automations cannot produce new settings during that outage. The app still runs
-a command queued before HA stopped, but timed-plan commands expire at their
-departure deadline. Expiry cancels only unsent work; it does not undo a current
-or pause already applied. Restarting the app cancels pending commands but keeps
-the accepted charging state. **App, host, power or USB/LAN/gateway failures
+a command queued before HA stopped and continues a handed-over departure plan;
+without new charge levels from the car it projects them from the metered
+energy. Restarting the app cancels pending commands but keeps the accepted
+charging state; the departure plan continues when the wallbox proves the car
+stayed plugged in. **App, host, power or USB/LAN/gateway failures
 still interrupt the heartbeat** and the wallbox's configured fallback applies.
 Switching the app to read-only also stops the heartbeat.
 

@@ -30,6 +30,16 @@ Update the app to 0.9.0b2 together with the integration.
   read-only; switch it on again after the update.
 - A status block that briefly cannot be read no longer makes every poll
   re-read the measurement and counter blocks while its last value is held.
+- **Departure planning runs in the app.** With the Modbus service app, Home
+  Assistant hands over the next departure, the selected car's capacity and
+  every charge level with its report time. The app plans start and current
+  itself, also while Home Assistant is offline, and continues after its own
+  restart when the wallbox proves the car stayed plugged in. Between the car's
+  reports it projects the charge level from the metered energy and pauses at
+  the target; a later report below the target charges again. **Timed charging
+  status** shows the app's plan and gains the states **Charged to the
+  estimated target** and **An order from the app has priority**. See
+  [departure planning](docs/departure-planning.md#with-the-modbus-service-app).
 - **Switch off charging release when unplugged** no longer writes to the
   wallbox after its entry was reloaded or unloaded in the same moment.
 - A vehicle change that is cancelled halfway reloads the entry instead of

@@ -28,6 +28,7 @@ from homeassistant.const import (
 from .device.charging_status import CHARGING_STATUS_OPTIONS
 from .device.control import PENDING_ACTIONS
 from .device.decode import RegisterValue
+from .device.departure_plan import DEPARTURE_STATES
 from .device.energy_goal import ENERGY_GOAL_STATES
 from .device.enums import (
     AuthorizationStatus,
@@ -61,12 +62,7 @@ CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         key="timed_goal_status",
         translation_key="timed_goal_status",
         device_class=SensorDeviceClass.ENUM,
-        options=[
-            "disabled", "waiting_for_target", "waiting_for_capacity",
-            "waiting_for_soc", "waiting_for_device", "vehicle_unconfirmed", "read_only", "queued",
-            "paused_until_start", "charging", "finishing", "unreachable",
-            "late", "reached", "write_pending", "error",
-        ],
+        options=list(DEPARTURE_STATES),
     ),
     SensorEntityDescription(
         key="soc_goal_status",

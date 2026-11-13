@@ -113,11 +113,15 @@ class BavarianTelemetrySource(BavarianVehicleBinding):
 
     @property
     def snapshot(self) -> VehicleTelemetry:
+        bindings = self._bindings()
+        states = [self._hass.states.get(binding[0]) if binding is not None else None for binding in bindings]
         values = [
-            _value(self._hass.states.get(binding[0]), binding[1]) if binding is not None else None
-            for binding in self._bindings()
+            _value(state, binding[1]) if binding is not None else None
+            for state, binding in zip(states, bindings, strict=True)
         ]
-        return VehicleTelemetry(*values)
+        soc = states[0]
+        reported = soc.last_changed if soc is not None and values[0] is not None else None
+        return VehicleTelemetry(*values, soc_reported_at=reported)
 
     def subscribe(self, on_change: Callable[[VehicleTelemetry], None]) -> CALLBACK_TYPE:
         """Each consumer owns bounded listeners and its own chronological cache."""

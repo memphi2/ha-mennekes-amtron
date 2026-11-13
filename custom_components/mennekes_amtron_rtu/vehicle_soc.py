@@ -8,6 +8,7 @@ import math
 from contextlib import suppress
 from copy import copy
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from homeassistant.core import (
@@ -219,6 +220,24 @@ class VehicleSocObserver:
         return vehicle_percentage(
             self._hass.states.get(self._soc_entity) if self._soc_entity else None,
         )
+
+    @property
+    def latest_soc_reading(self) -> tuple[float, datetime] | None:
+        """The charge level with the time its source first reported this value.
+
+        A source repeating an unchanged value says nothing new about the car.
+        """
+        if self._resting():
+            return None
+        if self._use_vehicle_soc:
+            reading = self._telemetry.snapshot if self._telemetry is not None else None
+            value = reading.soc_percent if reading is not None else None
+            reported = reading.soc_reported_at if reading is not None else None
+        else:
+            state = self._hass.states.get(self._soc_entity) if self._soc_entity else None
+            value = vehicle_percentage(state)
+            reported = state.last_changed if state is not None else None
+        return (value, reported) if value is not None and reported is not None else None
 
     @property
     def maximum(self) -> float | None:

@@ -188,12 +188,44 @@ minimum, the wallbox's configured transition delay and HA outages can make
 the exact target time impossible. Missing SoC or capacity data leaves the
 current charging state unchanged.
 
-The plan needs HA running to recalculate current and start climate actions.
-With the independent service, a queued timed-plan command expires at its
-deadline even if HA is offline; it cannot resume charging later as an obsolete
-request. Expiry does not undo a command already applied or stop an ongoing
-charge. The service continues its heartbeat and last applied state, subject
-to its charging limits.
+With a direct serial connection the plan needs HA running to recalculate the
+current. Climate actions always need HA.
+
+## With the Modbus service app
+
+With the [Modbus service app](modbus-service.md) the app plans the trip
+itself. Home Assistant hands over the departure time, the selected car with
+its usable capacity and remembered phases, and every charge level together with
+the time the car reported it. The percentage target reaches the app as before.
+The entities in Home Assistant show the app's plan; you set, change and clear
+the trip there as described above.
+
+- **The plan keeps running without Home Assistant.** A restart or outage of HA
+  changes nothing. After an app restart the plan continues when the wallbox
+  proves that the car stayed plugged in; otherwise it waits until Home
+  Assistant confirms the car again.
+- **The plan starts only for a confirmed car with a known charge level.** Home
+  Assistant confirms the selected car for each plug-in. Without a charge level
+  the status is **Waiting for vehicle charge level**.
+- **Between two reports the app projects the charge level**: the last reported
+  level plus the metered energy since then at 90% transfer efficiency. Energy
+  charged before a report is not counted twice, because every report carries
+  its own time.
+- **At the projected target the app pauses** and shows **Charged to the
+  estimated target**. This stop is provisional: a later report more than one
+  percentage point below the target charges again, a report at or above it
+  ends the trip as **Target reached**. Without another report the trip counts
+  as reached at departure. A target at the car's own charge limit is not paused
+  on an estimate, because the car ends that charge itself.
+- **Manual and PV commands act at once.** The plan sets its current again five
+  minutes after its last change at the earliest, and only when it differs by
+  at least 1 A.
+- **An order from the app has priority.** While a charging job, weekly plan or
+  guest order holds the wallbox, the status is **An order from the app has
+  priority** and the plan writes nothing.
+
+The plan's pause ends when the car is unplugged or another car is selected, so
+the next car is not left paused.
 
 The bus owner also checks for a disconnected vehicle before
 applying a planned command. Confirmed unplugging cancels that command, including

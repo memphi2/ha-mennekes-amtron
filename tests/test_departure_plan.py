@@ -194,9 +194,60 @@ def test_a_late_start_pauses_until_it_then_charges_at_full_current(tmp_path):
         box.clock[0] += 300
         await plan.tick()
         assert (plan.status, box.writes) == ("charging", [None, 16.0])
-        # The start that passed stays the plan's start.
+        # The pause is the plan's until the wallbox shows that it ended.
+        assert plan.plan_paused
+        await plan.tick()
         assert not plan.plan_paused
+        # The start that passed stays the plan's start.
         assert plan.planned_start == start
+        assert box.writes == [None, 16.0]
+    run(go())
+
+
+def test_a_start_that_never_landed_leaves_the_pause_to_the_plan(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        start = plan.planned_start
+        box.set(now=start + timedelta(seconds=1), meter_at=(start + timedelta(seconds=1)).timestamp())
+        box.clock[0] += 300
+        await plan.tick()
+        assert box.writes == [None, 16.0]
+        # The start is still queued, or its write was lost: the car stays paused.
+        box.set(paused=True, pause_requested=True)
+        await plan.tick()
+        assert plan.plan_paused
+        box.set(present=False)
+        await plan.tick()
+        assert (box.resumes, plan.plan_paused) == (1, False)
+    run(go())
+
+
+def test_the_same_level_reported_again_keeps_the_metered_energy(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start()
+        anchor = plan.anchor
+        later = NOW + timedelta(minutes=30)
+        box.set(now=later, total_kwh=110.0, meter_at=later.timestamp())
+        await plan.set_inputs(inputs(soc_observed_at=later - timedelta(minutes=1)))
+        await plan.tick()
+        assert plan.anchor == anchor
+        # 10 kWh x 0.9 / 60 kWh still count on top of the repeated 50 %.
+        assert plan.snapshot()["estimated_soc"] == 65.0
+    run(go())
+
+
+def test_an_unknown_pause_intent_is_asked_again_before_the_pause_ends(tmp_path):
+    async def go():
+        box = Box(tmp_path)
+        plan = await box.start(hours=10)
+        box.set(present=False, pause_requested=None)
+        await plan.tick()
+        assert (box.resumes, plan.plan_paused) == (0, True)
+        box.set(pause_requested=True)
+        await plan.tick()
+        assert (box.resumes, plan.plan_paused) == (1, False)
     run(go())
 
 

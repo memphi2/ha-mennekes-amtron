@@ -121,6 +121,8 @@ class FakeControl:
         self.energy_goal = EnergyGoal()
         self.max_charging_current = 16.0
         self.read_only = False
+        self.supports_departure_plan = False
+        self.departure = None
         self.energy_goal_stop_requested = False
         self.pending_action = None
         self.is_paused: bool | None = False

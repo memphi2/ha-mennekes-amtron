@@ -158,6 +158,42 @@ class SocAnchor:
         return {"percent": self.percent, "observed_at": self.observed_at.isoformat(), "meter_kwh": self.meter_kwh}
 
 
+_DIGEST = re.compile(r"[0-9a-f]{32}")
+_STATE_KEYS = frozenset({
+    "trip", "status", "planned_start", "estimated_soc", "inputs", "scope", "confirmed",
+})
+
+
+@dataclass(frozen=True, slots=True)
+class DepartureState:
+    """The service's plan as Home Assistant shows it."""
+
+    trip: TimedGoal
+    status: str
+    planned_start: datetime | None
+    estimated_soc: float | None
+    inputs: str | None
+    scope: str | None
+    confirmed: bool
+
+    @classmethod
+    def restore(cls, raw: object) -> DepartureState:
+        if not isinstance(raw, dict) or raw.keys() != _STATE_KEYS:
+            raise ValueError("invalid departure plan fields")
+        status, start, level = raw["status"], raw["planned_start"], raw["estimated_soc"]
+        digest, scope, confirmed = raw["inputs"], raw["scope"], raw["confirmed"]
+        if (
+            status not in DEPARTURE_STATES or type(confirmed) is not bool
+            or (digest is not None and (not isinstance(digest, str) or _DIGEST.fullmatch(digest) is None))
+            or (scope is not None and (not isinstance(scope, str) or _SCOPE.fullmatch(scope) is None))
+        ):
+            raise ValueError("invalid departure plan state")
+        return cls(
+            TimedGoal.restore(raw["trip"]), status, None if start is None else instant(start),
+            None if level is None else percentage(level), digest, scope, confirmed,
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class DepartureSample:
     """A passive view of the wallbox and its goals, taken for one decision."""
@@ -411,6 +447,10 @@ class DepartureController:
         self.anchor = None
 
     async def _evaluate(self, s: DepartureSample) -> None:
+        if self.plan_paused and self._command_current is not None and s.paused is False:
+            # The plan's own current ended its pause. A start that is still
+            # queued, or was lost, has not: the pause stays this plan's to end.
+            self.plan_paused = False
         binding = self._binding(s)
         self.confirmed = binding == "confirmed"
         if binding == "confirmed":
@@ -531,7 +571,10 @@ class DepartureController:
         if inputs.soc_observed_at > s.now + _CLOCK_SKEW:
             return
         observed = min(inputs.soc_observed_at, s.now)
-        if self.anchor is not None and observed <= self.anchor.observed_at:
+        anchor = self.anchor
+        # The same level reported again says nothing new: the energy metered
+        # since its first report still counts.
+        if anchor is not None and (observed <= anchor.observed_at or inputs.soc_percent == anchor.percent):
             return
         meter = self._meter_at(observed.timestamp(), s)
         if meter is not None:
@@ -590,7 +633,8 @@ class DepartureController:
         self._last_write_at = now
         self._command_submitted = True
         self._command_current = current
-        self.plan_paused = current is None
+        if current is None:
+            self.plan_paused = True
         await self._apply(current, deadline)
 
     async def _cancel_command(self) -> None:
@@ -600,12 +644,17 @@ class DepartureController:
 
     async def _rest(self, s: DepartureSample) -> None:
         await self._cancel_command()
-        if self.plan_paused:
-            # A goal's stop or an order owns the pause by now; leave it to them.
-            if s.pause_requested is True and not (s.read_only or s.goal_stop or s.order_active):
+        if not self.plan_paused:
+            return
+        # A goal's stop or an order owns the pause by now; leave it to them.
+        if not (s.read_only or s.goal_stop or s.order_active):
+            if s.pause_requested is None:
+                # The pause intent is unknown for now; try again next time.
+                return
+            if s.pause_requested:
                 await self._resume()
                 _LOGGER.info("Departure plan pause ended: the plan no longer applies to the car")
-            self.plan_paused = False
+        self.plan_paused = False
 
     async def _wait(self, status: str, s: DepartureSample, *, keep_start: bool = False) -> None:
         # Keep an applied charge unchanged, but do not let an older queued

@@ -169,11 +169,12 @@ class DepartureModbusService(ForecastModbusService):
     def snapshot(self) -> dict[str, Any]:
         result = super().snapshot()
         departure = self.departure
-        ready = departure is not None and departure.ready
+        # None while the plan is loading; Home Assistant then waits instead
+        # of planning on its own.
         result["control"] = {
             **result["control"],
-            "supports_departure_plan": ready,
-            "departure": departure.snapshot() if departure is not None and ready else None,
+            "supports_departure_plan": True,
+            "departure": departure.snapshot() if departure is not None and departure.ready else None,
         }
         return result
 
