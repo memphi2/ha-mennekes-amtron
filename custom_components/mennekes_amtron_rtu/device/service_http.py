@@ -50,7 +50,7 @@ def create_app(service: ModbusService) -> web.Application:
         return web.json_response({"status": "running"})
 
     async def state(_request: web.Request) -> web.Response:
-        return web.json_response(await service.stable_snapshot())
+        return web.json_response(await service.stable_snapshot(patient=True))
 
     async def diagnostics(_request: web.Request) -> web.Response:
         # Passive RAM snapshot: no serial reads, writes or file access.

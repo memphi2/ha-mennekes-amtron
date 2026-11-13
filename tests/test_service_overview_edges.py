@@ -70,7 +70,7 @@ def test_service_without_control_is_starting_not_live():
         assert result["reason"] == "service_starting"
         assert result["available"] is False
         assert all(value is None for value in result["measurements"].values())
-        service.stable_snapshot.assert_awaited_once_with()
+        service.stable_snapshot.assert_awaited_once_with(patient=True)
     asyncio.run(run())
 
 

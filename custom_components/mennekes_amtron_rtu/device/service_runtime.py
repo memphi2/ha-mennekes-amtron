@@ -41,6 +41,10 @@ from .write_state import WriteState
 
 _LOGGER = logging.getLogger(__name__)
 API_VERSION = 2
+# A state poll waits this long for a running command, then takes the last
+# published state unless that is older than the second value.
+_PATIENCE_SECONDS = 2.0
+_PUBLISHED_SECONDS = 60.0
 
 
 class ModbusService:
@@ -81,6 +85,8 @@ class ModbusService:
         self._session_history_error_logged = False
         self._logged_unavailable = False
         self._command_lock = asyncio.Lock()
+        # The last state published after a completed command, and when.
+        self._published: tuple[float, dict[str, Any]] | None = None
         # A fresh boot changes the revision, so a client cannot mistake an old
         # cached command outcome for a goal restored after a service restart.
         self._soc_goal_revision = secrets.token_hex(16)
@@ -509,10 +515,34 @@ class ModbusService:
             "write_errors": sorted(self.diagnostics.write_errors),
         }
 
-    async def stable_snapshot(self) -> dict[str, Any]:
-        """Publish a goal only after its enclosing command has completed."""
+    async def stable_snapshot(self, *, patient: bool = False) -> dict[str, Any]:
+        """Publish a goal only after its enclosing command has completed.
+
+        A ``patient`` reader waits two seconds for a running command and
+        then gets the last published state instead, as long as that is recent:
+        a long command must not make a poll time out, and a hanging one must
+        not hide behind an old state.
+        """
+        published = self._published
+        if (
+            patient and published is not None and self._command_lock.locked()
+            and time.monotonic() - published[0] <= _PUBLISHED_SECONDS
+        ):
+            try:
+                await asyncio.wait_for(self._command_lock.acquire(), _PATIENCE_SECONDS)
+            except TimeoutError:
+                return published[1]
+            try:
+                return self._publish()
+            finally:
+                self._command_lock.release()
         async with self._command_lock:
-            return self.snapshot()
+            return self._publish()
+
+    def _publish(self) -> dict[str, Any]:
+        result = self.snapshot()
+        self._published = (time.monotonic(), result)
+        return result
 
     async def command(
         self, payload: dict[str, Any], *,
@@ -671,7 +701,7 @@ class ModbusService:
                         _soc_outcome(initial_revision, self._soc_goal_revision, failure)
             if not cancelling and not metadata:
                 await self.refresh()
-            return self.snapshot()
+            return self._publish()
 
     async def read(self, payload: dict[str, Any]) -> dict[str, Any]:
         # An allowlist of known reads, never a raw Modbus write tunnel.

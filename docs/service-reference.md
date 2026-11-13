@@ -266,7 +266,7 @@ service data rather than maintaining a second queue.
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | Public process-liveness check; no wallbox data. |
-| `GET /v2/state` | Authenticated cached wallbox state and service status. |
+| `GET /v2/state` | Authenticated cached wallbox state and service status. While a command runs, the request waits up to two seconds and then returns the state published after the last completed command or poll, if that is at most a minute old. |
 | `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |

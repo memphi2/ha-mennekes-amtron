@@ -169,7 +169,12 @@ class DepartureModbusService(ForecastModbusService):
             )
         else:
             await departure.set_inputs(DepartureInputs.restore(payload.get("value")))
-        return self.snapshot()
+        if self._command_lock.locked():
+            # Another command still runs: a patient reader must not get the
+            # state from before this plan change.
+            self._published = None
+            return self.snapshot()
+        return self._publish()
 
     def snapshot(self) -> dict[str, Any]:
         result = super().snapshot()

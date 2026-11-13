@@ -140,7 +140,7 @@ async def service_overview(service: ModbusService | None) -> dict[str, Any]:
     """Read a command-consistent RAM snapshot; no extra Modbus or disk access."""
     if service is None:
         return overview_snapshot(None)
-    snapshot = await service.stable_snapshot()
+    snapshot = await service.stable_snapshot(patient=True)
     control = service.control
     return overview_snapshot(
         snapshot, ready=control is not None, held=service.data.held,

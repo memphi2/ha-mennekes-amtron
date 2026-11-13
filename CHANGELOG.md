@@ -133,6 +133,9 @@ Update the app to 0.9.0b2 together with the integration.
   before phase changes apply without a restart from its **Runtime** page; a
   queued start or stop is timed again. The app lowers a charging current above
   its cap after the next poll, also after a restart with a lower cap.
+- **A long command no longer makes the app's state unavailable.** While the
+  app waits or retries on the bus, Home Assistant's poll gets the last
+  published state after two seconds instead of running into its timeout.
 - All app pages are available in English, German, French, Dutch and Italian
   and share one navigation bar.
 - **Docs:** [the app's web pages](docs/app-guide.md) explains the overview,
