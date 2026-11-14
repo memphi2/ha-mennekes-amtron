@@ -14,9 +14,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from custom_components.mennekes_amtron_rtu import services
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
-from custom_components.mennekes_amtron_rtu.device.service_charging_http import (
-    create_service_app,
-)
+from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.guest_charging import GuestCharging
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient
 from tests.ha_fakes import FakeConfigEntry, build_runtime
@@ -41,7 +39,7 @@ def test_guest_button_uses_real_snapshot_and_identity_bound_command(tmp_path, mo
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with (
             runtime.guest_service(tmp_path) as (service, transport, clock),
-            TestServer(create_service_app(service)) as server, ClientSession() as session,
+            TestServer(create_app(service)) as server, ClientSession() as session,
         ):
             client = RemoteClient(session, str(server.make_url("/")), runtime.TOKEN)
             client.bind_identity(service.identity.serial_number)
@@ -180,7 +178,7 @@ def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypat
     async def run():
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock), TestServer(
-            create_service_app(service)
+            create_app(service)
         ) as server, ClientSession() as session:
             client = RemoteClient(session, str(server.make_url("/")), runtime.TOKEN)
             await client.update()

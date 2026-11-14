@@ -6,17 +6,17 @@ import asyncio
 
 from aiohttp.test_utils import TestClient, TestServer
 
-from custom_components.mennekes_amtron_rtu.device.service_charging_http import (
-    ChargingConsoleApp,
-    create_service_app,
+from custom_components.mennekes_amtron_rtu.device.console_charging import (
+    ChargingConsole,
 )
+from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 
 TOKEN = "job-api-test-private-token"  # noqa: S105 - fixture
 HEADERS = {"X-Remote-User-Id": "f" * 32, "X-Remote-User-Groups": "system-admin"}
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
 
-class Console(ChargingConsoleApp):
+class Console(ChargingConsole):
     async def _request(self, method, path, payload=None):
         assert method == "GET"
         assert path == "/info"
@@ -32,6 +32,6 @@ def test_obsolete_order_routes_are_not_exposed(tmp_path, monkeypatch):
         monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
         async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             service.config = __import__("dataclasses").replace(service.config, token=TOKEN)
-            async with TestClient(TestServer(create_service_app(service))) as client:
+            async with TestClient(TestServer(create_app(service))) as client:
                 assert (await client.post("/v2/jobs", headers=AUTH, json={"action":"create"})).status == 404
     asyncio.run(run())

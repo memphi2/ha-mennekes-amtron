@@ -103,7 +103,7 @@ class CommandEvents:
 
     @staticmethod
     def parse(raw: object) -> tuple[str, int, list[CommandEvent]] | None:
-        """Accept absent metadata from older API 2 services, validate new data."""
+        """Allow a null feed during service initialization; validate live metadata."""
         if raw is None:
             return None
         if not isinstance(raw, dict):

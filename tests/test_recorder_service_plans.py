@@ -10,12 +10,10 @@ from homeassistant.helpers.recorder import async_initialize_recorder
 from homeassistant.setup import async_setup_component
 
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
-from custom_components.mennekes_amtron_rtu.device.service_charging_http import (
-    create_service_app,
-)
 from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
     DepartureModbusService,
 )
+from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.entity import entry_entity_unique_id
 from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
     OPERATION_SENSOR_KEYS,
@@ -38,7 +36,7 @@ def test_service_plans_and_orders_do_not_record_unchanged_polls(tmp_path, monkey
                 assert await async_setup_component(hass, "recorder", {"recorder": {
                     "db_url": f"sqlite:///{db}", "commit_interval": 1, "auto_purge": False,
                 }})
-                async with TestServer(create_service_app(service)) as server:
+                async with TestServer(create_app(service)) as server:
                     entry = await add_entry(hass, str(server.make_url("/")))
                     coordinator = entry.runtime_data.coordinator
                     coordinator.update_interval = None

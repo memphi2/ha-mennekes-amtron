@@ -246,7 +246,9 @@ class RemoteClient(MennekesModbusClient):
             section = "service_version"
             validate_service_version(payload)
             section = "command_events"
-            command_events = CommandEvents.parse(payload.get("command_events"))
+            if "command_events" not in payload:
+                raise ValueError("missing command events")
+            command_events = CommandEvents.parse(payload["command_events"])
             section = "connection_quality"
             quality = payload.get("connection_quality")
             if quality is not None and quality not in CONNECTION_QUALITY_STATES:

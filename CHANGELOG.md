@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Remove redundant HTTP wrappers, unused charging-page text and the fallback
+  for services without command-event metadata.
+
 - Require service 0.9.0b8 for the simplified shared-guest contract; older
   services are rejected before their incompatible state is accepted.
 
