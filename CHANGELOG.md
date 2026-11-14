@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A stop of a charging job counts from the moment it is asked for, also while
   the app is still writing a start, and a request that was cut off does not
   withdraw it.
+- Orders from Home Assistant reach only the wallbox the entry is bound to: they
+  are sent only while the app answers for it, and the app checks the serial
+  number again before it changes an order.
 - **Weekly plans are removed.** The app has no Weekly plans page and no weekly
   API any more, and **Charging control**, **Charging wait reason** and **Next
   charging step** lose their weekly states. Recurring departures come from a

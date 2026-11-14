@@ -30,6 +30,7 @@ from tests.test_services import _patch_registry
 TOKEN = "orders-api-private-test-credential"  # noqa: S105 - fixture
 NOW = datetime(2026, 11, 16, 5, tzinfo=UTC)
 SCOPE = "b" * 64
+SERIAL = "ABC123456789"
 
 
 class Harness:
@@ -54,15 +55,19 @@ async def _with_app(tmp_path, body, *, app=None):
     """Run ``body`` with the orders of a real app behind a real HTTP client."""
     h = Harness(tmp_path)
     await h.jobs.initialize()
-    service = SimpleNamespace(jobs=h.jobs, config=SimpleNamespace(token=TOKEN))
+    service = SimpleNamespace(
+        jobs=h.jobs, config=SimpleNamespace(token=TOKEN), identity=SimpleNamespace(serial_number=SERIAL),
+    )
     refreshed = []
     async with TestServer(app or create_job_app(service)) as server, ClientSession() as session:
         client = RemoteClient(session, str(server.make_url("/")), TOKEN)
+        client.bind_identity(SERIAL)
 
         async def refresh():
             # The app's state carries its job status; here only that part exists.
             refreshed.append(True)
             client.snapshot = {"control": {"orders": h.jobs.snapshot()}}
+            client._connected = True
 
         orders = ServiceOrders(client, refresh)
         await refresh()
@@ -111,6 +116,27 @@ def test_a_job_is_started_boosted_stopped_and_cleared_in_one_step_each(tmp_path)
         assert orders.jobs["job"]["boost_until"] == (NOW + timedelta(minutes=30)).isoformat()
         await orders.async_cancel_boost()
         assert orders.jobs["job"]["boost_until"] is None
+
+    asyncio.run(_with_app(tmp_path, body))
+
+
+def test_orders_reach_only_the_wallbox_this_entry_is_bound_to(tmp_path):
+    async def body(h, orders, _refreshed):
+        client = orders._client
+        # Before the first valid state, or after a failed poll, nothing is sent.
+        client._connected = False
+        with pytest.raises(HomeAssistantError) as error:
+            await orders.async_start_guest(minutes=30, current=6, energy=1)
+        assert _key(error) == "service_unavailable"
+        client._connected = True
+        # The app now drives another wallbox with the same address and token.
+        client._bound_serial = "OTHER0000000"
+        for call in (orders.async_start_guest(minutes=30, current=6, energy=1), orders.async_stop_job()):
+            with pytest.raises(HomeAssistantError) as error:
+                await call
+            assert _key(error) == "device_identity_changed"
+        assert h.jobs.job is None
+        assert h.calls == []
 
     asyncio.run(_with_app(tmp_path, body))
 

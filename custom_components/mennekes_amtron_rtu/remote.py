@@ -123,6 +123,11 @@ class RemoteClient(MennekesModbusClient):
         self._bound_serial = serial_number
 
     @property
+    def bound_serial(self) -> str | None:
+        """The serial number this entry is bound to, as commands name it."""
+        return self._bound_serial or self.identity.serial_number
+
+    @property
     def connected(self) -> bool:
         return self._connected
 
@@ -581,7 +586,7 @@ class RemoteClient(MennekesModbusClient):
                     await self.request(
                         "POST", "/v2/command", {
                             "command": command, **values,
-                            "expected_serial_number": self._bound_serial or self.identity.serial_number,
+                            "expected_serial_number": self.bound_serial,
                         }
                     ),
                     require_available=not (cancelling or metadata),

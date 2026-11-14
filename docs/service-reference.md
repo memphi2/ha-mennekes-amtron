@@ -454,6 +454,10 @@ holds no vehicle identifier and no charging permission. It is written at most
 every ten minutes and at shutdown; an unreadable or unwritable file only stops
 the history, never charging.
 
+A `POST` may carry `expected_serial_number`, the serial number of the wallbox
+the caller is bound to; Home Assistant always sends it. If the app now drives
+another wallbox, it answers 409 `device_identity_changed` and changes nothing.
+
 Errors return HTTP 409 with a key such as `job_changed` (stale revision or
 scope), `job_exists`, `job_not_permitted`, `job_preview_expired`,
 `job_current_exceeds_cap`, `guest_vehicle_target_active`,

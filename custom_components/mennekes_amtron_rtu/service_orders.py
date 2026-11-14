@@ -17,6 +17,7 @@ from .control import ha_command
 from .device.client_errors import AmtronConnectionError
 from .device.errors import DeviceError
 from .remote import RemoteClient
+from .remote_errors import ServiceConnectionError
 
 JOBS = "/v2/jobs"
 
@@ -36,10 +37,21 @@ class ServiceOrders:
         return status if isinstance(status, dict) else None
 
     async def _call(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        client = self._client
+        if payload is not None:
+            # As for every other command: only while the app answers for the
+            # wallbox this entry is bound to, and the app checks it again.
+            if not client.connected:
+                raise DeviceError("service_unavailable")
+            payload = {**payload, "expected_serial_number": client.bound_serial}
         try:
-            return await self._client.request(
+            return await client.request(
                 "GET" if payload is None else "POST", JOBS, payload, update_connection=False
             )
+        except ServiceConnectionError as err:
+            if err.reason == "service_identity_changed":
+                raise DeviceError("device_identity_changed") from err
+            raise DeviceError("service_order_failed") from err
         except AmtronConnectionError as err:
             # Unreachable, too old for this action, or values it cannot use.
             raise DeviceError("service_order_failed") from err
