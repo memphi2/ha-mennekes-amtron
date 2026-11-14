@@ -94,8 +94,7 @@ Values saved on the **Runtime** page apply without a restart. Each previewed
 change names its `effect`: `next_cycle` for the polling intervals, `immediate`
 for the current cap and the state-change interval, `next_switch` for the
 phase-switch grace. After every poll the service lowers a charging current
-above its cap, unless a queued command, a phase switch, a goal or order stop or
-a holding guest session decides the current. `restart_fields` lists the
+above its cap, unless a queued command, a phase switch, a reached goal prevents the change. `restart_fields` lists the
 connection, read-only mode, listen address and port when their saved value
 differs from the running one.
 All other service settings are read only at startup: save configuration changes
@@ -226,21 +225,16 @@ recurring failures require their logged cause to be corrected.
 
 ## Saved state and database traffic
 
-Pause intent, charging-release intent and the resume current are saved in
-`intent.json`, bound to the wallbox identity. A guest session is saved in
-`guest-charge.json`, learned charging power
-in `charge-rates.json` and the departure plan in `departure-plan.json` the same
-way. The file is atomically replaced with
-owner-only permissions when those settings change. Both the file and directory
-are synced before a save is considered complete. This is bounded state rather
-than a growing history. Include the data directory in backups and protect its
-configuration/token.
+Ordinary charging intent and shared energy/percentage limits are saved in
+`intent.json`. The selected time, vehicle plan and its bounded learned model
+are saved in `departure-plan.json`. Both are bound to the wallbox identity.
+There is no guest-order file, separate guest energy baseline or charging-rate
+history. Guest permission is kept only in service memory for the current plug-in.
 
-A file of another wallbox or format, or a damaged one, is not used. For
-`intent.json` the service then starts as on its first
-run, keeps the wallbox's own state, logs a warning and replaces the file with
-its next save.
-A save that fails is logged; the wallbox stays in use.
+State updates use atomic replacement and owner-only permissions. Include the
+service data directory and private token in protected backups. Incompatible
+beta state must not be treated as fresh charging permission; follow the repair
+and reconfiguration instructions in [Updates](installation.md#updates).
 
 Heartbeats and polls do not create entries in that state file. The heartbeat
 sensor records health transitions, not timestamps for every beat. Measurement
@@ -343,17 +337,19 @@ snapshot's `control` object reports `supports_departure_plan: true` and
 | `confirmed` | Whether the handed-over car is confirmed for this plug-in |
 | `forecast` | `null` unless a plan is computed; otherwise `finish_at` (when the target is reached: the departure, or later when it is unreachable, rounded up to five minutes), `level_at_departure` (percent), `efficiency` (learned share of the metered energy that reaches the battery, 0.9 until learned) and `full_power_kw` (metered power at full current for the current phases, or `null`) |
 
-`control.orders` is the guest-charging state, or
-`null` while the job controller loads. Home Assistant reads its **Guest charging** sensor from it, so a poll needs no second request.
+`control.guest_active` reports active guest permission without a requested pause
+or reached limit. `control.guest_mode` also remains true while that guest is paused,
+so the vehicle planner cannot take over. `control.guest_revision` binds an explicit
+start to the current choices and physical connection. There is no `control.orders`.
 
 `control.operation` summarizes all controllers of the service for a reader. It
 is derived from their published state and decides nothing:
 
 | Field | Meaning |
 |---|---|
-| `controller` | `unavailable`, `guest_order`, `charging_job`, `departure_plan` or `direct`. An order that holds the wallbox comes before an open departure |
-| `waiting` | The first reason that keeps the car from charging, or `none`: `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, then the controller's reason (`until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`), then `target_reached`, `command_pending` or `paused` |
-| `next` | `event` (`none`, `queued_command`, `job_start`, `job_end`, `plan_start`, `target_reached`, `departure`) and `at`, an ISO timestamp that is `null` exactly for `none`. A queued command is named when it comes first |
+| `controller` | `unavailable`, `guest`, `departure_plan` or `direct`. Guest permission takes priority over a vehicle departure plan |
+| `waiting` | The first reason that keeps the car from charging, or `none`: `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, then the controller's reason (`meter_unavailable`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`), then `target_reached`, `command_pending` or `paused` |
+| `next` | `event` (`none`, `queued_command`, `plan_start`, `target_reached`, `departure`) and `at`, an ISO timestamp that is `null` exactly for `none`. A queued command is named when it comes first |
 | `target` | `kind` (`none`, `level` in percent, `energy` in kWh), `value` and `deadline` (ISO timestamp or `null`) |
 | `vehicle` | `unknown`, `none`, `connected`, or `confirmed` once Home Assistant confirmed its car for this plug-in |
 
@@ -422,7 +418,7 @@ HA restore values.
 
 ## Guest charging API
 
-Read `control.orders` and `control.guest_revision` in `GET /v2/state`.
+Read `control.guest_active`, `control.guest_mode` and `control.guest_revision` in `GET /v2/state`.
 Start with `POST /v2/command` naming `command: guest_start`,
 `expected_serial_number` and `expected_guest_revision`. A stale revision or a
 different wallbox is rejected. There is no `/v2/jobs` or `/api/jobs` route.
@@ -430,7 +426,7 @@ different wallbox is rejected. There is no `/v2/jobs` or `/api/jobs` route.
 The command uses the existing energy baseline and selected time. It grants release
 for this connection and lifts manual pause, while preserving locks, faults and
 current limits. It does not clear the saved vehicle percentage target; that target
-is ignored during the guest session. Normal pause ends the session.
+is ignored during the guest session. Normal pause stops charging; the vehicle planner stays excluded until unplugging.
 
 Admin-only `/api/charging` exposes the shared energy, percentage and time choices
 and the explicit guest action. Writes carry revisions and existing CSRF protection;

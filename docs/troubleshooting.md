@@ -67,7 +67,6 @@ distinguish a waiting interval from a device problem:
 | Service unavailable | Check the app log and its USB/LAN connection. HA reconnecting does not replay old commands. |
 | Device rejected a write | Check satellite configuration, supported hardware/registers, device state and whether another master is using the bus. |
 | Restart refused | The wallbox must report **idle** before its **Restart** button can be used. |
-| "A guest session of the Modbus app controls charging now" | An app guest session or guest order runs for the plugged-in car. See [Guest charging in the app](#guest-charging-in-the-app). |
 
 See [service setup](modbus-service.md) or the [hardware guide](hardware.md) for
 the relevant connection.
@@ -407,7 +406,7 @@ when permission was granted.
 | Guest start refused | Car connected, write access enabled, no wallbox lock or fault. Check the saved time is in the future. |
 | Values changed in another window | Reload the saved values and review them before pressing start again. |
 | Starts but immediately pauses | The shared kWh limit may already be reached. Guest start never resets its baseline. |
-| Guest session controls current | Use ordinary **Pause** to end it, or unplug. |
+| Guest is paused but vehicle planning does not resume | This is intentional: the guest connection stays outside vehicle planning until unplugging. Ordinary current and pause controls remain available. |
 | Interrupted after app restart | The wallbox could not prove the same connection. Review limits and explicitly start again. |
 | Storage unavailable | No fresh start is allowed without saving the session. Check the app log and storage. |
 

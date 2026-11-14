@@ -151,9 +151,9 @@ Replay results, retention checks and compatibility evidence are in
 [Recorder validation and measurements](recorder-validation.md). These are
 controlled test results with stated limits, not storage guarantees.
 
-### Charging-job draft
+### Shared charging controls
 
-Draft controls change only when edited. The draft status records readiness
-changes without revision tokens or a ticking countdown. Polling does not save
-the draft file. Optional earliest-start and reserve entities are disabled by
-default.
+Energy, percentage and target-time entities change when their values change.
+Guest status is `active` or `inactive`; it has no ticking countdown, revision
+attribute or separate journal. Vehicle planning keeps a bounded learned model;
+its normal status updates do not create a per-second history.

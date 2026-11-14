@@ -37,7 +37,7 @@ families.
 
 | Connection | Why choose it? |
 |---|---|
-| **Service app — recommended, optional** | Keeps the heartbeat and last charging state running through HA Core restarts and can run charging orders on its own. On HA OS, its URL and token are discovered automatically. |
+| **Service app — recommended, optional** | Keeps the heartbeat and last charging state running through HA Core restarts and enforces shared limits and accepted vehicle plans. On HA OS, its URL and token are discovered automatically. |
 | **Direct USB or LAN** | Uses the same charging controls without an extra app. HA restarts interrupt its heartbeat. |
 
 The service app is installed separately from the integration:

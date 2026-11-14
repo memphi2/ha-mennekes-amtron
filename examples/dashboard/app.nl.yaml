@@ -1,4 +1,4 @@
-# Manual card. Check the translated entity IDs. No helpers or scripts.
+# Single manual card. Adjust entity IDs for existing or renamed devices.
 type: vertical-stack
 cards:
 - type: custom:mushroom-template-card
@@ -19,10 +19,6 @@ cards:
   multiline_secondary: true
   tap_action:
     action: more-info
-- type: custom:mushroom-number-card
-  entity: number.mennekes_amtron_laadstroomlimiet
-  name: Stroomlimiet
-  display_mode: slider
 - type: custom:mushroom-chips-card
   alignment: center
   chips:
@@ -88,15 +84,32 @@ cards:
     icon: mdi:car-multiple
     tap_action:
       action: more-info
+- type: custom:mushroom-number-card
+  entity: number.mennekes_amtron_laadstroomlimiet
+  name: Stroomlimiet
+  display_mode: slider
 - type: custom:mushroom-title-card
-  title: ''
-  subtitle: 0 A verwijdert de limiet; pauzeer via Pauze.
+  title: Laadgrenzen
+  subtitle: 'Optioneel: kWh, tijdstip en voertuiglaadniveau. De eerst bereikte grens stopt het laden.'
+- type: conditional
+  conditions:
+  - condition: state
+    entity: number.mennekes_amtron_energiedoel
+    state_not:
+    - unknown
+    - unavailable
+  card:
+    type: entities
+    show_header_toggle: false
+    entities:
+    - entity: number.mennekes_amtron_energiedoel
+      name: Extra energie
 - type: conditional
   conditions:
   - condition: or
     conditions:
     - condition: state
-      entity: button.mennekes_amtron_gastladen_starten
+      entity: sensor.mennekes_amtron_gastladen
       state_not:
       - unknown
       - unavailable
@@ -125,55 +138,6 @@ cards:
         entity_id: datetime.mennekes_amtron_doeltijd
       confirmation:
         text: Tijd wissen? Andere doelen blijven ongewijzigd.
-- type: custom:mushroom-template-card
-  entity: sensor.mennekes_amtron_wachtreden_bij_het_laden
-  primary: Status
-  secondary: '{{ state_translated(''sensor.mennekes_amtron_wachtreden_bij_het_laden'') if has_value(''sensor.mennekes_amtron_wachtreden_bij_het_laden'')
-    else ''Niet beschikbaar'' }}'
-  icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_wachtreden_bij_het_laden'') in [''reached'',
-    ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_wachtreden_bij_het_laden'')
-    in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:timer-sand'' }}'
-  color: '{{ ''red'' if states(''sensor.mennekes_amtron_wachtreden_bij_het_laden'') in [''error'', ''interrupted'',
-    ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_wachtreden_bij_het_laden'')
-    in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey'' if
-    states(''sensor.mennekes_amtron_wachtreden_bij_het_laden'') in [''disabled'', ''none''] else ''amber'' }}'
-  multiline_secondary: true
-  tap_action:
-    action: more-info
-- type: conditional
-  conditions:
-  - condition: state
-    entity: number.mennekes_amtron_energiedoel
-    state_not:
-    - unknown
-    - unavailable
-  card:
-    type: vertical-stack
-    cards:
-    - type: custom:mushroom-title-card
-      title: Laaddoel
-      subtitle: Extra kWh of voertuigpercentage. Alleen begrenzen, niet starten. 0 schakelt de grens uit.
-    - type: entities
-      show_header_toggle: false
-      entities:
-      - entity: number.mennekes_amtron_energiedoel
-        name: Extra energie
-    - type: custom:mushroom-template-card
-      entity: sensor.mennekes_amtron_status_energiedoel
-      primary: Extra energie
-      secondary: '{{ state_translated(''sensor.mennekes_amtron_status_energiedoel'') if has_value(''sensor.mennekes_amtron_status_energiedoel'')
-        else ''Niet beschikbaar'' }}'
-      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_status_energiedoel'') in [''reached'',
-        ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_status_energiedoel'')
-        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:lightning-bolt''
-        }}'
-      color: '{{ ''red'' if states(''sensor.mennekes_amtron_status_energiedoel'') in [''error'', ''interrupted'',
-        ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_status_energiedoel'')
-        in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey''
-        if states(''sensor.mennekes_amtron_status_energiedoel'') in [''disabled'', ''none''] else ''amber'' }}'
-      multiline_secondary: true
-      tap_action:
-        action: more-info
 - type: conditional
   conditions:
   - condition: state
@@ -188,39 +152,42 @@ cards:
       entity: number.mennekes_amtron_laaddoel_van_voertuig
       name: Doelniveau
       display_mode: slider
-    - type: custom:mushroom-template-card
-      entity: sensor.mennekes_amtron_status_van_laaddoel_van_voertuig
-      primary: Doelniveau
-      secondary: '{{ state_translated(''sensor.mennekes_amtron_status_van_laaddoel_van_voertuig'') if has_value(''sensor.mennekes_amtron_status_van_laaddoel_van_voertuig'')
-        else ''Niet beschikbaar'' }}'
-      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_status_van_laaddoel_van_voertuig'')
-        in [''reached'', ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_status_van_laaddoel_van_voertuig'')
-        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:battery-arrow-up-outline''
-        }}'
-      color: '{{ ''red'' if states(''sensor.mennekes_amtron_status_van_laaddoel_van_voertuig'') in [''error'', ''interrupted'',
-        ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_status_van_laaddoel_van_voertuig'')
-        in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey''
-        if states(''sensor.mennekes_amtron_status_van_laaddoel_van_voertuig'') in [''disabled'', ''none''] else
-        ''amber'' }}'
-      multiline_secondary: true
-      tap_action:
-        action: more-info
 - type: conditional
   conditions:
   - condition: state
-    entity: number.mennekes_amtron_laaddoel_van_voertuig
-    state:
-    - unknown
-    - unavailable
+    entity: sensor.mennekes_amtron_gastladen
+    state: inactive
   card:
     type: custom:mushroom-template-card
-    primary: Optioneel voertuigdoel
-    secondary: 'Configureren → Voertuigen: stel een bron voor accuniveau in.'
+    entity: sensor.mennekes_amtron_gastladen
+    primary: Gastladen starten
+    secondary: Start direct met de opgeslagen kWh- en tijdslimieten.
     multiline_secondary: true
-    icon: mdi:information-outline
+    icon: mdi:account-arrow-right
     color: blue
     tap_action:
-      action: none
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_gastladen_starten
+- type: conditional
+  conditions:
+  - condition: state
+    entity: sensor.mennekes_amtron_gastladen
+    state: active
+  card:
+    type: custom:mushroom-template-card
+    entity: sensor.mennekes_amtron_gastladen
+    primary: Gastladen stoppen
+    secondary: Gasttoestemming actief · Tik om te pauzeren
+    multiline_secondary: true
+    icon: mdi:pause-circle
+    color: green
+    tap_action:
+      action: perform-action
+      perform_action: switch.turn_on
+      target:
+        entity_id: switch.mennekes_amtron_laden_gepauzeerd
 - type: conditional
   conditions:
   - condition: state
@@ -232,8 +199,8 @@ cards:
     type: vertical-stack
     cards:
     - type: custom:mushroom-title-card
-      title: Vertrek plannen
-      subtitle: Eén vertrek. Vereist accuniveau en bruikbare capaciteit. Mag een handmatige pauze opheffen.
+      title: Voertuigplanning
+      subtitle: Plant met voertuiggegevens en werkelijk geleverd vermogen.
     - type: custom:mushroom-chips-card
       chips:
       - type: entity
@@ -265,82 +232,12 @@ cards:
         else ''Niet beschikbaar'' }}'
       icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_status_geplande_lading'') in [''reached'',
         ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_status_geplande_lading'')
-        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:car-clock'' }}'
+        in [''error'', ''interrupted'', ''unavailable''] else ''mdi:car-clock'' }}'
       color: '{{ ''red'' if states(''sensor.mennekes_amtron_status_geplande_lading'') in [''error'', ''interrupted'',
-        ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_status_geplande_lading'')
+        ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_status_geplande_lading'')
         in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey''
         if states(''sensor.mennekes_amtron_status_geplande_lading'') in [''disabled'', ''none''] else ''amber''
         }}'
       multiline_secondary: true
       tap_action:
         action: more-info
-- type: conditional
-  conditions:
-  - condition: state
-    entity: sensor.mennekes_amtron_status_geplande_lading
-    state:
-    - unknown
-    - unavailable
-  card:
-    type: custom:mushroom-template-card
-    primary: Optionele vertrekplanning
-    secondary: 'Configureren → Voertuigen → Volgend vertrek: activeren en bruikbare capaciteit invullen.'
-    multiline_secondary: true
-    icon: mdi:information-outline
-    color: blue
-    tap_action:
-      action: none
-- type: conditional
-  conditions:
-  - condition: state
-    entity: button.mennekes_amtron_gastladen_starten
-    state_not:
-    - unknown
-    - unavailable
-  card:
-    type: vertical-stack
-    cards:
-    - type: custom:mushroom-title-card
-      title: Gastladen
-      subtitle: Start direct en heft pauze en P&C-beperking voor deze aansluiting op. Opgeslagen kWh- en tijdslimieten
-        gelden.
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_gastladen_starten
-      name: Gastladen starten
-      secondary_info: none
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_gastladen_starten
-    - type: custom:mushroom-template-card
-      entity: sensor.mennekes_amtron_gastladen
-      primary: Status
-      secondary: '{{ state_translated(''sensor.mennekes_amtron_gastladen'') if has_value(''sensor.mennekes_amtron_gastladen'')
-        else ''Niet beschikbaar'' }}'
-      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_gastladen'') in [''reached'', ''estimated_reached'',
-        ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_gastladen'') in [''error'',
-        ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:account-clock-outline'' }}'
-      color: '{{ ''red'' if states(''sensor.mennekes_amtron_gastladen'') in [''error'', ''interrupted'', ''job_storage_unavailable'',
-        ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_gastladen'') in [''active'', ''charging'',
-        ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey'' if states(''sensor.mennekes_amtron_gastladen'')
-        in [''disabled'', ''none''] else ''amber'' }}'
-      multiline_secondary: true
-      tap_action:
-        action: more-info
-- type: conditional
-  conditions:
-  - condition: state
-    entity: button.mennekes_amtron_gastladen_starten
-    state:
-    - unknown
-    - unavailable
-  card:
-    type: custom:mushroom-template-card
-    primary: Gastladen niet beschikbaar
-    secondary: Verbind de app en schakel schrijven in. Controleer entiteits-ID’s.
-    multiline_secondary: true
-    icon: mdi:information-outline
-    color: blue
-    tap_action:
-      action: none

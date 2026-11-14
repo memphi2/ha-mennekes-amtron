@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Remove the obsolete guest-order engine, persistence, separate forecast and
+  control locks. Guest permission uses ordinary controls and shared limits for
+  the current plug-in, with no separate guest record. An app restart requires
+  checking limits and explicitly starting the guest again.
+- Update vehicle planning from actual metered charging power after two minutes
+  at full offered current; a lower vehicle draw corrects the forecast promptly.
+- Rebuild the user-guide navigation, shared-limit explanations, app instructions
+  and all five Mushroom examples around the simplified controls.
+
 - Use shared kWh, time and optional vehicle percentage targets in HA and the app.
   Keep intelligent vehicle planning in HA, without a separate app planning page.
 - Start guests with one button: lift manual pause and grant this connection's

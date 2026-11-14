@@ -1,58 +1,48 @@
-# Wallbox guide
+# Your wallbox, step by step
 
-Start with these four pages. Basic charging needs no vehicle account, calendar,
-tariff import or YAML.
+You only need a current setting and a pause switch to charge. Vehicle accounts,
+calendars, prices and dashboards are optional.
 
-| What do you want to do? | Open |
+| Start here | What you will find |
 |---|---|
-| Install or update the wallbox integration | **[Installation](installation.md)** |
-| Set current, pause or resume charging | **[Everyday charging](user-guide.md)** |
-| Add the wallbox to your HA dashboard | **[Dashboard cards — YAML in five languages](app-from-home-assistant.md#dashboard-with-mushroom-cards)** |
-| Fix a problem | **[Troubleshooting](troubleshooting.md)** |
+| **[1. Install](installation.md)** | Choose direct USB/LAN or the recommended service app, connect and enable controls. |
+| **[2. Charge](user-guide.md)** | Current, pause, shared limits and one-button guest charging. |
+| **[3. Add a dashboard](app-from-home-assistant.md#dashboard-with-mushroom-cards)** | Ready-to-paste basic or Mushroom YAML in five languages. No helpers to create. |
+| **[Get help](troubleshooting.md)** | Missing controls, connection problems, waiting commands and charging targets. |
 
-The optional **[service app](modbus-service.md)** is recommended to keep the
-heartbeat running through Home Assistant Core restarts. Already using it?
-[Open the guide to its web interface](app-guide.md).
+## Add only what you need
 
-## Add a function when you need it
+| Optional function | Start here |
+|---|---|
+| Use the app's browser interface | [App guide](app-guide.md) |
+| Recognize cars, use battery percentage or enable virtual Plug & Charge | [Vehicle setup](vehicle-setup.md) |
+| Have a recognized car ready for the next trip | [Departure planning](departure-planning.md) |
+| Use calendars, preconditioning or solar surplus | [Blueprints](blueprints.md) |
+| Estimate charging costs and losses | [Costs and losses](charging-estimates.md) |
 
-- **[Vehicles](vehicle-setup.md):** vehicle data, selection, automatic recognition
-  and virtual Plug & Charge.
-- **[Departure](departure-planning.md):** a charging target for your next trip.
-- **[Solar and calendar](blueprints.md):** ready-to-use automations.
-- **[Costs and charging losses](charging-estimates.md):** optional estimates.
-
-Unsure what to enable? [Choose optional functions](features.md).
-
-## Three things to remember
-
-- **0 A removes the current limit.** Use **Charging paused** to pause.
-- **Enable writes in one place.** Service: app Read-only off. Direct: integration
-  Control mode set to Modbus master.
-- **One owner uses the bus.** Stop the old owner before starting another;
-  read-only mode still sends requests.
+[Compare optional functions](features.md). **0 A removes the current limit; it
+never means pause.** Only one program may use the wallbox bus, even in read-only mode.
 
 <details>
-<summary>Connection details and reference</summary>
+<summary>Installation and technical reference</summary>
 
-- [First charge walkthrough](quickstart.md)
-- [USB wiring and hardware](hardware.md), [supported models](compatibility.md)
-  and [operating limits](safety.md)
-- [LAN connection](network-gateway.md) and [adapter settings](lan-adapters.md)
-- [Standalone service](service-standalone.md) and [service configuration](service-reference.md)
-- [All entities](entities.md), [automation actions](automations.md)
-  and [Recorder settings](recorder.md)
+- [First charge walkthrough](quickstart.md), [USB wiring](hardware.md),
+  [supported models](compatibility.md), [operating limits](safety.md)
+- [LAN connection](network-gateway.md), [adapter setup](lan-adapters.md)
+- [Install the service app](modbus-service.md), [standalone service](service-standalone.md)
+- [Entities](entities.md), [automation actions](automations.md), [Recorder](recorder.md)
+- [Service API and storage](service-reference.md)
 
 </details>
 
 <details>
-<summary>Development, validation and legal information</summary>
+<summary>Development and project information</summary>
 
-- [Architecture](architecture.md) and [Modbus registers](modbus-registers.md)
-- [Quality scale](quality-scale.md), [validation](validation.md),
-  [Recorder validation](recorder-validation.md) and [charging conflict matrix](charging-conflict-matrix.md)
-- [Service publication](service-releasing.md), [repository settings](repository-settings.md)
-  and [November compatibility audit](ha-2026-11-validation.md)
-- [Legal information](legal.md) and [provenance evidence](audits/current-legal-provenance.md)
+[Architecture](architecture.md) · [Modbus registers](modbus-registers.md) ·
+[Validation](validation.md) · [Quality scale](quality-scale.md) ·
+[Recorder validation](recorder-validation.md) · [Control conflicts](charging-conflict-matrix.md) ·
+[Release process](service-releasing.md) · [Repository settings](repository-settings.md) ·
+[HA compatibility](ha-2026-11-validation.md) · [Legal](legal.md) ·
+[Provenance](audits/current-legal-provenance.md)
 
 </details>

@@ -21,11 +21,10 @@ pages in a second row.
 Every page follows the browser language in English, German, French, Dutch and
 Italian, and every page has the same navigation bar.
 
-Everyday charging stays in Home Assistant: the current slider, **Charging
-paused**, targets and departure planning. The app pages add a view of the
-service and orders that keep running while Home Assistant is offline.
-The orders can also be started and stopped from a Home Assistant dashboard or
-automation; see [Use the app from Home Assistant](app-from-home-assistant.md).
+Use HA for the ordinary current slider, pause and optional vehicle planning.
+Use **Charging** in the app to change the same limits and start a guest. There is
+no separate order to prepare. The running service continues its accepted controls
+when HA Core restarts. [Daily controls and limits](user-guide.md).
 
 [Overview](#overview) · [Charge target](#charge-target) · [Plan departure](#plan-departure) · [Guests](#guest-charging) · [Settings](#runtime-settings) · [Diagnostics](#log)
 
@@ -76,7 +75,7 @@ permission for this connection, including when virtual Plug & Charge is enabled.
 It respects the shared kWh limit and time, whichever is reached first. Unset limits
 do not add hidden defaults. The saved vehicle percentage target is ignored for
 the guest and remains unchanged. Locks, faults and electrical limits still apply.
-Use the ordinary HA pause control to stop, or unplug. There is no separate guest
+The same button changes to **Pause guest charging** while active. Use it, the ordinary HA pause switch, or unplug to stop. There is no separate guest
 draft, duration or current editor. See [charging details](app-from-home-assistant.md).
 
 ## Registers
@@ -146,12 +145,12 @@ is closed. See [troubleshooting](troubleshooting.md#watch-app-modbus-communicati
 - The pages show what the app knows. Home Assistant supplies vehicle data and departure choices. The overview
   shows the app’s active controller and target; edit the vehicle profile and
   next departure in HA.
-- An app restart pauses a running order. It continues only when the wallbox
-  proves the same plug-in; otherwise the app hands control back to Home
-  Assistant.
+- An HA Core restart leaves the service running. An app restart loses temporary
+  guest permission; check state and start the guest explicitly again. Shared
+  energy limits and ordinary wallbox intent are retained. [Restart details](user-guide.md#guest-charging).
 - A stop you request is shown as requested until the wallbox confirms it. Check
   the overview and its command results.
-- The browser never repeats an order by itself. If a reply is lost, reload the
+- The browser never repeats a start command by itself. If a reply is lost, reload the
   page and check the current state before trying again.
 
 For the HTTP interface behind these pages, see the

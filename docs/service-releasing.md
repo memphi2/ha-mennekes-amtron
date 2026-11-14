@@ -27,7 +27,7 @@ the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
 separately. The current requirement is **API 2 and service 0.9.0b7 or newer**,
-which supplies the shared charging-job draft used by the native HA controls. Raise the
+which supplies the shared limits used by the native HA controls. Raise the
 minimum only when the integration needs a newer service feature; a published
 or planned service release must satisfy that requirement.
 

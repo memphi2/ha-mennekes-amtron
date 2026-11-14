@@ -149,7 +149,7 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 
 - **[Current, pause and targets](user-guide.md):** use the HA controls.
 - **[Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards):** ready-to-copy examples in five languages.
-- **[App web interface](app-guide.md):** guest charging, guests, runtime settings and diagnostics.
+- **[App web interface](app-guide.md):** shared limits, guest start, runtime settings and diagnostics.
 - **Read-only:** change it in native Configuration, save and restart the app.
 - **Hand over the bus:** stop the app before starting another owner. Read-only
   mode and disabling the HA entry do not release the bus.
@@ -163,28 +163,23 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 | App, host, power, USB or LAN/gateway connection fails | The heartbeat can stop. The wallbox's configured fallback applies. |
 | HA reconnects | HA reads the current app state; it does not restore old commands. |
 
-An app/service restart cancels pending commands and pauses a running charging
-job, which continues only if the wallbox proves the car stayed plugged in; it
-does not cancel an already applied pause. HA Core restarts leave the independent
-service's queue running.
+An app/service restart cancels pending commands; an already applied pause is
+retained. HA Core restarts leave the independent service and its queue running.
+Guest permission is temporary and is not restored after an app restart. Check the
+shared limits and explicitly start the guest again. See [guest charging](user-guide.md#guest-charging).
 
-Configure and understand the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
-The service does not remove the need for it. Include app data in backups:
-it contains saved charging intent, a guest session, learned
-charging power and the private access token.
-
-The app saves changed settings and a bounded history of measured charging power
-for the [finish estimate](departure-planning.md#what-the-plan-changes-while-charging), not a growing history. Heartbeat history records
-health changes rather than every beat. For smaller HA history, use a
-[Recorder profile](recorder.md).
+Configure the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
+Include app data in protected backups: saved charging intent, shared limits,
+vehicle departure plan, bounded vehicle model and private token.
+There is no separate guest file or charging journal. Heartbeat history records
+health changes rather than every beat. [Reduce HA history](recorder.md).
 
 ## AppArmor protection
 
 The app includes a custom AppArmor profile.
 Supervisor loads it automatically when the app is installed;
 keep **Protection mode on**. It limits the service to its runtime files, USB/LAN
-communication and its own token, charging-state, charging-job and
-charging-power files. App options remain
+communication and its own token, charging-intent and vehicle-planning files. App options remain
 read-only to the service. Normal heartbeat and charging operation are intended
 to continue within these limits.
 
@@ -209,8 +204,8 @@ App and integration versions are independent. When both need updating,
 until it has started, then update the integration and restart Core. Use **Check
 for updates** in the app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
-**Updating the app briefly interrupts its heartbeat** and pauses a running
-guest session until the wallbox proves the same plug-in; see
+**Updating the app briefly interrupts its heartbeat** and loses temporary guest
+permission. Check the limits and start the guest explicitly again; see
 [after an app restart](app-from-home-assistant.md#guest-charging).
 An existing app updates in place with its data intact.
 

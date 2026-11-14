@@ -29,7 +29,7 @@ Keep the vehicle disconnected during the first control setup.
 | Who uses the adapter? | Service app | Home Assistant |
 | During an HA Core restart | Heartbeat and last charging state continue | Heartbeat is interrupted; wallbox fallback applies |
 | Where are writes enabled? | App **Configuration → Read-only** off | Integration **Configure → Wallbox → Control mode: Modbus master** |
-| Charging orders while HA is offline | [Guest charging and guest charging](app-guide.md#guest-charging) in the app | Not available |
+| Limits and planning while HA is offline | Shared energy limits, active guest time limit and accepted vehicle plan continue | Needs HA running |
 
 Both support USB and LAN. A LAN adapter needs no local USB device. On HA
 Container, the service can run as a [separate container](service-standalone.md).

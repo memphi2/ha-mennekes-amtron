@@ -23,7 +23,7 @@ scripts, packages, custom wallbox card or card-mod are required.
 | Italiano | [YAML](../examples/dashboard/basic.it.yaml) | [YAML](../examples/dashboard/app.it.yaml) |
 
 1. Install Mushroom. Guest charging requires the [service app](modbus-service.md),
-   write access and matching integration/app versions. Targets and departure
+   write access and the minimum app version required by the integration. Targets and departure
    planning also work with a direct connection; HA must then remain running.
 2. Copy the YAML for your language using GitHub's **Raw** view.
 3. Check IDs under **Settings → Devices & services → Entities**. The examples use
@@ -33,7 +33,7 @@ scripts, packages, custom wallbox card or card-mod are required.
 4. **Edit dashboard → Add card → Manual**, paste the complete YAML and save.
    Its root is `vertical-stack`; `masonry` belongs to a dashboard view instead.
 5. Leave edit mode to check conditional visibility. HA shows conditional cards
-   while editing. Missing optional features show setup guidance instead of controls.
+   while editing. Optional target and planning controls appear only when their entities are available.
 
 The top tile shows live power, session energy and charging state. State icons and
 colors change: charging/ready is green, waiting/paused amber, a fault red, and
@@ -43,79 +43,61 @@ has been recognized. Tap **Pause** to toggle it. Release and P&C open their
 native HA controls; the vehicle chip opens profile selection. **0 A removes the
 current limit; it does not pause charging.**
 
+## What the card shows
+
+The card follows daily use from top to bottom:
+
+1. **Wallbox now:** state, power and session energy, with colored state icons.
+2. **Controls:** pause, release, Plug & Charge, selected vehicle and current slider.
+3. **Charging limits:** shared kWh, target time and optional vehicle percentage.
+4. **Guest charging:** one button, changing to pause while the guest is active.
+5. **Vehicle planning:** only when configured; status and optional calendar/vehicle imports.
+
+Tap the time tile to edit it; hold it to clear the selected time. This uses the
+integration's existing datetime entity and `mennekes_amtron_rtu.clear_target_time`.
+There is no helper or separate clear-button entity to maintain.
+
 ## Charge target
 
-- **Additional energy:** wallbox kWh, independent of a vehicle integration.
-  Saving a positive value arms a new ceiling from the current meter reading.
-  Starting guest charging keeps that saved baseline; it does not add the amount again.
-- **Vehicle charge level:** optional percentage target for the selected vehicle.
-  Configure its SoC source and optional maximum under **Configure → Vehicles**.
-- **0** disables an energy or percentage limit without lifting a pause.
-
-HA and **App → Charging** use the same saved choices. In the app, save each edited
-field before starting a guest. Missing vehicle data is not guessed.
+[Shared limits](user-guide.md#shared-limits-and-target-time) explain which targets
+apply. A positive kWh setting establishes a new ceiling from the current meter.
+Saving a limit does not start charging. **0** disables an energy or percentage limit.
 
 ## Plan departure
 
-For a recognized vehicle, enable next-departure planning in HA and provide SoC
-and usable battery capacity. Set the percentage target and choose the next trip's
-date/time. The existing intelligent planner chooses the start and adjusts current.
-Calendar and supported vehicle departure imports remain optional HA buttons.
-The single shared time entity serves both guest charging and vehicle planning.
-In the Mushroom example, tap it to edit and hold it to clear the time.
-Automations use `mennekes_amtron_rtu.clear_target_time` with that datetime entity;
-there is no separate clear-button entity.
-There is no extra app planning workflow; its time field shows the shared selection.
-
-A plan may lift a manual pause. Clear the selected time to cancel planning; then
-pause explicitly if the car must stay stopped. Clearing a time does not clear the
-energy or vehicle target. See [departure planning](departure-planning.md).
+Configure the recognized vehicle's SoC and usable capacity in HA, then set its
+percentage target and next trip time. [Departure planning](departure-planning.md)
+explains waiting, actual-power learning, calendar imports and preconditioning.
+The app shows the same shared time; it needs no separate planning editor.
 
 ## Guest charging
 
-1. Connect the visitor's car.
-2. Optionally save a kWh limit and/or future time, in HA or **App → Charging**.
-3. Press **Start guest charging** once. It starts immediately, lifts a manual pause
-   and grants virtual Plug & Charge permission for this connection. Wallbox locks,
-   faults, local authorization requirements and electrical limits still apply.
-
-The first configured kWh or time limit reached stops charging. With neither set,
-there is no implicit energy or time limit. An already reached energy target is not
-reset by the button. A past time must be cleared or changed before starting.
-
-The vehicle percentage target stays saved but does not limit a guest charge.
-Changes to that vehicle target do not turn the guest into the selected vehicle.
-Use the ordinary **Pause** control to stop. Unplugging ends guest permission; a
-new connection needs a new explicit start. Guest charging requires the service app.
+Connect the guest, optionally set kWh and time, then press the guest button.
+It starts now and stops at whichever configured limit arrives first. While active,
+the card's button requests the ordinary pause. [Full behavior and restart limits](user-guide.md#guest-charging).
 
 ## Manual selection, automatic recognition and Plug & Charge
 
-Manual controls work without a vehicle integration. A percentage target and
-intelligent planning need a selected, confirmed vehicle. Optional automatic
-recognition chooses only a unique match; delayed or ambiguous signals wait.
-Virtual Plug & Charge can release recognized approved vehicles automatically.
-The guest button gives a separate explicit permission for the current connection
-without disabling Plug & Charge or changing the saved vehicle profile.
+Normal controls need no vehicle integration. Automatic recognition and virtual
+Plug & Charge are separate optional features. Guest start grants permission only
+for the connected guest; it does not disable Plug & Charge or change your vehicle
+profile. [Set up vehicles](vehicle-setup.md).
 
 ## Storage and failed handovers
 
-Limits, selected time and active guest session persist in the service. Polling does
-not repeatedly write them or add a charging journal. The app retains accepted intent
-across an HA restart. After an app restart a guest can continue only when the wallbox
-proves the same physical connection. A damaged record is not fresh permission.
-
-A failed or uncertain start response is never automatically retried. Reload the
-current state before deciding what to do next.
+HA and the app read the same saved limits. Guest permission itself is temporary;
+there is no saved guest order. An HA Core restart leaves the service running.
+After an app restart, check state and explicitly start the guest again.
+If a start response is lost, refresh and inspect the current state before retrying.
 
 ## Automation actions
 
-Use the parameter-free action `mennekes_amtron_rtu.start_guest_charging`.
-Supply `device_id` when there is more than one wallbox. Set shared limits first.
-Stop through the ordinary pause control.
+Set shared limits first, then use `mennekes_amtron_rtu.start_guest_charging`.
+Supply `device_id` if you have more than one wallbox. Stop with the ordinary pause switch.
 
 ```yaml
 - action: mennekes_amtron_rtu.start_guest_charging
 ```
 
-The separate guest draft, duration/current fields, stop/clear actions and old job
-API are removed before 1.0. Update old cards and automations.
+Old guest drafts, duration/current fields, stop/clear actions and the job API have
+been removed. Replace old dashboard YAML instead of adding missing helper entities.

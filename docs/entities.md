@@ -93,17 +93,15 @@ nothing from it. They are absent with a direct serial or LAN connection.
 
 | State | Meaning |
 |---|---|
-| Guest charging | A [guest session](app-guide.md#guest-charging) holds the wallbox until it ends and the wallbox confirms its last pause, or until the car is unplugged. |
+| Guest charging | A guest connection uses shared kWh/time limits and ordinary controls; vehicle planning stays excluded until unplugging. |
 | Departure planning | A [departure](departure-planning.md#with-the-modbus-service-app) is set and not finished. |
-| Direct control | No plan or order: your switches, numbers, targets and automations apply. |
+| Direct control | No vehicle plan or guest permission: your switches, numbers, targets and automations apply. |
 | Wallbox unavailable | The app has no current reading. |
 
 **Charging wait reason** names the first thing that keeps the car from
 charging: no car, a switched-off release, Virtual Plug & Charge, then the
 controller's own reason (for example **Paused until the planned start**), then
-a reached target, a queued change or a manual pause. An order comes before a
-departure plan, so the plan's status **An order from the app has priority**
-appears here as the order's reason.
+a reached target, a queued change or a manual pause. Guest permission takes priority over a vehicle departure plan, including while the guest is paused.
 
 **Next charging step** is the earliest of the controller's next event and a
 queued change. While the plan charges, **Target expected** carries the
@@ -191,11 +189,11 @@ pending target. See
 | Entity | Name | Unit | Class | Needs | Meaning |
 |---|---|---|---|---|---|
 | `sensor.*_vehicle_charge_target_status` | Vehicle charge target status | — | enum | optional configured vehicle SoC source | `disabled`, `active`, `reached`. Missing SoC leaves charging unchanged; reached stays latched until a new target or disabling. A reached target pauses only with a car at the wallbox. |
-| `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Next departure; the `planned_start` attribute holds when the plan starts charging for the next trip, or when it started, and is absent while the plan lacks its inputs or the trip is done. With the Modbus service app the app plans and this sensor shows its state, including **Charged to the estimated target** and **An order from the app has priority**. **Charging to the minimum level** means the car is below its [minimum charge level](departure-planning.md#minimum-charge-level) and charges before the planned start. With the app, the attributes `estimated_finish`, `estimated_level_at_departure`, `learned_efficiency` and `measured_power_kw` carry its [forecast](departure-planning.md#with-the-modbus-service-app). |
+| `sensor.*_timed_charging_status` | Timed charging status | — | enum | Departure planning enabled | Stable plan status. No per-minute countdown is recorded. The deadline is shown by Target time; the `planned_start` attribute holds when the plan starts charging for the next trip, or when it started, and is absent while the plan lacks its inputs or the trip is done. With the Modbus service app the app plans and this sensor shows its state, including **Charged to the estimated target** and **Guest charging has priority**. **Charging to the minimum level** means the car is below its [minimum charge level](departure-planning.md#minimum-charge-level) and charges before the planned start. With the app, the attributes `estimated_finish`, `estimated_level_at_departure`, `learned_efficiency` and `measured_power_kw` carry its [forecast](departure-planning.md#with-the-modbus-service-app). |
 | `sensor.*_charging_control` | Charging control | — | enum | Modbus service app | Which of the app's controllers decides about the charge right now; see [Charging control at a glance](#charging-control-at-a-glance). The attributes `vehicle`, `target`, `target_value` and `target_deadline` name the car's state and what is charged towards. |
 | `sensor.*_charging_wait_reason` | Charging wait reason | — | enum | Modbus service app | Why the car does not charge yet, or **Nothing is holding the charge**. It names the first reason that applies, not every one. |
 | `sensor.*_next_charging_step` | Next charging step | — | enum | Modbus service app | What the app expects next; the `at` attribute holds its time. No countdown is recorded. |
-| `sensor.*_guest_charging` | Guest charging | — | enum | Modbus service app | State of the guest charge, or **No guest charge**; the attributes hold its window, current, energy and progress. See [Use the app from Home Assistant](app-from-home-assistant.md). |
+| `sensor.*_guest_charging` | Guest charging | — | enum | Modbus service app | `active` or `inactive`. Shared energy and time controls hold the limits; there is no separate guest progress record. See [Use the app from Home Assistant](app-from-home-assistant.md). |
 | `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability | Shows recognition, permission and release status, or Disabled. **Charging blocked** carries a `blocked_reason` attribute (for example `release_off`, `wallbox_locked`, `authorization_required`, `pause_requested`, `energy_goal_stop` or `register_unavailable`). **Released by hand** shows a manual release for the current or next connection. No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. The raw wallbox states behind it are the `evse_state` and `cp_state` attributes (see [Attribute values](#attribute-values)). |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
@@ -258,8 +256,7 @@ when it runs, is replaced, or is cancelled; the pending sensors show the wait.
 The feed covers current, pause/resume, phase selection, release, locking and
 error recovery. Cancelling a queued action reports `cancelled` with reason
 `user_cancelled`; a kWh or percentage goal can cancel queued work with reason
-`energy_goal`. When a guest session of the app cancels queued work or refuses a
-queued command, the reason is `service_job`. Solar display selection and restart do not publish command
+`energy_goal`. An expired guest time prevents further starts with reason `time_limit`. Solar display selection and restart do not publish command
 outcomes.
 
 This is a live notification feed, not a durable audit log. It keeps at most 32
@@ -322,10 +319,10 @@ and templates see.
 | `sensor.*_cable_lock` | `fixed_cable`, `locked`, `undetermined`, `unlocked` |
 | `select.*_solar_display_mode` | `fast`, `not_active`, `sunshine`, `sunshine_plus` |
 | `select.*_requested_phases` | `all_available`, `single_phase` |
-| `sensor.*_charging_control` | `unavailable`, `guest_order`, `charging_job`, `departure_plan`, `direct` |
-| `sensor.*_charging_wait_reason` | `none`, `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, `until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`, `target_reached`, `paused` |
-| `sensor.*_next_charging_step` | `none`, `queued_command`, `job_start`, `job_end`, `plan_start`, `target_reached`, `departure` |
-| `sensor.*_guest_charging` | `none`, `scheduled`, `charging`, `waiting_meter`, `suspended`, `reached`, `finished`, `stopped`, `interrupted` |
+| `sensor.*_charging_control` | `unavailable`, `guest`, `departure_plan`, `direct` |
+| `sensor.*_charging_wait_reason` | `none`, `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, `meter_unavailable`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`, `target_reached`, `paused` |
+| `sensor.*_next_charging_step` | `none`, `queued_command`, `plan_start`, `target_reached`, `departure` |
+| `sensor.*_guest_charging` | `inactive`, `active` |
 
 ### Attribute values
 

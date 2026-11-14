@@ -183,7 +183,7 @@ its heartbeat briefly. Do not run the old and new service together on the bus.
 Update the service and the integration together. Replace the service first,
 retaining its data directory, and wait for initialization. Then update the
 integration and restart Core. Retaining the same data mount preserves saved
-intent, a guest session and the credentials; no new HA entry is needed. With
+intent, shared limits, the vehicle plan and credentials; no new HA entry is needed. With
 writes enabled, the updated service keeps its heartbeat and charging intent
 while HA updates. A service restart interrupts a running guest session.
 

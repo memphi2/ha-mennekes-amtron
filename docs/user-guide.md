@@ -1,15 +1,67 @@
 # Everyday charging
 
-[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+[Guide home](README.md) · [Dashboard YAML](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
 
-Open **Settings → Devices & services → Mennekes Amtron RTU** and select the
-wallbox. The examples use English control names; HA translates them into your
-selected language.
+Open your wallbox under **Settings → Devices & services → Mennekes Amtron RTU**,
+or use the [dashboard example](app-from-home-assistant.md). Names follow your HA language.
 
-**[Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards)** ·
-**[Choose optional features](features.md)** · **[Help](troubleshooting.md)**
+## Choose what you want to do
 
-[Controls](#everyday-controls) · [Enable writes](#where-do-i-enable-controls) · [Waiting](#waiting-between-charging-changes) · [Settings](#configuration-and-options) · [kWh target](#energy-target)
+| Your intention | What to do |
+|---|---|
+| Charge normally | Set the current, allow charging release and turn **Charging paused** off. |
+| Stop for now | Turn **Charging paused** on. Check **Pending change** if it cannot run immediately. |
+| Add a limited amount of energy | Set **Energy target**, for example 12 kWh. Start or resume separately. |
+| Charge a visitor's car | Optionally set kWh and a time, then press **Start guest charging**. |
+| Stop a selected car at a percentage | Configure its battery source, then set **Vehicle charge target**. |
+| Have a recognized car ready for a trip | Enable its optional [departure plan](departure-planning.md), set percentage and target time. |
+
+There is no charging order to create, save, clear or schedule. Limits are ordinary
+controls shared by HA and the app. Saving a limit does not start charging.
+
+## Shared limits and target time
+
+| Setting | Guest charging | Recognized vehicle |
+|---|---|---|
+| **Energy target** | Stops after the saved additional wallbox kWh. | Same energy ceiling. |
+| **Target time** | Stops at that time; it does not delay the start. | With planning enabled, the next trip's departure time. |
+| **Vehicle charge target** | Ignored; its saved value is retained. | Battery percentage ceiling from the vehicle's reported SoC. |
+
+For a guest, **the first reached kWh or time limit stops charging**. With neither
+set, there is no hidden limit. Enter **0** to disable a kWh or percentage target.
+Clear the target time separately; the Mushroom card offers this by holding the time
+tile. Changing or clearing a limit does not itself start guest charging.
+
+A positive kWh setting starts a new meter baseline when you save it. Guest start
+uses that baseline; it does not add the amount a second time. An already reached
+energy goal must be changed or disabled before charging can resume.
+
+A vehicle departure plan can lift a manual pause. Clear its time before pausing
+if you want the recognized vehicle to remain stopped. It never takes control of
+the current guest connection, including after you manually pause that guest.
+
+## Guest charging
+
+Requires the [service app](modbus-service.md) with writes enabled.
+
+1. Plug in the visitor's car.
+2. Optionally set **Energy target** and/or a future **Target time**. In the app,
+   save each changed field first.
+3. Press **Start guest charging**. Charging is requested immediately: a manual
+   pause is lifted and virtual Plug & Charge permission is granted for this plug-in.
+4. Use the ordinary **Charging paused** switch to stop early. The usual current
+   slider remains available throughout.
+
+Locks, wallbox faults, local authorization, write intervals and electrical limits
+still apply. “Started” means the request was accepted; check actual power and any
+pending change. The vehicle's percentage target and intelligent plan do not
+control a guest connection. Unplugging ends guest permission.
+
+There is no separate guest record, energy baseline or forecast. Permission belongs
+to the running service and this physical connection. An HA Core restart leaves
+it running; an app/service restart loses that guest designation. After restarting
+the app, check the limits and explicitly start guest charging again before relying
+on its time cutoff. The shared energy target and ordinary wallbox intent are retained.
 
 ## Everyday controls
 
@@ -76,182 +128,107 @@ the exact state values available to templates.
 
 ## Waiting between charging changes
 
-A requested change may be queued. **Pending change** tells you what will happen;
-its `due` attribute shows when, once the timing is known. You do not need to
-press the control again. The most recent charging request replaces the previous
-queued request; repeating the same request does not extend its wait.
+A queued request is not a completed change. **Pending change** shows the action
+and its `due` time when known. The latest request replaces an earlier one;
+repeating the same request does not extend its wait.
 
-| Setting | Default | Where to change it |
+| Guard | Default | Meaning |
 |---|---|---|
-| Minimum time between state changes | **300 seconds**, configurable from 0–3600 | Direct: integration options. Service: app configuration, then restart the app. |
-| Minimum interval for current-register writes | **5 seconds** | Required write guard; remains active when the longer wait is set to 0. |
-| Extra wait before a phase change | **5 seconds**, configurable from 0–30 | Same connection owner; see [phase switching](#phase-switching). |
+| State changes | 300 seconds; configurable 0–3600 | Starts, pauses, resumes, phases, release and lock changes can wait. |
+| Current writes | 5 seconds; fixed | Protects the register even if the longer wait is disabled. |
+| Phase grace | 5 seconds; configurable 0–30 | Extra wait after the car confirms a pause. |
 
-The longer interval applies to starts, pauses, resumes, phase changes, charging
-release and wallbox lock changes. **Even pause, disable-release and lock requests
-can wait**, so charging may continue until the shown time. Changing the current
-while paused can queue a resume. Goal-triggered stops use their own rules below.
+Set waits under **Configure → Wallbox** for direct mode or **App → Settings →
+Runtime** for service mode. Confirmed idle readings with no vehicle skip the
+longer wait. Unknown readings do not. MENNEKES recommends more than five minutes;
+choose, for example, 360 seconds to exceed that recommendation.
 
-With a confirmed idle wallbox and no vehicle, manual changes skip the longer
-wait. Unknown or inconsistent wallbox readings retain it. The heartbeat and
-five-second write guards continue in either case. A queued phase change first
-needs confirmation that the vehicle has paused, so its due time can temporarily
-be unknown.
-
-MENNEKES recommends **more than five minutes** between charging transitions.
-The default is 300 seconds; choose **360 seconds**, for example, to exceed that
-recommendation. PV automation still needs suitable start/stop thresholds and
-hold times; the delay alone cannot assess available surplus.
-
-Use [Cancel pending change](#cancel-a-queued-change) to remove a queued request.
-An owner restart also cancels it: HA reload/restart in direct mode, or app/service
-restart in service mode. Restarting HA Core alone leaves the separate service's
-queue running. After a cold start, a fresh guard period protects transitions
-whose previous timing is unknown.
+Even a manual pause, lock or release-off can wait. Check actual power; this is
+not an emergency-stop control. Goal stops have their own rules below. An owner
+restart cancels its queue; an HA restart does not restart the separate service.
 
 ## Cancel a queued change
 
-While **Pending change** shows an action, press **Cancel pending change**.
-This removes the queue entry and does not send a wallbox command. A phase-change
-pause already performed stays paused. The remembered current setpoint is kept;
-cancellation does not undo a command that has already reached the wallbox.
-
-Direct-mode cancellation also works during a failed wallbox poll. Service mode
-requires the app to be reachable, authenticated and write-enabled, but its
-wallbox connection may be down. It becomes unavailable again when there is no pending work.
+Press **Cancel pending change** while a request is waiting. It removes queued
+work without undoing commands already sent. A phase-change pause already applied
+stays paused. Service mode needs the app reachable and write-enabled, but the
+wallbox itself may be offline.
 
 ## Configuration and options
 
-Open **Settings → Devices & services → Mennekes Amtron RTU → Configure**.
-The main menu has three sections:
+Use **Configure** for optional features and **Reconfigure** to change the
+integration's connection. Keep the existing entry to retain device/entity IDs.
 
-| Section | What belongs here |
-|---|---|
-| **Wallbox** | Direct mode: current cap, polling and charging waits. App mode: displays the app's values. |
-| **Vehicles** | Each car's sources, percentage limit, departure planning, losses and detection signals. |
-| **Charging costs** | Fixed or dynamic energy price and optional German network tariffs. |
-
-The vehicle wizard saves at **Save and finish** or its final area. Other
-sections save on their last input form. Cancel an unfinished section to discard
-its draft. Features appear only when their prerequisites are configured.
-
-| Change | Direct USB/LAN | With the service app |
+| Setting | Direct USB/LAN | Service app |
 |---|---|---|
-| Adapter, protocol, host or address | Entry **Reconfigure** | **Open Web UI → Settings → Connection**, save and restart app |
-| Current cap, polling and charging waits | **Configure → Wallbox** | **Settings → Runtime**, preview and confirm; no restart |
-| Permission to write | **Configure → Wallbox → Current limit and polling → Control mode** | Native **Configuration → Read-only**, save and restart app |
-| Vehicle data and costs | **Configure** | **Configure** in HA |
+| Adapter, protocol, host, address | Entry **Reconfigure** | **Settings → Connection**, save and restart app |
+| Current cap, polling, waits | **Configure → Wallbox** | **Settings → Runtime**, preview and confirm; no restart |
+| Write permission | **Configure → Wallbox → Current limit and polling → Control mode** | Native **Configuration → Read-only**, save and restart app |
+| Vehicle sources and planning | **Configure → Vehicles** | Same HA menu |
+| Fixed/dynamic prices and network tariffs | **Configure → Charging costs** | Same HA menu |
 
-The app's current cap is the only software cap in service mode. HA does not
-add another. **0 A** removes the EMS current limit, including that cap;
-hardware limits still apply. The app's native Configuration tab also contains
-runtime settings, but changes made there need an app restart.
-
-Keep the entry when changing its connection; matching the wallbox's serial
-number preserves device and entity IDs. [Move to the app](modbus-service.md#move-an-existing-wallbox).
+Only relevant follow-up forms appear. The vehicle wizard saves on **Save and
+finish** or its final area; other sections save on their last input form. Cancel
+the unfinished section to discard its edits. The app is the only software current
+cap in service mode. Native app Configuration changes need an app restart.
+[Connection and update guide](installation.md).
 
 ## Energy target
 
-Set **Energy target** to the additional energy you want the wallbox to supply,
-for example **12 kWh**. The range is 0.1–1000 kWh in 0.1 kWh steps. Each positive
-setting establishes a new goal from a fresh lifetime-energy reading, even if
-you enter the same number again. It **only limits** a charge: it does not start
-charging, lift a pause, unlock the wallbox or enable charging release. Start
-charging yourself or through your existing automation.
+A positive value, 0.1–1000 kWh, means **additional wallbox energy from the moment
+you save it**. Saving the same positive value again establishes a new baseline.
+It does not start charging. At the target, the controller requests pause and
+cancels pending charging changes. The five-second write guard remains, but this
+stop bypasses the longer state-change wait. Check actual power to confirm the stop.
 
-At the target, the owner requests a pause and cancels pending charging changes.
-The five-second current-write interval remains, but this stop does not wait for
-the longer state-change interval. **Energy target status** changes to `reached`;
-check **Charging paused** and actual power to confirm that charging stopped.
-The goal is not an exact energy cutoff: measurement cadence (normally up to
-60 seconds for the lifetime counter), meter resolution, communication delays
-and the remaining write interval can cause additional energy to be delivered.
+Meter resolution, polling and communication delays can cause an overshoot; this
+is not an exact energy cutoff. The lifetime counter is required (Modbus layout
+v01.02 or newer). The goal and its baseline survive an owner restart.
 
-The target and meter baseline survive a controller restart. The independent
-service continues enforcing them during HA Core downtime. Direct mode can only
-monitor and pause while HA is running. A failed or unreadable meter pauses the
-charge instead of guessing how much energy was delivered. A falling counter
-requires your attention. After restart, a counter below the saved baseline
-is also detected; a counter reset during downtime that ends above the baseline
-cannot be distinguished reliably without saving every observation.
+| Status | What to do |
+|---|---|
+| `active` | Monitoring the saved baseline. |
+| `reached` | Change the goal or set 0 before resuming; neither action itself resumes charging. |
+| `meter_unavailable` | The goal pauses rather than guessing. Valid readings restore monitoring. |
+| `meter_reset` | Check the counter, then set a new goal or disable it with 0. |
 
-With `meter_unavailable`, fresh valid meter readings automatically restore
-monitoring against the original target. If the goal itself paused a previously
-unpaused charge, it can resume through the normal waiting interval. A deliberate
-pause, another charging/current/phase/lock/release command, or a new goal cancels
-that automatic restart. An already
-reached goal, a reset counter, or another active goal's stop remains paused.
-Heartbeat-error recovery likewise respects active goals and deliberate pauses;
-this does not introduce an automatic reset of unrelated wallbox faults.
-Permission to restart after a meter outage lasts only for the running owner.
-After restarting that owner, the target is retained but its error pause stays
-paused until you resume it. Restarting HA alone does not restart the separate app.
+A meter-outage pause can resume automatically only if the goal caused it, the
+owner is still running, no other stop applies and you have not issued a manual
+control command meanwhile. After restarting the owner, resume explicitly.
+Heartbeat recovery also respects deliberate pauses and reached goals.
 
-For `meter_reset`, check the meter and set a new goal or enter **0** to disable it.
-Neither setting nor disabling a goal resumes charging. A reached goal blocks
-start/resume until you change or disable it. Other limits, authorization, deliberate pauses,
-locks and release settings still apply. Read-only mode disables all writes,
-including goal enforcement.
-
-The goal requires the lifetime energy counter (Modbus layout v01.02 or later).
-Switching an entry between direct and service mode
-does not transfer an active goal: the new connection owner has its own stored
-state. Set the intended goal with that owner before continuing the charge.
+Read-only mode cannot enforce a goal. Direct mode requires HA running; the service
+can enforce it during HA Core downtime. Moving between owners does not transfer
+an active goal: set it again with the new owner. A counter reset during downtime
+that ends above the saved baseline cannot be reliably distinguished.
 
 ## Phase switching
 
-**Requested phases** appears only on hardware that supports switching. Check
-your vehicle's support before using it. Switching during charging pauses first
-and **does not resume automatically**. Resume explicitly after the waiting
-interval and check the result; some vehicles abort the session.
+**Requested phases** appears only on supported hardware. Check vehicle support
+before using it. During charging, switching first pauses and does not resume
+automatically. Wait for the phase command to finish, then resume explicitly.
 
-Phase changes share
-the [configurable state-change interval](#waiting-between-charging-changes)
-and an early request is queued. Wait until the phase request has actually run
-before requesting resume; a new resume request would replace a queued phase
-request. Before changing phases, the integration waits up to **30 seconds** for
-live confirmation that the vehicle has paused. It then waits an additional
-**5 seconds** by default and checks the state again before sending the phase
-command. Configure **Extra wait before phase changes** from **0 to 30 seconds** in
-the integration options for direct connections, or in the app/service for
-service connections. Zero removes only the extra grace time, not pause
-confirmation or the separate 300-second state-change interval. If confirmation
-fails or times out, the phase command is not sent and the requested pause
-remains in place. With no vehicle connected and the wallbox idle, there is no
-vehicle pause to confirm or extra wait. Fresh Idle and CP A1/A2 readings also
-skip the longer state-change interval; register-write guards still apply.
-See [phase-switching troubleshooting](troubleshooting.md#phase-switching-leaves-charging-paused).
+The owner waits up to 30 seconds for fresh confirmation that the car paused,
+then adds the configured phase grace and checks again. If confirmation fails,
+it sends no phase change and retains the pause. The separate state-change
+and current-write guards still apply. Confirmed idle with no car skips the
+vehicle wait. [Troubleshooting](troubleshooting.md#phase-switching-leaves-charging-paused).
 
 ## Heartbeat and Home Assistant restarts
 
-The **optional Modbus service is recommended** if you want charging to continue
-through Home Assistant Core restarts. It keeps the heartbeat running and holds
-the last charging state while HA is offline, including an active pause. HA
-reconnects to that state without replaying old charging commands. HA automations
-are still offline during a Core restart.
+| What restarts or fails? | Effect |
+|---|---|
+| HA Core, while the separate app keeps running | Heartbeat, applied state, shared energy goal and accepted app planning continue. HA automations and new vehicle reports stop temporarily. |
+| HA Core in direct mode | Heartbeat is interrupted; wallbox fallback applies. Error 200 recovery runs when communication returns and respects deliberate pause, release, lock and goals. |
+| App/service restart | Heartbeat is interrupted and queued commands are cancelled. Ordinary intent and limits are retained; temporary guest permission is lost. [Check and restart the guest](#guest-charging). |
+| Host, power or adapter failure | The owner may lose communication; the configured wallbox fallback applies. |
 
-For a charge that must run while HA is offline, the app can hold one
-[guest session](app-guide.md#guest-charging) itself, using the shared optional
-kWh and time limits for the plugged-in car. While such an order runs, HA
-cannot change the current or resume; pausing in HA stops the order. When it
-ends, charging stays paused and HA controls charging again.
-
-With a **direct USB or LAN connection**, a Core restart or entry reload interrupts
-the heartbeat. Once communication returns, error 200 recovery runs
-automatically. It preserves a deliberate pause, lock, disabled charging release
-and current setting. If recovery cannot complete, follow
-[heartbeat troubleshooting](troubleshooting.md#error-200-energy-manager-unavailable).
-
-The service cannot bridge its own shutdown, a host restart or a lost USB/LAN
-connection. In those cases, the wallbox follows its configured
-[fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
-Check that behavior before relying on unattended charging.
-
-A continuous heartbeat or service-connection fault raises a repair after
-**60 seconds** when the heartbeat is managed and writes are enabled. It clears
-automatically after recovery; a connection repair has no recovery button.
-A lost HA-to-service link does not establish that the app stopped sending its
-heartbeat. See [connection repairs](troubleshooting.md#heartbeat-or-service-connection-repair).
+HA reconnects to the service's current state without replaying old charging
+commands. A managed heartbeat or service-connection fault lasting 60 seconds
+raises a repair when writes are enabled; recovery clears it automatically.
+A lost HA-to-service link alone does not prove the heartbeat stopped.
+[Heartbeat help](troubleshooting.md#error-200-energy-manager-unavailable) ·
+[Fallback](safety.md#the-heartbeat-and-what-happens-without-it).
 
 ## Energy dashboard and database size
 

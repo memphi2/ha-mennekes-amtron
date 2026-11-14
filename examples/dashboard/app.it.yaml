@@ -1,4 +1,4 @@
-# Manual card. Check the translated entity IDs. No helpers or scripts.
+# Single manual card. Adjust entity IDs for existing or renamed devices.
 type: vertical-stack
 cards:
 - type: custom:mushroom-template-card
@@ -19,10 +19,6 @@ cards:
   multiline_secondary: true
   tap_action:
     action: more-info
-- type: custom:mushroom-number-card
-  entity: number.mennekes_amtron_limite_di_corrente_di_ricarica
-  name: Limite corrente
-  display_mode: slider
 - type: custom:mushroom-chips-card
   alignment: center
   chips:
@@ -89,15 +85,32 @@ cards:
     icon: mdi:car-multiple
     tap_action:
       action: more-info
+- type: custom:mushroom-number-card
+  entity: number.mennekes_amtron_limite_di_corrente_di_ricarica
+  name: Limite corrente
+  display_mode: slider
 - type: custom:mushroom-title-card
-  title: ''
-  subtitle: 0 A rimuove il limite; sospendere con Pausa.
+  title: Limiti di ricarica
+  subtitle: kWh, orario e livello del veicolo sono facoltativi. Il primo limite raggiunto arresta la ricarica.
+- type: conditional
+  conditions:
+  - condition: state
+    entity: number.mennekes_amtron_obiettivo_energetico
+    state_not:
+    - unknown
+    - unavailable
+  card:
+    type: entities
+    show_header_toggle: false
+    entities:
+    - entity: number.mennekes_amtron_obiettivo_energetico
+      name: Energia aggiuntiva
 - type: conditional
   conditions:
   - condition: or
     conditions:
     - condition: state
-      entity: button.mennekes_amtron_avvia_ricarica_ospite
+      entity: sensor.mennekes_amtron_ricarica_ospite
       state_not:
       - unknown
       - unavailable
@@ -126,57 +139,6 @@ cards:
         entity_id: datetime.mennekes_amtron_orario_obiettivo
       confirmation:
         text: Cancellare l’orario? Gli altri obiettivi restano invariati.
-- type: custom:mushroom-template-card
-  entity: sensor.mennekes_amtron_motivo_di_attesa_della_ricarica
-  primary: Stato
-  secondary: '{{ state_translated(''sensor.mennekes_amtron_motivo_di_attesa_della_ricarica'') if has_value(''sensor.mennekes_amtron_motivo_di_attesa_della_ricarica'')
-    else ''Non disponibile'' }}'
-  icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_motivo_di_attesa_della_ricarica'') in
-    [''reached'', ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_motivo_di_attesa_della_ricarica'')
-    in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:timer-sand'' }}'
-  color: '{{ ''red'' if states(''sensor.mennekes_amtron_motivo_di_attesa_della_ricarica'') in [''error'', ''interrupted'',
-    ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_motivo_di_attesa_della_ricarica'')
-    in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey'' if
-    states(''sensor.mennekes_amtron_motivo_di_attesa_della_ricarica'') in [''disabled'', ''none''] else ''amber''
-    }}'
-  multiline_secondary: true
-  tap_action:
-    action: more-info
-- type: conditional
-  conditions:
-  - condition: state
-    entity: number.mennekes_amtron_obiettivo_energetico
-    state_not:
-    - unknown
-    - unavailable
-  card:
-    type: vertical-stack
-    cards:
-    - type: custom:mushroom-title-card
-      title: Obiettivo di ricarica
-      subtitle: kWh aggiuntivi o percentuale veicolo. Solo limite, senza avvio. 0 disattiva il limite.
-    - type: entities
-      show_header_toggle: false
-      entities:
-      - entity: number.mennekes_amtron_obiettivo_energetico
-        name: Energia aggiuntiva
-    - type: custom:mushroom-template-card
-      entity: sensor.mennekes_amtron_stato_dellobiettivo_energetico
-      primary: Energia aggiuntiva
-      secondary: '{{ state_translated(''sensor.mennekes_amtron_stato_dellobiettivo_energetico'') if has_value(''sensor.mennekes_amtron_stato_dellobiettivo_energetico'')
-        else ''Non disponibile'' }}'
-      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_stato_dellobiettivo_energetico'')
-        in [''reached'', ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_stato_dellobiettivo_energetico'')
-        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:lightning-bolt''
-        }}'
-      color: '{{ ''red'' if states(''sensor.mennekes_amtron_stato_dellobiettivo_energetico'') in [''error'', ''interrupted'',
-        ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_stato_dellobiettivo_energetico'')
-        in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey''
-        if states(''sensor.mennekes_amtron_stato_dellobiettivo_energetico'') in [''disabled'', ''none''] else ''amber''
-        }}'
-      multiline_secondary: true
-      tap_action:
-        action: more-info
 - type: conditional
   conditions:
   - condition: state
@@ -191,39 +153,42 @@ cards:
       entity: number.mennekes_amtron_obiettivo_di_carica_del_veicolo
       name: Livello obiettivo
       display_mode: slider
-    - type: custom:mushroom-template-card
-      entity: sensor.mennekes_amtron_stato_dellobiettivo_di_carica_del_veicolo
-      primary: Livello obiettivo
-      secondary: '{{ state_translated(''sensor.mennekes_amtron_stato_dellobiettivo_di_carica_del_veicolo'') if has_value(''sensor.mennekes_amtron_stato_dellobiettivo_di_carica_del_veicolo'')
-        else ''Non disponibile'' }}'
-      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_stato_dellobiettivo_di_carica_del_veicolo'')
-        in [''reached'', ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_stato_dellobiettivo_di_carica_del_veicolo'')
-        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:battery-arrow-up-outline''
-        }}'
-      color: '{{ ''red'' if states(''sensor.mennekes_amtron_stato_dellobiettivo_di_carica_del_veicolo'') in [''error'',
-        ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_stato_dellobiettivo_di_carica_del_veicolo'')
-        in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey''
-        if states(''sensor.mennekes_amtron_stato_dellobiettivo_di_carica_del_veicolo'') in [''disabled'', ''none'']
-        else ''amber'' }}'
-      multiline_secondary: true
-      tap_action:
-        action: more-info
 - type: conditional
   conditions:
   - condition: state
-    entity: number.mennekes_amtron_obiettivo_di_carica_del_veicolo
-    state:
-    - unknown
-    - unavailable
+    entity: sensor.mennekes_amtron_ricarica_ospite
+    state: inactive
   card:
     type: custom:mushroom-template-card
-    primary: Obiettivo veicolo opzionale
-    secondary: 'Configura → Veicoli: impostare una fonte livello batteria.'
+    entity: sensor.mennekes_amtron_ricarica_ospite
+    primary: Avvia ricarica ospite
+    secondary: Avvia subito con i limiti salvati in kWh e di tempo.
     multiline_secondary: true
-    icon: mdi:information-outline
+    icon: mdi:account-arrow-right
     color: blue
     tap_action:
-      action: none
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_avvia_ricarica_ospite
+- type: conditional
+  conditions:
+  - condition: state
+    entity: sensor.mennekes_amtron_ricarica_ospite
+    state: active
+  card:
+    type: custom:mushroom-template-card
+    entity: sensor.mennekes_amtron_ricarica_ospite
+    primary: Ferma ricarica ospite
+    secondary: Autorizzazione ospite attiva · Tocca per mettere in pausa
+    multiline_secondary: true
+    icon: mdi:pause-circle
+    color: green
+    tap_action:
+      action: perform-action
+      perform_action: switch.turn_on
+      target:
+        entity_id: switch.mennekes_amtron_ricarica_in_pausa
 - type: conditional
   conditions:
   - condition: state
@@ -235,8 +200,8 @@ cards:
     type: vertical-stack
     cards:
     - type: custom:mushroom-title-card
-      title: Pianifica partenza
-      subtitle: Una sola partenza. Richiede livello batteria e capacità utile. Può rimuovere una pausa manuale.
+      title: Pianificazione del veicolo
+      subtitle: Usa i dati del veicolo e la potenza realmente erogata.
     - type: custom:mushroom-chips-card
       chips:
       - type: entity
@@ -268,83 +233,12 @@ cards:
         else ''Non disponibile'' }}'
       icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_stato_ricarica_programmata'') in
         [''reached'', ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_stato_ricarica_programmata'')
-        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:car-clock'' }}'
+        in [''error'', ''interrupted'', ''unavailable''] else ''mdi:car-clock'' }}'
       color: '{{ ''red'' if states(''sensor.mennekes_amtron_stato_ricarica_programmata'') in [''error'', ''interrupted'',
-        ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_stato_ricarica_programmata'')
+        ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_stato_ricarica_programmata'')
         in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey''
         if states(''sensor.mennekes_amtron_stato_ricarica_programmata'') in [''disabled'', ''none''] else ''amber''
         }}'
       multiline_secondary: true
       tap_action:
         action: more-info
-- type: conditional
-  conditions:
-  - condition: state
-    entity: sensor.mennekes_amtron_stato_ricarica_programmata
-    state:
-    - unknown
-    - unavailable
-  card:
-    type: custom:mushroom-template-card
-    primary: Pianificazione opzionale
-    secondary: 'Configura → Veicoli → Prossima partenza: attivare e indicare capacità utile.'
-    multiline_secondary: true
-    icon: mdi:information-outline
-    color: blue
-    tap_action:
-      action: none
-- type: conditional
-  conditions:
-  - condition: state
-    entity: button.mennekes_amtron_avvia_ricarica_ospite
-    state_not:
-    - unknown
-    - unavailable
-  card:
-    type: vertical-stack
-    cards:
-    - type: custom:mushroom-title-card
-      title: Ricarica ospite
-      subtitle: Avvia subito e rimuove pausa e restrizione P&C per questa connessione. Si applicano i limiti salvati
-        in kWh e di tempo.
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_avvia_ricarica_ospite
-      name: Avvia ospite
-      secondary_info: none
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_avvia_ricarica_ospite
-    - type: custom:mushroom-template-card
-      entity: sensor.mennekes_amtron_ricarica_ospite
-      primary: Stato
-      secondary: '{{ state_translated(''sensor.mennekes_amtron_ricarica_ospite'') if has_value(''sensor.mennekes_amtron_ricarica_ospite'')
-        else ''Non disponibile'' }}'
-      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_ricarica_ospite'') in [''reached'',
-        ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_ricarica_ospite'')
-        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:account-clock-outline''
-        }}'
-      color: '{{ ''red'' if states(''sensor.mennekes_amtron_ricarica_ospite'') in [''error'', ''interrupted'', ''job_storage_unavailable'',
-        ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_ricarica_ospite'') in [''active'', ''charging'',
-        ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey'' if states(''sensor.mennekes_amtron_ricarica_ospite'')
-        in [''disabled'', ''none''] else ''amber'' }}'
-      multiline_secondary: true
-      tap_action:
-        action: more-info
-- type: conditional
-  conditions:
-  - condition: state
-    entity: button.mennekes_amtron_avvia_ricarica_ospite
-    state:
-    - unknown
-    - unavailable
-  card:
-    type: custom:mushroom-template-card
-    primary: Ricarica ospite non disponibile
-    secondary: Collegare l’app e abilitare la scrittura. Controllare gli ID delle entità.
-    multiline_secondary: true
-    icon: mdi:information-outline
-    color: blue
-    tap_action:
-      action: none

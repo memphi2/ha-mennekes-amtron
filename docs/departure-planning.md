@@ -7,7 +7,7 @@ charging as late as it safely can, charges at full current and reduces to 6 A
 toward the end, so the car reaches the target at departure. This is optional;
 ordinary percentage and kWh targets work without a departure plan.
 
-**A departure plan may lift a manual charging pause.** Clear **Next departure**
+**A departure plan may lift a manual charging pause.** Clear **Target time**
 when you want the vehicle to stay paused. A percentage target on its own never
 resumes charging.
 
@@ -23,7 +23,7 @@ The departure belongs to a car's [vehicle profile](vehicle-setup.md).
    a fixed value or a suitable HA entity; a configured BavarianData profile can
    supply it when that source is available. Optionally set a
    [minimum charge level](#minimum-charge-level) the car charges to at once.
-3. Set **Next departure** to tomorrow's full date and **07:30**, or copy that
+3. Set **Target time** to tomorrow's full date and **07:30**, or copy that
    trip from a calendar or vehicle timer.
 4. Check the displayed date, time, target and planning status.
    The `planned_start` attribute of **Timed charging status** shows when
@@ -50,7 +50,7 @@ Manual entry is available once planning is enabled. Calendar, dated entity
 and vehicle-provider inputs are separate optional choices; select only the
 ones you want to use. They do not require each other.
 
-Set **Next departure** to a full date and time. This is a one-trip target, not
+Set **Target time** to a full date and time. This is a one-trip target, not
 a repeating daily plan. Manual entry, calendar selection and optional vehicle timer
 selection can coexist; choose the source you want for each trip.
 
@@ -59,7 +59,7 @@ selection can coexist; choose the source you want for each trip.
 For a calendar, enable the calendar option in **Next departure**, then select a
 **Departure calendar** and enter the **exact event title**. Press **Use next
 calendar event** to copy the first
-matching timed event within the next 14 days into **Next departure**. All-day
+matching timed event within the next 14 days into **Target time**. All-day
 events are ignored. Calendar changes after selection do not alter the copied
 time; press the button again to import the updated event. The
 [calendar blueprint](blueprints.md#plan-the-next-trip-from-a-calendar) can
@@ -74,7 +74,7 @@ timer. Other vehicle integrations can supply the generic SoC, capacity and dated
 departure entities described here.
 The adapter reads the vehicle's last locally
 published Home Assistant states; it does not fetch BMW cloud data or change the
-vehicle's timers. Those states may be cached, so check **Next departure** after
+vehicle's timers. Those states may be cached, so check **Target time** after
 importing, especially after changing the timer in your car or the BMW app.
 
 **Not every car sends its timers.** On an i4 and an i5, BMW CarData reported
@@ -82,7 +82,7 @@ only that a departure timer is set, not its time, even with the timer fields
 ticked in the data selection ([BavarianData #308](https://github.com/JustChr/BavarianData/issues/308)).
 **Use vehicle departure timers** is offered only when
 BavarianData has enabled action, hour and minute sensors of at least one timer;
-**Next departure** names the timer entities in use. Otherwise, take the
+**Target time** names the timer entities in use. Otherwise, take the
 departure from a calendar or a date/time entity instead.
 
 - BMW streams the timers only when they are ticked in the car's data selection.
@@ -119,13 +119,13 @@ and time also works. This optional source can automatically select a new future
 timestamp. A manual, calendar or vehicle selection takes priority over the source's
 current timestamp; it can be replaced when that timestamp changes to a new
 trip. A different time-zone representation of the same instant is still the
-same trip and does not reactivate a cleared plan. **Clear departure time** cancels the selected plan without changing the
+same trip and does not reactivate a cleared plan. Clearing **Target time** cancels the selected plan without changing the
 percentage ceiling. A pause the plan itself had set ends with it, so the car
 charges again; any other setting of the wallbox stays as it is.
 
 ## Change or cancel a trip
 
-Disabling **Next departure** clears its selected trip and cancels commands queued
+Disabling departure planning clears its selected trip and cancels commands queued
 by that plan. It keeps the ordinary percentage target and the current pause
 state. Before 1.0, incompatible beta settings are not migrated; see [Updates](installation.md#updates).
 
@@ -169,7 +169,7 @@ Each SoC report recalculates this. A charge that is faster than estimated never
 pauses again once it has started; it reaches the 6 A step sooner. A slower one
 returns to full current. **An active timed goal can lift even a
 manually set charging pause** to meet the selected time. To prevent that,
-clear **Next departure**. The ordinary percentage target without a departure
+clear **Target time**. The ordinary percentage target without a departure
 time still only limits charging and never resumes a pause.
 
 With [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge)
@@ -190,7 +190,7 @@ determines whether preconditioning draws grid or battery power; completed
 charging targets still apply. Once the target is reached, the charging plan
 cannot resume another charge. Raising **Vehicle charge
 target** above the car's charge level plans the same trip again. Every target
-change recalculates the plan. **Next departure** remains visible until that
+change recalculates the plan. **Target time** remains visible until that
 time so the climate blueprint can still run, then clears automatically.
 ## Limits and missing data
 
@@ -237,8 +237,14 @@ the trip there as described above.
   the power the car really draws, per number of phases and per ampere offered,
   so it stays valid when the maximum current changes. A car that draws less than the wallbox offers therefore
   gets an earlier start, and the 30-minute reserve stays for the unexpected.
+  Initially it uses the offered current and known phases. After at least two
+  minutes of valid metered delivery at full offered current, a lower observed
+  power updates the estimate immediately; increases are smoothed. For example,
+  offering 11 kW to a car that actually takes 5.5 kW no longer produces an 11 kW
+  forecast after measurement. It replans from the observed rate and reports an
+  unreachable target when necessary; it cannot recover time already lost.
   Both values are kept per vehicle profile for up to eight cars and survive a
-  restart.
+  restart. This adds no separate charging history or extra Modbus polling.
 - **The forecast runs to the percentage target.** **Timed charging status**
   shows it as attributes: `estimated_finish`, `estimated_level_at_departure`,
   `learned_efficiency` and, once metered, `measured_power_kw`. As long as the
@@ -253,9 +259,9 @@ the trip there as described above.
 - **Manual and PV commands act at once.** The plan sets its current again five
   minutes after its last change at the earliest, and only when it differs by
   at least 1 A.
-- **An order from the app has priority.** While a guest session or
-  guest order holds the wallbox, the status is **An order from the app has
-  priority** and the plan writes nothing.
+- **Guest charging has priority.** The vehicle planner does not control the guest
+  connection, even after you manually pause it. Unplug the guest before returning
+  to recognized-vehicle planning.
 
 The plan's pause ends when the car is unplugged or another car is selected, so
 the next car is not left paused. It also ends when the departure is cleared or
