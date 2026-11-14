@@ -73,8 +73,8 @@ the state-change wait is **300 seconds**. A queued request is not a completed
 command: check **Pending change**. The app is the only software current cap in
 service mode. Its cap does not apply to a deliberately selected unlimited **0 A**.
 
-A confirmed guest charge runs independently of HA, but does not unlock the wallbox or
-grant charging permission. HA pause/release-off/lock stops the guest charge. After an
+An explicitly started guest charge runs independently of HA. It grants permission
+for the current connection and lifts manual pause, but never unlocks the wallbox. HA pause/release-off/lock stops the guest charge. After an
 app restart it continues only if the wallbox proves the same plug-in.
 [App operation and restart behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b7/docs/app-guide.md).
 

@@ -20,6 +20,7 @@ from homeassistant.exceptions import Unauthorized, UnknownUser
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.service import async_register_platform_entity_service
 
 from .control import AmtronControl
 from .data import MennekesAmtronRuntimeData
@@ -46,30 +47,9 @@ SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
 
 # With one wallbox the target may be left out, which keeps dashboards short.
 _DEVICE = {probatio.Optional(ATTR_DEVICE_ID): probatio.All(cv.ensure_list, [cv.string])}
-_CURRENT = probatio.All(probatio.Coerce(float), probatio.Range(min=6, max=32))
-
-
-def _tenths(value: float) -> float:
-    """The app counts energy in 0.1 kWh steps; a computed value is rounded to them."""
-    return round(value, 1)
-
-
-_ENERGY = probatio.All(probatio.Coerce(float), _tenths, probatio.Range(min=0.1, max=1000))
-
-
-
-# Action name, its fields beside the wallbox, and the call it makes.
+# The single guest action takes its limits from the ordinary target controls.
 ORDER_ACTIONS: dict[str, tuple[dict[Any, Any], Callable[[ServiceOrders, dict[str, Any]], Awaitable[None]]]] = {
-    "start_guest_charging": ({
-        probatio.Required("duration"): probatio.All(probatio.Coerce(int), probatio.Range(min=1, max=1440)),
-        probatio.Required("current"): _CURRENT,
-        probatio.Required("energy"): _ENERGY,
-    }, lambda orders, data: orders.async_start_guest(
-        minutes=data["duration"], current=data["current"], energy=data["energy"],
-    )),
-    "stop_guest_charging": ({}, lambda orders, _data: orders.async_stop_job()),
-    "clear_guest_charging": ({}, lambda orders, _data: orders.async_clear_job()),
-
+    "start_guest_charging": ({}, lambda orders, _data: orders.async_start_guest()),
 }
 
 
@@ -80,6 +60,11 @@ def async_setup_services(hass: HomeAssistant) -> None:
     async_setup_recorder_service(hass)
     if hass.services.has_service(DOMAIN, SERVICE_SET_CHARGING_CURRENT):
         return
+
+    async_register_platform_entity_service(
+        hass, DOMAIN, "clear_target_time", entity_domain="datetime",
+        schema={}, func="async_clear_value",
+    )
 
     async def async_handle_set_charging_current(call: ServiceCall) -> None:
         user = None

@@ -88,8 +88,7 @@ Supervisor roles. See [the app's web pages](app-guide.md).
 | `/log`, `/api/modbus-debug` | Live log, in RAM only |
 | `/registers`, `GET /api/registers` | Register page below the overview, from passive observations |
 | `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
-| `/targets`, `/departure`, `/api/charging` | Shared charge targets and next departure |
-| `/guest`, `/api/jobs` | Guest charging and saved guest settings |
+| `/targets`, `/api/charging` | Shared limits and explicit guest start |
 
 Values saved on the **Runtime** page apply without a restart. Each previewed
 change names its `effect`: `next_cycle` for the polling intervals, `immediate`
@@ -229,7 +228,7 @@ recurring failures require their logged cause to be corrected.
 
 Pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. A guest session is saved in
-`guest-charge.json`, the shared draft in `guest-draft.json`, learned charging power
+`guest-charge.json`, learned charging power
 in `charge-rates.json` and the departure plan in `departure-plan.json` the same
 way. The file is atomically replaced with
 owner-only permissions when those settings change. Both the file and directory
@@ -284,7 +283,7 @@ service data rather than maintaining a second queue.
 | `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |
-| `GET`/`POST /v2/jobs` | Authenticated guest-charging state and operations; see [Guest charging API](#guest-charging-api). |
+
 | `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number
@@ -344,7 +343,7 @@ snapshot's `control` object reports `supports_departure_plan: true` and
 | `confirmed` | Whether the handed-over car is confirmed for this plug-in |
 | `forecast` | `null` unless a plan is computed; otherwise `finish_at` (when the target is reached: the departure, or later when it is unreachable, rounded up to five minutes), `level_at_departure` (percent), `efficiency` (learned share of the metered energy that reaches the battery, 0.9 until learned) and `full_power_kw` (metered power at full current for the current phases, or `null`) |
 
-`control.orders` is the guest-charging state that `GET /v2/jobs` returns, or
+`control.orders` is the guest-charging state, or
 `null` while the job controller loads. Home Assistant reads its **Guest charging** sensor from it, so a poll needs no second request.
 
 `control.operation` summarizes all controllers of the service for a reader. It
@@ -423,35 +422,20 @@ HA restore values.
 
 ## Guest charging API
 
-Authenticated clients use `GET /v2/jobs` for the bounded guest session and draft
-snapshot. Admin Ingress uses `/api/jobs` with its existing CSRF protection.
-The internal execution engine retains the jobs name; there is no scheduled-job
-or boost action in the public API.
+Read `control.orders` and `control.guest_revision` in `GET /v2/state`.
+Start with `POST /v2/command` naming `command: guest_start`,
+`expected_serial_number` and `expected_guest_revision`. A stale revision or a
+different wallbox is rejected. There is no `/v2/jobs` or `/api/jobs` route.
 
-The supported actions are `edit_guest_draft`, `reset_guest_draft`,
-`preview_guest_draft`, `create_guest_draft`, `preview_guest`, `create`, `stop`
-and `clear`. `create` accepts only `kind: guest`. Draft edits name the expected
-`draft_revision`; start confirmation additionally names the current state revision
-and connection scope. The preview freezes the absolute end time. Confirming it
-never extends the duration, and stale previews/edits are rejected.
+The command uses the existing energy baseline and selected time. It grants release
+for this connection and lifts manual pause, while preserving locks, faults and
+current limits. It does not clear the saved vehicle percentage target; that target
+is ignored during the guest session. Normal pause ends the session.
 
-Guest draft fields are `current_a` (6–32 A, limited by the service), `energy_kwh`
-(0.1–1000 kWh) and `duration_minutes` (1–1440 whole minutes). One bounded private
-`guest-draft.json` is written only after explicit edits, using atomic replacement.
-It contains no permission to charge. The active guest session is stored separately.
-
-HA POST requests name `expected_serial_number`; a service driving another
-wallbox refuses them. Starts never grant release, unlock the wallbox, disable
-Plug & Charge or remove a vehicle battery target. See the
-[user guide](app-from-home-assistant.md) for the three modes.
-
-Admin-only `/api/charging` exposes the existing persisted energy/percentage
-choices and selected departure. Writes carry the editor's revision and explicit
-confirmation. The percentage editor uses the current bound vehicle source and
-optional maximum; it does not accept arbitrary source IDs from the browser.
-Departure changes retain the external HA source marker so an unchanged timestamp
-cannot silently re-arm a cleared trip. HA mirrors explicit app changes for the
-same selected vehicle. Vehicle profile configuration remains in HA.
+Admin-only `/api/charging` exposes the shared energy, percentage and time choices
+and the explicit guest action. Writes carry revisions and existing CSRF protection;
+failed starts are not retried. Vehicle profile and intelligent planning configuration
+remain in HA. The percentage editor uses the bound source and optional maximum.
 
 ## Transport security
 

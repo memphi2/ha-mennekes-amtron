@@ -265,6 +265,6 @@ def charging_forecast(
         result["state"] = "awaiting_meter"
         return result
     earliest = max(earliest, sample.now)
-    deadline = "likely" if latest <= job.finish_at else "at_risk" if earliest <= job.finish_at else "unlikely"
+    deadline = "none" if job.finish_at is None else "likely" if latest <= job.finish_at else "at_risk" if earliest <= job.finish_at else "unlikely"
     result.update(state="estimate", earliest_finish=earliest.isoformat(), latest_finish=latest.isoformat(), deadline_status=deadline)
     return result

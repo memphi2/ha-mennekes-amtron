@@ -5,10 +5,10 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'../custom_components/mennekes_amtron_rtu/device');
 const source=fs.readFileSync(path.join(root,'app_charging.js'),'utf8');
-const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,energy:{target:10,status:'active'},soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,forecast:null,storage_error:false}});
+const initial=()=>({schema:1,csrf:'fixture-csrf',revision:'r1',read_only:false,guest_revision:'g1',guest_active:false,energy:{target:10,status:'active'},soc:{configured:true,target:80,maximum:90,maximum_required:false,status:'active'},departure:{configured:true,revision:'d1',deadline:'2026-11-16T07:30:45.000Z',status:'paused_until_start',planned_start:null,forecast:null,storage_error:false}});
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function setup(page='targets',responses=[initial()],language='de'){
- const html=fs.readFileSync(path.join(root,page==='targets'?'app_targets.html':'app_departure.html'),'utf8');
+ const html=fs.readFileSync(path.join(root,'app_targets.html'),'utf8');
  const elements=new Map([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],{value:'',textContent:'',disabled:false,listeners:{},addEventListener(k,v){this.listeners[k]=v;},reportValidity(){return true;}}]));
  const timers=new Map(),calls=[],events={},docEvents={};let next=1,confirmed=true;
  const document={hidden:false,documentElement:{lang:language,classList:{add(){}}},querySelectorAll(){return [];},querySelector(){return {dataset:{chargingPage:page}};},getElementById(id){assert.ok(elements.has(id),id);return elements.get(id);},addEventListener(k,v){docEvents[k]=v;}};
@@ -30,11 +30,10 @@ test('polls keep unsaved input and its original revision, rejecting stale intent
  assert.equal(h.elements.get('soc_value').value,'75');assert.match(h.elements.get('notice').textContent,/andernorts geändert/);
  await h.emit('soc_form','submit');assert.equal(JSON.parse(h.calls.at(-1).body).revision,'r1');assert.equal(h.elements.get('soc_value').value,'75');
 });
-test('read-only, missing profile and declined confirmation send nothing',async()=>{
+test('read-only and missing profile send nothing',async()=>{
  for(const data of [{...initial(),read_only:true},{...initial(),soc:{configured:false}}]){
   const h=setup('targets',[data]);await flush();assert.equal(h.elements.get('soc_save').disabled,true);await h.emit('soc_form','submit');assert.equal(h.calls.length,1);
  }
- const h=setup();await flush();h.cancel();await h.emit('energy_form','submit');assert.equal(h.calls.length,1);
 });
 test('unchanged displayed departure keeps the exact saved instant including seconds',async()=>{
  const h=setup('departure',[initial(),initial()]);await flush();await h.emit('departure_form','submit');
@@ -44,7 +43,7 @@ test('unchanged displayed departure keeps the exact saved instant including seco
 test('clear affects only departure and explicitly confirms it',async()=>{
  const next=initial();next.departure={...next.departure,revision:'d2',deadline:null};
  const h=setup('departure',[initial(),next]);await flush();await h.emit('departure_clear','click');
- assert.deepEqual(JSON.parse(h.calls[1].body),{action:'departure',value:null,revision:'d1',confirm:true});assert.equal(h.elements.get('departure_value').value,'');assert.match(h.elements.get('departure_summary').textContent,/80/);
+ assert.deepEqual(JSON.parse(h.calls[1].body),{action:'departure',value:null,revision:'d1',confirm:true});assert.equal(h.elements.get('departure_value').value,'');assert.equal(h.elements.get('soc_value').value,'80');
 });
 test('lost response remains uncertain and does not retry the write',async()=>{
  const h=setup('targets',[initial(),new Error('lost'),initial()]);await flush();await h.emit('energy_form','submit');assert.match(h.elements.get('notice').textContent,/nicht bestätigt/);await h.poll();assert.equal(h.calls.filter(c=>c.method==='POST').length,1);
@@ -66,4 +65,20 @@ test('invalid or nonexistent local departure never posts a normalized time',asyn
 test('malformed successful save is uncertain and preserves unsaved input',async()=>{
  const h=setup('targets',[initial(),{schema:1},initial()]);await flush();h.elements.get('energy_value').value='25';await h.emit('energy_form','input');await h.emit('energy_form','submit');
  assert.match(h.elements.get('notice').textContent,/nicht bestätigt/);await h.poll();assert.equal(h.elements.get('energy_value').value,'25');assert.equal(h.calls.filter(c=>c.method==='POST').length,1);
+});
+
+test('guest is a single explicit command using the shared selection revision',async()=>{
+ const h=setup('targets',[initial(),initial()]);await flush();await h.emit('guest_start','click');
+ assert.deepEqual(JSON.parse(h.calls[1].body),{action:'guest',value:true,revision:'g1',confirm:true});
+ assert.equal(h.calls.filter(c=>c.method==='POST').length,1);
+});
+test('unsaved edits block guest start rather than using unexpected limits',async()=>{
+ const h=setup();await flush();h.elements.get('energy_value').value='25';await h.emit('energy_form','input');
+ assert.equal(h.elements.get('guest_start').disabled,true);await h.emit('guest_start','click');assert.equal(h.calls.length,1);
+});
+test('active guest stays visible and cannot be started a second time',async()=>{
+ const h=setup('targets',[{...initial(),guest_active:true}]);await flush();
+ assert.equal(h.elements.get('guest_start').disabled,true);
+ assert.equal(h.elements.get('guest_start').textContent,'Gastladen aktiv');
+ await h.emit('guest_start','click');assert.equal(h.calls.length,1);
 });

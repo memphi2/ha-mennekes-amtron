@@ -37,7 +37,6 @@ from .device.departure_plan import DepartureInputs, DepartureState
 from .device.energy_goal import EnergyGoal
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
-from .device.guest_draft import read_snapshot
 from .device.heartbeat import HeartbeatTask
 from .device.identity import usable_max_evse_current
 from .device.link_quality import CONNECTION_QUALITY_STATES
@@ -535,7 +534,6 @@ class RemoteClient(MennekesModbusClient):
             # Meter value and timestamp form one observation. Never attach a
             # sample timestamp to an independently carried-forward raw value.
             values = {**values, "energy_total": observed_energy}
-        orders = control.get("orders")
         return WallboxData(
             values=values,
             failed_blocks=tuple(failed),
@@ -545,7 +543,6 @@ class RemoteClient(MennekesModbusClient):
             service_max_charging_current=control["max_charging_current"],
             service_charging_setpoint=current,
             service_soc_maximum_required=maximum_required,
-            service_guest_draft=read_snapshot(orders.get("guest_draft") if isinstance(orders, dict) else None),
             pending_change=pending_action,
             pending_change_until=pending_until,
             connection_quality=quality,

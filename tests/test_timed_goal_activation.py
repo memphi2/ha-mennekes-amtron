@@ -80,7 +80,7 @@ def test_real_ha_only_adds_departure_entities_for_enabled_vehicle_planning(tmp_p
                 assert (entry.runtime_data.timed_goal is not None) is enabled
                 assert (entry.runtime_data.vehicle_soc is not None) is soc
                 registry = er.async_get(hass)
-                for domain, key in (("datetime", "timed_departure"), ("sensor", "timed_goal_status"), ("button", "timed_clear_departure")):
+                for domain, key in (("datetime", "timed_departure"), ("sensor", "timed_goal_status")):
                     entity = registry.async_get_entity_id(domain, DOMAIN, f"{SERIAL_NUMBER}_{key}")
                     assert (entity is not None) is enabled
                 if enabled:

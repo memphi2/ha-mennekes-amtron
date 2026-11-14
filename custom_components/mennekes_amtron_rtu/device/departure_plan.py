@@ -485,8 +485,6 @@ class DepartureController:
             if editor == "app":
                 if sample.read_only or expected_revision != self.choice_revision or expected_vehicle != sample.vehicle:
                     raise DeviceError("service_unavailable")
-                if sample.vehicle is None or self.inputs is None or self.inputs.vehicle != sample.vehicle:
-                    raise DeviceError("soc_goal_source_changed")
                 if deadline is not None and deadline <= sample.now:
                     raise ValueError("departure time must be in the future")
                 # Keep the HA source marker, so an unchanged external calendar

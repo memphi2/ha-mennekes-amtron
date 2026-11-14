@@ -105,7 +105,7 @@ def summarize(
     if holding:
         controller = "guest_order" if held.get("kind") == "guest" else "charging_job"
         state = held.get("state")
-        target = _target("energy", held.get("energy_kwh"), held.get("finish_at"))
+        target = _target("energy", energy.get("target_kwh") if held.get("kind") == "guest" else held.get("energy_kwh"), held.get("finish_at"))
         if state == "scheduled":
             waits, following = "until_job_start", _event("job_start", held.get("start_at"))
         elif state == "charging":
@@ -148,7 +148,7 @@ def summarize(
         waiting = "plug_charge_waiting"
     elif waits is not None:
         waiting = waits
-    elif goal_stop or soc.get("status") == "reached" or energy.get("status") == "reached":
+    elif goal_stop or (not (holding and held.get("kind") == "guest") and soc.get("status") == "reached") or energy.get("status") == "reached":
         waiting = "target_reached"
     elif control.get("pending_action") is not None:
         waiting = "command_pending"

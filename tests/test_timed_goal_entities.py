@@ -70,7 +70,7 @@ def test_departure_status_remains_visible_without_calendar_configuration():
         entry.runtime_data.timed_goal = _timed_observer()
         datetimes, buttons, sensors = await _entities(hass, entry)
         assert "timed_next_calendar_event" not in buttons
-        assert buttons["timed_clear_departure"].available
+        assert "timed_clear_departure" not in buttons
         assert datetimes["timed_departure"].available
         status = sensors["timed_goal_status"]
         assert status.available
@@ -89,14 +89,14 @@ def test_departure_status_remains_visible_without_calendar_configuration():
         entry.runtime_data.coordinator.last_update_success = False
         assert not status.available
         assert not datetimes["timed_departure"].available
-        assert not buttons["timed_clear_departure"].available
+        assert "timed_clear_departure" not in buttons
         entry.runtime_data.coordinator.last_update_success = True
         entry.runtime_data.timed_goal = None
         # A car without departure planning leaves the entities unavailable.
         assert status.native_value is None
         assert not status.available
         assert not datetimes["timed_departure"].available
-        assert not buttons["timed_clear_departure"].available
+        assert "timed_clear_departure" not in buttons
         assert not transport.writes
         await entry.runtime_data.control.async_shutdown()
 
@@ -157,7 +157,7 @@ def test_departure_controls_respect_read_only_but_status_is_observable(remote, m
         assert sensors["timed_goal_status"].available
         if remote:
             assert not buttons["timed_next_calendar_event"].available
-            assert not buttons["timed_clear_departure"].available
+            assert "timed_clear_departure" not in buttons
             assert not buttons["timed_vehicle_departure"].available
         else:
             assert "timed_next_calendar_event" not in buttons

@@ -18,37 +18,16 @@
       "timed_next_calendar_event": {
         "default": "mdi:calendar-import"
       },
-      "timed_clear_departure": {
-        "default": "mdi:calendar-remove"
-      },
       "timed_vehicle_departure": {
         "default": "mdi:car-clock"
       },
       "guest_start": {
         "default": "mdi:account-arrow-right-outline"
-      },
-      "guest_reset_draft": {
-        "default": "mdi:clipboard-refresh-outline"
-      },
-      "guest_stop": {
-        "default": "mdi:stop-circle-outline"
-      },
-      "guest_clear": {
-        "default": "mdi:delete-outline"
       }
     },
     "number": {
       "soc_goal": {
         "default": "mdi:battery-arrow-up-outline"
-      },
-      "guest_current_a": {
-        "default": "mdi:current-ac"
-      },
-      "guest_energy_kwh": {
-        "default": "mdi:lightning-bolt"
-      },
-      "guest_duration_minutes": {
-        "default": "mdi:timer-outline"
       }
     },
     "select": {
@@ -199,20 +178,6 @@
           "departure": "mdi:car-arrow-right"
         }
       },
-      "guest_draft_status": {
-        "default": "mdi:clipboard-edit-outline",
-        "state": {
-          "ready": "mdi:clipboard-check-outline",
-          "job_exists": "mdi:account-clock-outline",
-          "job_not_permitted": "mdi:shield-lock-outline",
-          "job_current_exceeds_cap": "mdi:current-ac",
-          "job_preview_expired": "mdi:timer-alert-outline",
-          "job_storage_unavailable": "mdi:alert-circle-outline",
-          "invalid_job_request": "mdi:clipboard-alert-outline",
-          "job_stop_unconfirmed": "mdi:timer-sand",
-          "guest_vehicle_target_active": "mdi:battery-lock-outline"
-        }
-      },
       "guest_charging": {
         "default": "mdi:account-clock-outline",
         "state": {
@@ -353,7 +318,6 @@
   "services": {
     "set_charging_current": "mdi:current-ac",
     "start_guest_charging": "mdi:account-clock-outline",
-    "stop_guest_charging": "mdi:stop-circle-outline",
-    "clear_guest_charging": "mdi:delete-outline"
+    "clear_target_time": "mdi:calendar-remove"
   }
 }

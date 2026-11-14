@@ -3,6 +3,17 @@
   "use strict";
   const langs=["en","de","fr","nl","it"], index=langs.indexOf(document.documentElement.lang.slice(0,2)), lang=index<0?0:index;
   const words={
+    guest_started:["Guest start requested; check the overview for confirmation.", "Gaststart angefordert; die Übersicht zeigt die Bestätigung.", "Démarrage invité demandé ; vérifiez la confirmation dans la vue d’ensemble.", "Gaststart aangevraagd; controleer de bevestiging in het overzicht.", "Avvio ospite richiesto; verifica la conferma nella panoramica."],
+    overview:["View live overview", "Live-Übersicht öffnen", "Ouvrir la vue en direct", "Liveoverzicht openen", "Apri panoramica live"],
+    guest_limits:["Uses the saved kWh limit and time, whichever is reached first. Unset limits do not apply. The vehicle percentage target stays saved but does not apply to the guest.", "Verwendet gespeichertes kWh-Ziel und Zeitpunkt: Was zuerst erreicht ist, stoppt die Ladung. Ungesetzte Grenzen entfallen. Das Fahrzeug-Prozentziel bleibt gespeichert, gilt aber nicht für den Gast.", "Utilise la limite kWh et l’heure enregistrées ; la première atteinte arrête la recharge. Une limite non définie ne s’applique pas. L’objectif du véhicule reste enregistré mais ne s’applique pas à l’invité.", "Gebruikt de opgeslagen kWh-grens en tijd: wat het eerst wordt bereikt stopt het laden. Niet-ingestelde grenzen gelden niet. Het voertuigdoel blijft opgeslagen maar geldt niet voor de gast.", "Usa limite kWh e orario salvati: il primo raggiunto ferma la ricarica. I limiti non impostati non si applicano. L’obiettivo del veicolo resta salvato ma non vale per l’ospite."],
+    guest_hint:["Start the connected guest now, including with Plug & Charge. This lifts a deliberate pause.", "Das angeschlossene Gastfahrzeug jetzt laden, auch mit Plug & Charge. Eine bewusste Pause wird aufgehoben.", "Rechargez maintenant le véhicule invité connecté, même avec Plug & Charge. Une pause volontaire est levée.", "Laad de aangesloten gast nu, ook met Plug & Charge. Een bewuste pauze wordt opgeheven.", "Ricarica ora il veicolo ospite collegato, anche con Plug & Charge. Una pausa volontaria viene annullata."],
+    guest:["Start guest charging", "Gastladen starten", "Démarrer la recharge invité", "Gastladen starten", "Avvia ricarica ospite"],
+    time_hint:["Recognized vehicle: intelligent planning in HA. Guest: stop by this time.", "Erkanntes Fahrzeug: intelligente Planung in HA. Gast: spätestens zu diesem Zeitpunkt stoppen.", "Véhicule reconnu : planification intelligente dans HA. Invité : arrêt à cette heure.", "Herkend voertuig: slimme planning in HA. Gast: uiterlijk op dit tijdstip stoppen.", "Veicolo riconosciuto: pianificazione intelligente in HA. Ospite: fermarsi entro questo orario."],
+    time_label:["Target time (optional)", "Zielzeitpunkt (optional)", "Heure cible (facultative)", "Doeltijd (optioneel)", "Orario obiettivo (opzionale)"],
+    simple_hint:["Set only the limits you need. Values are shared with Home Assistant.", "Nur die benötigten Grenzen setzen. Die Werte gelten gemeinsam mit Home Assistant.", "Définissez uniquement les limites nécessaires. Les valeurs sont partagées avec Home Assistant.", "Stel alleen de benodigde grenzen in. Waarden worden gedeeld met Home Assistant.", "Imposta solo i limiti necessari. I valori sono condivisi con Home Assistant."],
+    current_title:["Current charging", "Aktuelle Ladung", "Recharge actuelle", "Huidige laadsessie", "Ricarica attuale"],
+    limits:["Charging limits", "Ladegrenzen", "Limites de recharge", "Laadgrenzen", "Limiti di ricarica"],
+    charging:["Charging", "Laden", "Recharge", "Laden", "Ricarica"],
     "plan_disabled":["Disabled", "Deaktiviert", "Désactivé", "Uitgeschakeld", "Disattivato"],
     "plan_waiting_for_target":["Waiting for percentage target", "Wartet auf Prozentziel", "En attente de la cible en %", "Wacht op procentdoel", "In attesa obiettivo %"],
     "plan_waiting_for_capacity":["Waiting for battery capacity", "Wartet auf Akkukapazität", "En attente de la capacité", "Wacht op accucapaciteit", "In attesa capacità"],
@@ -36,7 +47,8 @@
     departure_warning:["An active plan may lift a manual pause. Clear the departure to cancel the plan; percentage and energy limits remain. Clearing can release a pause owned by this plan.","Ein aktiver Plan darf eine manuelle Pause aufheben. Abfahrt löschen beendet den Plan; Prozent- und Energiegrenzen bleiben. Eine vom Plan gesetzte Pause kann dabei enden.","Un plan actif peut lever une pause manuelle. Effacer le départ annule le plan ; les limites restent. Une pause créée par ce plan peut alors prendre fin.","Een actief plan mag een handmatige pauze opheffen. Vertrek wissen stopt het plan; grenzen blijven. Een pauze van dit plan kan daarbij eindigen.","Un piano attivo può rimuovere una pausa manuale. Cancellare la partenza annulla il piano; i limiti restano. Una pausa creata dal piano può terminare."],
     sources:["Manual time here or in HA; import calendar/vehicle timers using the HA buttons. All edit the same next trip. Configure vehicle sources and capacity in HA.","Zeit hier oder in HA manuell setzen; Kalender/Fahrzeugtimer über die HA-Buttons übernehmen. Alles ändert dieselbe nächste Fahrt. Fahrzeugquellen und Kapazität werden in HA eingerichtet.","Heure manuelle ici ou dans HA ; importez calendrier/minuteurs avec les boutons HA. Tous modifient le même trajet. Configurez sources et capacité dans HA.","Tijd hier of in HA instellen; kalender/voertuigtimers via de HA-knoppen importeren. Alles wijzigt dezelfde rit. Configureer bronnen en capaciteit in HA.","Ora manuale qui o in HA; importare calendario/timer con i pulsanti HA. Tutti modificano lo stesso viaggio. Configurare fonti e capacità in HA."],
     shared:["Saved values are shared with Home Assistant. Save changes explicitly; starting a guest charge is a separate action.","Gespeicherte Werte sind gemeinsam mit Home Assistant. Änderungen ausdrücklich speichern; Gastladen wird separat gestartet.","Valeurs enregistrées partagées avec Home Assistant. Enregistrez explicitement ; la recharge invité démarre séparément.","Opgeslagen waarden worden gedeeld met Home Assistant. Wijzigingen expliciet opslaan; gastladen start apart.","Valori salvati condivisi con Home Assistant. Salvare esplicitamente; la ricarica ospite si avvia separatamente."],
-    save:["Save","Speichern","Enregistrer","Opslaan","Salva"],clear:["Clear departure","Abfahrt löschen","Effacer le départ","Vertrek wissen","Cancella partenza"],reload:["Reload saved values","Gespeicherte Werte neu laden","Recharger les valeurs","Opgeslagen waarden laden","Ricarica valori salvati"],
+    guest_active:["Guest charging active","Gastladen aktiv","Recharge invité active","Gastladen actief","Ricarica ospite attiva"],
+    save:["Save","Speichern","Enregistrer","Opslaan","Salva"],clear:["Clear time","Zeitpunkt löschen","Effacer l’heure","Tijd wissen","Cancella orario"],reload:["Reload saved values","Gespeicherte Werte neu laden","Recharger les valeurs","Opgeslagen waarden laden","Ricarica valori salvati"],
     ready:["Ready","Bereit","Prêt","Gereed","Pronto"],saved:["Saved","Gespeichert","Enregistré","Opgeslagen","Salvato"],
     offline:["No current response. Reload before editing.","Keine aktuelle Antwort. Vor dem Ändern neu laden.","Aucune réponse actuelle. Rechargez avant de modifier.","Geen actueel antwoord. Herlaad vóór wijzigen.","Nessuna risposta attuale. Ricaricare prima di modificare."],
     changed:["Values changed elsewhere. Reload and check before saving.","Werte wurden andernorts geändert. Vor dem Speichern neu laden und prüfen.","Valeurs modifiées ailleurs. Rechargez et vérifiez avant d’enregistrer.","Waarden elders gewijzigd. Herlaad en controleer vóór opslaan.","Valori modificati altrove. Ricaricare e verificare prima di salvare."],
@@ -51,7 +63,7 @@
   const t=k=>words[k]?.[lang]||words.configure[lang], el=id=>document.getElementById(id);
   document.querySelectorAll("[data-text]").forEach(n=>{n.textContent=t(n.dataset.text);});
   document.documentElement.classList?.add("ready");
-  const keys=document.querySelector("main").dataset.chargingPage==="targets"?["energy","soc"]:["departure"];
+  const keys=["energy","departure","soc"];
   let state=null,busy=false,timer=null,abort=null,generation=0,hidden=false,error="";
   const dirty=new Set(),revisions={},originalDates={};
   const live=()=>!hidden&&!document.hidden;
@@ -63,19 +75,23 @@
     for(const key of keys){
       const info=state?.[key], input=el(key+"_value");
       input.disabled=busy||!editable(key);el(key+"_save").disabled=input.disabled;
-      el(key+"_status").textContent=!info||!editable(key)?t("configure"):t(key==="departure"?"plan_"+info.status:info.status);
+      el(key+"_status").textContent=!info?"—":key==="departure"?(info.deadline?new Date(info.deadline).toLocaleString(langs[lang]):t("disabled")):!editable(key)?t("configure"):`${info.target} ${key==="energy"?"kWh":"%"} · ${t(info.status)}`;
       el(key+"_status").className="charging-state "+(!editable(key)?"state-muted":["reached","estimated_reached"].includes(info?.status)?"state-good":["active","charging","minimum_level","finishing"].includes(info?.status)?"state-active":["error","meter_reset"].includes(info?.status)?"state-error":info?.status==="disabled"?"state-muted":"state-wait");
       if(key==="soc"&&info){input.max=String(info.maximum??100);if(info.maximum_required&&info.maximum===null)el(key+"_status").textContent=t("limit_missing");}
       if(key==="departure"){
         el("departure_clear").disabled=busy||!editable(key);
-        el("departure_summary").textContent=state?`${t("soc")}: ${state.soc.target} %`:"";
+        el("departure_summary").textContent="";
       }
     }
+    el("guest_start").textContent=t(state?.guest_active?"guest_active":"guest");
+    el("guest_start").disabled=busy||!state||state.read_only||!state.guest_revision||state.guest_active||dirty.size>0;
     el("reload").disabled=busy;
   }
   function validate(data){
     const num=(v,max)=>typeof v==="number"&&Number.isFinite(v)&&v>=0&&v<=max;
     if(!data||data.schema!==1||typeof data.csrf!=="string"||typeof data.revision!=="string"||typeof data.read_only!=="boolean"
+        ||typeof data.guest_active!=="boolean"
+        ||!(data.guest_revision===null||typeof data.guest_revision==="string")
         ||!data.energy||!num(data.energy.target,1000)||typeof data.energy.status!=="string"
         ||!data.soc||typeof data.soc.configured!=="boolean"||!num(data.soc.target,100)
         ||!(data.soc.maximum===null||num(data.soc.maximum,100))
@@ -106,20 +122,20 @@
     finally{clearTimeout(timeout);if(own===generation){abort=null;schedule();}}
   }
   async function save(key,clear=false){
-    if(busy||!editable(key)||(!clear&&!el(key+"_form").reportValidity()))return;
-    let value=clear?null:el(key+"_value").value;
+    if(busy||(key==="guest"?(!state||state.read_only||dirty.size>0||state.guest_active||!state.guest_revision):(!editable(key)||(!clear&&!el(key+"_form").reportValidity()))))return;
+    let value=key==="guest"?true:clear?null:el(key+"_value").value;
     if(key==="departure"&&!clear){const original=originalDates[key];if(original&&localDate(original)===value)value=original;
       else {const date=new Date(value);if(!value||!Number.isFinite(date.getTime())||localDate(date.toISOString())!==value){error=t("configure");render();return;}value=date.toISOString();}}
-    else if(key!=="departure")value=Number(value);
-    if(!window.confirm(t("confirm")))return;
-    const csrf=state.csrf,rev=revisions[key];busy=true;suspend();error="";render();
+    else if(key!=="departure"&&key!=="guest")value=Number(value);
+    const csrf=state.csrf,rev=key==="guest"?state.guest_revision:revisions[key];busy=true;suspend();error="";render();
     const own=generation,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
-    try{const r=await fetch("./api/charging",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","X-Amtron-CSRF":csrf},body:JSON.stringify({action:key,value,revision:rev,confirm:true}),signal:controller.signal});const data=await r.json();if(own!==generation||!live())return;if(!r.ok){error=t(data.error==="soc_goal_source_changed"?"changed":data.error==="soc_goal_limit_unavailable"?"limit_missing":"uncertain");return;}validate(data);dirty.delete(key);error=t("saved");apply(data);}
+    try{const r=await fetch("./api/charging",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","X-Amtron-CSRF":csrf},body:JSON.stringify({action:key,value,revision:rev,confirm:true}),signal:controller.signal});const data=await r.json();if(own!==generation||!live())return;if(!r.ok){error=t(data.error==="soc_goal_source_changed"?"changed":data.error==="soc_goal_limit_unavailable"?"limit_missing":"uncertain");return;}validate(data);dirty.delete(key);error=t(key==="guest"?"guest_started":"saved");apply(data);}
     catch(_){if(own===generation&&live())error=t("uncertain");}
     finally{clearTimeout(timeout);busy=false;render();schedule();}
   }
-  for(const key of keys){el(key+"_form").addEventListener("input",()=>{dirty.add(key);error="";});el(key+"_form").addEventListener("submit",e=>{e.preventDefault();void save(key);});}
+  for(const key of keys){el(key+"_form").addEventListener("input",()=>{dirty.add(key);error="";render();});el(key+"_form").addEventListener("submit",e=>{e.preventDefault();void save(key);});}
   if(keys.includes("departure"))el("departure_clear").addEventListener("click",()=>{void save("departure",true);});
+  el("guest_start").addEventListener("click",()=>{void save("guest");});
   el("reload").addEventListener("click",()=>{if(busy)return;dirty.clear();error="";suspend();void read();});
   document.addEventListener("visibilitychange",()=>{suspend();state=null;render();if(live())void read();});
   addEventListener("pagehide",()=>{hidden=true;suspend();state=null;});addEventListener("pageshow",()=>{hidden=false;void read();});

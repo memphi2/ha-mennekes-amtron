@@ -19,7 +19,6 @@ from .charge_job_store import ChargeJobStore
 from .client_errors import AmtronBusError
 from .errors import DeviceError
 from .guest_charge import guest_request
-from .guest_draft import FIELDS, GuestDraft, validate
 from .persistence import finish_goal_save
 
 
@@ -83,7 +82,6 @@ class ChargeJobController:
         apply: Callable[[float | None, str, datetime], Awaitable[None]],
     ) -> None:
         self.store = store
-        self.guest_draft = GuestDraft(store.path.with_name("guest-draft.json"), store.identity)
         self.inputs = inputs
         self.apply = apply
         self.job: ChargeJob | None = None
@@ -112,10 +110,6 @@ class ChargeJobController:
                 # A deeply nested file or an oversized number is as corrupt
                 # as an invalid one.
                 self.storage_error = True
-            try:
-                await asyncio.to_thread(self.guest_draft.load)
-            except (OSError, ValueError, ArithmeticError, RecursionError):
-                self.guest_draft.storage_error = True
             self.ready = True
             # A restored job is interrupted. Do not claim the old disk state is
             # already the newly latched stop; write that stop before any action.
@@ -126,11 +120,57 @@ class ChargeJobController:
         self.revision = secrets.token_hex(16)
 
     def _vehicle_conflict(self, sample: JobInputs) -> bool:
-        return self.job is not None and self.job.kind == "guest" and sample.vehicle_target_active
+        return False
+
+    _starting_guest = False
+
+    @property
+    def guest_active(self) -> bool:
+        return self.job is not None and self.job.kind == "guest" and self.holding
+
+    async def start_shared(self, request: dict[str, Any], grant: Callable[[], Awaitable[None]]) -> dict[str, Any]:
+        """Save the session before granting release; never start without durable limits."""
+        async with self._lock:
+            sample = self.inputs()
+            if self.holding or not self.ready or self.storage_error or self._closing:
+                raise JobRequestError("job_not_permitted")
+            if sample.read_only or not sample.available or sample.present is not True or sample.scope is None or not sample.status_known:
+                raise JobRequestError("job_not_permitted")
+            self.job = ChargeJob.create(request, binding=sample.scope, total_kwh=sample.total_kwh, now=sample.now)
+            self.job.session = sample.session
+            self._durable = None
+            self._settled = False
+            self._changed()
+            await self._save()
+            if self.storage_error:
+                raise JobRequestError("job_storage_unavailable")
+            self._starting_guest = True
+            try:
+                await grant()
+            except BaseException:
+                self.job.stop()
+                self._changed()
+                await self._save()
+                raise
+            finally:
+                self._starting_guest = False
+            await self._tick_locked()
+            return self.snapshot()
+
+    async def update_guest_deadline(self, deadline: datetime | None) -> None:
+        async with self._lock:
+            if not self.guest_active or self.job is None or self.job.terminal or self.job.finish_at == deadline:
+                return
+            if deadline is not None and deadline <= self.job.start_at:
+                self.job.stop()
+            else:
+                self.job.finish_at = deadline
+            self._changed()
+            await self._tick_locked()
 
     def observe(self) -> None:
         job = self.job
-        if not self.ready or job is None:
+        if not self.ready or job is None or self._starting_guest:
             return
         sample = self.inputs()
         before = _decision(job.snapshot())
@@ -163,6 +203,8 @@ class ChargeJobController:
         """
         if not self.ready or self.storage_error or self._closing or self._stop_unconfirmed:
             return True
+        if self._starting_guest:
+            return False
         job = self.job
         if job is None or job.scope_ended or self._settled:
             return False
@@ -187,7 +229,7 @@ class ChargeJobController:
         if enabling and self._stop_unconfirmed:
             # Fence an in-flight start before the stop obtains the owner lock.
             return False
-        if not self.holding:
+        if not self.holding or self._starting_guest:
             return None
         job = self.job
         if job is None or owner != f"service-job:{job.identifier}":
@@ -204,7 +246,7 @@ class ChargeJobController:
     def _request(job: ChargeJob) -> dict[str, Any]:
         return {
             "id": job.identifier, "start_at": job.start_at.isoformat(),
-            "finish_at": job.finish_at.isoformat(), "current_a": job.current_a,
+            "finish_at": job.finish_at.isoformat() if job.finish_at else None, "current_a": job.current_a,
             "energy_kwh": job.energy.target_kwh,
             **({"kind": job.kind} if job.kind != "scheduled" else {}),
         }
@@ -246,76 +288,6 @@ class ChargeJobController:
         """Produce one absolute proposal; confirmation reuses normal creation."""
         absolute = guest_request(request, now=self.inputs().now)
         return self.preview(absolute, revision=revision, scope=scope)
-
-    def _draft_revision(self, revision: object) -> None:
-        draft = self.guest_draft
-        if not isinstance(revision, str) or revision != draft.revision:
-            raise JobRequestError("job_changed")
-
-    async def edit_draft(self, changes: object, *, revision: object) -> dict[str, Any]:
-        draft = self.guest_draft
-        async with self._lock:
-            self._draft_revision(revision)
-            if not self.ready or self._closing or self.inputs().read_only:
-                raise JobRequestError("job_not_permitted")
-            fields = FIELDS
-            if not isinstance(changes, dict) or not changes or changes.keys() - fields:
-                raise JobRequestError("invalid_job_request")
-            # After an uncertain save, reload the durable value on restart.
-            if draft.storage_error and changes.keys() != fields:
-                raise JobRequestError("job_storage_unavailable")
-            values = validate({**draft.values, **changes})
-            if values["current_a"] > self.inputs().current_cap:
-                raise JobRequestError("job_current_exceeds_cap")
-            if values != draft.values or draft.storage_error:
-                async def commit() -> None:
-                    try:
-                        await asyncio.to_thread(draft.save, values)
-                    except (OSError, ValueError):
-                        draft.storage_error = True
-                        raise
-                    draft.values = values
-                    draft.storage_error = False
-                    draft.revision = secrets.token_hex(16)
-                try:
-                    await finish_goal_save(commit())
-                except (OSError, ValueError) as err:
-                    raise JobRequestError("job_storage_unavailable") from err
-            return self.snapshot()
-
-    def preview_draft(self, *, draft_revision: object, revision: object, scope: object) -> dict[str, Any]:
-        draft = self.guest_draft
-        self._draft_revision(draft_revision)
-        if draft.storage_error:
-            raise JobRequestError("job_storage_unavailable")
-        request = {"id": secrets.token_hex(16), **draft.values}
-        request = guest_request(request, now=self.inputs().now)
-        return {**self.preview(request, revision=revision, scope=scope), "draft_revision": draft.revision}
-
-    def draft_status(self) -> str:
-        draft = self.guest_draft
-        if draft.storage_error:
-            return "job_storage_unavailable"
-        try:
-            self.preview_draft(draft_revision=draft.revision, revision=self.revision, scope=self.inputs().scope)
-        except JobRequestError as err:
-            return str(err)
-        except ValueError:
-            return "invalid_job_request"
-        return "ready"
-
-    async def create_draft(self, request: object, *, draft_revision: object, revision: object, scope: object) -> dict[str, Any]:
-        draft = self.guest_draft
-        async with self._lock:
-            self._draft_revision(draft_revision)
-            if draft.storage_error:
-                raise JobRequestError("job_storage_unavailable")
-            if not isinstance(request, dict):
-                raise JobRequestError("job_changed")
-            expected = guest_request({"id": request.get("id"), **draft.values}, now=job_time(request.get("start_at")))
-            if request != expected:
-                raise JobRequestError("job_changed")
-            return await self._create_locked(request, revision=revision, scope=scope)
 
     async def create(self, request: object, *, revision: object, scope: object) -> dict[str, Any]:
         async with self._lock:
@@ -435,7 +407,7 @@ class ChargeJobController:
         elif sample.pending:
             return
         try:
-            await self.apply(target, f"service-job:{job.identifier}" if job else "service-job:storage", sample.now if job is None else job.finish_at)
+            await self.apply(target, f"service-job:{job.identifier}" if job else "service-job:storage", job.finish_at if job is not None and job.finish_at is not None else sample.now + timedelta(hours=2))
         except (AmtronBusError, DeviceError, OSError, ValueError):
             self.action_error = "command_unconfirmed"
         else:
@@ -489,7 +461,6 @@ class ChargeJobController:
             }
         return {
             "schema": 1, "revision": self.revision, "scope": sample.scope,
-            "guest_draft": {**self.guest_draft.snapshot(), "status": self.draft_status()},
             "ready": self.ready, "storage_error": self.storage_error,
             "action_error": self.action_error, "job": summary,
             "available": sample.available, "present": sample.present,

@@ -234,7 +234,7 @@ For optional vehicle targets, profiles or departure planning, use the
 | App not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
 | Token rejected | During setup, retry discovery confirmation. For an existing connection, HA tries to refresh access automatically; if an authentication notice remains, [renew service access](troubleshooting.md#renew-service-access). No manual app token is needed. |
 | Service API or minimum version is incompatible | Install an app meeting the integration’s minimum version and API, app first; see [Updates](#updates). Changing the token does not fix this. |
-| HA reports that a guest session of the app controls charging | An app guest session runs for the plugged-in car. Stop it on **Guest charging**, or unplug the car; see [guest charging](troubleshooting.md#guest-charging-in-the-app). |
+| HA reports that a guest session of the app controls charging | An app guest session runs for the plugged-in car. Stop it with the normal **Pause** control, or unplug the car; see [guest charging](troubleshooting.md#guest-charging-in-the-app). |
 | Controls are unavailable | Check the app's **Read-only** switch and USB/LAN connection. After changing app settings, save and restart the app, then wait for fresh status. |
 | App exits immediately | Look for **Invalid or unreadable service configuration** in its log; the message names the invalid option or startup phase. |
 | App runs but cannot reach the wallbox | Check adapter path, bus settings and exclusive bus ownership. A missing serial device is retried. |

@@ -231,8 +231,8 @@ reconnects to that state without replaying old charging commands. HA automations
 are still offline during a Core restart.
 
 For a charge that must run while HA is offline, the app can hold one
-[guest session](app-guide.md#guest-charging) itself: a maximum duration, a current and
-a maximum amount of energy for the plugged-in car. While such an order runs, HA
+[guest session](app-guide.md#guest-charging) itself, using the shared optional
+kWh and time limits for the plugged-in car. While such an order runs, HA
 cannot change the current or resume; pausing in HA stops the order. When it
 ends, charging stays paused and HA controls charging again.
 

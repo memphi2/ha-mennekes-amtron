@@ -236,23 +236,11 @@
       "timed_next_calendar_event": {
         "name": "Utiliser le prochain événement"
       },
-      "timed_clear_departure": {
-        "name": "Effacer l’heure de départ"
-      },
       "timed_vehicle_departure": {
         "name": "Utiliser le départ du véhicule"
       },
       "guest_start": {
         "name": "Démarrer la recharge invité"
-      },
-      "guest_reset_draft": {
-        "name": "Réinitialiser le brouillon invité"
-      },
-      "guest_stop": {
-        "name": "Arrêter la recharge invité"
-      },
-      "guest_clear": {
-        "name": "Effacer la recharge invité"
       }
     },
     "number": {
@@ -264,15 +252,6 @@
       },
       "soc_goal": {
         "name": "Objectif de charge du véhicule"
-      },
-      "guest_current_a": {
-        "name": "Courant invité"
-      },
-      "guest_energy_kwh": {
-        "name": "Énergie invité"
-      },
-      "guest_duration_minutes": {
-        "name": "Durée maximale invité"
       }
     },
     "select": {
@@ -591,20 +570,6 @@
           }
         }
       },
-      "guest_draft_status": {
-        "name": "Brouillon invité",
-        "state": {
-          "ready": "Prêt à démarrer",
-          "job_exists": "Une recharge invité est déjà active",
-          "job_not_permitted": "Vérifier véhicule, autorisation, compteur et actions en attente",
-          "job_current_exceeds_cap": "Courant supérieur à la limite",
-          "job_preview_expired": "Aperçu expiré ; recréez-le",
-          "job_storage_unavailable": "Stockage indisponible",
-          "invalid_job_request": "Vérifiez énergie, courant et durée maximale",
-          "job_stop_unconfirmed": "En attente de l’arrêt confirmé",
-          "guest_vehicle_target_active": "Objectif de batterie actif"
-        }
-      },
       "guest_charging": {
         "name": "Recharge invité",
         "state": {
@@ -819,7 +784,7 @@
     },
     "datetime": {
       "timed_departure": {
-        "name": "Prochain départ"
+        "name": "Heure cible"
       }
     }
   },
@@ -977,9 +942,6 @@
     "guest_vehicle_target_active": {
       "message": "Objectif de batterie du véhicule actif ; aucun ordre invité créé."
     },
-    "invalid_job_request": {
-      "message": "L’application n’a pas accepté ces valeurs. Vérifiez l’heure, le courant et l’énergie."
-    },
     "job_changed": {
       "message": "L’état a changé entre-temps. Réessayez."
     },
@@ -998,9 +960,6 @@
     "job_preview_expired": {
       "message": "L’état a changé entre-temps. Réessayez."
     },
-    "job_service_starting": {
-      "message": "Le service démarre encore. Réessayez dans un instant."
-    },
     "job_stop_first": {
       "message": "Arrêtez d’abord l’ordre en cours."
     },
@@ -1018,6 +977,12 @@
     },
     "job_stop_unconfirmed": {
       "message": "L’arrêt n’est pas encore confirmé. Réessayez dans un instant."
+    },
+    "guest_start_not_permitted": {
+      "message": "Impossible de démarrer : vérifiez la connexion, les droits d’écriture, le verrouillage et les erreurs."
+    },
+    "guest_deadline_expired": {
+      "message": "L’heure limite est dépassée. Choisissez une heure future ou effacez-la."
     }
   },
   "issues": {
@@ -1702,29 +1667,7 @@
     },
     "start_guest_charging": {
       "name": "Démarrer une recharge invité",
-      "description": "Recharge la voiture d’un invité dès maintenant, pour une durée et une énergie limitées. Aucune donnée du véhicule ni objectif enregistré n’est utilisé.",
-      "fields": {
-        "device_id": {
-          "name": "Borne",
-          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
-        },
-        "current": {
-          "name": "Courant de charge",
-          "description": "Courant en ampères par phase, au plus la limite de l’application."
-        },
-        "energy": {
-          "name": "Énergie",
-          "description": "La recharge s’arrête une fois cette énergie fournie, en kWh."
-        },
-        "duration": {
-          "name": "Durée",
-          "description": "Durée de recharge autorisée, en minutes (jusqu’à 24 heures)."
-        }
-      }
-    },
-    "stop_guest_charging": {
-      "name": "Arrêter la recharge invité",
-      "description": "Arrête la recharge invité et demande une pause. Un départ planifié peut ensuite reprendre la charge.",
+      "description": "Démarre immédiatement pour cette connexion. Les limites en kWh et de temps sont appliquées ; la cible du véhicule reste inchangée.",
       "fields": {
         "device_id": {
           "name": "Borne",
@@ -1732,15 +1675,9 @@
         }
       }
     },
-    "clear_guest_charging": {
-      "name": "Effacer la recharge invité",
-      "description": "Retire une session invité terminée sans reprendre la charge.",
-      "fields": {
-        "device_id": {
-          "name": "Borne",
-          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
-        }
-      }
+    "clear_target_time": {
+      "name": "Effacer l’heure cible",
+      "description": "Efface l’heure commune sans modifier les objectifs d’énergie ou du véhicule."
     }
   }
 }

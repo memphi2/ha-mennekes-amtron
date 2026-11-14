@@ -182,6 +182,8 @@ class DepartureModbusService(ForecastModbusService):
             )
         else:
             await departure.set_inputs(DepartureInputs.restore(payload.get("value")))
+        if name in ("departure_choice", "departure_trip") and self.jobs is not None:
+            await self.jobs.update_guest_deadline(departure.trip.deadline)
         if self._command_lock.locked():
             # Another command still runs: a patient reader must not get the
             # state from before this plan change.
@@ -201,6 +203,7 @@ class DepartureModbusService(ForecastModbusService):
         }
         jobs = self.jobs
         # The charging job as its own page shows it; None while it loads.
+        result["control"]["guest_revision"] = self.guest_revision
         result["control"]["orders"] = jobs.snapshot() if jobs is not None and jobs.ready else None
         result["control"]["operation"] = self._operation(result)
         return result

@@ -176,3 +176,25 @@ def test_app_soc_choice_uses_only_the_current_plug_in(tmp_path, monkeypatch, rep
             await command(command="soc_goal_choice", value=70, expected_choice_revision=service.choice_revision)
             assert service.control.soc_goal.status == ("active" if replug else "reached")
     asyncio.run(body())
+
+
+def test_guest_console_requires_csrf_and_uses_one_shared_start(tmp_path, monkeypatch):
+    async def run():
+        monkeypatch.setattr(app_settings, "SUPERVISOR_PEER", "127.0.0.1")
+        monkeypatch.setattr(runtime, "JobModbusService", DepartureModbusService)
+        async with runtime.job_service(tmp_path) as (service, _transport, _clock), TestClient(
+            TestServer(create_job_console(Console("supervisor-fixture", TOKEN, service=service)))
+        ) as client:
+            state = await (await client.get("/api/charging", headers=HEADERS)).json()
+            headers = {**HEADERS, "X-Amtron-CSRF": state["csrf"]}
+            payload = {"action":"guest", "value":True, "revision":state["guest_revision"], "confirm":True}
+            assert (await client.post("/api/charging", headers=HEADERS, json=payload)).status == 403
+            assert service.jobs.job is None
+            assert (await client.post("/api/charging", headers=headers, json={**payload,"value":False})).status == 400
+            response = await client.post("/api/charging", headers=headers, json=payload)
+            assert response.status == 200
+            assert (await response.json())["guest_active"] is True
+            job_id = service.jobs.job.identifier
+            assert (await client.post("/api/charging", headers=headers, json=payload)).status == 409
+            assert service.jobs.job.identifier == job_id
+    asyncio.run(run())

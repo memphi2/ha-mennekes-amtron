@@ -3,20 +3,19 @@ type: vertical-stack
 cards:
 - type: custom:mushroom-template-card
   entity: sensor.mennekes_amtron_charging_status
-  primary: >-
-    AMTRON · {{ states('sensor.mennekes_amtron_total_power', with_unit=True) if has_value('sensor.mennekes_amtron_total_power')
+  primary: AMTRON · {{ states('sensor.mennekes_amtron_total_power', with_unit=True) if has_value('sensor.mennekes_amtron_total_power')
     else '—' }}
-  secondary: |-
-    {{ state_translated('sensor.mennekes_amtron_charging_status') if has_value('sensor.mennekes_amtron_charging_status') else 'Unavailable' }}
-    Session: {{ states('sensor.mennekes_amtron_session_energy', with_unit=True) if has_value('sensor.mennekes_amtron_session_energy') else '—' }}
-  icon: >-
-    {{ 'mdi:ev-station' if is_state('sensor.mennekes_amtron_charging_status','charging') else 'mdi:pause-circle'
-    if is_state('sensor.mennekes_amtron_charging_status','paused') else 'mdi:alert-circle' if states('sensor.mennekes_amtron_charging_status')
-    in ['wallbox_error','unavailable','unknown'] else 'mdi:ev-plug-type2' }}
-  color: >-
-    {{ 'green' if is_state('sensor.mennekes_amtron_charging_status','charging') else 'amber' if is_state('sensor.mennekes_amtron_charging_status','paused')
-    else 'red' if states('sensor.mennekes_amtron_charging_status') in ['wallbox_error','unavailable','unknown']
-    else 'blue' }}
+  secondary: '{{ state_translated(''sensor.mennekes_amtron_charging_status'') if has_value(''sensor.mennekes_amtron_charging_status'')
+    else ''Unavailable'' }}
+
+    Session: {{ states(''sensor.mennekes_amtron_session_energy'', with_unit=True) if has_value(''sensor.mennekes_amtron_session_energy'')
+    else ''—'' }}'
+  icon: '{{ ''mdi:ev-station'' if is_state(''sensor.mennekes_amtron_charging_status'',''charging'') else ''mdi:pause-circle''
+    if is_state(''sensor.mennekes_amtron_charging_status'',''paused'') else ''mdi:alert-circle'' if states(''sensor.mennekes_amtron_charging_status'')
+    in [''wallbox_error'',''unavailable'',''unknown''] else ''mdi:ev-plug-type2'' }}'
+  color: '{{ ''green'' if is_state(''sensor.mennekes_amtron_charging_status'',''charging'') else ''amber'' if is_state(''sensor.mennekes_amtron_charging_status'',''paused'')
+    else ''red'' if states(''sensor.mennekes_amtron_charging_status'') in [''wallbox_error'',''unavailable'',''unknown'']
+    else ''blue'' }}'
   multiline_secondary: true
   tap_action:
     action: more-info
@@ -37,13 +36,10 @@ cards:
     chip:
       type: template
       entity: switch.mennekes_amtron_charging_paused
-      content: >-
-        {{ 'Paused' if is_state('switch.mennekes_amtron_charging_paused','on') else 'Pause' }}
-      icon: >-
-        {{ 'mdi:pause-circle' if is_state('switch.mennekes_amtron_charging_paused','on') else 'mdi:play-circle-outline'
-        }}
-      icon_color: >-
-        {{ 'amber' if is_state('switch.mennekes_amtron_charging_paused','on') else 'grey' }}
+      content: '{{ ''Paused'' if is_state(''switch.mennekes_amtron_charging_paused'',''on'') else ''Pause'' }}'
+      icon: '{{ ''mdi:pause-circle'' if is_state(''switch.mennekes_amtron_charging_paused'',''on'') else ''mdi:play-circle-outline''
+        }}'
+      icon_color: '{{ ''amber'' if is_state(''switch.mennekes_amtron_charging_paused'',''on'') else ''grey'' }}'
       tap_action:
         action: toggle
   - type: conditional
@@ -56,13 +52,11 @@ cards:
     chip:
       type: template
       entity: switch.mennekes_amtron_charging_release
-      content: >-
-        {{ 'Released' if is_state('switch.mennekes_amtron_charging_release','on') else 'Release off' }}
-      icon: >-
-        {{ 'mdi:power-plug' if is_state('switch.mennekes_amtron_charging_release','on') else 'mdi:power-plug-off'
-        }}
-      icon_color: >-
-        {{ 'green' if is_state('switch.mennekes_amtron_charging_release','on') else 'grey' }}
+      content: '{{ ''Released'' if is_state(''switch.mennekes_amtron_charging_release'',''on'') else ''Release off''
+        }}'
+      icon: '{{ ''mdi:power-plug'' if is_state(''switch.mennekes_amtron_charging_release'',''on'') else ''mdi:power-plug-off''
+        }}'
+      icon_color: '{{ ''green'' if is_state(''switch.mennekes_amtron_charging_release'',''on'') else ''grey'' }}'
       tap_action:
         action: more-info
   - type: conditional
@@ -75,15 +69,15 @@ cards:
     chip:
       type: template
       entity: switch.mennekes_amtron_virtual_plug_charge
-      content: >-
-        {{ 'P&C off' if is_state('switch.mennekes_amtron_virtual_plug_charge','off') else 'P&C ready' if states('sensor.mennekes_amtron_virtual_plug_charge_status')
-        in ['authorized','manual_release'] else 'P&C waiting' }}
-      icon: >-
-        {{ 'mdi:car-key' if states('sensor.mennekes_amtron_virtual_plug_charge_status') in ['authorized','manual_release']
-        else 'mdi:car-clock' if is_state('switch.mennekes_amtron_virtual_plug_charge','on') else 'mdi:car-off' }}
-      icon_color: >-
-        {{ 'grey' if is_state('switch.mennekes_amtron_virtual_plug_charge','off') else 'green' if states('sensor.mennekes_amtron_virtual_plug_charge_status')
-        in ['authorized','manual_release'] else 'amber' }}
+      content: '{{ ''P&C off'' if is_state(''switch.mennekes_amtron_virtual_plug_charge'',''off'') else ''P&C ready''
+        if states(''sensor.mennekes_amtron_virtual_plug_charge_status'') in [''authorized'',''manual_release'']
+        else ''P&C waiting'' }}'
+      icon: '{{ ''mdi:car-key'' if states(''sensor.mennekes_amtron_virtual_plug_charge_status'') in [''authorized'',''manual_release'']
+        else ''mdi:car-clock'' if is_state(''switch.mennekes_amtron_virtual_plug_charge'',''on'') else ''mdi:car-off''
+        }}'
+      icon_color: '{{ ''grey'' if is_state(''switch.mennekes_amtron_virtual_plug_charge'',''off'') else ''green''
+        if states(''sensor.mennekes_amtron_virtual_plug_charge_status'') in [''authorized'',''manual_release'']
+        else ''amber'' }}'
       tap_action:
         action: more-info
   - type: entity
@@ -96,21 +90,52 @@ cards:
 - type: custom:mushroom-title-card
   title: ''
   subtitle: 0 A removes the current limit; use Pause to pause.
+- type: conditional
+  conditions:
+  - condition: or
+    conditions:
+    - condition: state
+      entity: button.mennekes_amtron_start_guest_charging
+      state_not:
+      - unknown
+      - unavailable
+    - condition: state
+      entity: sensor.mennekes_amtron_timed_charging_status
+      state_not:
+      - unknown
+      - unavailable
+  card:
+    type: custom:mushroom-template-card
+    entity: datetime.mennekes_amtron_target_time
+    primary: Target time
+    secondary: '{{ as_local(as_datetime(states(''datetime.mennekes_amtron_target_time''))).strftime(''%Y-%m-%d %H:%M'')
+      if has_value(''datetime.mennekes_amtron_target_time'') else ''Not set'' }}
+
+      Tap to edit · Hold to clear'
+    icon: mdi:calendar-clock
+    color: blue
+    multiline_secondary: true
+    tap_action:
+      action: more-info
+    hold_action:
+      action: perform-action
+      perform_action: mennekes_amtron_rtu.clear_target_time
+      target:
+        entity_id: datetime.mennekes_amtron_target_time
+      confirmation:
+        text: Clear the time? Energy and vehicle targets stay unchanged.
 - type: custom:mushroom-template-card
   entity: sensor.mennekes_amtron_charging_wait_reason
   primary: Status
-  secondary: >-
-    {{ state_translated('sensor.mennekes_amtron_charging_wait_reason') if has_value('sensor.mennekes_amtron_charging_wait_reason')
-    else 'Unavailable' }}
-  icon: >-
-    {{ 'mdi:check-circle-outline' if states('sensor.mennekes_amtron_charging_wait_reason') in ['reached', 'estimated_reached',
-    'finished'] else 'mdi:alert-circle-outline' if states('sensor.mennekes_amtron_charging_wait_reason') in ['error',
-    'interrupted', 'job_storage_unavailable', 'unavailable'] else 'mdi:timer-sand' }}
-  color: >-
-    {{ 'red' if states('sensor.mennekes_amtron_charging_wait_reason') in ['error', 'interrupted', 'job_storage_unavailable',
-    'unavailable'] else 'green' if states('sensor.mennekes_amtron_charging_wait_reason') in ['active', 'charging',
-    'finishing', 'ready', 'reached', 'estimated_reached'] else 'grey' if states('sensor.mennekes_amtron_charging_wait_reason')
-    in ['disabled', 'none'] else 'amber' }}
+  secondary: '{{ state_translated(''sensor.mennekes_amtron_charging_wait_reason'') if has_value(''sensor.mennekes_amtron_charging_wait_reason'')
+    else ''Unavailable'' }}'
+  icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_charging_wait_reason'') in [''reached'',
+    ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_charging_wait_reason'')
+    in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:timer-sand'' }}'
+  color: '{{ ''red'' if states(''sensor.mennekes_amtron_charging_wait_reason'') in [''error'', ''interrupted'',
+    ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_charging_wait_reason'')
+    in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey'' if
+    states(''sensor.mennekes_amtron_charging_wait_reason'') in [''disabled'', ''none''] else ''amber'' }}'
   multiline_secondary: true
   tap_action:
     action: more-info
@@ -135,18 +160,16 @@ cards:
     - type: custom:mushroom-template-card
       entity: sensor.mennekes_amtron_energy_target_status
       primary: Additional energy
-      secondary: >-
-        {{ state_translated('sensor.mennekes_amtron_energy_target_status') if has_value('sensor.mennekes_amtron_energy_target_status')
-        else 'Unavailable' }}
-      icon: >-
-        {{ 'mdi:check-circle-outline' if states('sensor.mennekes_amtron_energy_target_status') in ['reached', 'estimated_reached',
-        'finished'] else 'mdi:alert-circle-outline' if states('sensor.mennekes_amtron_energy_target_status') in
-        ['error', 'interrupted', 'job_storage_unavailable', 'unavailable'] else 'mdi:lightning-bolt' }}
-      color: >-
-        {{ 'red' if states('sensor.mennekes_amtron_energy_target_status') in ['error', 'interrupted', 'job_storage_unavailable',
-        'unavailable'] else 'green' if states('sensor.mennekes_amtron_energy_target_status') in ['active', 'charging',
-        'finishing', 'ready', 'reached', 'estimated_reached'] else 'grey' if states('sensor.mennekes_amtron_energy_target_status')
-        in ['disabled', 'none'] else 'amber' }}
+      secondary: '{{ state_translated(''sensor.mennekes_amtron_energy_target_status'') if has_value(''sensor.mennekes_amtron_energy_target_status'')
+        else ''Unavailable'' }}'
+      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_energy_target_status'') in [''reached'',
+        ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_energy_target_status'')
+        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:lightning-bolt''
+        }}'
+      color: '{{ ''red'' if states(''sensor.mennekes_amtron_energy_target_status'') in [''error'', ''interrupted'',
+        ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_energy_target_status'')
+        in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey''
+        if states(''sensor.mennekes_amtron_energy_target_status'') in [''disabled'', ''none''] else ''amber'' }}'
       multiline_secondary: true
       tap_action:
         action: more-info
@@ -167,19 +190,17 @@ cards:
     - type: custom:mushroom-template-card
       entity: sensor.mennekes_amtron_vehicle_charge_target_status
       primary: Target charge level
-      secondary: >-
-        {{ state_translated('sensor.mennekes_amtron_vehicle_charge_target_status') if has_value('sensor.mennekes_amtron_vehicle_charge_target_status')
-        else 'Unavailable' }}
-      icon: >-
-        {{ 'mdi:check-circle-outline' if states('sensor.mennekes_amtron_vehicle_charge_target_status') in ['reached',
-        'estimated_reached', 'finished'] else 'mdi:alert-circle-outline' if states('sensor.mennekes_amtron_vehicle_charge_target_status')
-        in ['error', 'interrupted', 'job_storage_unavailable', 'unavailable'] else 'mdi:battery-arrow-up-outline'
-        }}
-      color: >-
-        {{ 'red' if states('sensor.mennekes_amtron_vehicle_charge_target_status') in ['error', 'interrupted', 'job_storage_unavailable',
-        'unavailable'] else 'green' if states('sensor.mennekes_amtron_vehicle_charge_target_status') in ['active',
-        'charging', 'finishing', 'ready', 'reached', 'estimated_reached'] else 'grey' if states('sensor.mennekes_amtron_vehicle_charge_target_status')
-        in ['disabled', 'none'] else 'amber' }}
+      secondary: '{{ state_translated(''sensor.mennekes_amtron_vehicle_charge_target_status'') if has_value(''sensor.mennekes_amtron_vehicle_charge_target_status'')
+        else ''Unavailable'' }}'
+      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_vehicle_charge_target_status'')
+        in [''reached'', ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_vehicle_charge_target_status'')
+        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:battery-arrow-up-outline''
+        }}'
+      color: '{{ ''red'' if states(''sensor.mennekes_amtron_vehicle_charge_target_status'') in [''error'', ''interrupted'',
+        ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_vehicle_charge_target_status'')
+        in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey''
+        if states(''sensor.mennekes_amtron_vehicle_charge_target_status'') in [''disabled'', ''none''] else ''amber''
+        }}'
       multiline_secondary: true
       tap_action:
         action: more-info
@@ -212,11 +233,6 @@ cards:
     - type: custom:mushroom-title-card
       title: Plan departure
       subtitle: Charge for one departure. Requires vehicle SoC and usable capacity. May lift a manual pause.
-    - type: entities
-      show_header_toggle: false
-      entities:
-      - entity: datetime.mennekes_amtron_next_departure
-        name: Departure
     - type: custom:mushroom-chips-card
       chips:
       - type: entity
@@ -241,32 +257,18 @@ cards:
             entity_id: button.mennekes_amtron_use_vehicle_departure
           confirmation:
             text: Apply this change? A departure plan may lift a manual pause.
-      - type: entity
-        entity: button.mennekes_amtron_clear_departure_time
-        name: Clear departure
-        content_info: name
-        tap_action:
-          action: perform-action
-          perform_action: button.press
-          target:
-            entity_id: button.mennekes_amtron_clear_departure_time
-          confirmation:
-            text: Clear departure? Targets remain; a pause owned by the plan may end.
     - type: custom:mushroom-template-card
       entity: sensor.mennekes_amtron_timed_charging_status
       primary: Status
-      secondary: >-
-        {{ state_translated('sensor.mennekes_amtron_timed_charging_status') if has_value('sensor.mennekes_amtron_timed_charging_status')
-        else 'Unavailable' }}
-      icon: >-
-        {{ 'mdi:check-circle-outline' if states('sensor.mennekes_amtron_timed_charging_status') in ['reached', 'estimated_reached',
-        'finished'] else 'mdi:alert-circle-outline' if states('sensor.mennekes_amtron_timed_charging_status') in
-        ['error', 'interrupted', 'job_storage_unavailable', 'unavailable'] else 'mdi:car-clock' }}
-      color: >-
-        {{ 'red' if states('sensor.mennekes_amtron_timed_charging_status') in ['error', 'interrupted', 'job_storage_unavailable',
-        'unavailable'] else 'green' if states('sensor.mennekes_amtron_timed_charging_status') in ['active', 'charging',
-        'finishing', 'ready', 'reached', 'estimated_reached'] else 'grey' if states('sensor.mennekes_amtron_timed_charging_status')
-        in ['disabled', 'none'] else 'amber' }}
+      secondary: '{{ state_translated(''sensor.mennekes_amtron_timed_charging_status'') if has_value(''sensor.mennekes_amtron_timed_charging_status'')
+        else ''Unavailable'' }}'
+      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_timed_charging_status'') in [''reached'',
+        ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_timed_charging_status'')
+        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:car-clock'' }}'
+      color: '{{ ''red'' if states(''sensor.mennekes_amtron_timed_charging_status'') in [''error'', ''interrupted'',
+        ''job_storage_unavailable'', ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_timed_charging_status'')
+        in [''active'', ''charging'', ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey''
+        if states(''sensor.mennekes_amtron_timed_charging_status'') in [''disabled'', ''none''] else ''amber'' }}'
       multiline_secondary: true
       tap_action:
         action: more-info
@@ -289,7 +291,7 @@ cards:
 - type: conditional
   conditions:
   - condition: state
-    entity: sensor.mennekes_amtron_guest_charging_draft
+    entity: button.mennekes_amtron_start_guest_charging
     state_not:
     - unknown
     - unavailable
@@ -298,112 +300,43 @@ cards:
     cards:
     - type: custom:mushroom-title-card
       title: Guest charging
-      subtitle: 'Without a vehicle profile: choose energy, maximum duration and current, then start explicitly.
-        Saving the draft never starts charging.'
-    - type: entities
-      show_header_toggle: false
-      entities:
-      - entity: number.mennekes_amtron_guest_energy
-        name: Energy
-      - entity: number.mennekes_amtron_guest_maximum_duration
-        name: Max. minutes
-      - entity: number.mennekes_amtron_guest_current
-        name: Current
-    - type: custom:mushroom-template-card
-      entity: sensor.mennekes_amtron_guest_charging_draft
-      primary: Draft
-      secondary: >-
-        {{ state_translated('sensor.mennekes_amtron_guest_charging_draft') if has_value('sensor.mennekes_amtron_guest_charging_draft')
-        else 'Unavailable' }}
-      icon: >-
-        {{ 'mdi:check-circle-outline' if states('sensor.mennekes_amtron_guest_charging_draft') in ['reached', 'estimated_reached',
-        'finished'] else 'mdi:alert-circle-outline' if states('sensor.mennekes_amtron_guest_charging_draft') in
-        ['error', 'interrupted', 'job_storage_unavailable', 'unavailable'] else 'mdi:account-edit-outline' }}
-      color: >-
-        {{ 'red' if states('sensor.mennekes_amtron_guest_charging_draft') in ['error', 'interrupted', 'job_storage_unavailable',
-        'unavailable'] else 'green' if states('sensor.mennekes_amtron_guest_charging_draft') in ['active', 'charging',
-        'finishing', 'ready', 'reached', 'estimated_reached'] else 'grey' if states('sensor.mennekes_amtron_guest_charging_draft')
-        in ['disabled', 'none'] else 'amber' }}
-      multiline_secondary: true
+      subtitle: Starts now and lifts pause/P&C restriction for this connection. Saved kWh and time limits apply.
+    - type: custom:mushroom-entity-card
+      entity: button.mennekes_amtron_start_guest_charging
+      name: Start guest charge
+      secondary_info: none
       tap_action:
-        action: more-info
+        action: perform-action
+        perform_action: button.press
+        target:
+          entity_id: button.mennekes_amtron_start_guest_charging
     - type: custom:mushroom-template-card
       entity: sensor.mennekes_amtron_guest_charging
       primary: Status
-      secondary: >-
-        {{ state_translated('sensor.mennekes_amtron_guest_charging') if has_value('sensor.mennekes_amtron_guest_charging')
-        else 'Unavailable' }}
-      icon: >-
-        {{ 'mdi:check-circle-outline' if states('sensor.mennekes_amtron_guest_charging') in ['reached', 'estimated_reached',
-        'finished'] else 'mdi:alert-circle-outline' if states('sensor.mennekes_amtron_guest_charging') in ['error',
-        'interrupted', 'job_storage_unavailable', 'unavailable'] else 'mdi:account-clock-outline' }}
-      color: >-
-        {{ 'red' if states('sensor.mennekes_amtron_guest_charging') in ['error', 'interrupted', 'job_storage_unavailable',
-        'unavailable'] else 'green' if states('sensor.mennekes_amtron_guest_charging') in ['active', 'charging',
-        'finishing', 'ready', 'reached', 'estimated_reached'] else 'grey' if states('sensor.mennekes_amtron_guest_charging')
-        in ['disabled', 'none'] else 'amber' }}
+      secondary: '{{ state_translated(''sensor.mennekes_amtron_guest_charging'') if has_value(''sensor.mennekes_amtron_guest_charging'')
+        else ''Unavailable'' }}'
+      icon: '{{ ''mdi:check-circle-outline'' if states(''sensor.mennekes_amtron_guest_charging'') in [''reached'',
+        ''estimated_reached'', ''finished''] else ''mdi:alert-circle-outline'' if states(''sensor.mennekes_amtron_guest_charging'')
+        in [''error'', ''interrupted'', ''job_storage_unavailable'', ''unavailable''] else ''mdi:account-clock-outline''
+        }}'
+      color: '{{ ''red'' if states(''sensor.mennekes_amtron_guest_charging'') in [''error'', ''interrupted'', ''job_storage_unavailable'',
+        ''unavailable''] else ''green'' if states(''sensor.mennekes_amtron_guest_charging'') in [''active'', ''charging'',
+        ''finishing'', ''ready'', ''reached'', ''estimated_reached''] else ''grey'' if states(''sensor.mennekes_amtron_guest_charging'')
+        in [''disabled'', ''none''] else ''amber'' }}'
       multiline_secondary: true
       tap_action:
         action: more-info
-    - type: grid
-      columns: 2
-      square: false
-      cards:
-      - type: custom:mushroom-entity-card
-        entity: button.mennekes_amtron_start_guest_charging
-        name: Start guest charge
-        secondary_info: none
-        tap_action:
-          action: perform-action
-          perform_action: button.press
-          target:
-            entity_id: button.mennekes_amtron_start_guest_charging
-          confirmation:
-            text: Start guest charging? Disable the vehicle target first and ensure release.
-      - type: custom:mushroom-entity-card
-        entity: button.mennekes_amtron_stop_guest_charging
-        name: Stop
-        secondary_info: none
-        tap_action:
-          action: perform-action
-          perform_action: button.press
-          target:
-            entity_id: button.mennekes_amtron_stop_guest_charging
-          confirmation:
-            text: Stop guest charging and pause?
-      - type: custom:mushroom-entity-card
-        entity: button.mennekes_amtron_clear_guest_charging
-        name: Clear
-        secondary_info: none
-        tap_action:
-          action: perform-action
-          perform_action: button.press
-          target:
-            entity_id: button.mennekes_amtron_clear_guest_charging
-          confirmation:
-            text: Clear the ended guest charge? This never starts charging.
-      - type: custom:mushroom-entity-card
-        entity: button.mennekes_amtron_reset_guest_draft
-        name: Reset draft
-        secondary_info: none
-        tap_action:
-          action: perform-action
-          perform_action: button.press
-          target:
-            entity_id: button.mennekes_amtron_reset_guest_draft
-          confirmation:
-            text: Reset guest draft? The current guest charge is unchanged.
 - type: conditional
   conditions:
   - condition: state
-    entity: sensor.mennekes_amtron_guest_charging_draft
+    entity: button.mennekes_amtron_start_guest_charging
     state:
     - unknown
     - unavailable
   card:
     type: custom:mushroom-template-card
     primary: Guest charging unavailable
-    secondary: Connect the app, enable writes and update app/integration to at least 0.9.0b7. Check entity IDs.
+    secondary: Connect the app and enable writes. Check entity IDs.
     multiline_secondary: true
     icon: mdi:information-outline
     color: blue

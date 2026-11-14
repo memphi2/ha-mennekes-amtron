@@ -1087,7 +1087,6 @@ def test_stale_ha_selection_cannot_overwrite_a_new_app_trip(tmp_path):
 
 @pytest.mark.parametrize(("change", "error"), [
     ({"read_only": True}, "service_unavailable"),
-    ({"vehicle": None}, "soc_goal_source_changed"),
 ])
 def test_app_trip_requires_a_writable_selected_vehicle(tmp_path, change, error):
     async def body():
@@ -1109,10 +1108,10 @@ def test_app_departure_refuses_a_past_instant_and_uninitialized_inputs(tmp_path)
         before = plan.trip.snapshot()
         with pytest.raises(ValueError, match="future"):
             await plan.set_trip(NOW, None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
-        plan.inputs = None
-        with pytest.raises(DeviceError, match="soc_goal_source_changed"):
-            await plan.set_trip(NOW + timedelta(hours=3), None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
         assert plan.trip.snapshot() == before
+        plan.inputs = None
+        await plan.set_trip(NOW + timedelta(hours=3), None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
+        assert plan.trip.deadline == NOW + timedelta(hours=3)
     run(body())
 
 

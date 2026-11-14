@@ -125,10 +125,9 @@ in read-only mode; it does not send a charging command.
 |---|---|---|---|
 | `select.*_active_vehicle` | Active vehicle | optional vehicle profiles configured | Choose a car or no vehicle manually; either choice disables automatic selection. With detection sources configured, Automatic selection uses cable and home signals. Switching clears the previous percentage target and departure plan without resuming; settings and loss averages remain separate. |
 | `number.*_vehicle_charge_target` | Vehicle charge target | optional configured vehicle SoC source; compatible service in service mode | Percentage ceiling, 0 = off. Only limits charging. Up to 100%, or the separately optional vehicle charge-limit source. Neither setting nor disabling resumes charging. |
-| `datetime.*_next_departure` | Next departure | Departure planning enabled, vehicle SoC source and usable battery capacity | One dated target for the next trip. A timed goal may resume a pause to meet this time; the ordinary percentage goal alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
+| `datetime.*_target_time` | Shared target time | Service app, or enabled vehicle departure planning in direct mode | One shared dated target: guest stop time or next vehicle departure. A timed goal may resume a pause to meet this time; the ordinary percentage goal alone never does. After reaching the target, the time remains available for climate until departure, then clears. |
 | `button.*_use_next_calendar_event` | Use next calendar event | optional calendar and exact event title | Copies one matching timed event from the next 14 days into Next departure. Later events are not selected automatically. |
 | `button.*_use_vehicle_departure` | Use vehicle departure | optional selected vehicle provider and enabled timer sensors | Copies one upcoming active climate timer from locally published vehicle states. Currently implemented for BavarianData; recurring timers need explicitly configured weekdays. No cloud fetch or recurring HA schedule. Existing installations retain their earlier entity ID. |
-| `button.*_clear_departure_time` | Clear departure time | Departure planning enabled | Cancels the timed plan without changing the percentage ceiling or current wallbox state. |
 | `number.*_energy_target` | Energy target | lifetime energy counter; compatible service in service mode | Additional kWh from the time you set it, in 0.1 kWh steps, up to 1000. Setting a positive value never starts or resumes charging. Zero disables the goal without resuming. |
 | `button.*_cancel_pending_change` | Cancel pending change | new direct controller or supporting service | Removes the queued action without a wallbox write. Already executed preparation, such as a phase-change pause, remains. Available only while an action is pending. |
 | `number.*_charging_current_limit` | Charging current limit | always | Slider: 0 A removes the energy-manager limit and bypasses extra current caps; 6 A or more sets a limit. Hardware limits still apply. While paused it shows the remembered setpoint; changing it can resume charging. |
@@ -137,26 +136,23 @@ in read-only mode; it does not send a charging command.
 | `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
 | `select.*_requested_phases` | Requested phases | hardware that can switch phases | Single-phase or all-phase charging. A change while charging first pauses; resume separately after the waiting interval. Only exists on capable hardware. The `switched` attribute is the wallbox's answer: the phases it will use when it next closes the relay. |
 
-## Guest draft (service app only)
+## Guest charging and shared time
 
-These native controls share the app's durable guest draft. Editing never starts
-charging or changes a running guest session. No HA helper or Recorder restore
-is needed. See the [three-mode dashboard](app-from-home-assistant.md).
+The service app exposes one **Start guest charging** button (`guest_start`).
+It starts the connected guest immediately using the ordinary kWh target and shared
+time, if set. The first limit reached stops charging. Use normal **Pause** to stop
+manually. There are no guest draft, current, duration, stop or clear entities.
 
-| Entity key | Purpose |
-|---|---|
-| `number.guest_current_a` | Current per phase, 6 A up to the service cap. |
-| `number.guest_energy_kwh` | Additional wallbox energy ceiling, 0.1–1000 kWh. |
-| `number.guest_duration_minutes` | Maximum duration, 1–1440 whole minutes. |
-| `sensor.guest_draft_status` | Stable readiness/refusal reason, without ticking attributes. |
-| `button.guest_start` | Preview and confirm the saved draft for this plug-in. |
-| `button.guest_stop` | Stop the guest session and request a pause. |
-| `button.guest_clear` | Remove an ended session without resuming. |
-| `button.guest_reset_draft` | Restore 6 A, 10 kWh and 120 minutes; recover a damaged draft. |
+The existing datetime entity (`timed_departure`) is shared: for a guest it means
+“stop no later than”, and for a recognized vehicle it supplies the intelligent
+planner's departure. In service mode it also exists without a vehicle profile.
+Clear it with `mennekes_amtron_rtu.clear_target_time`, targeting this datetime
+entity; the Mushroom example attaches this to holding the time card. No second
+clear-button entity is needed. Other targets remain unchanged.
 
 These are translation keys, not literal IDs. HA generates IDs from the device
-and translated names. Edits require write access. The next departure is a
-separate datetime entity; it is not an end time for guest charging.
+and translated names. Edits require write access. See the
+[dashboard and charging guide](app-from-home-assistant.md).
 
 ## Configuration
 

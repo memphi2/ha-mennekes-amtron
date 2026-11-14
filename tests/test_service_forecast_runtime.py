@@ -93,10 +93,11 @@ def test_real_service_learns_without_extra_reads_writes_or_credentials(
                 assert "fixture-private-profile" not in json.dumps(result)
             assert (transport.reads, transport.writes, s.jobs.revision) == before
             async with TestClient(TestServer(create_job_app(s))) as client:
-                assert (await client.get("/v2/jobs")).status == 401
-                response = await client.get("/v2/jobs", headers={"Authorization": f"Bearer {runtime.TOKEN}"})
+                assert (await client.get("/v2/state")).status == 401
+                response = await client.get("/v2/state", headers={"Authorization": f"Bearer {runtime.TOKEN}"})
                 assert response.status == 200
-                forecast = (await response.json())["forecast"]
+                await response.json()
+                forecast = s.jobs.snapshot()["forecast"]
                 assert forecast["state"] == "estimate"
                 assert forecast["power_kw"] == expected_kw
             assert (transport.reads, transport.writes, s.jobs.revision) == before

@@ -124,7 +124,7 @@ class ChargeJob:
     identifier: str
     binding: str
     start_at: datetime
-    finish_at: datetime
+    finish_at: datetime | None
     current_a: float
     energy: EnergyGoal
     state: str = "scheduled"
@@ -153,15 +153,16 @@ class ChargeJob:
         if not isinstance(binding, str) or _BINDING.fullmatch(binding) is None:
             raise ValueError("invalid job binding")
         current = _current(request["current_a"])
-        start, finish = job_time(request["start_at"]), job_time(request["finish_at"])
+        start = job_time(request["start_at"])
+        finish = None if kind == "guest" and request["finish_at"] is None else job_time(request["finish_at"])
         now = job_time(now.isoformat())
-        if not now - timedelta(minutes=1) <= start < finish <= now + timedelta(days=7):
+        if start < now - timedelta(minutes=1) or (finish is not None and finish <= start) or (kind != "guest" and (finish is None or finish > now + timedelta(days=7))):
             raise ValueError("job window must end within seven days and start no more than one minute ago")
-        if kind == "guest" and (start > now or finish - start > timedelta(days=1)):
-            raise ValueError("guest window must start now and last at most 24 hours")
+        if kind == "guest" and start > now:
+            raise ValueError("guest charging must start now")
         energy = EnergyGoal()
         energy.set_target(request["energy_kwh"], total_kwh)
-        if energy.target_kwh == 0:
+        if energy.target_kwh == 0 and kind != "guest":
             raise ValueError("job energy ceiling must be positive")
         return cls(identifier, binding, start, finish, current, energy, _last_now=now, kind=kind)
 
@@ -176,7 +177,7 @@ class ChargeJob:
 
     def allows_at(self, now: datetime, *, total_kwh: object = None) -> bool:
         """A bounded session grants current only inside its accepted window."""
-        return not self.terminal and self.state != "suspended" and self.start_at <= now < self.finish_at
+        return not self.terminal and self.state != "suspended" and self.start_at <= now and (self.finish_at is None or now < self.finish_at)
 
     def interrupt(self, reason: str) -> None:
         if reason not in _INTERRUPTIONS:
@@ -208,7 +209,7 @@ class ChargeJob:
         The same connection scope needs no proof. A lasting lack of evidence
         interrupts it, so Home Assistant regains control within a minute.
         """
-        if present is False or now >= self.finish_at:
+        if present is False or (self.finish_at is not None and now >= self.finish_at):
             self.scope_ended = present is False
             self.interrupt(self.reason)
             return False
@@ -274,7 +275,7 @@ class ChargeJob:
                 self.state, self.reason = "reached", "energy_reached"
             elif self.energy.status == "meter_reset":
                 self.interrupt("meter_reset")
-            elif now >= self.finish_at:
+            elif (self.finish_at is not None and now >= self.finish_at):
                 self.state, self.reason = "finished", "window_ended"
             elif self.energy.status == "meter_unavailable":
                 self.state, self.reason = "waiting_meter", "meter_unavailable"
@@ -286,7 +287,7 @@ class ChargeJob:
     def snapshot(self) -> dict[str, Any]:
         return {
             "id": self.identifier, "binding": self.binding,
-            "start_at": self.start_at.isoformat(), "finish_at": self.finish_at.isoformat(),
+            "start_at": self.start_at.isoformat(), "finish_at": self.finish_at.isoformat() if self.finish_at else None,
             "current_a": self.current_a, "energy": self.energy.snapshot(),
             "state": self.state, "reason": self.reason, "scope_ended": self.scope_ended,
             **({"kind": self.kind} if self.kind != "scheduled" else {}),
@@ -309,13 +310,12 @@ class ChargeJob:
             or not isinstance(reason, str) or reason not in REASONS
         ):
             raise ValueError("invalid saved job identity or state")
-        start, finish = job_time(raw["start_at"]), job_time(raw["finish_at"])
-        if not start < finish or finish - start > timedelta(days=7, minutes=1):
+        start = job_time(raw["start_at"])
+        finish = None if kind == "guest" and raw["finish_at"] is None else job_time(raw["finish_at"])
+        if finish is not None and (not start < finish or (kind != "guest" and finish - start > timedelta(days=7, minutes=1))):
             raise ValueError("invalid saved job window")
-        if kind == "guest" and finish - start > timedelta(days=1):
-            raise ValueError("invalid saved guest window")
         energy = EnergyGoal.restore(raw["energy"])
-        if energy.target_kwh == 0:
+        if energy.target_kwh == 0 and kind != "guest":
             raise ValueError("invalid saved job energy ceiling")
         if type(raw["scope_ended"]) is not bool:
             raise ValueError("invalid saved job scope")
@@ -327,9 +327,9 @@ class ChargeJob:
             or (state == "interrupted" and reason not in _INTERRUPTIONS)
             or (state == "suspended" and (
                 reason not in _SUSPENSIONS or session is None
-                or energy.status not in ("active", "meter_unavailable")
+                or energy.status not in ("active", "meter_unavailable", "disabled")
             ))
-            or (state in expected_energy and energy.status != expected_energy[state])
+            or (state in expected_energy and energy.status != expected_energy[state] and not (kind == "guest" and energy.status == "disabled" and state in ("scheduled", "charging")))
             or (raw["scope_ended"] and state not in TERMINAL)
         ):
             raise ValueError("inconsistent saved job state")

@@ -236,23 +236,11 @@
       "timed_next_calendar_event": {
         "name": "Volgende agenda-afspraak gebruiken"
       },
-      "timed_clear_departure": {
-        "name": "Vertrektijd wissen"
-      },
       "timed_vehicle_departure": {
         "name": "Vertrektijd van voertuig overnemen"
       },
       "guest_start": {
         "name": "Gastladen starten"
-      },
-      "guest_reset_draft": {
-        "name": "Gastconcept herstellen"
-      },
-      "guest_stop": {
-        "name": "Gastladen stoppen"
-      },
-      "guest_clear": {
-        "name": "Gastlading wissen"
       }
     },
     "number": {
@@ -264,15 +252,6 @@
       },
       "soc_goal": {
         "name": "Laaddoel van voertuig"
-      },
-      "guest_current_a": {
-        "name": "Gastlaadstroom"
-      },
-      "guest_energy_kwh": {
-        "name": "Gastlaadenergie"
-      },
-      "guest_duration_minutes": {
-        "name": "Maximale gastlaadduur"
       }
     },
     "select": {
@@ -591,20 +570,6 @@
           }
         }
       },
-      "guest_draft_status": {
-        "name": "Gastlaadconcept",
-        "state": {
-          "ready": "Klaar om te starten",
-          "job_exists": "Gastladen is al actief",
-          "job_not_permitted": "Controleer auto, vrijgave, meter en wachtende wijzigingen",
-          "job_current_exceeds_cap": "Stroom boven de app-limiet",
-          "job_preview_expired": "Voorbeeld verlopen; maak een nieuw voorbeeld",
-          "job_storage_unavailable": "Conceptopslag niet beschikbaar",
-          "invalid_job_request": "Controleer energie, stroom en maximale duur",
-          "job_stop_unconfirmed": "Wachten op bevestigde stop",
-          "guest_vehicle_target_active": "Accudoel van voertuig actief"
-        }
-      },
       "guest_charging": {
         "name": "Gastladen",
         "state": {
@@ -819,7 +784,7 @@
     },
     "datetime": {
       "timed_departure": {
-        "name": "Volgend vertrek"
+        "name": "Doeltijd"
       }
     }
   },
@@ -977,9 +942,6 @@
     "guest_vehicle_target_active": {
       "message": "Batterijdoel van het voertuig actief; geen gastopdracht aangemaakt."
     },
-    "invalid_job_request": {
-      "message": "De app heeft deze waarden niet geaccepteerd. Controleer tijd, stroom en energie."
-    },
     "job_changed": {
       "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
     },
@@ -998,9 +960,6 @@
     "job_preview_expired": {
       "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
     },
-    "job_service_starting": {
-      "message": "De service start nog. Probeer het zo opnieuw."
-    },
     "job_stop_first": {
       "message": "Stop eerst de lopende opdracht."
     },
@@ -1018,6 +977,12 @@
     },
     "job_stop_unconfirmed": {
       "message": "De stop is nog niet bevestigd. Probeer het zo opnieuw."
+    },
+    "guest_start_not_permitted": {
+      "message": "Kan niet starten: controleer verbinding, schrijftoegang, vergrendeling en storingen."
+    },
+    "guest_deadline_expired": {
+      "message": "Het opgeslagen tijdstip is verstreken. Kies een toekomstig tijdstip of wis het."
     }
   },
   "issues": {
@@ -1702,29 +1667,7 @@
     },
     "start_guest_charging": {
       "name": "Gastladen starten",
-      "description": "Laadt de auto van een gast vanaf nu voor beperkte tijd en energie. Er worden geen voertuiggegevens of opgeslagen doelen gebruikt.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
-        },
-        "current": {
-          "name": "Laadstroom",
-          "description": "Stroom in ampère per fase, hoogstens de stroomlimiet van de app."
-        },
-        "energy": {
-          "name": "Energie",
-          "description": "Het laden stopt zodra deze energie in kWh is geleverd."
-        },
-        "duration": {
-          "name": "Duur",
-          "description": "Hoe lang er geladen mag worden, in minuten (tot 24 uur)."
-        }
-      }
-    },
-    "stop_guest_charging": {
-      "name": "Gastladen stoppen",
-      "description": "Stopt gastladen en vraagt een pauze. Een actief vertrekplan kan daarna hervatten.",
+      "description": "Start direct voor deze aansluiting. Opgeslagen kWh- en tijdslimieten gelden; het voertuigdoel blijft ongewijzigd.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1732,15 +1675,9 @@
         }
       }
     },
-    "clear_guest_charging": {
-      "name": "Gastlading wissen",
-      "description": "Verwijdert een beëindigde gastsessie zonder het laden te hervatten.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
-        }
-      }
+    "clear_target_time": {
+      "name": "Doeltijd wissen",
+      "description": "Wist de gedeelde tijd zonder energie- of voertuigdoelen te wijzigen."
     }
   }
 }

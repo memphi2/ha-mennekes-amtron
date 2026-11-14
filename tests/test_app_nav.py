@@ -16,16 +16,15 @@ from custom_components.mennekes_amtron_rtu.device.console_http import CONSOLE_AS
 from tests.test_app_settings import HEADERS, FixtureSettings
 
 DEVICE = Path(ui.__file__).parent
-ALL = {"/", "/registers", "/targets", "/departure", "/guest", "/connection", "/runtime", "/log"}
+ALL = {"/", "/registers", "/targets", "/connection", "/runtime", "/log"}
 
 
 def test_groups_are_tabs_and_their_pages_a_second_row():
-    nav = render_nav("/guest", "de", ALL).decode()
-    assert nav.count("<a ") == 7
-    assert '<a href="./targets" aria-current="true">Laden</a>' in nav
-    assert '<nav class="app-pages" aria-label="Laden">' in nav
-    assert '<a href="./guest" aria-current="page">Gastladen</a>' in nav
-    assert nav.count("aria-current") == 2
+    nav = render_nav("/targets", "de", ALL).decode()
+    assert nav.count("<a ") == 4
+    assert '<a href="./targets" aria-current="page">Laden</a>' in nav
+    assert "app-pages" not in nav
+    assert nav.count("aria-current") == 1
     # A group with one page links to it and shows no second row.
     single = render_nav("/", "fr", ALL).decode()
     assert 'aria-current="page"' in single

@@ -21,7 +21,6 @@ from .timed_goal_const import CONF_TIMED_CALENDAR_ENTITY
 from .vehicle_features import (
     CALENDAR,
     LOSS_ASSIGN,
-    TIMED,
     VEHICLE_DEPARTURE,
     vehicle_features,
 )
@@ -59,12 +58,10 @@ async def async_setup_entry(
         entities.append(AmtronNextDepartureButton(entry, coordinator))
     if VEHICLE_DEPARTURE in features:
         entities.append(AmtronVehicleDepartureButton(entry, coordinator))
-    if TIMED in features:
-        entities.append(AmtronClearDepartureButton(entry, coordinator))
     if runtime_data.control.read_only and CONF_SERVER_URL not in entry.data:
         entities = [entity for entity in entities if isinstance(entity, AmtronAssignChargeButton)]
     if runtime_data.orders is not None:
-        entities.extend(GuestButton(entry, action) for action in ("start", "stop", "clear", "reset_draft"))
+        entities.append(GuestButton(entry))
     async_add_entities(entities)
 
 
@@ -115,29 +112,6 @@ class AmtronVehicleDepartureButton(AmtronNextDepartureButton):
         observer = self.runtime_data.timed_goal
         if observer is not None:
             await observer.async_use_vehicle_departure()
-
-
-class AmtronClearDepartureButton(MennekesAmtronControlEntity, ButtonEntity):
-    """Cancel the selected one-off trip without changing the SoC ceiling."""
-
-    _attr_translation_key = "timed_clear_departure"
-
-    def __init__(
-        self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
-    ) -> None:
-        super().__init__(entry, coordinator, "timed_clear_departure")
-
-    @property
-    def available(self) -> bool:
-        return (
-            self.coordinator.last_update_success and not self.runtime_data.control.read_only
-            and self.runtime_data.timed_goal is not None
-        )
-
-    async def async_press(self) -> None:
-        observer = self.runtime_data.timed_goal
-        if observer is not None:
-            await observer.async_set_deadline(None)
 
 
 class AmtronCancelPendingButton(MennekesAmtronControlEntity, ButtonEntity):

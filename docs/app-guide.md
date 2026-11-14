@@ -6,15 +6,13 @@ Open the service app and select **Open Web UI**. The pages are for Home
 Assistant administrators and open through Home Assistant itself; no port or
 token is needed in the browser. They need **Supervisor 2026.10.4 or newer**.
 
-The bar at the top has four groups; **Charging**, **Settings** and **Diagnostics** show their
+The bar at the top has four groups; **Settings** and **Diagnostics** show their
 pages in a second row.
 
 | Group | Page | What it is for |
 |---|---|---|
 | **Overview** | [Overview](#overview) | What the wallbox and the app are doing right now. Read-only. |
-| **Charging** | [Charge target](#charge-target) | Limit kWh or the selected vehicle percentage without starting charging. |
-| | [Plan departure](#plan-departure) | One trip with a target percentage and automatic start/current planning. |
-| | [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
+| **Charging** | [Charge target](#charge-target) | Shared kWh, time and vehicle target, plus one guest-start button. |
 | **Settings** | [Connection](#connection) | USB or LAN connection, optional LAN-adapter setup. |
 | | [Runtime](#runtime-settings) | Polling intervals and control limits, with a preview before saving. |
 | **Diagnostics** | [Registers](#registers) | Every wallbox register with its raw and decoded value. Read-only. |
@@ -59,49 +57,27 @@ waiting states; it does not override a pause or authorize a vehicle.
 
 ## Charge target
 
-Open **Charging → Charge target**. Set additional wallbox kWh or the selected
-vehicle's percentage target and explicitly save. These are the same values as
-HA's native target entities. A target only limits charging; it never starts or
-resumes a pause. 0 disables the respective limit. If both are active, both apply.
-
-Set up vehicle sources and the optional maximum in HA first. The app respects
-that maximum and refuses a new percentage target when a required cap is unknown.
-It does not invent a vehicle SoC or battery capacity.
+Open **Charging**. Set an optional kWh limit, time or vehicle percentage target on
+the left and save each change. The right side shows the saved choices and the
+**Start guest charging** button. Unsaved edits must be saved or reloaded first.
+The same saved values appear in Home Assistant. Setting a limit does not start charging.
 
 ## Plan departure
 
-Open **Charging → Plan departure** after enabling the vehicle's departure
-planning in HA and providing usable battery capacity. Set the percentage target,
-then select one dated departure and save. HA and the app show the same trip.
-Calendar and vehicle timer imports remain optional HA buttons; imports replace
-this same departure rather than creating another schedule.
-
-An active plan may lift a manual pause. Clearing the departure cancels the plan,
-keeps the ordinary targets and may end a pause owned by the plan. Check the
-planning status; the requested target time is not a guarantee. See
-[the three-mode guide](app-from-home-assistant.md) and
-[departure planning](departure-planning.md) for examples and restart behavior.
+Intelligent vehicle planning is configured in Home Assistant, as before. It uses
+SoC, battery capacity and the selected next trip. The app shows the shared time
+and current plan status without a separate planning page.
+See [planning](departure-planning.md).
 
 ## Guest charging
 
-**Guest charging** (German: **Gastladen**) starts one order right away for a
-visitor's car, without any vehicle data.
-
-1. Let the guest authorize locally first, for example with an RFID card, so the
-   wallbox's charging release is on.
-2. Open **Guest charging** and enter the **additional energy**, the **maximum
-   duration** (1 to 1440 minutes) and the **current per phase**.
-3. The fields share a saved guest draft with HA. **Save draft** stores edits without starting; **Reload saved draft** adopts changes from another window.
-4. Select **Preview**, check the start and end times and select **Confirm and
-   start when permitted** within one minute.
-
-A guest order uses no battery level and no saved vehicle target. It cannot be
-created while a battery target is active in Home Assistant; set that target to 0
-first. If a battery target is switched on later, the guest order is interrupted.
-
-A guest session stops at the energy
-amount or the end time, ends when the car is unplugged, and **Clear stopped
-order without resuming** never restarts charging.
+Press **Start guest charging** to start now. It lifts a manual pause and grants
+permission for this connection, including when virtual Plug & Charge is enabled.
+It respects the shared kWh limit and time, whichever is reached first. Unset limits
+do not add hidden defaults. The saved vehicle percentage target is ignored for
+the guest and remains unchanged. Locks, faults and electrical limits still apply.
+Use the ordinary HA pause control to stop, or unplug. There is no separate guest
+draft, duration or current editor. See [charging details](app-from-home-assistant.md).
 
 ## Registers
 

@@ -236,23 +236,11 @@
       "timed_next_calendar_event": {
         "name": "Use next calendar event"
       },
-      "timed_clear_departure": {
-        "name": "Clear departure time"
-      },
       "timed_vehicle_departure": {
         "name": "Use vehicle departure"
       },
       "guest_start": {
         "name": "Start guest charging"
-      },
-      "guest_reset_draft": {
-        "name": "Reset guest draft"
-      },
-      "guest_stop": {
-        "name": "Stop guest charging"
-      },
-      "guest_clear": {
-        "name": "Clear guest charging"
       }
     },
     "number": {
@@ -264,15 +252,6 @@
       },
       "soc_goal": {
         "name": "Vehicle charge target"
-      },
-      "guest_current_a": {
-        "name": "Guest current"
-      },
-      "guest_energy_kwh": {
-        "name": "Guest energy"
-      },
-      "guest_duration_minutes": {
-        "name": "Guest maximum duration"
       }
     },
     "select": {
@@ -591,20 +570,6 @@
           }
         }
       },
-      "guest_draft_status": {
-        "name": "Guest charging draft",
-        "state": {
-          "ready": "Ready to start",
-          "job_exists": "Guest charging is already active",
-          "job_not_permitted": "Check vehicle, release, meter and pending changes",
-          "job_current_exceeds_cap": "Current exceeds the app limit",
-          "job_preview_expired": "Preview expired; preview again",
-          "job_storage_unavailable": "Draft storage unavailable",
-          "invalid_job_request": "Check energy, current and maximum duration",
-          "job_stop_unconfirmed": "Waiting for confirmed stop",
-          "guest_vehicle_target_active": "Vehicle battery target active"
-        }
-      },
       "guest_charging": {
         "name": "Guest charging",
         "state": {
@@ -819,7 +784,7 @@
     },
     "datetime": {
       "timed_departure": {
-        "name": "Next departure"
+        "name": "Target time"
       }
     }
   },
@@ -977,9 +942,6 @@
     "guest_vehicle_target_active": {
       "message": "Vehicle battery target active; no guest order created."
     },
-    "invalid_job_request": {
-      "message": "The app did not accept these values. Check time, current and energy."
-    },
     "job_changed": {
       "message": "The state changed in the meantime. Try again."
     },
@@ -998,9 +960,6 @@
     "job_preview_expired": {
       "message": "The state changed in the meantime. Try again."
     },
-    "job_service_starting": {
-      "message": "The service is still starting. Try again shortly."
-    },
     "job_stop_first": {
       "message": "Stop the active order first."
     },
@@ -1018,6 +977,12 @@
     },
     "job_stop_unconfirmed": {
       "message": "The stop is not confirmed yet. Try again shortly."
+    },
+    "guest_start_not_permitted": {
+      "message": "Guest charging cannot start: check the connection, write access, wallbox lock and fault status."
+    },
+    "guest_deadline_expired": {
+      "message": "The saved time limit has expired. Choose a future time or clear it."
     }
   },
   "issues": {
@@ -1702,29 +1667,7 @@
     },
     "start_guest_charging": {
       "name": "Start guest charging",
-      "description": "Charges a guest’s car from now on for a limited time and energy. No vehicle data and no saved target is used.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "The wallbox this applies to. Can be left out when only one is set up."
-        },
-        "current": {
-          "name": "Charging current",
-          "description": "Current in amperes per phase, at most the app’s current cap."
-        },
-        "energy": {
-          "name": "Energy",
-          "description": "Charging stops once this much energy was delivered, in kWh."
-        },
-        "duration": {
-          "name": "Duration",
-          "description": "How long charging is allowed, in minutes (up to 24 hours)."
-        }
-      }
-    },
-    "stop_guest_charging": {
-      "name": "Stop guest charging",
-      "description": "Stops guest charging and requests a pause. An armed departure plan may subsequently resume charging.",
+      "description": "Start immediately for this connection. Saved kWh and time limits apply; the vehicle percentage target stays unchanged.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1732,15 +1675,9 @@
         }
       }
     },
-    "clear_guest_charging": {
-      "name": "Clear guest charging",
-      "description": "Removes an ended guest session without resuming charging.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "The wallbox this applies to. Can be left out when only one is set up."
-        }
-      }
+    "clear_target_time": {
+      "name": "Clear target time",
+      "description": "Clears the shared time without changing energy or vehicle targets."
     }
   }
 }

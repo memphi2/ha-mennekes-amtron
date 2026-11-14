@@ -236,23 +236,11 @@
       "timed_next_calendar_event": {
         "name": "Usa prossimo evento calendario"
       },
-      "timed_clear_departure": {
-        "name": "Cancella ora di partenza"
-      },
       "timed_vehicle_departure": {
         "name": "Usa la partenza del veicolo"
       },
       "guest_start": {
         "name": "Avvia ricarica ospite"
-      },
-      "guest_reset_draft": {
-        "name": "Ripristina bozza ospite"
-      },
-      "guest_stop": {
-        "name": "Ferma ricarica ospite"
-      },
-      "guest_clear": {
-        "name": "Rimuovi ricarica ospite"
       }
     },
     "number": {
@@ -264,15 +252,6 @@
       },
       "soc_goal": {
         "name": "Obiettivo di carica del veicolo"
-      },
-      "guest_current_a": {
-        "name": "Corrente ospite"
-      },
-      "guest_energy_kwh": {
-        "name": "Energia ospite"
-      },
-      "guest_duration_minutes": {
-        "name": "Durata massima ospite"
       }
     },
     "select": {
@@ -591,20 +570,6 @@
           }
         }
       },
-      "guest_draft_status": {
-        "name": "Bozza ricarica ospite",
-        "state": {
-          "ready": "Pronto per avviare",
-          "job_exists": "Ricarica ospite già attiva",
-          "job_not_permitted": "Controllare veicolo, consenso, contatore e modifiche in attesa",
-          "job_current_exceeds_cap": "Corrente oltre il limite",
-          "job_preview_expired": "Anteprima scaduta; crearne una nuova",
-          "job_storage_unavailable": "Archivio bozza non disponibile",
-          "invalid_job_request": "Verificare energia, corrente e durata massima",
-          "job_stop_unconfirmed": "Attesa della conferma di arresto",
-          "guest_vehicle_target_active": "Obiettivo batteria attivo"
-        }
-      },
       "guest_charging": {
         "name": "Ricarica ospite",
         "state": {
@@ -819,7 +784,7 @@
     },
     "datetime": {
       "timed_departure": {
-        "name": "Prossima partenza"
+        "name": "Orario obiettivo"
       }
     }
   },
@@ -977,9 +942,6 @@
     "guest_vehicle_target_active": {
       "message": "Obiettivo batteria del veicolo attivo; nessun ordine ospite creato."
     },
-    "invalid_job_request": {
-      "message": "L’app non ha accettato questi valori. Controlla orario, corrente ed energia."
-    },
     "job_changed": {
       "message": "Nel frattempo lo stato è cambiato. Riprova."
     },
@@ -998,9 +960,6 @@
     "job_preview_expired": {
       "message": "Nel frattempo lo stato è cambiato. Riprova."
     },
-    "job_service_starting": {
-      "message": "Il servizio si sta ancora avviando. Riprova tra poco."
-    },
     "job_stop_first": {
       "message": "Fermare prima l’ordine in corso."
     },
@@ -1018,6 +977,12 @@
     },
     "job_stop_unconfirmed": {
       "message": "L’arresto non è ancora confermato. Riprova tra poco."
+    },
+    "guest_start_not_permitted": {
+      "message": "Impossibile avviare: controllare connessione, accesso in scrittura, blocco ed errori."
+    },
+    "guest_deadline_expired": {
+      "message": "Il limite orario è scaduto. Scegliere un orario futuro o cancellarlo."
     }
   },
   "issues": {
@@ -1702,29 +1667,7 @@
     },
     "start_guest_charging": {
       "name": "Avvia ricarica ospite",
-      "description": "Ricarica l’auto di un ospite da subito, per tempo ed energia limitati. Non vengono usati dati del veicolo né obiettivi salvati.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
-        },
-        "current": {
-          "name": "Corrente di ricarica",
-          "description": "Corrente in ampere per fase, al massimo il limite dell’app."
-        },
-        "energy": {
-          "name": "Energia",
-          "description": "La ricarica termina quando è stata fornita questa energia, in kWh."
-        },
-        "duration": {
-          "name": "Durata",
-          "description": "Per quanto tempo è consentita la ricarica, in minuti (fino a 24 ore)."
-        }
-      }
-    },
-    "stop_guest_charging": {
-      "name": "Ferma ricarica ospite",
-      "description": "Ferma la ricarica ospite e richiede una pausa. Un piano di partenza attivo può poi riprendere.",
+      "description": "Avvia subito per questa connessione. Si applicano i limiti salvati in kWh e di tempo; il target del veicolo resta invariato.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1732,15 +1675,9 @@
         }
       }
     },
-    "clear_guest_charging": {
-      "name": "Rimuovi ricarica ospite",
-      "description": "Rimuove una sessione ospite terminata senza riprendere la ricarica.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
-        }
-      }
+    "clear_target_time": {
+      "name": "Cancella orario obiettivo",
+      "description": "Cancella l’orario condiviso senza cambiare gli obiettivi energetici o del veicolo."
     }
   }
 }

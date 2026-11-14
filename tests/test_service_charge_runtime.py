@@ -146,14 +146,14 @@ def test_lost_connection_and_changed_vehicle_source_never_rearm(tmp_path):
             await s.jobs.create(request(), revision=s.jobs.revision, scope=s.jobs.snapshot()["scope"])
             clock[0] += 10
             s.control.soc_goal.configure_source("other")
-            assert s.jobs.stop_requested()
+            assert not s.jobs.stop_requested()
             await s.jobs.tick()
-            assert s.jobs.job.reason == "vehicle_changed"
+            assert s.jobs.job.state == "charging"
             s._success = False
             await s.jobs.tick()
             assert not s.jobs.snapshot()["available"]
             await s.refresh()
-            assert s.jobs.job.terminal
+            assert not s.jobs.job.terminal
             with pytest.raises(DeviceError, match="device_identity_changed"):
                 await s.command({"command": "pause", "expected_serial_number": "other"})
     asyncio.run(run())

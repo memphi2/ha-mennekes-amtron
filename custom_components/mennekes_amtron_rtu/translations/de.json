@@ -236,23 +236,11 @@
       "timed_next_calendar_event": {
         "name": "Nächsten Kalendertermin übernehmen"
       },
-      "timed_clear_departure": {
-        "name": "Abfahrtszeit löschen"
-      },
       "timed_vehicle_departure": {
         "name": "Abfahrt vom Fahrzeug übernehmen"
       },
       "guest_start": {
         "name": "Gastladen starten"
-      },
-      "guest_reset_draft": {
-        "name": "Gastladeentwurf zurücksetzen"
-      },
-      "guest_stop": {
-        "name": "Gastladen stoppen"
-      },
-      "guest_clear": {
-        "name": "Gastladung entfernen"
       }
     },
     "number": {
@@ -264,15 +252,6 @@
       },
       "soc_goal": {
         "name": "Fahrzeug-Ladeziel"
-      },
-      "guest_current_a": {
-        "name": "Gastladestrom"
-      },
-      "guest_energy_kwh": {
-        "name": "Gastladeenergie"
-      },
-      "guest_duration_minutes": {
-        "name": "Maximale Gastladedauer"
       }
     },
     "select": {
@@ -591,20 +570,6 @@
           }
         }
       },
-      "guest_draft_status": {
-        "name": "Gastladeentwurf",
-        "state": {
-          "ready": "Bereit zum Starten",
-          "job_exists": "Gastladen ist bereits aktiv",
-          "job_not_permitted": "Fahrzeug, Ladefreigabe, Zähler und ausstehende Änderungen prüfen",
-          "job_current_exceeds_cap": "Strom überschreitet das App-Limit",
-          "job_preview_expired": "Vorschau abgelaufen; neue Vorschau erstellen",
-          "job_storage_unavailable": "Entwurfsspeicher nicht verfügbar",
-          "invalid_job_request": "Energie, Strom und maximale Dauer prüfen",
-          "job_stop_unconfirmed": "Wartet auf bestätigten Stopp",
-          "guest_vehicle_target_active": "Fahrzeug-Ladeziel aktiv"
-        }
-      },
       "guest_charging": {
         "name": "Gastladen",
         "state": {
@@ -819,7 +784,7 @@
     },
     "datetime": {
       "timed_departure": {
-        "name": "Nächste Abfahrt"
+        "name": "Zielzeitpunkt"
       }
     }
   },
@@ -977,9 +942,6 @@
     "guest_vehicle_target_active": {
       "message": "Fahrzeug-Batterieziel aktiv; kein Gastauftrag angelegt."
     },
-    "invalid_job_request": {
-      "message": "Die App hat diese Werte nicht angenommen. Zeit, Strom und Energie prüfen."
-    },
     "job_changed": {
       "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
     },
@@ -998,9 +960,6 @@
     "job_preview_expired": {
       "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
     },
-    "job_service_starting": {
-      "message": "Der Service startet noch. Gleich noch einmal versuchen."
-    },
     "job_stop_first": {
       "message": "Zuerst den laufenden Auftrag stoppen."
     },
@@ -1018,6 +977,12 @@
     },
     "job_stop_unconfirmed": {
       "message": "Der Stopp ist noch nicht bestätigt. Gleich noch einmal versuchen."
+    },
+    "guest_start_not_permitted": {
+      "message": "Gastladen kann nicht starten: Verbindung, Schreibzugriff, Wallbox-Sperre und Fehlerstatus prüfen."
+    },
+    "guest_deadline_expired": {
+      "message": "Der gespeicherte Zeitpunkt ist abgelaufen. Einen zukünftigen Zeitpunkt wählen oder löschen."
     }
   },
   "issues": {
@@ -1702,29 +1667,7 @@
     },
     "start_guest_charging": {
       "name": "Gastladen starten",
-      "description": "Lädt das Auto eines Gastes ab sofort für begrenzte Zeit und Energie. Es werden weder Fahrzeugdaten noch gespeicherte Ziele verwendet.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
-        },
-        "current": {
-          "name": "Ladestrom",
-          "description": "Strom in Ampere pro Phase, höchstens die Stromgrenze der App."
-        },
-        "energy": {
-          "name": "Energie",
-          "description": "Das Laden endet, sobald diese Energie in kWh geliefert wurde."
-        },
-        "duration": {
-          "name": "Dauer",
-          "description": "Wie lange geladen werden darf, in Minuten (bis 24 Stunden)."
-        }
-      }
-    },
-    "stop_guest_charging": {
-      "name": "Gastladen stoppen",
-      "description": "Beendet Gastladen und fordert eine Pause an. Eine aktive Abfahrtsplanung kann danach wieder laden.",
+      "description": "Startet sofort für diese Verbindung. Gespeichertes kWh-Ziel und Zeitpunkt begrenzen die Ladung; das Fahrzeug-Prozentziel bleibt unberührt.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1732,15 +1675,9 @@
         }
       }
     },
-    "clear_guest_charging": {
-      "name": "Gastladung entfernen",
-      "description": "Entfernt einen beendeten Gastladevorgang, ohne die Ladung fortzusetzen.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
-        }
-      }
+    "clear_target_time": {
+      "name": "Zielzeitpunkt löschen",
+      "description": "Löscht den gemeinsamen Zeitpunkt. Energie- und Fahrzeugziel bleiben erhalten."
     }
   }
 }

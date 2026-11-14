@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Use shared kWh, time and optional vehicle percentage targets in HA and the app.
+  Keep intelligent vehicle planning in HA, without a separate app planning page.
+- Start guests with one button: lift manual pause and grant this connection's
+  permission, stopping at the first saved kWh/time limit. Keep vehicle targets
+  saved without applying them to guests.
+- Use one target-time entity for guests and vehicle planning. Clear it through
+  its entity action or by holding the time tile in the Mushroom examples.
+- Simplify the app overview and charging page, and update all five dashboard examples.
+- Remove the old guest draft, duration/current entities, separate stop/clear
+  buttons and job API. Update earlier beta automations and dashboard YAML.
+
 ## 0.9.0b7 — 2026-11-14
 
 - Organize charging around charge targets, one next departure and guest charging;

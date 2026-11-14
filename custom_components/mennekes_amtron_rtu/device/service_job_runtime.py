@@ -52,6 +52,7 @@ class JobModbusService(ConsoleModbusService):
             self._job_inputs, self._apply_job_current,
         )
         jobs = self.jobs
+        control.guest_active = lambda: jobs.guest_active
         control.set_service_policy(ServiceChargePolicy(
             jobs.current_policy, jobs.stop_requested, lambda: jobs.stop_requested(gate=False),
         ))
@@ -94,7 +95,7 @@ class JobModbusService(ConsoleModbusService):
         independent_stop = False
         if control is not None:
             if self._job_scope is not None:
-                selection = f"{control.soc_goal.source}|{control.plug_charge['policy']}"
+                selection = "physical-connection"
                 scope = hashlib.sha256(f"{self._job_scope}|{selection}".encode()).hexdigest()
                 reading = self._job_session
                 if available and reading is not None and reading.keys() >= {"at", "duration_s", "energy_kwh", "count"}:
@@ -198,10 +199,62 @@ class JobModbusService(ConsoleModbusService):
             finally:
                 await self._persist()
 
+    @property
+    def guest_revision(self) -> str:
+        departure = getattr(self, "departure", None)
+        selection = departure.choice_revision if departure is not None and departure.ready else "loading"
+        raw = f"{self.choice_revision}|{selection}|{self._job_scope}|{self.jobs.revision if self.jobs else 'loading'}"
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    async def _start_shared_guest(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if payload.keys() != {"command", "expected_serial_number", "expected_guest_revision"}:
+            raise ValueError("invalid guest command")
+        if payload["expected_serial_number"] != self.identity.serial_number:
+            raise DeviceError("device_identity_changed")
+        control, jobs = self.control, self.jobs
+        if control is None or jobs is None or self._stopping or not self._is_available():
+            raise DeviceError("service_unavailable")
+        if payload["expected_guest_revision"] != self.guest_revision:
+            raise DeviceError("soc_goal_source_changed")
+        sample = self._job_inputs()
+        if control.read_only or sample.present is not True or self.data.fresh("error_code") != 0 or self.data.fresh("lock_evse") != 0:
+            raise DeviceError("guest_start_not_permitted")
+        departure = getattr(self, "departure", None)
+        deadline = departure.trip.deadline if departure is not None and departure.ready else None
+        if deadline is not None and deadline <= sample.now:
+            raise DeviceError("guest_deadline_expired")
+        current = control.charging_setpoint
+        current = sample.current_cap if current is None or current == 0 else min(current, sample.current_cap)
+        request = {"kind": "guest", "id": secrets.token_hex(16), "start_at": sample.now.isoformat(),
+                   "finish_at": deadline.isoformat() if deadline is not None else None,
+                   "current_a": current, "energy_kwh": 0}
+
+        choice_revision = self.choice_revision
+        trip_revision = departure.choice_revision if departure is not None else None
+
+        async def grant() -> None:
+            async with self._command_lock:
+                if self.choice_revision != choice_revision or (departure is not None and departure.choice_revision != trip_revision):
+                    raise DeviceError("soc_goal_source_changed")
+                if self._job_inputs().scope != sample.scope or not self._is_available():
+                    raise DeviceError("guest_start_not_permitted")
+                try:
+                    await control.async_cancel_timed_current("departure")
+                    await control.async_set_charging_release(True)
+                    # The persisted guest session owns the following current write.
+                    # Explicit guest start lifts a manual pause, never a lock.
+                    control.pause_requested = False
+                finally:
+                    await self._persist()
+        await jobs.start_shared(request, grant)
+        return self._publish()
+
     async def command(
         self, payload: dict[str, Any], *,
         _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None,
     ) -> dict[str, Any]:
+        if payload.get("command") == "guest_start":
+            return await self._start_shared_guest(payload)
         jobs = self.jobs
         if jobs is not None and jobs.holding and "expected_serial_number" in payload and payload["expected_serial_number"] == self.identity.serial_number:
             command, value = payload.get("command"), payload.get("value")

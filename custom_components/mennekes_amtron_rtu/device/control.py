@@ -212,6 +212,7 @@ class AmtronControl:
         self.soc_goal_controller: SocGoalController | None = None
         self._plug_charge = PlugChargeController(self)
         self._service_policy: ServiceChargePolicy | None = None
+        self.guest_active: Callable[[], bool] = lambda: False
 
     def set_service_policy(self, policy: ServiceChargePolicy | None) -> None:
         """Let a service-owned charging order fence and authorize its commands."""
@@ -264,7 +265,7 @@ class AmtronControl:
             else self.energy_goal.stop_requested
         ) or (
             self.soc_goal_controller.stop_requested if self.soc_goal_controller is not None
-            else self.soc_goal.stop_requested
+            else (not self.guest_active() and self.soc_goal.stop_requested)
         )
 
     @property

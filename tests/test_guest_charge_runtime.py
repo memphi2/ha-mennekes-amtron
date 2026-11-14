@@ -37,13 +37,13 @@ def test_real_service_projects_and_enforces_vehicle_target_conflict(tmp_path, ta
             assert current_writes(transport)[-1] == 12
             clock[0] += 1000
             control.soc_goal.set_target(80, soc=20)
-            assert jobs.stop_requested()
+            assert not jobs.stop_requested()
             await jobs.tick()
-            assert jobs.job.reason == "independent_stop"
-            assert current_writes(transport)[-1] == 1
+            assert jobs.job.state == "charging"
+            assert current_writes(transport)[-1] == 12
             assert all(address == R.CHARGING_CURRENT_EMS.address for address, _words in transport.writes)
             control.soc_goal.set_target(0)
             await jobs.tick()
-            assert jobs.job.terminal
-            assert current_writes(transport)[-1] == 1
+            assert not jobs.job.terminal
+            assert current_writes(transport)[-1] == 12
     asyncio.run(run())
