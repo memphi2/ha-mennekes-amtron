@@ -1,48 +1,51 @@
-# Your wallbox, step by step
+# Mennekes Amtron: user guide
 
-You only need a current setting and a pause switch to charge. Vehicle accounts,
-calendars, prices and dashboards are optional.
+Start with normal charging. Add vehicle data, a departure time or automation only
+when you need it. You do not need a vehicle account or a dashboard card to begin.
 
-| Start here | What you will find |
+## Start here
+
+| Your next step | Guide |
 |---|---|
-| **[1. Install](installation.md)** | Choose direct USB/LAN or the recommended service app, connect and enable controls. |
-| **[2. Charge](user-guide.md)** | Current, pause, shared limits and one-button guest charging. |
-| **[3. Add a dashboard](app-from-home-assistant.md#dashboard-with-mushroom-cards)** | Ready-to-paste basic or Mushroom YAML in five languages. No helpers to create. |
-| **[Get help](troubleshooting.md)** | Missing controls, connection problems, waiting commands and charging targets. |
+| Connect a wallbox for the first time | **[Installation](installation.md)** — choose the app or a direct connection, then connect USB or LAN |
+| Check that charging works | **[First charge](quickstart.md)** — current, pause, resume and heartbeat |
+| Use the wallbox every day | **[Charging](user-guide.md)** — normal charging, limits and guest start |
+| Put the controls on a dashboard | **[Dashboard YAML](app-from-home-assistant.md#dashboard-with-mushroom-cards)** — basic and Mushroom examples in five languages |
+| Something is not working | **[Troubleshooting](troubleshooting.md)** — start with the symptom |
 
-## Add only what you need
+**Already installed?** Use [Updates](installation.md#updates); keep your wallbox
+entry. Integration and app updates are separate.
 
-| Optional function | Start here |
-|---|---|
-| Use the app's browser interface | [App guide](app-guide.md) |
-| Recognize cars, use battery percentage or enable virtual Plug & Charge | [Vehicle setup](vehicle-setup.md) |
-| Have a recognized car ready for the next trip | [Departure planning](departure-planning.md) |
-| Use calendars, preconditioning or solar surplus | [Blueprints](blueprints.md) |
-| Estimate charging costs and losses | [Costs and losses](charging-estimates.md) |
+## Add an optional function
 
-[Compare optional functions](features.md). **0 A removes the current limit; it
-never means pause.** Only one program may use the wallbox bus, even in read-only mode.
+- **[App web interface](app-guide.md):** see what is happening and change shared limits.
+- **[Vehicle data](vehicle-setup.md):** percentage targets, several cars, optional
+  automatic recognition and virtual Plug & Charge.
+- **[Ready for the next trip](departure-planning.md):** a one-time departure,
+  manual or imported from a calendar or vehicle timer.
+- **[Costs and losses](charging-estimates.md):** choose the available price and vehicle data.
+- **[Automations](blueprints.md):** solar charging, calendar import and preconditioning.
+
+[Which feature starts or stops charging?](features.md#which-function-may-start-or-stop-charging)
+
+The **optional service app is recommended** for HA Core restart continuity and
+is **required for guest charging**. Normal charging, kWh limits and vehicle
+planning also work directly while HA is running. [Compare the setups](installation.md#1-choose-your-connection).
+
+## Reference
+
+Look up a detail when you need it: [models](compatibility.md), [wiring](hardware.md),
+[LAN adapters](network-gateway.md), [entities](entities.md), [actions](automations.md),
+[history and database size](recorder.md), [operating limits](safety.md).
 
 <details>
-<summary>Installation and technical reference</summary>
+<summary>Development, protocols and project information</summary>
 
-- [First charge walkthrough](quickstart.md), [USB wiring](hardware.md),
-  [supported models](compatibility.md), [operating limits](safety.md)
-- [LAN connection](network-gateway.md), [adapter setup](lan-adapters.md)
-- [Install the service app](modbus-service.md), [standalone service](service-standalone.md)
-- [Entities](entities.md), [automation actions](automations.md), [Recorder](recorder.md)
-- [Service API and storage](service-reference.md)
-
-</details>
-
-<details>
-<summary>Development and project information</summary>
-
-[Architecture](architecture.md) · [Modbus registers](modbus-registers.md) ·
-[Validation](validation.md) · [Quality scale](quality-scale.md) ·
-[Recorder validation](recorder-validation.md) · [Control conflicts](charging-conflict-matrix.md) ·
-[Release process](service-releasing.md) · [Repository settings](repository-settings.md) ·
-[HA compatibility](ha-2026-11-validation.md) · [Legal](legal.md) ·
-[Provenance](audits/current-legal-provenance.md)
+[Architecture](architecture.md) · [Service API](service-reference.md) ·
+[Standalone deployment](service-standalone.md) · [Modbus registers](modbus-registers.md) ·
+[Validation](validation.md) · [Control conflicts](charging-conflict-matrix.md) ·
+[Recorder validation](recorder-validation.md) · [Release process](service-releasing.md) ·
+[Repository settings](repository-settings.md) · [HA compatibility](ha-2026-11-validation.md) ·
+[Quality scale](quality-scale.md) · [Legal](legal.md) · [Provenance](audits/current-legal-provenance.md)
 
 </details>

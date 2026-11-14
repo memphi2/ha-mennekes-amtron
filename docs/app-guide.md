@@ -1,32 +1,23 @@
-# The app's web pages
+# Use the app's web interface
 
-[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+[Guide home](README.md) · [Install the app](modbus-service.md) · [HA dashboard](app-from-home-assistant.md) · [Help](troubleshooting.md)
 
-Open the service app and select **Open Web UI**. The pages are for Home
-Assistant administrators and open through Home Assistant itself; no port or
-token is needed in the browser. They need **Supervisor 2026.10.4 or newer**.
+In Home Assistant, open **Settings → Apps → Mennekes Amtron Modbus Service →
+Open Web UI**. The interface requires an administrator account. It is provided
+by the service app; a direct integration connection has no app web interface.
 
-The bar at the top has four groups; **Settings** and **Diagnostics** show their
-pages in a second row.
+| You want to… | Page |
+|---|---|
+| See whether the car is charging and why it waits | **Overview** |
+| Change kWh/time/percentage limits or start a guest | **Charging** |
+| Set up USB or LAN | **Settings → Connection** |
+| Change the current cap, polling or waiting interval | **Settings → Runtime** |
+| Investigate a problem | **Diagnostics → Registers** or **Log** |
 
-| Group | Page | What it is for |
-|---|---|---|
-| **Overview** | [Overview](#overview) | What the wallbox and the app are doing right now. Read-only. |
-| **Charging** | [Charge target](#charge-target) | Shared kWh, time and vehicle target, plus one guest-start button. |
-| **Settings** | [Connection](#connection) | USB or LAN connection, optional LAN-adapter setup. |
-| | [Runtime](#runtime-settings) | Polling intervals and control limits, with a preview before saving. |
-| **Diagnostics** | [Registers](#registers) | Every wallbox register with its raw and decoded value. Read-only. |
-| | [Log](#log) | The Modbus traffic as it happens, for troubleshooting. |
-
-Every page follows the browser language in English, German, French, Dutch and
-Italian, and every page has the same navigation bar.
-
-Use HA for the ordinary current slider, pause and optional vehicle planning.
-Use **Charging** in the app to change the same limits and start a guest. There is
-no separate order to prepare. The running service continues its accepted controls
-when HA Core restarts. [Daily controls and limits](user-guide.md).
-
-[Overview](#overview) · [Charge target](#charge-target) · [Plan departure](#plan-departure) · [Guests](#guest-charging) · [Settings](#runtime-settings) · [Diagnostics](#log)
+Configure vehicle profiles, recognition, percentage sources and intelligent
+departure planning in **Home Assistant**. Once handed over, the app can execute
+a vehicle plan while HA is offline. The web interface needs no separate saved
+charging order.
 
 ## Overview
 
@@ -66,7 +57,8 @@ The same saved values appear in Home Assistant. Setting a limit does not start c
 Intelligent vehicle planning is configured in Home Assistant, as before. It uses
 SoC, battery capacity and the selected next trip. The app shows the shared time
 and current plan status without a separate planning page.
-See [planning](departure-planning.md).
+See [planning](departure-planning.md). A time used for a guest is instead a
+stop time: guest charging does not wait until a planned start.
 
 ## Guest charging
 
@@ -75,6 +67,10 @@ permission for this connection, including when virtual Plug & Charge is enabled.
 It respects the shared kWh limit and time, whichever is reached first. Unset limits
 do not add hidden defaults. The saved vehicle percentage target is ignored for
 the guest and remains unchanged. Locks, faults and electrical limits still apply.
+For example, set **10 kWh** and **07:30 tomorrow**, save both, then start.
+The car starts as soon as the write guards allow and stops at whichever limit
+is reached first.
+
 The same button changes to **Pause guest charging** while active. Use it, the ordinary HA pause switch, or unplug to stop. There is no separate guest
 draft, duration or current editor. See [charging details](app-from-home-assistant.md).
 

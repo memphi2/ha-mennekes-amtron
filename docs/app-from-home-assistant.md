@@ -1,11 +1,10 @@
-# Charging made simple
+# Your wallbox on a Home Assistant dashboard
 
-[User guide](README.md) · [App](app-guide.md) · [Help](troubleshooting.md)
+[Guide home](README.md) · [Everyday charging](user-guide.md) · [App interface](app-guide.md) · [Help](troubleshooting.md)
 
-Use the usual current slider and pause control. Add a kWh limit, a time or a
-vehicle percentage target when you need one. Saving a limit does not start charging.
-Guest charging has one explicit start button. Intelligent planning for a recognized
-vehicle remains in Home Assistant; the app has no separate planning page.
+Choose a ready-to-paste card below. It uses the integration's own entities: no
+extra helpers or separate wallbox card to maintain. HA and the app operate on
+the same shared limits; optional vehicle planning is configured in HA.
 
 ## Dashboard with Mushroom cards
 

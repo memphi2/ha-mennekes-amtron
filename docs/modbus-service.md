@@ -12,9 +12,10 @@ LAN needs no USB device on its host; see [LAN setup](network-gateway.md) for the
 two supported protocols. Compatible Waveshare adapters also have optional
 [configuration from the app](lan-adapters.md#service-app).
 
-Its **Open Web UI** pages show an overview, set up the connection and run
-[departure planning and guest charging](app-guide.md) inside the app, so they continue
-while HA is offline. Use a service version meeting the integration’s minimum requirement; see
+Its **Open Web UI** shows the charge, edits shared limits and starts a guest.
+Configure intelligent vehicle planning in **Home Assistant**; the app executes
+a plan already handed over and keeps it running while HA is offline.
+[Use the app](app-guide.md). Use a service version meeting the integration’s minimum requirement; see
 [updates](installation.md#updates).
 Check the [handover](#check-the-handover) on your hardware before relying on it.
 

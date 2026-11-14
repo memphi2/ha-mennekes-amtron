@@ -31,14 +31,14 @@ families.
    Amtron RTU** by **memphi2** through the Marketplace on HA 2026.11+ or HACS on
    HA 2026.9/2026.10.
 2. Choose the **optional, recommended [Modbus service app](docs/modbus-service.md)**
-   or a **[direct USB/LAN connection](docs/quickstart.md#5-add-the-wallbox)**.
+   or a **[direct USB/LAN connection](docs/installation.md#3-connect-the-wallbox)**.
 3. Check readings in read-only mode, enable control and try your
-   [first charge](docs/quickstart.md#7-first-charge).
+   [first charge](docs/quickstart.md#first-charge).
 
 | Connection | Why choose it? |
 |---|---|
 | **Service app — recommended, optional** | Keeps the heartbeat and last charging state running through HA Core restarts and enforces shared limits and accepted vehicle plans. On HA OS, its URL and token are discovered automatically. |
-| **Direct USB or LAN** | Uses the same charging controls without an extra app. HA restarts interrupt its heartbeat. |
+| **Direct USB or LAN** | Normal charging, limits and optional vehicle planning without an extra app. Guest charging needs the service. HA restarts interrupt its heartbeat. |
 
 The service app is installed separately from the integration:
 
@@ -52,35 +52,35 @@ still interrupt the heartbeat; prepare the wallbox's [fallback](docs/safety.md).
 Already installed? **Keep the existing entry** and follow
 [Updates](docs/installation.md#updates): update the app first, then the integration.
 
-## Everyday charging
+## Use it every day
 
-| I want to… | Use |
+Set **Charging current limit** and use **Charging paused** to stop or resume.
+**0 A removes the current limit; it is not a pause.** Add a kWh limit or optional
+vehicle percentage target when needed; setting a target does not start charging.
+
+With the service app, **Start guest charging** releases the connected car now,
+optionally until the first reached kWh limit or stop time. No guest order needs
+to be created. Intelligent vehicle planning is optional and configured in HA.
+
+| You want to… | Open |
 |---|---|
-| Add a wallbox card to my dashboard | [Dashboard YAML in five languages: basic or Mushroom](docs/app-from-home-assistant.md#dashboard-with-mushroom-cards) |
-| Set the charging current | **Charging current limit** slider |
-| Remove the current limit | **0 A**; this does not pause charging |
-| Pause or resume | **Charging paused** switch |
-| Check the heartbeat | `heartbeat` attribute of the **Connection quality** diagnostic sensor |
-| Track energy | **Total energy** in the Energy dashboard |
-| Add targets, a trip time or vehicle data | [Optional functions and examples](docs/features.md) |
-| Estimate costs or charging losses | [Charging estimates](docs/charging-estimates.md) |
-| Charge from solar surplus | [PV blueprints](docs/blueprints.md) |
-| Let the app charge on its own, or charge a guest's car | [The app's web pages](docs/app-guide.md) |
-| Keep history manageable | [Recorder settings](docs/recorder.md) |
-
-Write permission has one owner: disable **Read-only** in the service app, or
-select **Modbus master** in the integration's direct-connection options.
-[The user guide](docs/user-guide.md#where-do-i-enable-controls) explains where each
-setting belongs and why a requested change may wait.
+| Learn the controls, waits and restart behavior | [Everyday charging](docs/user-guide.md) |
+| Add a card without building helpers | [Basic and Mushroom YAML in five languages](docs/app-from-home-assistant.md#dashboard-with-mushroom-cards) |
+| Use the app's browser interface | [App guide](docs/app-guide.md) |
+| Use one or several cars, percentage limits or Plug & Charge | [Vehicle setup](docs/vehicle-setup.md) |
+| Have the car ready for the next trip | [Departure planning](docs/departure-planning.md) |
+| Add costs, losses or solar charging | [Optional functions](docs/features.md) |
+| Keep the database manageable | [Recorder settings](docs/recorder.md) |
+| Resolve a connection or charging problem | [Troubleshooting](docs/troubleshooting.md) |
 
 ## Guides and updates
 
-**[User guide](docs/README.md)** · **[Release notes](CHANGELOG.md)** · **[Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)**
+**[Guide home](docs/README.md)** · **[Release notes](CHANGELOG.md)** · **[Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)**
 
-The user guide starts with installation, everyday charging, dashboard cards and
-help. Optional features and technical reference are separate, so you can add
-only what you need. [Beta releases](https://github.com/memphi2/ha-mennekes-amtron/releases)
-are marked as pre-releases.
+Before 1.0, beta updates can change configuration and stored data without
+migration. Read [the update steps](docs/installation.md#updates) and release
+notes first. Integration and app versions are independent; update the app first
+when a newer minimum is required. Only a changed app needs an app update.
 
 Unofficial community project, not affiliated with MENNEKES.
 [Apache 2.0 license](LICENSE) · [Notices](NOTICE) · [Legal information](docs/legal.md)
