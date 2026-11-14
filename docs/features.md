@@ -7,6 +7,25 @@ Start with ordinary current control and pause/resume, then add one function at
 a time. Each configuration section saves independently and shows the inputs
 needed for your choice.
 
+## Four everyday tasks
+
+- **Charge now:** choose the current in Home Assistant and turn off **Charging
+  paused**. Setting a percentage or energy target only limits charging; it does
+  not start a deliberately paused charge.
+- **Ready for the next trip:** enable [departure planning](departure-planning.md),
+  then choose the target and the next departure. A target in percent describes
+  battery charge; a kWh ceiling describes additional energy at the wallbox.
+- **Charge a guest car:** open **Charging → Guest charging** in the app and set
+  its limit. Follow the local authorization steps shown there.
+- **Understand why it waits:** open **Overview → My charging** in the app, or
+  the [charging-control sensors](entities.md#charging-control-at-a-glance) in HA.
+  Check the reason and next step before changing a target. **Diagnostics** is
+  for investigating communication, not for daily charging.
+
+A pause temporarily blocks charging. Stopping an app job ends that automation
+and pauses charging; removing the stopped job clears its record and does not
+resume charging. See [app actions](app-from-home-assistant.md) for automation.
+
 ## Choose what you want to achieve
 
 | I want to… | I need… | Set it up |

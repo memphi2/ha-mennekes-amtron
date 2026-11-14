@@ -1052,6 +1052,21 @@
     "write_rejected": {
       "description": "Ein Schreibzugriff wurde nicht bestätigt. Prüfe die USB- oder LAN-Verbindung und die Satellite-Konfiguration der Wallbox. Die Meldung verschwindet nach einem erfolgreichen Zugriff auf den betroffenen Befehl. Frühere Fehler bleiben im Diagnosezähler erhalten.",
       "title": "Wallbox hat einen Schreibzugriff abgelehnt"
+    },
+    "service_intent_rejected": {
+      "title": "Laden gesperrt: gespeicherte Einstellungen abgelehnt",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Laden gesperrt: gespeicherte Einstellungen abgelehnt",
+            "description": "Die App konnte ihre gespeicherten Ladeeinstellungen nicht lesen. Die alte Datei bleibt erhalten; automatisches Laden ist gesperrt. Bestätige, um sie durch sichere Startwerte zu ersetzen: Pause aktiv, Ladefreigabe aus, 6 A Fortsetzstrom, keine Ladeziele. Es wird keine Ladung gestartet. Prüfe danach Fahrzeugprofile, Ziele und Plug & Charge und schalte Ladefreigabe und Fortsetzen bewusst ein. Im Nur-Lesen-Modus kann die App eine physische Ladung nicht stoppen; prüfe zuerst die Wallbox."
+          }
+        },
+        "error": {
+          "entry_unavailable": "Die Integration ist nicht geladen. Stelle zuerst die Verbindung wieder her.",
+          "recovery_failed": "Die Wiederherstellung konnte nicht bestätigt werden. Prüfe die Verbindung und versuche es erneut."
+        }
+      }
     }
   },
   "options": {
@@ -1108,7 +1123,7 @@
       },
       "vehicle": {
         "title": "Fahrzeuge",
-        "description": "Ausgewähltes Fahrzeug: **{vehicle}**.\n\nÖffne ein Profil, um alles für dieses Auto an einer Stelle einzurichten. Mit Fahrzeug auswählen legst du fest, welches Auto gerade lädt. Soll das Auto stattdessen anhand von Kabel- und Zuhause-Signalen gewählt werden, richte in jedem Profil die Erkennungssignale ein und wähle in der Entität **Aktives Fahrzeug** auf der Geräteseite der Wallbox **Automatische Auswahl**. Ein neues Profil aktiviert noch keine Ladefunktion.\n\nOhne Profile gelten die Fahrzeugeinstellungen für jedes Auto. Beim ersten neuen Profil bleiben sie in einem Profil namens „Existing sources“ erhalten.",
+        "description": "Ausgewähltes Fahrzeug: **{vehicle}**.\n\nÖffne ein Profil, um alles für dieses Auto an einer Stelle einzurichten. Mit Fahrzeug auswählen legst du fest, welches Auto gerade lädt. Soll das Auto stattdessen anhand von Kabel- und Zuhause-Signalen gewählt werden, richte in jedem Profil die Erkennungssignale ein und wähle in der Entität **Aktives Fahrzeug** auf der Geräteseite der Wallbox **Automatische Auswahl**. Ein neues Profil aktiviert noch keine Ladefunktion.\n\nOhne Profile gelten die Fahrzeugeinstellungen für jedes Auto. Das erste Profil ersetzt diese gemeinsamen Einstellungen. Richte die gewünschten Quellen und Funktionen für jedes Profil neu ein; alte Einstellungen werden nicht importiert.",
         "menu_options": {
           "vehicle_profile_add": "Profil hinzufügen",
           "vehicle_settings": "Fahrzeugeinstellungen ohne Profil",

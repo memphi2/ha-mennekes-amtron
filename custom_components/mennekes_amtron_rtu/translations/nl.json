@@ -1052,6 +1052,21 @@
     "write_rejected": {
       "description": "Een schrijfopdracht is niet bevestigd. Controleer de USB- of LAN-verbinding en of de wallbox als satelliet is ingesteld. Deze melding verdwijnt zodra de betreffende opdracht slaagt. Eerdere fouten blijven in de diagnostische teller staan.",
       "title": "Wallbox heeft een schrijfopdracht geweigerd"
+    },
+    "service_intent_rejected": {
+      "title": "Laden geblokkeerd: opgeslagen instellingen geweigerd",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Laden geblokkeerd: opgeslagen instellingen geweigerd",
+            "description": "De app kan de opgeslagen instellingen niet lezen. Het bestand blijft behouden en automatisch laden is geblokkeerd. Bevestig veilige beginwaarden: pauze aan, laadvrijgave uit, hervatstroom 6 A, geen doelen. Laden start niet. Controleer daarna profielen, doelen en Plug & Charge voordat je vrijgeeft en hervat. In alleen-lezenmodus kan de app laden niet stoppen; controleer eerst de wallbox."
+          }
+        },
+        "error": {
+          "entry_unavailable": "De integratie is niet geladen. Herstel de verbinding voordat je het opnieuw probeert.",
+          "recovery_failed": "Het herstel kon niet worden bevestigd. Controleer de verbinding en probeer het opnieuw."
+        }
+      }
     }
   },
   "options": {
@@ -1108,7 +1123,7 @@
       },
       "vehicle": {
         "title": "Voertuigen",
-        "description": "Geselecteerd voertuig: **{vehicle}**.\n\nOpen een profiel om alles voor die auto op één plek in te stellen. Met Voertuig selecteren bepaal je welke auto nu laadt. Wil je dat kabel- en thuissignalen de auto kiezen, stel dan per profiel de Detectiesignalen in en kies **Automatische keuze** in de entiteit **Actief voertuig** op de apparaatpagina van de wallbox. Een profiel toevoegen schakelt geen laadfunctie in.\n\nZonder profielen gelden de voertuiginstellingen voor elke auto. Het eerste nieuwe profiel bewaart ze in een profiel met de naam ‘Existing sources’.",
+        "description": "Geselecteerd voertuig: **{vehicle}**.\n\nOpen een profiel om alles voor die auto op één plek in te stellen. Met Voertuig selecteren bepaal je welke auto nu laadt. Wil je dat kabel- en thuissignalen de auto kiezen, stel dan per profiel de Detectiesignalen in en kies **Automatische keuze** in de entiteit **Actief voertuig** op de apparaatpagina van de wallbox. Een profiel toevoegen schakelt geen laadfunctie in.\n\nZonder profielen gelden de voertuiginstellingen voor elke auto. Het eerste profiel vervangt deze gedeelde instellingen. Stel de gewenste bronnen en functies opnieuw per profiel in; oude instellingen worden niet geïmporteerd.",
         "menu_options": {
           "vehicle_profile_add": "Profiel toevoegen",
           "vehicle_settings": "Voertuiginstellingen zonder profiel",

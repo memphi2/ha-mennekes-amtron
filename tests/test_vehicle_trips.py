@@ -91,7 +91,7 @@ def test_a_resumed_trip_that_cannot_be_saved_leaves_the_car_without_one(tmp_path
             **profile_options(active=B), "timed_goal_reset_pending": True,
         })
         entry.options["vehicle_profiles"][B]["options"]["timed_goal_enabled"] = True
-        entry.runtime_data = SimpleNamespace(identity=SimpleNamespace(serial_number="serial"))
+        entry.runtime_data = SimpleNamespace(client=object(), identity=SimpleNamespace(serial_number="serial"))
         await m.VehicleTripMemory(hass, entry.entry_id, "serial").async_swap(B, trip(), None)
         with patch.object(TimedGoalStore, "async_save", AsyncMock(side_effect=OSError("disk"))):
             await integration._async_resume_trip(hass, entry, True)
@@ -123,7 +123,7 @@ def test_a_car_that_stops_planning_loses_its_parked_trip(tmp_path):
         # Car B plans departures; car A, selected, has none configured.
         entry = FakeConfigEntry(options=profile_options())
         entry.options["vehicle_profiles"][B]["options"]["timed_goal_enabled"] = True
-        entry.runtime_data = SimpleNamespace(identity=SimpleNamespace(serial_number="serial"))
+        entry.runtime_data = SimpleNamespace(client=object(), identity=SimpleNamespace(serial_number="serial"))
         memory = m.VehicleTripMemory(hass, entry.entry_id, "serial")
         await memory.async_swap(B, trip(), None)
         await memory.async_swap(A, trip(), None)

@@ -1052,6 +1052,21 @@
     "write_rejected": {
       "description": "Una scrittura non è stata confermata. Controlla la connessione USB o LAN e la configurazione satellite della wallbox. Questo problema scompare quando il comando interessato riesce. Gli errori precedenti rimangono nel contatore diagnostico.",
       "title": "La wallbox ha rifiutato una scrittura"
+    },
+    "service_intent_rejected": {
+      "title": "Ricarica bloccata: impostazioni salvate rifiutate",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Ricarica bloccata: impostazioni salvate rifiutate",
+            "description": "L’app non riesce a leggere le impostazioni salvate. Il file resta conservato e la ricarica automatica è bloccata. Conferma per sostituirlo: pausa attiva, consenso disattivato, corrente di ripresa 6 A, nessun obiettivo. La ricarica non parte. Controlla poi profili, obiettivi e Plug & Charge prima di riprendere. In sola lettura l’app non può fermare la ricarica: controlla prima la wallbox."
+          }
+        },
+        "error": {
+          "entry_unavailable": "L'integrazione non è caricata. Ripristina la connessione prima di riprovare.",
+          "recovery_failed": "Impossibile confermare il ripristino. Controlla la connessione e riprova."
+        }
+      }
     }
   },
   "options": {
@@ -1108,7 +1123,7 @@
       },
       "vehicle": {
         "title": "Veicoli",
-        "description": "Veicolo selezionato: **{vehicle}**.\n\nApri un profilo per configurare tutto di quell’auto in un unico punto. Seleziona veicolo decide quale auto ricarica ora. Per far scegliere l’auto ai segnali di cavo e presenza, configura i Segnali di rilevamento di ogni profilo e scegli **Selezione automatica** nell’entità **Veicolo attivo** nella pagina del dispositivo della wallbox. Aggiungere un profilo non attiva alcuna funzione di ricarica.\n\nSenza profili, le impostazioni del veicolo valgono per ogni auto. Il primo profilo aggiunto le conserva in un profilo chiamato “Existing sources”.",
+        "description": "Veicolo selezionato: **{vehicle}**.\n\nApri un profilo per configurare tutto di quell’auto in un unico punto. Seleziona veicolo decide quale auto ricarica ora. Per far scegliere l’auto ai segnali di cavo e presenza, configura i Segnali di rilevamento di ogni profilo e scegli **Selezione automatica** nell’entità **Veicolo attivo** nella pagina del dispositivo della wallbox. Aggiungere un profilo non attiva alcuna funzione di ricarica.\n\nSenza profili, le impostazioni del veicolo valgono per ogni auto. Il primo profilo sostituisce queste impostazioni comuni. Configura di nuovo fonti e funzioni desiderate per ogni profilo; le vecchie impostazioni non vengono importate.",
         "menu_options": {
           "vehicle_profile_add": "Aggiungi profilo",
           "vehicle_settings": "Impostazioni del veicolo senza profilo",

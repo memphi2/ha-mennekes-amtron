@@ -180,7 +180,7 @@ config_flow.py        + _flow_serial.py, _flow_connect.py, config_schemas.py
 options_flow.py       options menu and section routing
 _options_*.py         independent draft, vehicle, departure and estimate steps
 vehicle_profiles.py  bounded profiles and effective vehicle options
-vehicle_sources/     optional provider capabilities and selection compatibility
+vehicle_sources/     optional provider capabilities and explicit selection
 vehicle_sources/bavariandata/  local telemetry, timer and charging-history adapters
 vehicle_sources/bavariandata/identity.py  shared lifetime binding to one vehicle
 timed_goal_observer.py  departure plan from generic HA sources or a provider
@@ -267,11 +267,12 @@ observations. Transport generation changes discard incomplete measurements;
 full unload and failed setup close all retained owners. Only completed summaries
 are stored, so retaining these bounded in-memory models adds no Recorder writes.
 
-Without profile configuration, existing flat options retain their behavior,
-including independently selected departure and history vehicles. Explicit
-profile setup preserves those settings as a manual profile instead of guessing
-that two old selections describe the same car. Provider/device keys still take
-precedence over older keys, including an explicitly disabled provider.
+Manually selected entity sources work without a vehicle profile. Creating a
+profile starts with that vehicle's explicit settings; it does not invent a
+profile from earlier flat selections. Provider selection uses only the current
+provider/device keys. Before 1.0 we do not maintain migrations for obsolete
+beta configuration, storage or API formats. Hardware capability handling,
+identity checks and the supported Home Assistant range are separate concerns.
 
 Options edits are held in a section-local draft until the final form is
 submitted. Completing it merges only that section's keys into the latest

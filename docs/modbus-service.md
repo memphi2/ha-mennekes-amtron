@@ -12,7 +12,8 @@ two supported protocols. Compatible Waveshare adapters also have optional
 
 Its **Open Web UI** pages show an overview, set up the connection and run
 [charging jobs and guest charging](app-guide.md) inside the app, so they continue
-while HA is offline. Install the app and the integration in the same version.
+while HA is offline. Use a service version meeting the integration’s minimum requirement; see
+[updates](installation.md#updates).
 Check the [handover](#check-the-handover) on your hardware before relying on it.
 
 [Install on HA OS](#install-on-home-assistant-os) ·
@@ -273,8 +274,8 @@ For optional vehicle targets, profiles or departure planning, use the
 
 The log shows service startup, USB/LAN connection and heartbeat start/stop.
 The [live communication view](troubleshooting.md#watch-app-modbus-communication-live)
-under **Open Web UI → Log** (**Protokoll** in German) runs while its page is
-open; the **Registers** page below **Overview** shows the last value of every register.
+under **Open Web UI → Diagnostics → Log** (**Protokoll** in German) runs while its page is
+open; the **Registers** page below **Diagnostics** shows the last value of every register.
 Connection and heartbeat failures are logged when their state changes.
 Home Assistant also shows a repair after a continuous 60-second heartbeat or
 service-connection problem in a managed, write-enabled setup. It clears

@@ -27,8 +27,8 @@ def test_groups_are_tabs_and_their_pages_a_second_row():
     assert '<a href="./guest" aria-current="page">Gastladen</a>' in nav
     assert nav.count("aria-current") == 2
     # A group with one page links to it and shows no second row.
-    single = render_nav("/log", "fr", ALL).decode()
-    assert '<a href="./log" aria-current="page">Journal</a>' in single
+    single = render_nav("/", "fr", ALL).decode()
+    assert 'aria-current="page"' in single
     assert "app-pages" not in single
     assert 'href="./"' in single
 
@@ -48,10 +48,10 @@ def test_page_stays_hidden_until_ready_but_never_for_good():
     assert "@keyframes reveal { to { opacity: 1; } }" in css
 
 
-def test_registers_are_a_subpage_of_the_overview():
+def test_registers_are_a_subpage_of_diagnostics():
     nav = render_nav("/registers", "de", ALL).decode()
-    assert '<a href="./" aria-current="true">Übersicht</a>' in nav
-    assert '<nav class="app-pages" aria-label="Übersicht">' in nav
+    assert '<a href="./registers" aria-current="true">Diagnose</a>' in nav
+    assert '<nav class="app-pages" aria-label="Diagnose">' in nav
     assert '<a href="./registers" aria-current="page">Register</a>' in nav
 
 
@@ -85,7 +85,7 @@ def test_served_page_is_complete_and_assets_revalidate(monkeypatch):
             text = await page.text()
             assert page.headers["Cache-Control"] == "no-store"
             assert PLACEHOLDER.decode() not in text
-            assert '<a href="./log" aria-current="page">Protokoll</a>' in text
+            assert '<a href="./log" aria-current="page">Diagnose</a>' in text
             assert "./jobs" not in text
             # The styles are inside the page, under a policy naming exactly them.
             style = (DEVICE / "app_settings.css").read_bytes()

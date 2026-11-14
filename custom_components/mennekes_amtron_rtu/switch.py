@@ -195,8 +195,6 @@ class AmtronIntentSwitch(MennekesAmtronControlEntity, SwitchEntity, RestoreEntit
     """Restore saved intent without replacing live service or runtime intent."""
 
     _intent_key: IntentKey
-    _legacy_stop_state: str
-    _legacy_stop_intent: bool
 
     @property
     def extra_restore_state_data(self) -> ExtraStoredData:
@@ -217,12 +215,6 @@ class AmtronIntentSwitch(MennekesAmtronControlEntity, SwitchEntity, RestoreEntit
             ):
                 setattr(control, self._intent_key, requested)
                 return
-        # Legacy readback is evidence of a stop only, never permission to start.
-        if (
-            (state := await self.async_get_last_state()) is not None
-            and state.state == self._legacy_stop_state
-        ):
-            setattr(control, self._intent_key, self._legacy_stop_intent)
 
 
 class AmtronPauseSwitch(AmtronIntentSwitch):
@@ -235,8 +227,6 @@ class AmtronPauseSwitch(AmtronIntentSwitch):
 
     _attr_translation_key = "charging_paused"
     _intent_key: IntentKey = "pause_requested"
-    _legacy_stop_state = "on"
-    _legacy_stop_intent = True
 
     def __init__(
         self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator
@@ -274,8 +264,6 @@ class AmtronChargingReleaseSwitch(AmtronIntentSwitch):
     _attr_translation_key = "charging_release"
     _attr_device_class = SwitchDeviceClass.SWITCH
     _intent_key: IntentKey = "charging_release_requested"
-    _legacy_stop_state = "off"
-    _legacy_stop_intent = False
 
     def __init__(
         self, entry: MennekesAmtronConfigEntry, coordinator: MennekesAmtronCoordinator

@@ -270,7 +270,7 @@ def test_tariff_only_option_update_does_not_restart_modbus() -> None:
         hass = FakeHass()
         entry = FakeConfigEntry()
         entry.runtime_data = SimpleNamespace(
-            plug_charge=None,
+            client=object(), plug_charge=None,
             charging_cost=SimpleNamespace(apply_tariff_only_update=lambda: True),
             entry_data=dict(entry.data), vehicle_base_options={},
             vehicle_selection={

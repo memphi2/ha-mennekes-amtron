@@ -218,7 +218,7 @@ def loss_vehicle_options(hass: HomeAssistant, entry: MennekesAmtronConfigEntry) 
 
 
 def attributed_session(hass: HomeAssistant, entry: MennekesAmtronConfigEntry, profile_id: str, session: CompletedSession) -> bool | None:
-    """Return a witnessed ownership result, or None for legacy time-based rules."""
+    """Return a witnessed ownership result, or None for manually configured time-based matching."""
     if (attribution := _state(hass, entry)) is None:
         return None
     attribution.observe(entry)

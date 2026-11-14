@@ -48,7 +48,7 @@ def test_a_cancelled_switch_reloads_only_a_running_entry(monkeypatch, state, sto
     async def run():
         options = {"active_vehicle_profile": "b" * 32}
         runtime = SimpleNamespace(
-            entry_data={}, vehicle_base_options=without_selection(options),
+            client=object(), entry_data={}, vehicle_base_options=without_selection(options),
             vehicle_selection={"previous": True},
             coordinator=SimpleNamespace(retry_soc_goal=None), vehicle_switching=False,
         )

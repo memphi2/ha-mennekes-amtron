@@ -371,17 +371,17 @@ async def async_setup_entry(
             # Enabling needs write access; retrying setup would never get it.
             # The gate keeps its last state until writing is allowed again.
             _LOGGER.warning("Virtual Plug & Charge is not applied while the wallbox is read-only")
-        elif plug_enabled or (
+        elif not _service_intent_rejected(client) and (plug_enabled or (
             CONF_VIRTUAL_PLUG_CHARGE in entry.options and control.supports_plug_charge
             and control.plug_charge.get("enabled") is True
-        ):
+        )):
             try:
                 await control.async_configure_plug_charge(
                     plug_enabled, policy=plug_charge_policy(entry.options),
                 )
             except (AmtronBusError, HomeAssistantError) as err:
                 _raise_optional_setup_error(client, err, "plug_charge_unavailable")
-        if control.supports_plug_charge:
+        if control.supports_plug_charge and not _service_intent_rejected(client):
             entry.runtime_data.plug_charge = PlugChargeObserver(hass, entry)
         await _async_resume_trip(hass, entry, timed_reset_complete)
         await _async_cancel_old_trip(hass, entry, timed_reset_complete)
@@ -462,7 +462,16 @@ async def async_setup_entry(
             heartbeat = RemoteHeartbeat(client, diagnostics)
             entry.runtime_data.heartbeat = heartbeat
 
+            intent_rejected = _service_intent_rejected(client)
+
             def update_remote() -> None:
+                nonlocal intent_rejected
+                rejected = _service_intent_rejected(client)
+                if rejected != intent_rejected:
+                    intent_rejected = rejected
+                    # Rebuild deferred vehicle owners after the reset, including
+                    # one acknowledged through another HA or API client.
+                    hass.config_entries.async_schedule_reload(entry.entry_id)
                 heartbeat.update()
                 if not client.connected:
                     # A command or diagnostics request can fail long before
@@ -524,7 +533,7 @@ async def async_setup_entry(
         entry.async_on_unload(entry.add_update_listener(async_reload_entry))
         if entry.runtime_data.plug_charge is not None:
             entry.runtime_data.plug_charge.start()
-        if entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True:
+        if entry.options.get(CONF_VEHICLE_AUTO_SELECTION) is True and not _service_intent_rejected(client):
             detector = VehicleDetectionObserver(hass, entry)
             entry.runtime_data.vehicle_detection = detector
             detector.start()
@@ -582,6 +591,8 @@ async def _async_resume_trip(
     hass: HomeAssistant, entry: MennekesAmtronConfigEntry, timed_reset_complete: bool,
 ) -> None:
     """Give a newly selected car back its own open trip, or none at all."""
+    if _service_intent_rejected(entry.runtime_data.client):
+        return
     # Any car can be edited without selecting it. A car whose planning was
     # switched off loses its parked trip, so re-enabling never revives it.
     await _trip_memory(hass, entry).async_retain({
@@ -612,6 +623,8 @@ async def _async_cancel_old_trip(
 ) -> None:
     """Withdraw a disabled or replaced trip's current before a car starts."""
     runtime = entry.runtime_data
+    if _service_intent_rejected(runtime.client):
+        return
     if (
         vehicle_options(entry.options).get(CONF_TIMED_GOAL_ENABLED) is False
         or entry.options.get(CONF_TIMED_GOAL_RESET_PENDING) is True
@@ -638,6 +651,10 @@ async def _async_start_vehicle(
 ) -> None:
     """Start the observers that belong to the selected vehicle."""
     runtime = entry.runtime_data
+    # A repair must remain reachable even if source binding/configuration is
+    # deliberately refused by the quarantined service. Rebuild after reset.
+    if _service_intent_rejected(runtime.client):
+        return
     control, coordinator, client = runtime.control, runtime.coordinator, runtime.client
     loss_enabled = loss_vehicle_options(hass, entry).get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED) != LOSS_SOURCE_DISABLED
     if loss_enabled:
@@ -719,7 +736,8 @@ async def _async_switch_vehicle(
     """
     runtime = entry.runtime_data
     if (
-        runtime.entry_data != dict(entry.data)
+        _service_intent_rejected(runtime.client)
+        or runtime.entry_data != dict(entry.data)
         or runtime.vehicle_base_options != without_selection(entry.options)
     ):
         return False
@@ -769,6 +787,10 @@ async def _async_switch_vehicle(
     runtime.vehicle_selection = selection
     runtime.coordinator.async_update_listeners()
     return True
+
+
+def _service_intent_rejected(client: MennekesModbusClient) -> bool:
+    return isinstance(client, RemoteClient) and client.snapshot.get("control", {}).get("intent_rejected") is True
 
 
 def _raise_optional_setup_error(
@@ -1020,7 +1042,7 @@ def _entry_platforms(entry: MennekesAmtronConfigEntry) -> list[Platform]:
 
 
 def _connection_config(entry: MennekesAmtronConfigEntry) -> ConnectionConfig:
-    """Load direct transport settings, retaining serial as the legacy default."""
+    """Load direct transport settings, using serial as the default."""
 
     data = entry.data
     connection_type = data.get(CONF_CONNECTION_TYPE, CONNECTION_SERIAL)

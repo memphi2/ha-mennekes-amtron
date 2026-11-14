@@ -183,6 +183,7 @@ class AmtronControl:
         self._diagnostics = diagnostics
         self._identity = identity
         self._options = options
+        self.startup_hold = False
         self._state = state
         self._request_refresh = request_refresh
         self._notify_write_error = notify_write_error
@@ -571,7 +572,7 @@ class AmtronControl:
     def read_only(self) -> bool:
         """Return true while the integration must not write to the bus."""
 
-        return self._options.read_only
+        return self._options.read_only or self.startup_hold
 
     @property
     def max_charging_current(self) -> float:
@@ -1584,5 +1585,5 @@ class AmtronControl:
             raise _TimedCommandCancelledError(reason)
 
     def _require_write_access(self) -> None:
-        if self._options.read_only:
+        if self.read_only:
             raise validation_error("read_only_mode")

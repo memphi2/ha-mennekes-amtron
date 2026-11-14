@@ -89,7 +89,7 @@ def test_departure_manual_target_needs_only_capacity_and_saves_scoped(dynamic):
                 "charging_price": 0.3,
                 "timed_calendar_entity": "calendar.old",
                 "timed_calendar_title": "Old",
-                "timed_bavarian_device": "car",
+                "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "car",
                 "timed_timer1_days": ["mon"],
                 "timed_departure_entity": "sensor.old",
                 "timed_goal_reset_pending": True,
@@ -127,7 +127,7 @@ def test_departure_manual_target_needs_only_capacity_and_saves_scoped(dynamic):
             not {
                 "timed_calendar_entity",
                 "timed_calendar_title",
-                "timed_bavarian_device",
+                "timed_vehicle_device",
                 "timed_timer1_days",
                 "timed_departure_entity",
             }
@@ -154,7 +154,7 @@ def test_all_optional_departure_sources_coexist_and_generic_provider_saves():
         entry = FakeConfigEntry(
             options={
                 "vehicle_soc_entity": "sensor.soc",
-                "charge_loss_bavarian_device": "car",
+                "charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "car",
             }
         )
         flow = Flow(entry)
@@ -287,14 +287,14 @@ def test_departure_requires_soc_before_entering_and_again_before_save():
     asyncio.run(run())
 
 
-def test_departure_keeps_distinct_legacy_vehicle_and_empty_dynamic_source_is_error():
+def test_departure_keeps_distinct_vehicle_and_empty_dynamic_source_is_error():
     async def run():
         flow = Flow(
             FakeConfigEntry(
                 options={
                     "vehicle_soc_entity": "sensor.soc",
-                    "timed_bavarian_device": "own",
-                    "charge_loss_bavarian_device": "other",
+                    "timed_vehicle_provider": "bavariandata", "timed_vehicle_device": "own",
+                    "charge_loss_vehicle_provider": "bavariandata", "charge_loss_vehicle_device": "other",
                 }
             )
         )

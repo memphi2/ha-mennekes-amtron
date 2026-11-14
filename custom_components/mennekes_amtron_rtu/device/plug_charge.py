@@ -129,25 +129,20 @@ class PlugChargeState:
         return {"enabled": self.enabled, "policy": self.policy, "session": self.session, "authorized": self.authorized, "since": self.since.isoformat() if self.since else None}
 
     def durable(self) -> dict[str, Any]:
-        result = {"enabled": self.enabled, "policy": self.policy, "hold": self.hold}
-        # Only a pending release is written: older services refuse
-        # the whole saved state when they find the key.
-        if self.manual:
-            result["manual"] = True
-        return result
+        return {"enabled": self.enabled, "policy": self.policy, "hold": self.hold,
+                "manual": self.manual}
 
     @classmethod
     def restore(cls, raw: object) -> PlugChargeState:
-        # Older saved states have no manual release.
         if (
             not isinstance(raw, dict)
-            or raw.keys() - {"manual"} != {"enabled", "policy", "hold"}
-            or type(raw["hold"]) is not bool or type(raw.get("manual", False)) is not bool
+            or raw.keys() != {"enabled", "policy", "hold", "manual"}
+            or type(raw["hold"]) is not bool or type(raw["manual"]) is not bool
         ):
             raise ValueError("invalid saved Plug & Charge configuration")
         result = cls(hold=raw["hold"])
         result.configure(raw["enabled"], raw["policy"])
-        result.manual = raw.get("manual", False) and result.enabled
+        result.manual = raw["manual"] and result.enabled
         return result
 
 

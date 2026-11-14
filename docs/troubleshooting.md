@@ -473,7 +473,7 @@ full serial-port path.
 
 ### Watch app Modbus communication live
 
-In the app, select **Open Web UI → Log** (German: **Protokoll**). The log
+In the app, select **Open Web UI → Diagnostics → Log** (German: **Protokoll**). The log
 starts by itself and adds a line for every read, write and heartbeat: time,
 register address, duration, result and the decoded values. Each retry is its
 own line. A failed write shows the requested value; it does not confirm that
@@ -482,7 +482,9 @@ register map.
 
 The view follows the newest line until you scroll up. **Pause** holds it,
 **Filter** narrows it, **Download** saves the lines shown as a text file and
-**Clear** empties the view.
+**Clear** empties the view. A stalled request times out and is retried. Hidden
+browser tabs stop fetching; returning to the tab resumes the view without
+applying replies left over from before it was hidden.
 
 The app records only while the page is open and for at most ten minutes after
 it was closed, keeps the latest **200 transactions in RAM** and nothing after
@@ -492,7 +494,7 @@ numbers and all text registers are masked, including inside block reads;
 network login traffic and exception-message contents are never captured.
 
 This view requires a Home Assistant administrator and a configured
-connection. The **Registers** page below **Overview** shows the last value of every register; see
+connection. The **Registers** page below **Diagnostics** shows the last value of every register; see
 [the app's web pages](app-guide.md#registers). It remains available when that connection is failing. Direct-mode
 integration users can use the diagnostics described above.
 
@@ -512,6 +514,22 @@ Adjust the container and path for your installation. `--scan` searches addresses
 heartbeat, but still needs [exclusive bus access](safety.md#modbus-rtu-uses-a-single-master).
 Remove device serial numbers and adapter paths before sharing its output.
 See [Removal](installation.md#removal) before uninstalling.
+
+## Saved charging settings could not be loaded
+
+If the app rejects its saved control state after an update or because the file
+is damaged, it keeps that file and blocks normal charging commands. With write
+access enabled, it requests that charging release be switched off; heartbeat
+communication continues. In read-only mode it cannot stop the wallbox.
+
+Open **Settings → System → Repairs** in Home Assistant and confirm the reset.
+This saves a new state with charging paused, release off and a 6 A current
+setting. Confirmation does not start charging. Reconfigure your goals and
+Plug & Charge rules before explicitly allowing charging again. If saving fails,
+the repair remains open and the block stays active. Existing vehicle options
+stay saved while the repair is pending; their observers start again after the
+reset. A reset acknowledged through another client is detected on the next
+status update.
 
 ## Getting help
 

@@ -15,10 +15,12 @@ from .device.client_errors import AmtronBusError
 from .device.const import DOMAIN, ERROR_CODE_EMS_UNAVAILABLE
 from .device.registers import ERROR_CODE
 from .entry_types import MennekesAmtronConfigEntry
+from .remote import RemoteClient
 from .repair_health import HeartbeatRepairMonitor
 from .repair_issues import (
     ISSUE_EMS_FALLBACK_NOT_CONFIGURED,
     ISSUE_EMS_HEARTBEAT_LOST,
+    ISSUE_SERVICE_INTENT_REJECTED,
     ISSUE_UNSUPPORTED_LAYOUT,
     ISSUE_WRITE_REJECTED,
     fallback_not_configured,
@@ -87,6 +89,13 @@ def async_check_repairs(
     data = runtime_data.coordinator.current_data()
     identity = runtime_data.identity
 
+    client = runtime_data.client
+    _set_issue(
+        hass, entry, ISSUE_SERVICE_INTENT_REJECTED,
+        isinstance(client, RemoteClient) and client.snapshot.get("control", {}).get("intent_rejected") is True,
+        severity=ir.IssueSeverity.ERROR, is_fixable=True,
+    )
+
     # A failed block read removes its values from the current snapshot. Missing
     # evidence must not clear a confirmed fault or repeatedly recreate the same
     # issue when the register becomes readable again.
@@ -132,6 +141,8 @@ async def async_create_fix_flow(
     """Return the repair flow of a fixable issue."""
 
     entry_id = str((data or {}).get("entry_id", ""))
+    if (data or {}).get("issue") == ISSUE_SERVICE_INTENT_REJECTED:
+        return IntentResetRepairFlow(entry_id)
     return HeartbeatRecoveryRepairFlow(entry_id)
 
 
@@ -189,6 +200,29 @@ class HeartbeatRecoveryRepairFlow(RepairsFlow):
         return self.async_show_form(
             step_id="confirm", data_schema=None, errors={"base": error}
         )
+
+
+class IntentResetRepairFlow(HeartbeatRecoveryRepairFlow):
+    """Acknowledge rejected state without restoring it or starting charging."""
+
+    async def async_step_confirm(
+        self, user_input: dict[str, str] | None = None,
+    ) -> RepairsFlowResult:
+        if user_input is None:
+            return self.async_show_form(step_id="confirm", data_schema=None)
+        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        if entry is None:
+            return self.async_create_entry(data={})
+        if not hasattr(entry, "runtime_data") or not isinstance(entry.runtime_data.client, RemoteClient):
+            return self._show_error("entry_unavailable")
+        try:
+            await entry.runtime_data.client.execute("acknowledge_intent_reset")
+        except (AmtronBusError, HomeAssistantError):
+            return self._show_error("recovery_failed")
+        # The reset response schedules a reload of deferred vehicle owners.
+        # The entry may already be unloaded; clear only this acknowledged issue.
+        ir.async_delete_issue(self.hass, DOMAIN, _issue_id(entry, ISSUE_SERVICE_INTENT_REJECTED))
+        return self.async_create_entry(data={})
 
 
 def _issue_id(entry: MennekesAmtronConfigEntry, issue: str) -> str:

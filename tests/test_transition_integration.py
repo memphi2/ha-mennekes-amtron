@@ -195,7 +195,7 @@ def test_invalid_queue_metadata_invalidates_remote_connection(tmp_path, metadata
     asyncio.run(run())
 
 
-def test_older_api2_snapshot_and_timezone_offsets_are_supported(tmp_path):
+def test_missing_queue_metadata_is_rejected_and_timezone_offsets_are_supported(tmp_path):
     async def run():
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
@@ -204,8 +204,9 @@ def test_older_api2_snapshot_and_timezone_offsets_are_supported(tmp_path):
                 payload = copy.deepcopy(service.snapshot())
                 for key in ("pending_action", "pending_until", "state_change_interval_seconds"):
                     payload["control"].pop(key)
-                assert remote.apply_snapshot(payload).pending_change is None
-                assert remote.connected
+                with pytest.raises(ServiceConnectionError, match=r"control\.pending_change"):
+                    remote.apply_snapshot(payload)
+                assert not remote.connected
             action, deadline = _pending_status({
                 "pending_action": "resume", "pending_until": "2026-11-06T14:00:00+01:00",
             })

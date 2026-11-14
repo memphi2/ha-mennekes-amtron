@@ -333,10 +333,11 @@ def test_a_rejected_saved_state_does_not_keep_the_service_down(tmp_path, caplog)
         service, _transport, _clock = await service_fixture(tmp_path)
         try:
             assert service.control is not None
-            assert service.client.write_state.pause_requested is None
-            assert caplog.text.count("belongs to another wallbox or is damaged") == 1
-            # The first save replaces the file with this wallbox's intent.
-            assert json.loads(path.read_text())["identity"] == "ABC123456789"
+            assert service.client.write_state.pause_requested is True
+            assert service.control.read_only
+            assert caplog.text.count("Saved control intent rejected") == 1
+            # Rejected evidence survives until an explicit acknowledgement.
+            assert json.loads(path.read_text())["identity"] == "another-wallbox"
         finally:
             await service.stop()
     asyncio.run(run())

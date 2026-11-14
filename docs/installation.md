@@ -99,6 +99,19 @@ required just to use the wallbox.
 
 ## Updates
 
+Before version 1.0, beta updates may deliberately change configuration, stored
+state and the service API without migration. Read the release notes first.
+After an incompatible update, reconfigure the affected profiles or planning
+options and verify Plug & Charge, pause, release, charging target and departure
+before use. An incompatible saved app state is preserved and charging control is blocked.
+Open **Settings → System → Repairs** in HA to acknowledge safe defaults: pause
+on, charging release off, resume current 6 A and no targets. This does not start
+charging. Reconfigure the desired policies before explicitly enabling release
+and resuming. In read-only mode the app cannot stop a physical charge.
+This does not change the supported wallbox families or minimum Home Assistant
+version. The current integration requires service **0.9.0b4 or newer**, API 2;
+app and integration versions do not otherwise have to match.
+
 1. Back up HA and read the release notes, especially the changes marked
    **Breaking**. Keep the existing integration entry.
 2. In service mode, update the app or standalone service first and wait until it
@@ -107,8 +120,7 @@ required just to use the wallbox.
    HACS, then complete the requested HA Core restart.
 4. Check current readings, heartbeat, pause/release and the intended current.
 
-Install the integration and the app in the same version. Use **Check for
-updates** in the app store if an offered app update is missing.
+Use **Check for updates** in the app store if an offered app update is missing.
 Moving between stable and beta app catalogs creates a separate app and requires
 [the channel handover](modbus-service.md#updates). Moving from HACS to Marketplace
 does not require adding the wallbox again. For changed blueprints,

@@ -29,9 +29,9 @@ class IntentStore:
     def load(self, state: WriteState) -> bool:
         """Apply the saved intent; False when the file was rejected.
 
-        A file of another wallbox or format, or a damaged one, counts as none:
-        the app starts as on its first run, takes the wallbox's own state and
-        replaces the file with its next save.
+        A missing file is a first start. An incompatible or damaged file is
+        rejected without applying it. The service must preserve that file and
+        block charging commands until the user acknowledges a safe reset.
         """
         try:
             raw = self.path.read_bytes()
@@ -46,6 +46,9 @@ class IntentStore:
     def _apply(self, payload: Any, state: WriteState) -> None:
         if (
             not isinstance(payload, dict)
+            or payload.keys() != {"version", "identity", "pause_requested",
+                                  "charging_release_requested", "charging_setpoint",
+                                  "energy_goal", "soc_goal", "plug_charge", "charging_session_history"}
             or payload.get("version") != 1
             or payload.get("identity") != self.identity
         ):
@@ -59,17 +62,16 @@ class IntentStore:
             current = number(current, 0, 32)
             if 0 < current < 6:
                 raise ValueError("invalid saved resume current")
-        goal = EnergyGoal.restore(payload["energy_goal"]) if "energy_goal" in payload else EnergyGoal()
-        soc_goal = SocGoal.restore(payload["soc_goal"]) if "soc_goal" in payload else SocGoal()
-        plug_charge = PlugChargeState.restore(payload["plug_charge"]) if "plug_charge" in payload else PlugChargeState()
+        goal = EnergyGoal.restore(payload["energy_goal"])
+        soc_goal = SocGoal.restore(payload["soc_goal"])
+        plug_charge = PlugChargeState.restore(payload["plug_charge"])
         history = SessionHistory()
-        if "charging_session_history" in payload:
-            try:
-                history = SessionHistory.restore(payload["charging_session_history"])
-            except ValueError:
-                # Optional measurements must not block valid control intent
-                # or heartbeat startup. Do not expose stored data in the log.
-                _LOGGER.warning("Ignoring invalid completed charging session history")
+        try:
+            history = SessionHistory.restore(payload["charging_session_history"])
+        except ValueError:
+            # Optional measurements must not block valid control intent
+            # or heartbeat startup. Do not expose stored data in the log.
+            _LOGGER.warning("Ignoring invalid completed charging session history")
         state.pause_requested = payload.get("pause_requested")
         state.charging_release_requested = payload.get("charging_release_requested")
         state.charging_setpoint = current

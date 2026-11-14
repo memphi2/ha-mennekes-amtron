@@ -4,18 +4,18 @@ Open the service app and select **Open Web UI**. The pages are for Home
 Assistant administrators and open through Home Assistant itself; no port or
 token is needed in the browser. They need **Supervisor 2026.10.4 or newer**.
 
-The bar at the top has four groups; **Charging** and **Settings** show their
+The bar at the top has four groups; **Charging**, **Settings** and **Diagnostics** show their
 pages in a second row.
 
 | Group | Page | What it is for |
 |---|---|---|
 | **Overview** | [Overview](#overview) | What the wallbox and the app are doing right now. Read-only. |
-| | [Registers](#registers) | Every wallbox register with its raw and decoded value. Read-only. |
 | **Charging** | [Charging jobs](#charging-jobs) | A charging order the app runs on its own, with optional early start and an estimated finish. |
 | | [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
 | **Settings** | [Connection](#connection) | USB or LAN connection, optional LAN-adapter setup. |
 | | [Runtime](#runtime-settings) | Polling intervals and control limits, with a preview before saving. |
-| **Log** | [Log](#log) | The Modbus traffic as it happens, for troubleshooting. |
+| **Diagnostics** | [Registers](#registers) | Every wallbox register with its raw and decoded value. Read-only. |
+| | [Log](#log) | The Modbus traffic as it happens, for troubleshooting. |
 
 Every page follows the browser language in English, German, French, Dutch and
 Italian, and every page has the same navigation bar.
@@ -31,7 +31,7 @@ automation; see [Use the app from Home Assistant](app-from-home-assistant.md).
 The overview opens first. It refreshes every five seconds while the page is
 visible and shows:
 
-- **Charging control**: which of the app's controllers decides right now (a
+- **My charging**: which of the app's controllers decides right now (a
   guest order, a charging job, the departure plan or none), why
   the car does not charge yet, the next step with its time, the target and
   whether Home Assistant confirmed the car. Home Assistant shows the same
@@ -47,6 +47,10 @@ visible and shows:
 
 If the app cannot be reached, the page hides old values instead of showing them
 as current. The overview never changes charging.
+
+The command history is collapsed by default. Open it when a command did not
+have the expected result. The overview also gives a suggested action for common
+waiting states; it does not override a pause or authorize a vehicle.
 
 ## Charging jobs
 
@@ -197,6 +201,9 @@ continues once readings return. To let the app charge again, create a new order.
 The order belongs to the physical connection, not to a particular car. The app
 does not identify vehicles; it only knows that the plug stayed connected.
 
+Reserve and temporary early charging (boost) are collapsed by default. Open
+these sections only when you need them; they are not required for an ordinary job.
+
 ## Guest charging
 
 **Guest charging** (German: **Gastladen**) starts one order right away for a
@@ -219,7 +226,7 @@ order without resuming** never restarts charging.
 
 ## Registers
 
-**Registers**, a page below **Overview**, lists every register the integration knows, with address, raw
+**Registers**, a page below **Diagnostics**, lists every register the integration knows, with address, raw
 words, decoded value, last successful read and last attempt. The **Quality**
 column describes the reading, not the wallbox:
 
@@ -269,7 +276,7 @@ app restart.
 
 ## Log
 
-**Log** (German: **Protokoll**) shows the app's own Modbus reads, writes and
+**Diagnostics → Log** (German: **Diagnose → Protokoll**) shows the app's own Modbus reads, writes and
 heartbeats one line each, as they happen. It starts when you open the page and
 follows the newest line; scroll up to read on undisturbed. **Pause** holds the
 view while new lines are still collected, **Filter** narrows it to a register

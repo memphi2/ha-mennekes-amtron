@@ -7,13 +7,10 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.mennekes_amtron_rtu.charge_loss_const import (
     CONF_CHARGE_LOSS_SOURCE,
-    CONF_LOSS_BAVARIAN_DEVICE,
-    LOSS_SOURCE_BAVARIANDATA,
     LOSS_SOURCE_DISABLED,
     LOSS_SOURCE_VEHICLE_HISTORY,
 )
 from custom_components.mennekes_amtron_rtu.timed_goal_const import (
-    CONF_TIMED_BAVARIAN_DEVICE,
     CONF_TIMED_TIMER1_DAYS,
     CONF_TIMED_TIMER2_DAYS,
     CONF_TIMED_VEHICLE_TIME_ZONE,
@@ -65,7 +62,7 @@ def provider_definitions(capability: Capability) -> tuple[ProviderDefinition, ..
 
 
 def provider_selection(options: Mapping[str, Any], capability: Capability) -> ProviderSelection:
-    """An explicit generic selection always wins over retained legacy options."""
+    """Read only the current provider and device settings."""
     if capability in ("soc", "charge_limit", "capacity", "detection"):
         provider = options.get(CONF_VEHICLE_PROVIDER)
         device = options.get(CONF_VEHICLE_DEVICE)
@@ -73,16 +70,11 @@ def provider_selection(options: Mapping[str, Any], capability: Capability) -> Pr
             provider if isinstance(provider, str) and provider else PROVIDER_NONE,
             device if isinstance(device, str) else "",
         )
-    provider_key, device_key, legacy_key = (
-        (CONF_TIMED_VEHICLE_PROVIDER, CONF_TIMED_VEHICLE_DEVICE, CONF_TIMED_BAVARIAN_DEVICE)
+    provider_key, device_key = (
+        (CONF_TIMED_VEHICLE_PROVIDER, CONF_TIMED_VEHICLE_DEVICE)
         if capability == "departure" else
-        (CONF_LOSS_VEHICLE_PROVIDER, CONF_LOSS_VEHICLE_DEVICE, CONF_LOSS_BAVARIAN_DEVICE)
+        (CONF_LOSS_VEHICLE_PROVIDER, CONF_LOSS_VEHICLE_DEVICE)
     )
-    if provider_key not in options and device_key not in options:
-        device = options.get(legacy_key)
-        if isinstance(device, str) and device:
-            return ProviderSelection(PROVIDER_BAVARIANDATA, device)
-        return ProviderSelection(PROVIDER_NONE, "")
     provider = options.get(provider_key)
     device = options.get(device_key)
     if provider == "profile":
@@ -179,8 +171,6 @@ def resolve_history_source(hass: HomeAssistant, options: Mapping[str, Any]) -> C
 
 
 def loss_source(options: Mapping[str, Any]) -> str:
-    """Canonicalize the old manufacturer-specific mode at the configuration edge."""
+    """Return only a supported charge-loss source."""
     source = options.get(CONF_CHARGE_LOSS_SOURCE, LOSS_SOURCE_DISABLED)
-    if source == LOSS_SOURCE_BAVARIANDATA:
-        return LOSS_SOURCE_VEHICLE_HISTORY
-    return source if isinstance(source, str) else LOSS_SOURCE_DISABLED
+    return source if source in (LOSS_SOURCE_DISABLED, LOSS_SOURCE_VEHICLE_HISTORY, "sensor") else LOSS_SOURCE_DISABLED

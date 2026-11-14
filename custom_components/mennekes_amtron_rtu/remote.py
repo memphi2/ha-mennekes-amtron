@@ -52,9 +52,7 @@ CONF_SERVER_TOKEN = "server_token"  # noqa: S105 - configuration key, not a cred
 
 
 def _pending_status(control: dict[str, Any]) -> tuple[str | None, datetime | None]:
-    """Validate optional API 2 queue metadata without rejecting older services."""
-    if "pending_action" not in control and "pending_until" not in control:
-        return None, None
+    """Validate the current service queue contract."""
     action = control["pending_action"]
     until = control["pending_until"]
     if action is None and until is None:
@@ -253,11 +251,10 @@ class RemoteClient(MennekesModbusClient):
             quality = payload.get("connection_quality")
             if quality is not None and quality not in CONNECTION_QUALITY_STATES:
                 raise ValueError("invalid connection quality")
-            # Older apps do not report the count; it is then unknown.
-            failures = payload.get("connection_failures")
+            failures = payload["connection_failures"]
             if failures is not None and (type(failures) is not int or failures < 0):
                 raise ValueError("invalid connection failure count")
-            retried = payload.get("connection_retries")
+            retried = payload["connection_retries"]
             if retried is not None and (type(retried) is not int or retried < 0):
                 raise ValueError("invalid connection retry count")
             section = "charging_session"
@@ -386,7 +383,7 @@ class RemoteClient(MennekesModbusClient):
                 )
             ):
                 raise ValueError("invalid device current")
-            # Older service snapshots contain the raw optional register value.
+            # This optional hardware capability can be unavailable.
             # An unusable capability must not invalidate authenticated readings;
             # command limits below remain mandatory and strictly validated.
             identity.max_evse_current = usable_max_evse_current(identity.max_evse_current)
@@ -462,8 +459,7 @@ class RemoteClient(MennekesModbusClient):
                     or started.utcoffset() is None
                 ):
                     raise ValueError("invalid plug charge start")
-                # Services before 0.8.0 have no manual release.
-                manual = control.get("plug_charge_manual", False)
+                manual = control["plug_charge_manual"]
                 if type(manual) is not bool or (manual and not gate["enabled"]):
                     raise ValueError("invalid plug charge release")
             section = "control.intent"

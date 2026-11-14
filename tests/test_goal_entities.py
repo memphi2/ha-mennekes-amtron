@@ -68,7 +68,7 @@ def test_old_layouts_do_not_get_an_unusable_goal():
     asyncio.run(run())
 
 
-def test_remote_goal_and_quality_metadata_are_optional_and_change_snapshots(tmp_path):
+def test_remote_capabilities_and_quality_change_snapshots_but_old_formats_are_rejected(tmp_path):
     async def run():
         service, _, _ = await service_fixture(tmp_path)
         async with ClientSession() as session:
@@ -100,7 +100,11 @@ def test_remote_goal_and_quality_metadata_are_optional_and_change_snapshots(tmp_
             legacy["control"].pop("energy_goal")
             legacy.pop("connection_quality")
             legacy.pop("connection_failures")
-            assert remote.apply_snapshot(legacy).connection_failures is None
+            with pytest.raises(ServiceConnectionError, match="connection_quality"):
+                remote.apply_snapshot(legacy)
+            unsupported = deepcopy(service.snapshot())
+            unsupported["control"]["supports_energy_goal"] = False
+            remote.apply_snapshot(unsupported)
             assert not wrapper.supports_energy_goal
             with pytest.raises(ServiceValidationError):
                 await wrapper.async_set_energy_goal(12)

@@ -291,6 +291,16 @@ identity:
 }
 ```
 
+The recovery command `acknowledge_intent_reset` accepts only `command` and
+`expected_serial_number`. It acknowledges a rejected saved control file after
+the user reviews the reset. Normal commands remain blocked while
+`control.intent_rejected` is true. The acknowledgement durably saves paused,
+release-off, 6 A defaults before lifting that block; it sends no start command.
+If saving fails, the block remains; an atomic replacement that already completed
+may have made the safe defaults visible on disk. HA exposes this through
+**Settings → System → Repairs**. Repeated acknowledgements after a successful
+reset leave the current intent unchanged.
+
 Timed plans use two additional commands:
 
 | Command | Additional fields | Behavior |
