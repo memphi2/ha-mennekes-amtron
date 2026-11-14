@@ -57,6 +57,7 @@ class AmtronControl(DeviceControl):
 
     async def async_set_departure_trip(
         self, deadline: datetime | None, source: str | None, *, withdraw: bool = False,
+        expected_selection: dict[str, Any] | None = None,
     ) -> None:
         raise DeviceError("service_unavailable")
 
@@ -82,8 +83,8 @@ class AmtronControl(DeviceControl):
         await super().async_set_energy_goal(value)
 
     @ha_command
-    async def async_configure_soc(self, source: str | None) -> None:
-        await super().async_configure_soc(source)
+    async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None:
+        await super().async_configure_soc(source, maximum_required=maximum_required)
 
     @ha_command
     async def async_set_soc_goal(

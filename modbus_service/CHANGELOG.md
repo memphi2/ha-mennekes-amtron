@@ -1,5 +1,14 @@
 # Changes
 
+## 0.9.0b7
+
+- Split charging controls into charge targets, next departure and guest charging.
+- Share guest settings, targets and departure edits with Home Assistant; reject
+  outdated edits and preserve vehicle and Plug & Charge guards.
+- Remove the separate scheduled-order, reserve and boost pages/actions.
+- Store guest sessions and settings separately from old beta order files.
+- Update all five app languages and dashboard guidance.
+
 ## 0.9.0b6
 
 - Share one persistent charging-job draft between Home Assistant and the app,

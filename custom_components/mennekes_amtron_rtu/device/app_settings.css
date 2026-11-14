@@ -121,3 +121,16 @@ th { position: sticky; top: 0; background: var(--card); color: var(--muted); fon
   .log { height: calc(100vh - 330px); }
 }
 fieldset.plain { margin: 0; padding: 0; border: 0; }
+
+/* Charging states always carry text; colour and symbols are supplementary. */
+.charging-state { font-weight: 600; }
+.charging-state::before { display: inline-block; width: 1.5em; }
+.state-active { color: #1680b5; } .state-active::before { content: "ϟ"; }
+.state-good { color: #27834b; } .state-good::before { content: "✓"; }
+.state-wait { color: #a56a00; } .state-wait::before { content: "◷"; }
+.state-error { color: #c44949; } .state-error::before { content: "!"; }
+.state-muted { opacity: .8; } .state-muted::before { content: "○"; }
+@media (prefers-color-scheme: dark) {
+  .state-active { color: #68c8f3; } .state-good { color: #75d194; }
+  .state-wait { color: #f2c05d; } .state-error { color: #ff9494; }
+}

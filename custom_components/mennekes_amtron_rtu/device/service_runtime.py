@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import math
 import secrets
@@ -96,6 +98,8 @@ class ModbusService:
         # A fresh boot changes the revision, so a client cannot mistake an old
         # cached command outcome for a goal restored after a service restart.
         self._soc_goal_revision = secrets.token_hex(16)
+        self._soc_maximum_required: bool | None = None
+        self._soc_reading: tuple[str, float | None, float, str] | None = None
         self.soc_transactions = SocTransactions(self)
         self._task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
@@ -523,6 +527,8 @@ class ModbusService:
                 "supports_soc_goal": control.supports_soc_goal if control else False,
                 "soc_transactions_supported": True,
                 "soc_goal_revision": self._soc_goal_revision,
+                "soc_maximum_required": self._soc_maximum_required,
+                "choice_revision": self.choice_revision,
                 "soc_goal": control.soc_goal.snapshot() if control else None,
                 "energy_goal": control.energy_goal.snapshot() if control else None,
                 "read_only": self.config.read_only or self._intent_rejected,
@@ -595,6 +601,17 @@ class ModbusService:
         self._published = (time.monotonic(), result)
         return result
 
+    def _soc_observation_scope(self) -> str | None:
+        """Only a service tracking a physical connection may cache its SoC."""
+        return None
+
+    @property
+    def choice_revision(self) -> str:
+        """Fence app edits against explicit selections, not changing telemetry."""
+        state = self.client.write_state
+        raw = [self._soc_goal_revision, self._soc_maximum_required, state.energy_goal_generation]
+        return hashlib.sha256(json.dumps(raw).encode()).hexdigest()
+
     async def command(
         self, payload: dict[str, Any], *,
         _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None,
@@ -602,7 +619,7 @@ class ModbusService:
         if payload.keys() - {
             "command", "value", "allow_unlimited", "current_cap", "expected_serial_number",
             "source", "soc", "maximum", "deadline", "owner", "expected_soc_revision",
-            "session", "policy",
+            "session", "policy", "maximum_required", "expected_choice_revision",
         }:
             raise ValueError("unknown command field")
         if "expected_serial_number" not in payload:
@@ -628,6 +645,8 @@ class ModbusService:
             # Explicit null matches only a device without a readable serial.
             if expected_serial != self.identity.serial_number:
                 raise DeviceError("device_identity_changed")
+            if "expected_choice_revision" in payload and payload["expected_choice_revision"] != self.choice_revision:
+                raise DeviceError("soc_goal_source_changed")
             if "expected_soc_revision" in payload and (
                 command != "soc_observation"
                 or payload["expected_soc_revision"] != self._soc_goal_revision
@@ -702,21 +721,36 @@ class ModbusService:
                     source = payload.get("source")
                     if source is not None and not isinstance(source, str):
                         raise ValueError("source must be a string or null")
+                    maximum_required = payload.get("maximum_required")
+                    if maximum_required is not None and type(maximum_required) is not bool:
+                        raise ValueError("maximum_required must be boolean")
                     before = control.soc_goal.snapshot()
                     success = False
                     try:
                         await control.async_configure_soc(source)
+                        self._soc_maximum_required = maximum_required
+                        if before["source"] != source:
+                            self._soc_reading = None
                         success = True
                     finally:
                         if success or control.soc_goal.snapshot() != before:
                             self._soc_goal_revision = secrets.token_hex(16)
-                elif command in ("soc_goal", "soc_observation"):
+                elif command in ("soc_goal", "soc_observation", "soc_goal_choice"):
+                    if command == "soc_goal_choice":
+                        if "expected_choice_revision" not in payload or self._soc_maximum_required is None:
+                            raise DeviceError("soc_goal_source_changed")
+                        if value != 0 and self._soc_maximum_required and control.soc_goal.maximum_percent is None:
+                            raise DeviceError("soc_goal_limit_unavailable")
+                        reading = self._soc_reading
+                        payload = {**payload, "source": control.soc_goal.source,
+                            "maximum": control.soc_goal.maximum_percent,
+                            "soc": reading[1] if reading is not None and reading[0] == control.soc_goal.source and reading[3] == self._soc_observation_scope() and time.monotonic() - reading[2] <= 900 else None}
                     source = payload.get("source")
                     if not isinstance(source, str):
                         raise ValueError("source is required")
                     soc = payload.get("soc")
                     maximum = payload.get("maximum")
-                    if command == "soc_goal":
+                    if command in ("soc_goal", "soc_goal_choice"):
                         before = control.soc_goal.snapshot()
                         success = False
                         try:
@@ -734,6 +768,9 @@ class ModbusService:
                             None if soc is None else number(soc, 0, 100),
                             None if maximum is None else number(maximum, 0, 100), source=source,
                         )
+                    if command != "soc_goal_choice":
+                        scope = self._soc_observation_scope()
+                        self._soc_reading = None if scope is None else (source, None if soc is None else number(soc, 0, 100), time.monotonic(), scope)
                 elif command == "resume":
                     await control.async_resume_charging(
                         current_cap=number(

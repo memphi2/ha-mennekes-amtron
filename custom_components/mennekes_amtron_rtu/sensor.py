@@ -28,7 +28,7 @@ from .entity import MennekesAmtronEntity
 from .entity_attributes import read_attributes
 from .entry_types import MennekesAmtronConfigEntry
 from .estimate_sensor import AmtronEstimateSensor
-from .job_entities import JobDraftStatus
+from .guest_entities import GuestDraftStatus
 from .sensor_descriptions import (
     CONTROL_SENSOR_DESCRIPTIONS,
     ESTIMATE_SENSOR_DESCRIPTIONS,
@@ -50,7 +50,7 @@ async def async_setup_entry(
     """Add the sensors this device supports."""
 
     if entry.runtime_data.orders is not None:
-        async_add_entities([JobDraftStatus(entry)])
+        async_add_entities([GuestDraftStatus(entry)])
     runtime_data = entry.runtime_data
     identity = runtime_data.identity
     features = vehicle_features(hass, entry)
@@ -211,21 +211,17 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
                 "learned_efficiency": forecast.efficiency if forecast is not None else None,
                 "measured_power_kw": forecast.full_power_kw if forecast is not None else None,
             }
-        elif key == "charging_job" and (status := self._orders) is not None:
+        elif key == "guest_charging" and (status := self._orders) is not None:
             job = status.get("job")
-            attributes = {"boost_available": status.get("boost_available")}
             if isinstance(job, dict):
                 attributes |= {
-                    "kind": job.get("kind", "scheduled"),
                     "start": _moment(job.get("start_at")),
                     "finish": _moment(job.get("finish_at")),
                     "current": job.get("current_a"),
                     "energy": job.get("energy_kwh"),
                     # Whole tenths: a running charge must not write a state per poll.
                     "delivered": _tenths(job.get("delivered_kwh")),
-                    "reserve": job.get("reserve_kwh"),
                     "reason": job.get("reason"),
-                    "boost_until": _moment(job.get("boost_until")),
                 }
         elif key == "operation_controller" and (operation := self.runtime_data.control.operation) is not None:
             attributes = {

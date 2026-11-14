@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, Self
 
@@ -205,8 +206,31 @@ class PlanPauseStore(ModelStore[PlanPause]):
         super().__init__(hass, entry_id, identity, kind="timed_pause", model=PlanPause)
 
 
-class TimedGoalStore(ModelStore[TimedGoal]):
-    """Keep a single trip time durable without Recorder history."""
+@dataclass(frozen=True, slots=True)
+class DepartureIntent:
+    """Persist a trip and its unsynchronized HA edit in one atomic record."""
+
+    trip: TimedGoal = field(default_factory=TimedGoal)
+    pending: bool = False
+    base_revision: str | None = None
+
+    def snapshot(self) -> dict[str, Any]:
+        return {"trip": self.trip.snapshot(), "pending": self.pending, "base_revision": self.base_revision}
+
+    @classmethod
+    def restore(cls, raw: object) -> DepartureIntent:
+        if not isinstance(raw, dict) or raw.keys() != {"trip", "pending", "base_revision"}:
+            raise ValueError("invalid departure intent fields")
+        revision = raw["base_revision"]
+        if type(raw["pending"]) is not bool or (
+            revision is not None and (not isinstance(revision, str) or re.fullmatch(r"[0-9a-f]{32}", revision) is None)
+        ) or (not raw["pending"] and revision is not None):
+            raise ValueError("invalid departure intent provenance")
+        return cls(TimedGoal.restore(raw["trip"]), raw["pending"], revision)
+
+
+class TimedGoalStore(ModelStore[DepartureIntent]):
+    """Keep one trip and its handover provenance durable without Recorder."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str, identity: str) -> None:
-        super().__init__(hass, entry_id, identity, kind="timed_goal", model=TimedGoal)
+        super().__init__(hass, entry_id, identity, kind="departure_intent", model=DepartureIntent)

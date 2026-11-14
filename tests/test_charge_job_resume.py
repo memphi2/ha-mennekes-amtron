@@ -83,21 +83,18 @@ def test_corrupt_saved_session_is_rejected(raw):
 
 
 def test_a_restart_suspends_and_a_proven_plug_in_continues_on_the_new_connection():
-    job = model(reserve_kwh=2)
+    job = model()
     job.observe(now=NOW, available=True, present=True, matches=True, total_kwh=101, meter_fresh=True)
     assert job.state == "charging"
     job = restarted(job)
     assert (job.state, job.reason) == ("suspended", "service_restarted")
     assert job.stop_requested
     assert not job.allows_at(NOW + timedelta(minutes=5), total_kwh=101)
-    with pytest.raises(ValueError, match="boost"):
-        job.set_boost((NOW + timedelta(minutes=10)).isoformat(), now=NOW)
     observe(job, total_kwh=101)
     assert (job.state, job.reason) == ("charging", "charging")
     assert job.binding == OTHER
-    # The ceiling, its baseline and the reserve continue unchanged.
+    # The ceiling, its baseline continue unchanged.
     assert job.energy.baseline_kwh == 100
-    assert job.reserve.reached is False
     observe(job, after=timedelta(minutes=6), total_kwh=110, matches=True)
     assert job.state == "reached"
 
@@ -258,21 +255,4 @@ def test_a_closing_service_never_continues_its_suspended_order(tmp_path):
         await h.jobs.shutdown()
         assert h.jobs.job.state == "suspended"
         assert h.calls[-1] is None
-    asyncio.run(run())
-
-
-def test_a_suspended_order_offers_no_boost_even_on_the_same_connection(tmp_path):
-    async def run():
-        h = Harness(tmp_path)
-        await h.jobs.initialize()
-        request = {"id": "b" * 32, "start_at": (NOW + timedelta(hours=2)).isoformat(),
-                   "finish_at": (NOW + timedelta(hours=4)).isoformat(), "current_a": 12, "energy_kwh": 10}
-        p = h.jobs.preview(request, revision=h.jobs.revision, scope=SCOPE)
-        await h.jobs.create(p["request"], revision=p["revision"], scope=SCOPE)
-        assert h.jobs.snapshot()["boost_available"]
-        h.jobs.job.suspend("connection_lost")
-        assert not h.jobs.snapshot()["boost_available"]
-        h.jobs.observe()
-        assert h.jobs.job.state == "scheduled"
-        assert h.jobs.snapshot()["boost_available"]
     asyncio.run(run())

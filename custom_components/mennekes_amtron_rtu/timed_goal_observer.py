@@ -8,7 +8,7 @@ import math
 import time
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -20,7 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from .device.charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
-from .device.departure_plan import DepartureForecast, DepartureInputs
+from .device.departure_plan import DepartureForecast, DepartureInputs, DepartureState
 from .device.departure_step import (
     MIN_WRITE_INTERVAL,
     keeps_start,
@@ -40,7 +40,7 @@ from .device.registers import EVSE_STATE
 from .device.timed_goal import TimedGoal, matches_departure_source
 from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
-from .goal_store import PlanPause, PlanPauseStore, TimedGoalStore
+from .goal_store import DepartureIntent, PlanPause, PlanPauseStore, TimedGoalStore
 from .timed_goal_const import (
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
@@ -143,13 +143,17 @@ class TimedGoalObserver:
         self._pause_store_current = True
         # The trip changed here and the service has not taken it over yet.
         self._trip_dirty = False
+        self._trip_base: dict[str, Any] | None = None
 
     async def async_start(self) -> None:
         # The service may retain a queued command after an unreachable unload
         # or HA crash. Reclaim this entry's stable owner before arming a trip.
         self._command_submitted = True
         await self._cancel_command()
-        self.goal = await self._store.async_load()
+        intent = await self._store.async_load()
+        self.goal = intent.trip
+        self._trip_dirty = intent.pending
+        self._trip_base = {"edit_revision": intent.base_revision} if intent.base_revision is not None else None
         try:
             self._plan_paused = (await self._pause_store.async_load()).paused
         except (OSError, ValueError) as err:
@@ -287,6 +291,9 @@ class TimedGoalObserver:
             if not changed and not self._save_dirty:
                 return
             await self._cancel_command()
+            if not self._trip_dirty:
+                remote = getattr(self._runtime.control, "departure", None)
+                self._trip_base = remote.selection() if remote is not None else None
             self._trip_dirty = True
             await self._save_goal(candidate)
             self._reached_target = None
@@ -314,7 +321,9 @@ class TimedGoalObserver:
 
     async def _save_goal(self, candidate: TimedGoal) -> None:
         """Keep the live trip aligned with a save that survives cancellation."""
-        task = asyncio.create_task(self._store.async_save(candidate))
+        intent = DepartureIntent(candidate, self._trip_dirty,
+                                 self._trip_base["edit_revision"] if self._trip_dirty and self._trip_base is not None else None)
+        task = asyncio.create_task(self._store.async_save(intent))
         try:
             await asyncio.shield(task)
         except (StorageCommitUncertainError, StorageStateUnknownError) as err:
@@ -578,7 +587,7 @@ class TimedGoalObserver:
         # A command of this observer from before the service took over.
         await self._cancel_command()
         if (remote := control.departure) is not None:
-            await self._sync_trip(remote.trip)
+            await self._sync_trip(remote)
         if (remote := control.departure) is not None:
             inputs = self._departure_inputs(remote.scope)
             if inputs is not None and inputs.digest != remote.inputs:
@@ -592,9 +601,22 @@ class TimedGoalObserver:
             self.status, self.planned_start, self.forecast = status, start, forecast
             self._notify()
 
-    async def _sync_trip(self, service: TimedGoal) -> None:
+    async def _sync_trip(self, remote: DepartureState) -> None:
+        service, editor, vehicle = remote.trip, remote.editor, remote.selection_vehicle
         trip = self.goal
         same = (trip.deadline, trip.source) == (service.deadline, service.source)
+        selection = remote.selection()
+        observer = self._runtime.vehicle_soc
+        from_app = editor == "app" and observer is not None and observer.source == vehicle
+        if self._trip_dirty and from_app and self._trip_base is not None and selection != self._trip_base:
+            # A newer app edit supersedes an unsent HA edit after an outage.
+            async with self._goal_lock:
+                if self.goal is trip and not self._stopping:
+                    self._trip_dirty = False
+                    self._trip_base = None
+                    await self._save_goal(TimedGoal.restore(service.snapshot()))
+                    self._notify()
+            return
         if not self._trip_dirty:
             if (trip.deadline is None and service.deadline is None) or (
                 same and trip.finished == service.finished
@@ -607,16 +629,21 @@ class TimedGoalObserver:
                 and trip.deadline is not None
                 and trip.deadline <= dt_util.utcnow() + _CLOCK_TOLERANCE
             )
-            if same or ended:
+            if same or ended or from_app:
                 async with self._goal_lock:
                     if self.goal is trip and not self._stopping:
                         await self._save_goal(TimedGoal.restore(service.snapshot()))
                         self._notify()
                 return
         # The trip was set here, or the service lost its plan.
-        await self._runtime.control.async_set_departure_trip(trip.deadline, trip.source)
-        if self.goal is trip:
-            self._trip_dirty = False
+        await self._runtime.control.async_set_departure_trip(
+            trip.deadline, trip.source, expected_selection=selection,
+        )
+        async with self._goal_lock:
+            if self.goal is trip and self._trip_dirty:
+                self._trip_dirty = False
+                self._trip_base = None
+                await self._save_goal(trip)
 
     def _departure_inputs(self, scope: str | None) -> DepartureInputs | None:
         observer = self._runtime.vehicle_soc

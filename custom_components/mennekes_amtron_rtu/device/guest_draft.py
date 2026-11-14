@@ -1,4 +1,4 @@
-"""One bounded durable job draft, without any permission to charge."""
+"""One bounded durable guest draft, without any permission to charge."""
 
 from __future__ import annotations
 
@@ -7,12 +7,10 @@ import secrets
 from pathlib import Path
 from typing import Any
 
-from .charge_job import job_time
 from .decode import is_hex32
 from .persistence import replace_file
 
 DRAFT_STATES = (
-    "needs_finish",
     "ready",
     "job_exists",
     "job_not_permitted",
@@ -21,35 +19,30 @@ DRAFT_STATES = (
     "job_storage_unavailable",
     "invalid_job_request",
     "job_stop_unconfirmed",
+    "guest_vehicle_target_active",
 )
 
-FIELDS = frozenset({"start_at", "finish_at", "current_a", "energy_kwh", "reserve_kwh"})
+FIELDS = frozenset({"duration_minutes", "current_a", "energy_kwh"})
+
+
+def defaults() -> dict[str, Any]:
+    return {"current_a": 6.0, "energy_kwh": 10.0, "duration_minutes": 120}
 
 
 def validate(values: object) -> dict[str, Any]:
-    """Allow incomplete/expired dates; creation performs live time checks."""
+    """Persist bounded inputs, never charging authority."""
     if not isinstance(values, dict) or values.keys() != FIELDS:
-        raise ValueError("invalid job draft fields")
-    result = dict(values)
-    for key in ("start_at", "finish_at"):
-        if result[key] is not None:
-            result[key] = job_time(result[key]).isoformat()
-    for key, minimum, maximum in (
-        ("current_a", 6, 32),
-        ("energy_kwh", 0.1, 1000),
-        ("reserve_kwh", 0, 1000),
-    ):
-        value = result[key]
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
+        raise ValueError("invalid guest draft fields")
+    duration = values["duration_minutes"]
+    if type(duration) is not int or not 1 <= duration <= 1440:
+        raise ValueError("invalid guest draft duration")
+    for key, minimum, maximum in (("current_a", 6, 32), ("energy_kwh", 0.1, 1000)):
+        value = values[key]
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
             or not minimum <= value <= maximum
-            or abs(value * 10 - round(value * 10)) > 1e-8
-        ):
-            raise ValueError("invalid job draft value")
-    if result["reserve_kwh"] > result["energy_kwh"]:
-        raise ValueError("draft reserve exceeds energy")
-    return result
+            or abs(value * 10 - round(value * 10)) > 1e-8):
+            raise ValueError("invalid guest draft value")
+    return dict(values)
 
 
 def read_snapshot(raw: object) -> dict[str, Any] | None:
@@ -72,19 +65,13 @@ def read_snapshot(raw: object) -> dict[str, Any] | None:
     }
 
 
-class JobDraft:
+class GuestDraft:
     """Persist only explicit edits; never save polling progress or arm a job."""
 
     def __init__(self, path: Path, identity: str) -> None:
         self.path = path
         self.identity = identity
-        self.values: dict[str, Any] = {
-            "start_at": None,
-            "finish_at": None,
-            "current_a": 6.0,
-            "energy_kwh": 10.0,
-            "reserve_kwh": 0.0,
-        }
+        self.values = defaults()
         self.revision = secrets.token_hex(16)
         self.storage_error = False
 
@@ -95,7 +82,7 @@ class JobDraft:
         except FileNotFoundError:
             return
         if len(raw) > 4096:
-            raise ValueError("job draft too large")
+            raise ValueError("guest draft too large")
         value = json.loads(raw)
         if (
             not isinstance(value, dict)
@@ -104,7 +91,7 @@ class JobDraft:
             or value["version"] != 1
             or value["identity"] != self.identity
         ):
-            raise ValueError("invalid saved job draft")
+            raise ValueError("invalid saved guest draft")
         self.values = validate(value["values"])
 
     def save(self, values: dict[str, Any]) -> None:

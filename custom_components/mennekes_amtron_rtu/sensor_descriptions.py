@@ -52,12 +52,12 @@ from .entity_attributes import (
 
 OPERATION_SENSOR_KEYS = frozenset({"operation_controller", "operation_waiting", "operation_next"})
 # What the app is charging for.
-ORDER_SENSOR_KEYS = frozenset({"charging_job"})
+ORDER_SENSOR_KEYS = frozenset({"guest_charging"})
 
 CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
-        key="charging_job",
-        translation_key="charging_job",
+        key="guest_charging",
+        translation_key="guest_charging",
         device_class=SensorDeviceClass.ENUM,
         options=["none", *JOB_STATES],
     ),

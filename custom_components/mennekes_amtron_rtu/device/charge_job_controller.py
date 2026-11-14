@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hmac
 import secrets
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -12,7 +11,6 @@ from typing import Any
 
 from .charge_job import (
     CURRENT_TOLERANCE_A,
-    MAX_BOOST_MINUTES,
     ChargeJob,
     SessionMark,
     job_time,
@@ -21,7 +19,7 @@ from .charge_job_store import ChargeJobStore
 from .client_errors import AmtronBusError
 from .errors import DeviceError
 from .guest_charge import guest_request
-from .job_draft import FIELDS, JobDraft, validate
+from .guest_draft import FIELDS, GuestDraft, validate
 from .persistence import finish_goal_save
 
 
@@ -85,7 +83,7 @@ class ChargeJobController:
         apply: Callable[[float | None, str, datetime], Awaitable[None]],
     ) -> None:
         self.store = store
-        self.draft = JobDraft(store.path.with_name("job-draft.json"), store.identity)
+        self.guest_draft = GuestDraft(store.path.with_name("guest-draft.json"), store.identity)
         self.inputs = inputs
         self.apply = apply
         self.job: ChargeJob | None = None
@@ -115,9 +113,9 @@ class ChargeJobController:
                 # as an invalid one.
                 self.storage_error = True
             try:
-                await asyncio.to_thread(self.draft.load)
+                await asyncio.to_thread(self.guest_draft.load)
             except (OSError, ValueError, ArithmeticError, RecursionError):
-                self.draft.storage_error = True
+                self.guest_draft.storage_error = True
             self.ready = True
             # A restored job is interrupted. Do not claim the old disk state is
             # already the newly latched stop; write that stop before any action.
@@ -196,58 +194,10 @@ class ChargeJobController:
             return False if enabling else None
         return not self.stop_requested() if enabling else True
 
-    def _can_boost(self, sample: JobInputs) -> bool:
-        job = self.job
-        return (
-            self.ready and not self._closing and not self.storage_error
-            and job is not None and job.kind != "guest" and not job.terminal and not job.scope_ended
-            and job.state != "suspended" and sample.now < job.start_at and sample.available and sample.present is True
-            and sample.scope == job.binding and sample.meter_fresh and sample.permitted
-            and not sample.independent_stop and not sample.pending
-        )
-
-    def _boost_context(self, revision: object, scope: object) -> tuple[ChargeJob, JobInputs]:
-        self._check_revision(revision)
-        sample, job = self.inputs(), self.job
-        if job is None or scope != sample.scope or not self._can_boost(sample):
-            raise JobRequestError("job_boost_unavailable")
-        return job, sample
-
-    def preview_boost(self, minutes: object, *, revision: object, scope: object) -> dict[str, Any]:
-        job, sample = self._boost_context(revision, scope)
-        if type(minutes) is not int or not 1 <= minutes <= MAX_BOOST_MINUTES:
-            raise JobRequestError("invalid_boost_duration")
-        until = min(job.start_at, sample.now + timedelta(minutes=minutes))
-        return {
-            "schema": 1, "revision": self.revision, "scope": sample.scope,
-            "until": until.isoformat(), "current_a": job.current_a,
-            "energy_kwh": job.energy.target_kwh,
-        }
-
-    async def boost(self, until: object, *, revision: object, scope: object) -> dict[str, Any]:
-        async with self._lock:
-            job, sample = self._boost_context(revision, scope)
-            # Absolute preview expiry: retrying cannot slide a relative timer.
-            job.set_boost(until, now=sample.now)
-            self._changed()
-            await self._tick_locked()
-            if self.storage_error:
-                raise JobRequestError("job_storage_unavailable")
-            return self.snapshot()
-
-    async def cancel_boost(self, *, revision: object) -> dict[str, Any]:
-        async with self._lock:
-            self._check_revision(revision)
-            if self.job is None:
-                raise JobRequestError("job_boost_unavailable")
-            if self.job.boost_until is not None:
-                self.job.cancel_boost()
-                self._changed()
-            await self._tick_locked()
-            return self.snapshot()
-
     def _check_revision(self, revision: object) -> None:
-        if not isinstance(revision, str) or not hmac.compare_digest(revision, self.revision):
+        # Revisions are public opaque tokens, not secrets. Unicode must be a
+        # normal conflict, never a compare_digest TypeError.
+        if not isinstance(revision, str) or revision != self.revision:
             raise JobRequestError("job_changed")
 
     @staticmethod
@@ -257,7 +207,6 @@ class ChargeJobController:
             "finish_at": job.finish_at.isoformat(), "current_a": job.current_a,
             "energy_kwh": job.energy.target_kwh,
             **({"kind": job.kind} if job.kind != "scheduled" else {}),
-            **({"reserve_kwh": job.reserve.target_kwh} if job.reserve is not None else {}),
         }
 
     def _candidate(self, request: object, revision: object, scope: object) -> ChargeJob:
@@ -299,32 +248,35 @@ class ChargeJobController:
         return self.preview(absolute, revision=revision, scope=scope)
 
     def _draft_revision(self, revision: object) -> None:
-        if not isinstance(revision, str) or revision != self.draft.revision:
+        draft = self.guest_draft
+        if not isinstance(revision, str) or revision != draft.revision:
             raise JobRequestError("job_changed")
 
     async def edit_draft(self, changes: object, *, revision: object) -> dict[str, Any]:
+        draft = self.guest_draft
         async with self._lock:
             self._draft_revision(revision)
             if not self.ready or self._closing or self.inputs().read_only:
                 raise JobRequestError("job_not_permitted")
-            if not isinstance(changes, dict) or not changes or changes.keys() - FIELDS:
+            fields = FIELDS
+            if not isinstance(changes, dict) or not changes or changes.keys() - fields:
                 raise JobRequestError("invalid_job_request")
             # After an uncertain save, reload the durable value on restart.
-            if self.draft.storage_error and changes.keys() != FIELDS:
+            if draft.storage_error and changes.keys() != fields:
                 raise JobRequestError("job_storage_unavailable")
-            values = validate({**self.draft.values, **changes})
+            values = validate({**draft.values, **changes})
             if values["current_a"] > self.inputs().current_cap:
                 raise JobRequestError("job_current_exceeds_cap")
-            if values != self.draft.values or self.draft.storage_error:
+            if values != draft.values or draft.storage_error:
                 async def commit() -> None:
                     try:
-                        await asyncio.to_thread(self.draft.save, values)
+                        await asyncio.to_thread(draft.save, values)
                     except (OSError, ValueError):
-                        self.draft.storage_error = True
+                        draft.storage_error = True
                         raise
-                    self.draft.values = values
-                    self.draft.storage_error = False
-                    self.draft.revision = secrets.token_hex(16)
+                    draft.values = values
+                    draft.storage_error = False
+                    draft.revision = secrets.token_hex(16)
                 try:
                     await finish_goal_save(commit())
                 except (OSError, ValueError) as err:
@@ -332,20 +284,20 @@ class ChargeJobController:
             return self.snapshot()
 
     def preview_draft(self, *, draft_revision: object, revision: object, scope: object) -> dict[str, Any]:
+        draft = self.guest_draft
         self._draft_revision(draft_revision)
-        if self.draft.storage_error:
+        if draft.storage_error:
             raise JobRequestError("job_storage_unavailable")
-        request = {"id": secrets.token_hex(16), **self.draft.values}
-        request["start_at"] = request["start_at"] or self.inputs().now.isoformat()
-        return {**self.preview(request, revision=revision, scope=scope), "draft_revision": self.draft.revision}
+        request = {"id": secrets.token_hex(16), **draft.values}
+        request = guest_request(request, now=self.inputs().now)
+        return {**self.preview(request, revision=revision, scope=scope), "draft_revision": draft.revision}
 
     def draft_status(self) -> str:
-        if self.draft.storage_error:
+        draft = self.guest_draft
+        if draft.storage_error:
             return "job_storage_unavailable"
-        if self.draft.values["finish_at"] is None:
-            return "needs_finish"
         try:
-            self.preview_draft(draft_revision=self.draft.revision, revision=self.revision, scope=self.inputs().scope)
+            self.preview_draft(draft_revision=draft.revision, revision=self.revision, scope=self.inputs().scope)
         except JobRequestError as err:
             return str(err)
         except ValueError:
@@ -353,14 +305,15 @@ class ChargeJobController:
         return "ready"
 
     async def create_draft(self, request: object, *, draft_revision: object, revision: object, scope: object) -> dict[str, Any]:
+        draft = self.guest_draft
         async with self._lock:
             self._draft_revision(draft_revision)
-            if self.draft.storage_error:
+            if draft.storage_error:
                 raise JobRequestError("job_storage_unavailable")
-            if not isinstance(request, dict) or any(
-                request.get(key, 0 if key == "reserve_kwh" else None) != value
-                for key, value in self.draft.values.items() if key != "start_at" or value is not None
-            ):
+            if not isinstance(request, dict):
+                raise JobRequestError("job_changed")
+            expected = guest_request({"id": request.get("id"), **draft.values}, now=job_time(request.get("start_at")))
+            if request != expected:
                 raise JobRequestError("job_changed")
             return await self._create_locked(request, revision=revision, scope=scope)
 
@@ -533,18 +486,15 @@ class ChargeJobController:
                 **self._request(job), "state": job.state, "reason": job.reason,
                 "scope_ended": job.scope_ended, "holding": self.holding,
                 "delivered_kwh": progress,
-                "boost_until": job.boost_until.isoformat() if job.boost_until is not None else None,
-                **({"reserve_reached": job.reserve.reached} if job.reserve is not None else {}),
             }
         return {
             "schema": 1, "revision": self.revision, "scope": sample.scope,
-            "draft": {**self.draft.snapshot(), "status": self.draft_status()},
+            "guest_draft": {**self.guest_draft.snapshot(), "status": self.draft_status()},
             "ready": self.ready, "storage_error": self.storage_error,
             "action_error": self.action_error, "job": summary,
             "available": sample.available, "present": sample.present,
             "permitted": sample.permitted, "meter_fresh": sample.meter_fresh,
             "max_current_a": sample.current_cap, "now": sample.now.isoformat(),
-            "boost_available": self._can_boost(sample),
             "vehicle_target_active": sample.vehicle_target_active,
             "read_only": sample.read_only,
             "manual_stop_pending": self._stop_unconfirmed,

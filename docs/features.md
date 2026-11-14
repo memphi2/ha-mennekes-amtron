@@ -20,8 +20,7 @@ when you need it; you do not need to configure every option.
 | Recognize the connected car automatically | Optional profiles and cable/home signals | [Automatic selection](vehicle-setup.md#optional-automatic-vehicle-selection) |
 | Release charging for a recognized car | An active profile with fresh cable/home detection | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) |
 | Charge from solar surplus | A suitable power sensor and the PV blueprint | [PV charging](blueprints.md#set-up-pv-charging) |
-| Charge in a time window with a kWh limit, also while HA is offline | The service app | [Charging jobs](app-guide.md#charging-jobs) |
-| Charge a visitor's car for a limited time | The service app and local authorization, for example RFID | [Guest charging](app-guide.md#guest-charging) |
+| Start a guest charge with energy and duration limits, also while HA is offline | The service app | [Guest charging](app-guide.md#guest-charging) |
 | Estimate charging costs | A fixed gross price or existing dynamic price sensor | [Charging costs](charging-estimates.md#charging-costs-fixed-or-dynamic-price) |
 | Estimate losses | Battery energy from the matching vehicle charge | [Charging losses](charging-estimates.md#charging-losses-choose-the-available-data) |
 | Get notified when the car is unplugged or the wallbox faults | Nothing extra; the **Wallbox event** entity | [React to wallbox events](automations.md#react-to-wallbox-events) |

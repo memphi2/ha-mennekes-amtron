@@ -175,7 +175,7 @@ def test_without_a_trip_or_car_nothing_is_planned(tmp_path):
         assert (plan.status, plan.snapshot()) == ("disabled", {
             "trip": {"deadline": None, "source": None, "finished": None}, "status": "disabled",
             "planned_start": None, "estimated_soc": None, "inputs": None, "scope": SCOPE,
-            "confirmed": False, "forecast": None,
+            "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None, "edit_revision": plan.edit_revision,
         })
         await plan.set_trip(NOW + timedelta(hours=2), "manual")
         await plan.tick()
@@ -866,7 +866,8 @@ def test_the_plan_survives_storage_failures(tmp_path, caplog, monkeypatch):
         await box.plan.initialize()
         monkeypatch.setattr(box.plan.store, "save", lambda _plan: (_ for _ in ()).throw(OSError("full")))
         with caplog.at_level(logging.WARNING, logger=dp.__name__):
-            await box.plan.set_trip(NOW + timedelta(hours=2), "manual")
+            with pytest.raises(DeviceError, match="service_unavailable"):
+                await box.plan.set_trip(NOW + timedelta(hours=2), "manual")
             await box.plan.set_inputs(inputs())
         assert box.plan.storage_error
         assert caplog.text.count("could not be saved") == 1
@@ -1052,3 +1053,102 @@ def test_a_reduced_current_is_not_measured_as_full_power(tmp_path):
         plan = await box.start(hours=0.2, given=inputs(soc_percent=79))
         assert (plan.status, box.writes, plan._full_from) == ("finishing", [], None)
     run(go())
+
+
+def test_app_edit_rechecks_the_vehicle_after_cancelling_queued_work(tmp_path):
+    async def body():
+        box = Box(tmp_path)
+        plan = await box.start()
+        saved = plan.trip.snapshot()
+        plan._command_submitted = True
+        async def change_car():
+            box.set(vehicle="another-car")
+        plan._cancel = change_car
+        with pytest.raises(DeviceError, match="soc_goal_source_changed"):
+            await plan.set_trip(NOW + timedelta(hours=7), None, editor="app",
+                                expected_revision=plan.choice_revision, expected_vehicle=CAR)
+        assert plan.trip.snapshot() == saved
+    run(body())
+
+
+def test_stale_ha_selection_cannot_overwrite_a_new_app_trip(tmp_path):
+    async def body():
+        box = Box(tmp_path)
+        plan = await box.start()
+        expected = dp.DepartureState.restore(plan.snapshot()).selection()
+        deadline = NOW + timedelta(hours=7)
+        await plan.set_trip(deadline, None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
+        with pytest.raises(DeviceError, match="soc_goal_source_changed"):
+            await plan.set_trip(NOW + timedelta(hours=3), "manual", expected_selection=expected)
+        assert plan.trip.deadline == deadline
+        assert plan.store.load()["trip"]["deadline"] == deadline.isoformat()
+    run(body())
+
+
+@pytest.mark.parametrize(("change", "error"), [
+    ({"read_only": True}, "service_unavailable"),
+    ({"vehicle": None}, "soc_goal_source_changed"),
+])
+def test_app_trip_requires_a_writable_selected_vehicle(tmp_path, change, error):
+    async def body():
+        box = Box(tmp_path)
+        plan = await box.start()
+        before = plan.trip.snapshot()
+        box.set(**change)
+        with pytest.raises(DeviceError, match=error):
+            await plan.set_trip(NOW + timedelta(hours=3), None, editor="app",
+                                expected_revision=plan.choice_revision, expected_vehicle=box.state.vehicle)
+        assert plan.trip.snapshot() == before
+    run(body())
+
+
+def test_app_departure_refuses_a_past_instant_and_uninitialized_inputs(tmp_path):
+    async def body():
+        box = Box(tmp_path)
+        plan = await box.start()
+        before = plan.trip.snapshot()
+        with pytest.raises(ValueError, match="future"):
+            await plan.set_trip(NOW, None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
+        plan.inputs = None
+        with pytest.raises(DeviceError, match="soc_goal_source_changed"):
+            await plan.set_trip(NOW + timedelta(hours=3), None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
+        assert plan.trip.snapshot() == before
+    run(body())
+
+
+def test_edit_revision_survives_restart_and_ignores_automatic_completion(tmp_path):
+    async def body():
+        box = Box(tmp_path)
+        plan = await box.start()
+        revision = plan.choice_revision
+        selection = dp.DepartureState.restore(plan.snapshot()).selection()
+        plan.trip.finish("late")
+        assert plan.choice_revision == revision
+        await plan._save()
+        restored = box.controller()
+        await restored.initialize()
+        assert dp.DepartureState.restore(restored.snapshot()).selection() == selection
+        await restored.set_trip(NOW + timedelta(hours=6), "manual", expected_selection=selection)
+        assert restored.choice_revision != revision
+        with pytest.raises(DeviceError, match="soc_goal_source_changed"):
+            await restored.set_trip(NOW + timedelta(hours=8), "manual", expected_selection=selection)
+    run(body())
+
+
+@pytest.mark.parametrize("invalid", [None, 1, "not-a-revision"])
+def test_invalid_edit_revision_is_not_restored_or_published(tmp_path, invalid):
+    async def body():
+        box = Box(tmp_path)
+        plan = await box.start()
+        raw = plan.snapshot()
+        raw["edit_revision"] = invalid
+        with pytest.raises(ValueError, match="edit revision"):
+            dp.DepartureState.restore(raw)
+        saved = plan.store.load()
+        saved["edit_revision"] = invalid
+        plan.store.save(saved)
+        restarted = box.controller()
+        await restarted.initialize()
+        assert restarted.trip.deadline is None
+        assert restarted.inputs is None
+    run(body())

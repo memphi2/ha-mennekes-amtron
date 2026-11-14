@@ -19,7 +19,8 @@ _NAV: tuple[tuple[tuple[str, ...], tuple[tuple[str, tuple[str, ...]], ...]], ...
         ("/", ("Overview", "Übersicht", "Vue d’ensemble", "Overzicht", "Panoramica")),
     )),
     (("Charging", "Laden", "Recharge", "Laden", "Ricarica"), (
-        ("/jobs", ("Charging jobs", "Ladeaufträge", "Ordres de recharge", "Laadopdrachten", "Ordini di ricarica")),
+        ("/targets", ("Charge target", "Ladeziel", "Objectif de charge", "Laaddoel", "Obiettivo di ricarica")),
+        ("/departure", ("Plan departure", "Abfahrt planen", "Planifier le départ", "Vertrek plannen", "Pianifica partenza")),
         ("/guest", ("Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite")),
     )),
     (("Settings", "Einstellungen", "Réglages", "Instellingen", "Impostazioni"), (

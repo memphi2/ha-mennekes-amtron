@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.9.0b7 — 2026-11-14
+
+- Organize charging around charge targets, one next departure and guest charging;
+  remove the separate scheduled order, reserve and boost controls.
+- Share saved guest settings and charge targets between Home Assistant and the
+  app, with explicit confirmation, stale-edit protection and separate actions.
+- Provide compact Mushroom dashboards in five languages with state-aware icons,
+  native controls and guidance for vehicle selection and Plug & Charge.
+- Restore vehicle-limit configuration after an app restart, keep a new HA trip
+  when an older trip finishes, retain pending edits across HA reloads, and discard
+  cached battery levels after unplugging.
+- Require service **0.9.0b7 or newer**, API 2. Update the app first. Old beta
+  scheduled orders, drafts and HA departure settings are not imported; recheck departure planning.
+
 ## 0.9.0b6 — 2026-11-14
 
 - Share one persistent charging-job draft between Home Assistant and the app,

@@ -29,7 +29,7 @@ from amtron_device.charge_job_store import ChargeJobStore
 from amtron_device.charge_rate_store import RateStore
 from amtron_device.decode import encode_register
 from amtron_device.departure_store import DepartureStore
-from amtron_device.job_draft import JobDraft
+from amtron_device.guest_draft import GuestDraft
 from pymodbus import FramerType
 from pymodbus.server import ModbusSerialServer, ModbusTcpServer
 from pymodbus.simulator import SimData, SimDevice
@@ -184,8 +184,8 @@ def check_environment(profile: str) -> None:
     require(Path("/proc/self/attr/current").read_text().strip() == f"{profile} (enforce)", "probe is not enforcing the expected profile")
     require(not (DATA / "service-token").exists(), "token fixture must start empty")
     require(not (DATA / "intent.json").exists(), "intent fixture must start empty")
-    require(not (DATA / "job-draft.json").exists(), "draft fixture must start empty")
-    require(not (DATA / "charge-job.json").exists(), "charge job fixture must start empty")
+    require(not (DATA / "guest-draft.json").exists(), "draft fixture must start empty")
+    require(not (DATA / "guest-charge.json").exists(), "charge job fixture must start empty")
     require(not (DATA / "charge-rates.json").exists(), "rate history fixture must start empty")
     require(not (DATA / "departure-plan.json").exists(), "departure plan fixture must start empty")
 
@@ -208,13 +208,13 @@ def check_charge_job_storage() -> None:
     now = datetime.now(UTC)
     job = ChargeJob.create({
         "id": "b" * 32, "start_at": now.isoformat(), "finish_at": (now + timedelta(hours=1)).isoformat(),
-        "current_a": 6, "energy_kwh": 1,
+        "current_a": 6, "energy_kwh": 1, "kind": "guest",
     }, binding="a" * 64, total_kwh=100, now=now)
-    path = DATA / "charge-job.json"
+    path = DATA / "guest-charge.json"
     try:
-        draft = JobDraft(DATA / "job-draft.json", SERIAL)
+        draft = GuestDraft(DATA / "guest-draft.json", SERIAL)
         draft.save(draft.values)
-        restored_draft = JobDraft(draft.path, SERIAL)
+        restored_draft = GuestDraft(draft.path, SERIAL)
         restored_draft.load()
         require(restored_draft.values == draft.values, "draft could not be read back")
         require(stat.S_IMODE(draft.path.stat().st_mode) == 0o600, "draft file is not private")
@@ -272,7 +272,7 @@ async def check_connection_page(session: ClientSession, mode: str, original: dic
         ("/", "text/html"), ("/connection", "text/html"),
         ("/app_overview.js", "text/javascript"), ("/log", "text/html"), ("/app_log.js", "text/javascript"),
         ("/app_settings.js", "text/javascript"), ("/app_settings.css", "text/css"),
-        ("/jobs", "text/html"),
+        ("/guest", "text/html"), ("/targets", "text/html"), ("/departure", "text/html"),
     ):
         async with session.get(SETTINGS_API + path, headers={"Accept-Language": "de-DE"}) as response:
             require(response.status == 200 and response.content_type == expected_type, "connection asset was not served")
@@ -280,8 +280,8 @@ async def check_connection_page(session: ClientSession, mode: str, original: dic
             require(bool(content) and SUPERVISOR_TOKEN not in content, "connection asset was empty or exposed a credential")
             if path == "/":
                 require('lang="de"' in content and 'id="overview"' in content, "translated overview page missing")
-            elif path == "/jobs":
-                require('lang="de"' in content and 'id="job_form"' in content, "translated charging job page missing")
+            elif path == "/guest":
+                require('lang="de"' in content and 'id="guest_form"' in content, "translated charging job page missing")
             elif path == "/connection":
                 require('lang="de"' in content and 'id="serial_port"' in content, "translated connection page or adapter selector missing")
     async with session.get(SETTINGS_API + "/api/overview") as response:

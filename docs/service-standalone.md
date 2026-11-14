@@ -6,11 +6,11 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-Run service **0.9.0b6 or newer** (API 2) with this integration, and
+Run service **0.9.0b7 or newer** (API 2) with this integration, and
 update the service first. See [Updates](#operation-and-updates). The app's web
-pages, including charging jobs, are part of the Home Assistant app and need
-Supervisor Ingress; a standalone service offers the same charging jobs through
-its [API](service-reference.md#charging-job-api).
+pages, including guest charging, are part of the Home Assistant app and need
+Supervisor Ingress; a standalone service offers the same guest charging through
+its [API](service-reference.md#guest-charging-api).
 
 ## 1. Prepare the serial handover
 
@@ -183,9 +183,9 @@ its heartbeat briefly. Do not run the old and new service together on the bus.
 Update the service and the integration together. Replace the service first,
 retaining its data directory, and wait for initialization. Then update the
 integration and restart Core. Retaining the same data mount preserves saved
-intent, a charging job and the credentials; no new HA entry is needed. With
+intent, a guest session and the credentials; no new HA entry is needed. With
 writes enabled, the updated service keeps its heartbeat and charging intent
-while HA updates. A service restart interrupts a running charging job.
+while HA updates. A service restart interrupts a running guest session.
 
 [Everyday operation and troubleshooting](modbus-service.md#everyday-use) ·
 [API, diagnostics and local development](service-reference.md)

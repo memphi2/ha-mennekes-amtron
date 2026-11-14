@@ -51,7 +51,8 @@ class Control:
         self.async_observe_soc = AsyncMock(side_effect=self.observe)
         self.async_set_soc_goal = AsyncMock(side_effect=self.set_goal)
 
-    async def configure(self, source):
+    async def configure(self, source, *, maximum_required=False):
+        self.maximum_required = maximum_required
         self.soc_goal.configure_source(source)
 
     async def observe(self, soc, maximum, *, source):
@@ -303,7 +304,7 @@ def test_absent_source_clears_an_old_goal_and_old_service_is_optional(tmp_path):
             control.supports_soc_goal = True
             coordinator.update()
             await hass.async_block_till_done()
-            control.async_configure_soc.assert_awaited_once_with(None)
+            control.async_configure_soc.assert_awaited_once_with(None, maximum_required=False)
             control.async_observe_soc.assert_not_awaited()
             assert control.soc_goal.status == "disabled"
             assert control.soc_goal.source is None
@@ -554,3 +555,60 @@ def test_automatic_target_waiting_for_lock_cannot_override_new_manual_choice(tmp
             await observer.async_stop()
             await hass.async_stop()
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("resting", [False, True])
+def test_service_restart_resends_cap_policy_without_ha_restart(tmp_path, resting):
+    async def body():
+        hass = HomeAssistant(str(tmp_path))
+        control, coordinator = Control(), Coordinator()
+        hass.states.async_set("sensor.car", "50")
+        hass.states.async_set("number.limit", "85")
+        observer = VehicleSocObserver(hass, control, coordinator, "sensor.car", "number.limit")
+        try:
+            await observer.async_start()
+            assert control.maximum_required
+            count = control.async_configure_soc.await_count
+            observer._binding = SimpleNamespace(resting=resting)
+            # A quick service boot may never appear as an unavailable HA poll.
+            control.maximum_required = None
+            control.soc_configuration_required = True
+            coordinator.update(True)
+            await hass.async_block_till_done()
+            assert control.maximum_required is True
+            assert control.async_configure_soc.await_count == count + 1
+            control.soc_configuration_required = False
+            coordinator.update(True)
+            await hass.async_block_till_done()
+            assert control.async_configure_soc.await_count == count + 1
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(body())
+
+
+def test_reconfiguration_failure_retries_on_next_update_without_spinning(tmp_path, caplog):
+    async def body():
+        hass = HomeAssistant(str(tmp_path))
+        control, coordinator = Control(), Coordinator()
+        observer = VehicleSocObserver(hass, control, coordinator, "sensor.car")
+        try:
+            await observer.async_start()
+            control.soc_configuration_required = True
+            control.async_configure_soc.side_effect = DeviceError("service_unavailable")
+            for _ in range(2):
+                count = control.async_configure_soc.await_count
+                coordinator.update()
+                await hass.async_block_till_done()
+                assert control.async_configure_soc.await_count == count + 1
+                assert observer._task is None
+                assert not observer._configured
+            assert caplog.text.count("Cannot configure vehicle charge target") == 1
+            control.async_configure_soc.side_effect = control.configure
+            coordinator.update()
+            await hass.async_block_till_done()
+            assert observer._configured
+        finally:
+            await observer.async_stop()
+            await hass.async_stop()
+    asyncio.run(body())

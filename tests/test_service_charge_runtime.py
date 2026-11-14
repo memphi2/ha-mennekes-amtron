@@ -248,7 +248,7 @@ def test_unplug_ends_the_scope_and_restart_cannot_resume_saved_order(tmp_path):
 
 def test_corrupt_storage_does_not_restart_loop_or_advertise_permission(tmp_path, caplog):
     async def run():
-        (tmp_path / "charge-job.json").write_text("not-json")
+        (tmp_path / "guest-charge.json").write_text("not-json")
         async with job_service(tmp_path) as (s, transport, _clock):
             assert s.jobs.storage_error
             await s.jobs.tick()

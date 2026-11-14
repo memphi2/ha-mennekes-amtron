@@ -242,17 +242,17 @@
       "timed_vehicle_departure": {
         "name": "Abfahrt vom Fahrzeug übernehmen"
       },
-      "job_start": {
-        "name": "Ladeauftrag starten"
+      "guest_start": {
+        "name": "Gastladen starten"
       },
-      "job_stop": {
-        "name": "Ladeauftrag stoppen"
+      "guest_reset_draft": {
+        "name": "Gastladeentwurf zurücksetzen"
       },
-      "job_clear": {
-        "name": "Ladeauftrag entfernen"
+      "guest_stop": {
+        "name": "Gastladen stoppen"
       },
-      "job_reset_draft": {
-        "name": "Ladeauftragsentwurf zurücksetzen"
+      "guest_clear": {
+        "name": "Gastladung entfernen"
       }
     },
     "number": {
@@ -265,14 +265,14 @@
       "soc_goal": {
         "name": "Fahrzeug-Ladeziel"
       },
-      "job_current_a": {
-        "name": "Auftragsladestrom"
+      "guest_current_a": {
+        "name": "Gastladestrom"
       },
-      "job_energy_kwh": {
-        "name": "Auftragsenergie"
+      "guest_energy_kwh": {
+        "name": "Gastladeenergie"
       },
-      "job_reserve_kwh": {
-        "name": "Auftrags-Sofortreserve"
+      "guest_duration_minutes": {
+        "name": "Maximale Gastladedauer"
       }
     },
     "select": {
@@ -470,7 +470,7 @@
           "waiting_for_device": "Wartet auf Wallbox",
           "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
           "read_only": "Nur lesen",
-          "order_active": "Auftrag aus der App hat Vorrang",
+          "order_active": "Gastladen hat Vorrang",
           "queued": "Änderung vorgemerkt",
           "paused_until_start": "Pausiert bis zum Start",
           "minimum_level": "Lädt bis zum Mindestladestand",
@@ -520,7 +520,7 @@
         "state": {
           "unavailable": "Wallbox nicht erreichbar",
           "guest_order": "Gastauftrag",
-          "charging_job": "Ladeauftrag",
+          "charging_job": "Gastladen",
           "departure_plan": "Abfahrtsplanung",
           "direct": "Direkte Steuerung"
         },
@@ -591,27 +591,34 @@
           }
         }
       },
-      "charging_job": {
-        "name": "Ladeauftrag",
+      "guest_draft_status": {
+        "name": "Gastladeentwurf",
         "state": {
-          "none": "Kein Auftrag",
-          "scheduled": "Wartet auf das Zeitfenster",
+          "ready": "Bereit zum Starten",
+          "job_exists": "Gastladen ist bereits aktiv",
+          "job_not_permitted": "Fahrzeug, Ladefreigabe, Zähler und ausstehende Änderungen prüfen",
+          "job_current_exceeds_cap": "Strom überschreitet das App-Limit",
+          "job_preview_expired": "Vorschau abgelaufen; neue Vorschau erstellen",
+          "job_storage_unavailable": "Entwurfsspeicher nicht verfügbar",
+          "invalid_job_request": "Energie, Strom und maximale Dauer prüfen",
+          "job_stop_unconfirmed": "Wartet auf bestätigten Stopp",
+          "guest_vehicle_target_active": "Fahrzeug-Ladeziel aktiv"
+        }
+      },
+      "guest_charging": {
+        "name": "Gastladen",
+        "state": {
+          "none": "Kein Gastladen",
+          "scheduled": "Gastladen wird vorbereitet",
           "charging": "Laden angefordert",
           "waiting_meter": "Wartet auf gültigen Zählerstand",
           "suspended": "Unterbrochen; prüft, ob derselbe Steckvorgang weiterläuft",
           "reached": "Energieobergrenze erreicht",
-          "finished": "Zeitfenster beendet",
+          "finished": "Maximale Dauer erreicht",
           "stopped": "Vom Benutzer gestoppt",
           "interrupted": "Unterbrochen; kein automatischer Neustart"
         },
         "state_attributes": {
-          "kind": {
-            "name": "Art",
-            "state": {
-              "scheduled": "Ladeauftrag",
-              "guest": "Gastladen"
-            }
-          },
           "start": {
             "name": "Start"
           },
@@ -627,32 +634,9 @@
           "delivered": {
             "name": "Geladen"
           },
-          "reserve": {
-            "name": "Sofortreserve"
-          },
           "reason": {
             "name": "Grund"
-          },
-          "boost_until": {
-            "name": "Boost bis"
-          },
-          "boost_available": {
-            "name": "Boost möglich"
           }
-        }
-      },
-      "job_draft_status": {
-        "name": "Ladeauftragsentwurf",
-        "state": {
-          "needs_finish": "Endzeit auswählen",
-          "ready": "Bereit zum Starten",
-          "job_exists": "Es läuft bereits ein Auftrag",
-          "job_not_permitted": "Fahrzeug, Ladefreigabe, Zähler und ausstehende Änderungen prüfen",
-          "job_current_exceeds_cap": "Strom überschreitet das App-Limit",
-          "job_preview_expired": "Startzeit abgelaufen; neue Zeit wählen",
-          "job_storage_unavailable": "Entwurfsspeicher nicht verfügbar",
-          "invalid_job_request": "Start, Ende und Energiemenge prüfen",
-          "job_stop_unconfirmed": "Wartet auf bestätigten Stopp"
         }
       }
     },
@@ -773,7 +757,7 @@
               "unknown": "Unbekannter Grund",
               "user_cancelled": "Vom Benutzer abgebrochen",
               "energy_goal": "Ladestopp durch ein Ladeziel",
-              "service_job": "Ladestopp durch einen Ladeauftrag der App",
+              "service_job": "Gastladen hat Vorrang",
               "deadline_expired": "Abfahrtszeit abgelaufen"
             }
           }
@@ -836,12 +820,6 @@
     "datetime": {
       "timed_departure": {
         "name": "Nächste Abfahrt"
-      },
-      "job_start_at": {
-        "name": "Frühester Auftragsstart"
-      },
-      "job_finish_at": {
-        "name": "Spätestes Auftragsende"
       }
     }
   },
@@ -919,7 +897,7 @@
       "message": "Ein Ladeziel erfordert eine Pause. Prüfe seinen Status. Nach Erreichen des Ziels oder einem Zählerreset kannst du ein neues Ziel setzen oder es mit 0 deaktivieren, bevor du weiterlädst. Eine Zieländerung startet das Laden nicht."
     },
     "service_job_active": {
-      "message": "Ein Ladeauftrag der Modbus-App steuert gerade das Laden. Stoppe ihn mit der Aktion „Ladeauftrag stoppen“ oder auf der Seite Ladeaufträge der App, oder stecke das Auto ab. Sobald die Wallbox die Pause bestätigt, kannst du hier wieder den Strom ändern oder weiterladen."
+      "message": "Gastladen steuert gerade den Ladestrom. Beende es unter Gastladen in der App oder mit „Gastladen stoppen“ in Home Assistant. Sobald die Pause bestätigt ist, ist die manuelle Steuerung wieder möglich."
     },
     "energy_goal_state_invalid": {
       "message": "Das gespeicherte Ladeziel konnte nicht wiederhergestellt werden. Prüfe das Protokoll, bevor du das Laden erneut freigibst."
@@ -999,14 +977,8 @@
     "guest_vehicle_target_active": {
       "message": "Fahrzeug-Batterieziel aktiv; kein Gastauftrag angelegt."
     },
-    "invalid_boost_duration": {
-      "message": "Eine ganze Zahl von 1 bis 120 Minuten eingeben."
-    },
     "invalid_job_request": {
       "message": "Die App hat diese Werte nicht angenommen. Zeit, Strom und Energie prüfen."
-    },
-    "job_boost_unavailable": {
-      "message": "Boost erfordert einen aktiven Auftrag vor dessen geplantem Start und eine aktuelle Freigabe."
     },
     "job_changed": {
       "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
@@ -1046,12 +1018,6 @@
     },
     "job_stop_unconfirmed": {
       "message": "Der Stopp ist noch nicht bestätigt. Gleich noch einmal versuchen."
-    },
-    "job_window_invalid": {
-      "message": "Das Ende muss nach dem Start und innerhalb von sieben Tagen liegen, und der Start darf nicht in der Vergangenheit liegen."
-    },
-    "job_reserve_exceeds_energy": {
-      "message": "Die Sofortreserve darf die Energie des Auftrags nicht überschreiten."
     }
   },
   "issues": {
@@ -1734,36 +1700,6 @@
         }
       }
     },
-    "start_charging_job": {
-      "name": "Ladeauftrag starten",
-      "description": "Lädt das angesteckte Auto in einem Zeitfenster mit festem Strom bis zu einer Energiemenge. Der Auftrag endet, wenn das Auto abgezogen wird.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
-        },
-        "current": {
-          "name": "Ladestrom",
-          "description": "Strom in Ampere pro Phase, höchstens die Stromgrenze der App."
-        },
-        "energy": {
-          "name": "Energie",
-          "description": "Das Laden endet, sobald diese Energie in kWh geliefert wurde."
-        },
-        "start": {
-          "name": "Start",
-          "description": "Wann das Laden beginnen darf. Leer lassen, um sofort zu beginnen."
-        },
-        "finish": {
-          "name": "Ende",
-          "description": "Wann das Laden spätestens endet, innerhalb von sieben Tagen."
-        },
-        "reserve": {
-          "name": "Sofortreserve",
-          "description": "Optional: Diese Energie in kWh wird sofort geladen, vor dem Zeitfenster."
-        }
-      }
-    },
     "start_guest_charging": {
       "name": "Gastladen starten",
       "description": "Lädt das Auto eines Gastes ab sofort für begrenzte Zeit und Energie. Es werden weder Fahrzeugdaten noch gespeicherte Ziele verwendet.",
@@ -1786,9 +1722,9 @@
         }
       }
     },
-    "stop_charging_job": {
-      "name": "Ladeauftrag stoppen",
-      "description": "Stoppt den laufenden Ladeauftrag oder das Gastladen und pausiert das Laden. Der Auftrag läuft nicht weiter; ein fälliger Abfahrtsplan kann wieder laden.",
+    "stop_guest_charging": {
+      "name": "Gastladen stoppen",
+      "description": "Beendet Gastladen und fordert eine Pause an. Eine aktive Abfahrtsplanung kann danach wieder laden.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1796,33 +1732,9 @@
         }
       }
     },
-    "clear_charging_job": {
-      "name": "Ladeauftrag löschen",
-      "description": "Entfernt einen beendeten oder gestoppten Ladeauftrag, damit ein neuer gestartet werden kann.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
-        }
-      }
-    },
-    "start_boost": {
-      "name": "Boost starten",
-      "description": "Lädt sofort, obwohl der Ladeauftrag erst später beginnt, und kehrt danach zum Plan zurück.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
-        },
-        "duration": {
-          "name": "Dauer",
-          "description": "Wie lange vorab geladen wird, in Minuten (bis 120)."
-        }
-      }
-    },
-    "cancel_boost": {
-      "name": "Boost beenden",
-      "description": "Beendet das vorzeitige Laden; der Ladeauftrag läuft wie geplant weiter.",
+    "clear_guest_charging": {
+      "name": "Gastladung entfernen",
+      "description": "Entfernt einen beendeten Gastladevorgang, ohne die Ladung fortzusetzen.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

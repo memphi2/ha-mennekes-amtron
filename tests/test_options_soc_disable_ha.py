@@ -13,7 +13,10 @@ from homeassistant.util import dt as dt_util
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
+from custom_components.mennekes_amtron_rtu.goal_store import (
+    DepartureIntent,
+    TimedGoalStore,
+)
 from tests.fakes import FakeModbusClient, device_bank
 from tests.options_flow_helpers import async_options
 from tests.test_home_assistant_smoke import SERIAL_NUMBER, _boot
@@ -60,7 +63,7 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 trip = TimedGoal()
                 trip.set(dt_util.utcnow() + timedelta(hours=8))
                 store = TimedGoalStore(hass, entry.entry_id, SERIAL_NUMBER)
-                await store.async_save(trip)
+                await store.async_save(DepartureIntent(trip))
                 before = current_writes(transport)
 
                 # Opening the car guides through its settings, name first.
@@ -80,7 +83,7 @@ def test_remove_percentage_feature_clears_target_and_trip_without_resuming(tmp_p
                 assert entry.runtime_data.control.soc_goal.source is None
                 assert entry.runtime_data.control.soc_goal.maximum_percent is None
                 assert entry.runtime_data.timed_goal is None
-                assert (await store.async_load()).deadline is None
+                assert (await store.async_load()).trip.deadline is None
                 assert entry.runtime_data.control.is_paused is True
                 assert current_writes(transport) == before
                 menu = await async_options(hass, entry, *battery)

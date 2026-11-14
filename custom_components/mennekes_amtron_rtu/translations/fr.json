@@ -242,17 +242,17 @@
       "timed_vehicle_departure": {
         "name": "Utiliser le départ du véhicule"
       },
-      "job_start": {
-        "name": "Démarrer la recharge"
+      "guest_start": {
+        "name": "Démarrer la recharge invité"
       },
-      "job_stop": {
-        "name": "Arrêter la recharge"
+      "guest_reset_draft": {
+        "name": "Réinitialiser le brouillon invité"
       },
-      "job_clear": {
-        "name": "Effacer la recharge"
+      "guest_stop": {
+        "name": "Arrêter la recharge invité"
       },
-      "job_reset_draft": {
-        "name": "Réinitialiser le brouillon"
+      "guest_clear": {
+        "name": "Effacer la recharge invité"
       }
     },
     "number": {
@@ -265,14 +265,14 @@
       "soc_goal": {
         "name": "Objectif de charge du véhicule"
       },
-      "job_current_a": {
-        "name": "Courant de la recharge"
+      "guest_current_a": {
+        "name": "Courant invité"
       },
-      "job_energy_kwh": {
-        "name": "Énergie de la recharge"
+      "guest_energy_kwh": {
+        "name": "Énergie invité"
       },
-      "job_reserve_kwh": {
-        "name": "Réserve immédiate"
+      "guest_duration_minutes": {
+        "name": "Durée maximale invité"
       }
     },
     "select": {
@@ -470,7 +470,7 @@
           "waiting_for_device": "En attente de la borne",
           "vehicle_unconfirmed": "Véhicule non confirmé",
           "read_only": "Lecture seule",
-          "order_active": "Un ordre de l’application a la priorité",
+          "order_active": "La recharge invité est prioritaire",
           "queued": "Modification en attente",
           "paused_until_start": "En pause jusqu’au démarrage",
           "minimum_level": "Recharge jusqu’au niveau minimal",
@@ -520,7 +520,7 @@
         "state": {
           "unavailable": "Borne injoignable",
           "guest_order": "Ordre invité",
-          "charging_job": "Ordre de recharge",
+          "charging_job": "Recharge invité",
           "departure_plan": "Planification du départ",
           "direct": "Commande directe"
         },
@@ -591,27 +591,34 @@
           }
         }
       },
-      "charging_job": {
-        "name": "Ordre de recharge",
+      "guest_draft_status": {
+        "name": "Brouillon invité",
         "state": {
-          "none": "Aucun ordre",
-          "scheduled": "En attente de la plage",
+          "ready": "Prêt à démarrer",
+          "job_exists": "Une recharge invité est déjà active",
+          "job_not_permitted": "Vérifier véhicule, autorisation, compteur et actions en attente",
+          "job_current_exceeds_cap": "Courant supérieur à la limite",
+          "job_preview_expired": "Aperçu expiré ; recréez-le",
+          "job_storage_unavailable": "Stockage indisponible",
+          "invalid_job_request": "Vérifiez énergie, courant et durée maximale",
+          "job_stop_unconfirmed": "En attente de l’arrêt confirmé",
+          "guest_vehicle_target_active": "Objectif de batterie actif"
+        }
+      },
+      "guest_charging": {
+        "name": "Recharge invité",
+        "state": {
+          "none": "Aucune recharge invité",
+          "scheduled": "Préparation de la recharge invité",
           "charging": "Recharge demandée",
           "waiting_meter": "En attente d’un relevé de compteur valide",
           "suspended": "Interrompu ; vérifie si le même branchement continue",
           "reached": "Plafond d’énergie atteint",
-          "finished": "Plage horaire terminée",
+          "finished": "Durée maximale atteinte",
           "stopped": "Arrêté par l’utilisateur",
           "interrupted": "Interrompu ; pas de redémarrage automatique"
         },
         "state_attributes": {
-          "kind": {
-            "name": "Type",
-            "state": {
-              "scheduled": "Ordre de recharge",
-              "guest": "Recharge invité"
-            }
-          },
           "start": {
             "name": "Début"
           },
@@ -627,32 +634,9 @@
           "delivered": {
             "name": "Fournie"
           },
-          "reserve": {
-            "name": "Réserve immédiate"
-          },
           "reason": {
             "name": "Motif"
-          },
-          "boost_until": {
-            "name": "Boost jusqu’à"
-          },
-          "boost_available": {
-            "name": "Boost disponible"
           }
-        }
-      },
-      "job_draft_status": {
-        "name": "Brouillon de recharge",
-        "state": {
-          "needs_finish": "Choisir une heure de fin",
-          "ready": "Prêt à démarrer",
-          "job_exists": "Une recharge est déjà en cours",
-          "job_not_permitted": "Vérifier véhicule, autorisation, compteur et actions en attente",
-          "job_current_exceeds_cap": "Courant supérieur à la limite",
-          "job_preview_expired": "Heure de début passée",
-          "job_storage_unavailable": "Stockage indisponible",
-          "invalid_job_request": "Vérifier début, fin et énergie",
-          "job_stop_unconfirmed": "En attente de l’arrêt confirmé"
         }
       }
     },
@@ -773,7 +757,7 @@
               "unknown": "Motif inconnu",
               "user_cancelled": "Annulé par l’utilisateur",
               "energy_goal": "Arrêt demandé par un objectif de recharge",
-              "service_job": "Arrêt par un ordre de recharge de l’app",
+              "service_job": "La recharge invité est prioritaire",
               "deadline_expired": "Heure de départ dépassée"
             }
           }
@@ -836,12 +820,6 @@
     "datetime": {
       "timed_departure": {
         "name": "Prochain départ"
-      },
-      "job_start_at": {
-        "name": "Début au plus tôt"
-      },
-      "job_finish_at": {
-        "name": "Fin au plus tard"
       }
     }
   },
@@ -919,7 +897,7 @@
       "message": "Un objectif de recharge impose une pause. Vérifiez son état. Une fois l’objectif atteint ou après une remise à zéro du compteur, définissez un nouvel objectif ou désactivez-le avec 0 avant de reprendre. Modifier l’objectif ne démarre pas la recharge."
     },
     "service_job_active": {
-      "message": "Un ordre de recharge de l’app Modbus pilote actuellement la recharge. Arrêtez-le avec l’action « Arrêter l’ordre de recharge » ou sur la page Ordres de recharge de l’app, ou débranchez le véhicule. Dès que la borne confirme la pause, vous pouvez de nouveau modifier le courant ou reprendre ici."
+      "message": "La recharge invité contrôle le courant. Arrêtez-la dans Recharge invité de l’application ou avec Arrêter la recharge invité dans Home Assistant. Le contrôle manuel revient après confirmation de la pause."
     },
     "energy_goal_state_invalid": {
       "message": "L’objectif énergétique enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
@@ -999,14 +977,8 @@
     "guest_vehicle_target_active": {
       "message": "Objectif de batterie du véhicule actif ; aucun ordre invité créé."
     },
-    "invalid_boost_duration": {
-      "message": "Saisissez un nombre entier de 1 à 120 minutes."
-    },
     "invalid_job_request": {
       "message": "L’application n’a pas accepté ces valeurs. Vérifiez l’heure, le courant et l’énergie."
-    },
-    "job_boost_unavailable": {
-      "message": "Le boost exige un ordre actif avant son début prévu et une autorisation actuelle."
     },
     "job_changed": {
       "message": "L’état a changé entre-temps. Réessayez."
@@ -1046,12 +1018,6 @@
     },
     "job_stop_unconfirmed": {
       "message": "L’arrêt n’est pas encore confirmé. Réessayez dans un instant."
-    },
-    "job_window_invalid": {
-      "message": "La fin doit être après le début et sous sept jours, et le début ne doit pas être dans le passé."
-    },
-    "job_reserve_exceeds_energy": {
-      "message": "La réserve immédiate ne doit pas dépasser l’énergie de l’ordre."
     }
   },
   "issues": {
@@ -1734,36 +1700,6 @@
         }
       }
     },
-    "start_charging_job": {
-      "name": "Démarrer un ordre de recharge",
-      "description": "Recharge la voiture branchée dans une plage horaire, à courant fixe, jusqu’à une quantité d’énergie. L’ordre prend fin au débranchement.",
-      "fields": {
-        "device_id": {
-          "name": "Borne",
-          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
-        },
-        "current": {
-          "name": "Courant de charge",
-          "description": "Courant en ampères par phase, au plus la limite de l’application."
-        },
-        "energy": {
-          "name": "Énergie",
-          "description": "La recharge s’arrête une fois cette énergie fournie, en kWh."
-        },
-        "start": {
-          "name": "Début",
-          "description": "Quand la recharge peut commencer. Laissez vide pour commencer maintenant."
-        },
-        "finish": {
-          "name": "Fin",
-          "description": "Quand la recharge se termine au plus tard, sous sept jours."
-        },
-        "reserve": {
-          "name": "Réserve immédiate",
-          "description": "Facultatif : cette énergie en kWh est chargée tout de suite, avant la plage."
-        }
-      }
-    },
     "start_guest_charging": {
       "name": "Démarrer une recharge invité",
       "description": "Recharge la voiture d’un invité dès maintenant, pour une durée et une énergie limitées. Aucune donnée du véhicule ni objectif enregistré n’est utilisé.",
@@ -1786,9 +1722,9 @@
         }
       }
     },
-    "stop_charging_job": {
-      "name": "Arrêter l’ordre de recharge",
-      "description": "Arrête l’ordre de recharge ou la recharge invité en cours et met la recharge en pause. L’ordre ne reprend pas ; un plan de départ arrivé à échéance peut recharger de nouveau.",
+    "stop_guest_charging": {
+      "name": "Arrêter la recharge invité",
+      "description": "Arrête la recharge invité et demande une pause. Un départ planifié peut ensuite reprendre la charge.",
       "fields": {
         "device_id": {
           "name": "Borne",
@@ -1796,33 +1732,9 @@
         }
       }
     },
-    "clear_charging_job": {
-      "name": "Effacer l’ordre de recharge",
-      "description": "Supprime un ordre de recharge terminé ou arrêté, pour pouvoir en démarrer un nouveau.",
-      "fields": {
-        "device_id": {
-          "name": "Borne",
-          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
-        }
-      }
-    },
-    "start_boost": {
-      "name": "Démarrer le boost",
-      "description": "Recharge tout de suite bien que l’ordre commence plus tard, puis revient au plan.",
-      "fields": {
-        "device_id": {
-          "name": "Borne",
-          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
-        },
-        "duration": {
-          "name": "Durée",
-          "description": "Durée de la recharge anticipée, en minutes (jusqu’à 120)."
-        }
-      }
-    },
-    "cancel_boost": {
-      "name": "Annuler le boost",
-      "description": "Met fin à la recharge anticipée ; l’ordre se poursuit comme prévu.",
+    "clear_guest_charging": {
+      "name": "Effacer la recharge invité",
+      "description": "Retire une session invité terminée sans reprendre la charge.",
       "fields": {
         "device_id": {
           "name": "Borne",

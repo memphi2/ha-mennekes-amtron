@@ -12,7 +12,10 @@ from homeassistant.util import dt as dt_util
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
+from custom_components.mennekes_amtron_rtu.goal_store import (
+    DepartureIntent,
+    TimedGoalStore,
+)
 from custom_components.mennekes_amtron_rtu.vehicle_profiles import activate_profile
 from custom_components.mennekes_amtron_rtu.vehicle_targets import VehicleTargetMemory
 from tests.fakes import FakeModbusClient, device_bank
@@ -71,7 +74,7 @@ def test_real_profile_select_rebinds_sources_clears_old_trip_and_preserves_pause
                 assert entry.runtime_data.control.is_paused is True
                 old_trip = TimedGoal()
                 old_trip.set(dt_util.utcnow() + timedelta(hours=8))
-                await TimedGoalStore(hass, entry.entry_id, SERIAL_NUMBER).async_save(old_trip)
+                await TimedGoalStore(hass, entry.entry_id, SERIAL_NUMBER).async_save(DepartureIntent(old_trip))
                 writes = current_writes(transport)
                 runtime = entry.runtime_data
                 unavailable = []

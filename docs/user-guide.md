@@ -231,7 +231,7 @@ reconnects to that state without replaying old charging commands. HA automations
 are still offline during a Core restart.
 
 For a charge that must run while HA is offline, the app can hold one
-[charging job](app-guide.md#charging-jobs) itself: a time window, a current and
+[guest session](app-guide.md#guest-charging) itself: a maximum duration, a current and
 a maximum amount of energy for the plugged-in car. While such an order runs, HA
 cannot change the current or resume; pausing in HA stops the order. When it
 ends, charging stays paused and HA controls charging again.
@@ -301,5 +301,4 @@ load protection remains the responsibility of the installation.
 ## Actions
 
 Use [automation examples](automations.md) for current control and events, or
-[app actions](app-from-home-assistant.md#action-fields) for charging jobs and
-guests. [Recorder settings](recorder.md) explains the exclusion-list action.
+[app actions](app-from-home-assistant.md#automation-actions) for guest charging. [Recorder settings](recorder.md) explains the exclusion-list action.

@@ -81,7 +81,7 @@ def test_unknown_kind_is_rejected_on_create_and_restore(kind):
         ChargeJob.restore({**saved, "kind": kind})
 
 
-@pytest.mark.parametrize("case", ["future", "long", "expired_preview", "boost"])
+@pytest.mark.parametrize("case", ["future", "long", "expired_preview", "obsolete_fields"])
 def test_guest_limits_cannot_be_bypassed_with_absolute_payloads(case):
     raw = guest_request(request(), now=NOW)
     if case == "future":
@@ -94,9 +94,7 @@ def test_guest_limits_cannot_be_bypassed_with_absolute_payloads(case):
         return
     else:
         job = ChargeJob.create(raw, binding=SCOPE, total_kwh=100, now=NOW)
-        with pytest.raises(ValueError, match="boost must end"):
-            job.set_boost(NOW.isoformat(), now=NOW - timedelta(seconds=1))
-        with pytest.raises(ValueError, match="invalid saved boost"):
+        with pytest.raises(ValueError, match="invalid saved job fields"):
             ChargeJob.restore({**job.snapshot(), "boost_until": NOW.isoformat()})
         return
     with pytest.raises(ValueError, match="guest window"):
@@ -180,7 +178,7 @@ def test_guest_completion_retries_and_restart_never_extend_permission(tmp_path, 
         await h.confirm(preview)
         assert c.job.kind == "guest"
         assert h.calls == [12]
-        assert c.snapshot()["boost_available"] is False
+        assert "boost_available" not in c.snapshot()
         h.change(total_kwh=103, now=NOW + timedelta(minutes=5))
         await h.confirm(preview)
         assert c.job.energy.baseline_kwh == 100

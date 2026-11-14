@@ -30,7 +30,7 @@ from .device.registers import CHARGING_CURRENT_EMS, ENERGY_TOTAL, EVSE_STATE
 from .entity import MennekesAmtronControlEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
-from .job_entities import JobNumber
+from .guest_entities import GuestNumber
 from .vehicle_features import SOC, vehicle_features
 
 PARALLEL_UPDATES = 1
@@ -51,7 +51,7 @@ async def async_setup_entry(
     if SOC in vehicle_features(hass, entry):
         entities.append(AmtronSocGoalNumber(entry, entry.runtime_data.coordinator))
     if entry.runtime_data.orders is not None:
-        entities.extend(JobNumber(entry, field) for field in ("current_a", "energy_kwh", "reserve_kwh"))
+        entities.extend(GuestNumber(entry, field) for field in ("current_a", "energy_kwh", "duration_minutes"))
     async_add_entities(entities)
 
 

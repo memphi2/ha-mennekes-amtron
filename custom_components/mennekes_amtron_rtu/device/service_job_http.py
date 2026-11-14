@@ -9,7 +9,9 @@ from aiohttp import web
 
 from .app_settings import SettingsError
 from .charge_job_controller import ChargeJobController, JobRequestError
-from .console_http import ServiceConsole, create_console_app
+from .console_charging import ChargingConsole
+from .console_http import create_console_app
+from .guest_draft import defaults
 from .service_http import create_app
 
 if TYPE_CHECKING:
@@ -27,29 +29,25 @@ async def job_operation(controller: ChargeJobController, payload: object) -> dic
     if not isinstance(payload, dict):
         raise JobRequestError("invalid_job_request")
     action = payload.get("action")
-    if action == "reset_draft" and payload.keys() == {"action", "draft_revision", "confirm"} and payload["confirm"] is True:
-        return await controller.edit_draft({"start_at": None, "finish_at": None, "current_a": 6.0, "energy_kwh": 10.0, "reserve_kwh": 0.0}, revision=payload["draft_revision"])
-    if action == "edit_draft" and payload.keys() == {"action", "draft_revision", "changes"}:
+    if action is not None and not isinstance(action, str):
+        raise ValueError("invalid action type")
+    if action == "reset_guest_draft" and payload.keys() == {"action", "draft_revision", "confirm"} and payload["confirm"] is True:
+        return await controller.edit_draft(defaults(), revision=payload["draft_revision"])
+    if action == "edit_guest_draft" and payload.keys() == {"action", "draft_revision", "changes"}:
         return await controller.edit_draft(payload["changes"], revision=payload["draft_revision"])
-    if action == "preview_draft" and payload.keys() == {"action", "draft_revision", "revision", "scope"}:
+    if action == "preview_guest_draft" and payload.keys() == {"action", "draft_revision", "revision", "scope"}:
         return controller.preview_draft(draft_revision=payload["draft_revision"], revision=payload["revision"], scope=payload["scope"])
-    if action == "create_draft" and payload.keys() == {"action", "draft_revision", "revision", "scope", "request"}:
+    if action == "create_guest_draft" and payload.keys() == {"action", "draft_revision", "revision", "scope", "request"}:
         return await controller.create_draft(payload["request"], draft_revision=payload["draft_revision"], revision=payload["revision"], scope=payload["scope"])
     if action == "preview_guest" and payload.keys() == {"action", "revision", "scope", "request"}:
         return controller.preview_guest(payload["request"], revision=payload["revision"], scope=payload["scope"])
-    if action in ("create", "preview") and payload.keys() == {"action", "revision", "scope", "request"}:
-        if action == "preview":
-            return controller.preview(payload["request"], revision=payload["revision"], scope=payload["scope"])
+    if action == "create" and payload.keys() == {"action", "revision", "scope", "request"}:
+        if not isinstance(payload["request"], dict) or payload["request"].get("kind") != "guest":
+            raise ValueError("invalid guest request")
         return await controller.create(payload["request"], revision=payload["revision"], scope=payload["scope"])
-    if action == "preview_boost" and payload.keys() == {"action", "revision", "scope", "minutes"}:
-        return controller.preview_boost(payload["minutes"], revision=payload["revision"], scope=payload["scope"])
-    if action == "boost" and payload.keys() == {"action", "revision", "scope", "until"}:
-        return await controller.boost(payload["until"], revision=payload["revision"], scope=payload["scope"])
-    if action in ("stop", "clear", "cancel_boost") and payload.keys() == {"action", "revision", "confirm"} and payload["confirm"] is True:
+    if action in ("stop", "clear") and payload.keys() == {"action", "revision", "confirm"} and payload["confirm"] is True:
         if action == "stop":
             return await controller.stop(revision=payload["revision"])
-        if action == "cancel_boost":
-            return await controller.cancel_boost(revision=payload["revision"])
         return await controller.clear(revision=payload["revision"])
     raise JobRequestError("invalid_job_request")
 
@@ -89,7 +87,7 @@ def create_job_app(service: JobModbusService) -> web.Application:
     return app
 
 
-class JobConsole(ServiceConsole):
+class JobConsole(ChargingConsole):
     """Job writes inherit Supervisor peer, administrator, CSRF and size checks."""
 
     def __init__(self, *args: Any, service: JobModbusService | None, **kwargs: Any) -> None:
@@ -120,6 +118,8 @@ class JobConsole(ServiceConsole):
 
 def create_job_console(settings: JobConsole) -> web.Application:
     app = create_console_app(settings)
+    app.router.add_get("/api/charging", settings.read_charging)
+    app.router.add_post("/api/charging", settings.save_charging)
     app.router.add_get("/api/jobs", settings.read_jobs)
     app.router.add_post("/api/jobs", settings.edit_jobs)
     return app

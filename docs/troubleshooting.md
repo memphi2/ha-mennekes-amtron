@@ -26,7 +26,7 @@ Find the symptom first; collect diagnostics before restarting if the problem is 
 ## A documented feature is missing
 
 These pages describe the current release. Check that the integration and, in
-service mode, the app are both up to date; the app's web pages and charging jobs
+service mode, the app are both up to date; the app's web pages and guest charging
 come with the app. Do not delete and recreate the wallbox to reveal a feature.
 
 Optional features stay off until you enable them in their own configuration section.
@@ -67,7 +67,7 @@ distinguish a waiting interval from a device problem:
 | Service unavailable | Check the app log and its USB/LAN connection. HA reconnecting does not replay old commands. |
 | Device rejected a write | Check satellite configuration, supported hardware/registers, device state and whether another master is using the bus. |
 | Restart refused | The wallbox must report **idle** before its **Restart** button can be used. |
-| "A charging job of the Modbus app controls charging now" | An app charging job or guest order runs for the plugged-in car. See [Charging jobs in the app](#charging-jobs-in-the-app). |
+| "A guest session of the Modbus app controls charging now" | An app guest session or guest order runs for the plugged-in car. See [Guest charging in the app](#guest-charging-in-the-app). |
 
 See [service setup](modbus-service.md) or the [hardware guide](hardware.md) for
 the relevant connection.
@@ -400,7 +400,7 @@ when permission was granted.
 [energy-target recovery](user-guide.md#energy-target) and
 [departure setup](departure-planning.md) explain each control's behavior.
 
-## Charging jobs in the app
+## Guest charging in the app
 
 | Symptom | What to check |
 |---|---|
@@ -409,7 +409,7 @@ when permission was granted.
 | "Another order is still running" | Only one order runs at a time. Stop it; once its pause is confirmed, create the new order. |
 | "Preview again" | The page changed meanwhile, or the start already lies more than a minute in the past. Preview again and confirm right away. |
 | Guest order refused: battery target active | Set the battery (percentage) target in Home Assistant to 0, then preview again. |
-| HA reports that a charging job of the app controls charging | An order runs for the plugged-in car. Stop it on **Charging jobs**, or unplug the car. HA controls charging again once the pause is confirmed. |
+| HA reports that a guest session of the app controls charging | An order runs for the plugged-in car. Stop it on **Guest charging**, or unplug the car. HA controls charging again once the pause is confirmed. |
 | Charging stays paused after the order ended | Intended: a finished order never resumes by itself. Resume in Home Assistant. |
 | The order shows **Interrupted; checking whether the same plug-in continues** | The app restarted or the wallbox was unreadable for over a minute. Charging stays paused for at most a minute after the wallbox is readable again, then the order continues or is interrupted. |
 | The order shows **Interrupted** after an app restart although the car stayed plugged in | The wallbox did not prove the same plug-in: its session duration did not keep running with the clock, its session counter changed, another vehicle was selected in HA, or the wallbox has no session counter (layout before v01.02). Check `session_duration` and `sessions_total` on **Registers** while charging is paused. Create a new order. |
@@ -417,7 +417,7 @@ when permission was granted.
 | "Clearing requires a confirmed pause or unplug" | Wait until the overview shows the pause, then clear again. |
 | "Storage unavailable; no automatic start" | The app could not save the order. Check the app log; restarting the app resolves a temporary problem. |
 
-See [charging jobs](app-guide.md#charging-jobs) for the full behavior.
+See [guest charging](app-guide.md#guest-charging) for the full behavior.
 
 ## Loss or cost estimates are unknown
 

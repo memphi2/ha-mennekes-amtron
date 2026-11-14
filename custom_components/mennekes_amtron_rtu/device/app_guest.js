@@ -5,6 +5,11 @@
   const found=languages.indexOf((document.documentElement.lang||"").slice(0,2).toLowerCase());
   const column=found<0?0:found, locale=languages[column];
   const words={
+    reset_draft:["Reset draft (keeps running order)","Entwurf zurücksetzen (laufender Auftrag bleibt)","Réinitialiser le brouillon (ordre conservé)","Concept resetten (opdracht blijft)","Reimposta bozza (ordine invariato)"],
+    draft_storage_error:["Draft could not be read or saved. Reset the draft to recover; the current order is unchanged.","Entwurf konnte nicht gelesen oder gespeichert werden. Entwurf zum Wiederherstellen zurücksetzen; der laufende Auftrag bleibt unverändert.","Lecture ou enregistrement du brouillon impossible. Réinitialisez-le ; l’ordre actuel reste inchangé.","Concept kon niet worden gelezen of opgeslagen. Reset het concept; de huidige opdracht blijft ongewijzigd.","Impossibile leggere o salvare la bozza. Reimpostarla; l’ordine attuale resta invariato."],
+    draft_saved:["Draft saved; charging unchanged.","Entwurf gespeichert; Laden unverändert.","Brouillon enregistré ; recharge inchangée.","Concept opgeslagen; laden ongewijzigd.","Bozza salvata; ricarica invariata."],
+    save_draft:["Save draft","Entwurf speichern","Enregistrer le brouillon","Concept opslaan","Salva bozza"],
+    reload_draft:["Reload saved draft","Gespeicherten Entwurf laden","Recharger le brouillon","Opgeslagen concept laden","Ricarica bozza salvata"],
     title:["Guest charging","Gastladen","Recharge invité","Gastladen","Ricarica ospite"],
     intro:["One immediate energy/time order for the connected guest vehicle. No battery data or saved vehicle target is used.","Ein sofortiger Energie-/Zeitauftrag für das angeschlossene Gastfahrzeug. Keine Batteriedaten oder gespeicherten Fahrzeugziele werden übernommen.","Un ordre immédiat d’énergie et de durée pour le véhicule invité connecté. Aucune donnée de batterie ni objectif de véhicule enregistré n’est utilisé.","Eén directe energie-/tijdopdracht voor het aangesloten gastvoertuig. Er worden geen accugegevens of opgeslagen voertuigdoelen gebruikt.","Un ordine immediato di energia e durata per il veicolo ospite collegato. Non vengono usati dati della batteria né obiettivi salvati del veicolo."],
     status:["Current order","Aktueller Auftrag","Ordre actuel","Huidige opdracht","Ordine attuale"],
@@ -24,7 +29,7 @@
     loading:["Reading service state…","Servicestatus wird gelesen …","Lecture de l’état du service…","Servicestatus wordt gelezen…","Lettura dello stato del servizio…"],
     offline:["No current response. Controls disabled until status is read again.","Keine aktuelle Antwort. Bedienung bis zur erneuten Statusabfrage gesperrt.","Aucune réponse actuelle. Commandes désactivées jusqu’à la prochaine lecture de l’état.","Geen actueel antwoord. Bediening uitgeschakeld tot de status opnieuw is gelezen.","Nessuna risposta attuale. Comandi disattivati fino alla prossima lettura dello stato."],
     no_job:["No order","Kein Auftrag","Aucun ordre","Geen opdracht","Nessun ordine"],
-    other_job:["Another charging order exists. Manage it on the Charging jobs page.","Ein anderer Ladeauftrag besteht. Diesen auf der Seite Ladeaufträge verwalten.","Un autre ordre de recharge existe. Gérez-le sur la page Ordres de recharge.","Er bestaat een andere laadopdracht. Beheer deze op de pagina Laadopdrachten.","Esiste un altro ordine di ricarica. Gestirlo nella pagina Ordini di ricarica."],
+    other_job:["Unsupported saved session. Stop and clear it before starting guest charging.", "Nicht unterstützter gespeicherter Ladevorgang. Vor Gastladen stoppen und entfernen.", "Session enregistrée non prise en charge. Arrêtez-la et retirez-la avant une recharge invité.", "Niet-ondersteunde opgeslagen sessie. Stop en verwijder vóór gastladen.", "Sessione salvata non supportata. Fermare e rimuovere prima della ricarica ospite."],
     unavailable:["Fresh meter, connected vehicle and existing release are required.","Aktueller Zählerstand, angeschlossenes Fahrzeug und bestehende Ladefreigabe erforderlich.","Un compteur à jour, un véhicule connecté et une autorisation existante sont requis.","Een actuele meterstand, een aangesloten voertuig en een bestaande vrijgave zijn vereist.","Servono un contatore aggiornato, un veicolo collegato e un consenso esistente."],
     vehicle_target:["A vehicle battery target is active. Explicitly disable it in Home Assistant before using guest charging; it will not be cleared automatically.","Ein Fahrzeug-Batterieziel ist aktiv. Vor Gastladen ausdrücklich in Home Assistant deaktivieren; es wird nicht automatisch gelöscht.","Un objectif de batterie du véhicule est actif. Désactivez-le explicitement dans Home Assistant avant la recharge invité ; il n’est pas effacé automatiquement.","Er is een accudoel van het voertuig actief. Schakel het in Home Assistant uitdrukkelijk uit vóór gastladen; het wordt niet automatisch gewist.","È attivo un obiettivo della batteria del veicolo. Disattivarlo esplicitamente in Home Assistant prima della ricarica ospite; non viene cancellato automaticamente."],
     storage_error:["Storage unavailable; starting is blocked.","Speicher nicht verfügbar; Ladestarts gesperrt.","Stockage indisponible ; démarrage bloqué.","Opslag niet beschikbaar; starten geblokkeerd.","Memoria non disponibile; avvio bloccato."],
@@ -67,20 +72,26 @@
   // The page shows once its texts are in the page language.
   document.documentElement.classList?.add("ready");
   let state=null, proposal=null, busy=false, timer=null, readAbort=null, generation=0, hidden=false, lastError="";
+  let draftRevision=null, draftDirty=false;
+  const fields={duration_minutes:"guest_duration",current_a:"guest_current",energy_kwh:"guest_energy"};
   const live=()=>!hidden&&!document.hidden;
   function invalidate(){proposal=null;el("guest_confirmation").hidden=true;}
   function render(){
     const job=state?.job, own=job?.kind==="guest", ended=Boolean(job)&&["reached","finished","stopped","interrupted"].includes(job.state);
     const good=state?.ready&&!state.storage_error&&state.available&&state.present===true&&state.permitted&&state.meter_fresh&&!state.vehicle_target_active&&!job?.holding;
-    el("guest_fields").disabled=busy||!good;
+    el("guest_fields").disabled=busy||!state?.ready||state.read_only||!state.guest_draft||state.guest_draft.storage_error;
+    el("guest_preview").disabled=busy||!good;
+    el("guest_reset_draft").disabled=busy||!state?.guest_draft||state.read_only;
+    el("guest_reload_draft").disabled=busy||!state;
     el("guest_current").max=String(state?.max_current_a||6);
     el("guest_confirm").disabled=busy||!proposal;
     el("guest_stop").disabled=busy||!own||!job.holding||ended;
-    el("guest_clear").disabled=busy||!own||!ended;
+    el("guest_clear").disabled=busy||!state||state.read_only||(!state.storage_error&&(!own||!ended));
     el("guest_status").hidden=!state;
     el("guest_state").textContent=!job||(!own&&!job.holding)?t("no_job"):own?t(job.state):t("other_job");
+    el("guest_state").className="charging-state "+(state?.action_error||state?.storage_error?"state-error":job?.state==="reached"?"state-good":job?.state==="charging"?"state-active":!job?"state-muted":"state-wait");
     el("guest_detail").textContent=own?`${date(job.start_at)} → ${date(job.finish_at)} · ${job.current_a} A · ${job.delivered_kwh==null?"—":Number(job.delivered_kwh).toLocaleString(locale,{maximumFractionDigits:2})} / ${job.energy_kwh} kWh${job.scope_ended?` · ${t("scope_ended")}`:!job.holding?` · ${t("released")}`:""}${state.action_error?` · ${t("unconfirmed")}`:""}`:"";
-    el("guest_notice").textContent=lastError||(!state?t("loading"):state.storage_error?t("storage_error"):state.vehicle_target_active?t("vehicle_target"):good?t("ready"):job?t(own?job.state:"other_job"):state.read_only?t("read_only"):t("unavailable"));
+    el("guest_notice").textContent=lastError||(!state?t("loading"):state.guest_draft?.storage_error?t("draft_storage_error"):state.storage_error?t("storage_error"):state.vehicle_target_active?t("vehicle_target"):good?t("ready"):job?t(own?job.state:"other_job"):state.read_only?t("read_only"):t("unavailable"));
   }
   function suspend(){generation++;clearTimeout(timer);timer=null;readAbort?.abort();readAbort=null;}
   async function read(){
@@ -92,7 +103,11 @@
       const data=await response.json();
       if(!response.ok||data.schema!==1||typeof data.revision!=="string"||typeof data.csrf!=="string")throw new Error("invalid");
       if(own!==generation||!live())return;
-      if(proposal&&proposal.revision!==data.revision)invalidate();
+      if(proposal&&(proposal.revision!==data.revision||proposal.draft_revision!==data.guest_draft?.revision))invalidate();
+      if(!draftDirty&&data.guest_draft?.values){
+        draftRevision=data.guest_draft.revision;
+        for(const [key,id] of Object.entries(fields))el(id).value=String(data.guest_draft.values[key]);
+      }else if(draftDirty&&draftRevision!==data.guest_draft?.revision)lastError=t("job_changed");
       if(lastError===t("offline"))lastError="";
       state=data;render();
     }catch(_){if(own===generation&&live()){state=null;invalidate();lastError=t("offline");render();}}
@@ -111,27 +126,43 @@
     }catch(_){if(own===generation&&live())lastError=t("uncertain");return null;}
     finally{clearTimeout(timeout);busy=false;render();}
   }
-  el("guest_form").addEventListener("input",()=>{invalidate();lastError="";render();});
+  el("guest_form").addEventListener("input",()=>{draftDirty=true;invalidate();lastError="";render();});
+  function scheduleRead(){clearTimeout(timer);timer=null;if(live()&&!busy&&!readAbort)timer=setTimeout(read,5000);}
+  async function saveDraft(){
+    if(!state||!draftRevision||busy||!el("guest_form").reportValidity())return false;
+    const changes=Object.fromEntries(Object.entries(fields).map(([key,id])=>[key,Number(el(id).value)]));
+    if(!Number.isInteger(changes.duration_minutes)||changes.duration_minutes<1||changes.duration_minutes>1440){lastError=t("invalid");render();return false;}
+    const csrf=state.csrf;
+    const result=await post({action:"edit_guest_draft",draft_revision:draftRevision,changes});
+    if(!result?.guest_draft)return false;
+    state={...result,csrf};draftRevision=result.guest_draft.revision;draftDirty=false;render();return true;
+  }
+  el("guest_save_draft").addEventListener("click",async()=>{invalidate();if(await saveDraft())lastError=t("draft_saved");render();scheduleRead();});
+  el("guest_reload_draft").addEventListener("click",()=>{if(busy)return;draftDirty=false;lastError="";invalidate();suspend();void read();});
+  el("guest_reset_draft").addEventListener("click",async()=>{
+    if(!state||busy)return;invalidate();lastError="";
+    const result=await post({action:"reset_guest_draft",draft_revision:draftRevision,confirm:true});
+    if(result)draftDirty=false;
+    state=null;render();void read();
+  });
   el("guest_form").addEventListener("submit",async event=>{
     event.preventDefault();if(!state||busy||!el("guest_form").reportValidity())return;
     invalidate();lastError="";
-    const minutes=Number(el("guest_duration").value);
-    if(!Number.isInteger(minutes)||minutes<1||minutes>1440){lastError=t("invalid");render();return;}
-    const request={id:crypto.randomUUID().replaceAll("-",""),duration_minutes:minutes,current_a:Number(el("guest_current").value),energy_kwh:Number(el("guest_energy").value)};
-    const result=await post({action:"preview_guest",revision:state.revision,scope:state.scope,request});
+    if(!await saveDraft()){scheduleRead();return;}
+    const result=await post({action:"preview_guest_draft",draft_revision:draftRevision,revision:state.revision,scope:state.scope});
     if(result?.schema===1&&result.request?.kind==="guest"){
       proposal=result;el("guest_summary").textContent=`${date(result.request.start_at)} → ${date(result.request.finish_at)} · ${result.request.current_a} A · ${result.request.energy_kwh} kWh`;
       el("guest_confirmation").hidden=false;render();
     }else{state=null;render();}
-    if(live())timer=setTimeout(read,5000);
+    scheduleRead();
   });
   el("guest_confirm").addEventListener("click",async()=>{
     if(!proposal||busy)return;const p=proposal;invalidate();lastError="";
-    await post({action:"create",revision:p.revision,scope:p.scope,request:p.request});
+    await post({action:"create_guest_draft",draft_revision:p.draft_revision,revision:p.revision,scope:p.scope,request:p.request});
     state=null;render();void read();
   });
   for(const action of ["stop","clear"])el(`guest_${action}`).addEventListener("click",async()=>{
-    if(!state||busy||state.job?.kind!=="guest")return;const revision=state.revision;invalidate();lastError="";
+    if(!state||busy||(state.job?.kind!=="guest"&&!(action==="clear"&&state.storage_error)))return;const revision=state.revision;invalidate();lastError="";
     await post({action,revision,confirm:true});state=null;render();void read();
   });
   document.addEventListener("visibilitychange",()=>{suspend();invalidate();state=null;render();if(live())void read();});

@@ -202,18 +202,10 @@ class ChargeRateLearner:
         return (), "none", None, None
 
 
-def _finish(job: ChargeJob, remaining: float, delivered: float, now: datetime, rate: float) -> datetime:
-    """Include the accepted reserve/boost and the original waiting window."""
-    if now >= job.start_at:
-        return now + timedelta(hours=remaining / rate)
-    early = max(0.0, job.reserve.target_kwh - delivered) if job.reserve is not None and not job.reserve.reached else 0.0
-    if job.boost_until is not None and job.boost_until > now:
-        early = max(early, rate * (job.boost_until - now).total_seconds() / 3600)
-    early = min(remaining, early)
-    early_end = now + timedelta(hours=early / rate)
-    if early >= remaining:
-        return early_end
-    return max(job.start_at, early_end) + timedelta(hours=(remaining - early) / rate)
+def _finish(job: ChargeJob, remaining: float, now: datetime, rate: float) -> datetime:
+    """Estimate the accepted bounded window without a second early-start mode."""
+    return max(now, job.start_at) + timedelta(hours=remaining / rate)
+
 
 
 def charging_forecast(
@@ -267,8 +259,8 @@ def charging_forecast(
         result.update(state="beyond_horizon", deadline_status="at_risk")
         return result
     anchor = datetime.fromtimestamp(observed, UTC) if source == "live" and observed is not None else sample.now
-    earliest = _finish(job, remaining, delivered, anchor, fast)
-    latest = _finish(job, remaining, delivered, anchor, slow)
+    earliest = _finish(job, remaining, anchor, fast)
+    latest = _finish(job, remaining, anchor, slow)
     if latest <= sample.now:
         result["state"] = "awaiting_meter"
         return result
