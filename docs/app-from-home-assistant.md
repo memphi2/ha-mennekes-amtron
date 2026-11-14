@@ -34,27 +34,25 @@ scripts, packages, custom wallbox card or card-mod are required.
 5. Leave edit mode to check conditional visibility. HA shows conditional cards
    while editing. Optional target and planning controls appear only when their entities are available.
 
-The top tile shows live power, session energy and charging state. State icons and
-colors change: charging/ready is green, waiting/paused amber, a fault red, and
-an inactive function grey. Text always explains the state as well. **P&C ready**
-means authorization was reported; merely turning P&C on does not mean the car
-has been recognized. Tap **Pause** to toggle it. Release and P&C open their
-native HA controls; the vehicle chip opens profile selection. **0 A removes the
-current limit; it does not pause charging.**
-
 ## What the card shows
 
-The card follows daily use from top to bottom:
+One status tile and two rows of chips, so it fits next to other tiles:
 
-1. **Wallbox now:** state, power and session energy, with colored state icons.
-2. **Controls:** pause, release, Plug & Charge, selected vehicle and current slider.
-3. **Charging limits:** shared kWh, target time and optional vehicle percentage.
-4. **Guest charging:** one button, changing to pause while the guest is active.
-5. **Vehicle planning:** only when configured; status and optional calendar/vehicle imports.
+1. **Tile:** `AMTRON · power`, then charging state and session energy, then
+   the active limits, for example `Limits: 10 kWh · until 07:30 · 80 %`, and
+   the planning state when vehicle planning is configured. Green means
+   charging, amber paused, red a fault.
+2. **Control chips:** **P&C** (green once the car is authorized, amber while
+   it waits), the selected vehicle, the current limit (**0 A** removes the
+   limit; it does not pause), **Pause** (tap toggles) and **Release**.
+3. **Limit chips:** kWh target, **target time**, and with a vehicle profile its
+   percentage target. Tap a chip to edit it: the time chip opens date and time
+   input; **hold** it to clear the time. **Start guest** appears only while no
+   guest is charging; **Pause** stops a guest. **Calendar** and **Vehicle
+   timer** appear only when vehicle planning offers them.
 
-Tap the time tile to edit it; hold it to clear the selected time. This uses the
-integration's existing datetime entity and `mennekes_amtron_rtu.clear_target_time`.
-There is no helper or separate clear-button entity to maintain.
+The card uses only the integration's entities and
+`mennekes_amtron_rtu.clear_target_time`; no helpers are needed.
 
 ## Charge target
 
