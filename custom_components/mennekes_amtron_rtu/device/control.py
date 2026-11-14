@@ -1238,7 +1238,8 @@ class AmtronControl:
         try:
             await self._async_apply_release(True)
         except BaseException as err:
-            if self._release_writes == written and (not self._command_write_started or not self._uncertain(err)):
+            refused = isinstance(err, (AmtronRateLimitedError, _TimedCommandCancelledError))
+            if self._release_writes == written and (refused or not self._command_write_started or not self._uncertain(err)):
                 gate.manual = manual
             raise
 
@@ -1530,7 +1531,7 @@ class AmtronControl:
             raise self.stop_error()
 
     async def _async_check_command_vehicle(self, read: LockedRegisterReader) -> None:
-        """Cancel a trip's command if live EVSE and CP both prove unplugging."""
+        """Cancel a bound command if live EVSE and CP both prove unplugging."""
         if await self._async_vehicle_absent(read):
             raise _TimedCommandCancelledError("unknown")
 

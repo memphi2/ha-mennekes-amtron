@@ -252,6 +252,9 @@ def test_guest_release_and_resume_remain_one_deferred_request(tmp_path, monkeypa
             assert service.control.pending_action == "resume"
             assert service.control.pending_guest_start
             assert service.data.get("charging_release") == 0
+            # Waiting is not an applied authorization. Cancellation or error
+            # recovery must not inherit a manual Plug & Charge bypass.
+            assert service.control.plug_charge["manual"] is False
             if cancel:
                 await service.control.async_cancel_pending_change()
             clock[0] += 301
