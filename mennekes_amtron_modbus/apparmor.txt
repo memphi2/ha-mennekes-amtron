@@ -61,6 +61,6 @@ profile mennekes_amtron_modbus flags=(attach_disconnected,mediate_deleted) {
   # named same-directory files; no general /data or /tmp write permission.
   /data/ r,
   /data/options.json r,
-  /data/{service-token,intent.json,charge-job.json,weekly-plans.json,charge-rates.json,departure-plan.json} rw,
-  /data/.{token,intent,job,weekly,rates,departure}-* rw,
+  /data/{service-token,intent.json,charge-job.json,charge-rates.json,departure-plan.json} rw,
+  /data/.{token,intent,job,rates,departure}-* rw,
 }
