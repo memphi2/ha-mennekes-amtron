@@ -19,12 +19,17 @@ departure planning in **Home Assistant**. Once handed over, the app can execute
 a vehicle plan while HA is offline. The web interface needs no separate saved
 charging order.
 
+![Charging page with shared limits and the guest-start button](images/charging-de.png)
+
+*German interface with simulated example values. The app also supports English,
+French, Italian and Dutch.*
+
 ## Overview
 
 The overview opens first. It refreshes every five seconds while the page is
 visible and shows:
 
-- **My charging**: which of the app's controllers decides right now (a
+- **Current charging plan**: which of the app's controllers decides right now (a
   guest charge, departure plan or manual control), why
   the car does not charge yet, the next step with its time, the target and
   whether Home Assistant confirmed the car. Home Assistant shows the same

@@ -556,7 +556,7 @@
           "queued_command": "Queued change runs",
           "plan_start": "Planned charge starts",
           "target_reached": "Target expected",
-          "departure": "Departure"
+          "departure": "Target time"
         },
         "state_attributes": {
           "at": {

@@ -556,7 +556,7 @@
           "queued_command": "La modifica in coda viene eseguita",
           "plan_start": "Inizia la ricarica pianificata",
           "target_reached": "Obiettivo previsto",
-          "departure": "Partenza"
+          "departure": "Orario obiettivo"
         },
         "state_attributes": {
           "at": {

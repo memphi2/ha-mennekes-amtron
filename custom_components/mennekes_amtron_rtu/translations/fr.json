@@ -556,7 +556,7 @@
           "queued_command": "La modification en attente s’exécute",
           "plan_start": "La recharge planifiée démarre",
           "target_reached": "Cible attendue",
-          "departure": "Départ"
+          "departure": "Heure cible"
         },
         "state_attributes": {
           "at": {

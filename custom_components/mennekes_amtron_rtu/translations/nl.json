@@ -556,7 +556,7 @@
           "queued_command": "Wijziging in wachtrij wordt uitgevoerd",
           "plan_start": "Gepland laden start",
           "target_reached": "Doel verwacht",
-          "departure": "Vertrek"
+          "departure": "Doeltijd"
         },
         "state_attributes": {
           "at": {

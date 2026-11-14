@@ -556,7 +556,7 @@
           "queued_command": "Vorgemerkte Änderung wird ausgeführt",
           "plan_start": "Geplantes Laden startet",
           "target_reached": "Ziel voraussichtlich erreicht",
-          "departure": "Abfahrt"
+          "departure": "Zielzeitpunkt"
         },
         "state_attributes": {
           "at": {
