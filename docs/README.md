@@ -34,7 +34,7 @@ Already installed? Keep your device and entity IDs and follow
 
 ## Version
 
-These pages describe **0.9.0b3** of the integration and the app. Install both
+These pages describe **0.9.0b4** of the integration and the app. Install both
 in the same version; in service mode, update the app first. The app's web pages
 need **Supervisor 2026.10.4 or newer**. Optional features stay off until you set
 them up.

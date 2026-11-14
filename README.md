@@ -74,10 +74,11 @@ setting belongs and why a requested change may wait.
 
 ## Development and releases
 
-**Current beta: 0.9.0b3.** The app's web pages look like Home Assistant, with
-the registers on the overview and a log that runs by itself; the app runs
-charging jobs, early boosts and guest charging on its own. Total
-power carries the values of all three phases. Optional features
+**Current beta: 0.9.0b4.** Charging jobs, early boosts and guest charging of
+the app can be started from a Home Assistant dashboard or automation, and with
+the app its wallbox settings live in one place. Weekly plans are gone;
+recurring departures come from a calendar. Total power carries the values of
+all three phases. Optional features
 stay off until you configure them. See the [release notes](CHANGELOG.md).
 
 [All documentation](docs/README.md) · [Compatibility](docs/compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)

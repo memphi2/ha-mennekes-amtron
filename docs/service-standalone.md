@@ -4,7 +4,7 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-Run the service in the same version as the integration, here **0.9.0b3**, and
+Run the service in the same version as the integration, here **0.9.0b4**, and
 update the service first. See [Updates](#operation-and-updates). The app's web
 pages, including charging jobs, are part of the Home Assistant app and need
 Supervisor Ingress; a standalone service offers the same charging jobs through
@@ -106,7 +106,7 @@ that runs independently of Home Assistant.
 
 Copy the **standalone container reference** from the
 [published app catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps)
-for your release. Prereleases such as 0.9.0b3 are in the
+for your release. Prereleases such as 0.9.0b4 are in the
 [beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta).
 Use the complete `ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference
 as the image. The digest selects the verified release even if a registry tag

@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.9.0b4 — unreleased
+## 0.9.0b4 — 2026-11-14
 
 - **The registers are a page below Overview again,** with the complete table,
   instead of a card of the overview.
