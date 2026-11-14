@@ -10,19 +10,19 @@ from .console_http import create_console_app
 from .service_http import create_app
 
 if TYPE_CHECKING:
-    from .service_job_runtime import JobModbusService
+    from .service_guest_runtime import GuestModbusService
 
 
-def create_job_app(service: JobModbusService) -> web.Application:
+def create_service_app(service: GuestModbusService) -> web.Application:
     """Guest start is a named command; there is no separate order-edit API."""
     return create_app(service)
 
 
-class JobConsole(ChargingConsole):
+class ChargingConsoleApp(ChargingConsole):
     """Use the same charging controls and limits as Home Assistant."""
 
 
-def create_job_console(settings: JobConsole) -> web.Application:
+def create_charging_console(settings: ChargingConsoleApp) -> web.Application:
     app = create_console_app(settings)
     app.router.add_get("/api/charging", settings.read_charging)
     app.router.add_post("/api/charging", settings.save_charging)

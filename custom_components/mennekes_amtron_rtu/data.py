@@ -22,9 +22,9 @@ if TYPE_CHECKING:
     from .device.energy_goal_controller import EnergyGoalController
     from .device.heartbeat import HeartbeatTask
     from .device.soc_goal_controller import SocGoalController
+    from .guest_charging import GuestCharging
     from .plug_charge import PlugChargeObserver
     from .recovery import HeartbeatRecovery
-    from .service_orders import ServiceOrders
     from .session_observer import SessionObserver
     from .timed_goal_observer import TimedGoalObserver
     from .vehicle_binding import VehicleBinding
@@ -59,7 +59,7 @@ class MennekesAmtronRuntimeData:
     vehicle_switching: bool = False
     heartbeat: HeartbeatTask | None = None
     # Charging jobs of the app; None with a direct connection.
-    orders: ServiceOrders | None = None
+    guest: GuestCharging | None = None
     recovery: HeartbeatRecovery | None = None
     goal: EnergyGoalController | None = None
     soc_goal: SocGoalController | None = None

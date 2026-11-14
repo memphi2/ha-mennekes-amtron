@@ -155,10 +155,9 @@
         "default": "mdi:account-tie-hat-outline",
         "state": {
           "unavailable": "mdi:lan-disconnect",
-          "guest_order": "mdi:account-clock-outline",
-          "charging_job": "mdi:clipboard-clock-outline",
           "departure_plan": "mdi:car-clock",
-          "direct": "mdi:gesture-tap"
+          "direct": "mdi:gesture-tap",
+          "guest": "mdi:account-clock-outline"
         }
       },
       "operation_waiting": {
@@ -181,15 +180,8 @@
       "guest_charging": {
         "default": "mdi:account-clock-outline",
         "state": {
-          "none": "mdi:clipboard-outline",
-          "charging": "mdi:battery-charging",
-          "reached": "mdi:clipboard-check-outline",
-          "finished": "mdi:clipboard-check-outline",
-          "stopped": "mdi:stop-circle-outline",
-          "interrupted": "mdi:alert-circle-outline",
-          "scheduled": "mdi:account-clock-outline",
-          "waiting_meter": "mdi:meter-electric-outline",
-          "suspended": "mdi:pause-circle-outline"
+          "inactive": "mdi:account-outline",
+          "active": "mdi:account-check"
         }
       }
     },

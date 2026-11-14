@@ -10,7 +10,6 @@ database row every few seconds.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
@@ -31,8 +30,8 @@ from .estimate_sensor import AmtronEstimateSensor
 from .sensor_descriptions import (
     CONTROL_SENSOR_DESCRIPTIONS,
     ESTIMATE_SENSOR_DESCRIPTIONS,
+    GUEST_SENSOR_KEYS,
     OPERATION_SENSOR_KEYS,
-    ORDER_SENSOR_KEYS,
     SENSOR_DESCRIPTIONS,
     AmtronSensorEntityDescription,
 )
@@ -68,7 +67,7 @@ async def async_setup_entry(
         and (description.key != "timed_goal_status" or TIMED in features)
         and (description.key != "virtual_plug_charge_status" or runtime_data.plug_charge is not None)
         and (description.key not in OPERATION_SENSOR_KEYS or runtime_data.control.operation is not None)
-        and (description.key not in ORDER_SENSOR_KEYS or runtime_data.orders is not None)
+        and (description.key not in GUEST_SENSOR_KEYS or runtime_data.guest is not None)
     )
     entities.extend(
         AmtronEstimateSensor(entry, runtime_data.coordinator, description)
@@ -76,22 +75,6 @@ async def async_setup_entry(
         if (LOSS in features if description.key in LOSS_SENSOR_KEYS else runtime_data.charging_cost is not None)
     )
     async_add_entities(entities)
-
-
-def _tenths(value: object) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return round(float(value), 1)
-
-
-def _moment(value: object) -> datetime | None:
-    """A time of the app as a time attribute; anything else is left out."""
-    if not isinstance(value, str):
-        return None
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
 
 
 class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
@@ -129,17 +112,14 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
             return self.runtime_data.timed_goal is not None
         if self.entity_description.key in OPERATION_SENSOR_KEYS:
             return self.runtime_data.control.operation is not None
-        if self.entity_description.key in ORDER_SENSOR_KEYS:
-            return self._orders is not None
+        if self.entity_description.key in GUEST_SENSOR_KEYS:
+            return self._guest_active is not None
         return True
 
     @property
-    def _orders(self) -> dict[str, Any] | None:
-        """The app's status behind an order sensor; None while it is unknown."""
-        orders = self.runtime_data.orders
-        if orders is None:
-            return None
-        return orders.jobs
+    def _guest_active(self) -> bool | None:
+        guest = self.runtime_data.guest
+        return guest.active if guest is not None else None
 
     @property
     def native_value(self) -> str | None:
@@ -151,13 +131,9 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
             )
         if key == "connection_quality":
             return self.wallbox_data.connection_quality
-        if key in ORDER_SENSOR_KEYS:
-            status = self._orders
-            if status is None:
-                return None
-            job = status.get("job")
-            state = job.get("state") if isinstance(job, dict) else "none"
-            return state if state in (self.options or ()) else None
+        if key in GUEST_SENSOR_KEYS:
+            active = self._guest_active
+            return None if active is None else "active" if active else "inactive"
         control = self.runtime_data.control
         if key in OPERATION_SENSOR_KEYS:
             operation = control.operation
@@ -208,18 +184,6 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
                 "learned_efficiency": forecast.efficiency if forecast is not None else None,
                 "measured_power_kw": forecast.full_power_kw if forecast is not None else None,
             }
-        elif key == "guest_charging" and (status := self._orders) is not None:
-            job = status.get("job")
-            if isinstance(job, dict):
-                attributes |= {
-                    "start": _moment(job.get("start_at")),
-                    "finish": _moment(job.get("finish_at")),
-                    "current": job.get("current_a"),
-                    "energy": job.get("energy_kwh"),
-                    # Whole tenths: a running charge must not write a state per poll.
-                    "delivered": _tenths(job.get("delivered_kwh")),
-                    "reason": job.get("reason"),
-                }
         elif key == "operation_controller" and (operation := self.runtime_data.control.operation) is not None:
             attributes = {
                 "vehicle": operation.vehicle,

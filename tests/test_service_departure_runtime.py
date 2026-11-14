@@ -23,15 +23,15 @@ from custom_components.mennekes_amtron_rtu.device.operation import Operation
 from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
     DepartureModbusService,
 )
-from tests import test_service_charge_runtime as runtime
+from tests import service_guest_fixture as runtime
 
 CAR = "profile:bmw:sensor.soc|"
 
 
 @pytest.fixture
 def departure_service(tmp_path, monkeypatch):
-    monkeypatch.setattr(runtime, "JobModbusService", DepartureModbusService)
-    return lambda: runtime.job_service(tmp_path)
+    monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+    return lambda: runtime.guest_service(tmp_path)
 
 
 async def hand_over(service, *, hours=2.0, soc=50.0):
@@ -118,14 +118,9 @@ def test_the_snapshot_summarizes_who_controls_the_charge(departure_service):
                 "kind": "level", "value": 80.0, "deadline": s.departure.trip.deadline.isoformat(),
             }
             assert Operation.restore(summary).controller == "departure_plan"
-            # An order from the app takes the wallbox over from the plan.
-            job = {"id": "j", "state": "charging", "holding": True, "energy_kwh": 5.0,
-                   "start_at": summary["next"]["at"], "finish_at": summary["target"]["deadline"]}
-            s.jobs.snapshot = lambda: {"job": job}
-            assert s.snapshot()["control"]["operation"]["controller"] == "charging_job"
-            # Until the controllers have loaded, only the plan is summarized.
-            s.jobs.ready = False
-            assert s.snapshot()["control"]["operation"]["controller"] == "departure_plan"
+            s._guest_scope = s._connection_sample().scope
+            assert s.snapshot()["control"]["operation"]["controller"] == "guest"
+
     asyncio.run(run())
 
 
@@ -242,9 +237,9 @@ def test_the_jobs_loop_runs_the_plan_beside_the_orders(departure_service, monkey
                 await asyncio.Event().wait()
 
             monkeypatch.setattr(s, "_departure_loop", departure_loop)
-            monkeypatch.setattr(departure_runtime.ForecastModbusService, "_jobs_loop", lambda _self: orders())
+            monkeypatch.setattr(departure_runtime.GuestModbusService, "_guest_loop", lambda _self: orders())
             with pytest.raises(ExceptionGroup) as raised:
-                await s._jobs_loop()
+                await s._guest_loop()
             assert raised.group_contains(StopLoopError)
     asyncio.run(run())
 
@@ -252,7 +247,7 @@ def test_the_jobs_loop_runs_the_plan_beside_the_orders(departure_service, monkey
 def test_initialisation_needs_a_configured_plan(departure_service, monkeypatch):
     async def run():
         async with departure_service() as (s, _transport, _clock):
-            monkeypatch.setattr(departure_runtime.ForecastModbusService, "_initialize", AsyncMock())
+            monkeypatch.setattr(departure_runtime.GuestModbusService, "_initialize", AsyncMock())
             s.departure = None
             with pytest.raises(RuntimeError, match="not configured"):
                 await departure_runtime.DepartureModbusService._initialize(s)

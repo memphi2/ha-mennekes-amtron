@@ -32,8 +32,8 @@ from .device.const import (
 )
 from .entity import entry_entity_unique_id
 from .exceptions import service_validation_error
+from .guest_charging import GuestCharging
 from .recorder_profile import async_setup_recorder_service
-from .service_orders import ServiceOrders
 
 SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
     {
@@ -48,8 +48,8 @@ SET_CHARGING_CURRENT_SCHEMA = probatio.Schema(
 # With one wallbox the target may be left out, which keeps dashboards short.
 _DEVICE = {probatio.Optional(ATTR_DEVICE_ID): probatio.All(cv.ensure_list, [cv.string])}
 # The single guest action takes its limits from the ordinary target controls.
-ORDER_ACTIONS: dict[str, tuple[dict[Any, Any], Callable[[ServiceOrders, dict[str, Any]], Awaitable[None]]]] = {
-    "start_guest_charging": ({}, lambda orders, _data: orders.async_start_guest()),
+GUEST_ACTIONS: dict[str, tuple[dict[Any, Any], Callable[[GuestCharging, dict[str, Any]], Awaitable[None]]]] = {
+    "start_guest_charging": ({}, lambda guest, _data: guest.async_start_guest()),
 }
 
 
@@ -87,8 +87,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
         schema=SET_CHARGING_CURRENT_SCHEMA,
     )
 
-    def order_handler(
-        run: Callable[[ServiceOrders, dict[str, Any]], Awaitable[None]],
+    def guest_handler(
+        run: Callable[[GuestCharging, dict[str, Any]], Awaitable[None]],
     ) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
         async def handle(call: ServiceCall) -> None:
             user = None
@@ -96,20 +96,20 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 user = await hass.auth.async_get_user(call.context.user_id)
                 if user is None:
                     raise UnknownUser(context=call.context)
-            # Resolve and authorize every target before the first order is sent.
+            # Resolve and authorize every target before the first start is sent.
             targets = []
             for runtime in _resolve_runtimes(hass, call.data.get(ATTR_DEVICE_ID), user):
-                if runtime.orders is None:
+                if runtime.guest is None:
                     raise service_validation_error("app_required")
-                targets.append(runtime.orders)
-            for orders in targets:
-                await run(orders, dict(call.data))
+                targets.append(runtime.guest)
+            for guest in targets:
+                await run(guest, dict(call.data))
 
         return handle
 
-    for name, (fields, run) in ORDER_ACTIONS.items():
+    for name, (fields, run) in GUEST_ACTIONS.items():
         hass.services.async_register(
-            DOMAIN, name, order_handler(run), schema=probatio.Schema({**_DEVICE, **fields}),
+            DOMAIN, name, guest_handler(run), schema=probatio.Schema({**_DEVICE, **fields}),
         )
 
 

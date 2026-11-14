@@ -11,21 +11,19 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from .charge_job import TERMINAL
-
 CONTROLLERS = (
-    "unavailable", "guest_order", "charging_job", "departure_plan", "direct",
+    "unavailable", "guest", "departure_plan", "direct",
 )
 WAITING = (
     "none", "wallbox_unavailable", "no_vehicle", "release_off", "plug_charge_waiting",
-    "until_job_start", "meter_unavailable", "job_suspended", "job_ended",
+    "meter_unavailable",
     "vehicle_unconfirmed", "until_planned_start",
     "estimated_target_reached", "waiting_for_device", "waiting_for_soc",
     "waiting_for_capacity", "waiting_for_target", "read_only", "command_pending",
     "target_reached", "paused",
 )
 EVENTS = (
-    "none", "queued_command", "job_start", "job_end", "plan_start",
+    "none", "queued_command", "plan_start",
     "target_reached", "departure",
 )
 VEHICLES = ("unknown", "none", "connected", "confirmed")
@@ -84,39 +82,27 @@ def _target(kind: str, value: object, deadline: object = None) -> dict[str, Any]
 
 def summarize(
     *, available: bool, present: bool | None, control: Mapping[str, Any],
-    departure: Mapping[str, Any] | None, job: Mapping[str, Any] | None,
+    departure: Mapping[str, Any] | None,
     goal_stop: bool = False,
 ) -> dict[str, Any]:
     """Summarize the controllers' published state.
 
-    ``job`` is the job summary of the job controller and ``departure`` the
-    plan's snapshot, or None while it loads.
+    ``departure`` is the vehicle plan snapshot, or None while it loads.
     """
-    plan, held = _map(departure), _map(job)
+    plan = _map(departure)
     trip = _map(plan.get("trip"))
     soc, energy = _map(control.get("soc_goal")), _map(control.get("energy_goal"))
     status = plan.get("status")
-    holding = held.get("holding") is True
+    guest = control.get("guest_mode") is True
     planning = trip.get("deadline") is not None and trip.get("finished") is None
 
     waits: str | None = None
     following = _event("none", None)
     target = _target("none", None)
-    if holding:
-        controller = "guest_order" if held.get("kind") == "guest" else "charging_job"
-        state = held.get("state")
-        target = _target("energy", energy.get("target_kwh") if held.get("kind") == "guest" else held.get("energy_kwh"), held.get("finish_at"))
-        if state == "scheduled":
-            waits, following = "until_job_start", _event("job_start", held.get("start_at"))
-        elif state == "charging":
-            following = _event("job_end", held.get("finish_at"))
-        elif state == "waiting_meter":
-            waits = "meter_unavailable"
-        elif state == "suspended":
-            waits = "job_suspended"
-        elif state in TERMINAL:
-            # A finished order holds until its pause is confirmed or the car leaves.
-            waits = "job_ended"
+    if guest:
+        controller = "guest"
+        target = _target("energy", energy.get("target_kwh"), trip.get("deadline"))
+        following = _event("departure", trip.get("deadline"))
     elif planning:
         controller = "departure_plan"
         target = _target("level", soc.get("target_percent"), trip.get("deadline"))
@@ -148,7 +134,7 @@ def summarize(
         waiting = "plug_charge_waiting"
     elif waits is not None:
         waiting = waits
-    elif goal_stop or (not (holding and held.get("kind") == "guest") and soc.get("status") == "reached") or energy.get("status") == "reached":
+    elif goal_stop or (not guest and soc.get("status") == "reached") or energy.get("status") == "reached":
         waiting = "target_reached"
     elif control.get("pending_action") is not None:
         waiting = "command_pending"

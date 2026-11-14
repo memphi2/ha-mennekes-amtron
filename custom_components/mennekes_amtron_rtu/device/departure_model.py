@@ -21,7 +21,7 @@ _SAMPLE_LOW, _SAMPLE_HIGH = 0.5, 1.1
 MIN_LEVEL_GAIN = 10.0
 MIN_ENERGY_KWH = 1.0
 # Metered power at full current is averaged over at least this long.
-POWER_WINDOW_SECONDS = 600.0
+POWER_WINDOW_SECONDS = 120.0
 MIN_POWER_KW, MAX_POWER_KW = 1.0, 50.0
 # Power is kept per ampere of the offered current, so it stays valid when the
 # maximum current changes.
@@ -96,7 +96,9 @@ class CarModel:
         known = powers[phases - 1]
         # A first sample is taken as it is only when it lies below the
         # nominal power: assuming too much power would start too late.
-        learned = min(sample, NOMINAL_VOLTAGE_V * phases / 1000) if known is None else _blend(known, sample)
+        # A sustained lower limit at the car applies immediately. Increases
+        # are smoothed so one fast window cannot postpone charging too much.
+        learned = min(sample, NOMINAL_VOLTAGE_V * phases / 1000) if known is None else min(sample, _blend(known, sample))
         powers[phases - 1] = round(learned, 4)
         return replace(self, kw_per_a=(powers[0], powers[1], powers[2]))
 

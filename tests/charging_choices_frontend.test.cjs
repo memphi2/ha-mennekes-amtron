@@ -76,9 +76,19 @@ test('unsaved edits block guest start rather than using unexpected limits',async
  const h=setup();await flush();h.elements.get('energy_value').value='25';await h.emit('energy_form','input');
  assert.equal(h.elements.get('guest_start').disabled,true);await h.emit('guest_start','click');assert.equal(h.calls.length,1);
 });
-test('active guest stays visible and cannot be started a second time',async()=>{
- const h=setup('targets',[{...initial(),guest_active:true}]);await flush();
- assert.equal(h.elements.get('guest_start').disabled,true);
- assert.equal(h.elements.get('guest_start').textContent,'Gastladen aktiv');
- await h.emit('guest_start','click');assert.equal(h.calls.length,1);
+test('active guest button requests the ordinary pause',async()=>{
+ const h=setup('targets',[{...initial(),guest_active:true},initial()]);await flush();
+ assert.equal(h.elements.get('guest_start').disabled,false);
+ assert.equal(h.elements.get('guest_start').textContent,'Gastladen pausieren');
+ await h.emit('guest_start','click');assert.equal(h.calls.length,2);
+ assert.equal(JSON.parse(h.calls[1].body).action,'pause');
+});
+
+test('unsaved limits do not block pausing an active guest',async()=>{
+ const h=setup('targets',[{...initial(),guest_active:true},initial()]);await flush();
+ h.elements.get('energy_value').value='25';await h.emit('energy_form','input');
+ assert.equal(h.elements.get('guest_start').disabled,false);
+ await h.emit('guest_start','click');
+ assert.equal(JSON.parse(h.calls[1].body).action,'pause');
+ assert.equal(h.elements.get('energy_value').value,'25');
 });

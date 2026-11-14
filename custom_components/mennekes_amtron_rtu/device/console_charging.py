@@ -1,4 +1,4 @@
-"""Three charging modes use the existing bus owner and persistent controllers."""
+"""Shared charging limits and explicit guest controls for the app."""
 
 from __future__ import annotations
 
@@ -20,13 +20,12 @@ class ChargingConsole(ServiceConsole):
         if control is None:
             raise SettingsError("service_not_configured", 503)
         departure = getattr(service, "departure", None)
-        jobs = getattr(service, "jobs", None)
         plan = departure.snapshot() if departure is not None and departure.ready else None
         return {
             "schema": 1, "read_only": control.read_only,
             "revision": service.choice_revision,
             "guest_revision": getattr(service, "guest_revision", None),
-            "guest_active": jobs is not None and jobs.guest_active,
+            "guest_active": getattr(service, "guest_active", False),
             "energy": {"target": control.energy_goal.target_kwh, "status": control.energy_goal.status},
             "soc": {
                 "configured": control.soc_goal.source is not None,
@@ -71,6 +70,13 @@ class ChargingConsole(ServiceConsole):
                     raise ValueError("guest start must be explicit")
                 await service.command({
                     "command": "guest_start", "expected_guest_revision": payload["revision"],
+                    "expected_serial_number": service.identity.serial_number,
+                })
+            elif action == "pause":
+                if payload["value"] is not True:
+                    raise ValueError("pause must be explicit")
+                await service.command({
+                    "command": "pause", "value": True,
                     "expected_serial_number": service.identity.serial_number,
                 })
             elif action == "departure":

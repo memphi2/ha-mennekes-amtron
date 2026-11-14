@@ -449,7 +449,7 @@
           "waiting_for_device": "In attesa wallbox",
           "vehicle_unconfirmed": "Veicolo non confermato",
           "read_only": "Sola lettura",
-          "order_active": "La ricarica ospite ha priorità",
+          "guest_mode": "La ricarica ospite ha priorità",
           "queued": "Modifica in coda",
           "paused_until_start": "In pausa fino all’avvio",
           "minimum_level": "Ricarica fino al livello minimo",
@@ -498,10 +498,9 @@
         "name": "Controllo della ricarica",
         "state": {
           "unavailable": "Wallbox non raggiungibile",
-          "guest_order": "Ordine ospite",
-          "charging_job": "Ricarica ospite",
           "departure_plan": "Pianificazione della partenza",
-          "direct": "Controllo diretto"
+          "direct": "Controllo diretto",
+          "guest": "Ordine ospite"
         },
         "state_attributes": {
           "vehicle": {
@@ -536,10 +535,7 @@
           "no_vehicle": "Nessun veicolo collegato",
           "release_off": "Abilitazione alla ricarica disattivata",
           "plug_charge_waiting": "Il Plug & Charge virtuale non ha abilitato il veicolo",
-          "until_job_start": "In attesa dell’avvio dell’ordine",
           "meter_unavailable": "In attesa del contatore di energia",
-          "job_suspended": "L’ordine attende la prova dello stesso collegamento",
-          "job_ended": "Ordine terminato, in pausa fino allo scollegamento",
           "vehicle_unconfirmed": "Veicolo non confermato",
           "until_planned_start": "In pausa fino all’avvio pianificato",
           "estimated_target_reached": "Caricato fino all’obiettivo stimato",
@@ -558,8 +554,6 @@
         "state": {
           "none": "Nulla in programma",
           "queued_command": "La modifica in coda viene eseguita",
-          "job_start": "L’ordine inizia",
-          "job_end": "L’ordine termina",
           "plan_start": "Inizia la ricarica pianificata",
           "target_reached": "Obiettivo previsto",
           "departure": "Partenza"
@@ -573,15 +567,8 @@
       "guest_charging": {
         "name": "Ricarica ospite",
         "state": {
-          "none": "Nessuna ricarica ospite",
-          "scheduled": "Preparazione ricarica ospite",
-          "charging": "Ricarica richiesta",
-          "waiting_meter": "In attesa di una lettura valida del contatore",
-          "suspended": "Interrotto; verifica se lo stesso collegamento prosegue",
-          "reached": "Tetto di energia raggiunto",
-          "finished": "Durata massima raggiunta",
-          "stopped": "Fermato dall’utente",
-          "interrupted": "Interrotto; nessun riavvio automatico"
+          "inactive": "Inattivo",
+          "active": "Attivo"
         },
         "state_attributes": {
           "start": {
@@ -722,8 +709,8 @@
               "unknown": "Motivo sconosciuto",
               "user_cancelled": "Annullato dall’utente",
               "energy_goal": "Arresto richiesto da un obiettivo di ricarica",
-              "service_job": "La ricarica ospite ha priorità",
-              "deadline_expired": "Ora di partenza trascorsa"
+              "deadline_expired": "Ora di partenza trascorsa",
+              "time_limit": "Limite orario raggiunto"
             }
           }
         }
@@ -861,9 +848,6 @@
     "energy_goal_stop_active": {
       "message": "Un obiettivo di ricarica richiede una pausa. Controllane lo stato. Dopo aver raggiunto l’obiettivo o un azzeramento del contatore, imposta un nuovo obiettivo o disattivalo con 0 prima di riprendere. Modificare l’obiettivo non avvia la ricarica."
     },
-    "service_job_active": {
-      "message": "La ricarica ospite controlla la corrente. Fermarla in Ricarica ospite nell’app o con Ferma ricarica ospite in Home Assistant. Il controllo manuale torna dopo la conferma della pausa."
-    },
     "energy_goal_state_invalid": {
       "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."
     },
@@ -939,50 +923,20 @@
     "plug_charge_not_supported": {
       "message": "L’app o il servizio Modbus collegato non supporta Plug & Charge virtuale. Aggiornalo a una versione compatibile prima di attivarlo."
     },
-    "guest_vehicle_target_active": {
-      "message": "Obiettivo batteria del veicolo attivo; nessun ordine ospite creato."
-    },
-    "job_changed": {
-      "message": "Nel frattempo lo stato è cambiato. Riprova."
-    },
-    "job_clear_requires_pause": {
-      "message": "La cancellazione richiede una pausa confermata o il veicolo scollegato."
-    },
-    "job_current_exceeds_cap": {
-      "message": "La corrente supera il limite del servizio."
-    },
-    "job_exists": {
-      "message": "Un altro ordine è ancora in corso. Fermarlo prima."
-    },
-    "job_not_permitted": {
-      "message": "Collegamento o consenso modificati; nessun ordine creato."
-    },
-    "job_preview_expired": {
-      "message": "Nel frattempo lo stato è cambiato. Riprova."
-    },
-    "job_stop_first": {
-      "message": "Fermare prima l’ordine in corso."
-    },
-    "job_storage_unavailable": {
-      "message": "Memoria non disponibile; nessun avvio automatico."
-    },
-    "service_order_failed": {
-      "message": "L’app non lo ha eseguito. Verifica che sia raggiungibile e aggiornata e che orari e valori siano validi."
-    },
     "app_required": {
       "message": "Questa azione richiede l’app Modbus; questa wallbox è collegata direttamente."
     },
     "wallbox_target_required": {
       "message": "Sono configurate più wallbox; indica la wallbox interessata."
     },
-    "job_stop_unconfirmed": {
-      "message": "L’arresto non è ancora confermato. Riprova tra poco."
-    },
     "guest_start_not_permitted": {
       "message": "Impossibile avviare: controllare connessione, accesso in scrittura, blocco ed errori."
     },
     "guest_deadline_expired": {
       "message": "Il limite orario è scaduto. Scegliere un orario futuro o cancellarlo."
+    },
+    "time_limit_reached": {
+      "message": "L’orario scelto è passato. Modificarlo o cancellarlo prima di riprendere."
     }
   },
   "issues": {

@@ -28,7 +28,7 @@ def test_efficiency_blends_plausible_charges_only():
 def test_power_is_kept_per_offered_ampere_and_number_of_phases():
     car = CarModel().with_power(3, 10.5, 16).with_power(1, 3.6, 16)
     assert car.kw_per_a == (0.225, None, 0.6562)
-    assert car.with_power(3, 9.5, 16).power(3, 16) == pytest.approx(10.2, abs=0.01)
+    assert car.with_power(3, 9.5, 16).power(3, 16) == pytest.approx(9.5, abs=0.01)
     # A lower maximum current expects proportionally less.
     assert car.power(3, 8) == pytest.approx(5.25, abs=0.01)
     assert (car.power(2, 16), car.power(0, 16), car.power(3, 0)) == (None, None, None)

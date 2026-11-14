@@ -449,7 +449,7 @@
           "waiting_for_device": "Waiting for wallbox",
           "vehicle_unconfirmed": "Car not confirmed",
           "read_only": "Read only",
-          "order_active": "Guest charging has priority",
+          "guest_mode": "Guest charging has priority",
           "queued": "Change queued",
           "paused_until_start": "Paused until start",
           "minimum_level": "Charging to the minimum level",
@@ -498,10 +498,9 @@
         "name": "Charging control",
         "state": {
           "unavailable": "Wallbox unavailable",
-          "guest_order": "Guest order",
-          "charging_job": "Guest charging",
           "departure_plan": "Departure planning",
-          "direct": "Direct control"
+          "direct": "Direct control",
+          "guest": "Guest order"
         },
         "state_attributes": {
           "vehicle": {
@@ -536,10 +535,7 @@
           "no_vehicle": "No vehicle connected",
           "release_off": "Charging release switched off",
           "plug_charge_waiting": "Virtual Plug & Charge has not released the car",
-          "until_job_start": "Waiting for the job's start",
           "meter_unavailable": "Waiting for the energy meter",
-          "job_suspended": "Job waits for proof of the same plug-in",
-          "job_ended": "Job ended, paused until unplugged",
           "vehicle_unconfirmed": "Car not confirmed",
           "until_planned_start": "Paused until the planned start",
           "estimated_target_reached": "Charged to the estimated target",
@@ -558,8 +554,6 @@
         "state": {
           "none": "Nothing scheduled",
           "queued_command": "Queued change runs",
-          "job_start": "Job starts",
-          "job_end": "Job ends",
           "plan_start": "Planned charge starts",
           "target_reached": "Target expected",
           "departure": "Departure"
@@ -573,15 +567,8 @@
       "guest_charging": {
         "name": "Guest charging",
         "state": {
-          "none": "No guest charge",
-          "scheduled": "Preparing guest charge",
-          "charging": "Charging requested",
-          "waiting_meter": "Waiting for a valid meter reading",
-          "suspended": "Interrupted; checking whether the same plug-in continues",
-          "reached": "Energy ceiling reached",
-          "finished": "Maximum duration reached",
-          "stopped": "Stopped by user",
-          "interrupted": "Interrupted; no automatic restart"
+          "inactive": "Inactive",
+          "active": "Active"
         },
         "state_attributes": {
           "start": {
@@ -722,8 +709,8 @@
               "unknown": "Unknown reason",
               "user_cancelled": "Cancelled by user",
               "energy_goal": "Charge target stop",
-              "service_job": "Guest charging has priority",
-              "deadline_expired": "Departure time expired"
+              "deadline_expired": "Departure time expired",
+              "time_limit": "Time limit reached"
             }
           }
         }
@@ -861,9 +848,6 @@
     "energy_goal_stop_active": {
       "message": "A charging target requires a pause. Check its status. After reaching a target or a meter reset, set a new target or disable it with 0 before resuming. Changing a target does not start charging."
     },
-    "service_job_active": {
-      "message": "Guest charging controls the current. Stop it under Guest charging in the app or with Stop guest charging in Home Assistant. Once the pause is confirmed, manual control is available again."
-    },
     "energy_goal_state_invalid": {
       "message": "The saved energy target could not be restored. Check the logs before allowing charging again."
     },
@@ -939,50 +923,20 @@
     "plug_charge_not_supported": {
       "message": "The connected Modbus app or service does not support Virtual Plug & Charge. Update it to a compatible version before enabling this feature."
     },
-    "guest_vehicle_target_active": {
-      "message": "Vehicle battery target active; no guest order created."
-    },
-    "job_changed": {
-      "message": "The state changed in the meantime. Try again."
-    },
-    "job_clear_requires_pause": {
-      "message": "Clearing requires a confirmed pause or unplug."
-    },
-    "job_current_exceeds_cap": {
-      "message": "Current exceeds the service limit."
-    },
-    "job_exists": {
-      "message": "Another order is still running. Stop it first."
-    },
-    "job_not_permitted": {
-      "message": "Connection or release changed; no order was created."
-    },
-    "job_preview_expired": {
-      "message": "The state changed in the meantime. Try again."
-    },
-    "job_stop_first": {
-      "message": "Stop the active order first."
-    },
-    "job_storage_unavailable": {
-      "message": "Storage unavailable; no automatic start."
-    },
-    "service_order_failed": {
-      "message": "The app did not carry this out. Check that it is reachable and up to date, and that times and values are valid."
-    },
     "app_required": {
       "message": "This action needs the Modbus app; this wallbox is connected directly."
     },
     "wallbox_target_required": {
       "message": "Several wallboxes are set up; name the wallbox this applies to."
     },
-    "job_stop_unconfirmed": {
-      "message": "The stop is not confirmed yet. Try again shortly."
-    },
     "guest_start_not_permitted": {
       "message": "Guest charging cannot start: check the connection, write access, wallbox lock and fault status."
     },
     "guest_deadline_expired": {
       "message": "The saved time limit has expired. Choose a future time or clear it."
+    },
+    "time_limit_reached": {
+      "message": "The selected time has passed. Change or clear it before resuming."
     }
   },
   "issues": {

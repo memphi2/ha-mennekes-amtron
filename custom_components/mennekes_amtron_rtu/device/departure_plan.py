@@ -24,7 +24,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from .charge_job import SessionMark
 from .charging_plan import ChargePlan, plan_current, usable_capacity
 from .client_errors import AmtronBusError
 from .departure_model import (
@@ -42,6 +41,7 @@ from .departure_step import (
 from .departure_store import DepartureStore
 from .errors import DeviceError
 from .persistence import finish_goal_save
+from .session_mark import SessionMark
 from .soc_goal import percentage
 from .timed_goal import TimedGoal
 
@@ -69,7 +69,7 @@ _TAPER_LEVEL = 90.0
 _FORECAST_STEP = 300
 DEPARTURE_STATES = (
     "disabled", "waiting_for_target", "waiting_for_capacity", "waiting_for_soc",
-    "waiting_for_device", "vehicle_unconfirmed", "read_only", "order_active", "queued",
+    "waiting_for_device", "vehicle_unconfirmed", "read_only", "guest_mode", "queued",
     "paused_until_start", "minimum_level", "charging", "finishing", "unreachable", "late",
     "estimated_reached", "reached", "write_pending", "error",
 )
@@ -292,7 +292,7 @@ class DepartureSample:
     target_is_limit: bool
     energy_reached: bool
     goal_stop: bool
-    order_active: bool
+    guest_mode: bool
     # The phases the car draws on, None while the wallbox cannot tell.
     phases: int | None
     # A command of another owner is queued, e.g. one by hand.
@@ -556,6 +556,10 @@ class DepartureController:
             if not self.ready or self._closing:
                 return
             sample = self.sample()
+            if sample.guest_mode:
+                await self._cancel_command()
+                self.status = "guest_mode"
+                return
             self._now = sample.now
             self._observe(sample)
             self._at_full, self.forecast = False, None
@@ -737,10 +741,6 @@ class DepartureController:
         if s.read_only:
             await self._wait("read_only", s)
             return
-        if s.order_active:
-            # An order from the app holds the wallbox until it ends.
-            await self._wait("order_active", s, keep_start=True)
-            return
         if soc >= s.target_percent or (self.estimated_stop and soc >= s.target_percent - SOC_HYSTERESIS):
             await self._stop_at_estimate(s, deadline)
             return
@@ -882,8 +882,8 @@ class DepartureController:
         await self._cancel_command()
         if not self.plan_paused:
             return
-        # A goal's stop or an order owns the pause by now; leave it to them.
-        if not (s.read_only or s.goal_stop or s.order_active):
+        # A goal stop or guest connection owns the pause; leave it in place.
+        if not (s.read_only or s.goal_stop or s.guest_mode):
             if s.pause_requested is None:
                 # The pause intent is unknown for now; try again next time.
                 return

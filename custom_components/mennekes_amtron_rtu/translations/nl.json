@@ -449,7 +449,7 @@
           "waiting_for_device": "Wacht op laadpaal",
           "vehicle_unconfirmed": "Voertuig niet bevestigd",
           "read_only": "Alleen lezen",
-          "order_active": "Gastladen heeft voorrang",
+          "guest_mode": "Gastladen heeft voorrang",
           "queued": "Wijziging in wachtrij",
           "paused_until_start": "Gepauzeerd tot start",
           "minimum_level": "Laadt tot het minimumniveau",
@@ -498,10 +498,9 @@
         "name": "Laadsturing",
         "state": {
           "unavailable": "Wallbox niet bereikbaar",
-          "guest_order": "Gastopdracht",
-          "charging_job": "Gastladen",
           "departure_plan": "Vertrekplanning",
-          "direct": "Directe bediening"
+          "direct": "Directe bediening",
+          "guest": "Gastopdracht"
         },
         "state_attributes": {
           "vehicle": {
@@ -536,10 +535,7 @@
           "no_vehicle": "Geen voertuig aangesloten",
           "release_off": "Laadvrijgave uitgeschakeld",
           "plug_charge_waiting": "Virtueel Plug & Charge heeft het voertuig niet vrijgegeven",
-          "until_job_start": "Wacht op de start van de opdracht",
           "meter_unavailable": "Wacht op de energiemeter",
-          "job_suspended": "Opdracht wacht op bewijs van dezelfde aansluiting",
-          "job_ended": "Opdracht beëindigd, gepauzeerd tot loskoppelen",
           "vehicle_unconfirmed": "Voertuig niet bevestigd",
           "until_planned_start": "Gepauzeerd tot de geplande start",
           "estimated_target_reached": "Geladen tot het berekende doel",
@@ -558,8 +554,6 @@
         "state": {
           "none": "Niets gepland",
           "queued_command": "Wijziging in wachtrij wordt uitgevoerd",
-          "job_start": "Opdracht start",
-          "job_end": "Opdracht eindigt",
           "plan_start": "Gepland laden start",
           "target_reached": "Doel verwacht",
           "departure": "Vertrek"
@@ -573,15 +567,8 @@
       "guest_charging": {
         "name": "Gastladen",
         "state": {
-          "none": "Geen gastlading",
-          "scheduled": "Gastladen voorbereiden",
-          "charging": "Laden gevraagd",
-          "waiting_meter": "Wacht op een geldige meterstand",
-          "suspended": "Onderbroken; controleert of dezelfde aansluiting doorloopt",
-          "reached": "Energiegrens bereikt",
-          "finished": "Maximale duur bereikt",
-          "stopped": "Gestopt door gebruiker",
-          "interrupted": "Onderbroken; geen automatische herstart"
+          "inactive": "Inactief",
+          "active": "Actief"
         },
         "state_attributes": {
           "start": {
@@ -722,8 +709,8 @@
               "unknown": "Onbekende reden",
               "user_cancelled": "Geannuleerd door de gebruiker",
               "energy_goal": "Stop door een laaddoel",
-              "service_job": "Gastladen heeft voorrang",
-              "deadline_expired": "Vertrektijd verstreken"
+              "deadline_expired": "Vertrektijd verstreken",
+              "time_limit": "Tijdslimiet bereikt"
             }
           }
         }
@@ -861,9 +848,6 @@
     "energy_goal_stop_active": {
       "message": "Een laaddoel vereist een pauze. Controleer de status. Stel na het bereiken van het doel of een meterreset een nieuw doel in of schakel het uit met 0 voordat je hervat. Het wijzigen van een doel start het laden niet."
     },
-    "service_job_active": {
-      "message": "Gastladen regelt de stroom. Stop het via Gastladen in de app of Gastladen stoppen in Home Assistant. Na bevestiging van de pauze is handmatige bediening weer beschikbaar."
-    },
     "energy_goal_state_invalid": {
       "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."
     },
@@ -939,50 +923,20 @@
     "plug_charge_not_supported": {
       "message": "De verbonden Modbus-app of dienst ondersteunt virtuele Plug & Charge niet. Werk deze eerst bij naar een compatibele versie."
     },
-    "guest_vehicle_target_active": {
-      "message": "Batterijdoel van het voertuig actief; geen gastopdracht aangemaakt."
-    },
-    "job_changed": {
-      "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
-    },
-    "job_clear_requires_pause": {
-      "message": "Wissen vereist een bevestigde pauze of een losgekoppeld voertuig."
-    },
-    "job_current_exceeds_cap": {
-      "message": "Stroom overschrijdt de servicegrens."
-    },
-    "job_exists": {
-      "message": "Er loopt nog een andere opdracht. Stop deze eerst."
-    },
-    "job_not_permitted": {
-      "message": "Verbinding of vrijgave gewijzigd; geen opdracht aangemaakt."
-    },
-    "job_preview_expired": {
-      "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
-    },
-    "job_stop_first": {
-      "message": "Stop eerst de lopende opdracht."
-    },
-    "job_storage_unavailable": {
-      "message": "Opslag niet beschikbaar; geen automatische start."
-    },
-    "service_order_failed": {
-      "message": "De app heeft dit niet uitgevoerd. Controleer of ze bereikbaar en actueel is en of tijden en waarden geldig zijn."
-    },
     "app_required": {
       "message": "Deze actie vereist de Modbus-app; deze wallbox is rechtstreeks verbonden."
     },
     "wallbox_target_required": {
       "message": "Er zijn meerdere wallboxen ingesteld; geef aan voor welke wallbox dit geldt."
     },
-    "job_stop_unconfirmed": {
-      "message": "De stop is nog niet bevestigd. Probeer het zo opnieuw."
-    },
     "guest_start_not_permitted": {
       "message": "Kan niet starten: controleer verbinding, schrijftoegang, vergrendeling en storingen."
     },
     "guest_deadline_expired": {
       "message": "Het opgeslagen tijdstip is verstreken. Kies een toekomstig tijdstip of wis het."
+    },
+    "time_limit_reached": {
+      "message": "Het gekozen tijdstip is voorbij. Wijzig of wis het vóór hervatten."
     }
   },
   "issues": {

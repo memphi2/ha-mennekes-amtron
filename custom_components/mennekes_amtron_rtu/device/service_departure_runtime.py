@@ -20,7 +20,7 @@ from .departure_plan import (
 from .departure_store import DepartureStore
 from .errors import DeviceError
 from .operation import summarize
-from .service_forecast_runtime import ForecastModbusService
+from .service_guest_runtime import GuestModbusService
 
 _LOGGER = logging.getLogger(__name__)
 _TICK_SECONDS = 5.0
@@ -31,7 +31,7 @@ _FIELDS = {
 }
 
 
-class DepartureModbusService(ForecastModbusService):
+class DepartureModbusService(GuestModbusService):
     """Home Assistant hands its departure over; the service plans and stops it.
 
     The plan keeps running while Home Assistant is away, and across a restart
@@ -56,19 +56,19 @@ class DepartureModbusService(ForecastModbusService):
         await self.departure.initialize()
 
     def _departure_sample(self) -> DepartureSample:
-        job = self._job_inputs()
+        connection = self._connection_sample()
         control = self.control
         energy = self._energy_sample
-        stamp = energy.get("observed_at") if energy is not None and job.total_kwh is not None else None
+        stamp = energy.get("observed_at") if energy is not None and connection.total_kwh is not None else None
         goal = control.soc_goal if control is not None else None
         return DepartureSample(
-            now=job.now, available=job.available, present=job.present,
-            scope=job.scope, session=job.session,
-            total_kwh=job.total_kwh, meter_at=float(stamp) if stamp is not None else None,
-            applied_a=job.current_a, max_current_a=job.current_cap,
+            now=connection.now, available=connection.available, present=connection.present,
+            scope=connection.scope, session=connection.session,
+            total_kwh=connection.total_kwh, meter_at=float(stamp) if stamp is not None else None,
+            applied_a=connection.current_a, max_current_a=connection.current_cap,
             paused=control.is_paused if control is not None else None,
             pause_requested=control.pause_requested if control is not None else None,
-            pending=job.pending,
+            pending=connection.pending,
             read_only=control.read_only if control is not None else self.config.read_only,
             vehicle=goal.source if goal is not None else None,
             target_percent=goal.target_percent if goal is not None else 0.0,
@@ -76,7 +76,7 @@ class DepartureModbusService(ForecastModbusService):
             target_is_limit=goal is not None and goal.target_percent == goal.maximum_percent,
             energy_reached=control is not None and control.energy_goal.status == "reached",
             goal_stop=control is not None and control.energy_goal_stop_requested,
-            order_active=self.jobs is not None and self.jobs.holding,
+            guest_mode=self._guest_scope is not None,
             phases=self._rate_phases() or None,
             pending_foreign=(
                 control is not None and control.pending_action is not None
@@ -116,9 +116,9 @@ class DepartureModbusService(ForecastModbusService):
             if self.departure is not None:
                 self.departure.observe()
 
-    async def _jobs_loop(self) -> None:
+    async def _guest_loop(self) -> None:
         async with asyncio.TaskGroup() as group:
-            group.create_task(super()._jobs_loop(), name="amtron_charge_jobs")
+            group.create_task(super()._guest_loop(), name="amtron_guest_limits")
             group.create_task(self._departure_loop(), name="amtron_departure")
 
     async def _departure_loop(self) -> None:
@@ -182,8 +182,6 @@ class DepartureModbusService(ForecastModbusService):
             )
         else:
             await departure.set_inputs(DepartureInputs.restore(payload.get("value")))
-        if name in ("departure_choice", "departure_trip") and self.jobs is not None:
-            await self.jobs.update_guest_deadline(departure.trip.deadline)
         if self._command_lock.locked():
             # Another command still runs: a patient reader must not get the
             # state from before this plan change.
@@ -201,23 +199,21 @@ class DepartureModbusService(ForecastModbusService):
             "supports_departure_plan": True,
             "departure": departure.snapshot() if departure is not None and departure.ready else None,
         }
-        jobs = self.jobs
-        # The charging job as its own page shows it; None while it loads.
+        # Guest permission and shared choices, without a separate order snapshot.
         result["control"]["guest_revision"] = self.guest_revision
-        result["control"]["orders"] = jobs.snapshot() if jobs is not None and jobs.ready else None
+        result["control"]["guest_active"] = self.guest_active
+        result["control"]["guest_mode"] = self._guest_scope is not None
         result["control"]["operation"] = self._operation(result)
         return result
 
     def _operation(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         """Who controls the charge, why it waits and what comes next."""
         control = self.control
-        orders = snapshot["control"]["orders"]
-        sample = self._job_inputs()
+        sample = self._connection_sample()
         return summarize(
             available=snapshot["available"] is True, present=sample.present,
             control=snapshot["control"], departure=snapshot["control"]["departure"],
-            job=orders["job"] if orders is not None else None,
-            # Only a charge target's stop is a reached target; an order names its own.
+            # Energy and percentage goals can report a reached target.
             goal_stop=control is not None and control.goal_stop_requested,
         )
 

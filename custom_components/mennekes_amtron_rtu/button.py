@@ -60,7 +60,7 @@ async def async_setup_entry(
         entities.append(AmtronVehicleDepartureButton(entry, coordinator))
     if runtime_data.control.read_only and CONF_SERVER_URL not in entry.data:
         entities = [entity for entity in entities if isinstance(entity, AmtronAssignChargeButton)]
-    if runtime_data.orders is not None:
+    if runtime_data.guest is not None:
         entities.append(GuestButton(entry))
     async_add_entities(entities)
 
