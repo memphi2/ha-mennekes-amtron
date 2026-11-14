@@ -47,6 +47,8 @@ def test_no_partial_or_foreign_session_records(raw):
 @pytest.mark.parametrize("change", [
     {"context": "b" * 64}, {"count": 8}, {"duration_s": 0}, {"energy_kwh": 0},
     {"at": MARK.at + timedelta(hours=1)},
+    {"at": MARK.at - timedelta(seconds=1)},
+    {"duration_s": MARK.duration_s - 1}, {"energy_kwh": MARK.energy_kwh - 0.01},
 ])
 def test_replug_counter_reset_and_clock_jump_do_not_prove_continuity(change):
     assert not MARK.continues(replace(MARK, **change))

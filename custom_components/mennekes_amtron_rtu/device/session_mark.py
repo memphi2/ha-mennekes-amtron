@@ -9,7 +9,6 @@ from typing import Any
 
 _BINDING = re.compile(r"[0-9a-f]{64}")
 SESSION_TOLERANCE = timedelta(minutes=2)
-_SESSION_ENERGY_TOLERANCE_KWH = 0.05
 _UINT32 = 2**32 - 1
 
 def session_time(value: object) -> datetime:
@@ -68,7 +67,8 @@ class SessionMark:
         """
         elapsed = (later.at - self.at).total_seconds()
         return (
-            later.context == self.context and later.count == self.count
+            elapsed >= 0 and later.duration_s >= self.duration_s
+            and later.context == self.context and later.count == self.count
             and abs(later.duration_s - self.duration_s - elapsed) <= SESSION_TOLERANCE.total_seconds()
-            and later.energy_kwh >= self.energy_kwh - _SESSION_ENERGY_TOLERANCE_KWH
+            and later.energy_kwh >= self.energy_kwh
         )
