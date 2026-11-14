@@ -36,6 +36,53 @@ def rejected_file(path):
     return path.read_bytes()
 
 
+@pytest.mark.parametrize("initially_absent", [True, False])
+def test_reset_keeps_release_off_after_vehicle_absence(tmp_path, monkeypatch, initially_absent):
+    original_bank = fixture_module.device_bank
+
+    def vehicle_bank(**kwargs):
+        bank = original_bank(**kwargs)
+        bank[R.EVSE_STATE.address] = 1 if initially_absent else 3
+        bank[R.CP_STATE.address] = 10 if initially_absent else 30
+        return bank
+
+    monkeypatch.setattr(fixture_module, "device_bank", vehicle_bank)
+
+    async def run():
+        path = tmp_path / "intent.json"
+        rejected_file(path)
+        service, transport, clock = await service_fixture(tmp_path)
+        try:
+            if not initially_absent:
+                transport.bank[R.EVSE_STATE.address] = 1
+                transport.bank[R.CP_STATE.address] = 10
+                clock[0] += 6
+                await service.refresh()
+            state = service.client.write_state
+            limiter = state.limiter
+            result = await service.command({
+                "command": "acknowledge_intent_reset",
+                "expected_serial_number": service.identity.serial_number,
+            })
+            assert not result["control"]["intent_rejected"]
+            assert result["control"]["charging_release_requested"] is False
+            assert service.control.charging_release_requested is False
+            assert service.control.pause_requested is True
+            assert service.control.charging_setpoint == 6
+            assert service.client.write_state is state
+            assert state.limiter is limiter
+            await service.refresh()
+            await service._persist()
+            restored = WriteState()
+            assert IntentStore(path, service.identity.serial_number).load(restored)
+            assert restored.charging_release_requested is False
+            assert restored.pause_requested is True
+        finally:
+            await service.stop()
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("read_only", [False, True])
 def test_quarantine_survives_restart_and_never_overwrites_evidence(tmp_path, read_only):
     async def run():

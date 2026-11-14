@@ -642,7 +642,14 @@ class ModbusService:
                     safe = WriteState(pause_requested=True, charging_release_requested=False, charging_setpoint=6)
                     async with self._store_lock:
                         await finish_goal_save(asyncio.to_thread(self._store.save, safe))
-                    self.client.write_state.plug_charge = safe.plug_charge
+                    # Vehicle absence can clear the temporary gate's release
+                    # intent. Restore the durable safe intent without replacing
+                    # the live state and its Modbus write limiter.
+                    state = self.client.write_state
+                    state.pause_requested = safe.pause_requested
+                    state.charging_release_requested = safe.charging_release_requested
+                    state.charging_setpoint = safe.charging_setpoint
+                    state.plug_charge = safe.plug_charge
                     self._intent_rejected = False
                     control.startup_hold = False
                 return self.snapshot()
