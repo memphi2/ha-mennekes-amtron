@@ -10,6 +10,16 @@ from .app_settings import SettingsError
 from .console_http import ServiceConsole
 from .errors import DeviceError
 
+# Refusals decided before the requested change, each with its own app hint.
+# Everything else, e.g. a lost write or storage error, stays uncertain.
+_REFUSALS = frozenset({
+    "soc_goal_source_changed", "soc_goal_limit_unavailable", "read_only_mode",
+    "guest_start_not_permitted", "guest_deadline_expired", "time_limit_reached",
+    "energy_goal_stop_active", "device_identity_changed", "write_rate_limited",
+    "control_state_unknown", "energy_goal_invalid", "soc_goal_invalid",
+    "energy_goal_unavailable",
+})
+
 
 class ChargingConsole(ServiceConsole):
     """Admin-only choices; no duplicate goals in browser or Supervisor options."""
@@ -90,7 +100,7 @@ class ChargingConsole(ServiceConsole):
         except DeviceError as err:
             # Codes only; never expose source IDs, credentials or arbitrary errors.
             code = str(err)
-            safe = code if code in {"soc_goal_source_changed", "soc_goal_limit_unavailable", "read_only_mode"} else "charging_save_uncertain"
+            safe = code if code in _REFUSALS else "charging_save_uncertain"
             raise SettingsError(safe, 409) from err
         except (ValueError, TypeError, OverflowError) as err:
             raise SettingsError("invalid_request") from err

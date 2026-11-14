@@ -847,7 +847,7 @@
       "message": "Un objectif énergétique nécessite un compteur d’énergie totale pris en charge et une mesure récente valide. Vérifiez la connexion et réessayez."
     },
     "energy_goal_stop_active": {
-      "message": "Un objectif de recharge impose une pause. Vérifiez son état. Une fois l’objectif atteint ou après une remise à zéro du compteur, définissez un nouvel objectif ou désactivez-le avec 0 avant de reprendre. Modifier l’objectif ne démarre pas la recharge."
+      "message": "Une limite de recharge est atteinte, la recharge reste donc en pause. Pour continuer, augmentez la limite kWh ou l’objectif en pourcentage, ou mettez-la à 0 ; après une remise à zéro du compteur, enregistrez à nouveau la limite. Modifier une limite ne démarre pas la recharge."
     },
     "energy_goal_state_invalid": {
       "message": "L’objectif énergétique enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
@@ -931,7 +931,7 @@
       "message": "Plusieurs bornes sont configurées ; indiquez la borne concernée."
     },
     "guest_start_not_permitted": {
-      "message": "Impossible de démarrer : vérifiez la connexion, les droits d’écriture, le verrouillage et les erreurs."
+      "message": "La recharge invité ne démarre pas : branchez le véhicule, déverrouillez la borne et corrigez toute erreur de la borne. En lecture seule, activez d’abord les écritures dans l’app."
     },
     "guest_deadline_expired": {
       "message": "L’heure limite est dépassée. Choisissez une heure future ou effacez-la."

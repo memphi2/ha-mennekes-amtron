@@ -21,6 +21,8 @@ integration and app are published together.
 - Add the app overview, decoded diagnostics and wallbox event entity. Reduce
   Recorder load by folding detailed readings into attributes and bounding
   event history.
+- A refused guest start names what to do, in the app and in Home Assistant:
+  plug in the car, unlock the wallbox or raise the reached limit.
 - Rebuild installation and everyday-use guides, app instructions and five
   Mushroom dashboard examples.
 - **Breaking since 0.8.2:** remove charging-job, boost and reserve APIs,
