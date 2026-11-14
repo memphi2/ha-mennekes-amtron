@@ -95,3 +95,32 @@ def test_fresh_progress_with_five_minute_control_finishes_close_to_departure(pha
         previous_current = current
     else:
         pytest.fail("planner did not finish within the bounded simulation")
+
+
+@pytest.mark.parametrize("vehicle_current", [6, 8, 10])
+def test_fixed_vehicle_current_cap_does_not_scale_minimum_current_down(vehicle_current):
+    """The simulated car draws min(offered current, its own fixed limit)."""
+    full_kw = 0.69 * vehicle_current
+    energy = 8.0
+    deadline = NOW + timedelta(hours=energy / (full_kw * 0.9) + 2)
+    initial = plan_current(
+        now=NOW, deadline=deadline, soc_percent=80-energy,
+        target_percent=80, capacity_kwh=100, phases=3,
+        max_current_a=16, full_power_kw=full_kw,
+    )
+    now, remaining = initial.start_at, energy
+    for _ in range(200):
+        result = plan_current(
+            now=now, deadline=deadline, soc_percent=80-remaining,
+            target_percent=80, capacity_kwh=100, phases=3,
+            max_current_a=16, full_power_kw=full_kw,
+        )
+        actual_power = min(result.current_a, vehicle_current) * 0.69 * 0.9
+        finish = now + timedelta(hours=remaining/actual_power)
+        if finish <= now + timedelta(minutes=5):
+            assert abs((deadline-finish).total_seconds()) <= 61
+            break
+        remaining -= actual_power * 5/60
+        now += timedelta(minutes=5)
+    else:
+        pytest.fail("vehicle cap simulation did not finish")

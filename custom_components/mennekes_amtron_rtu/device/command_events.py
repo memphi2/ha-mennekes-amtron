@@ -47,7 +47,7 @@ def _valid(action: object, outcome: object, reason: object) -> bool:
 REASONS = (
     "completed", "replaced", "shutdown", "phase_timeout", "phase_unconfirmed",
     "connection_error", "write_rejected", "permission_denied",
-    "status_refresh_failed", "unknown", "error_still_active", "user_cancelled", "energy_goal", "service_job",
+    "status_refresh_failed", "unknown", "error_still_active", "user_cancelled", "energy_goal", "time_limit", "guest_confirmation",
     "deadline_expired",
 )
 
@@ -103,7 +103,7 @@ class CommandEvents:
 
     @staticmethod
     def parse(raw: object) -> tuple[str, int, list[CommandEvent]] | None:
-        """Accept absent metadata from older API 2 services, validate new data."""
+        """Allow a null feed during service initialization; validate live metadata."""
         if raw is None:
             return None
         if not isinstance(raw, dict):

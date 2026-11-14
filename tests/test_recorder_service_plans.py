@@ -13,22 +13,22 @@ from custom_components.mennekes_amtron_rtu.device.const import DOMAIN
 from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
     DepartureModbusService,
 )
-from custom_components.mennekes_amtron_rtu.device.service_job_http import create_job_app
+from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.entity import entry_entity_unique_id
 from custom_components.mennekes_amtron_rtu.sensor_descriptions import (
     OPERATION_SENSOR_KEYS,
 )
-from tests import test_service_charge_runtime as runtime
+from tests import service_guest_fixture as runtime
 from tests.test_home_assistant_smoke import _boot
 from tests.test_service_departure_runtime import hand_over
 from tests.test_service_reauth import add_entry
 
 
 def test_service_plans_and_orders_do_not_record_unchanged_polls(tmp_path, monkeypatch):
-    monkeypatch.setattr(runtime, "JobModbusService", DepartureModbusService)
+    monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
 
     async def run():
-        async with runtime.job_service(tmp_path) as (service, transport, _clock):
+        async with runtime.guest_service(tmp_path) as (service, transport, _clock):
             hass = await _boot(tmp_path / "ha")
             async_initialize_recorder(hass)
             db = tmp_path / "recorder.db"
@@ -36,7 +36,7 @@ def test_service_plans_and_orders_do_not_record_unchanged_polls(tmp_path, monkey
                 assert await async_setup_component(hass, "recorder", {"recorder": {
                     "db_url": f"sqlite:///{db}", "commit_interval": 1, "auto_purge": False,
                 }})
-                async with TestServer(create_job_app(service)) as server:
+                async with TestServer(create_app(service)) as server:
                     entry = await add_entry(hass, str(server.make_url("/")))
                     coordinator = entry.runtime_data.coordinator
                     coordinator.update_interval = None
@@ -68,14 +68,13 @@ def test_service_plans_and_orders_do_not_record_unchanged_polls(tmp_path, monkey
                     assert await rows() == before
                     assert len(transport.reads) == reads
 
-                    current = service.jobs.snapshot()
-                    await service.jobs.create(runtime.request(future=True), revision=current["revision"], scope=current["scope"])
-                    await service.departure.tick()
+                    await service.command({"command":"guest_start", "expected_serial_number":service.identity.serial_number,
+                                           "expected_guest_revision":service.guest_revision})
                     await coordinator.async_refresh()
                     before = await rows()
                     reads = len(transport.reads)
                     for _ in range(120):
-                        await service.jobs.tick()
+                        await service._guest_tick()
                         await service.departure.tick()
                         await coordinator.async_refresh()
                     assert await rows() == before

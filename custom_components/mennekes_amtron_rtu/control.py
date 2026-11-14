@@ -55,6 +55,10 @@ class AmtronControl(DeviceControl):
         """Only a service summarizes its controllers."""
         return None
 
+    async def async_set_target_time(self, deadline: datetime | None) -> None:
+        """Explicit shared-time editing is provided by the independent service."""
+        raise NotImplementedError
+
     async def async_set_departure_trip(
         self, deadline: datetime | None, source: str | None, *, withdraw: bool = False,
         expected_selection: dict[str, Any] | None = None,

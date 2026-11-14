@@ -1,5 +1,11 @@
 # Changes
 
+## 0.9.0b8
+
+- Replace guest orders with ordinary controls and shared limits.
+- Restore guest permission only for the proven same plug-in; retain pauses and stop guards.
+- Reject incompatible beta intent files with a safe reset acknowledgement.
+
 ## 0.9.0b7
 
 - Split charging controls into charge targets, next departure and guest charging.

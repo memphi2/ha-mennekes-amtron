@@ -14,9 +14,27 @@
     <p id="overview_notice" class="notice" role="status" aria-live="polite" data-overview="loading">Loading service state…</p>
     <noscript>JavaScript is required to display current service state.</noscript>
     <div id="overview_data" class="cards" hidden>
-      <section class="card wide" aria-labelledby="observed_title">
-      <section id="operation" aria-labelledby="operation_title" hidden>
-        <h2 id="operation_title" data-overview="op_title">My charging</h2>
+      <section class="card wide charging-hero" aria-labelledby="observed_title">
+        <div class="hero-heading"><div>
+          <h2 id="observed_title" data-overview="observed">Charging now</h2>
+          <p id="charge_state" class="state"></p><p id="charge_reason"></p>
+        </div><div class="badges"><span id="service_mode"></span><span id="heartbeat_state"></span></div></div>
+        <dl class="values hero-values">
+          <div><dt data-overview="power">Power</dt><dd id="power"></dd></div>
+          <div><dt data-overview="energy">Session energy</dt><dd id="energy"></dd></div>
+          <div><dt data-overview="limit">Current limit</dt><dd id="current_limit"></dd></div>
+        </dl>
+      </section>
+      <section class="card" aria-labelledby="choose_title">
+        <h2 id="choose_title" data-overview="choose">Plan your charging</h2>
+        <nav class="charging-choices" aria-labelledby="choose_title">
+          <a href="./targets"><span class="choice-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span><span><strong data-overview="targets_link">Charge target</strong><small data-overview="target_help">Limit energy or battery level without starting.</small></span><span aria-hidden="true">›</span></a>
+          <a href="./targets#departure_form"><span class="choice-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg></span><span><strong data-overview="departure_link">Target time</strong><small data-overview="departure_help">Vehicle departure or guest stop time.</small></span><span aria-hidden="true">›</span></a>
+          <a href="./targets#guest_start"><span class="choice-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3 5 14h6l-1 7 9-11h-6z"/></svg></span><span><strong data-overview="guest_link">Guest charging</strong><small data-overview="guest_help">Start now; optional energy and target-time limits apply.</small></span><span aria-hidden="true">›</span></a>
+        </nav>
+      </section>
+      <section id="operation" class="card" aria-labelledby="operation_title" hidden>
+        <h2 id="operation_title" data-overview="op_title">Current charging plan</h2>
         <p id="op_controller" class="state"></p>
         <dl class="values">
           <div><dt data-overview="op_wait">Why it waits</dt><dd id="op_waiting"></dd></div>
@@ -25,31 +43,18 @@
           <div><dt data-overview="op_vehicle">Vehicle</dt><dd id="op_car"></dd></div>
         </dl>
         <p id="op_advice" class="hint"></p>
-        <div class="actions"><a href="./targets" data-overview="jobs_link">Charge target</a><a href="./departure" data-overview="departure_link">Plan departure</a><a href="./guest" data-overview="guest_link">Guest charging</a></div>
-        <p class="hint" data-overview="op_hint">A percentage target limits battery charge; a kWh target limits additional wallbox energy.</p>
       </section>
-      <section aria-labelledby="observed_title">
-        <h2 id="observed_title" data-overview="observed">Observed charging state</h2>
-        <p id="charge_state" class="state"></p>
-        <p id="charge_reason"></p>
-        <div class="badges"><span id="service_mode"></span><span id="heartbeat_state"></span></div>
-        <dl class="values">
-          <div><dt data-overview="power">Power</dt><dd id="power"></dd></div>
-          <div><dt data-overview="energy">Session energy</dt><dd id="energy"></dd></div>
-          <div><dt data-overview="limit">Observed current limit</dt><dd id="current_limit"></dd></div>
-        </dl>
-      </section>
-      </section>
-      <section class="card" aria-labelledby="next_title">
-        <h2 id="next_title" data-overview="next">Next queued action</h2>
-        <p id="next_action"></p><p id="next_due" class="hint"></p>
-        <p data-overview="guard_hint" class="hint">A queued action is not a confirmed write. The earliest execution time can change; permissions and other guards still apply.</p>
+      <details class="card wide">
+        <summary data-overview="limits_details">Saved limits and queued actions</summary>
         <dl class="values">
           <div><dt data-overview="energy_target">Energy target</dt><dd id="energy_target"></dd></div>
           <div><dt data-overview="soc_target">Battery target</dt><dd id="soc_target"></dd></div>
         </dl>
-        <p class="hint" data-overview="plan_hint">Targets are saved limits, not progress. The car's current battery level stays in Home Assistant.</p>
-      </section>
+        <p class="hint" data-overview="plan_hint">Targets are saved limits, not progress.</p>
+        <h3 id="next_title" data-overview="next">Next queued action</h3>
+        <p id="next_action"></p><p id="next_due" class="hint"></p>
+        <p data-overview="guard_hint" class="hint">A queued action is not a confirmed write.</p>
+      </details>
       <details class="card wide">
         <summary id="commands_title" data-overview="commands">Recent command results</summary>
         <p class="hint" data-overview="history_hint">Up to 32 results since the service started, newest first. Sequence numbers are not timestamps. This is not a charging-session journal.</p>

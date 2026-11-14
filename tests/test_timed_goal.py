@@ -130,8 +130,12 @@ class FakePauseStore:
 
 
 class FakeControl:
+    @staticmethod
+    def guest_active():
+        return False
+
     def __init__(self, data: WallboxData) -> None:
-        self.soc_goal = SimpleNamespace(status="active", target_percent=80.0)
+        self.soc_goal = SimpleNamespace(status="active", target_percent=80.0, source="car")
         self.energy_goal = EnergyGoal()
         self.max_charging_current = 16.0
         self.read_only = False
@@ -535,13 +539,13 @@ def test_departure_controls_show_saved_trip_and_delegate_actions() -> None:
         next_event = buttons["timed_next_calendar_event"]
         await next_event.async_press()
         timed.async_use_next_calendar_event.assert_awaited_once()
-        await buttons["timed_clear_departure"].async_press()
+        await departure.async_clear_value()
         timed.async_set_deadline.assert_any_await(None)
         entry.runtime_data.timed_goal = None
         assert departure.native_value is None
         await departure.async_set_value(NOW + timedelta(hours=10))
         await next_event.async_press()
-        await buttons["timed_clear_departure"].async_press()
+        await departure.async_clear_value()
         await entry.runtime_data.control.async_shutdown()
 
     asyncio.run(run())
@@ -701,4 +705,29 @@ def test_an_unreadable_saved_pause_counts_as_none(monkeypatch: pytest.MonkeyPatc
         restarted._pause_store.async_save = AsyncMock()
         await restarted._set_plan_paused(True)
         restarted._pause_store.async_save.assert_awaited_once()
+    asyncio.run(run())
+
+
+def test_shared_time_without_vehicle_uses_service_and_needs_no_clear_button(monkeypatch):
+    from custom_components.mennekes_amtron_rtu.datetime import AmtronDepartureTime
+    async def run():
+        hass, entry, _transport = await build_runtime()
+        control = entry.runtime_data.control
+        monkeypatch.setattr(type(control), "departure", property(lambda _: SimpleNamespace(trip=SimpleNamespace(deadline=NOW))))
+        control.async_set_target_time = AsyncMock()
+        entry.data["server_url"] = "http://fixture"
+        added = {}
+        await setup_datetime(hass, entry, lambda entities: added.update(collect(entities)))
+        entity = added["timed_departure"]
+        assert isinstance(entity, AmtronDepartureTime)
+        assert entity.available
+        assert entity.native_value == NOW
+        await entity.async_set_value(NOW + timedelta(hours=1))
+        control.async_set_target_time.assert_awaited_with(NOW + timedelta(hours=1))
+        await entity.async_clear_value()
+        control.async_set_target_time.assert_awaited_with(None)
+        buttons = {}
+        await setup_buttons(hass, entry, lambda entities: buttons.update(collect(entities)))
+        assert "timed_clear_departure" not in buttons
+        await control.async_shutdown()
     asyncio.run(run())

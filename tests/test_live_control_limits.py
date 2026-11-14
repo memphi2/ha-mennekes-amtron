@@ -13,7 +13,6 @@ from custom_components.mennekes_amtron_rtu.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device import registers as R
 from custom_components.mennekes_amtron_rtu.device import service_runtime as runtime
 from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
-from custom_components.mennekes_amtron_rtu.device.control import ServiceChargePolicy
 from custom_components.mennekes_amtron_rtu.device.decode import decode_register
 from custom_components.mennekes_amtron_rtu.device.enums import (
     EvseState,
@@ -154,7 +153,7 @@ def test_only_a_fresh_reading_of_this_connection_counts(snapshot):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("fence", ["read_only", "pending", "service_order", "order_stop"])
+@pytest.mark.parametrize("fence", ["read_only", "pending", "time_limit"])
 def test_owners_and_stops_keep_their_say(fence):
     async def run():
         harness = Harness(current_cap=16, read_only=fence == "read_only", state_change_interval_seconds=300)
@@ -165,11 +164,8 @@ def test_owners_and_stops_keep_their_say(fence):
             await control.async_resume_charging()
             assert control.pending_action == "resume"
             harness.snapshot = WallboxData(values={"charging_current_ems": 16.0})
-        elif fence == "service_order":
-            # A holding order follows the cap on its own tick.
-            control.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: False, lambda: False))
-        elif fence == "order_stop":
-            control.set_service_policy(ServiceChargePolicy(lambda _owner, _enabling: None, lambda: True))
+        elif fence == "time_limit":
+            control.time_limit_reached = lambda: True
         writes = len(harness.transport.writes)
         assert await control.async_enforce_current_cap() is False
         assert len(harness.transport.writes) == writes
@@ -216,9 +212,9 @@ def test_the_service_lowers_after_each_poll_and_backs_off_after_a_failure(caplog
         with caplog.at_level(logging.INFO, logger=runtime.__name__):
             await service._enforce_current_cap()
         assert "lowered to the 10.0 A cap" in caplog.text
-        control.async_enforce_current_cap.side_effect = DeviceError("service_job_active")
+        control.async_enforce_current_cap.side_effect = DeviceError("time_limit_reached")
         await service._enforce_current_cap()
-        assert "could not be lowered (service_job_active)" in caplog.text
+        assert "could not be lowered (time_limit_reached)" in caplog.text
         assert service._cap_retry_at == 130
         control.async_enforce_current_cap.side_effect = AmtronBusError("lost")
         clock[0] = 129

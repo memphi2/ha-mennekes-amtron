@@ -118,7 +118,7 @@ def test_the_action_fields_match_the_service_description() -> None:
     strings = _load(COMPONENT / "strings.json")["services"]
     assert set(services) == set(strings)
     for action, definition in services.items():
-        assert set(definition["fields"]) == set(strings[action]["fields"])
+        assert set(definition.get("fields", {})) == set(strings[action].get("fields", {}))
 
 
 def _walk(payload: Any, prefix: str = ""):

@@ -236,23 +236,11 @@
       "timed_next_calendar_event": {
         "name": "Use next calendar event"
       },
-      "timed_clear_departure": {
-        "name": "Clear departure time"
-      },
       "timed_vehicle_departure": {
         "name": "Use vehicle departure"
       },
       "guest_start": {
         "name": "Start guest charging"
-      },
-      "guest_reset_draft": {
-        "name": "Reset guest draft"
-      },
-      "guest_stop": {
-        "name": "Stop guest charging"
-      },
-      "guest_clear": {
-        "name": "Clear guest charging"
       }
     },
     "number": {
@@ -264,15 +252,6 @@
       },
       "soc_goal": {
         "name": "Vehicle charge target"
-      },
-      "guest_current_a": {
-        "name": "Guest current"
-      },
-      "guest_energy_kwh": {
-        "name": "Guest energy"
-      },
-      "guest_duration_minutes": {
-        "name": "Guest maximum duration"
       }
     },
     "select": {
@@ -470,7 +449,7 @@
           "waiting_for_device": "Waiting for wallbox",
           "vehicle_unconfirmed": "Car not confirmed",
           "read_only": "Read only",
-          "order_active": "Guest charging has priority",
+          "guest_mode": "Guest charging has priority",
           "queued": "Change queued",
           "paused_until_start": "Paused until start",
           "minimum_level": "Charging to the minimum level",
@@ -519,10 +498,9 @@
         "name": "Charging control",
         "state": {
           "unavailable": "Wallbox unavailable",
-          "guest_order": "Guest order",
-          "charging_job": "Guest charging",
           "departure_plan": "Departure planning",
-          "direct": "Direct control"
+          "direct": "Direct control",
+          "guest": "Guest order"
         },
         "state_attributes": {
           "vehicle": {
@@ -557,10 +535,7 @@
           "no_vehicle": "No vehicle connected",
           "release_off": "Charging release switched off",
           "plug_charge_waiting": "Virtual Plug & Charge has not released the car",
-          "until_job_start": "Waiting for the job's start",
           "meter_unavailable": "Waiting for the energy meter",
-          "job_suspended": "Job waits for proof of the same plug-in",
-          "job_ended": "Job ended, paused until unplugged",
           "vehicle_unconfirmed": "Car not confirmed",
           "until_planned_start": "Paused until the planned start",
           "estimated_target_reached": "Charged to the estimated target",
@@ -579,11 +554,9 @@
         "state": {
           "none": "Nothing scheduled",
           "queued_command": "Queued change runs",
-          "job_start": "Job starts",
-          "job_end": "Job ends",
           "plan_start": "Planned charge starts",
           "target_reached": "Target expected",
-          "departure": "Departure"
+          "departure": "Target time"
         },
         "state_attributes": {
           "at": {
@@ -591,32 +564,11 @@
           }
         }
       },
-      "guest_draft_status": {
-        "name": "Guest charging draft",
-        "state": {
-          "ready": "Ready to start",
-          "job_exists": "Guest charging is already active",
-          "job_not_permitted": "Check vehicle, release, meter and pending changes",
-          "job_current_exceeds_cap": "Current exceeds the app limit",
-          "job_preview_expired": "Preview expired; preview again",
-          "job_storage_unavailable": "Draft storage unavailable",
-          "invalid_job_request": "Check energy, current and maximum duration",
-          "job_stop_unconfirmed": "Waiting for confirmed stop",
-          "guest_vehicle_target_active": "Vehicle battery target active"
-        }
-      },
       "guest_charging": {
         "name": "Guest charging",
         "state": {
-          "none": "No guest charge",
-          "scheduled": "Preparing guest charge",
-          "charging": "Charging requested",
-          "waiting_meter": "Waiting for a valid meter reading",
-          "suspended": "Interrupted; checking whether the same plug-in continues",
-          "reached": "Energy ceiling reached",
-          "finished": "Maximum duration reached",
-          "stopped": "Stopped by user",
-          "interrupted": "Interrupted; no automatic restart"
+          "inactive": "Inactive",
+          "active": "Active"
         },
         "state_attributes": {
           "start": {
@@ -757,8 +709,9 @@
               "unknown": "Unknown reason",
               "user_cancelled": "Cancelled by user",
               "energy_goal": "Charge target stop",
-              "service_job": "Guest charging has priority",
-              "deadline_expired": "Departure time expired"
+              "deadline_expired": "Departure time expired",
+              "time_limit": "Time limit reached",
+              "guest_confirmation": "Guest start requires confirmation"
             }
           }
         }
@@ -819,7 +772,7 @@
     },
     "datetime": {
       "timed_departure": {
-        "name": "Next departure"
+        "name": "Target time"
       }
     }
   },
@@ -896,9 +849,6 @@
     "energy_goal_stop_active": {
       "message": "A charging target requires a pause. Check its status. After reaching a target or a meter reset, set a new target or disable it with 0 before resuming. Changing a target does not start charging."
     },
-    "service_job_active": {
-      "message": "Guest charging controls the current. Stop it under Guest charging in the app or with Stop guest charging in Home Assistant. Once the pause is confirmed, manual control is available again."
-    },
     "energy_goal_state_invalid": {
       "message": "The saved energy target could not be restored. Check the logs before allowing charging again."
     },
@@ -974,50 +924,20 @@
     "plug_charge_not_supported": {
       "message": "The connected Modbus app or service does not support Virtual Plug & Charge. Update it to a compatible version before enabling this feature."
     },
-    "guest_vehicle_target_active": {
-      "message": "Vehicle battery target active; no guest order created."
-    },
-    "invalid_job_request": {
-      "message": "The app did not accept these values. Check time, current and energy."
-    },
-    "job_changed": {
-      "message": "The state changed in the meantime. Try again."
-    },
-    "job_clear_requires_pause": {
-      "message": "Clearing requires a confirmed pause or unplug."
-    },
-    "job_current_exceeds_cap": {
-      "message": "Current exceeds the service limit."
-    },
-    "job_exists": {
-      "message": "Another order is still running. Stop it first."
-    },
-    "job_not_permitted": {
-      "message": "Connection or release changed; no order was created."
-    },
-    "job_preview_expired": {
-      "message": "The state changed in the meantime. Try again."
-    },
-    "job_service_starting": {
-      "message": "The service is still starting. Try again shortly."
-    },
-    "job_stop_first": {
-      "message": "Stop the active order first."
-    },
-    "job_storage_unavailable": {
-      "message": "Storage unavailable; no automatic start."
-    },
-    "service_order_failed": {
-      "message": "The app did not carry this out. Check that it is reachable and up to date, and that times and values are valid."
-    },
     "app_required": {
       "message": "This action needs the Modbus app; this wallbox is connected directly."
     },
     "wallbox_target_required": {
       "message": "Several wallboxes are set up; name the wallbox this applies to."
     },
-    "job_stop_unconfirmed": {
-      "message": "The stop is not confirmed yet. Try again shortly."
+    "guest_start_not_permitted": {
+      "message": "Guest charging cannot start: check the connection, write access, wallbox lock and fault status."
+    },
+    "guest_deadline_expired": {
+      "message": "The saved time limit has expired. Choose a future time or clear it."
+    },
+    "time_limit_reached": {
+      "message": "The selected time has passed. Change or clear it before resuming."
     }
   },
   "issues": {
@@ -1702,29 +1622,7 @@
     },
     "start_guest_charging": {
       "name": "Start guest charging",
-      "description": "Charges a guest’s car from now on for a limited time and energy. No vehicle data and no saved target is used.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "The wallbox this applies to. Can be left out when only one is set up."
-        },
-        "current": {
-          "name": "Charging current",
-          "description": "Current in amperes per phase, at most the app’s current cap."
-        },
-        "energy": {
-          "name": "Energy",
-          "description": "Charging stops once this much energy was delivered, in kWh."
-        },
-        "duration": {
-          "name": "Duration",
-          "description": "How long charging is allowed, in minutes (up to 24 hours)."
-        }
-      }
-    },
-    "stop_guest_charging": {
-      "name": "Stop guest charging",
-      "description": "Stops guest charging and requests a pause. An armed departure plan may subsequently resume charging.",
+      "description": "Start immediately for this connection. Saved kWh and time limits apply; the vehicle percentage target stays unchanged.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1732,15 +1630,9 @@
         }
       }
     },
-    "clear_guest_charging": {
-      "name": "Clear guest charging",
-      "description": "Removes an ended guest session without resuming charging.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "The wallbox this applies to. Can be left out when only one is set up."
-        }
-      }
+    "clear_target_time": {
+      "name": "Clear target time",
+      "description": "Clears the shared time without changing energy or vehicle targets."
     }
   }
 }

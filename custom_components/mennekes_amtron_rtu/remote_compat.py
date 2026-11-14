@@ -9,7 +9,7 @@ from packaging.version import Version
 from .remote_errors import ServiceConnectionError
 
 SUPPORTED_API_VERSION = 2
-MIN_SERVICE_VERSION = "0.9.0b7"
+MIN_SERVICE_VERSION = "0.9.0b8"
 
 
 def validate_service_version(snapshot: Mapping[str, object]) -> None:

@@ -918,3 +918,47 @@ def test_a_future_planned_start_is_planned_anew_after_a_gap(monkeypatch):
         assert observer.planned_start is None
 
     asyncio.run(run())
+
+
+def test_direct_plan_learns_real_power_with_the_shared_full_current_window(monkeypatch):
+    async def run():
+        observer, control, _hass = setup_observer(monkeypatch)
+        observer.goal.set(NOW + timedelta(hours=4))
+        control.data.values.update(charging_current_ems=16, energy_total=100.0)
+        control.data.energy_read = True
+        control.data.energy_observed_at = NOW.timestamp()
+        await observer._evaluate()
+        assert observer._power_model.car("car").power(3, 16) is None
+        # A car capped at 8 A draws 5.52 kW although the wallbox offers 16 A.
+        control.data.energy_observed_at += 120
+        control.data.values["energy_total"] += 5.52 * 120 / 3600
+        await observer._evaluate()
+        assert observer._power_model.car("car").power(3, 16) == pytest.approx(5.52)
+        # The same cached snapshot is not another measurement.
+        before = observer._power_model.snapshot()
+        await observer._evaluate()
+        assert observer._power_model.snapshot() == before
+        # A goal or telemetry gap discards the partial measurement window.
+        control.data.values["energy_total"] = None
+        await observer._evaluate()
+        assert observer._power_window.start is None
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("missing", ["phase", "source", "timestamp"])
+def test_direct_power_learning_requires_current_context(monkeypatch, missing):
+    observer, control, _hass = setup_observer(monkeypatch)
+    observer._at_full = True
+    observer._power_window.sample(at=1000, total=100, phases=3, current=16, vehicle="car")
+    control.data.energy_read = True
+    control.data.energy_observed_at = 1120
+    control.data.values["energy_total"] = 100.2
+    if missing == "phase":
+        control.data.held = frozenset({"switched_phases"})
+    elif missing == "source":
+        control.soc_goal.source = None
+    else:
+        control.data.energy_observed_at = None
+    observer._learn_power()
+    assert observer._power_window.start is None
+    assert not observer._power_model.cars

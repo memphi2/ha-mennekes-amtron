@@ -19,8 +19,6 @@ START_RESERVE = timedelta(minutes=30)
 # pulse that would cross the finishing boundary before it can be reduced.
 FINISHING_WINDOW_HOURS = 5 / 60
 _TIME_TOLERANCE_HOURS = 1e-6  # Less than four milliseconds of date/float rounding.
-# A metered full-current power counts only this close to the nominal one.
-_POWER_LOW, _POWER_HIGH = 0.3, 1.1
 
 
 def usable_capacity(value: object, unit: str = "kWh") -> float | None:
@@ -65,7 +63,8 @@ def plan_current(
 
     ``full_power_kw`` is the power the car was metered to draw at full
     current. It replaces the nominal figure within bounds; a car that draws
-    less than offered then also counts less per ampere, which starts earlier.
+    less than offered caps the expected power. Below that ceiling, nominal
+    per-phase power still applies; a fixed vehicle limit is not an efficiency loss.
     """
     if now.tzinfo is None or deadline.tzinfo is None or now.utcoffset() is None or deadline.utcoffset() is None:
         raise ValueError("charge deadline needs an aware timestamp")
@@ -89,18 +88,16 @@ def plan_current(
     now, deadline = now.astimezone(UTC), deadline.astimezone(UTC)
     hours = (deadline - now).total_seconds() / 3600
     kw_per_amp = NOMINAL_VOLTAGE_V * phases * efficiency / 1000
+    full_power = max_current_a * kw_per_amp
     if full_power_kw is not None:
-        nominal = max_current_a * NOMINAL_VOLTAGE_V * phases / 1000
-        measured = min(_POWER_HIGH * nominal, max(_POWER_LOW * nominal, full_power_kw))
-        kw_per_amp = min(kw_per_amp, measured * efficiency / max_current_a)
-        full_hours = required / (measured * efficiency)
-    else:
-        full_hours = required / (max_current_a * kw_per_amp)
+        full_power = min(full_power, full_power_kw * efficiency)
+    full_hours = required / full_power
     if hours <= 0:
         return ChargePlan(max_current_a, "late", full_hours=full_hours)
     if full_hours > hours + _TIME_TOLERANCE_HOURS:
         return ChargePlan(max_current_a, "unreachable", full_hours=full_hours)
-    minimum_hours = required / (CHARGING_CURRENT_MINIMUM * kw_per_amp)
+    minimum_power = min(CHARGING_CURRENT_MINIMUM * kw_per_amp, full_power)
+    minimum_hours = required / minimum_power
     start_at = deadline - min(timedelta(hours=minimum_hours), timedelta(hours=full_hours) + START_RESERVE)
     if minimum_hours <= hours + _TIME_TOLERANCE_HOURS:
         return ChargePlan(CHARGING_CURRENT_MINIMUM, "finishing", start_at, full_hours)
@@ -109,6 +106,7 @@ def plan_current(
     # itself. Whole-amp upward steps match the observer's 1 A change threshold
     # and avoid understating the remaining demand; the configured cap wins.
     window = min(hours, FINISHING_WINDOW_HOURS)
-    surplus_amp_hours = CHARGING_CURRENT_MINIMUM * (minimum_hours - hours)
-    current = min(max_current_a, math.ceil(CHARGING_CURRENT_MINIMUM + surplus_amp_hours / window))
+    surplus_kwh = required - minimum_power * hours
+    needed_power = minimum_power + surplus_kwh / window
+    current = max_current_a if needed_power >= full_power else min(max_current_a, math.ceil(needed_power / kw_per_amp))
     return ChargePlan(current, "charging", start_at, full_hours)

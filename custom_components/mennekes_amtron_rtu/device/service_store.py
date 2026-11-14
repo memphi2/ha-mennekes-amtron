@@ -11,6 +11,7 @@ from typing import Any
 
 from .charging_session import SessionHistory
 from .energy_goal import EnergyGoal
+from .guest_permission import GuestPermission
 from .persistence import StorageCommitUncertainError
 from .plug_charge import PlugChargeState
 from .service_config import number
@@ -48,8 +49,8 @@ class IntentStore:
             not isinstance(payload, dict)
             or payload.keys() != {"version", "identity", "pause_requested",
                                   "charging_release_requested", "charging_setpoint",
-                                  "energy_goal", "soc_goal", "plug_charge", "charging_session_history"}
-            or payload.get("version") != 1
+                                  "energy_goal", "soc_goal", "plug_charge", "charging_session_history", "guest_permission"}
+            or payload.get("version") != 2
             or payload.get("identity") != self.identity
         ):
             raise ValueError("saved intent does not match this wallbox or state format")
@@ -62,6 +63,7 @@ class IntentStore:
             current = number(current, 0, 32)
             if 0 < current < 6:
                 raise ValueError("invalid saved resume current")
+        guest = None if payload["guest_permission"] is None else GuestPermission.restore(payload["guest_permission"])
         goal = EnergyGoal.restore(payload["energy_goal"])
         soc_goal = SocGoal.restore(payload["soc_goal"])
         plug_charge = PlugChargeState.restore(payload["plug_charge"])
@@ -75,6 +77,7 @@ class IntentStore:
         state.pause_requested = payload.get("pause_requested")
         state.charging_release_requested = payload.get("charging_release_requested")
         state.charging_setpoint = current
+        state.guest_permission = guest
         state.energy_goal = goal
         state.soc_goal = soc_goal
         state.session_history = history
@@ -83,11 +86,12 @@ class IntentStore:
 
     def save(self, state: WriteState) -> None:
         payload = {
-            "version": 1,
+            "version": 2,
             "identity": self.identity,
             "pause_requested": state.pause_requested,
             "charging_release_requested": state.charging_release_requested,
             "charging_setpoint": state.charging_setpoint,
+            "guest_permission": state.guest_permission.snapshot() if state.guest_permission is not None else None,
             "energy_goal": state.energy_goal.snapshot(),
             "soc_goal": state.soc_goal.snapshot(),
             "charging_session_history": state.session_history.snapshot(),

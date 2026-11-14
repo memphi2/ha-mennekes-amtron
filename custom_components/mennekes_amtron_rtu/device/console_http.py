@@ -15,10 +15,7 @@ if TYPE_CHECKING:
 
 CONSOLE_ASSETS = {
     "/targets": ("app_targets.html", "text/html"),
-    "/departure": ("app_departure.html", "text/html"),
     "/app_charging.js": ("app_charging.js", "text/javascript"),
-    "/guest": ("app_guest.html", "text/html"),
-    "/app_guest.js": ("app_guest.js", "text/javascript"),
     "/registers": ("app_registers.html", "text/html"),
     "/runtime": ("app_runtime.html", "text/html"),
     "/app_runtime.js": ("app_runtime.js", "text/javascript"),

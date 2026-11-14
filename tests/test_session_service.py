@@ -263,7 +263,8 @@ def test_store_discards_only_invalid_optional_history(tmp_path, caplog, history)
     soc_goal.configure_source("vehicle-source")
     soc_goal.set_target(80, 50, 90)
     payload = {
-        "version": 1, "identity": "wallbox", "pause_requested": True,
+        "version": 2, "identity": "wallbox", "pause_requested": True,
+        "guest_permission": None,
         "charging_release_requested": False, "charging_setpoint": 8,
         "energy_goal": energy_goal.snapshot(), "soc_goal": soc_goal.snapshot(),
         "charging_session_history": history,
@@ -293,14 +294,17 @@ def test_store_discards_only_invalid_optional_history(tmp_path, caplog, history)
 
 
 @pytest.mark.parametrize("broken", [
-    {"version": 2}, {"identity": "other-wallbox"}, {"pause_requested": 1},
+    {"version": 1}, {"identity": "other-wallbox"}, {"pause_requested": 1},
     {"charging_release_requested": 1}, {"charging_setpoint": 3},
     {"energy_goal": {}}, {"soc_goal": {}},
 ])
 def test_optional_history_recovery_never_accepts_invalid_control_state(tmp_path, caplog, broken):
     path = tmp_path / "intent.json"
     payload = {
-        "version": 1, "identity": "wallbox", "pause_requested": False,
+        "version": 2, "identity": "wallbox", "pause_requested": False,
+        "guest_permission": None, "charging_release_requested": False,
+        "energy_goal": EnergyGoal().snapshot(), "soc_goal": SocGoal().snapshot(),
+        "plug_charge": WriteState().plug_charge.durable(),
         "charging_setpoint": 8, "charging_session_history": {"version": 2, "latest": None},
     } | broken
     path.write_text(json.dumps(payload))

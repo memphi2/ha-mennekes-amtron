@@ -29,7 +29,8 @@ Keep the vehicle disconnected during the first control setup.
 | Who uses the adapter? | Service app | Home Assistant |
 | During an HA Core restart | Heartbeat and last charging state continue | Heartbeat is interrupted; wallbox fallback applies |
 | Where are writes enabled? | App **Configuration → Read-only** off | Integration **Configure → Wallbox → Control mode: Modbus master** |
-| Charging orders while HA is offline | [Guest charging and guest charging](app-guide.md#guest-charging) in the app | Not available |
+| Guest charging | Available; one explicit start button | Not available |
+| Limits and planning while HA is offline | Shared energy limits, active guest time limit and accepted vehicle plan continue | Needs HA running |
 
 Both support USB and LAN. A LAN adapter needs no local USB device. On HA
 Container, the service can run as a [separate container](service-standalone.md).
@@ -69,27 +70,55 @@ To update an existing installation, follow [Updates](#updates).
 
 ## 3. Connect the wallbox
 
-| Your choice | Next step |
+Choose **one** path below. Do not start a direct connection while the app owns
+the adapter, even if either connection is read-only.
+
+### Through the service
+
+On HA OS, follow [Install the app](modbus-service.md#install-on-home-assistant-os).
+Start read-only, choose **USB or LAN** under **Open Web UI → Connection**, save,
+and restart the app. Guided connection setup needs Supervisor 2026.10.4 or newer;
+native app Configuration is also available. Once the wallbox is initialized,
+confirm discovery under **Settings → Devices & services**. URL and token are
+supplied automatically.
+
+On HA Container or another host, follow [Standalone service](service-standalone.md),
+then choose **Connect to the Modbus service** when adding the integration and
+enter the service's URL and token.
+
+### Direct serial connection
+
+Open **Settings → Devices & services → Add integration → Mennekes Amtron RTU**.
+Choose **Direct serial connection**, select the USB adapter and enter the
+wallbox's bus settings. Prefer its stable `/dev/serial/by-id/...` path.
+
+| Factory setting | Value |
 |---|---|
-| **Service app on HA OS** | [Install and configure the app](modbus-service.md#install-on-home-assistant-os), leave it read-only and confirm its discovery in HA. URL and token are supplied automatically. |
-| **Standalone service** | [Start the service](service-standalone.md), then enter its service URL and token when adding the integration. |
-| **Direct USB** | [Add a direct serial connection](quickstart.md#direct-serial-connection) and select the adapter. |
-| **Direct LAN** | [Add a direct LAN connection](quickstart.md#direct-lan-adapter-connection) with protocol, adapter IP/hostname, TCP port and wallbox address. |
+| Device address | `50` |
+| Baud rate | `57600` |
+| Frame | `8N2` — 8 data bits, no parity, 2 stop bits |
 
-A **Service URL** points to this project's HTTP service. An adapter's **IP and
-TCP port** point to the LAN-to-RS-485 hardware. They are different fields for
-different connections. On HA OS, you normally type neither a service URL nor a
-token for the app.
+Use the wallbox's actual settings if they were changed. The form verifies the
+connection; its search can find unknown settings but may take several minutes.
+New entries start read-only. [USB adapter not visible?](hardware.md#making-the-adapter-visible-to-home-assistant)
 
-The app's **Open Web UI → Connection** provides guided connection setup on
-**Supervisor 2026.10.4+**. Native **Configuration** remains available for manual
-setup. See [the app's web pages](app-guide.md).
+### Direct LAN adapter connection
+
+Choose **Direct LAN adapter connection**. Enter the adapter's **IP/hostname**,
+**TCP port** (default 502), **wallbox address** and matching protocol:
+**RTU over TCP** for a transparent serial tunnel, or **Modbus TCP** when the adapter
+translates that protocol to RTU. Set baud rate and frame on the adapter.
+No local USB device is needed. [LAN setup](network-gateway.md).
+
+A **Service URL** belongs to this project's HTTP service. It is not the LAN
+adapter's IP/port. For an existing wallbox, use **Reconfigure** instead of adding
+another entry.
 
 ## 4. Check readings and try a charge
 
 Compare the readings with the wallbox while still read-only. Choose an
 appropriate current cap, then enable writes in the single place shown in the
-connection table. Follow [First charge](quickstart.md#7-first-charge) to check
+connection table. Follow [First charge](quickstart.md#first-charge) to check
 current control, pause and resume. Verify **Connection quality** (its
 `heartbeat` attribute should read `ok`) and resolve connection repairs before
 adding automation.
@@ -110,7 +139,7 @@ on, charging release off, resume current 6 A and no targets. This does not start
 charging. Reconfigure the desired policies before explicitly enabling release
 and resuming. In read-only mode the app cannot stop a physical charge.
 This does not change the supported wallbox families or minimum Home Assistant
-version. The current integration requires service **0.9.0b7 or newer**, API 2;
+version. The current integration requires service **0.9.0b8 or newer**, API 2;
 app and integration versions do not otherwise have to match.
 
 1. Back up HA and read the release notes, especially the changes marked

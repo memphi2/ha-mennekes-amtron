@@ -21,11 +21,8 @@ _SAMPLE_LOW, _SAMPLE_HIGH = 0.5, 1.1
 MIN_LEVEL_GAIN = 10.0
 MIN_ENERGY_KWH = 1.0
 # Metered power at full current is averaged over at least this long.
-POWER_WINDOW_SECONDS = 600.0
+POWER_WINDOW_SECONDS = 120.0
 MIN_POWER_KW, MAX_POWER_KW = 1.0, 50.0
-# Power is kept per ampere of the offered current, so it stays valid when the
-# maximum current changes.
-_MIN_KW_PER_A, _MAX_KW_PER_A = 0.02, 1.0
 _WEIGHT = 0.3
 
 
@@ -48,20 +45,20 @@ def _blend(known: float, sample: float) -> float:
 
 @dataclass(frozen=True, slots=True)
 class CarModel:
-    """One car's learned efficiency and its metered power per offered ampere, by phases."""
+    """One car's learned efficiency and its metered power ceiling, by phases."""
 
     efficiency: float | None = None
-    kw_per_a: tuple[float | None, float | None, float | None] = (None, None, None)
+    power_kw: tuple[float | None, float | None, float | None] = (None, None, None)
 
     @classmethod
     def restore(cls, raw: object) -> CarModel:
-        if not isinstance(raw, dict) or raw.keys() != {"efficiency", "kw_per_a"}:
+        if not isinstance(raw, dict) or raw.keys() != {"efficiency", "power_kw"}:
             raise ValueError("invalid learned car fields")
-        powers = raw["kw_per_a"]
+        powers = raw["power_kw"]
         if not isinstance(powers, list) or len(powers) != 3:
             raise ValueError("invalid learned power")
         efficiency = _number(raw["efficiency"], EFFICIENCY_LOW, EFFICIENCY_HIGH)
-        full = tuple(_number(value, _MIN_KW_PER_A, _MAX_KW_PER_A) for value in powers)
+        full = tuple(_number(value, MIN_POWER_KW, MAX_POWER_KW) for value in powers)
         if (raw["efficiency"] is not None and efficiency is None) or any(
             value is not None and known is None for value, known in zip(powers, full, strict=True)
         ):
@@ -69,7 +66,7 @@ class CarModel:
         return cls(efficiency, (full[0], full[1], full[2]))
 
     def snapshot(self) -> dict[str, Any]:
-        return {"efficiency": self.efficiency, "kw_per_a": list(self.kw_per_a)}
+        return {"efficiency": self.efficiency, "power_kw": list(self.power_kw)}
 
     def with_charge(self, *, level_gain: float, capacity_kwh: float, metered_kwh: float) -> CarModel:
         """Learn from two reports of the car and the energy metered between them."""
@@ -87,23 +84,29 @@ class CarModel:
 
     def with_power(self, phases: int, kw: float, max_current_a: float) -> CarModel:
         """Learn the power the car really drew while the plan offered full current."""
-        if phases not in (1, 2, 3) or not MIN_POWER_KW <= kw <= MAX_POWER_KW or max_current_a <= 0:
+        if (type(phases) is not int or phases not in (1, 2, 3)
+                or _number(kw, MIN_POWER_KW, MAX_POWER_KW) is None
+                or _number(max_current_a, 6, 32) is None):
             return self
-        sample = kw / max_current_a
-        if not _MIN_KW_PER_A <= sample <= _MAX_KW_PER_A:
+        nominal = NOMINAL_VOLTAGE_V * phases * max_current_a / 1000
+        # Grossly implausible measurements cannot train the model.
+        if kw > nominal * 1.1:
             return self
-        powers = list(self.kw_per_a)
+        sample = min(kw, nominal)
+        powers = list(self.power_kw)
         known = powers[phases - 1]
-        # A first sample is taken as it is only when it lies below the
-        # nominal power: assuming too much power would start too late.
-        learned = min(sample, NOMINAL_VOLTAGE_V * phases / 1000) if known is None else _blend(known, sample)
+        # Apply a sustained lower vehicle ceiling immediately; increases are
+        # smoothed so one fast window cannot postpone charging too much.
+        learned = sample if known is None else min(sample, _blend(known, sample))
         powers[phases - 1] = round(learned, 4)
-        return replace(self, kw_per_a=(powers[0], powers[1], powers[2]))
+        return replace(self, power_kw=(powers[0], powers[1], powers[2]))
 
     def power(self, phases: int, max_current_a: float) -> float | None:
-        """The power expected at this maximum current, or None until metered."""
-        known = self.kw_per_a[phases - 1] if phases in (1, 2, 3) else None
-        return None if known is None or max_current_a <= 0 else known * max_current_a
+        """Bound the offered nominal power by the car's measured ceiling."""
+        known = self.power_kw[phases - 1] if type(phases) is int and phases in (1, 2, 3) else None
+        if known is None or _number(max_current_a, 6, 32) is None:
+            return None
+        return min(known, NOMINAL_VOLTAGE_V * phases * max_current_a / 1000)
 
 
 @dataclass(slots=True)

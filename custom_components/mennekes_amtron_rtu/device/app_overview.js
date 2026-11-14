@@ -5,27 +5,31 @@
   const language = languages.indexOf(document.documentElement.lang.split("-")[0]);
   const column = language < 0 ? 0 : language;
   const words = {
-    departure_link: ["Plan departure", "Abfahrt planen", "Planifier le départ", "Vertrek plannen", "Pianifica partenza"],
+    limits_details: ["Saved limits and queued actions", "Gespeicherte Grenzen und vorgemerkte Aktionen", "Limites enregistrées et actions en attente", "Opgeslagen grenzen en geplande acties", "Limiti salvati e azioni in attesa"],
+    guest_help: ["Start now; optional energy and target-time limits apply.", "Jetzt starten; optionale Energie- und Zeitpunktgrenzen gelten.", "Démarrer maintenant ; limites d’énergie et heure cible facultatives.", "Start nu; optionele energiegrens en eindtijd gelden.", "Avvia ora; valgono i limiti facoltativi di energia e orario."],
+    departure_help: ["Vehicle departure or guest stop time.", "Fahrzeugabfahrt oder Stoppzeit für Gäste.", "Départ du véhicule ou heure d’arrêt pour l’invité.", "Vertrektijd van het voertuig of stoptijd voor gasten.", "Partenza del veicolo o orario di arresto ospite."],
+    target_help: ["Limit energy or battery level without starting.", "Energie oder Akkustand begrenzen, ohne die Ladung zu starten.", "Limiter l’énergie ou le niveau de batterie sans démarrer.", "Beperk energie of accuniveau zonder te starten.", "Limita energia o livello batteria senza avviare."],
+    choose: ["Plan your charging", "Laden vorbereiten", "Préparer la recharge", "Laden voorbereiden", "Prepara la ricarica"],
+    departure_link: ["Target time", "Zielzeitpunkt", "Heure cible", "Doeltijd", "Orario obiettivo"],
     advice_connect: ["Connect the vehicle to the wallbox and wait for a fresh reading.", "Fahrzeug an die Wallbox anschließen und auf eine aktuelle Meldung warten.", "Branchez le véhicule et attendez une mesure récente.", "Sluit de auto aan en wacht op een actuele meting.", "Collegare il veicolo e attendere una lettura aggiornata."],
     intent_rejected: ["Saved settings rejected. Open Home Assistant Settings → System → Repairs. Confirmation keeps charging paused and release off.", "Gespeicherte Einstellungen abgelehnt. Öffne in Home Assistant Einstellungen → System → Reparaturen. Nach Bestätigung bleiben Pause aktiv und Ladefreigabe aus.", "Réglages enregistrés rejetés. Ouvrez Paramètres → Système → Réparations dans Home Assistant. La confirmation conserve la pause et coupe l’autorisation.", "Opgeslagen instellingen geweigerd. Open Instellingen → Systeem → Reparaties in Home Assistant. Bevestigen houdt pauze aan en vrijgave uit.", "Impostazioni salvate rifiutate. Apri Impostazioni → Sistema → Riparazioni in Home Assistant. Dopo la conferma pausa attiva e consenso disattivato."],
-    advice_job: ["Open Guest charging to inspect this session. Stopping pauses it; clearing it does not resume charging.", "Unter Gastladen den Ladevorgang prüfen. Stoppen pausiert; Entfernen startet keine Ladung.", "Ouvrez Recharge invité. Arrêter met en pause ; retirer ne reprend pas la recharge.", "Open Gastladen. Stoppen pauzeert; verwijderen hervat niet.", "Aprire Ricarica ospite. Fermare mette in pausa; rimuovere non riprende."],
     advice_target: ["The target stops charging. Open Charge target to change the limit.", "Das Ziel stoppt die Ladung. Zum Ändern der Grenze Ladeziel öffnen.", "L’objectif arrête la recharge. Ouvrez Objectif de charge pour modifier la limite.", "Het doel stopt het laden. Open Laaddoel om de grens te wijzigen.", "L’obiettivo ferma la ricarica. Aprire Obiettivo di ricarica per modificare il limite."],
     advice_readonly: ["Enable writing in the app configuration if you want the app to control charging.", "Schreibzugriff unter App-Konfiguration aktivieren, wenn die App das Laden steuern soll.", "Activez l’écriture dans la configuration de l’application pour piloter la recharge.", "Schakel schrijven in via de appconfiguratie om laden te bedienen.", "Abilitare la scrittura in configurazione dell’app per controllare la ricarica."],
     advice_connection: ["Check Connection and the diagnostic log. Saved settings are not a live wallbox reading.", "Verbindung und Diagnoseprotokoll prüfen. Gespeicherte Einstellungen sind keine aktuelle Wallbox-Meldung.", "Vérifiez Connexion et le journal de diagnostic. Les réglages enregistrés ne sont pas des mesures actuelles.", "Controleer Verbinding en het diagnoselog. Opgeslagen instellingen zijn geen actuele meting.", "Verificare Connessione e registro diagnostico. Le impostazioni salvate non sono letture attuali."],
     advice_pause: ["Check the pause and charging-release switches in Home Assistant before resuming.", "Vor dem Fortsetzen in Home Assistant die Schalter Ladepause und Ladefreigabe prüfen.", "Vérifiez pause et autorisation de recharge dans Home Assistant avant de reprendre.", "Controleer pauze en laadvrijgave in Home Assistant voordat je hervat.", "Verificare pausa e consenso alla ricarica in Home Assistant prima di riprendere."],
     advice_wait: ["The next step is scheduled. No action is needed unless you want to change the plan.", "Der nächste Schritt ist geplant. Nur eingreifen, wenn du den Plan ändern möchtest.", "La prochaine étape est prévue. Intervenez seulement pour changer le plan.", "De volgende stap is gepland. Alleen ingrijpen als je het plan wilt wijzigen.", "Il prossimo passo è pianificato. Intervenire solo per cambiare il piano."],
-    advice_plan: ["Open Plan departure and check the target, charge level and capacity.", "Abfahrt planen öffnen und Ziel, Ladestand und Kapazität prüfen.", "Ouvrez Planifier le départ et vérifiez objectif, niveau et capacité.", "Open Vertrek plannen en controleer doel, laadniveau en capaciteit.", "Aprire Pianifica partenza e verificare obiettivo, livello e capacità."],
+    advice_plan: ["Check the target, charge level and battery capacity in Home Assistant’s vehicle settings.", "Ziel, Ladestand und Akkukapazität in den Fahrzeugeinstellungen von Home Assistant prüfen.", "Vérifiez objectif, niveau et capacité dans les réglages du véhicule de Home Assistant.", "Controleer doel, laadniveau en accucapaciteit in de voertuiginstellingen van Home Assistant.", "Verifica obiettivo, livello e capacità nelle impostazioni veicolo di Home Assistant."],
     advice_vehicle: ["Check the selected vehicle and its cable/home signals in Home Assistant.", "In Home Assistant das ausgewählte Fahrzeug und dessen Kabel-/Zuhause-Signale prüfen.", "Vérifiez le véhicule sélectionné et ses signaux câble/domicile dans Home Assistant.", "Controleer het geselecteerde voertuig en de kabel-/thuissignalen in Home Assistant.", "Controllare veicolo selezionato e segnali cavo/casa in Home Assistant."],
     guest_link: ["Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite"],
-    jobs_link: ["Charge target", "Ladeziel", "Objectif de charge", "Laaddoel", "Obiettivo di ricarica"],
+    targets_link: ["Charge target", "Ladeziel", "Objectif de charge", "Laaddoel", "Obiettivo di ricarica"],
     title: ["Charging overview", "Ladeübersicht", "Vue de la recharge", "Laadoverzicht", "Panoramica ricarica"],
-    intro: ["Observed state and service decisions. This page does not change charging.", "Messzustand und Entscheidungen des Services. Diese Seite verändert die Ladung nicht.", "État observé et décisions du service. Cette page ne modifie pas la recharge.", "Gemeten toestand en beslissingen van de service. Deze pagina wijzigt het laden niet.", "Stato osservato e decisioni del servizio. Questa pagina non modifica la ricarica."],
+    intro: ["Your charging at a glance. Choose a target, plan your next departure or start guest charging.", "Deine Ladung auf einen Blick. Ladeziel setzen, die nächste Abfahrt planen oder Gastladen starten.", "Votre recharge en un coup d’œil. Choisissez un objectif, planifiez le prochain départ ou lancez une recharge invité.", "Je laadsessie in één oogopslag. Kies een doel, plan het volgende vertrek of start gastladen.", "La ricarica a colpo d’occhio. Scegli un obiettivo, pianifica la prossima partenza o avvia la ricarica ospite."],
     loading: ["Loading service state…", "Service-Zustand wird geladen…", "Chargement de l’état…", "Servicestatus laden…", "Caricamento dello stato…"],
     live: ["Service snapshot · refreshes every 5 seconds", "Service-Zustand · Aktualisierung alle 5 Sekunden", "État du service · actualisation toutes les 5 secondes", "Servicestatus · elke 5 seconden vernieuwd", "Stato del servizio · aggiornamento ogni 5 secondi"],
     offline: ["Service state unavailable. Old readings are hidden; retrying automatically.", "Service-Zustand nicht erreichbar. Alte Werte sind ausgeblendet; erneuter Abruf erfolgt automatisch.", "État indisponible. Les anciennes valeurs sont masquées ; nouvelle tentative automatique.", "Servicestatus niet beschikbaar. Oude waarden zijn verborgen; automatische nieuwe poging.", "Stato non disponibile. I vecchi valori sono nascosti; nuovo tentativo automatico."],
     admin: ["Administrator access is required.", "Administrator-Zugriff erforderlich.", "Accès administrateur requis.", "Beheerderstoegang vereist.", "Accesso amministratore richiesto."],
     supervisor: ["Update Supervisor to a supported version to open this page.", "Für diese Seite Supervisor auf eine unterstützte Version aktualisieren.", "Mettez Supervisor à jour vers une version compatible.", "Werk Supervisor bij naar een ondersteunde versie.", "Aggiornare Supervisor a una versione supportata."],
-    observed: ["Observed charging state", "Beobachteter Ladezustand", "État de recharge observé", "Gemeten laadstatus", "Stato di ricarica osservato"],
+    observed: ["Charging now", "Laden im Moment", "Recharge en cours", "Laden op dit moment", "Ricarica attuale"],
     power: ["Power", "Leistung", "Puissance", "Vermogen", "Potenza"],
     energy: ["Session energy", "Energie dieses Ladevorgangs", "Énergie de la session", "Energie van deze sessie", "Energia della sessione"],
     limit: ["Observed current limit", "Gelesene Stromvorgabe", "Limite de courant lue", "Uitgelezen stroomlimiet", "Limite di corrente letto"],
@@ -44,7 +48,7 @@
     history_hint: ["Up to 32 results since service start, newest first. Sequence numbers are not timestamps. This is not a session journal.", "Bis zu 32 Ergebnisse seit Service-Start, neueste zuerst. Laufende Nummern sind keine Zeitangaben. Dies ist kein Ladejournal.", "Jusqu’à 32 résultats depuis le démarrage, les plus récents d’abord. Les numéros ne sont pas des horaires. Ce n’est pas un journal de sessions.", "Maximaal 32 resultaten sinds servicestart, nieuwste eerst. Volgnummers zijn geen tijdstippen. Dit is geen sessielogboek.", "Fino a 32 risultati dall’avvio, dal più recente. I numeri non sono orari. Non è un registro delle sessioni."],
     no_commands: ["No command results yet.", "Noch keine Befehlsergebnisse.", "Aucun résultat pour le moment.", "Nog geen opdrachtresultaten.", "Nessun risultato disponibile."],
     footer: ["Charging: targets, next departure and guest charging. Vehicle setup and manual switches: Home Assistant.", "Laden: Ziele, nächste Abfahrt und Gastladen. Fahrzeugeinrichtung und manuelle Schalter: Home Assistant.", "Recharge : objectifs, prochain départ et invités. Profils et interrupteurs manuels : Home Assistant.", "Laden: doelen, volgend vertrek en gasten. Voertuigconfiguratie en handmatige schakelaars: Home Assistant.", "Ricarica: obiettivi, prossima partenza e ospiti. Profili e interruttori manuali: Home Assistant."],
-    op_title: ["My charging", "Meine Ladung", "Ma recharge", "Mijn laadsessie", "La mia ricarica"],
+    op_title: ["Current charging plan", "Aktueller Ladeablauf", "Plan de recharge actuel", "Huidig laadplan", "Piano di ricarica attuale"],
     op_wait: ["Why it waits", "Warum es wartet", "Pourquoi elle attend", "Waarom het wacht", "Perché attende"],
     op_next: ["Next step", "Nächster Schritt", "Prochaine étape", "Volgende stap", "Prossimo passo"],
     op_target: ["Target", "Ziel", "Cible", "Doel", "Obiettivo"],
@@ -52,8 +56,7 @@
     op_by: ["by", "bis", "d’ici", "tegen", "entro"],
     op_hint: ["Limits in % describe the battery; kWh describes additional energy at the wallbox.", "Ziele in % betreffen den Akku; kWh bedeutet zusätzliche Energie an der Wallbox.", "Les objectifs en % concernent la batterie ; les kWh sont l’énergie supplémentaire à la borne.", "Doelen in % gelden voor de accu; kWh is extra energie aan de laadpaal.", "Gli obiettivi in % riguardano la batteria; i kWh indicano energia aggiuntiva alla wallbox."],
     op_unavailable: ["Wallbox unavailable", "Wallbox nicht erreichbar", "Borne injoignable", "Wallbox niet bereikbaar", "Wallbox non raggiungibile"],
-    op_guest_order: ["Guest order", "Gastauftrag", "Ordre invité", "Gastopdracht", "Ordine ospite"],
-    op_charging_job: ["Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite"],
+    op_guest: ["Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite"],
     op_departure_plan: ["Departure planning", "Abfahrtsplanung", "Planification du départ", "Vertrekplanning", "Pianificazione della partenza"],
     op_direct: ["Direct control", "Direkte Steuerung", "Commande directe", "Directe bediening", "Controllo diretto"],
     wait_none: ["Nothing is holding the charge", "Nichts hält das Laden auf", "Rien ne retient la recharge", "Niets houdt het laden tegen", "Nulla trattiene la ricarica"],
@@ -61,10 +64,7 @@
     wait_no_vehicle: ["No vehicle connected", "Kein Fahrzeug angeschlossen", "Aucun véhicule connecté", "Geen voertuig aangesloten", "Nessun veicolo collegato"],
     wait_release_off: ["Charging release switched off", "Ladefreigabe ausgeschaltet", "Autorisation de recharge désactivée", "Laadvrijgave uitgeschakeld", "Abilitazione alla ricarica disattivata"],
     wait_plug_charge_waiting: ["Virtual Plug & Charge has not released the car", "Virtuelles Plug & Charge hat das Fahrzeug nicht freigegeben", "Le Plug & Charge virtuel n’a pas autorisé le véhicule", "Virtueel Plug & Charge heeft het voertuig niet vrijgegeven", "Il Plug & Charge virtuale non ha abilitato il veicolo"],
-    wait_until_job_start: ["Waiting for the job's start", "Wartet auf den Start des Auftrags", "En attente du début de l’ordre", "Wacht op de start van de opdracht", "In attesa dell’avvio dell’ordine"],
     wait_meter_unavailable: ["Waiting for the energy meter", "Wartet auf den Energiezähler", "En attente du compteur d’énergie", "Wacht op de energiemeter", "In attesa del contatore di energia"],
-    wait_job_suspended: ["Job waits for proof of the same plug-in", "Auftrag wartet auf den Nachweis desselben Steckvorgangs", "L’ordre attend la preuve du même branchement", "Opdracht wacht op bewijs van dezelfde aansluiting", "L’ordine attende la prova dello stesso collegamento"],
-    wait_job_ended: ["Job ended, paused until unplugged", "Auftrag beendet, pausiert bis zum Abstecken", "Ordre terminé, en pause jusqu’au débranchement", "Opdracht beëindigd, gepauzeerd tot loskoppelen", "Ordine terminato, in pausa fino allo scollegamento"],
     wait_vehicle_unconfirmed: ["Car not confirmed", "Fahrzeug nicht bestätigt", "Véhicule non confirmé", "Voertuig niet bevestigd", "Veicolo non confermato"],
     wait_until_planned_start: ["Paused until the planned start", "Pausiert bis zum geplanten Start", "En pause jusqu’au démarrage prévu", "Gepauzeerd tot de geplande start", "In pausa fino all’avvio pianificato"],
     wait_estimated_target_reached: ["Charged to the estimated target", "Bis zum errechneten Ziel geladen", "Chargé jusqu’à l’objectif estimé", "Geladen tot het berekende doel", "Caricato fino all’obiettivo stimato"],
@@ -78,11 +78,9 @@
     wait_paused: ["Charging paused", "Laden pausiert", "Recharge en pause", "Laden gepauzeerd", "Ricarica in pausa"],
     step_none: ["Nothing scheduled", "Nichts geplant", "Rien de prévu", "Niets gepland", "Nulla in programma"],
     step_queued_command: ["Queued change runs", "Vorgemerkte Änderung wird ausgeführt", "La modification en attente s’exécute", "Wijziging in wachtrij wordt uitgevoerd", "La modifica in coda viene eseguita"],
-    step_job_start: ["Job starts", "Auftrag startet", "L’ordre démarre", "Opdracht start", "L’ordine inizia"],
-    step_job_end: ["Job ends", "Auftrag endet", "L’ordre se termine", "Opdracht eindigt", "L’ordine termina"],
     step_plan_start: ["Planned charge starts", "Geplantes Laden startet", "La recharge planifiée démarre", "Gepland laden start", "Inizia la ricarica pianificata"],
     step_target_reached: ["Target expected", "Ziel voraussichtlich erreicht", "Cible attendue", "Doel verwacht", "Obiettivo previsto"],
-    step_departure: ["Departure", "Abfahrt", "Départ", "Vertrek", "Partenza"],
+    step_departure: ["Target time", "Zielzeitpunkt", "Heure cible", "Doeltijd", "Orario obiettivo"],
     car_unknown: ["Unknown", "Unbekannt", "Inconnu", "Onbekend", "Sconosciuto"],
     car_none: ["Not connected", "Nicht angeschlossen", "Non connecté", "Niet aangesloten", "Non collegato"],
     car_connected: ["Connected", "Angeschlossen", "Connecté", "Aangesloten", "Collegato"],
@@ -140,7 +138,8 @@
     error_still_active: ["Fault still active", "Fehler weiterhin aktiv", "Défaut toujours actif", "Storing nog actief", "Guasto ancora attivo"],
     user_cancelled: ["Cancelled by user", "Vom Benutzer verworfen", "Annulé par l’utilisateur", "Door gebruiker geannuleerd", "Annullato dall’utente"],
     energy_goal: ["Charge target prevents command", "Ladeziel verhindert Befehl", "Objectif empêchant la commande", "Laaddoel voorkomt opdracht", "Obiettivo impedisce comando"],
-    service_job: ["Guest charging has priority", "Gastladen hat Vorrang", "La recharge invité est prioritaire", "Gastladen heeft voorrang", "La ricarica ospite ha priorità"],
+    guest_confirmation: ["Guest start requires confirmation", "Gaststart muss bestätigt werden", "Confirmez le démarrage invité", "Bevestig het starten voor de gast", "Conferma avvio ospite"],
+    time_limit: ["Time limit reached", "Zeitgrenze erreicht", "Limite horaire atteinte", "Tijdslimiet bereikt", "Limite orario raggiunto"],
     deadline_expired: ["Deadline expired", "Gültigkeit abgelaufen", "Échéance dépassée", "Deadline verstreken", "Scadenza superata"]
   };
   const text = key => words[key]?.[column] ?? words.unknown[column];
@@ -163,7 +162,9 @@
         || !Array.isArray(data.commands) || data.commands.length > 32
         || (data.operation && !(data.operation.next && data.operation.target))) throw new Error("invalid overview");
     put("charge_state", text(data.state));
+    el("charge_state").className="state charging-state "+(!data.available?"state-error":data.state==="charging"?"state-active":data.state==="wallbox_error"?"state-error":["paused","locked","release_disabled","authorization_required","preparing","waiting_for_vehicle"].includes(data.state)?"state-wait":"state-muted");
     put("charge_reason", text(data.reason));
+    el("charge_reason").hidden=text(data.reason)===text(data.state);
     put("service_mode", text(data.read_only === true ? "readonly" : data.read_only === false ? "writable" : "unknown"));
     put("heartbeat_state", `${text("heartbeat")}: ${text(data.heartbeat)}`);
     const measurement = data.available ? data.measurements : {};
@@ -183,11 +184,10 @@
       const advice = {
         plug_charge_waiting: "vehicle", vehicle_unconfirmed: "vehicle", no_vehicle: "connect",
         waiting_for_soc: "plan", waiting_for_capacity: "plan", waiting_for_target: "plan",
-        until_job_start: "wait", until_planned_start: "wait", command_pending: "wait",
+        until_planned_start: "wait", command_pending: "wait",
         paused: "pause", release_off: "pause", read_only: "readonly",
         wallbox_unavailable: "connection", waiting_for_device: "connection", meter_unavailable: "connection",
         target_reached: "target", estimated_target_reached: "target",
-        job_suspended: "job", job_ended: "job",
       }[summary.waiting];
       put("op_advice", data.reason === "intent_rejected" ? text("intent_rejected") : advice ? text(`advice_${advice}`) : "");
       const at = moment(summary.next.at);

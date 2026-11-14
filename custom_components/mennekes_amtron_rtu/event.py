@@ -78,7 +78,7 @@ class AmtronControlResultEvent(CoordinatorEntity[MennekesAmtronCoordinator], Eve
 
     @property
     def available(self) -> bool:
-        """Older services remain compatible but cannot supply command events."""
+        """Wait for the service's controller to initialize its event feed."""
         return super().available and self._feed.supported
 
     async def async_added_to_hass(self) -> None:

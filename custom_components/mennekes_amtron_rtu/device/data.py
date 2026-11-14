@@ -42,7 +42,6 @@ class WallboxData:
     service_max_charging_current: float | None = field(default=None, repr=False)
     service_charging_setpoint: float | None = field(default=None, repr=False)
     # Draft edits must notify HA even if no Modbus value changed. Internal only.
-    service_guest_draft: dict[str, Any] | None = field(default=None, repr=False)
     # Fixed queue metadata changes only when intent changes, never each second.
     pending_change: str | None = field(default=None, repr=False)
     pending_change_until: datetime | None = field(default=None, repr=False)
@@ -56,7 +55,7 @@ class WallboxData:
     soc_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
     # A goal may only act on a counter attempted in this poll, never a cached one.
     energy_read: bool = field(default=False, compare=False, repr=False)
-    # Actual service-side meter attempt time, not a repeated API cache read.
+    # Actual meter attempt time, never the time of a repeated API/cache read.
     energy_observed_at: float | None = field(default=None, compare=False, repr=False)
     # The session clock and energy were read in this poll, not carried forward.
     session_read: bool = field(default=False, compare=False, repr=False)

@@ -1,42 +1,35 @@
-# The app's web pages
+# Use the app's web interface
 
-[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+[Guide home](README.md) · [Install the app](modbus-service.md) · [HA dashboard](app-from-home-assistant.md) · [Help](troubleshooting.md)
 
-Open the service app and select **Open Web UI**. The pages are for Home
-Assistant administrators and open through Home Assistant itself; no port or
-token is needed in the browser. They need **Supervisor 2026.10.4 or newer**.
+In Home Assistant, open **Settings → Apps → Mennekes Amtron Modbus Service →
+Open Web UI**. The interface requires an administrator account. It is provided
+by the service app; a direct integration connection has no app web interface.
 
-The bar at the top has four groups; **Charging**, **Settings** and **Diagnostics** show their
-pages in a second row.
+| You want to… | Page |
+|---|---|
+| See whether the car is charging and why it waits | **Overview** |
+| Change kWh/time/percentage limits or start a guest | **Charging** |
+| Set up USB or LAN | **Settings → Connection** |
+| Change the current cap, polling or waiting interval | **Settings → Runtime** |
+| Investigate a problem | **Diagnostics → Registers** or **Log** |
 
-| Group | Page | What it is for |
-|---|---|---|
-| **Overview** | [Overview](#overview) | What the wallbox and the app are doing right now. Read-only. |
-| **Charging** | [Charge target](#charge-target) | Limit kWh or the selected vehicle percentage without starting charging. |
-| | [Plan departure](#plan-departure) | One trip with a target percentage and automatic start/current planning. |
-| | [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
-| **Settings** | [Connection](#connection) | USB or LAN connection, optional LAN-adapter setup. |
-| | [Runtime](#runtime-settings) | Polling intervals and control limits, with a preview before saving. |
-| **Diagnostics** | [Registers](#registers) | Every wallbox register with its raw and decoded value. Read-only. |
-| | [Log](#log) | The Modbus traffic as it happens, for troubleshooting. |
+Configure vehicle profiles, recognition, percentage sources and intelligent
+departure planning in **Home Assistant**. Once handed over, the app can execute
+a vehicle plan while HA is offline. The web interface needs no separate saved
+charging order.
 
-Every page follows the browser language in English, German, French, Dutch and
-Italian, and every page has the same navigation bar.
+![Charging page with shared limits and the guest-start button](images/charging-de.png)
 
-Everyday charging stays in Home Assistant: the current slider, **Charging
-paused**, targets and departure planning. The app pages add a view of the
-service and orders that keep running while Home Assistant is offline.
-The orders can also be started and stopped from a Home Assistant dashboard or
-automation; see [Use the app from Home Assistant](app-from-home-assistant.md).
-
-[Overview](#overview) · [Charge target](#charge-target) · [Plan departure](#plan-departure) · [Guests](#guest-charging) · [Settings](#runtime-settings) · [Diagnostics](#log)
+*German interface with simulated example values. The app also supports English,
+French, Italian and Dutch.*
 
 ## Overview
 
 The overview opens first. It refreshes every five seconds while the page is
 visible and shows:
 
-- **My charging**: which of the app's controllers decides right now (a
+- **Current charging plan**: which of the app's controllers decides right now (a
   guest charge, departure plan or manual control), why
   the car does not charge yet, the next step with its time, the target and
   whether Home Assistant confirmed the car. Home Assistant shows the same
@@ -59,49 +52,32 @@ waiting states; it does not override a pause or authorize a vehicle.
 
 ## Charge target
 
-Open **Charging → Charge target**. Set additional wallbox kWh or the selected
-vehicle's percentage target and explicitly save. These are the same values as
-HA's native target entities. A target only limits charging; it never starts or
-resumes a pause. 0 disables the respective limit. If both are active, both apply.
-
-Set up vehicle sources and the optional maximum in HA first. The app respects
-that maximum and refuses a new percentage target when a required cap is unknown.
-It does not invent a vehicle SoC or battery capacity.
+Open **Charging**. Set an optional kWh limit, time or vehicle percentage target on
+the left and save each change. The right side shows the saved choices and the
+**Start guest charging** button. Unsaved edits must be saved or reloaded first.
+The same saved values appear in Home Assistant. Setting a limit does not start charging.
 
 ## Plan departure
 
-Open **Charging → Plan departure** after enabling the vehicle's departure
-planning in HA and providing usable battery capacity. Set the percentage target,
-then select one dated departure and save. HA and the app show the same trip.
-Calendar and vehicle timer imports remain optional HA buttons; imports replace
-this same departure rather than creating another schedule.
-
-An active plan may lift a manual pause. Clearing the departure cancels the plan,
-keeps the ordinary targets and may end a pause owned by the plan. Check the
-planning status; the requested target time is not a guarantee. See
-[the three-mode guide](app-from-home-assistant.md) and
-[departure planning](departure-planning.md) for examples and restart behavior.
+Intelligent vehicle planning is configured in Home Assistant, as before. It uses
+SoC, battery capacity and the selected next trip. The app shows the shared time
+and current plan status without a separate planning page.
+See [planning](departure-planning.md). A time used for a guest is instead a
+stop time: guest charging does not wait until a planned start.
 
 ## Guest charging
 
-**Guest charging** (German: **Gastladen**) starts one order right away for a
-visitor's car, without any vehicle data.
+Press **Start guest charging** to start now. It lifts a manual pause and grants
+permission for this connection, including when virtual Plug & Charge is enabled.
+It respects the shared kWh limit and time, whichever is reached first. Unset limits
+do not add hidden defaults. The saved vehicle percentage target is ignored for
+the guest and remains unchanged. Locks, faults and electrical limits still apply.
+For example, set **10 kWh** and **07:30 tomorrow**, save both, then start.
+The car starts as soon as the write guards allow and stops at whichever limit
+is reached first.
 
-1. Let the guest authorize locally first, for example with an RFID card, so the
-   wallbox's charging release is on.
-2. Open **Guest charging** and enter the **additional energy**, the **maximum
-   duration** (1 to 1440 minutes) and the **current per phase**.
-3. The fields share a saved guest draft with HA. **Save draft** stores edits without starting; **Reload saved draft** adopts changes from another window.
-4. Select **Preview**, check the start and end times and select **Confirm and
-   start when permitted** within one minute.
-
-A guest order uses no battery level and no saved vehicle target. It cannot be
-created while a battery target is active in Home Assistant; set that target to 0
-first. If a battery target is switched on later, the guest order is interrupted.
-
-A guest session stops at the energy
-amount or the end time, ends when the car is unplugged, and **Clear stopped
-order without resuming** never restarts charging.
+The same button changes to **Pause guest charging** while active. Use it, the ordinary HA pause switch, or unplug to stop. There is no separate guest
+draft, duration or current editor. See [charging details](app-from-home-assistant.md).
 
 ## Registers
 
@@ -170,12 +146,12 @@ is closed. See [troubleshooting](troubleshooting.md#watch-app-modbus-communicati
 - The pages show what the app knows. Home Assistant supplies vehicle data and departure choices. The overview
   shows the app’s active controller and target; edit the vehicle profile and
   next departure in HA.
-- An app restart pauses a running order. It continues only when the wallbox
-  proves the same plug-in; otherwise the app hands control back to Home
-  Assistant.
+- An HA Core restart leaves the service running. An app restart restores guest permission
+  and limits only for the proven same plug-in, preserving a deliberate pause.
+  Without that proof it stops and requires a new guest start. [Restart details](user-guide.md#guest-charging).
 - A stop you request is shown as requested until the wallbox confirms it. Check
   the overview and its command results.
-- The browser never repeats an order by itself. If a reply is lost, reload the
+- The browser never repeats a start command by itself. If a reply is lost, reload the
   page and check the current state before trying again.
 
 For the HTTP interface behind these pages, see the

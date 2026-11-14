@@ -117,8 +117,7 @@ def test_real_profile_select_rebinds_sources_clears_old_trip_and_preserves_pause
                     "mennekes_amtron_vehicle_charge_target",
                     "mennekes_amtron_vehicle_charge_target_status",
                     "mennekes_amtron_timed_charging_status",
-                    "mennekes_amtron_next_departure",
-                    "mennekes_amtron_clear_departure_time",
+                    "mennekes_amtron_target_time",
                 }
                 assert hass.states.get(target).state == "unavailable"
                 unsubscribe()
@@ -328,9 +327,9 @@ def test_each_car_keeps_its_own_departure_across_switches(tmp_path):
                 await choose("Second car")
                 assert planned() == second
                 # A departure cleared for one car stays cleared for it.
-                await hass.services.async_call("button", "press", {
+                await hass.services.async_call(DOMAIN, "clear_target_time", {
                     "entity_id": registry.async_get_entity_id(
-                        "button", DOMAIN, f"{SERIAL_NUMBER}_timed_clear_departure"),
+                        "datetime", DOMAIN, f"{SERIAL_NUMBER}_timed_departure"),
                 }, blocking=True)
                 await choose("First car")
                 await choose("Second car")

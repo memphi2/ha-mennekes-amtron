@@ -137,8 +137,8 @@ def test_ingress_overview_requires_admin_and_never_accepts_writes(monkeypatch):
 
 def test_the_services_summary_is_passed_on_only_when_it_holds_up():
     summary = {
-        "controller": "charging_job", "waiting": "until_job_start",
-        "next": {"event": "job_start", "at": "2026-11-14T02:00:00+00:00"},
+        "controller": "departure_plan", "waiting": "until_planned_start",
+        "next": {"event": "plan_start", "at": "2026-11-14T02:00:00+00:00"},
         "target": {"kind": "energy", "value": 12.0, "deadline": "2026-11-14T06:00:00+00:00"},
         "vehicle": "connected",
     }

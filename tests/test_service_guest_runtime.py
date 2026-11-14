@@ -1,0 +1,93 @@
+"""Guest permission expires with its connection and retains normal bus guards."""
+from __future__ import annotations
+
+import asyncio
+from unittest.mock import AsyncMock
+
+import pytest
+
+from custom_components.mennekes_amtron_rtu.device.data import WallboxData
+from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+from custom_components.mennekes_amtron_rtu.device.service_console_runtime import (
+    ConsoleModbusService,
+)
+from custom_components.mennekes_amtron_rtu.device.service_guest_runtime import (
+    GuestModbusService,
+)
+from tests import service_guest_fixture as runtime
+
+
+@pytest.mark.parametrize(("values", "expected"), [
+    ({"switched_phases": 1, "detected_ev_phases": 3}, 1),
+    ({"switched_phases": 0, "grid_phases_connected": 0, "detected_ev_phases": 3}, 1),
+    ({"switched_phases": 0, "grid_phases_connected": 2, "detected_ev_phases": 2}, 2),
+    ({"detected_ev_phases": 3}, 0), ({"switched_phases": True}, 0),
+    ({"switched_phases": 0, "grid_phases_connected": True, "detected_ev_phases": 3}, 0),
+    ({"switched_phases": 0, "grid_phases_connected": 99, "detected_ev_phases": 3}, 0),
+])
+def test_power_learning_uses_selected_phases_not_vehicle_maximum(values, expected):
+    service = GuestModbusService.__new__(GuestModbusService)
+    service.data = WallboxData(values=values)
+    assert service._rate_phases() == expected
+    service.data.held = frozenset({"switched_phases"})
+    assert service._rate_phases() == 0
+
+
+def test_stopping_and_malformed_guest_requests_never_write(tmp_path):
+    async def run():
+        async with runtime.guest_service(tmp_path) as (service, transport, _clock):
+            payload = {"command":"guest_start", "expected_serial_number":service.identity.serial_number,
+                       "expected_guest_revision":service.guest_revision}
+            with pytest.raises(ValueError, match="guest command"):
+                await service.command({**payload, "extra":True})
+            service._stopping = True
+            with pytest.raises(DeviceError, match="service_unavailable"):
+                await service.command(payload)
+            service._stopping = False
+            assert not transport.writes
+    asyncio.run(run())
+
+
+def test_bus_owner_return_cannot_leave_a_healthy_looking_guest_loop(monkeypatch):
+    async def run():
+        service = GuestModbusService.__new__(GuestModbusService)
+        monkeypatch.setattr(ConsoleModbusService, "_run", AsyncMock())
+        with pytest.raises(RuntimeError, match="bus owner stopped"):
+            await service._run_bus()
+    asyncio.run(run())
+
+
+def test_long_unknown_connection_discards_guest_permission(tmp_path, monkeypatch):
+    async def run():
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            service._guest_scope = service._connection_sample().scope
+            assert service._guest_scope is not None
+            monkeypatch.setattr(ConsoleModbusService, "refresh", AsyncMock())
+            monkeypatch.setattr(service, "_is_available", lambda: False)
+            await service.refresh()
+            assert service._guest_scope is not None
+            service._connection_unknown_since -= 61
+            await service.refresh()
+            assert service._guest_scope is None
+            assert service._connection_session is None
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("bus_error", [False, True])
+def test_guest_limit_loop_retries_transient_errors_and_propagates_cancellation(monkeypatch, bus_error):
+    from custom_components.mennekes_amtron_rtu.device import service_guest_runtime
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronConnectionError,
+        AmtronRateLimitedError,
+    )
+
+    async def run():
+        service = GuestModbusService.__new__(GuestModbusService)
+        error = AmtronConnectionError("offline") if bus_error else AmtronRateLimitedError("current", 4)
+        tick = AsyncMock(side_effect=[error, asyncio.CancelledError()])
+        monkeypatch.setattr(service, "_guest_tick", tick)
+        monkeypatch.setattr(service_guest_runtime.asyncio, "sleep", AsyncMock())
+        with pytest.raises(asyncio.CancelledError):
+            await service._guest_loop()
+        assert tick.await_count == 2
+    asyncio.run(run())

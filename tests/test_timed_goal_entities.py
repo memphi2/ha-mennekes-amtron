@@ -70,7 +70,7 @@ def test_departure_status_remains_visible_without_calendar_configuration():
         entry.runtime_data.timed_goal = _timed_observer()
         datetimes, buttons, sensors = await _entities(hass, entry)
         assert "timed_next_calendar_event" not in buttons
-        assert buttons["timed_clear_departure"].available
+        assert "timed_clear_departure" not in buttons
         assert datetimes["timed_departure"].available
         status = sensors["timed_goal_status"]
         assert status.available
@@ -89,14 +89,14 @@ def test_departure_status_remains_visible_without_calendar_configuration():
         entry.runtime_data.coordinator.last_update_success = False
         assert not status.available
         assert not datetimes["timed_departure"].available
-        assert not buttons["timed_clear_departure"].available
+        assert "timed_clear_departure" not in buttons
         entry.runtime_data.coordinator.last_update_success = True
         entry.runtime_data.timed_goal = None
         # A car without departure planning leaves the entities unavailable.
         assert status.native_value is None
         assert not status.available
         assert not datetimes["timed_departure"].available
-        assert not buttons["timed_clear_departure"].available
+        assert "timed_clear_departure" not in buttons
         assert not transport.writes
         await entry.runtime_data.control.async_shutdown()
 
@@ -157,7 +157,7 @@ def test_departure_controls_respect_read_only_but_status_is_observable(remote, m
         assert sensors["timed_goal_status"].available
         if remote:
             assert not buttons["timed_next_calendar_event"].available
-            assert not buttons["timed_clear_departure"].available
+            assert "timed_clear_departure" not in buttons
             assert not buttons["timed_vehicle_departure"].available
         else:
             assert "timed_next_calendar_event" not in buttons
@@ -192,4 +192,27 @@ def test_vehicle_import_button_keeps_its_identity_and_tracks_provider_availabili
         observer.async_use_vehicle_departure.assert_awaited_once()
         assert not transport.writes
         await entry.runtime_data.control.async_shutdown()
+    asyncio.run(run())
+
+
+def test_guest_time_entity_edits_service_limit_without_changing_vehicle_trip(monkeypatch):
+    async def run():
+        hass, entry, _transport = await build_runtime()
+        control = entry.runtime_data.control
+        guest_time = datetime(2026, 11, 20, 9, tzinfo=UTC)
+        remote = SimpleNamespace(trip=SimpleNamespace(deadline=guest_time))
+        monkeypatch.setattr(type(control), "departure", property(lambda _: remote))
+        control.guest_active = lambda: True
+        control.async_set_target_time = AsyncMock()
+        entry.runtime_data.timed_goal = observer = _timed_observer()
+        _plan_departures(entry)
+        dates, _buttons, _sensors = await _entities(hass, entry)
+        entity = dates["timed_departure"]
+        assert entity.native_value == guest_time
+        await entity.async_set_value(guest_time)
+        control.async_set_target_time.assert_awaited_with(guest_time)
+        await entity.async_clear_value()
+        control.async_set_target_time.assert_awaited_with(None)
+        observer.async_set_deadline.assert_not_awaited()
+        await control.async_shutdown()
     asyncio.run(run())

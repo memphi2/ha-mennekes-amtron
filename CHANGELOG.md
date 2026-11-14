@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+## 0.9.0b8 — 2026-11-14
+
+- Simplify charging in HA and the app: shared kWh and time limits, an optional
+  vehicle percentage target, and one button to start guest charging. Guests
+  stop at the first active kWh/time limit; vehicle planning remains optional in HA.
+- Preserve guest limits and deliberate pauses across a service restart when
+  the same plug-in is proven. Fix queued starts, partial writes, protective
+  stops and conflicts with vehicle planning.
+- Adapt intelligent planning to the charging power the vehicle actually draws,
+  using the existing meter readings without additional Modbus polling.
+- Redesign the app overview, refresh all five Mushroom examples and rebuild
+  the user guides around installation, first charging and everyday controls.
+- Remove obsolete guest orders, drafts, separate rate models and their APIs.
+  Update old beta automations and dashboard YAML; no beta migration is provided.
+- Requires app **0.9.0b8 or newer**, API 2: update the app first. Earlier beta
+  intent files require acknowledgement of a safe reset; recheck charging
+  permissions, limits and vehicle planning before use.
+
 ## 0.9.0b7 — 2026-11-14
 
 - Organize charging around charge targets, one next departure and guest charging;

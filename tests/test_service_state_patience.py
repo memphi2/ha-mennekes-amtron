@@ -9,7 +9,7 @@ from custom_components.mennekes_amtron_rtu.device.departure_plan import Departur
 from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
     DepartureModbusService,
 )
-from tests import test_service_charge_runtime as runtime
+from tests import service_guest_fixture as runtime
 from tests.test_modbus_service import service_fixture
 
 
@@ -65,10 +65,10 @@ def test_a_command_that_ends_in_time_is_waited_for(tmp_path, monkeypatch):
 
 
 def test_every_completed_command_publishes_its_state(tmp_path, monkeypatch):
-    monkeypatch.setattr(runtime, "JobModbusService", DepartureModbusService)
+    monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
 
     async def run():
-        async with runtime.job_service(tmp_path) as (service, _transport, _clock):
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
             serial = service.identity.serial_number
             before = await service.stable_snapshot(patient=True)
             result = await service.command({"command": "pause", "expected_serial_number": serial})

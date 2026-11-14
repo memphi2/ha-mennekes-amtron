@@ -10,7 +10,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from custom_components.mennekes_amtron_rtu.device import departure_plan as dp
-from custom_components.mennekes_amtron_rtu.device.charge_job import SessionMark
 from custom_components.mennekes_amtron_rtu.device.client_errors import AmtronBusError
 from custom_components.mennekes_amtron_rtu.device.departure_plan import (
     DepartureController,
@@ -23,6 +22,7 @@ from custom_components.mennekes_amtron_rtu.device.departure_store import (
     DepartureStore,
 )
 from custom_components.mennekes_amtron_rtu.device.errors import DeviceError
+from custom_components.mennekes_amtron_rtu.device.session_mark import SessionMark
 
 NOW = datetime(2026, 11, 13, 22, 0, tzinfo=UTC)
 SCOPE = "a" * 64
@@ -37,7 +37,7 @@ def sample(**changes) -> DepartureSample:
         total_kwh=100.0, meter_at=NOW.timestamp(), applied_a=8.0, max_current_a=16.0,
         paused=False, pause_requested=False, pending=False, read_only=False,
         vehicle=CAR, target_percent=80.0, goal_status="active", target_is_limit=False,
-        energy_reached=False, goal_stop=False, order_active=False, phases=3,
+        energy_reached=False, goal_stop=False, guest_mode=False, phases=3,
     ), **changes)
 
 
@@ -293,7 +293,7 @@ def test_charging_to_the_minimum_level_does_not_save_every_reading(tmp_path):
         # The start ahead moves with every reading; the file stays as it is.
         assert plan.status == "minimum_level"
         assert len(starts) == 5
-        assert saves == []
+        assert len(saves) <= 1  # One learned power update, not one write per reading.
     run(go())
 
 
@@ -437,7 +437,7 @@ def test_a_reported_target_finishes_and_only_a_higher_target_plans_again(tmp_pat
     ({"available": False}, "waiting_for_device"),
     ({"read_only": True}, "read_only"),
     ({"total_kwh": None, "meter_at": None}, "waiting_for_device"),
-    ({"order_active": True}, "order_active"),
+    ({"guest_mode": True}, "guest_mode"),
     ({"goal_stop": True}, "waiting_for_device"),
 ])
 def test_missing_inputs_wait_without_writing(tmp_path, changes, status):
@@ -557,7 +557,7 @@ def test_unplugging_withdraws_the_plan_and_ends_its_own_pause(tmp_path):
     run(go())
 
 
-@pytest.mark.parametrize("owner", ["goal_stop", "order_active", "read_only"])
+@pytest.mark.parametrize("owner", ["goal_stop", "guest_mode", "read_only"])
 def test_a_pause_another_owner_holds_is_left_alone(tmp_path, owner):
     async def go():
         box = Box(tmp_path)
@@ -565,7 +565,7 @@ def test_a_pause_another_owner_holds_is_left_alone(tmp_path, owner):
         box.set(present=False, **{owner: True})
         await plan.tick()
         assert box.resumes == 0
-        assert not plan.plan_paused
+        assert plan.plan_paused is (owner == "guest_mode")
     run(go())
 
 
@@ -647,9 +647,9 @@ def test_a_departure_that_passes_during_the_pause_ends_it_unless_the_target_hold
         third = Box(tmp_path / "third")
         (tmp_path / "third").mkdir()
         plan = await third.start(hours=10)
-        third.set(now=NOW + timedelta(hours=11), order_active=True)
+        third.set(now=NOW + timedelta(hours=11), guest_mode=True)
         await plan.tick()
-        assert (plan.status, third.resumes) == ("late", 0)
+        assert (plan.status, third.resumes) == ("guest_mode", 0)
     run(go())
 
 
@@ -1008,8 +1008,8 @@ def test_the_power_at_full_current_is_metered_and_corrects_the_forecast(tmp_path
             at = NOW + timedelta(minutes=minutes)
             box.set(now=at, total_kwh=100.0 + 7.0 * minutes / 60, meter_at=at.timestamp())
             await plan.tick()
-        assert plan.model.cars["profile:bmw"].kw_per_a == (None, None, 0.4375)
-        assert plan.status == "charging"
+        assert plan.model.cars["profile:bmw"].power_kw == (None, None, 7.0)
+        assert plan.status == "unreachable"
         # At 7 kW the rest takes about 2.7 h: the target is no longer reachable.
         await plan.tick()
         assert plan.status == "unreachable"
@@ -1022,10 +1022,10 @@ def test_the_power_at_full_current_is_metered_and_corrects_the_forecast(tmp_path
         box.set(applied_a=8.0)
         box.clock[0] += 300
         await plan.tick()
-        assert plan._full_from is None
+        assert plan._power_window.start is None
         box.set(phases=None)
         await plan.tick()
-        assert plan._full_from is None
+        assert plan._power_window.start is None
     run(go())
 
 
@@ -1033,16 +1033,16 @@ def test_a_change_of_phases_starts_the_power_measurement_again(tmp_path):
     async def go():
         box = Box(tmp_path, applied_a=16.0)
         plan = await box.start(hours=2)
-        assert plan._full_from == (NOW.timestamp(), 100.0, 3, 16.0)
+        assert plan._power_window.start == (NOW.timestamp(), 100.0, 3, 16.0)
         at = NOW + timedelta(minutes=5)
         box.set(now=at, total_kwh=100.5, meter_at=at.timestamp(), phases=1)
         await plan.tick()
-        assert plan._full_from == (at.timestamp(), 100.5, 1, 16.0)
+        assert plan._power_window.start == (at.timestamp(), 100.5, 1, 16.0)
         # So does another maximum current.
         later = NOW + timedelta(minutes=8)
         box.set(now=later, total_kwh=100.7, meter_at=later.timestamp(), max_current_a=10.0, applied_a=10.0)
         await plan.tick()
-        assert plan._full_from == (later.timestamp(), 100.7, 1, 10.0)
+        assert plan._power_window.start == (later.timestamp(), 100.7, 1, 10.0)
         assert plan.model.cars == {}
     run(go())
 
@@ -1051,7 +1051,7 @@ def test_a_reduced_current_is_not_measured_as_full_power(tmp_path):
     async def go():
         box = Box(tmp_path, applied_a=6.0)
         plan = await box.start(hours=0.2, given=inputs(soc_percent=79))
-        assert (plan.status, box.writes, plan._full_from) == ("finishing", [], None)
+        assert (plan.status, box.writes, plan._power_window.start) == ("finishing", [], None)
     run(go())
 
 
@@ -1087,7 +1087,6 @@ def test_stale_ha_selection_cannot_overwrite_a_new_app_trip(tmp_path):
 
 @pytest.mark.parametrize(("change", "error"), [
     ({"read_only": True}, "service_unavailable"),
-    ({"vehicle": None}, "soc_goal_source_changed"),
 ])
 def test_app_trip_requires_a_writable_selected_vehicle(tmp_path, change, error):
     async def body():
@@ -1109,10 +1108,10 @@ def test_app_departure_refuses_a_past_instant_and_uninitialized_inputs(tmp_path)
         before = plan.trip.snapshot()
         with pytest.raises(ValueError, match="future"):
             await plan.set_trip(NOW, None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
-        plan.inputs = None
-        with pytest.raises(DeviceError, match="soc_goal_source_changed"):
-            await plan.set_trip(NOW + timedelta(hours=3), None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
         assert plan.trip.snapshot() == before
+        plan.inputs = None
+        await plan.set_trip(NOW + timedelta(hours=3), None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
+        assert plan.trip.deadline == NOW + timedelta(hours=3)
     run(body())
 
 
@@ -1151,4 +1150,21 @@ def test_invalid_edit_revision_is_not_restored_or_published(tmp_path, invalid):
         await restarted.initialize()
         assert restarted.trip.deadline is None
         assert restarted.inputs is None
+    run(body())
+
+
+def test_lower_car_limit_replans_after_two_minutes_of_measured_delivery(tmp_path):
+    async def body():
+        box = Box(tmp_path)
+        plan = await box.start()
+        await plan.tick()  # Readback confirms the initial 16 A offer.
+        assert box.state.applied_a == 16
+        assert plan.forecast["full_power_kw"] is None
+        at = NOW + timedelta(seconds=120)
+        box.set(now=at, total_kwh=100 + 5.5 * 120 / 3600, meter_at=at.timestamp())
+        await plan.tick()
+        await plan.tick()
+        assert plan.forecast["full_power_kw"] == 5.5
+        assert plan.status == "unreachable"
+        assert plan.forecast["level_at_departure"] < 80
     run(body())

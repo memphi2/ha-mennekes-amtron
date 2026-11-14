@@ -234,8 +234,8 @@ def test_service_event_extension_is_optional_and_identity_validated_before_deliv
             assert wrapper.events is remote.events
             old = deepcopy(snapshot)
             del old["command_events"]
-            remote.apply_snapshot(old)
-            assert remote.events.supported is False
+            with pytest.raises(ServiceConnectionError, match="invalid service snapshot"):
+                remote.apply_snapshot(old)
             invalid = deepcopy(snapshot)
             invalid["command_events"] = []
             with pytest.raises(ServiceConnectionError, match="invalid service snapshot \\(command_events\\)"):

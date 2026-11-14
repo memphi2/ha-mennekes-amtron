@@ -101,6 +101,7 @@ from .goal_store import (
     SocGoalStore,
     TimedGoalStore,
 )
+from .guest_charging import GuestCharging
 from .loss_attribution import (
     forget_loss_attribution,
     loss_vehicle_options,
@@ -125,7 +126,6 @@ from .remote import (
 )
 from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
-from .service_orders import ServiceOrders
 from .services import async_setup_services
 from .session_observer import SessionObserver, session_capture_enabled
 from .timed_goal_const import (
@@ -339,9 +339,9 @@ async def async_setup_entry(
         coordinator.observe_plug_charge = lambda data, observed_at: control.observe_plug_charge(
             data, observed_at=observed_at,
         )
-    orders = None
+    guest = None
     if isinstance(client, RemoteClient) and isinstance(coordinator, RemoteCoordinator):
-        orders = ServiceOrders(client, coordinator.async_refresh)
+        guest = GuestCharging(client, coordinator.async_refresh)
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -350,7 +350,7 @@ async def async_setup_entry(
         diagnostics=diagnostics,
         connection_state=connection_state,
         entry_data=dict(entry.data),
-        orders=orders,
+        guest=guest,
     )
     try:
         if handoff is not None:
