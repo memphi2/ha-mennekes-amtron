@@ -499,7 +499,6 @@
         "state": {
           "unavailable": "Wallbox niet bereikbaar",
           "guest_order": "Gastopdracht",
-          "weekly_plan": "Weekplan",
           "charging_job": "Laadopdracht",
           "departure_plan": "Vertrekplanning",
           "direct": "Directe bediening"
@@ -541,7 +540,6 @@
           "meter_unavailable": "Wacht op de energiemeter",
           "job_suspended": "Opdracht wacht op bewijs van dezelfde aansluiting",
           "job_ended": "Opdracht beëindigd, gepauzeerd tot loskoppelen",
-          "until_weekly_window": "Wacht op het venster van het weekplan",
           "vehicle_unconfirmed": "Voertuig niet bevestigd",
           "until_planned_start": "Gepauzeerd tot de geplande start",
           "estimated_target_reached": "Geladen tot het berekende doel",
@@ -562,7 +560,6 @@
           "queued_command": "Wijziging in wachtrij wordt uitgevoerd",
           "job_start": "Opdracht start",
           "job_end": "Opdracht eindigt",
-          "weekly_window": "Venster van het weekplan opent",
           "plan_start": "Gepland laden start",
           "target_reached": "Doel verwacht",
           "departure": "Vertrek"
@@ -570,6 +567,56 @@
         "state_attributes": {
           "at": {
             "name": "Tijdstip"
+          }
+        }
+      },
+      "charging_job": {
+        "name": "Laadopdracht",
+        "state": {
+          "none": "Geen opdracht",
+          "scheduled": "Wacht op het tijdvenster",
+          "charging": "Laden gevraagd",
+          "waiting_meter": "Wacht op een geldige meterstand",
+          "suspended": "Onderbroken; controleert of dezelfde aansluiting doorloopt",
+          "reached": "Energiegrens bereikt",
+          "finished": "Tijdvenster afgelopen",
+          "stopped": "Gestopt door gebruiker",
+          "interrupted": "Onderbroken; geen automatische herstart"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Soort",
+            "state": {
+              "scheduled": "Laadopdracht",
+              "guest": "Gastladen"
+            }
+          },
+          "start": {
+            "name": "Start"
+          },
+          "finish": {
+            "name": "Einde"
+          },
+          "current": {
+            "name": "Stroom"
+          },
+          "energy": {
+            "name": "Energie"
+          },
+          "delivered": {
+            "name": "Geladen"
+          },
+          "reserve": {
+            "name": "Directe reserve"
+          },
+          "reason": {
+            "name": "Reden"
+          },
+          "boost_until": {
+            "name": "Boost tot"
+          },
+          "boost_available": {
+            "name": "Boost mogelijk"
           }
         }
       }
@@ -831,7 +878,7 @@
       "message": "Een laaddoel vereist een pauze. Controleer de status. Stel na het bereiken van het doel of een meterreset een nieuw doel in of schakel het uit met 0 voordat je hervat. Het wijzigen van een doel start het laden niet."
     },
     "service_job_active": {
-      "message": "Een laadopdracht van de Modbus-app bestuurt nu het laden. Stop deze op de pagina Laadopdrachten van de app of koppel de auto los. Zodra de wallbox de pauze bevestigt, kun je hier weer de stroom wijzigen of hervatten."
+      "message": "Een laadopdracht van de Modbus-app bestuurt nu het laden. Stop deze met de actie “Laadopdracht stoppen” of op de pagina Laadopdrachten van de app, of koppel de auto los. Zodra de wallbox de pauze bevestigt, kun je hier weer de stroom wijzigen of hervatten."
     },
     "energy_goal_state_invalid": {
       "message": "Het opgeslagen energiedoel kon niet worden hersteld. Controleer de logboeken voordat je het laden opnieuw toestaat."
@@ -907,6 +954,63 @@
     },
     "plug_charge_not_supported": {
       "message": "De verbonden Modbus-app of dienst ondersteunt virtuele Plug & Charge niet. Werk deze eerst bij naar een compatibele versie."
+    },
+    "guest_vehicle_target_active": {
+      "message": "Batterijdoel van het voertuig actief; geen gastopdracht aangemaakt."
+    },
+    "invalid_boost_duration": {
+      "message": "Voer een geheel getal van 1 tot 120 minuten in."
+    },
+    "invalid_job_request": {
+      "message": "De app heeft deze waarden niet geaccepteerd. Controleer tijd, stroom en energie."
+    },
+    "job_boost_unavailable": {
+      "message": "Boost vereist een actieve opdracht vóór de geplande start en een actuele vrijgave."
+    },
+    "job_changed": {
+      "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
+    },
+    "job_clear_requires_pause": {
+      "message": "Wissen vereist een bevestigde pauze of een losgekoppeld voertuig."
+    },
+    "job_current_exceeds_cap": {
+      "message": "Stroom overschrijdt de servicegrens."
+    },
+    "job_exists": {
+      "message": "Er loopt nog een andere opdracht. Stop deze eerst."
+    },
+    "job_not_permitted": {
+      "message": "Verbinding of vrijgave gewijzigd; geen opdracht aangemaakt."
+    },
+    "job_preview_expired": {
+      "message": "De toestand is intussen gewijzigd. Probeer het opnieuw."
+    },
+    "job_service_starting": {
+      "message": "De service start nog. Probeer het zo opnieuw."
+    },
+    "job_stop_first": {
+      "message": "Stop eerst de lopende opdracht."
+    },
+    "job_storage_unavailable": {
+      "message": "Opslag niet beschikbaar; geen automatische start."
+    },
+    "service_order_failed": {
+      "message": "De app heeft dit niet uitgevoerd. Controleer of ze bereikbaar en actueel is en of tijden en waarden geldig zijn."
+    },
+    "app_required": {
+      "message": "Deze actie vereist de Modbus-app; deze wallbox is rechtstreeks verbonden."
+    },
+    "wallbox_target_required": {
+      "message": "Er zijn meerdere wallboxen ingesteld; geef aan voor welke wallbox dit geldt."
+    },
+    "job_stop_unconfirmed": {
+      "message": "De stop is nog niet bevestigd. Probeer het zo opnieuw."
+    },
+    "job_window_invalid": {
+      "message": "Het einde moet na de start en binnen zeven dagen liggen, en de start mag niet in het verleden liggen."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "De directe reserve mag de energie van de opdracht niet overschrijden."
     }
   },
   "issues": {
@@ -968,7 +1072,11 @@
           "wallbox_advanced": "Metingen en wachttijden",
           "back": "Terug zonder opslaan"
         },
-        "description": "Stel de maximale stroom in die Home Assistant mag aanvragen en hoe vaak de status wordt gelezen. Bij de Modbus-app horen schrijftoestemming en busintervallen in het tabblad Configuratie van de app. Wijzig USB/LAN via Opnieuw configureren bij een directe verbinding, of in de app bij een appverbinding."
+        "description": "Stel in welke stroom Home Assistant maximaal mag aanvragen, hoe vaak de status wordt gelezen en of er geschreven mag worden. Wijzig USB/LAN via Opnieuw configureren."
+      },
+      "wallbox_service": {
+        "title": "Wallbox-instellingen van de app",
+        "description": "Deze wallbox loopt via de Modbus-app. De instellingen staan daarom daar en gelden ook voor Home Assistant.\n\nStroomlimiet: {current_cap} A\nMinimale tijd tussen statuswijzigingen: {state_change_interval} s\nExtra wachttijd vóór fasewissels: {phase_switch_grace} s\n\nWijzig deze waarden, de uitleesintervallen en de verbinding in de app onder Open webinterface. De schrijftoestemming staat op het tabblad Configuratie van de app."
       },
       "wallbox_basic": {
         "title": "Stroomlimiet en uitlezen",
@@ -979,10 +1087,10 @@
         },
         "data_description": {
           "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
-          "current_limit": "Bovengrens van de laadstroomregeling, in ampère per fase. Dit is geen procentueel laaddoel of pauzeopdracht. De limieten van de laadpaal en eventueel de app blijven ook gelden.",
+          "current_limit": "Bovengrens van de laadstroomregeling, in ampère per fase. Dit is geen procentueel laaddoel of pauzeopdracht. De limiet van de wallbox blijft ook gelden.",
           "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk."
         },
-        "description": "De stroomlimiet begrenst verzoeken vanuit HA; de limieten van wallbox en dienst blijven gelden. Bij app-verbindingen betreft het uitleesinterval alleen HA-verzoeken aan de dienst."
+        "description": "De stroomlimiet begrenst wat hier kan worden aangevraagd; de limiet van de wallbox blijft gelden."
       },
       "wallbox_advanced": {
         "title": "Metingen en wachttijden",
@@ -1567,6 +1675,102 @@
         "profile": {
           "name": "Geschiedenisprofiel",
           "description": "Bewaar alle geschiedenis, verminder de details of bewaar alleen energie- en vermogensstatistieken."
+        }
+      }
+    },
+    "start_charging_job": {
+      "name": "Laadopdracht starten",
+      "description": "Laadt de aangesloten auto in een tijdvenster met vaste stroom tot een hoeveelheid energie. De opdracht eindigt wanneer de auto wordt losgekoppeld.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
+        },
+        "current": {
+          "name": "Laadstroom",
+          "description": "Stroom in ampère per fase, hoogstens de stroomlimiet van de app."
+        },
+        "energy": {
+          "name": "Energie",
+          "description": "Het laden stopt zodra deze energie in kWh is geleverd."
+        },
+        "start": {
+          "name": "Start",
+          "description": "Wanneer het laden mag beginnen. Laat leeg om nu te beginnen."
+        },
+        "finish": {
+          "name": "Einde",
+          "description": "Wanneer het laden uiterlijk eindigt, binnen zeven dagen."
+        },
+        "reserve": {
+          "name": "Directe reserve",
+          "description": "Optioneel: deze energie in kWh wordt meteen geladen, vóór het venster."
+        }
+      }
+    },
+    "start_guest_charging": {
+      "name": "Gastladen starten",
+      "description": "Laadt de auto van een gast vanaf nu voor beperkte tijd en energie. Er worden geen voertuiggegevens of opgeslagen doelen gebruikt.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
+        },
+        "current": {
+          "name": "Laadstroom",
+          "description": "Stroom in ampère per fase, hoogstens de stroomlimiet van de app."
+        },
+        "energy": {
+          "name": "Energie",
+          "description": "Het laden stopt zodra deze energie in kWh is geleverd."
+        },
+        "duration": {
+          "name": "Duur",
+          "description": "Hoe lang er geladen mag worden, in minuten (tot 24 uur)."
+        }
+      }
+    },
+    "stop_charging_job": {
+      "name": "Laadopdracht stoppen",
+      "description": "Stopt de lopende laadopdracht of het gastladen en pauzeert het laden. De opdracht gaat niet verder; een vertrekplan dat aan de beurt is kan weer laden.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
+        }
+      }
+    },
+    "clear_charging_job": {
+      "name": "Laadopdracht wissen",
+      "description": "Verwijdert een beëindigde of gestopte laadopdracht, zodat een nieuwe kan worden gestart.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
+        }
+      }
+    },
+    "start_boost": {
+      "name": "Boost starten",
+      "description": "Laadt meteen, hoewel de laadopdracht later begint, en keert daarna terug naar het plan.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
+        },
+        "duration": {
+          "name": "Duur",
+          "description": "Hoe lang er vooraf wordt geladen, in minuten (tot 120)."
+        }
+      }
+    },
+    "cancel_boost": {
+      "name": "Boost beëindigen",
+      "description": "Beëindigt het vervroegd laden; de laadopdracht loopt verder zoals gepland.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "De wallbox waarvoor dit geldt. Mag weggelaten worden als er maar één is ingesteld."
         }
       }
     }

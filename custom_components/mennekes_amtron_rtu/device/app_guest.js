@@ -58,13 +58,14 @@
     supervisor_unavailable:["Home Assistant Supervisor did not answer. Reload this page.", "Home Assistant Supervisor hat nicht geantwortet. Seite neu laden.", "Supervisor n’a pas répondu. Rechargez la page.", "Supervisor heeft niet geantwoord. Herlaad deze pagina.", "Supervisor non ha risposto. Ricaricare la pagina."],
     supervisor_update_required:["Update Home Assistant Supervisor to 2026.10.4 or newer.", "Home Assistant Supervisor auf 2026.10.4 oder neuer aktualisieren.", "Mettez Supervisor à jour vers 2026.10.4 ou ultérieur.", "Werk Supervisor bij naar 2026.10.4 of nieuwer.", "Aggiorna Supervisor alla versione 2026.10.4 o successiva."],
     invalid_request:["The request was rejected. Reload this page and try again.", "Anfrage abgelehnt. Seite neu laden und erneut versuchen.", "Requête refusée. Rechargez la page et réessayez.", "Verzoek geweigerd. Herlaad de pagina en probeer het opnieuw.", "Richiesta rifiutata. Ricaricare la pagina e riprovare."],
+    job_stop_unconfirmed:["The stop is not confirmed yet. Try again shortly.", "Der Stopp ist noch nicht bestätigt. Gleich noch einmal versuchen.", "L’arrêt n’est pas encore confirmé. Réessayez dans un instant.", "De stop is nog niet bevestigd. Probeer het zo opnieuw.", "L’arresto non è ancora confermato. Riprova tra poco."],
     job_service_starting:["The service is still starting. Try again shortly.", "Der Service startet noch. Gleich noch einmal versuchen.", "Le service démarre encore. Réessayez dans un instant.", "De service start nog. Probeer het zo opnieuw.", "Il servizio si sta ancora avviando. Riprova tra poco."],
-    weekly_service_starting:["The service is still starting. Try again shortly.", "Der Service startet noch. Gleich noch einmal versuchen.", "Le service démarre encore. Réessayez dans un instant.", "De service start nog. Probeer het zo opnieuw.", "Il servizio si sta ancora avviando. Riprova tra poco."],
-    weekly_stop_unconfirmed:["The weekly plan's stop is not confirmed yet. Try again shortly.", "Der Stopp des Wochenplans ist noch nicht bestätigt. Gleich noch einmal versuchen.", "L’arrêt du plan hebdomadaire n’est pas encore confirmé. Réessayez dans un instant.", "De stop van het weekplan is nog niet bevestigd. Probeer het zo opnieuw.", "Lo stop del piano settimanale non è ancora confermato. Riprova tra poco."]
   };
   const t=k=>words[k]?.[column]||words.uncertain[column];
   const el=id=>document.getElementById(id), date=v=>new Date(v).toLocaleString(locale,{timeZoneName:"short"});
   document.querySelectorAll("[data-text]").forEach(n=>{n.textContent=t(n.dataset.text);});
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   let state=null, proposal=null, busy=false, timer=null, readAbort=null, generation=0, hidden=false, lastError="";
   const live=()=>!hidden&&!document.hidden;
   function invalidate(){proposal=null;el("guest_confirmation").hidden=true;}

@@ -124,6 +124,7 @@ from .remote import (
 )
 from .remote_errors import ServiceConnectionError
 from .repairs import async_check_repairs, async_setup_repairs
+from .service_orders import ServiceOrders
 from .services import async_setup_services
 from .session_observer import SessionObserver, session_capture_enabled
 from .timed_goal_const import (
@@ -337,6 +338,9 @@ async def async_setup_entry(
         coordinator.observe_plug_charge = lambda data, observed_at: control.observe_plug_charge(
             data, observed_at=observed_at,
         )
+    orders = None
+    if isinstance(client, RemoteClient) and isinstance(coordinator, RemoteCoordinator):
+        orders = ServiceOrders(client, coordinator.async_refresh)
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,
@@ -345,6 +349,7 @@ async def async_setup_entry(
         diagnostics=diagnostics,
         connection_state=connection_state,
         entry_data=dict(entry.data),
+        orders=orders,
     )
     try:
         if handoff is not None:
@@ -1044,13 +1049,18 @@ def _serial_config(entry: MennekesAmtronConfigEntry) -> SerialConfig:
 
 
 def _scan_interval(entry: MennekesAmtronConfigEntry) -> float:
+    # With the app, HA fetches its status at the default pace; the app's own
+    # settings decide how often the wallbox is read.
+    if CONF_SERVER_URL in entry.data:
+        return float(DEFAULT_SCAN_INTERVAL_SECONDS)
     value = entry.options.get(CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS)
     return float(value)
 
 
 def _control_options(entry: MennekesAmtronConfigEntry) -> ControlOptions:
     options = dict(entry.options)
-    cap = options.get(CONF_CURRENT_LIMIT)
+    # With the app, its current cap is the only one; HA adds none of its own.
+    cap = None if CONF_SERVER_URL in entry.data else options.get(CONF_CURRENT_LIMIT)
     return ControlOptions(
         read_only=CONF_SERVER_URL not in entry.data and not control_mode_is_master(options),
         current_cap=float(cap) if isinstance(cap, (int, float)) else None,

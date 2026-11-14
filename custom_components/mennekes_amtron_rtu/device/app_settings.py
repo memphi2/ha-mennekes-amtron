@@ -8,6 +8,7 @@ user/group header; older releases cannot authorize this page safely.
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
@@ -16,6 +17,7 @@ import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Mapping
 from contextlib import AbstractAsyncContextManager, nullcontext, suppress
 from dataclasses import dataclass, field
+from functools import cache
 from importlib.resources import files
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -53,6 +55,12 @@ _DIGEST = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"([0-9]{4})\.([0-9]{1,2})\.([0-9]+)")
 _FIELDS = {"connection_type", "serial_port", "host", "tcp_port", "device_id", "baudrate", "frame", "tcp_authentication"}
 _NETWORK_EXTRAS = {"tcp_authentication", "tcp_auth_password", "adapter_token", "adapter_baudrate", "adapter_frame"}
+_STYLE_FILE = "app_settings.css"
+_STYLE_LINK = b'<link rel="stylesheet" href="./app_settings.css">'
+_CSP = (
+    "default-src 'none'; script-src 'self'; style-src {style}; connect-src 'self'; "
+    "base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+)
 _ASSETS = {
     "/": ("app_overview.html", "text/html"),
     "/connection": ("app_settings.html", "text/html"),
@@ -83,6 +91,14 @@ def localize_page(content: bytes, accept_language: str, path: str = "/", availab
     return content.replace(PLACEHOLDER, render_nav(path, language, available), 1)
 
 
+@cache
+def _inline_style() -> tuple[bytes, str]:
+    """The packaged styles as a style element, and the policy that allows them."""
+    style = files(__package__).joinpath(_STYLE_FILE).read_bytes()
+    digest = base64.b64encode(hashlib.sha256(style).digest()).decode()
+    return b"<style>" + style + b"</style>", _CSP.format(style=f"'self' 'sha256-{digest}'")
+
+
 async def serve_asset(request: web.Request, assets: Mapping[str, tuple[str, str]]) -> web.Response:
     """Serve one packaged file; scripts and styles revalidate instead of reloading."""
     filename, content_type = assets[request.path]
@@ -90,6 +106,15 @@ async def serve_asset(request: web.Request, assets: Mapping[str, tuple[str, str]
     if content_type == "text/html":
         available = {route.resource.canonical for route in request.app.router.routes() if route.resource is not None}
         content = localize_page(content, request.headers.get("Accept-Language", ""), request.path, available)
+        # The styles travel inside the page: it is styled from its first paint
+        # and no stylesheet request can leave it bare. The policy allows
+        # exactly this text, nothing else inline.
+        if _STYLE_LINK in content:
+            style, policy = await asyncio.to_thread(_inline_style)
+            content = content.replace(_STYLE_LINK, style, 1)
+            return web.Response(body=content, content_type=content_type, headers={
+                "Content-Security-Policy": policy,
+            })
         return web.Response(body=content, content_type=content_type)
     # An unchanged file answers with 304: a change of page shows at once.
     etag = f'"{hashlib.sha256(content).hexdigest()[:32]}"'
@@ -579,8 +604,8 @@ class AppSettings:
             "Cache-Control": "no-cache" if asset else "no-store",
             "X-Content-Type-Options": "nosniff",
             "Referrer-Policy": "no-referrer",
-            "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
         })
+        response.headers.setdefault("Content-Security-Policy", _CSP.format(style="'self'"))
         return response
 
 

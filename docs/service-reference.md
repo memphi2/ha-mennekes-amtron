@@ -79,10 +79,9 @@ Supervisor roles. See [the app's web pages](app-guide.md).
 | `/`, `GET /api/overview` | Overview page and its read-only snapshot |
 | `/connection`, `/api/config`, `/api/adapter` | Connection settings and LAN-adapter setup |
 | `/log`, `/api/modbus-debug` | Live log, in RAM only |
-| `GET /api/registers` | The registers on the overview, from passive observations |
+| `/registers`, `GET /api/registers` | Register page below the overview, from passive observations |
 | `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
 | `/jobs`, `/guest`, `/api/jobs` | Charging jobs, boost and guest charging |
-| `/weekly`, `/api/weekly` | Weekly plans; see [Weekly plan API](#weekly-plan-api) |
 
 Values saved on the **Runtime** page apply without a restart. Each previewed
 change names its `effect`: `next_cycle` for the polling intervals, `immediate`
@@ -222,7 +221,7 @@ recurring failures require their logged cause to be corrected.
 
 Pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. A charging job is saved in
-`charge-job.json`, weekly plans in `weekly-plans.json`, learned charging power
+`charge-job.json`, learned charging power
 in `charge-rates.json` and the departure plan in `departure-plan.json` the same
 way. The file is atomically replaced with
 owner-only permissions when those settings change. Both the file and directory
@@ -231,13 +230,10 @@ than a growing history. Include the data directory in backups and protect its
 configuration/token.
 
 A file of another wallbox or format, or a damaged one, is not used. For
-`intent.json` and `weekly-plans.json` the service then starts as on its first
+`intent.json` the service then starts as on its first
 run, keeps the wallbox's own state, logs a warning and replaces the file with
-its next save. The weekly plans start empty then and need to be created again.
-A save that fails is logged; the wallbox stays in use. After a failed save of
-the weekly plans their changes are refused with `weekly_storage_unavailable`
-until the file reads back, which is tried every ten seconds while no plan is
-active.
+its next save.
+A save that fails is logged; the wallbox stays in use.
 
 Heartbeats and polls do not create entries in that state file. The heartbeat
 sensor records health transitions, not timestamps for every beat. Measurement
@@ -281,7 +277,6 @@ service data rather than maintaining a second queue.
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |
 | `GET`/`POST /v2/jobs` | Authenticated charging-job state and operations; see [Charging job API](#charging-job-api). |
-| `GET`/`POST /v2/weekly` | Authenticated weekly-plan state and operations; see [Weekly plan API](#weekly-plan-api). |
 | `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number
@@ -329,14 +324,18 @@ snapshot's `control` object reports `supports_departure_plan: true` and
 | `confirmed` | Whether the handed-over car is confirmed for this plug-in |
 | `forecast` | `null` unless a plan is computed; otherwise `finish_at` (when the target is reached: the departure, or later when it is unreachable, rounded up to five minutes), `level_at_departure` (percent), `efficiency` (learned share of the metered energy that reaches the battery, 0.9 until learned) and `full_power_kw` (metered power at full current for the current phases, or `null`) |
 
+`control.orders` is the charging-job state that `GET /v2/jobs` returns, or
+`null` while the job controller loads. Home Assistant reads its **Charging
+job** sensor from it, so a poll needs no second request.
+
 `control.operation` summarizes all controllers of the service for a reader. It
 is derived from their published state and decides nothing:
 
 | Field | Meaning |
 |---|---|
-| `controller` | `unavailable`, `guest_order`, `weekly_plan`, `charging_job`, `departure_plan` or `direct`. An order that holds the wallbox comes before an open departure, a departure before a weekly plan that waits for its window |
-| `waiting` | The first reason that keeps the car from charging, or `none`: `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, then the controller's reason (`until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `until_weekly_window`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`), then `target_reached`, `command_pending` or `paused` |
-| `next` | `event` (`none`, `queued_command`, `job_start`, `job_end`, `weekly_window`, `plan_start`, `target_reached`, `departure`) and `at`, an ISO timestamp that is `null` exactly for `none`. A queued command is named when it comes first |
+| `controller` | `unavailable`, `guest_order`, `charging_job`, `departure_plan` or `direct`. An order that holds the wallbox comes before an open departure |
+| `waiting` | The first reason that keeps the car from charging, or `none`: `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, then the controller's reason (`until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`), then `target_reached`, `command_pending` or `paused` |
+| `next` | `event` (`none`, `queued_command`, `job_start`, `job_end`, `plan_start`, `target_reached`, `departure`) and `at`, an ISO timestamp that is `null` exactly for `none`. A queued command is named when it comes first |
 | `target` | `kind` (`none`, `level` in percent, `energy` in kWh), `value` and `deadline` (ISO timestamp or `null`) |
 | `vehicle` | `unknown`, `none`, `connected`, or `confirmed` once Home Assistant confirmed its car for this plug-in |
 
@@ -350,7 +349,7 @@ access no bus:
 | Command | Additional fields | Behavior |
 |---|---|---|
 | `departure_trip` | `deadline`: timezone-aware ISO timestamp or `null`; `source`: string up to 512 characters or `null`; optional `withdraw`: boolean | Sets or clears the trip. The same time and source leave a running plan unchanged. `withdraw` also forgets the car and ends a pause the plan set. |
-| `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) and `detected` (whether the car itself reported this plug-in; a weekly plan activates itself only then) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
+| `departure_inputs` | `value`: object with `vehicle` (the configured charge-level source), `scope` (the plug-in the car is confirmed for, or `null`), `capacity_kwh`, `phases`, `soc_percent`, `soc_observed_at` and `minimum_percent` (0 to 100; below it the plan charges at once at full current with status `minimum_level`, 0 switches that off) | Replaces the car data. A charge level needs its report time; a report older than the one in use is ignored. |
 
 The plan writes through the same guarded path as `timed_current`, with the
 owner `departure`. It is saved in `/data/departure-plan.json`, together with
@@ -455,10 +454,16 @@ holds no vehicle identifier and no charging permission. It is written at most
 every ten minutes and at shutdown; an unreadable or unwritable file only stops
 the history, never charging.
 
+A `POST` may carry `expected_serial_number`, the serial number of the wallbox
+the caller is bound to; Home Assistant always sends it. If the app now drives
+another wallbox, it answers 409 `device_identity_changed` and changes nothing.
+
 Errors return HTTP 409 with a key such as `job_changed` (stale revision or
 scope), `job_exists`, `job_not_permitted`, `job_preview_expired`,
 `job_current_exceeds_cap`, `guest_vehicle_target_active`,
-`job_clear_requires_pause` or `job_storage_unavailable`; malformed input returns
+`job_clear_requires_pause`, `job_stop_unconfirmed` (a stop was asked for and
+has not finished; `manual_stop_pending` is true meanwhile, and a clear after a
+confirmed pause ends it) or `job_storage_unavailable`; malformed input returns
 400 with `invalid_job_request`. `job.state` is the order's intent, not a measured
 vehicle state: `scheduled`, `charging`, `waiting_meter`, `suspended`, or one of
 the final states `reached`, `finished`, `stopped` and `interrupted`; `job.reason`
@@ -483,60 +488,6 @@ becomes `interrupted` with the same reason. For this proof the saved order
 also holds the last session duration, session energy, session counter and a
 digest of the vehicle selection; that record is saved only with the order's own
 changes.
-
-## Weekly plan API
-
-The service also accepts `GET` and `POST` at `/v2/weekly`; Ingress uses
-`/api/weekly` with the same administrator check, CSRF token, size limit and
-no-retry rule as the job API. `GET` returns the saved plans with their upcoming
-dates, the active activation and the current job. Every `POST` names an
-`action`; changes need `confirm: true`:
-
-| Action | Fields besides `action` | Effect |
-|---|---|---|
-| `preview_plan` | `revision`, `plan` | Validates a plan and lists its next dates. Writes nothing. |
-| `save_plan`, `remove_plan` | `revision`, `plan` or `plan_id`, `confirm` | Saves or removes a plan. Editing or removing the active plan stops its job. |
-| `preview_activation` | `revision`, `plan_id`, `vehicle_profile`, `scope` | Returns a signed proposal for the first job and the activation end. |
-| `activate` | `proposal`, `confirm` | Starts the activation within 60 seconds of the preview. Repeating it returns the outcome without extending it. |
-| `deactivate` | `revision`, `confirm` | Ends the activation, stops its job and forgets the plan's remembered car. Without an activation it forgets every remembered car. |
-
-The first job is created on activation. Each later job is created when its
-window opens, replacing the finished one; until then the finished job has handed
-control back (`holding` is `false`).
-
-A `plan` has `id`, `vehicle_profile`, `timezone` (IANA), `weekdays` (Monday is
-0), `departure_time`, `charge_minutes`, `current_a`, `energy_kwh`,
-`ambiguous_time` (`earlier` or `later`), `enabled`, up to 32 `exceptions`
-(`date` with `departure_time` or `null` to skip) and an optional `reserve_kwh`.
-The activation itself is never saved; a service restart ends it. A running job
-of the plan may then continue on its own as described above. Each local
-date is marked as used before its job is created, so a date never runs twice,
-also after an edit or restart. Plans, used dates and remembered cars are kept
-in `/data/weekly-plans.json`, at most 128 KiB. The latest used date of up to
-128 plans is kept; when that is full, the oldest one of a deleted plan makes
-room.
-
-An `activate` while Home Assistant has detected a car at the plug-in
-(`departure_inputs` with `detected: true` and the current `scope`, see
-[Departure plan](#departure-plan)) saves that car with the plan once its job
-exists; each entry of `plans` then reports `assigned: true`. A car handed over
-as `profile:<id>:…` is remembered as `profile:<id>`, any other by its full
-source text. Saving a plan with another `vehicle_profile` removes its car.
-
-While no activation exists and the same car is detected for the current scope,
-the service activates the plan itself, once per scope and again when seven days
-have passed. It takes up a job of the plan that is still running. Otherwise
-`active.job_id` is `null` and `reason` is `waiting_next_occurrence` until the
-next unused date's window opens; the job is then created once the ordinary job
-admission succeeds. A date whose job was interrupted before its `start_at` is
-freed again first. A manual job stop or clear, also while no activation exists,
-and `deactivate` remove the remembered car.
-
-Errors return HTTP 409 with a key such as `weekly_changed`,
-`weekly_already_active`, `weekly_vehicle_not_confirmed`,
-`weekly_confirmation_expired`, `weekly_no_occurrence` or
-`weekly_storage_unavailable`; malformed input returns 400 with
-`invalid_weekly_request`.
 
 ## Transport security
 

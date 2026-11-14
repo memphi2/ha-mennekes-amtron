@@ -499,7 +499,6 @@
         "state": {
           "unavailable": "Wallbox unavailable",
           "guest_order": "Guest order",
-          "weekly_plan": "Weekly plan",
           "charging_job": "Charging job",
           "departure_plan": "Departure planning",
           "direct": "Direct control"
@@ -541,7 +540,6 @@
           "meter_unavailable": "Waiting for the energy meter",
           "job_suspended": "Job waits for proof of the same plug-in",
           "job_ended": "Job ended, paused until unplugged",
-          "until_weekly_window": "Waiting for the weekly plan's window",
           "vehicle_unconfirmed": "Car not confirmed",
           "until_planned_start": "Paused until the planned start",
           "estimated_target_reached": "Charged to the estimated target",
@@ -562,7 +560,6 @@
           "queued_command": "Queued change runs",
           "job_start": "Job starts",
           "job_end": "Job ends",
-          "weekly_window": "Weekly plan's window opens",
           "plan_start": "Planned charge starts",
           "target_reached": "Target expected",
           "departure": "Departure"
@@ -570,6 +567,56 @@
         "state_attributes": {
           "at": {
             "name": "Time"
+          }
+        }
+      },
+      "charging_job": {
+        "name": "Charging job",
+        "state": {
+          "none": "No job",
+          "scheduled": "Waiting for the window",
+          "charging": "Charging requested",
+          "waiting_meter": "Waiting for a valid meter reading",
+          "suspended": "Interrupted; checking whether the same plug-in continues",
+          "reached": "Energy ceiling reached",
+          "finished": "Time window ended",
+          "stopped": "Stopped by user",
+          "interrupted": "Interrupted; no automatic restart"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Kind",
+            "state": {
+              "scheduled": "Charging job",
+              "guest": "Guest charging"
+            }
+          },
+          "start": {
+            "name": "Start"
+          },
+          "finish": {
+            "name": "End"
+          },
+          "current": {
+            "name": "Current"
+          },
+          "energy": {
+            "name": "Energy"
+          },
+          "delivered": {
+            "name": "Delivered"
+          },
+          "reserve": {
+            "name": "Immediate reserve"
+          },
+          "reason": {
+            "name": "Reason"
+          },
+          "boost_until": {
+            "name": "Boost until"
+          },
+          "boost_available": {
+            "name": "Boost available"
           }
         }
       }
@@ -831,7 +878,7 @@
       "message": "A charging target requires a pause. Check its status. After reaching a target or a meter reset, set a new target or disable it with 0 before resuming. Changing a target does not start charging."
     },
     "service_job_active": {
-      "message": "A charging job of the Modbus app controls charging now. Stop it on the app's Charging jobs page or unplug the car. Once the wallbox confirms the pause, you can change the current or resume here again."
+      "message": "A charging job of the Modbus app controls charging now. Stop it with the Stop charging job action or on the app’s Charging jobs page, or unplug the car. Once the wallbox confirms the pause, you can change the current or resume here again."
     },
     "energy_goal_state_invalid": {
       "message": "The saved energy target could not be restored. Check the logs before allowing charging again."
@@ -907,6 +954,63 @@
     },
     "plug_charge_not_supported": {
       "message": "The connected Modbus app or service does not support Virtual Plug & Charge. Update it to a compatible version before enabling this feature."
+    },
+    "guest_vehicle_target_active": {
+      "message": "Vehicle battery target active; no guest order created."
+    },
+    "invalid_boost_duration": {
+      "message": "Enter a whole number from 1 to 120 minutes."
+    },
+    "invalid_job_request": {
+      "message": "The app did not accept these values. Check time, current and energy."
+    },
+    "job_boost_unavailable": {
+      "message": "Boost requires an active order before its planned start and current permission."
+    },
+    "job_changed": {
+      "message": "The state changed in the meantime. Try again."
+    },
+    "job_clear_requires_pause": {
+      "message": "Clearing requires a confirmed pause or unplug."
+    },
+    "job_current_exceeds_cap": {
+      "message": "Current exceeds the service limit."
+    },
+    "job_exists": {
+      "message": "Another order is still running. Stop it first."
+    },
+    "job_not_permitted": {
+      "message": "Connection or release changed; no order was created."
+    },
+    "job_preview_expired": {
+      "message": "The state changed in the meantime. Try again."
+    },
+    "job_service_starting": {
+      "message": "The service is still starting. Try again shortly."
+    },
+    "job_stop_first": {
+      "message": "Stop the active order first."
+    },
+    "job_storage_unavailable": {
+      "message": "Storage unavailable; no automatic start."
+    },
+    "service_order_failed": {
+      "message": "The app did not carry this out. Check that it is reachable and up to date, and that times and values are valid."
+    },
+    "app_required": {
+      "message": "This action needs the Modbus app; this wallbox is connected directly."
+    },
+    "wallbox_target_required": {
+      "message": "Several wallboxes are set up; name the wallbox this applies to."
+    },
+    "job_stop_unconfirmed": {
+      "message": "The stop is not confirmed yet. Try again shortly."
+    },
+    "job_window_invalid": {
+      "message": "The end must be after the start and within seven days, and the start must not lie in the past."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "The immediate reserve must not exceed the job’s energy."
     }
   },
   "issues": {
@@ -968,7 +1072,11 @@
           "wallbox_advanced": "Measurements and switching delays",
           "back": "Back without saving"
         },
-        "description": "Set the maximum current Home Assistant may request and how often it reads status. With the Modbus app, write permission and bus timing belong in the app’s Configuration tab. USB/LAN connection changes belong in Reconfigure for direct connections, or in the app for app connections."
+        "description": "Set the maximum current Home Assistant may request, how often it reads status and whether it may write. USB/LAN connection changes belong in Reconfigure."
+      },
+      "wallbox_service": {
+        "title": "Wallbox settings of the app",
+        "description": "This wallbox runs through the Modbus app, so its settings are kept there and apply to Home Assistant as well.\n\nCharging current cap: {current_cap} A\nMinimum time between state changes: {state_change_interval} s\nExtra wait before phase changes: {phase_switch_grace} s\n\nChange these values, the polling intervals and the connection in the app under Open Web UI. Write permission is on the app’s Configuration tab."
       },
       "wallbox_basic": {
         "title": "Current limit and polling",
@@ -979,10 +1087,10 @@
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
-          "current_limit": "Upper limit for the charging-current control, in amperes per phase. This is not a percentage target or a pause command. The wallbox’s own limit and, when used, the app’s limit also apply.",
+          "current_limit": "Upper limit for the charging-current control, in amperes per phase. This is not a percentage target or a pause command. The wallbox’s own limit also applies.",
           "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently."
         },
-        "description": "The current cap limits requests from HA; the wallbox and service limits still apply. For app connections, the polling interval only affects HA’s service requests."
+        "description": "The current cap limits what can be requested here; the wallbox’s own limit still applies."
       },
       "wallbox_advanced": {
         "title": "Measurements and switching delays",
@@ -1567,6 +1675,102 @@
         "profile": {
           "name": "History profile",
           "description": "Keep all history, reduce detail, or keep only energy and power statistics."
+        }
+      }
+    },
+    "start_charging_job": {
+      "name": "Start charging job",
+      "description": "Charges the plugged-in car in a time window, with a fixed current, up to an amount of energy. The job ends when the car is unplugged.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "The wallbox this applies to. Can be left out when only one is set up."
+        },
+        "current": {
+          "name": "Charging current",
+          "description": "Current in amperes per phase, at most the app’s current cap."
+        },
+        "energy": {
+          "name": "Energy",
+          "description": "Charging stops once this much energy was delivered, in kWh."
+        },
+        "start": {
+          "name": "Start",
+          "description": "When charging may begin. Leave empty to begin now."
+        },
+        "finish": {
+          "name": "End",
+          "description": "When charging ends at the latest, within seven days."
+        },
+        "reserve": {
+          "name": "Immediate reserve",
+          "description": "Optional: this much energy in kWh is charged right away, before the window."
+        }
+      }
+    },
+    "start_guest_charging": {
+      "name": "Start guest charging",
+      "description": "Charges a guest’s car from now on for a limited time and energy. No vehicle data and no saved target is used.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "The wallbox this applies to. Can be left out when only one is set up."
+        },
+        "current": {
+          "name": "Charging current",
+          "description": "Current in amperes per phase, at most the app’s current cap."
+        },
+        "energy": {
+          "name": "Energy",
+          "description": "Charging stops once this much energy was delivered, in kWh."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "How long charging is allowed, in minutes (up to 24 hours)."
+        }
+      }
+    },
+    "stop_charging_job": {
+      "name": "Stop charging job",
+      "description": "Stops the running charging job or guest charge and pauses charging. The job does not resume; a departure plan that is due may charge again.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "The wallbox this applies to. Can be left out when only one is set up."
+        }
+      }
+    },
+    "clear_charging_job": {
+      "name": "Clear charging job",
+      "description": "Removes an ended or stopped charging job, so that a new one can be started.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "The wallbox this applies to. Can be left out when only one is set up."
+        }
+      }
+    },
+    "start_boost": {
+      "name": "Start boost",
+      "description": "Charges right away although the charging job starts later, then returns to the plan.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "The wallbox this applies to. Can be left out when only one is set up."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "How long to charge early, in minutes (up to 120)."
+        }
+      }
+    },
+    "cancel_boost": {
+      "name": "Cancel boost",
+      "description": "Ends early charging; the charging job continues as planned.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "The wallbox this applies to. Can be left out when only one is set up."
         }
       }
     }

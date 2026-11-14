@@ -161,7 +161,7 @@ pause replaces the pending resume and also waits for its due time. See
   tariff schedule, manual command or phase change can conflict with PV control.
 - While an [order of the app](app-guide.md#charging-jobs) charges, the app
   refuses the current blueprint's writes, and a pause from the pause/resume
-  blueprint stops the order; a weekly plan then forgets its car.
+  blueprint stops the order.
 
 These are convenience automations, not house-connection overload protection.
 Review [Safety and limitations](safety.md) and test the behavior with your

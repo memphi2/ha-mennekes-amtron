@@ -20,6 +20,7 @@ Already installed? Keep your device and entity IDs and follow
 |---|---|
 | Install the recommended service app | [Modbus service](modbus-service.md) |
 | Use the app's overview, charging jobs or guest charging | [The app's web pages](app-guide.md) |
+| Start jobs, boost or guest charging from a dashboard or automation | [Use the app from Home Assistant](app-from-home-assistant.md) |
 | Use a LAN-to-RS-485 adapter | [LAN connection](network-gateway.md) |
 | Select one car, several cars or optional automatic detection | [Vehicle setup](vehicle-setup.md) |
 | Automatically release charging for a recognized profile | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) |
@@ -33,7 +34,7 @@ Already installed? Keep your device and entity IDs and follow
 
 ## Version
 
-These pages describe **0.9.0b3** of the integration and the app. Install both
+These pages describe **0.9.0b4** of the integration and the app. Install both
 in the same version; in service mode, update the app first. The app's web pages
 need **Supervisor 2026.10.4 or newer**. Optional features stay off until you set
 them up.

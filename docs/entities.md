@@ -91,7 +91,7 @@ nothing from it. They are absent with a direct serial or LAN connection.
 
 | State | Meaning |
 |---|---|
-| Guest order, Charging job, Weekly plan | An [order from the app](app-guide.md#charging-jobs) holds the wallbox until it ends and the wallbox confirms its last pause, or until the car is unplugged. A weekly plan also shows here while it waits for its next window. |
+| Guest order, Charging job | An [order from the app](app-guide.md#charging-jobs) holds the wallbox until it ends and the wallbox confirms its last pause, or until the car is unplugged. |
 | Departure planning | A [departure](departure-planning.md#with-the-modbus-service-app) is set and not finished. |
 | Direct control | No plan or order: your switches, numbers, targets and automations apply. |
 | Wallbox unavailable | The app has no current reading. |
@@ -216,6 +216,7 @@ pending target. See
 | `sensor.*_charging_control` | Charging control | — | enum | Modbus service app | Which of the app's controllers decides about the charge right now; see [Charging control at a glance](#charging-control-at-a-glance). The attributes `vehicle`, `target`, `target_value` and `target_deadline` name the car's state and what is charged towards. |
 | `sensor.*_charging_wait_reason` | Charging wait reason | — | enum | Modbus service app | Why the car does not charge yet, or **Nothing is holding the charge**. It names the first reason that applies, not every one. |
 | `sensor.*_next_charging_step` | Next charging step | — | enum | Modbus service app | What the app expects next; the `at` attribute holds its time. No countdown is recorded. |
+| `sensor.*_charging_job` | Charging job | — | enum | Modbus service app | State of the app's charging job or guest charge, or **No job**; the attributes hold its window, current, energy and progress. See [Use the app from Home Assistant](app-from-home-assistant.md). |
 | `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability | Shows recognition, permission and release status, or Disabled. **Charging blocked** carries a `blocked_reason` attribute (for example `release_off`, `wallbox_locked`, `authorization_required`, `pause_requested`, `energy_goal_stop` or `register_unavailable`). **Released by hand** shows a manual release for the current or next connection. No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. The raw wallbox states behind it are the `evse_state` and `cp_state` attributes (see [Attribute values](#attribute-values)). |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
@@ -342,9 +343,10 @@ and templates see.
 | `sensor.*_cable_lock` | `fixed_cable`, `locked`, `undetermined`, `unlocked` |
 | `select.*_solar_display_mode` | `fast`, `not_active`, `sunshine`, `sunshine_plus` |
 | `select.*_requested_phases` | `all_available`, `single_phase` |
-| `sensor.*_charging_control` | `unavailable`, `guest_order`, `weekly_plan`, `charging_job`, `departure_plan`, `direct` |
-| `sensor.*_charging_wait_reason` | `none`, `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, `until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `until_weekly_window`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`, `target_reached`, `paused` |
-| `sensor.*_next_charging_step` | `none`, `queued_command`, `job_start`, `job_end`, `weekly_window`, `plan_start`, `target_reached`, `departure` |
+| `sensor.*_charging_control` | `unavailable`, `guest_order`, `charging_job`, `departure_plan`, `direct` |
+| `sensor.*_charging_wait_reason` | `none`, `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, `until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`, `target_reached`, `paused` |
+| `sensor.*_next_charging_step` | `none`, `queued_command`, `job_start`, `job_end`, `plan_start`, `target_reached`, `departure` |
+| `sensor.*_charging_job` | `none`, `scheduled`, `charging`, `waiting_meter`, `suspended`, `reached`, `finished`, `stopped`, `interrupted` |
 
 ### Attribute values
 
@@ -371,6 +373,10 @@ value leaves the attribute out.
 `mennekes_amtron_rtu.set_charging_current` writes the charging-current limit.
 Both the action and the slider accept 0 A to remove the limit. See
 [user-guide.md](user-guide.md#actions).
+
+With the Modbus service app, six more actions start and stop the app's
+charging jobs, boost and guest charging; see
+[Use the app from Home Assistant](app-from-home-assistant.md).
 
 
 ## Optional charging estimates

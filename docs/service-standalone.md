@@ -4,7 +4,7 @@ Use this guide for Home Assistant Container or a service on another host.
 Home Assistant OS users can use the simpler [app installation](modbus-service.md).
 Both options keep the heartbeat independent of Home Assistant Core.
 
-Run the service in the same version as the integration, here **0.9.0b3**, and
+Run the service in the same version as the integration, here **0.9.0b4**, and
 update the service first. See [Updates](#operation-and-updates). The app's web
 pages, including charging jobs, are part of the Home Assistant app and need
 Supervisor Ingress; a standalone service offers the same charging jobs through
@@ -106,7 +106,7 @@ that runs independently of Home Assistant.
 
 Copy the **standalone container reference** from the
 [published app catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps)
-for your release. Prereleases such as 0.9.0b3 are in the
+for your release. Prereleases such as 0.9.0b4 are in the
 [beta catalog](https://github.com/memphi2/ha-mennekes-amtron/tree/apps-beta).
 Use the complete `ghcr.io/memphi2/ha-mennekes-amtron-service@sha256:…` reference
 as the image. The digest selects the verified release even if a registry tag
@@ -160,8 +160,8 @@ Compare readings while read-only. Then set the permitted `current_cap`, change
 `read_only` to `false`, save the file and restart the service. Configuration is
 read at startup; this briefly interrupts the heartbeat. HA needs no restart. After
 fresh writable status, HA enables the controls automatically; no additional HA
-write switch is needed. The integration options can impose a lower current cap.
-Both caps constrain limited-current commands; deliberately selecting **0 A**
+write switch is needed. The app's current cap constrains limited-current
+commands; deliberately selecting **0 A**
 removes the EMS limit while hardware limits remain in force.
 
 HA does not replay old commands after permission changes or reconnection. The

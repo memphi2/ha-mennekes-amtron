@@ -101,7 +101,7 @@ current cap, then enable control in the place that owns the USB or LAN connectio
 | Service | Disable **Read-only** in the app or service configuration, save and restart the service. HA controls become available after the next status refresh. There is no second HA write switch. |
 | Direct USB or LAN | Open **Configure → Wallbox → Current limit and polling** and change **Control mode** to **Modbus master**. The entry reloads, starts the heartbeat and adds controls. |
 
-For the service, HA's entry options offer an additional current cap. Resolve
+For the service, the app's current cap is the only one. Resolve
 any repair messages and check the `heartbeat` attribute of **Connection
 quality** before charging.
 

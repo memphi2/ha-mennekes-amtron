@@ -14,18 +14,18 @@ from typing import Any
 from .charge_job import TERMINAL
 
 CONTROLLERS = (
-    "unavailable", "guest_order", "weekly_plan", "charging_job", "departure_plan", "direct",
+    "unavailable", "guest_order", "charging_job", "departure_plan", "direct",
 )
 WAITING = (
     "none", "wallbox_unavailable", "no_vehicle", "release_off", "plug_charge_waiting",
     "until_job_start", "meter_unavailable", "job_suspended", "job_ended",
-    "until_weekly_window", "vehicle_unconfirmed", "until_planned_start",
+    "vehicle_unconfirmed", "until_planned_start",
     "estimated_target_reached", "waiting_for_device", "waiting_for_soc",
     "waiting_for_capacity", "waiting_for_target", "read_only", "command_pending",
     "target_reached", "paused",
 )
 EVENTS = (
-    "none", "queued_command", "job_start", "job_end", "weekly_window", "plan_start",
+    "none", "queued_command", "job_start", "job_end", "plan_start",
     "target_reached", "departure",
 )
 VEHICLES = ("unknown", "none", "connected", "confirmed")
@@ -85,34 +85,25 @@ def _target(kind: str, value: object, deadline: object = None) -> dict[str, Any]
 def summarize(
     *, available: bool, present: bool | None, control: Mapping[str, Any],
     departure: Mapping[str, Any] | None, job: Mapping[str, Any] | None,
-    weekly: Mapping[str, Any] | None, goal_stop: bool = False,
+    goal_stop: bool = False,
 ) -> dict[str, Any]:
     """Summarize the controllers' published state.
 
-    ``job`` is the job summary of the job controller, ``weekly`` the session
-    consent of the weekly plans with the ``start_at`` of its next window, and
-    ``departure`` the plan's snapshot, or None while it loads.
+    ``job`` is the job summary of the job controller and ``departure`` the
+    plan's snapshot, or None while it loads.
     """
     plan, held = _map(departure), _map(job)
-    consent = _map(weekly)
     trip = _map(plan.get("trip"))
     soc, energy = _map(control.get("soc_goal")), _map(control.get("energy_goal"))
     status = plan.get("status")
     holding = held.get("holding") is True
     planning = trip.get("deadline") is not None and trip.get("finished") is None
-    # Also between departures: the plan's ended order no longer holds.
-    awaiting_window = bool(consent) and not holding
 
     waits: str | None = None
     following = _event("none", None)
     target = _target("none", None)
     if holding:
-        if held.get("kind") == "guest":
-            controller = "guest_order"
-        elif consent and consent.get("job_id") == held.get("id"):
-            controller = "weekly_plan"
-        else:
-            controller = "charging_job"
+        controller = "guest_order" if held.get("kind") == "guest" else "charging_job"
         state = held.get("state")
         target = _target("energy", held.get("energy_kwh"), held.get("finish_at"))
         if state == "scheduled":
@@ -137,9 +128,6 @@ def summarize(
             following = _event("target_reached", forecast.get("finish_at"))
         if following["event"] == "none":
             following = _event("departure", trip.get("deadline"))
-    elif awaiting_window:
-        controller, waits = "weekly_plan", "until_weekly_window"
-        following = _event("weekly_window", consent.get("start_at"))
     else:
         controller = "direct"
         if soc.get("status") in ("active", "reached"):

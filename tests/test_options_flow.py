@@ -66,11 +66,9 @@ def test_obsolete_review_and_save_routes_are_not_available():
         assert not hasattr(flow, f"async_step_{step}")
 
 
-@pytest.mark.parametrize("service", [False, True])
-def test_independent_sections_and_scoped_wallbox_save(service):
+def test_independent_sections_and_scoped_wallbox_save():
     async def run():
         entry = FakeConfigEntry(
-            data={"server_url": "http://app:8765"} if service else None,
             options={
                 "charging_price": 0.3,
                 "timed_capacity_kwh": 80,
@@ -87,11 +85,9 @@ def test_independent_sections_and_scoped_wallbox_save(service):
         assert settings["step_id"] == "vehicle_settings"
         assert settings["menu_options"] == ["vehicle_battery", "departure", "losses", "vehicle"]
         menu = await flow.async_step_wallbox()
-        assert ("wallbox_advanced" in menu["menu_options"]) is not service
+        assert menu["menu_options"] == ["wallbox_basic", "wallbox_advanced", "back"]
         form = await flow.async_step_wallbox_basic()
-        assert set(fields(form)) == {"scan_interval_seconds", "current_limit"} | (
-            set() if service else {"control_mode"}
-        )
+        assert set(fields(form)) == {"scan_interval_seconds", "current_limit", "control_mode"}
         values = form["data_schema"](
             {"scan_interval_seconds": 7, "current_limit": 11.5}
         )
@@ -102,7 +98,39 @@ def test_independent_sections_and_scoped_wallbox_save(service):
         assert result["data"]["scan_interval_seconds"] == 7
         assert result["data"]["state_change_interval_seconds"] == 175
         assert result["data"]["timed_capacity_kwh"] == 80
-        assert ("control_mode" in result["data"]) is not service
+        assert "control_mode" in result["data"]
+
+    asyncio.run(run())
+
+
+def test_app_connection_only_shows_the_apps_wallbox_settings():
+    async def run():
+        entry = FakeConfigEntry(
+            data={"server_url": "http://app:8765"}, options={"current_limit": 8},
+        )
+        entry.runtime_data = SimpleNamespace(client=SimpleNamespace(snapshot={"control": {
+            "current_cap": 13.5, "state_change_interval_seconds": 300,
+            "phase_switch_grace_seconds": True,
+        }}))
+        flow = Flow(entry)
+        shown = await flow.async_step_wallbox()
+        assert shown["type"] == "form"
+        assert shown["step_id"] == "wallbox_service"
+        assert fields(shown) == {}
+        assert shown["description_placeholders"] == {
+            "current_cap": "13.5", "state_change_interval": "300", "phase_switch_grace": "-",
+        }
+        # Nothing is saved; confirming leads back to the sections.
+        assert (await flow.async_step_wallbox_service({}))["step_id"] == "init"
+        assert entry.options == {"current_limit": 8}
+        # The forms of a direct connection are not reachable.
+        assert (await flow.async_step_wallbox_basic())["step_id"] == "init"
+        assert (await flow.async_step_wallbox_advanced())["step_id"] == "init"
+        # Before the first status there are no values to show.
+        del entry.runtime_data
+        assert set((await flow.async_step_wallbox())["description_placeholders"].values()) == {"-"}
+        # A direct connection has no such page.
+        assert (await Flow(FakeConfigEntry()).async_step_wallbox_service())["step_id"] == "init"
 
     asyncio.run(run())
 
@@ -192,15 +220,6 @@ def test_missing_section_cannot_skip_into_detail_or_save(step):
     async def run():
         flow = Flow(FakeConfigEntry())
         assert (await getattr(flow, f"async_step_{step}")())["step_id"] == "init"
-
-    asyncio.run(run())
-
-
-def test_service_cannot_open_direct_only_advanced_step():
-    async def run():
-        flow = Flow(FakeConfigEntry(data={"server_url": "http://app"}))
-        await flow.async_step_wallbox()
-        assert (await flow.async_step_wallbox_advanced())["step_id"] == "init"
 
     asyncio.run(run())
 

@@ -97,12 +97,10 @@ def test_a_plug_in_binds_only_after_the_cars_own_fresh_report(tmp_path, caplog):
         coordinator.plug(False)
         await settle(hass)
         assert not binding.resting
-        assert not binding.detected
         # A plug-in after the car's last report is not proven to be that car.
         coordinator.plug(True)
         await settle(hass)
         assert binding.resting
-        assert not binding.detected
         assert "not confirmed as First car" in caplog.text
         # An unreadable wallbox neither confirms the car nor releases its rules.
         coordinator.last_update_success = False
@@ -114,7 +112,6 @@ def test_a_plug_in_binds_only_after_the_cars_own_fresh_report(tmp_path, caplog):
         report(hass)
         await settle(hass)
         assert not binding.resting
-        assert binding.detected
         assert "First car confirmed at the wallbox" in caplog.text
         assert changes == [True, False]
         # The unplug ends the binding; an old report cannot renew it.

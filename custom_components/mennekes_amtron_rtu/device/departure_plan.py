@@ -57,7 +57,7 @@ _TRAIL_LIMIT = 2048
 _SCOPE = re.compile(r"[0-9a-f]{64}")
 _INPUT_KEYS = frozenset({
     "vehicle", "scope", "capacity_kwh", "phases", "soc_percent", "soc_observed_at",
-    "minimum_percent", "detected",
+    "minimum_percent",
 })
 _PLAN_KEYS = frozenset({
     "trip", "inputs", "anchor", "session", "planned_start", "plan_paused", "estimated_stop",
@@ -95,8 +95,7 @@ class DepartureInputs:
     ``scope`` names the plug-in Home Assistant confirmed the car for, as the
     service reported it; None means it confirms no car now. Below
     ``minimum_percent`` the car charges at once instead of waiting for the
-    plan's start; zero switches that off. ``detected`` says the car itself
-    reported the plug-in; without it the scope only repeats the selection.
+    plan's start; zero switches that off.
     """
 
     vehicle: str
@@ -106,11 +105,8 @@ class DepartureInputs:
     soc_percent: float | None = None
     soc_observed_at: datetime | None = None
     minimum_percent: float = 0.0
-    detected: bool = False
 
     def __post_init__(self) -> None:
-        if type(self.detected) is not bool:
-            raise ValueError("invalid departure detection")
         object.__setattr__(self, "minimum_percent", percentage(self.minimum_percent))
         if not isinstance(self.vehicle, str) or not 1 <= len(self.vehicle) <= 512:
             raise ValueError("invalid departure vehicle")
@@ -141,7 +137,7 @@ class DepartureInputs:
         return cls(
             raw["vehicle"], raw["scope"], raw["capacity_kwh"], raw["phases"],
             raw["soc_percent"], None if observed is None else instant(observed),
-            raw["minimum_percent"], raw["detected"],
+            raw["minimum_percent"],
         )
 
     def snapshot(self) -> dict[str, Any]:
@@ -150,7 +146,7 @@ class DepartureInputs:
             "capacity_kwh": self.capacity_kwh, "phases": self.phases,
             "soc_percent": self.soc_percent,
             "soc_observed_at": None if self.soc_observed_at is None else self.soc_observed_at.isoformat(),
-            "minimum_percent": self.minimum_percent, "detected": self.detected,
+            "minimum_percent": self.minimum_percent,
         }
 
     @property
@@ -585,16 +581,6 @@ class DepartureController:
             return "unknown"
         # Home Assistant confirmed this plug-in before a restart or a gap.
         return "confirmed" if self._session.continues(s.session) else "unconfirmed"
-
-    def confirmed_vehicle(self, s: DepartureSample) -> tuple[str, str] | None:
-        """The car Home Assistant detected at the plug-in of this sample."""
-        inputs = self.inputs
-        if (
-            not self.ready or inputs is None or not inputs.detected or s.scope is None
-            or self._binding(s) != "confirmed"
-        ):
-            return None
-        return inputs.vehicle, s.scope
 
     def _unbind(self) -> None:
         # A provisional stop stays: a car that leaves at its projected target

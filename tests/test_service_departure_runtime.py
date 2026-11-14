@@ -34,7 +34,7 @@ def departure_service(tmp_path, monkeypatch):
     return lambda: runtime.job_service(tmp_path)
 
 
-async def hand_over(service, *, hours=2.0, soc=50.0, detected=False):
+async def hand_over(service, *, hours=2.0, soc=50.0):
     """Do what Home Assistant does: select the car, set the trip, confirm it."""
     service.control.soc_goal.configure_source(CAR)
     service.control.soc_goal.set_target(80)
@@ -47,7 +47,7 @@ async def hand_over(service, *, hours=2.0, soc=50.0, detected=False):
         "expected_serial_number": serial,
     })
     given = DepartureInputs(
-        CAR, scope, 60.0, None, soc, datetime.now(UTC) - timedelta(minutes=1), detected=detected,
+        CAR, scope, 60.0, None, soc, datetime.now(UTC) - timedelta(minutes=1),
     )
     result = await service.command({
         "command": "departure_inputs", "value": given.snapshot(), "expected_serial_number": serial,
@@ -124,7 +124,7 @@ def test_the_snapshot_summarizes_who_controls_the_charge(departure_service):
             s.jobs.snapshot = lambda: {"job": job}
             assert s.snapshot()["control"]["operation"]["controller"] == "charging_job"
             # Until the controllers have loaded, only the plan is summarized.
-            s.jobs.ready = s.weekly.ready = False
+            s.jobs.ready = False
             assert s.snapshot()["control"]["operation"]["controller"] == "departure_plan"
     asyncio.run(run())
 
@@ -257,18 +257,4 @@ def test_initialisation_needs_a_configured_plan(departure_service, monkeypatch):
             with pytest.raises(RuntimeError, match="not configured"):
                 await departure_runtime.DepartureModbusService._initialize(s)
             monkeypatch.undo()
-    asyncio.run(run())
-
-
-def test_weekly_plans_learn_the_confirmed_car_from_the_departure_plan(departure_service):
-    async def run():
-        async with departure_service() as (s, _transport, _clock):
-            assert s.weekly.confirmed() is None
-            given, _result = await hand_over(s, detected=True)
-            assert s.weekly.confirmed() == (CAR, given.scope)
-            # A service without a departure plan confirms no car.
-            assert departure_runtime.ForecastModbusService._confirmed_vehicle(s) is None
-            plan, s.departure = s.departure, None
-            assert s.weekly.confirmed() is None
-            s.departure = plan
     asyncio.run(run())

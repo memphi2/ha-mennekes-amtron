@@ -499,7 +499,6 @@
         "state": {
           "unavailable": "Borne injoignable",
           "guest_order": "Ordre invité",
-          "weekly_plan": "Plan hebdomadaire",
           "charging_job": "Ordre de recharge",
           "departure_plan": "Planification du départ",
           "direct": "Commande directe"
@@ -541,7 +540,6 @@
           "meter_unavailable": "En attente du compteur d’énergie",
           "job_suspended": "L’ordre attend la preuve du même branchement",
           "job_ended": "Ordre terminé, en pause jusqu’au débranchement",
-          "until_weekly_window": "En attente de la fenêtre du plan hebdomadaire",
           "vehicle_unconfirmed": "Véhicule non confirmé",
           "until_planned_start": "En pause jusqu’au démarrage prévu",
           "estimated_target_reached": "Chargé jusqu’à l’objectif estimé",
@@ -562,7 +560,6 @@
           "queued_command": "La modification en attente s’exécute",
           "job_start": "L’ordre démarre",
           "job_end": "L’ordre se termine",
-          "weekly_window": "La fenêtre du plan hebdomadaire s’ouvre",
           "plan_start": "La recharge planifiée démarre",
           "target_reached": "Cible attendue",
           "departure": "Départ"
@@ -570,6 +567,56 @@
         "state_attributes": {
           "at": {
             "name": "Heure"
+          }
+        }
+      },
+      "charging_job": {
+        "name": "Ordre de recharge",
+        "state": {
+          "none": "Aucun ordre",
+          "scheduled": "En attente de la plage",
+          "charging": "Recharge demandée",
+          "waiting_meter": "En attente d’un relevé de compteur valide",
+          "suspended": "Interrompu ; vérifie si le même branchement continue",
+          "reached": "Plafond d’énergie atteint",
+          "finished": "Plage horaire terminée",
+          "stopped": "Arrêté par l’utilisateur",
+          "interrupted": "Interrompu ; pas de redémarrage automatique"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Type",
+            "state": {
+              "scheduled": "Ordre de recharge",
+              "guest": "Recharge invité"
+            }
+          },
+          "start": {
+            "name": "Début"
+          },
+          "finish": {
+            "name": "Fin"
+          },
+          "current": {
+            "name": "Courant"
+          },
+          "energy": {
+            "name": "Énergie"
+          },
+          "delivered": {
+            "name": "Fournie"
+          },
+          "reserve": {
+            "name": "Réserve immédiate"
+          },
+          "reason": {
+            "name": "Motif"
+          },
+          "boost_until": {
+            "name": "Boost jusqu’à"
+          },
+          "boost_available": {
+            "name": "Boost disponible"
           }
         }
       }
@@ -831,7 +878,7 @@
       "message": "Un objectif de recharge impose une pause. Vérifiez son état. Une fois l’objectif atteint ou après une remise à zéro du compteur, définissez un nouvel objectif ou désactivez-le avec 0 avant de reprendre. Modifier l’objectif ne démarre pas la recharge."
     },
     "service_job_active": {
-      "message": "Un ordre de recharge de l’app Modbus pilote actuellement la recharge. Arrêtez-le sur la page Ordres de recharge de l’app ou débranchez le véhicule. Dès que la borne confirme la pause, vous pouvez de nouveau modifier le courant ou reprendre ici."
+      "message": "Un ordre de recharge de l’app Modbus pilote actuellement la recharge. Arrêtez-le avec l’action « Arrêter l’ordre de recharge » ou sur la page Ordres de recharge de l’app, ou débranchez le véhicule. Dès que la borne confirme la pause, vous pouvez de nouveau modifier le courant ou reprendre ici."
     },
     "energy_goal_state_invalid": {
       "message": "L’objectif énergétique enregistré n’a pas pu être restauré. Consultez les journaux avant d’autoriser à nouveau la recharge."
@@ -907,6 +954,63 @@
     },
     "plug_charge_not_supported": {
       "message": "L’application ou le service Modbus connecté ne prend pas en charge Plug & Charge virtuel. Mettez-le à jour vers une version compatible."
+    },
+    "guest_vehicle_target_active": {
+      "message": "Objectif de batterie du véhicule actif ; aucun ordre invité créé."
+    },
+    "invalid_boost_duration": {
+      "message": "Saisissez un nombre entier de 1 à 120 minutes."
+    },
+    "invalid_job_request": {
+      "message": "L’application n’a pas accepté ces valeurs. Vérifiez l’heure, le courant et l’énergie."
+    },
+    "job_boost_unavailable": {
+      "message": "Le boost exige un ordre actif avant son début prévu et une autorisation actuelle."
+    },
+    "job_changed": {
+      "message": "L’état a changé entre-temps. Réessayez."
+    },
+    "job_clear_requires_pause": {
+      "message": "L’effacement exige une pause confirmée ou un véhicule débranché."
+    },
+    "job_current_exceeds_cap": {
+      "message": "Le courant dépasse la limite du service."
+    },
+    "job_exists": {
+      "message": "Un autre ordre est encore en cours. Arrêtez-le d’abord."
+    },
+    "job_not_permitted": {
+      "message": "Connexion ou autorisation modifiée ; aucun ordre créé."
+    },
+    "job_preview_expired": {
+      "message": "L’état a changé entre-temps. Réessayez."
+    },
+    "job_service_starting": {
+      "message": "Le service démarre encore. Réessayez dans un instant."
+    },
+    "job_stop_first": {
+      "message": "Arrêtez d’abord l’ordre en cours."
+    },
+    "job_storage_unavailable": {
+      "message": "Stockage indisponible ; aucun démarrage automatique."
+    },
+    "service_order_failed": {
+      "message": "L’application ne l’a pas exécuté. Vérifiez qu’elle est joignable et à jour, et que les heures et valeurs sont valides."
+    },
+    "app_required": {
+      "message": "Cette action nécessite l’application Modbus ; cette borne est connectée directement."
+    },
+    "wallbox_target_required": {
+      "message": "Plusieurs bornes sont configurées ; indiquez la borne concernée."
+    },
+    "job_stop_unconfirmed": {
+      "message": "L’arrêt n’est pas encore confirmé. Réessayez dans un instant."
+    },
+    "job_window_invalid": {
+      "message": "La fin doit être après le début et sous sept jours, et le début ne doit pas être dans le passé."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "La réserve immédiate ne doit pas dépasser l’énergie de l’ordre."
     }
   },
   "issues": {
@@ -968,7 +1072,11 @@
           "wallbox_advanced": "Mesures et délais de commutation",
           "back": "Retour sans enregistrer"
         },
-        "description": "Définissez le courant maximal demandé par Home Assistant et la fréquence de lecture de l’état. Avec l’application Modbus, l’autorisation d’écriture et les délais du bus se règlent dans son onglet Configuration. Modifiez USB/LAN via Reconfigurer pour une connexion directe, ou dans l’application si elle gère la connexion."
+        "description": "Définissez le courant maximal que Home Assistant peut demander, la fréquence de lecture de l’état et l’autorisation d’écriture. Modifiez USB/LAN via Reconfigurer."
+      },
+      "wallbox_service": {
+        "title": "Réglages de la borne dans l’application",
+        "description": "Cette borne passe par l’application Modbus. Ses réglages s’y trouvent donc et valent aussi pour Home Assistant.\n\nLimite de courant : {current_cap} A\nDélai minimal entre changements d’état : {state_change_interval} s\nAttente supplémentaire avant un changement de phases : {phase_switch_grace} s\n\nModifiez ces valeurs, les intervalles de lecture et la connexion dans l’application, sous Ouvrir l’interface utilisateur web. L’autorisation d’écriture se trouve dans l’onglet Configuration de l’application."
       },
       "wallbox_basic": {
         "title": "Limite de courant et interrogation",
@@ -979,10 +1087,10 @@
         },
         "data_description": {
           "control_mode": "Les deux modes envoient des requêtes de lecture et nécessitent un accès exclusif au bus. Lecture seule n’écrit pas dans les registres. Maître Modbus envoie également le signal de présence et active les entités de commande. Ne partagez pas ce bus avec un autre maître.",
-          "current_limit": "Limite supérieure de la commande du courant de charge, en ampères par phase. Ce n’est ni un objectif en pourcentage ni une commande de pause. Les limites de la borne et, le cas échéant, de l’application s’appliquent aussi.",
+          "current_limit": "Limite supérieure de la commande du courant de charge, en ampères par phase. Ce n’est ni un objectif en pourcentage ni une commande de pause. La limite de la borne s’applique aussi.",
           "scan_interval_seconds": "Fréquence de lecture de l’état de charge, des erreurs et des commandes. Le signal de présence fonctionne indépendamment."
         },
-        "description": "La limite de courant s’applique aux demandes HA ; les limites de la borne et du service restent actives. Avec l’application, l’intervalle ne concerne que les requêtes HA au service."
+        "description": "La limite de courant borne ce qui peut être demandé ici ; la limite de la borne reste active."
       },
       "wallbox_advanced": {
         "title": "Mesures et délais de commutation",
@@ -1567,6 +1675,102 @@
         "profile": {
           "name": "Profil d’historique",
           "description": "Conserver tout l’historique, réduire les détails ou conserver uniquement les statistiques d’énergie et de puissance."
+        }
+      }
+    },
+    "start_charging_job": {
+      "name": "Démarrer un ordre de recharge",
+      "description": "Recharge la voiture branchée dans une plage horaire, à courant fixe, jusqu’à une quantité d’énergie. L’ordre prend fin au débranchement.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        },
+        "current": {
+          "name": "Courant de charge",
+          "description": "Courant en ampères par phase, au plus la limite de l’application."
+        },
+        "energy": {
+          "name": "Énergie",
+          "description": "La recharge s’arrête une fois cette énergie fournie, en kWh."
+        },
+        "start": {
+          "name": "Début",
+          "description": "Quand la recharge peut commencer. Laissez vide pour commencer maintenant."
+        },
+        "finish": {
+          "name": "Fin",
+          "description": "Quand la recharge se termine au plus tard, sous sept jours."
+        },
+        "reserve": {
+          "name": "Réserve immédiate",
+          "description": "Facultatif : cette énergie en kWh est chargée tout de suite, avant la plage."
+        }
+      }
+    },
+    "start_guest_charging": {
+      "name": "Démarrer une recharge invité",
+      "description": "Recharge la voiture d’un invité dès maintenant, pour une durée et une énergie limitées. Aucune donnée du véhicule ni objectif enregistré n’est utilisé.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        },
+        "current": {
+          "name": "Courant de charge",
+          "description": "Courant en ampères par phase, au plus la limite de l’application."
+        },
+        "energy": {
+          "name": "Énergie",
+          "description": "La recharge s’arrête une fois cette énergie fournie, en kWh."
+        },
+        "duration": {
+          "name": "Durée",
+          "description": "Durée de recharge autorisée, en minutes (jusqu’à 24 heures)."
+        }
+      }
+    },
+    "stop_charging_job": {
+      "name": "Arrêter l’ordre de recharge",
+      "description": "Arrête l’ordre de recharge ou la recharge invité en cours et met la recharge en pause. L’ordre ne reprend pas ; un plan de départ arrivé à échéance peut recharger de nouveau.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        }
+      }
+    },
+    "clear_charging_job": {
+      "name": "Effacer l’ordre de recharge",
+      "description": "Supprime un ordre de recharge terminé ou arrêté, pour pouvoir en démarrer un nouveau.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        }
+      }
+    },
+    "start_boost": {
+      "name": "Démarrer le boost",
+      "description": "Recharge tout de suite bien que l’ordre commence plus tard, puis revient au plan.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        },
+        "duration": {
+          "name": "Durée",
+          "description": "Durée de la recharge anticipée, en minutes (jusqu’à 120)."
+        }
+      }
+    },
+    "cancel_boost": {
+      "name": "Annuler le boost",
+      "description": "Met fin à la recharge anticipée ; l’ordre se poursuit comme prévu.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
         }
       }
     }

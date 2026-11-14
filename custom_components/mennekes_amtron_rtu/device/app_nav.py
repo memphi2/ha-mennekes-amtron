@@ -17,11 +17,11 @@ PLACEHOLDER = b"<!-- app-nav -->"
 _NAV: tuple[tuple[tuple[str, ...], tuple[tuple[str, tuple[str, ...]], ...]], ...] = (
     (("Overview", "Übersicht", "Vue d’ensemble", "Overzicht", "Panoramica"), (
         ("/", ("Overview", "Übersicht", "Vue d’ensemble", "Overzicht", "Panoramica")),
+        ("/registers", ("Registers", "Register", "Registres", "Registers", "Registri")),
     )),
     (("Charging", "Laden", "Recharge", "Laden", "Ricarica"), (
         ("/jobs", ("Charging jobs", "Ladeaufträge", "Ordres de recharge", "Laadopdrachten", "Ordini di ricarica")),
         ("/guest", ("Guest charging", "Gastladen", "Recharge invité", "Gastladen", "Ricarica ospite")),
-        ("/weekly", ("Weekly plans", "Wochenpläne", "Plans hebdomadaires", "Weekplannen", "Piani settimanali")),
     )),
     (("Settings", "Einstellungen", "Réglages", "Instellingen", "Impostazioni"), (
         ("/connection", ("Connection", "Verbindung", "Connexion", "Verbinding", "Connessione")),

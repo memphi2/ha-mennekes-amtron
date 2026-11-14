@@ -43,15 +43,15 @@ def _schema(name):
         return user_schema([])
     if name == "network":
         return network_schema()
-    if name in ("direct", "service"):
-        return options_schema({}, max_current=16, service_mode=name == "service")
+    if name == "direct":
+        return options_schema({}, max_current=16)
     if name == "advanced":
         return advanced_schema({}, phase_switch=True)
     return cost_network_schema({}, module=name)
 
 
 @pytest.mark.parametrize("name", [
-    "serial", "network", "direct", "service", "advanced", "module_2", "module_3",
+    "serial", "network", "direct", "advanced", "module_2", "module_3",
 ])
 def test_http_view_serializes_every_integer_bearing_form(name):
     view = FlowManagerResourceView(None)

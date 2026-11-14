@@ -38,7 +38,7 @@ def test_the_action_is_registered_once() -> None:
         services.async_setup_services(hass)
         services.async_setup_services(hass)
         assert hass.services.has_service(DOMAIN, SERVICE_SET_CHARGING_CURRENT)
-        assert len(hass.services.registered) == 2
+        assert len(hass.services.registered) == 2 + len(services.ORDER_ACTIONS)
 
     asyncio.run(run())
 

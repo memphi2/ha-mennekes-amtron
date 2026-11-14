@@ -21,8 +21,8 @@ from custom_components.mennekes_amtron_rtu.device import (
 from custom_components.mennekes_amtron_rtu.device import service_runtime as bus_runtime
 from custom_components.mennekes_amtron_rtu.device.charge_rate_store import RateStore
 from custom_components.mennekes_amtron_rtu.device.data import WallboxData
-from custom_components.mennekes_amtron_rtu.device.service_weekly_http import (
-    create_weekly_app,
+from custom_components.mennekes_amtron_rtu.device.service_job_http import (
+    create_job_app,
 )
 from tests import test_service_charge_runtime as runtime
 from tests.test_charge_rate import AT, KEY, SCOPE, sample, train
@@ -92,7 +92,7 @@ def test_real_service_learns_without_extra_reads_writes_or_credentials(
                 assert result["power_kw"] == expected_kw
                 assert "fixture-private-profile" not in json.dumps(result)
             assert (transport.reads, transport.writes, s.jobs.revision) == before
-            async with TestClient(TestServer(create_weekly_app(s))) as client:
+            async with TestClient(TestServer(create_job_app(s))) as client:
                 assert (await client.get("/v2/jobs")).status == 401
                 response = await client.get("/v2/jobs", headers={"Authorization": f"Bearer {runtime.TOKEN}"})
                 assert response.status == 200
@@ -117,7 +117,6 @@ def test_unusable_advisory_file_does_not_disable_the_real_service(tmp_path, monk
         async with runtime.job_service(tmp_path) as (service, transport, _clock):
             assert service._rate_storage_error
             assert service.jobs.ready
-            assert service.weekly.ready
             assert service._is_available()
             assert service.jobs.snapshot()["forecast"]["history_storage"] == "unavailable"
             assert transport.writes == []
@@ -177,7 +176,7 @@ def test_bus_stop_precedes_optional_flush_even_after_parent_failure(tmp_path, mo
             assert stopped
             original(raw)
 
-        monkeypatch.setattr(m.WeeklyModbusService, "stop", stop)
+        monkeypatch.setattr(m.JobModbusService, "stop", stop)
         monkeypatch.setattr(s._rate_store, "save", save)
         if failure:
             with pytest.raises(OSError, match="fixture parent stop"):
@@ -202,7 +201,7 @@ def test_cancelled_shutdown_joins_the_single_history_worker(tmp_path, monkeypatc
             original(raw)
 
         monkeypatch.setattr(s._rate_store, "save", save)
-        monkeypatch.setattr(m.WeeklyModbusService, "stop", AsyncMock())
+        monkeypatch.setattr(m.JobModbusService, "stop", AsyncMock())
         s._start_rate_save()
         assert await asyncio.to_thread(started.wait, 5)
         task = asyncio.create_task(s.stop())
@@ -218,7 +217,6 @@ def test_cancelled_shutdown_joins_the_single_history_worker(tmp_path, monkeypatc
 
 def test_history_is_never_assigned_to_a_guest_or_an_old_connection(tmp_path):
     s = bare(tmp_path)
-    s.weekly = None
     s.control = SimpleNamespace(soc_goal=SimpleNamespace(source="private-source"))
     order = SimpleNamespace(kind="scheduled", scope_ended=False, binding=SCOPE, identifier="fixture")
     expected = hashlib.sha256(b"source:private-source").hexdigest()
@@ -230,9 +228,6 @@ def test_history_is_never_assigned_to_a_guest_or_an_old_connection(tmp_path):
     order.kind, order.scope_ended = "scheduled", True
     assert s._rate_profile(order, SCOPE) is None
     order.scope_ended = False
-    s.weekly = SimpleNamespace(consent=SimpleNamespace(profile="fixture-profile", job_id="fixture"))
-    assert s._rate_profile(order, SCOPE) == hashlib.sha256(b"weekly:fixture-profile").hexdigest()
-    s.weekly.consent.job_id = "other"
     assert s._rate_profile(order, SCOPE) == expected
     s.control = None
     assert s._rate_profile(order, SCOPE) is None
@@ -249,7 +244,7 @@ def test_unknown_phase_count_is_not_presented_as_three_phase(tmp_path, value, ex
 def test_failed_refresh_discards_live_prediction_without_swallowing_failure(tmp_path, monkeypatch, error):
     async def run():
         s = bare(tmp_path)
-        monkeypatch.setattr(m.WeeklyModbusService, "refresh", AsyncMock(side_effect=error))
+        monkeypatch.setattr(m.JobModbusService, "refresh", AsyncMock(side_effect=error))
         with pytest.raises(type(error)):
             await s.refresh()
         assert s.rates.reason == "unavailable"
@@ -262,16 +257,16 @@ def test_passive_non_meter_refresh_and_unconfigured_advisory_callback(tmp_path, 
         s.jobs = None
         s.data = WallboxData(values={"evse_state": 5, "detected_ev_phases": 3})
         s._job_inputs = lambda: sample()
-        monkeypatch.setattr(m.WeeklyModbusService, "refresh", AsyncMock())
+        monkeypatch.setattr(m.JobModbusService, "refresh", AsyncMock())
         before = s.rates.history.generation
         await s.refresh()
         if s._rate_save is not None:
             await s._rate_save
         assert s.rates.history.generation == before
-        monkeypatch.setattr(m.WeeklyModbusService, "_configure_control", Mock())
+        monkeypatch.setattr(m.JobModbusService, "_configure_control", Mock())
         with pytest.raises(RuntimeError, match="job controller"):
             s._configure_control(None)
-        monkeypatch.setattr(m.WeeklyChargeJobs, "snapshot", lambda _self: {"ordinary": True})
+        monkeypatch.setattr(m.ChargeJobController, "snapshot", lambda _self: {"ordinary": True})
         controller = m.ForecastJobs.__new__(m.ForecastJobs)
         controller.job = None
         assert controller.snapshot() == {"ordinary": True}
@@ -286,7 +281,7 @@ def test_empty_identity_fallback_does_not_require_a_raw_serial(tmp_path, monkeyp
         s.state_path = tmp_path / "intent.json"
         s.identity = SimpleNamespace(serial_number=None)
         s.config = SimpleNamespace(connection=SimpleNamespace(port="fixture-port", device_id=50))
-        monkeypatch.setattr(m.WeeklyModbusService, "_initialize", AsyncMock())
+        monkeypatch.setattr(m.JobModbusService, "_initialize", AsyncMock())
         await s._initialize()
         assert s._rate_store.identity == "fixture-port:50"
         assert s.rates.history.snapshot() == []

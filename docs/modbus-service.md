@@ -65,7 +65,7 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 The repository above provides stable releases. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog carries
-prereleases such as 0.9.0b3 and also receives stable releases. To switch
+prereleases such as 0.9.0b4 and also receives stable releases. To switch
 catalogs, follow the [channel handover](#updates).
 
 ### 3. Configure and start read-only
@@ -123,8 +123,8 @@ enable automatically. **There is no second write-permission switch in HA and no
 HA restart is needed for this change.** An app restart briefly interrupts the
 heartbeat.
 
-Check the app's current cap. In the integration options you can set an additional
-HA current cap, which can further restrict limited-current commands.
+Check the app's current cap; it is the only one, and Home Assistant shows it
+under **Configure → Wallbox**.
 Reapply the pause, current and charging-release settings you noted before the
 handover, and verify them before reconnecting the vehicle. On its first start,
 the app reads the wallbox's current state; it cannot recover a previous intention
@@ -154,7 +154,6 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 | Change USB/LAN connection settings | **Open Web UI → Connection**, save and restart the app. For LAN, use the adapter interface or optional [adapter setup](lan-adapters.md#service-app). |
 | Let the app charge on its own, or charge a guest's car | **Open Web UI → Charging jobs** or **Guest charging**; see [the app's web pages](app-guide.md). |
 | See what the app is doing | **Open Web UI → Overview**. |
-| Change how often HA reads app status, or lower HA's current cap | Open the integration options. |
 | Hand the USB or LAN connection to another master | Stop the app. Disabling its HA entry or enabling read-only does not release the bus. |
 
 Control entities keep their IDs when permission changes. They are unavailable
@@ -202,7 +201,7 @@ service's queue running.
 
 Configure and understand the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
 The service does not remove the need for it. Include app data in backups:
-it contains saved charging intent, a charging job, weekly plans, learned
+it contains saved charging intent, a charging job, learned
 charging power and the private access token.
 
 The app saves changed settings and a bounded history of measured charging power
@@ -215,7 +214,7 @@ health changes rather than every beat. For smaller HA history, use a
 The app includes a custom AppArmor profile.
 Supervisor loads it automatically when the app is installed;
 keep **Protection mode on**. It limits the service to its runtime files, USB/LAN
-communication and its own token, charging-state, charging-job, weekly-plan and
+communication and its own token, charging-state, charging-job and
 charging-power files. App options remain
 read-only to the service. Normal heartbeat and charging operation are intended
 to continue within these limits.
@@ -275,7 +274,7 @@ For optional vehicle targets, profiles or departure planning, use the
 The log shows service startup, USB/LAN connection and heartbeat start/stop.
 The [live communication view](troubleshooting.md#watch-app-modbus-communication-live)
 under **Open Web UI → Log** (**Protokoll** in German) runs while its page is
-open; the **Overview** shows the last value of every register.
+open; the **Registers** page below **Overview** shows the last value of every register.
 Connection and heartbeat failures are logged when their state changes.
 Home Assistant also shows a repair after a continuous 60-second heartbeat or
 service-connection problem in a managed, write-enabled setup. It clears

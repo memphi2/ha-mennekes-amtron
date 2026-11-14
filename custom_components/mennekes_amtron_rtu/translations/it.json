@@ -499,7 +499,6 @@
         "state": {
           "unavailable": "Wallbox non raggiungibile",
           "guest_order": "Ordine ospite",
-          "weekly_plan": "Piano settimanale",
           "charging_job": "Ordine di ricarica",
           "departure_plan": "Pianificazione della partenza",
           "direct": "Controllo diretto"
@@ -541,7 +540,6 @@
           "meter_unavailable": "In attesa del contatore di energia",
           "job_suspended": "L’ordine attende la prova dello stesso collegamento",
           "job_ended": "Ordine terminato, in pausa fino allo scollegamento",
-          "until_weekly_window": "In attesa della finestra del piano settimanale",
           "vehicle_unconfirmed": "Veicolo non confermato",
           "until_planned_start": "In pausa fino all’avvio pianificato",
           "estimated_target_reached": "Caricato fino all’obiettivo stimato",
@@ -562,7 +560,6 @@
           "queued_command": "La modifica in coda viene eseguita",
           "job_start": "L’ordine inizia",
           "job_end": "L’ordine termina",
-          "weekly_window": "Si apre la finestra del piano settimanale",
           "plan_start": "Inizia la ricarica pianificata",
           "target_reached": "Obiettivo previsto",
           "departure": "Partenza"
@@ -570,6 +567,56 @@
         "state_attributes": {
           "at": {
             "name": "Orario"
+          }
+        }
+      },
+      "charging_job": {
+        "name": "Ordine di ricarica",
+        "state": {
+          "none": "Nessun ordine",
+          "scheduled": "In attesa della finestra",
+          "charging": "Ricarica richiesta",
+          "waiting_meter": "In attesa di una lettura valida del contatore",
+          "suspended": "Interrotto; verifica se lo stesso collegamento prosegue",
+          "reached": "Tetto di energia raggiunto",
+          "finished": "Finestra oraria terminata",
+          "stopped": "Fermato dall’utente",
+          "interrupted": "Interrotto; nessun riavvio automatico"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Tipo",
+            "state": {
+              "scheduled": "Ordine di ricarica",
+              "guest": "Ricarica ospite"
+            }
+          },
+          "start": {
+            "name": "Inizio"
+          },
+          "finish": {
+            "name": "Fine"
+          },
+          "current": {
+            "name": "Corrente"
+          },
+          "energy": {
+            "name": "Energia"
+          },
+          "delivered": {
+            "name": "Erogata"
+          },
+          "reserve": {
+            "name": "Riserva immediata"
+          },
+          "reason": {
+            "name": "Motivo"
+          },
+          "boost_until": {
+            "name": "Boost fino a"
+          },
+          "boost_available": {
+            "name": "Boost disponibile"
           }
         }
       }
@@ -831,7 +878,7 @@
       "message": "Un obiettivo di ricarica richiede una pausa. Controllane lo stato. Dopo aver raggiunto l’obiettivo o un azzeramento del contatore, imposta un nuovo obiettivo o disattivalo con 0 prima di riprendere. Modificare l’obiettivo non avvia la ricarica."
     },
     "service_job_active": {
-      "message": "Un ordine di ricarica dell’app Modbus controlla ora la ricarica. Interrompilo nella pagina Ordini di ricarica dell’app oppure scollega l’auto. Appena la wallbox conferma la pausa, puoi di nuovo modificare la corrente o riprendere qui."
+      "message": "Un ordine di ricarica dell’app Modbus controlla ora la ricarica. Interrompilo con l’azione «Ferma ordine di ricarica» o nella pagina Ordini di ricarica dell’app, oppure scollega l’auto. Appena la wallbox conferma la pausa, puoi di nuovo modificare la corrente o riprendere qui."
     },
     "energy_goal_state_invalid": {
       "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."
@@ -907,6 +954,63 @@
     },
     "plug_charge_not_supported": {
       "message": "L’app o il servizio Modbus collegato non supporta Plug & Charge virtuale. Aggiornalo a una versione compatibile prima di attivarlo."
+    },
+    "guest_vehicle_target_active": {
+      "message": "Obiettivo batteria del veicolo attivo; nessun ordine ospite creato."
+    },
+    "invalid_boost_duration": {
+      "message": "Inserire un numero intero da 1 a 120 minuti."
+    },
+    "invalid_job_request": {
+      "message": "L’app non ha accettato questi valori. Controlla orario, corrente ed energia."
+    },
+    "job_boost_unavailable": {
+      "message": "Il boost richiede un ordine attivo prima del suo inizio previsto e un consenso attuale."
+    },
+    "job_changed": {
+      "message": "Nel frattempo lo stato è cambiato. Riprova."
+    },
+    "job_clear_requires_pause": {
+      "message": "La cancellazione richiede una pausa confermata o il veicolo scollegato."
+    },
+    "job_current_exceeds_cap": {
+      "message": "La corrente supera il limite del servizio."
+    },
+    "job_exists": {
+      "message": "Un altro ordine è ancora in corso. Fermarlo prima."
+    },
+    "job_not_permitted": {
+      "message": "Collegamento o consenso modificati; nessun ordine creato."
+    },
+    "job_preview_expired": {
+      "message": "Nel frattempo lo stato è cambiato. Riprova."
+    },
+    "job_service_starting": {
+      "message": "Il servizio si sta ancora avviando. Riprova tra poco."
+    },
+    "job_stop_first": {
+      "message": "Fermare prima l’ordine in corso."
+    },
+    "job_storage_unavailable": {
+      "message": "Memoria non disponibile; nessun avvio automatico."
+    },
+    "service_order_failed": {
+      "message": "L’app non lo ha eseguito. Verifica che sia raggiungibile e aggiornata e che orari e valori siano validi."
+    },
+    "app_required": {
+      "message": "Questa azione richiede l’app Modbus; questa wallbox è collegata direttamente."
+    },
+    "wallbox_target_required": {
+      "message": "Sono configurate più wallbox; indica la wallbox interessata."
+    },
+    "job_stop_unconfirmed": {
+      "message": "L’arresto non è ancora confermato. Riprova tra poco."
+    },
+    "job_window_invalid": {
+      "message": "La fine deve essere dopo l’inizio ed entro sette giorni, e l’inizio non deve essere nel passato."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "La riserva immediata non deve superare l’energia dell’ordine."
     }
   },
   "issues": {
@@ -968,7 +1072,11 @@
           "wallbox_advanced": "Misure e tempi di attesa",
           "back": "Indietro senza salvare"
         },
-        "description": "Imposta la corrente massima richiedibile da Home Assistant e la frequenza di lettura dello stato. Con l’app Modbus, autorizzazione alla scrittura e intervalli del bus si impostano nella sua scheda Configurazione. Modifica USB/LAN tramite Riconfigura per le connessioni dirette, oppure nell’app se gestisce la connessione."
+        "description": "Imposta la corrente massima che Home Assistant può richiedere, la frequenza di lettura dello stato e il permesso di scrittura. Modifica USB/LAN tramite Riconfigura."
+      },
+      "wallbox_service": {
+        "title": "Impostazioni della wallbox nell’app",
+        "description": "Questa wallbox passa dall’app Modbus. Le sue impostazioni si trovano quindi lì e valgono anche per Home Assistant.\n\nLimite di corrente: {current_cap} A\nTempo minimo tra i cambi di stato: {state_change_interval} s\nAttesa aggiuntiva prima dei cambi di fase: {phase_switch_grace} s\n\nModifica questi valori, gli intervalli di lettura e la connessione nell’app, in Apri interfaccia utente web. Il permesso di scrittura si trova nella scheda Configurazione dell’app."
       },
       "wallbox_basic": {
         "title": "Limite di corrente e lettura",
@@ -979,10 +1087,10 @@
         },
         "data_description": {
           "control_mode": "Entrambe le modalità inviano richieste di lettura e richiedono l'accesso esclusivo al bus. Sola lettura non scrive registri. Master Modbus invia anche l'heartbeat e abilita le entità di controllo. Non condividere questo bus con un altro master.",
-          "current_limit": "Limite superiore del controllo della corrente, in ampere per fase. Non è un obiettivo percentuale né un comando di pausa. Si applicano anche i limiti della wallbox e, se usata, dell’app.",
+          "current_limit": "Limite superiore del controllo della corrente, in ampere per fase. Non è un obiettivo percentuale né un comando di pausa. Si applica anche il limite della wallbox.",
           "scan_interval_seconds": "Frequenza di lettura dello stato di ricarica, degli errori e dei controlli. L'heartbeat funziona indipendentemente."
         },
-        "description": "Il limite di corrente si applica alle richieste HA; restano validi i limiti della wallbox e del servizio. Con l’app, l’intervallo riguarda solo le richieste HA al servizio."
+        "description": "Il limite di corrente delimita ciò che si può richiedere qui; resta valido il limite della wallbox."
       },
       "wallbox_advanced": {
         "title": "Misure e tempi di attesa",
@@ -1567,6 +1675,102 @@
         "profile": {
           "name": "Profilo della cronologia",
           "description": "Mantieni tutta la cronologia, riduci i dettagli oppure mantieni solo le statistiche di energia e potenza."
+        }
+      }
+    },
+    "start_charging_job": {
+      "name": "Avvia ordine di ricarica",
+      "description": "Ricarica l’auto collegata in una finestra oraria, a corrente fissa, fino a una quantità di energia. L’ordine termina quando l’auto viene scollegata.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        },
+        "current": {
+          "name": "Corrente di ricarica",
+          "description": "Corrente in ampere per fase, al massimo il limite dell’app."
+        },
+        "energy": {
+          "name": "Energia",
+          "description": "La ricarica termina quando è stata fornita questa energia, in kWh."
+        },
+        "start": {
+          "name": "Inizio",
+          "description": "Quando può iniziare la ricarica. Lascia vuoto per iniziare subito."
+        },
+        "finish": {
+          "name": "Fine",
+          "description": "Quando termina al più tardi la ricarica, entro sette giorni."
+        },
+        "reserve": {
+          "name": "Riserva immediata",
+          "description": "Facoltativo: questa energia in kWh viene caricata subito, prima della finestra."
+        }
+      }
+    },
+    "start_guest_charging": {
+      "name": "Avvia ricarica ospite",
+      "description": "Ricarica l’auto di un ospite da subito, per tempo ed energia limitati. Non vengono usati dati del veicolo né obiettivi salvati.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        },
+        "current": {
+          "name": "Corrente di ricarica",
+          "description": "Corrente in ampere per fase, al massimo il limite dell’app."
+        },
+        "energy": {
+          "name": "Energia",
+          "description": "La ricarica termina quando è stata fornita questa energia, in kWh."
+        },
+        "duration": {
+          "name": "Durata",
+          "description": "Per quanto tempo è consentita la ricarica, in minuti (fino a 24 ore)."
+        }
+      }
+    },
+    "stop_charging_job": {
+      "name": "Ferma ordine di ricarica",
+      "description": "Ferma l’ordine di ricarica o la ricarica ospite in corso e mette in pausa la ricarica. L’ordine non riprende; un piano di partenza in scadenza può ricaricare di nuovo.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        }
+      }
+    },
+    "clear_charging_job": {
+      "name": "Cancella ordine di ricarica",
+      "description": "Rimuove un ordine di ricarica terminato o fermato, per poterne avviare uno nuovo.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        }
+      }
+    },
+    "start_boost": {
+      "name": "Avvia boost",
+      "description": "Ricarica subito anche se l’ordine inizia più tardi, poi torna al piano.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        },
+        "duration": {
+          "name": "Durata",
+          "description": "Per quanto tempo ricaricare in anticipo, in minuti (fino a 120)."
+        }
+      }
+    },
+    "cancel_boost": {
+      "name": "Annulla boost",
+      "description": "Termina la ricarica anticipata; l’ordine prosegue come previsto.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
         }
       }
     }

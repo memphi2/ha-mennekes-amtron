@@ -51,6 +51,8 @@
   // A known server key names the cause; anything else stays the generic text.
   const failure = err => { const key = err?.message === "options_save_uncertain" ? "blocked" : err?.message; return labels[key] ? text(key) : text("error"); };
   document.querySelectorAll("[data-text]").forEach(node => { node.textContent = text(node.dataset.text); });
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   const el = id => document.getElementById(id);
   let state = null, pending = null, busy = false, blocked = false;
   function buttons() { names.forEach(key=>{el(key).disabled=busy||blocked;}); el("runtime_check").disabled=busy||blocked; el("runtime_reload").disabled=busy; el("runtime_save").disabled=busy||blocked||!pending; }

@@ -94,6 +94,8 @@ class ChargeJobController:
         self._durable: dict[str, Any] | None = None
         self._lock = asyncio.Lock()
         self._closing = False
+        # A stop that was asked for but has not finished yet; see stop().
+        self._stop_unconfirmed = False
         # A finished order whose pause the wallbox confirmed hands control
         # back; the pause stays as ordinary charging intent.
         self._settled = False
@@ -155,7 +157,7 @@ class ChargeJobController:
         ``gate=False`` leaves out a release that only Plug & Charge keeps
         closed: the order waits for that grant, which may then open it.
         """
-        if not self.ready or self.storage_error or self._closing:
+        if not self.ready or self.storage_error or self._closing or self._stop_unconfirmed:
             return True
         job = self.job
         if job is None or job.scope_ended or self._settled:
@@ -178,6 +180,9 @@ class ChargeJobController:
         """
         if not self.ready or self.storage_error or self._closing:
             return False if enabling else None
+        if enabling and self._stop_unconfirmed:
+            # Fence an in-flight start before the stop obtains the owner lock.
+            return False
         if not self.holding:
             return None
         job = self.job
@@ -254,6 +259,8 @@ class ChargeJobController:
         sample = self.inputs()
         if not self.ready or self._closing or self.storage_error:
             raise JobRequestError("job_storage_unavailable")
+        if self._stop_unconfirmed:
+            raise JobRequestError("job_stop_unconfirmed")
         if self.holding:
             raise JobRequestError("job_exists")
         if (
@@ -300,14 +307,24 @@ class ChargeJobController:
             return self.snapshot()
 
     async def stop(self, *, revision: object = None) -> dict[str, Any]:
+        if revision is not None:
+            self._check_revision(revision)
+        # The stop counts from now on, not from when it obtains the lock. A
+        # request cut off while it waits must not withdraw it; an explicit
+        # clear then removes this fence, but only after its pause checks.
+        self._stop_unconfirmed = True
         async with self._lock:
-            if revision is not None:
-                self._check_revision(revision)
-            if self.job is not None:
-                self.job.stop()
-                self._changed()
-            await self._tick_locked()
-            return self.snapshot()
+            try:
+                if self.job is not None:
+                    self.job.stop()
+                    self._changed()
+                await self._tick_locked()
+            finally:
+                # The stopped job now holds the stop itself. Whatever the
+                # tick did, this fence must not outlive it and block every
+                # later start without a job to show for it.
+                self._stop_unconfirmed = False
+        return self.snapshot()
 
     async def clear(self, *, revision: object) -> dict[str, Any]:
         async with self._lock:
@@ -334,12 +351,13 @@ class ChargeJobController:
             self._settled = False
             self.storage_error = False
             self.action_error = None
+            self._stop_unconfirmed = False
             self._changed()
             return self.snapshot()
 
     def _clear_needs_pause(self) -> bool:
-        """Only an order that still holds the car needs its pause first."""
-        return self.holding
+        """An order that still holds the car, or a stop still in flight, needs its pause first."""
+        return self._stop_unconfirmed or self.holding
 
     async def _save(self) -> None:
         job = self.job
@@ -454,4 +472,5 @@ class ChargeJobController:
             "boost_available": self._can_boost(sample),
             "vehicle_target_active": sample.vehicle_target_active,
             "read_only": sample.read_only,
+            "manual_stop_pending": self._stop_unconfirmed,
         }

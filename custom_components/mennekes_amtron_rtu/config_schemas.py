@@ -226,7 +226,6 @@ def options_schema(
     current: dict[str, Any],
     *,
     max_current: float,
-    service_mode: bool = False,
 ) -> probatio.Schema:
     """Basic wallbox settings; optional features have their own sections."""
     fields: dict[Any, Any] = {
@@ -249,22 +248,21 @@ def options_schema(
             )
         ),
     }
-    if not service_mode:
-        fields[
-            probatio.Required(
+    fields[
+        probatio.Required(
+            CONF_CONTROL_MODE,
+            default=current.get(
                 CONF_CONTROL_MODE,
-                default=current.get(
-                    CONF_CONTROL_MODE,
-                    DEFAULT_CONTROL_MODE,
-                ),
-            )
-        ] = SelectSelector(
-            SelectSelectorConfig(
-                options=list(CONTROL_MODES),
-                translation_key="control_mode",
-                mode=SelectSelectorMode.LIST,
-            )
+                DEFAULT_CONTROL_MODE,
+            ),
         )
+    ] = SelectSelector(
+        SelectSelectorConfig(
+            options=list(CONTROL_MODES),
+            translation_key="control_mode",
+            mode=SelectSelectorMode.LIST,
+        )
+    )
     return probatio.Schema(fields)
 
 

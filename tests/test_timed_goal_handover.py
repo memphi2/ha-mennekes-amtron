@@ -119,13 +119,13 @@ def test_the_trip_and_car_are_handed_over_once_and_the_service_state_is_shown(mo
 
 def test_an_unconfirmed_car_is_handed_over_without_a_plug_in(monkeypatch):
     async def run():
-        binding = SimpleNamespace(resting=True, detected=False)
+        binding = SimpleNamespace(resting=True)
         observer, service, _hass = handover(monkeypatch, binding=binding)
         await observer._evaluate()
-        assert (service.inputs[-1].scope, service.inputs[-1].detected) == (None, False)
-        binding.resting, binding.detected = False, True
+        assert service.inputs[-1].scope is None
+        binding.resting = False
         await observer._evaluate()
-        assert (service.inputs[-1].scope, service.inputs[-1].detected) == (SCOPE, True)
+        assert service.inputs[-1].scope == SCOPE
         # Without a selected car there is nothing to hand over.
         observer._runtime.vehicle_soc = None
         await observer._evaluate()

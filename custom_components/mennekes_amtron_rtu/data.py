@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from .device.soc_goal_controller import SocGoalController
     from .plug_charge import PlugChargeObserver
     from .recovery import HeartbeatRecovery
+    from .service_orders import ServiceOrders
     from .session_observer import SessionObserver
     from .timed_goal_observer import TimedGoalObserver
     from .vehicle_binding import VehicleBinding
@@ -57,6 +58,8 @@ class MennekesAmtronRuntimeData:
     vehicle_profile_id: str | None = None
     vehicle_switching: bool = False
     heartbeat: HeartbeatTask | None = None
+    # Charging jobs of the app; None with a direct connection.
+    orders: ServiceOrders | None = None
     recovery: HeartbeatRecovery | None = None
     goal: EnergyGoalController | None = None
     soc_goal: SocGoalController | None = None

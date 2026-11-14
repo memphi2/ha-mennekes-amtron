@@ -61,8 +61,15 @@ def create_job_app(service: JobModbusService) -> web.Application:
                 raise web.HTTPUnsupportedMediaType
             if slots.locked():
                 raise web.HTTPServiceUnavailable
+            payload = await request.json()
+            if isinstance(payload, dict) and "expected_serial_number" in payload:
+                # Home Assistant names the wallbox it is bound to. An app that
+                # now drives another one refuses before any order changes.
+                payload = dict(payload)
+                if payload.pop("expected_serial_number") != service.identity.serial_number:
+                    raise JobRequestError("device_identity_changed")
             async with slots:
-                result = await job_operation(controller, await request.json())
+                result = await job_operation(controller, payload)
             return web.json_response(result, headers={"Cache-Control": "no-store"})
         except JobRequestError as err:
             return web.json_response({"error": str(err)}, status=409)

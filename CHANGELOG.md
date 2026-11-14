@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.9.0b4 — 2026-11-14
+
+- **The registers are a page below Overview again,** with the complete table,
+  instead of a card of the overview.
+- **Pages carry their styles inside** and are styled from the first paint, so
+  a change of page cannot show an unformatted page for a moment.
+- **A page appears once its texts are in your language,** so the English
+  fallback is not visible for a moment after a click.
+- **With the app, wallbox settings live in one place.** Home Assistant no
+  longer offers its own current cap and polling interval for an app
+  connection; **Configure → Wallbox** shows the app's current cap and waits,
+  and they are changed in the app.
+- **The app's orders can be used from Home Assistant.** New actions start,
+  stop and clear a charging job, start guest charging and start and end a
+  boost, in one step and without a device ID when there is one wallbox. The
+  new sensor **Charging job** shows the state.
+  `docs/app-from-home-assistant.md` has a ready dashboard view with Mushroom
+  cards.
+- A stop of a charging job counts from the moment it is asked for, also while
+  the app is still writing a start, and a request that was cut off does not
+  withdraw it.
+- Orders from Home Assistant reach only the wallbox the entry is bound to: they
+  are sent only while the app answers for it, and the app checks the serial
+  number again before it changes an order.
+- **Weekly plans are removed.** The app has no Weekly plans page and no weekly
+  API any more, and **Charging control**, **Charging wait reason** and **Next
+  charging step** lose their weekly states. Recurring departures come from a
+  calendar: the calendar blueprint sets **Next departure**.
+
 ## 0.9.0b3 — 2026-11-14
 
 - **The app's web pages look like Home Assistant and use the whole width.**

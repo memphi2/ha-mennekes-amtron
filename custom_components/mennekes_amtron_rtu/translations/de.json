@@ -499,7 +499,6 @@
         "state": {
           "unavailable": "Wallbox nicht erreichbar",
           "guest_order": "Gastauftrag",
-          "weekly_plan": "Wochenplan",
           "charging_job": "Ladeauftrag",
           "departure_plan": "Abfahrtsplanung",
           "direct": "Direkte Steuerung"
@@ -541,7 +540,6 @@
           "meter_unavailable": "Wartet auf den Energiezähler",
           "job_suspended": "Auftrag wartet auf den Nachweis desselben Steckvorgangs",
           "job_ended": "Auftrag beendet, pausiert bis zum Abstecken",
-          "until_weekly_window": "Wartet auf das Fenster des Wochenplans",
           "vehicle_unconfirmed": "Fahrzeug nicht bestätigt",
           "until_planned_start": "Pausiert bis zum geplanten Start",
           "estimated_target_reached": "Bis zum errechneten Ziel geladen",
@@ -562,7 +560,6 @@
           "queued_command": "Vorgemerkte Änderung wird ausgeführt",
           "job_start": "Auftrag startet",
           "job_end": "Auftrag endet",
-          "weekly_window": "Fenster des Wochenplans öffnet",
           "plan_start": "Geplantes Laden startet",
           "target_reached": "Ziel voraussichtlich erreicht",
           "departure": "Abfahrt"
@@ -570,6 +567,56 @@
         "state_attributes": {
           "at": {
             "name": "Zeitpunkt"
+          }
+        }
+      },
+      "charging_job": {
+        "name": "Ladeauftrag",
+        "state": {
+          "none": "Kein Auftrag",
+          "scheduled": "Wartet auf das Zeitfenster",
+          "charging": "Laden angefordert",
+          "waiting_meter": "Wartet auf gültigen Zählerstand",
+          "suspended": "Unterbrochen; prüft, ob derselbe Steckvorgang weiterläuft",
+          "reached": "Energieobergrenze erreicht",
+          "finished": "Zeitfenster beendet",
+          "stopped": "Vom Benutzer gestoppt",
+          "interrupted": "Unterbrochen; kein automatischer Neustart"
+        },
+        "state_attributes": {
+          "kind": {
+            "name": "Art",
+            "state": {
+              "scheduled": "Ladeauftrag",
+              "guest": "Gastladen"
+            }
+          },
+          "start": {
+            "name": "Start"
+          },
+          "finish": {
+            "name": "Ende"
+          },
+          "current": {
+            "name": "Strom"
+          },
+          "energy": {
+            "name": "Energie"
+          },
+          "delivered": {
+            "name": "Geladen"
+          },
+          "reserve": {
+            "name": "Sofortreserve"
+          },
+          "reason": {
+            "name": "Grund"
+          },
+          "boost_until": {
+            "name": "Boost bis"
+          },
+          "boost_available": {
+            "name": "Boost möglich"
           }
         }
       }
@@ -831,7 +878,7 @@
       "message": "Ein Ladeziel erfordert eine Pause. Prüfe seinen Status. Nach Erreichen des Ziels oder einem Zählerreset kannst du ein neues Ziel setzen oder es mit 0 deaktivieren, bevor du weiterlädst. Eine Zieländerung startet das Laden nicht."
     },
     "service_job_active": {
-      "message": "Ein Ladeauftrag der Modbus-App steuert gerade das Laden. Stoppe ihn auf der Seite Ladeaufträge der App oder stecke das Auto ab. Sobald die Wallbox die Pause bestätigt, kannst du hier wieder den Strom ändern oder weiterladen."
+      "message": "Ein Ladeauftrag der Modbus-App steuert gerade das Laden. Stoppe ihn mit der Aktion „Ladeauftrag stoppen“ oder auf der Seite Ladeaufträge der App, oder stecke das Auto ab. Sobald die Wallbox die Pause bestätigt, kannst du hier wieder den Strom ändern oder weiterladen."
     },
     "energy_goal_state_invalid": {
       "message": "Das gespeicherte Ladeziel konnte nicht wiederhergestellt werden. Prüfe das Protokoll, bevor du das Laden erneut freigibst."
@@ -907,6 +954,63 @@
     },
     "plug_charge_not_supported": {
       "message": "Die verbundene Modbus-App oder der Dienst unterstützt virtuelles Plug & Charge nicht. Aktualisiere zuerst auf eine kompatible Version."
+    },
+    "guest_vehicle_target_active": {
+      "message": "Fahrzeug-Batterieziel aktiv; kein Gastauftrag angelegt."
+    },
+    "invalid_boost_duration": {
+      "message": "Eine ganze Zahl von 1 bis 120 Minuten eingeben."
+    },
+    "invalid_job_request": {
+      "message": "Die App hat diese Werte nicht angenommen. Zeit, Strom und Energie prüfen."
+    },
+    "job_boost_unavailable": {
+      "message": "Boost erfordert einen aktiven Auftrag vor dessen geplantem Start und eine aktuelle Freigabe."
+    },
+    "job_changed": {
+      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
+    },
+    "job_clear_requires_pause": {
+      "message": "Löschen erfordert eine bestätigte Pause oder abgezogenes Fahrzeug."
+    },
+    "job_current_exceeds_cap": {
+      "message": "Strom überschreitet die Servicegrenze."
+    },
+    "job_exists": {
+      "message": "Ein anderer Auftrag läuft noch. Zuerst diesen stoppen."
+    },
+    "job_not_permitted": {
+      "message": "Anschluss oder Freigabe geändert; kein Auftrag angelegt."
+    },
+    "job_preview_expired": {
+      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
+    },
+    "job_service_starting": {
+      "message": "Der Service startet noch. Gleich noch einmal versuchen."
+    },
+    "job_stop_first": {
+      "message": "Zuerst den laufenden Auftrag stoppen."
+    },
+    "job_storage_unavailable": {
+      "message": "Speicher nicht verfügbar; kein automatischer Start."
+    },
+    "service_order_failed": {
+      "message": "Die App hat das nicht ausgeführt. Prüfe, ob sie erreichbar und aktuell ist und ob Zeiten und Werte gültig sind."
+    },
+    "app_required": {
+      "message": "Diese Aktion braucht die Modbus-App; diese Wallbox ist direkt verbunden."
+    },
+    "wallbox_target_required": {
+      "message": "Es sind mehrere Wallboxen eingerichtet; gib die Wallbox an, für die das gilt."
+    },
+    "job_stop_unconfirmed": {
+      "message": "Der Stopp ist noch nicht bestätigt. Gleich noch einmal versuchen."
+    },
+    "job_window_invalid": {
+      "message": "Das Ende muss nach dem Start und innerhalb von sieben Tagen liegen, und der Start darf nicht in der Vergangenheit liegen."
+    },
+    "job_reserve_exceeds_energy": {
+      "message": "Die Sofortreserve darf die Energie des Auftrags nicht überschreiten."
     }
   },
   "issues": {
@@ -968,7 +1072,11 @@
           "wallbox_advanced": "Messwerte und Wartezeiten",
           "back": "Zurück ohne Speichern"
         },
-        "description": "Lege fest, welchen Strom Home Assistant höchstens anfordern darf und wie oft der Status gelesen wird. Bei Nutzung der Modbus-App gehören Schreibfreigabe und Bus-Zeitabstände in deren Reiter Konfiguration. USB/LAN änderst du bei Direktverbindungen über Neu konfigurieren, bei App-Verbindungen in der App."
+        "description": "Lege fest, welchen Strom Home Assistant höchstens anfordern darf, wie oft der Status gelesen wird und ob geschrieben werden darf. USB/LAN änderst du über Neu konfigurieren."
+      },
+      "wallbox_service": {
+        "title": "Wallbox-Einstellungen der App",
+        "description": "Diese Wallbox läuft über die Modbus-App. Ihre Einstellungen liegen deshalb dort und gelten auch für Home Assistant.\n\nStromgrenze: {current_cap} A\nMindestabstand zwischen Zustandswechseln: {state_change_interval} s\nZusätzliche Wartezeit vor Phasenwechseln: {phase_switch_grace} s\n\nDiese Werte, die Abfrageintervalle und die Verbindung änderst du in der App unter Benutzeroberfläche öffnen. Die Schreibfreigabe steht im Reiter Konfiguration der App."
       },
       "wallbox_basic": {
         "title": "Stromgrenze und Abfrage",
@@ -979,10 +1087,10 @@
         },
         "data_description": {
           "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
-          "current_limit": "Obergrenze für den Ladestrom-Regler, in Ampere pro Phase. Dies ist weder ein Prozent-Ladeziel noch ein Pausenbefehl. Die Grenze der Wallbox und gegebenenfalls die der App gelten zusätzlich.",
+          "current_limit": "Obergrenze für den Ladestrom-Regler, in Ampere pro Phase. Dies ist weder ein Prozent-Ladeziel noch ein Pausenbefehl. Die Grenze der Wallbox gilt zusätzlich.",
           "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon."
         },
-        "description": "Die Stromgrenze begrenzt Anforderungen aus HA; die Grenzen von Wallbox und Dienst gelten zusätzlich. Bei App-Verbindungen betrifft das Abfrageintervall nur die Dienstabfragen von HA."
+        "description": "Die Stromgrenze begrenzt, was hier angefordert werden kann; die Grenze der Wallbox gilt zusätzlich."
       },
       "wallbox_advanced": {
         "title": "Messwerte und Wartezeiten",
@@ -1567,6 +1675,102 @@
         "profile": {
           "name": "Historienprofil",
           "description": "Alle Daten, weniger Details oder nur Energie- und Leistungsstatistiken behalten."
+        }
+      }
+    },
+    "start_charging_job": {
+      "name": "Ladeauftrag starten",
+      "description": "Lädt das angesteckte Auto in einem Zeitfenster mit festem Strom bis zu einer Energiemenge. Der Auftrag endet, wenn das Auto abgezogen wird.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        },
+        "current": {
+          "name": "Ladestrom",
+          "description": "Strom in Ampere pro Phase, höchstens die Stromgrenze der App."
+        },
+        "energy": {
+          "name": "Energie",
+          "description": "Das Laden endet, sobald diese Energie in kWh geliefert wurde."
+        },
+        "start": {
+          "name": "Start",
+          "description": "Wann das Laden beginnen darf. Leer lassen, um sofort zu beginnen."
+        },
+        "finish": {
+          "name": "Ende",
+          "description": "Wann das Laden spätestens endet, innerhalb von sieben Tagen."
+        },
+        "reserve": {
+          "name": "Sofortreserve",
+          "description": "Optional: Diese Energie in kWh wird sofort geladen, vor dem Zeitfenster."
+        }
+      }
+    },
+    "start_guest_charging": {
+      "name": "Gastladen starten",
+      "description": "Lädt das Auto eines Gastes ab sofort für begrenzte Zeit und Energie. Es werden weder Fahrzeugdaten noch gespeicherte Ziele verwendet.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        },
+        "current": {
+          "name": "Ladestrom",
+          "description": "Strom in Ampere pro Phase, höchstens die Stromgrenze der App."
+        },
+        "energy": {
+          "name": "Energie",
+          "description": "Das Laden endet, sobald diese Energie in kWh geliefert wurde."
+        },
+        "duration": {
+          "name": "Dauer",
+          "description": "Wie lange geladen werden darf, in Minuten (bis 24 Stunden)."
+        }
+      }
+    },
+    "stop_charging_job": {
+      "name": "Ladeauftrag stoppen",
+      "description": "Stoppt den laufenden Ladeauftrag oder das Gastladen und pausiert das Laden. Der Auftrag läuft nicht weiter; ein fälliger Abfahrtsplan kann wieder laden.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        }
+      }
+    },
+    "clear_charging_job": {
+      "name": "Ladeauftrag löschen",
+      "description": "Entfernt einen beendeten oder gestoppten Ladeauftrag, damit ein neuer gestartet werden kann.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        }
+      }
+    },
+    "start_boost": {
+      "name": "Boost starten",
+      "description": "Lädt sofort, obwohl der Ladeauftrag erst später beginnt, und kehrt danach zum Plan zurück.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        },
+        "duration": {
+          "name": "Dauer",
+          "description": "Wie lange vorab geladen wird, in Minuten (bis 120)."
+        }
+      }
+    },
+    "cancel_boost": {
+      "name": "Boost beenden",
+      "description": "Beendet das vorzeitige Laden; der Ladeauftrag läuft wie geplant weiter.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
         }
       }
     }

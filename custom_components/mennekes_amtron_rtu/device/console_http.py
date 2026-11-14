@@ -18,11 +18,10 @@ CONSOLE_ASSETS = {
     "/app_guest.js": ("app_guest.js", "text/javascript"),
     "/jobs": ("app_jobs.html", "text/html"),
     "/app_jobs.js": ("app_jobs.js", "text/javascript"),
+    "/registers": ("app_registers.html", "text/html"),
     "/runtime": ("app_runtime.html", "text/html"),
     "/app_runtime.js": ("app_runtime.js", "text/javascript"),
     "/app_registers.js": ("app_registers.js", "text/javascript"),
-    "/weekly": ("app_weekly.html", "text/html"),
-    "/app_weekly.js": ("app_weekly.js", "text/javascript"),
 }
 
 

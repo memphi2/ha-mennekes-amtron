@@ -233,6 +233,8 @@ const messages = {
 const language = messages[document.documentElement.lang] ? document.documentElement.lang : "en";
 const text = (key) => messages[language][key] || messages.en[key] || messages.en.supervisor_unavailable;
 document.querySelectorAll("[data-i18n]").forEach((element) => { element.textContent = text(element.dataset.i18n); });
+// The page shows once its texts are in the page language.
+document.documentElement.classList?.add("ready");
 const el = (id) => document.getElementById(id);
 let revision = null;
 let csrf = null;

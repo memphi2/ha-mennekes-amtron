@@ -126,7 +126,7 @@ Choose one of five independent sections:
 
 | Section | What you configure |
 |---|---|
-| **Wallbox** | Control mode, polling, current cap and transition timing, as applicable to the connection |
+| **Wallbox** | Direct connection: control mode, polling, current cap and transition timing. With the app: shows the app's current cap and waits |
 | **Vehicle** | Vehicle sources, optional profiles/selection, Virtual Plug & Charge and the percentage target and charge limit |
 | **Next departure** | Optional planning for the next trip, battery capacity and the departure sources you want |
 | **Charging costs** | A fixed price or price entity; German network tariffs when applicable |
@@ -149,12 +149,12 @@ vehicle integrations. Calendar and manual departure inputs remain available.
 | USB adapter, or LAN protocol/host/TCP port, and wallbox address | Integration entry: **Reconfigure** | App: **Open Web UI** |
 | Baud rate and frame | USB: **Reconfigure**; LAN: adapter interface or optional [adapter setup](lan-adapters.md) | USB: app **Open Web UI**; LAN: adapter interface or optional [adapter setup](lan-adapters.md#service-app) |
 | Status and measurement polling | Integration options | App **Open Web UI → Runtime** (no restart) or app configuration |
-| How often HA fetches service status | Not applicable | Integration options: **Status polling interval** |
-| Additional current cap for HA commands | Integration options: **Charging current cap** | Same HA option; the service's current cap also applies |
+| Current cap for commands | Integration options: **Charging current cap** | App **Runtime** page or configuration; HA adds no cap of its own |
 | Minimum time between state changes | Integration options, in seconds | App **Runtime** page (no restart) or configuration, in seconds |
 | Extra wait before phase changes | Integration options, in seconds | App **Runtime** page (no restart) or configuration, in seconds |
 
-The app keeps connection settings under **Open Web UI → Connection**, live
+With the app, **Configure → Wallbox** in Home Assistant only shows the app's
+current cap and waits; there is nothing to set twice. The app keeps connection settings under **Open Web UI → Connection**, live
 operating settings under **Runtime** and write permission under
 **Configuration**. **Runtime** applies its values without a restart; after a
 change under **Connection** or **Configuration**, restart the app. The web pages need Supervisor 2026.10.4 or newer; the native

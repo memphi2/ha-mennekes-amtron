@@ -9,10 +9,10 @@ pages in a second row.
 
 | Group | Page | What it is for |
 |---|---|---|
-| **Overview** | [Overview](#overview) | What the wallbox and the app are doing right now, and every [register](#registers). Read-only. |
+| **Overview** | [Overview](#overview) | What the wallbox and the app are doing right now. Read-only. |
+| | [Registers](#registers) | Every wallbox register with its raw and decoded value. Read-only. |
 | **Charging** | [Charging jobs](#charging-jobs) | A charging order the app runs on its own, with optional early start and an estimated finish. |
 | | [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
-| | [Weekly plans](#weekly-plans) | Recurring departures for one car, turned into charging jobs for up to seven days. |
 | **Settings** | [Connection](#connection) | USB or LAN connection, optional LAN-adapter setup. |
 | | [Runtime](#runtime-settings) | Polling intervals and control limits, with a preview before saving. |
 | **Log** | [Log](#log) | The Modbus traffic as it happens, for troubleshooting. |
@@ -23,6 +23,8 @@ Italian, and every page has the same navigation bar.
 Everyday charging stays in Home Assistant: the current slider, **Charging
 paused**, targets and departure planning. The app pages add a view of the
 service and orders that keep running while Home Assistant is offline.
+The orders can also be started and stopped from a Home Assistant dashboard or
+automation; see [Use the app from Home Assistant](app-from-home-assistant.md).
 
 ## Overview
 
@@ -30,7 +32,7 @@ The overview opens first. It refreshes every five seconds while the page is
 visible and shows:
 
 - **Charging control**: which of the app's controllers decides right now (a
-  guest order, a charging job, a weekly plan, the departure plan or none), why
+  guest order, a charging job, the departure plan or none), why
   the car does not charge yet, the next step with its time, the target and
   whether Home Assistant confirmed the car. Home Assistant shows the same
   summary as [three sensors](entities.md#charging-control-at-a-glance).
@@ -119,7 +121,7 @@ earlier. It never changes the order.
   planned start, without counting energy twice.
 - While an order waits for its window, the range can come from earlier
   measurements of the same car, current and phases within the last 30 days. The
-  car is the vehicle selected in Home Assistant or the weekly plan's profile.
+  car is the vehicle selected in Home Assistant.
   Guest orders and orders without a selected vehicle learn only for the
   current charge.
 
@@ -215,98 +217,9 @@ Otherwise a guest order behaves like a charging job: it stops at the energy
 amount or the end time, ends when the car is unplugged, and **Clear stopped
 order without resuming** never restarts charging.
 
-## Weekly plans
-
-**Weekly plans** (German: **Wochenpläne**) save a recurring schedule for one
-car: weekdays, departure time, charging window in minutes, current, energy per
-departure and an optional [immediate reserve](#immediate-reserve). Up to 16
-plans are stored, one per vehicle profile.
-
-1. Enter a **vehicle profile reference**, for example `bmw-i4`. It is a label
-   you choose; the app does not recognize the car by it.
-2. Choose the time zone, weekdays and the other values. **Date exceptions**
-   skip a day or move its departure, one line per date: `2026-12-24 = skip` or
-   `2026-12-25 = 09:00`.
-3. Select **Preview changes**, check the listed dates and select **Save this
-   recipe**. Saving alone never charges.
-4. With the car plugged in, select the saved plan, confirm **I have checked that
-   the selected vehicle is connected**, select **Preview activation** and
-   **Confirm activation** within one minute.
-
-The activation creates a charging job for the next departure right away, so an
-immediate reserve charges at once. When that job ends, control returns to Home
-Assistant as for any finished order: PV or other automations may charge until
-the next departure's window opens. Then the app creates the next job, which
-takes over charging, also from a car Home Assistant is charging. It waits while
-the meter is not current, a command is still queued, the release is off or
-another limit requires a stop. Later departures therefore have no separate
-reserve.
-
-Between departures, pausing, switching off the release or locking in Home
-Assistant does not end the plan; it only keeps the next job from starting while
-it lasts. A new order on **Charging jobs** or **Guest charging** ends the plan.
-
-An activation covers only this connection and ends after seven days at the
-latest. Unplugging, an app restart, a wallbox unreadable for more than a minute
-between departures, a stop or clear on **Charging jobs**, editing or removing
-the active plan, **Stop weekly automation** or another limit that stops a
-running job all end it. A running job of the plan continues after an app
-restart only as described under
-[After an app restart](#after-an-app-restart-or-a-connection-loss). Each
-departure date runs at most once, also after an edit or a restart. A local time
-that does not exist on a clock change is shown as invalid instead of being
-moved; for a repeated time, choose the earlier or later occurrence.
-
-### Automatic activation for a confirmed car
-
-If Home Assistant has detected the selected car at the plug-in when you confirm
-the activation, the plan remembers that car. Detection means the car itself
-reported the plug-in, through the detection signals of its
-[vehicle profile](vehicle-setup.md); a profile without detection, or a car that
-is only selected, is never remembered.
-
-From then on the plan activates itself, without a new confirmation, as soon as
-Home Assistant detects the same car at a plug-in:
-
-- after the car is plugged in again
-- after an app restart, or a wallbox that was unreadable for more than a minute;
-  a job of the plan that continues is taken up again
-- after seven days, while the car stays plugged in
-
-The page shows **Activates itself for its confirmed car** for such a plan. A
-plan that activated itself only waits: Home Assistant keeps controlling
-charging, and the job for the next departure is created when its window opens,
-under the same conditions as every later departure. While another order holds
-the wallbox, the plan waits without using up the date. The
-[immediate reserve](#immediate-reserve) therefore charges at once only after an
-activation by hand. The
-[minimum charge level](departure-planning.md#minimum-charge-level) of departure
-planning also charges at once, but only while a departure is set and no order
-of the app holds the wallbox.
-
-A departure whose job ended before its window opened, because the car left and
-came back or the app restarted, is charged at its window all the same. A
-departure whose window had already opened is not repeated.
-
-The plan forgets its car when you
-
-- select **Stop weekly automation**; without an active plan this makes every
-  plan forget its car
-- stop the plan's job on **Charging jobs**, or pause charging, switch off the
-  release or lock the wallbox in Home Assistant while that job runs
-- remove the plan or change its vehicle profile reference
-
-Clearing the plan's ended job only ends the current activation; the car stays
-remembered for the next plug-in. Stopping or clearing another order does not
-concern a plan that waits for its window.
-
-Activate it again by hand to have the car remembered once more. A car has one
-such plan: activating another plan for the same car moves the car to that plan.
-After you edit the active plan, it activates itself again at the next plug-in.
-
 ## Registers
 
-The **Registers** card at the end of the overview lists every register the integration knows, with address, raw
+**Registers**, a page below **Overview**, lists every register the integration knows, with address, raw
 words, decoded value, last successful read and last attempt. The **Quality**
 column describes the reading, not the wallbox:
 
@@ -317,7 +230,7 @@ column describes the reading, not the wallbox:
 | Error | No usable value, or the wallbox is not reachable. |
 | Unknown, unsupported, write-only | Not read yet, not supported by this wallbox's firmware, or not readable. |
 
-Filter, sort and **Freeze display** only affect the browser. The card adds no
+Filter, sort and **Freeze display** only affect the browser. The page adds no
 Modbus traffic and no Recorder history. The serial number is hidden.
 
 ## Runtime settings

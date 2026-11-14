@@ -82,13 +82,14 @@
     supervisor_unavailable:["Home Assistant Supervisor did not answer. Reload this page.", "Home Assistant Supervisor hat nicht geantwortet. Seite neu laden.", "Supervisor n’a pas répondu. Rechargez la page.", "Supervisor heeft niet geantwoord. Herlaad deze pagina.", "Supervisor non ha risposto. Ricaricare la pagina."],
     supervisor_update_required:["Update Home Assistant Supervisor to 2026.10.4 or newer.", "Home Assistant Supervisor auf 2026.10.4 oder neuer aktualisieren.", "Mettez Supervisor à jour vers 2026.10.4 ou ultérieur.", "Werk Supervisor bij naar 2026.10.4 of nieuwer.", "Aggiorna Supervisor alla versione 2026.10.4 o successiva."],
     invalid_request:["The request was rejected. Reload this page and try again.", "Anfrage abgelehnt. Seite neu laden und erneut versuchen.", "Requête refusée. Rechargez la page et réessayez.", "Verzoek geweigerd. Herlaad de pagina en probeer het opnieuw.", "Richiesta rifiutata. Ricaricare la pagina e riprovare."],
+    job_stop_unconfirmed:["The stop is not confirmed yet. Try again shortly.", "Der Stopp ist noch nicht bestätigt. Gleich noch einmal versuchen.", "L’arrêt n’est pas encore confirmé. Réessayez dans un instant.", "De stop is nog niet bevestigd. Probeer het zo opnieuw.", "L’arresto non è ancora confermato. Riprova tra poco."],
     job_service_starting:["The service is still starting. Try again shortly.", "Der Service startet noch. Gleich noch einmal versuchen.", "Le service démarre encore. Réessayez dans un instant.", "De service start nog. Probeer het zo opnieuw.", "Il servizio si sta ancora avviando. Riprova tra poco."],
-    weekly_service_starting:["The service is still starting. Try again shortly.", "Der Service startet noch. Gleich noch einmal versuchen.", "Le service démarre encore. Réessayez dans un instant.", "De service start nog. Probeer het zo opnieuw.", "Il servizio si sta ancora avviando. Riprova tra poco."],
-    weekly_stop_unconfirmed:["The weekly plan's stop is not confirmed yet. Try again shortly.", "Der Stopp des Wochenplans ist noch nicht bestätigt. Gleich noch einmal versuchen.", "L’arrêt du plan hebdomadaire n’est pas encore confirmé. Réessayez dans un instant.", "De stop van het weekplan is nog niet bevestigd. Probeer het zo opnieuw.", "Lo stop del piano settimanale non è ancora confermato. Riprova tra poco."],
     guest_vehicle_target_active:["Vehicle battery target active; no guest order created.", "Fahrzeug-Batterieziel aktiv; kein Gastauftrag angelegt.", "Objectif de batterie du véhicule actif ; aucun ordre invité créé.", "Batterijdoel van het voertuig actief; geen gastopdracht aangemaakt.", "Obiettivo batteria del veicolo attivo; nessun ordine ospite creato."]
   };
   const t = k => words[k]?.[column] || k;
   document.querySelectorAll("[data-text]").forEach(n => { n.textContent = t(n.dataset.text); });
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   const el = id => document.getElementById(id), notice = message => { el("job_notice").textContent = message; };
   const date = value => new Date(value).toLocaleString(locale, {timeZoneName:"short"});
   const local = d => { const p = n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
@@ -146,7 +147,7 @@
     el("job_fields").disabled = busy || !good || !state.available || state.present !== true || !state.permitted || !state.meter_fresh || Boolean(state.job?.holding);
     el("job_current").max=String(state?.max_current_a || 6);
     el("job_stop").disabled=busy || !state?.job?.holding || ended(state.job);
-    el("job_clear").disabled=busy || !state || (!state.job && !state.storage_error);
+    el("job_clear").disabled=busy || !state || (!state.job && !state.storage_error && !state.manual_stop_pending);
     el("job_confirm").disabled=busy || !proposal;
     el("job_boost_preview").disabled=busy || state?.boost_available !== true;
     el("job_boost_minutes").disabled=busy || state?.boost_available !== true;

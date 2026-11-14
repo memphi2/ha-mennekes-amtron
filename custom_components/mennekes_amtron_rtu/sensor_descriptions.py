@@ -25,6 +25,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 
+from .device.charge_job import STATES as JOB_STATES
 from .device.charging_status import CHARGING_STATUS_OPTIONS
 from .device.control import PENDING_ACTIONS
 from .device.decode import RegisterValue
@@ -50,8 +51,16 @@ from .entity_attributes import (
 )
 
 OPERATION_SENSOR_KEYS = frozenset({"operation_controller", "operation_waiting", "operation_next"})
+# What the app is charging for.
+ORDER_SENSOR_KEYS = frozenset({"charging_job"})
 
 CONTROL_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="charging_job",
+        translation_key="charging_job",
+        device_class=SensorDeviceClass.ENUM,
+        options=["none", *JOB_STATES],
+    ),
     SensorEntityDescription(
         key="operation_controller",
         translation_key="operation_controller",

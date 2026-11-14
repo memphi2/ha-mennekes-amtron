@@ -17,7 +17,6 @@ from custom_components.mennekes_amtron_rtu.device.charge_job_controller import (
 )
 from custom_components.mennekes_amtron_rtu.device.charge_job_store import ChargeJobStore
 from custom_components.mennekes_amtron_rtu.device.charge_reserve import ChargeReserve
-from custom_components.mennekes_amtron_rtu.device.weekly_plan import WeeklyPlan
 
 NOW = datetime(2026, 11, 16, 0, tzinfo=UTC)
 SCOPE = "a" * 64
@@ -253,28 +252,3 @@ def test_legacy_job_output_and_storage_shape_are_unchanged(tmp_path):
         assert "reserve" not in h.jobs.job.snapshot()
         assert h.calls == [None]
     asyncio.run(run())
-
-
-@pytest.mark.parametrize("value", [0, 0.1, 5, 20])
-def test_weekly_recipes_carry_exact_reserve_into_each_absolute_order(value):
-    plan = WeeklyPlan.parse({"id": "c" * 32, "vehicle_profile": "fixture", "timezone": "UTC",
-                             "weekdays": list(range(7)), "departure_time": "08:00", "charge_minutes": 120,
-                             "current_a": 12, "energy_kwh": 20, "reserve_kwh": value})
-    canonical = plan.snapshot()
-    assert canonical.get("reserve_kwh", 0) == value
-    assert WeeklyPlan.parse(canonical).snapshot() == canonical
-    first, second, *_ = plan.upcoming(now=NOW)
-    assert first.snapshot().get("reserve_kwh", 0) == value
-    for row in (first, second):
-        proposal = row.job_request(now=NOW, vehicle_profile="fixture")
-        assert proposal.get("reserve_kwh", 0) == value
-        accepted = ChargeJob.create(proposal, binding=SCOPE, total_kwh=100, now=NOW)
-        assert (accepted.reserve.target_kwh if accepted.reserve else 0) == value
-    assert first.identifier != second.identifier
-
-
-def test_weekly_reserve_above_total_ceiling_is_rejected():
-    with pytest.raises(ValueError, match="reserve exceeds"):
-        WeeklyPlan.parse({"id": "c" * 32, "vehicle_profile": "fixture", "timezone": "UTC",
-                          "weekdays": [0], "departure_time": "08:00", "charge_minutes": 120,
-                          "current_a": 12, "energy_kwh": 20, "reserve_kwh": 21})

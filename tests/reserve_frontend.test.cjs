@@ -50,21 +50,9 @@ test("lost reserve create response is never retried",async()=>{
   await h.fire("job_form","submit");await h.fire("job_confirm");
   assert.deepEqual(h.posts().map(p=>p.body.action),["preview","create"]);assert.equal(h.state().job.reserve_kwh,3);
 });
-for(const page of ["jobs","weekly"])for(const value of ["-1","11","0.11","NaN"]){
-  test(`${page}: invalid reserve ${value} never sends a POST`,async()=>{
-    const h=harness(page);await flush();h.el(page==="jobs"?"job_reserve":"reserve_kwh").value=value;
-    h.el("vehicle_profile").value="fixture";await h.fire(page==="jobs"?"job_form":"weekly_form","submit");assert.equal(h.posts().length,0);
+for(const value of ["-1","11","0.11","NaN"]){
+  test(`jobs: invalid reserve ${value} never sends a POST`,async()=>{
+    const h=harness("jobs");await flush();h.el("job_reserve").value=value;
+    await h.fire("job_form","submit");assert.equal(h.posts().length,0);
   });
 }
-test("weekly reserve persists from recipe preview to signed activation proposal",async()=>{
-  const h=harness("weekly");await flush();h.el("vehicle_profile").value="fixture";h.el("reserve_kwh").value="4";
-  await h.fire("weekly_form","submit");assert.equal(h.posts()[0].body.plan.reserve_kwh,4);assert.match(h.el("plan_summary").textContent,/Sofortreserve.*4/);
-  await h.fire("save_plan");assert.equal(h.posts()[1].body.plan.reserve_kwh,4);assert.equal(Number(h.el("reserve_kwh").value),4);
-  h.el("confirm_vehicle").checked=true;await h.fire("confirm_vehicle","change");await h.fire("preview_activation");
-  assert.match(h.el("activation_summary").textContent,/Sofortreserve.*4/);await h.fire("activate");
-  assert.equal(h.posts().at(-1).body.proposal.request.reserve_kwh,4);assert.equal(h.posts().at(-1).body.proposal.confirmation,"frozen");
-});
-test("loading an old saved recipe fills zero and keeps it absent on the wire",async()=>{
-  const h=harness("weekly",{legacy:true});await flush();h.el("plan_select").value="a".repeat(32);await h.fire("plan_select","change");
-  assert.equal(Number(h.el("reserve_kwh").value),0);await h.fire("weekly_form","submit");assert.equal(h.posts()[0].body.plan.reserve_kwh,undefined);
-});

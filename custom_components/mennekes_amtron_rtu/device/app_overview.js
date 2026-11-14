@@ -40,7 +40,6 @@
     op_hint: ["A summary of the service's own controllers. It explains, it does not command.", "Eine Zusammenfassung der Steuerungen des Services. Sie erklärt, sie steuert nicht.", "Un résumé des pilotages du service. Il explique, il ne commande pas.", "Een samenvatting van de sturingen van de service. Ze legt uit, ze stuurt niet.", "Un riepilogo dei controlli del servizio. Spiega, non comanda."],
     op_unavailable: ["Wallbox unavailable", "Wallbox nicht erreichbar", "Borne injoignable", "Wallbox niet bereikbaar", "Wallbox non raggiungibile"],
     op_guest_order: ["Guest order", "Gastauftrag", "Ordre invité", "Gastopdracht", "Ordine ospite"],
-    op_weekly_plan: ["Weekly plan", "Wochenplan", "Plan hebdomadaire", "Weekplan", "Piano settimanale"],
     op_charging_job: ["Charging job", "Ladeauftrag", "Ordre de recharge", "Laadopdracht", "Ordine di ricarica"],
     op_departure_plan: ["Departure planning", "Abfahrtsplanung", "Planification du départ", "Vertrekplanning", "Pianificazione della partenza"],
     op_direct: ["Direct control", "Direkte Steuerung", "Commande directe", "Directe bediening", "Controllo diretto"],
@@ -53,7 +52,6 @@
     wait_meter_unavailable: ["Waiting for the energy meter", "Wartet auf den Energiezähler", "En attente du compteur d’énergie", "Wacht op de energiemeter", "In attesa del contatore di energia"],
     wait_job_suspended: ["Job waits for proof of the same plug-in", "Auftrag wartet auf den Nachweis desselben Steckvorgangs", "L’ordre attend la preuve du même branchement", "Opdracht wacht op bewijs van dezelfde aansluiting", "L’ordine attende la prova dello stesso collegamento"],
     wait_job_ended: ["Job ended, paused until unplugged", "Auftrag beendet, pausiert bis zum Abstecken", "Ordre terminé, en pause jusqu’au débranchement", "Opdracht beëindigd, gepauzeerd tot loskoppelen", "Ordine terminato, in pausa fino allo scollegamento"],
-    wait_until_weekly_window: ["Waiting for the weekly plan's window", "Wartet auf das Fenster des Wochenplans", "En attente de la fenêtre du plan hebdomadaire", "Wacht op het venster van het weekplan", "In attesa della finestra del piano settimanale"],
     wait_vehicle_unconfirmed: ["Car not confirmed", "Fahrzeug nicht bestätigt", "Véhicule non confirmé", "Voertuig niet bevestigd", "Veicolo non confermato"],
     wait_until_planned_start: ["Paused until the planned start", "Pausiert bis zum geplanten Start", "En pause jusqu’au démarrage prévu", "Gepauzeerd tot de geplande start", "In pausa fino all’avvio pianificato"],
     wait_estimated_target_reached: ["Charged to the estimated target", "Bis zum errechneten Ziel geladen", "Chargé jusqu’à l’objectif estimé", "Geladen tot het berekende doel", "Caricato fino all’obiettivo stimato"],
@@ -69,7 +67,6 @@
     step_queued_command: ["Queued change runs", "Vorgemerkte Änderung wird ausgeführt", "La modification en attente s’exécute", "Wijziging in wachtrij wordt uitgevoerd", "La modifica in coda viene eseguita"],
     step_job_start: ["Job starts", "Auftrag startet", "L’ordre démarre", "Opdracht start", "L’ordine inizia"],
     step_job_end: ["Job ends", "Auftrag endet", "L’ordre se termine", "Opdracht eindigt", "L’ordine termina"],
-    step_weekly_window: ["Weekly plan's window opens", "Fenster des Wochenplans öffnet", "La fenêtre du plan hebdomadaire s’ouvre", "Venster van het weekplan opent", "Si apre la finestra del piano settimanale"],
     step_plan_start: ["Planned charge starts", "Geplantes Laden startet", "La recharge planifiée démarre", "Gepland laden start", "Inizia la ricarica pianificata"],
     step_target_reached: ["Target expected", "Ziel voraussichtlich erreicht", "Cible attendue", "Doel verwacht", "Obiettivo previsto"],
     step_departure: ["Departure", "Abfahrt", "Départ", "Vertrek", "Partenza"],
@@ -135,6 +132,8 @@
   };
   const text = key => words[key]?.[column] ?? words.unknown[column];
   document.querySelectorAll("[data-overview]").forEach(node => { node.textContent = text(node.dataset.overview); });
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   const el = id => document.getElementById(id);
   if (!el("overview")) return;
   const number = value => typeof value === "number" && Number.isFinite(value) && value >= 0;
