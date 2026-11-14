@@ -165,8 +165,8 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 
 An app/service restart cancels pending commands; an already applied pause is
 retained. HA Core restarts leave the independent service and its queue running.
-Guest permission is temporary and is not restored after an app restart. Check the
-shared limits and explicitly start the guest again. See [guest charging](user-guide.md#guest-charging).
+Guest permission and shared limits are restored only when the wallbox proves
+the same plug-in. Otherwise charging stops and needs a new guest start. See [guest charging](user-guide.md#guest-charging).
 
 Configure the wallbox's [fallback behavior](safety.md#the-heartbeat-and-what-happens-without-it).
 Include app data in protected backups: saved charging intent, shared limits,
@@ -204,8 +204,9 @@ App and integration versions are independent. When both need updating,
 until it has started, then update the integration and restart Core. Use **Check
 for updates** in the app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
-**Updating the app briefly interrupts its heartbeat** and loses temporary guest
-permission. Check the limits and start the guest explicitly again; see
+**Updating the app briefly interrupts its heartbeat**. Guest permission is restored
+only for the proven same plug-in. If confirmation is required, check the limits
+and start the guest explicitly again; see
 [after an app restart](app-from-home-assistant.md#guest-charging).
 An existing app updates in place with its data intact.
 

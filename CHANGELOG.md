@@ -18,8 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Remove the obsolete guest-order engine, persistence, separate forecast and
   control locks. Guest permission uses ordinary controls and shared limits for
-  the current plug-in, with no separate guest record. An app restart requires
-  checking limits and explicitly starting the guest again.
+  the current plug-in. Minimal restart evidence restores the grant and shared
+  limits only for a proven same plug-in, preserving manual pauses. Missing
+  evidence stops charging and requires a new guest start. Old beta intent files
+  require acknowledgement of a safe reset; no migration is performed.
 - Update vehicle planning from actual metered charging power after two minutes
   at full offered current; a lower vehicle draw corrects the forecast promptly.
 - Rebuild the user-guide navigation, shared-limit explanations, app instructions

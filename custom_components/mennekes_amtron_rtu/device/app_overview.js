@@ -138,6 +138,7 @@
     error_still_active: ["Fault still active", "Fehler weiterhin aktiv", "Défaut toujours actif", "Storing nog actief", "Guasto ancora attivo"],
     user_cancelled: ["Cancelled by user", "Vom Benutzer verworfen", "Annulé par l’utilisateur", "Door gebruiker geannuleerd", "Annullato dall’utente"],
     energy_goal: ["Charge target prevents command", "Ladeziel verhindert Befehl", "Objectif empêchant la commande", "Laaddoel voorkomt opdracht", "Obiettivo impedisce comando"],
+    guest_confirmation: ["Guest start requires confirmation", "Gaststart muss bestätigt werden", "Confirmez le démarrage invité", "Bevestig het starten voor de gast", "Conferma avvio ospite"],
     time_limit: ["Time limit reached", "Zeitgrenze erreicht", "Limite horaire atteinte", "Tijdslimiet bereikt", "Limite orario raggiunto"],
     deadline_expired: ["Deadline expired", "Gültigkeit abgelaufen", "Échéance dépassée", "Deadline verstreken", "Scadenza superata"]
   };

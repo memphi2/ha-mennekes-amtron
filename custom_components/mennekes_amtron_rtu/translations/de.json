@@ -710,7 +710,8 @@
               "user_cancelled": "Vom Benutzer abgebrochen",
               "energy_goal": "Ladestopp durch ein Ladeziel",
               "deadline_expired": "Abfahrtszeit abgelaufen",
-              "time_limit": "Zeitgrenze erreicht"
+              "time_limit": "Zeitgrenze erreicht",
+              "guest_confirmation": "Gaststart muss bestätigt werden"
             }
           }
         }

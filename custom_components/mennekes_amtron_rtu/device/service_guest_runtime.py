@@ -16,6 +16,7 @@ from .client_errors import AmtronBusError
 from .control import AmtronControl
 from .enums import GridPhasesConnected, SwitchedPhases
 from .errors import DeviceError
+from .guest_permission import GuestPermission
 from .service_console_runtime import ConsoleModbusService
 from .session_mark import SessionMark
 from .vehicle import snapshot_vehicle_connected
@@ -48,10 +49,50 @@ class GuestModbusService(ConsoleModbusService):
     _connection_session: dict[str, Any] | None = None
     # Also fences the vehicle planner after a manual guest stop, until unplug.
     _guest_scope: str | None = None
+    _guest_restore_pending = False
+    _guest_ready = False
 
     def _configure_control(self, control: AmtronControl) -> None:
-        control.guest_active = lambda: self._guest_scope is not None
+        self._guest_ready = False
+        self._guest_restore_pending = self.client.write_state.guest_permission is not None
+        control.guest_active = lambda: self.guest_mode
+        control.guest_confirmation_required = lambda: self._guest_restore_pending
         control.time_limit_reached = self._guest_time_reached
+
+    @property
+    def guest_mode(self) -> bool:
+        return self._guest_scope is not None or self._guest_restore_pending
+
+    async def _initialize_dependents(self) -> None:
+        await super()._initialize_dependents()
+        permission = self.client.write_state.guest_permission
+        if permission is None:
+            self._guest_ready = True
+            return
+        sample = self._connection_sample()
+        if sample.present is False:
+            self._clear_guest()
+        elif (sample.present is True and sample.scope is not None
+              and permission.session is not None and sample.session is not None
+              and permission.session.continues(sample.session)
+              and permission.deadline == self.guest_deadline):
+            self._guest_scope = sample.scope
+            self._guest_restore_pending = False
+        # Missing/mismatched evidence remains fenced until an explicit guest
+        # start or confirmed unplug. Normal recovery must not open this gate.
+        await self._persist()
+        self._guest_ready = True
+
+    def _clear_guest(self) -> None:
+        self._guest_scope = None
+        self._guest_restore_pending = False
+        self.client.write_state.guest_permission = None
+
+    async def _persist(self, *, include_session_history: bool = False) -> None:
+        permission = self.client.write_state.guest_permission
+        if permission is not None and not self._guest_restore_pending:
+            self.client.write_state.guest_permission = GuestPermission(permission.session, self.guest_deadline)
+        await super()._persist(include_session_history=include_session_history)
 
     @property
     def guest_deadline(self) -> datetime | None:
@@ -60,11 +101,11 @@ class GuestModbusService(ConsoleModbusService):
 
     def _guest_time_reached(self) -> bool:
         deadline = self.guest_deadline
-        return self._guest_scope is not None and deadline is not None and deadline <= datetime.now(UTC)
+        return self.guest_mode and deadline is not None and deadline <= datetime.now(UTC)
 
     @property
     def guest_active(self) -> bool:
-        return (self._guest_scope is not None and self.control is not None
+        return (self.guest_mode and self.control is not None
                 and (self.control.pause_requested is not True or self.control.is_paused is False))
 
     @property
@@ -96,12 +137,16 @@ class GuestModbusService(ConsoleModbusService):
             if deadline is not None and deadline <= sample.now:
                 raise DeviceError("guest_deadline_expired")
             self._guest_scope = sample.scope
+            self._guest_restore_pending = False
+            self.client.write_state.guest_permission = GuestPermission(sample.session, deadline)
+            # Make the ownership fence durable before any charging write.
+            await self._persist()
             try:
                 await control.async_cancel_timed_current("departure")
                 await control.async_set_charging_release(True)
                 await control.async_resume_charging(current_cap=self.config.current_cap)
             finally:
-                # Only ordinary wallbox intent and existing limits are persisted.
+                # No separate guest order or limits are stored.
                 await self._persist()
             await self.refresh()
             return self._publish()
@@ -109,8 +154,8 @@ class GuestModbusService(ConsoleModbusService):
     async def _guest_tick(self) -> None:
         async with self._command_lock:
             control = self.control
-            if (control is None or self._stopping or not self._is_available()
-                    or not self._guest_time_reached()):
+            if (control is None or not self._guest_ready or self._stopping or not self._is_available()
+                    or not (self._guest_time_reached() or self._guest_restore_pending)):
                 return
             try:
                 await control.async_pause_for_energy_goal()
@@ -226,8 +271,13 @@ class GuestModbusService(ConsoleModbusService):
                 self._connection_session = None
             elif polled:
                 self._note_session()
-            if self._guest_scope is not None and self._connection_sample().scope != self._guest_scope:
+            if self.control is not None and present is False:
+                self._clear_guest()
+            elif self._guest_scope is not None and self._connection_sample().scope != self._guest_scope:
+                # A lasting outage may hide a replug. Keep a stop fence rather
+                # than silently returning the guest to a vehicle planner.
                 self._guest_scope = None
+                self._guest_restore_pending = True
 
 
     def _rate_phases(self) -> int:

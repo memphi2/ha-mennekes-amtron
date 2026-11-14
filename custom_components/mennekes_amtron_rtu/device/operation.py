@@ -126,6 +126,8 @@ def summarize(
         controller, waiting = "unavailable", "wallbox_unavailable"
     elif present is False:
         waiting = "no_vehicle"
+    elif control.get("guest_confirmation_required") is True:
+        waiting = "vehicle_unconfirmed"
     elif control.get("charging_release_requested") is False:
         waiting = "release_off"
     elif gate.get("enabled") is True and not (

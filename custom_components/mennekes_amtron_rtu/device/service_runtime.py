@@ -157,6 +157,7 @@ class ModbusService:
             state.pause_requested = safe.pause_requested
             state.charging_release_requested = safe.charging_release_requested
             state.charging_setpoint = safe.charging_setpoint
+            state.guest_permission = None
             state.energy_goal = safe.energy_goal
             state.soc_goal = safe.soc_goal
             state.session_history = safe.session_history
@@ -212,6 +213,7 @@ class ModbusService:
         self.control = control
         self.goal = goal
         self.soc_goal = soc_goal
+        await self._initialize_dependents()
         goal.observe(self.data)
         soc_goal.retry_stop()
         _LOGGER.info(
@@ -224,6 +226,9 @@ class ModbusService:
             _LOGGER.info("Heartbeat started")
         else:
             _LOGGER.info("Heartbeat disabled in read-only mode")
+
+    async def _initialize_dependents(self) -> None:
+        """Load dependent guards before goal recovery and heartbeat startup."""
 
     def _configure_control(self, control: AmtronControl) -> None:
         """Allow an in-process service owner to install guards before first use."""
@@ -438,6 +443,7 @@ class ModbusService:
                     else self._saved_session_history
                 )
                 state = WriteState(
+                    guest_permission=original.guest_permission,
                     charging_setpoint=original.charging_setpoint,
                     pause_requested=original.pause_requested,
                     charging_release_requested=original.charging_release_requested,
@@ -669,6 +675,7 @@ class ModbusService:
                     state.charging_release_requested = safe.charging_release_requested
                     state.charging_setpoint = safe.charging_setpoint
                     state.plug_charge = safe.plug_charge
+                    state.guest_permission = None
                     self._intent_rejected = False
                     control.startup_hold = False
                 return self.snapshot()

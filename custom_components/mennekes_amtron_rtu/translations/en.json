@@ -710,7 +710,8 @@
               "user_cancelled": "Cancelled by user",
               "energy_goal": "Charge target stop",
               "deadline_expired": "Departure time expired",
-              "time_limit": "Time limit reached"
+              "time_limit": "Time limit reached",
+              "guest_confirmation": "Guest start requires confirmation"
             }
           }
         }

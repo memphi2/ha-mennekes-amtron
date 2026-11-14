@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from ._client_write import WriteRateLimiter
 from .charging_session import SessionHistory
 from .energy_goal import EnergyGoal
+from .guest_permission import GuestPermission
 from .plug_charge import PlugChargeState
 from .registers import CHARGING_CURRENT_EMS, REQUESTED_PHASES
 from .soc_goal import SocGoal
@@ -35,6 +36,7 @@ class WriteState:
     soc_goal_generation: int = 0
     soc_goal: SocGoal = field(default_factory=SocGoal)
     session_history: SessionHistory = field(default_factory=SessionHistory)
+    guest_permission: GuestPermission | None = None
     plug_charge: PlugChargeState = field(default_factory=PlugChargeState)
 
     @classmethod

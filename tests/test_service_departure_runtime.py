@@ -247,10 +247,10 @@ def test_the_jobs_loop_runs_the_plan_beside_the_orders(departure_service, monkey
 def test_initialisation_needs_a_configured_plan(departure_service, monkeypatch):
     async def run():
         async with departure_service() as (s, _transport, _clock):
-            monkeypatch.setattr(departure_runtime.GuestModbusService, "_initialize", AsyncMock())
+            monkeypatch.setattr(departure_runtime.GuestModbusService, "_initialize_dependents", AsyncMock())
             s.departure = None
             with pytest.raises(RuntimeError, match="not configured"):
-                await departure_runtime.DepartureModbusService._initialize(s)
+                await departure_runtime.DepartureModbusService._initialize_dependents(s)
             monkeypatch.undo()
     asyncio.run(run())
 

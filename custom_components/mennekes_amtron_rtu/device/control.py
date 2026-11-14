@@ -194,6 +194,7 @@ class AmtronControl:
         self.goal_controller: EnergyGoalController | None = None
         self.soc_goal_controller: SocGoalController | None = None
         self._plug_charge = PlugChargeController(self)
+        self.guest_confirmation_required: Callable[[], bool] = lambda: False
         self.time_limit_reached: Callable[[], bool] = lambda: False
         self.guest_active: Callable[[], bool] = lambda: False
 
@@ -246,7 +247,7 @@ class AmtronControl:
     @property
     def energy_goal_stop_requested(self) -> bool:
         """Every stop that fences starts: energy, vehicle percentage and guest time."""
-        return self.goal_stop_requested or self.time_limit_reached()
+        return self.goal_stop_requested or self.time_limit_reached() or self.guest_confirmation_required()
 
     @property
     def release_stop_requested(self) -> bool:
@@ -255,9 +256,13 @@ class AmtronControl:
 
     def _stop_reason(self) -> str:
         """Prefer the retained energy/percentage goal when multiple limits apply."""
+        if self.guest_confirmation_required():
+            return "guest_confirmation"
         return "time_limit" if not self.goal_stop_requested and self.time_limit_reached() else "energy_goal"
 
     def stop_error(self) -> DeviceValidationError:
+        if self.guest_confirmation_required():
+            return validation_error("guest_start_not_permitted")
         return validation_error(
             "time_limit_reached" if self._stop_reason() == "time_limit" else "energy_goal_stop_active"
         )

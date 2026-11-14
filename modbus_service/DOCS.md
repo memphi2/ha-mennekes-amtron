@@ -74,8 +74,8 @@ command: check **Pending change**. The app is the only software current cap in
 service mode. Its cap does not apply to a deliberately selected unlimited **0 A**.
 
 An explicitly started guest charge runs independently of HA. It grants permission
-for the current connection and lifts manual pause, but never unlocks the wallbox. Use the ordinary pause switch to stop. Guest permission is temporary; after an
-app restart check the shared limits and start guest charging explicitly again.
+for the current connection and lifts manual pause, but never unlocks the wallbox. Use the ordinary pause switch to stop. After an app restart, guest permission and limits are restored only for the
+proven same plug-in; otherwise charging stops and needs a new guest start.
 There is no separate saved guest order.
 [App operation and restart behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b7/docs/app-guide.md).
 

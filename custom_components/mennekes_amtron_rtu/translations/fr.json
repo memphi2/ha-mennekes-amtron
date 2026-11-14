@@ -710,7 +710,8 @@
               "user_cancelled": "Annulé par l’utilisateur",
               "energy_goal": "Arrêt demandé par un objectif de recharge",
               "deadline_expired": "Heure de départ dépassée",
-              "time_limit": "Limite horaire atteinte"
+              "time_limit": "Limite horaire atteinte",
+              "guest_confirmation": "Confirmez le démarrage invité"
             }
           }
         }

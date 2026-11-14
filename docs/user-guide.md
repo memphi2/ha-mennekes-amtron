@@ -60,11 +60,14 @@ still apply. “Started” means the request was accepted; check actual power an
 pending change. The vehicle's percentage target and intelligent plan do not
 control a guest connection. Unplugging ends guest permission.
 
-There is no separate guest record, energy baseline or forecast. Permission belongs
-to the running service and this physical connection. An HA Core restart leaves
-it running; an app/service restart loses that guest designation. After restarting
-the app, check the limits and explicitly start guest charging again before relying
-on its time cutoff. The shared energy target and ordinary wallbox intent are retained.
+There is no separate guest order, energy baseline or forecast. An HA Core restart
+leaves guest charging running in the app. After an app restart, the app restores
+the permission and shared limits only when the wallbox's session counter, session
+duration and energy reading prove the same plug-in. A deliberate pause stays paused.
+If that proof or the saved time limit is missing or inconsistent, the app stops
+charging and requires a new **Start guest charging**. Check the limits first.
+Reached limits still stop charging after a restart. The app stores only bounded
+restart evidence with the ordinary wallbox intent; there is no guest history.
 
 ## Everyday controls
 
@@ -226,7 +229,7 @@ vehicle wait. [Troubleshooting](troubleshooting.md#phase-switching-leaves-chargi
 |---|---|
 | HA Core, while the separate app keeps running | Heartbeat, applied state, shared energy goal and accepted app planning continue. HA automations and new vehicle reports stop temporarily. |
 | HA Core in direct mode | Heartbeat is interrupted; wallbox fallback applies. Error 200 recovery runs when communication returns and respects deliberate pause, release, lock and goals. |
-| App/service restart | Heartbeat is interrupted and queued commands are cancelled. Ordinary intent and limits are retained; temporary guest permission is lost. [Check and restart the guest](#guest-charging). |
+| App/service restart | Heartbeat is interrupted and queued commands are cancelled. Ordinary intent and limits are retained. Guest permission is restored only for a proven same plug-in; otherwise a new start is required. [Details](#guest-charging). |
 | Host, power or adapter failure | The owner may lose communication; the configured wallbox fallback applies. |
 
 HA reconnects to the service's current state without replaying old charging

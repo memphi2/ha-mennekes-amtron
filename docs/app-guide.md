@@ -145,9 +145,9 @@ is closed. See [troubleshooting](troubleshooting.md#watch-app-modbus-communicati
 - The pages show what the app knows. Home Assistant supplies vehicle data and departure choices. The overview
   shows the app’s active controller and target; edit the vehicle profile and
   next departure in HA.
-- An HA Core restart leaves the service running. An app restart loses temporary
-  guest permission; check state and start the guest explicitly again. Shared
-  energy limits and ordinary wallbox intent are retained. [Restart details](user-guide.md#guest-charging).
+- An HA Core restart leaves the service running. An app restart restores guest permission
+  and limits only for the proven same plug-in, preserving a deliberate pause.
+  Without that proof it stops and requires a new guest start. [Restart details](user-guide.md#guest-charging).
 - A stop you request is shown as requested until the wallbox confirms it. Check
   the overview and its command results.
 - The browser never repeats a start command by itself. If a reply is lost, reload the

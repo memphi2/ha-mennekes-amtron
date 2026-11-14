@@ -226,7 +226,9 @@ recurring failures require their logged cause to be corrected.
 ## Saved state and database traffic
 
 Ordinary charging intent and shared energy/percentage limits are saved in
-`intent.json`. The selected time, vehicle plan and its bounded learned model
+`intent.json`, including bounded evidence for restoring guest permission.
+Format 2 rejects older beta intent files and requires a safe reset acknowledgement.
+The selected time, vehicle plan and its bounded learned model
 are saved in `departure-plan.json`. Both are bound to the wallbox identity.
 There is no guest-order file, separate guest energy baseline or charging-rate
 history. Guest permission is kept only in service memory for the current plug-in.
@@ -337,10 +339,12 @@ snapshot's `control` object reports `supports_departure_plan: true` and
 | `confirmed` | Whether the handed-over car is confirmed for this plug-in |
 | `forecast` | `null` unless a plan is computed; otherwise `finish_at` (when the target is reached: the departure, or later when it is unreachable, rounded up to five minutes), `level_at_departure` (percent), `efficiency` (learned share of the metered energy that reaches the battery, 0.9 until learned) and `full_power_kw` (metered power at full current for the current phases, or `null`) |
 
-`control.guest_active` reports active guest permission without a requested pause
-or reached limit. `control.guest_mode` also remains true while that guest is paused,
+`control.guest_active` reports guest charging until a requested pause is confirmed. `control.guest_mode` also remains true while that guest is paused,
 so the vehicle planner cannot take over. `control.guest_revision` binds an explicit
-start to the current choices and physical connection. There is no `control.orders`.
+start to the current choices and physical connection.
+`control.guest_confirmation_required` means restart evidence is missing or
+inconsistent: charging stops until a fresh guest start or confirmed unplug.
+There is no `control.orders`.
 
 `control.operation` summarizes all controllers of the service for a reader. It
 is derived from their published state and decides nothing:

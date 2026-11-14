@@ -87,7 +87,8 @@ profile. [Set up vehicles](vehicle-setup.md).
 
 HA and the app read the same saved limits. Guest permission itself is temporary;
 there is no saved guest order. An HA Core restart leaves the service running.
-After an app restart, check state and explicitly start the guest again.
+After an app restart, the permission is restored only for the proven same plug-in.
+Otherwise the app stops charging and needs a new explicit guest start.
 If a start response is lost, refresh and inspect the current state before retrying.
 
 ## Automation actions

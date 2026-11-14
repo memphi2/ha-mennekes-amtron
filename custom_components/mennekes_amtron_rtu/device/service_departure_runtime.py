@@ -49,11 +49,11 @@ class DepartureModbusService(GuestModbusService):
             self._end_departure_pause,
         )
 
-    async def _initialize(self) -> None:
-        await super()._initialize()
+    async def _initialize_dependents(self) -> None:
         if self.departure is None:
             raise RuntimeError("departure plan was not configured")
         await self.departure.initialize()
+        await super()._initialize_dependents()
 
     def _departure_sample(self) -> DepartureSample:
         connection = self._connection_sample()
@@ -76,7 +76,7 @@ class DepartureModbusService(GuestModbusService):
             target_is_limit=goal is not None and goal.target_percent == goal.maximum_percent,
             energy_reached=control is not None and control.energy_goal.status == "reached",
             goal_stop=control is not None and control.energy_goal_stop_requested,
-            guest_mode=self._guest_scope is not None,
+            guest_mode=self.guest_mode,
             phases=self._rate_phases() or None,
             pending_foreign=(
                 control is not None and control.pending_action is not None
@@ -102,7 +102,7 @@ class DepartureModbusService(GuestModbusService):
             # taken over meanwhile, including a deliberately paused guest.
             # Check ownership here for every plan write, including resumes
             # that end a pause the plan originally set.
-            if self._guest_scope is not None:
+            if self.guest_mode:
                 raise DeviceError("soc_goal_source_changed")
             try:
                 await write(control)
@@ -188,6 +188,8 @@ class DepartureModbusService(GuestModbusService):
             )
         else:
             await departure.set_inputs(DepartureInputs.restore(payload.get("value")))
+        if name == "departure_choice":
+            await self._persist()
         if self._command_lock.locked():
             # Another command still runs: a patient reader must not get the
             # state from before this plan change.
@@ -209,7 +211,8 @@ class DepartureModbusService(GuestModbusService):
         result["control"]["target_time_revision"] = departure.choice_revision if departure is not None and departure.ready else None
         result["control"]["guest_revision"] = self.guest_revision
         result["control"]["guest_active"] = self.guest_active
-        result["control"]["guest_mode"] = self._guest_scope is not None
+        result["control"]["guest_mode"] = self.guest_mode
+        result["control"]["guest_confirmation_required"] = self._guest_restore_pending
         result["control"]["operation"] = self._operation(result)
         return result
 

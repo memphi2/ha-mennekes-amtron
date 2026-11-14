@@ -185,7 +185,8 @@ retaining its data directory, and wait for initialization. Then update the
 integration and restart Core. Retaining the same data mount preserves saved
 intent, shared limits, the vehicle plan and credentials; no new HA entry is needed. With
 writes enabled, the updated service keeps its heartbeat and charging intent
-while HA updates. A service restart interrupts a running guest session.
+while HA updates. A service restart restores guest permission only for the proven same plug-in;
+otherwise it stops and needs a new guest start.
 
 [Everyday operation and troubleshooting](modbus-service.md#everyday-use) ·
 [API, diagnostics and local development](service-reference.md)
