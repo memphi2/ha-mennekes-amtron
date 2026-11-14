@@ -4,7 +4,7 @@
 service is the preferred way to connect the integration: the wallbox keeps its
 last charging state, including a deliberate pause, independently of HA.
 
-**Version 0.9.0b7 · Home Assistant app or standalone service**
+**Version 0.9.0b8 · Home Assistant app or standalone service**
 
 **Open Web UI** starts on an overview of the wallbox and the app's recent
 commands. Further pages set up the USB or LAN connection, show every register,

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Require service 0.9.0b8 for the simplified shared-guest contract; older
+  services are rejected before their incompatible state is accepted.
+
 - Roll back a guest start rejected before acceptance; retain its guards after
   an accepted or uncertain release so a partial start cannot lose its limits.
 
