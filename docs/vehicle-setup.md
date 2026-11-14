@@ -1,6 +1,6 @@
 # Set up your vehicle data
 
-[Documentation](README.md) › Vehicle setup
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
 
 Basic wallbox controls do not need a vehicle integration. Add vehicle data only
 for a percentage target, a departure plan, charging-loss estimates or optional
@@ -10,6 +10,8 @@ can also supply supported data from one selected BMW vehicle.
 
 Every setting of a car is in its profile: open **Configure → Vehicles**, then
 the profile.
+
+[Add a car](#vehicle-profiles) · [Automatic selection](#optional-automatic-vehicle-selection) · [Plug & Charge](#optional-virtual-plug--charge) · [Percentage target](#optional-vehicle-percentage-target) · [Missing data](#when-data-is-missing)
 
 ## Choose the setup that fits
 
@@ -38,9 +40,9 @@ A profile does not enable every feature at once:
 Vehicle profiles keep the data and settings of different cars together. You can
 configure up to eight profiles. Manual selection is the default; optional
 [automatic selection](#optional-automatic-vehicle-selection) can use cable and
-home signals. Adding a profile does not enable a percentage target, departure
-planning or loss estimates.
-Enable only the features you want for that profile.
+home signals. A manually configured profile uses only the sources you choose. Linking a
+BavarianData car can preselect its available data; review the guided areas
+before saving. Departure planning remains off until configured.
 
 Open **Configure → Vehicles → Add profile**. Give the profile
 a name, choose **BavarianData**, then choose the vehicle device. Select the car
@@ -116,13 +118,9 @@ stays off until you set it up:
 
 You can open and change any profile, not only the selected car. Changing a car
 that is not selected leaves the selected car's target and departure untouched.
-Without profiles, **Vehicle settings without a profile** holds the shared charge
-level, departure and loss settings instead.
 
-Existing manually selected sources keep working after an update. They are not
-silently replaced by a BavarianData vehicle, even when old departure and history
-settings refer to different cars. When you start using profiles, those existing
-settings are retained as a manual profile.
+Before 1.0, incompatible beta profiles are not migrated. Reconfigure affected
+profiles after an update; see [Updates](installation.md#updates).
 
 ### Optional automatic vehicle selection
 
@@ -156,6 +154,13 @@ automatic selection on. Open the selector’s details
 to see the currently selected profile. Selecting a particular car or no vehicle
 manually turns the automatic mode off.
 
+Automatic selection needs one unambiguous car with cable connected and at-home
+evidence. The car may report later than the wallbox. If selection is unclear,
+choose the car manually; that alone does not grant Plug & Charge permission.
+
+<details>
+<summary>How automatic matching handles delayed or unclear signals</summary>
+
 The integration selects a car only when exactly one configured profile reports
 both **cable connected** and **at home**. A positive change must remain stable
 for three seconds. The selected car stays selected after it is
@@ -174,6 +179,8 @@ No matching car or several matching cars means **no active vehicle**. The
 previous car's target and departure plan stop applying when the assignment
 changes; each car keeps them for its return. Detection alone never starts charging or lifts a pause. If the result is
 unclear, choose the correct profile manually.
+
+</details>
 
 Changing the vehicle, manually or automatically, does not reload the
 integration: the wallbox entities stay available throughout.
@@ -262,6 +269,13 @@ authorization must already be disabled in the wallbox's installation settings.
 This feature controls the energy manager's charging release; it cannot switch
 off or bypass the wallbox's RFID requirement.
 
+**A fresh recognized plug-in can end a previous manual pause.** A grant restored
+after a restart keeps the pause. An armed departure plan decides when to start;
+locks and reached targets still apply.
+
+<details>
+<summary>Permission lifetime, pauses and restart behavior</summary>
+
 Permission requires one unambiguous matching vehicle, that car's profile
 selected, and a **new cable report for the current connection cycle**. The last confirmed
 disconnected wallbox reading marks the earliest acceptable report; if the app
@@ -302,6 +316,8 @@ Choosing another profile alone also leaves an existing grant with that same
 physical connection. Changing a vehicle's identity or detection sources invalidates the grant; the
 next connection always needs a fresh match for the then-active profile.
 
+</details>
+
 Enabling the feature can stop an ongoing charge while it waits for a valid
 grant. Disabling it **does not resume charging**: use **Charging release**
 explicitly afterwards, and leave a wanted pause or lock in place. Check new
@@ -333,8 +349,8 @@ see [charging permission](safety.md#virtual-plug--charge).
 Create **Family car** and **Second car**. Select Family car, configure its charge
 level and optional limit, then repeat for Second car. Before charging, choose
 the connected car in **Active vehicle** and set its intended target. Selecting
-another car clears the previous percentage target and trip; it never starts
-charging. If you do not want vehicle-based features for this charge, select
+another car restores that profile’s saved target and upcoming trip; the previous
+car keeps its own settings. Selection alone does not start charging. If you do not want vehicle-based features for this charge, select
 **No vehicle selected** and use the normal wallbox controls. With Virtual Plug & Charge
 enabled, a new grant still needs a recognized active profile and matching
 detection; choosing no vehicle does not bypass that requirement.

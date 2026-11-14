@@ -241,6 +241,18 @@
       },
       "timed_vehicle_departure": {
         "name": "Utiliser le départ du véhicule"
+      },
+      "job_start": {
+        "name": "Démarrer la recharge"
+      },
+      "job_stop": {
+        "name": "Arrêter la recharge"
+      },
+      "job_clear": {
+        "name": "Effacer la recharge"
+      },
+      "job_reset_draft": {
+        "name": "Réinitialiser le brouillon"
       }
     },
     "number": {
@@ -252,6 +264,15 @@
       },
       "soc_goal": {
         "name": "Objectif de charge du véhicule"
+      },
+      "job_current_a": {
+        "name": "Courant de la recharge"
+      },
+      "job_energy_kwh": {
+        "name": "Énergie de la recharge"
+      },
+      "job_reserve_kwh": {
+        "name": "Réserve immédiate"
       }
     },
     "select": {
@@ -619,6 +640,20 @@
             "name": "Boost disponible"
           }
         }
+      },
+      "job_draft_status": {
+        "name": "Brouillon de recharge",
+        "state": {
+          "needs_finish": "Choisir une heure de fin",
+          "ready": "Prêt à démarrer",
+          "job_exists": "Une recharge est déjà en cours",
+          "job_not_permitted": "Vérifier véhicule, autorisation, compteur et actions en attente",
+          "job_current_exceeds_cap": "Courant supérieur à la limite",
+          "job_preview_expired": "Heure de début passée",
+          "job_storage_unavailable": "Stockage indisponible",
+          "invalid_job_request": "Vérifier début, fin et énergie",
+          "job_stop_unconfirmed": "En attente de l’arrêt confirmé"
+        }
       }
     },
     "switch": {
@@ -801,6 +836,12 @@
     "datetime": {
       "timed_departure": {
         "name": "Prochain départ"
+      },
+      "job_start_at": {
+        "name": "Début au plus tôt"
+      },
+      "job_finish_at": {
+        "name": "Fin au plus tard"
       }
     }
   },

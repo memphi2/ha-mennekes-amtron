@@ -1,4 +1,6 @@
-# Legal and Asset Hygiene
+# Legal information
+
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
 
 This repository is an independent community project for local Home Assistant
 use with compatible MENNEKES AMTRON wallboxes.

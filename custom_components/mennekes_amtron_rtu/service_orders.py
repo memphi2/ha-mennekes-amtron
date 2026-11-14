@@ -16,6 +16,7 @@ from typing import Any
 from .control import ha_command
 from .device.client_errors import AmtronConnectionError
 from .device.errors import DeviceError
+from .device.job_draft import read_snapshot
 from .remote import RemoteClient
 from .remote_errors import ServiceConnectionError
 
@@ -35,6 +36,50 @@ class ServiceOrders:
         control = self._client.snapshot.get("control")
         status = control.get("orders") if isinstance(control, dict) else None
         return status if isinstance(status, dict) else None
+
+    @property
+    def draft(self) -> dict[str, Any] | None:
+        status = self.jobs
+        draft = status.get("draft") if status is not None else None
+        return read_snapshot(draft)
+
+    @ha_command
+    async def async_edit_draft(self, field: str, value: object) -> None:
+        draft = self.draft
+        if draft is None:
+            raise DeviceError("service_order_failed")
+        try:
+            await self._call({"action": "edit_draft", "draft_revision": draft.get("revision"), "changes": {field: value}})
+        finally:
+            await self._done()
+
+    @ha_command
+    async def async_reset_draft(self) -> None:
+        draft = self.draft
+        if draft is None:
+            raise DeviceError("service_order_failed")
+        try:
+            await self._call({"action": "reset_draft", "draft_revision": draft.get("revision"), "confirm": True})
+        finally:
+            await self._done()
+
+    @ha_command
+    async def async_start_draft(self) -> None:
+        draft = self.draft
+        if draft is None:
+            raise DeviceError("service_order_failed")
+        state = await self._call()
+        try:
+            preview = await self._call({
+                "action": "preview_draft", "draft_revision": draft.get("revision"),
+                "revision": state.get("revision"), "scope": state.get("scope"),
+            })
+            await self._call({
+                "action": "create_draft", "draft_revision": preview.get("draft_revision"),
+                "revision": preview.get("revision"), "scope": preview.get("scope"), "request": preview.get("request"),
+            })
+        finally:
+            await self._done()
 
     async def _call(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         client = self._client

@@ -1,5 +1,8 @@
 # Security Policy
 
+[User guide](docs/README.md) · [Support](SUPPORT.md)
+
+
 ## Supported Versions
 
 Security fixes target the current release line. See [SUPPORT.md](SUPPORT.md).

@@ -1,6 +1,6 @@
 # Charge for your next departure
 
-[Documentation](README.md) › Departure planning
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
 
 Choose a target percentage and one departure time. The integration starts
 charging as late as it safely can, charges at full current and reduces to 6 A
@@ -12,6 +12,8 @@ when you want the vehicle to stay paused. A percentage target on its own never
 resumes charging.
 
 The departure belongs to a car's [vehicle profile](vehicle-setup.md).
+
+[First trip](#example-ready-tomorrow-at-0730) · [Choose a time](#choose-a-time-for-this-trip) · [Cancel](#change-or-cancel-a-trip) · [Climate](#climate-before-departure) · [App mode](#with-the-modbus-service-app)
 
 ## Example: ready tomorrow at 07:30
 
@@ -68,8 +70,7 @@ perform this selection ahead of the next trip using a Toggle helper.
 To use the active BavarianData profile's timers, enable **Use vehicle departure
 timers** in **Next departure**. You do not need to select the integration and car
 again. Use **Use vehicle departure** when you want to copy the next active climate
-timer. Existing setups without profiles retain their separate vehicle selection.
-Other vehicle integrations can supply the generic SoC, capacity and dated
+timer. Other vehicle integrations can supply the generic SoC, capacity and dated
 departure entities described here.
 The adapter reads the vehicle's last locally
 published Home Assistant states; it does not fetch BMW cloud data or change the
@@ -126,8 +127,7 @@ charges again; any other setting of the wallbox stays as it is.
 
 Disabling **Next departure** clears its selected trip and cancels commands queued
 by that plan. It keeps the ordinary percentage target and the current pause
-state. Existing configured sources are recognized after an update; the vehicle
-departure button keeps its existing entity identity and automations.
+state. Before 1.0, incompatible beta settings are not migrated; see [Updates](installation.md#updates).
 
 ## What the plan changes while charging
 

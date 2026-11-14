@@ -9,7 +9,7 @@ Control your Mennekes Amtron in Home Assistant: set the charging current, pause
 charging, track energy and add solar, vehicle or departure-based charging when
 you need it. Communication stays local through **USB/RS-485 or a LAN adapter**.
 
-**[Install](docs/installation.md)** · **[Everyday use](docs/user-guide.md)** · **[Optional functions](docs/features.md)** · **[Get help](docs/troubleshooting.md)**
+**[Install](docs/installation.md)** · **[Everyday use](docs/user-guide.md)** · **[Dashboard cards](docs/app-from-home-assistant.md#dashboard-with-mushroom-cards)** · **[Get help](docs/troubleshooting.md)**
 
 Integration and app available in **English, German, French, Dutch and Italian**.
 
@@ -56,6 +56,7 @@ Already installed? **Keep the existing entry** and follow
 
 | I want to… | Use |
 |---|---|
+| Add a wallbox card to my dashboard | [Dashboard YAML in five languages: basic or Mushroom](docs/app-from-home-assistant.md#dashboard-with-mushroom-cards) |
 | Set the charging current | **Charging current limit** slider |
 | Remove the current limit | **0 A**; this does not pause charging |
 | Pause or resume | **Charging paused** switch |
@@ -72,16 +73,14 @@ select **Modbus master** in the integration's direct-connection options.
 [The user guide](docs/user-guide.md#where-do-i-enable-controls) explains where each
 setting belongs and why a requested change may wait.
 
-## Development and releases
+## Guides and updates
 
-**Current beta: 0.9.0b4.** Charging jobs, early boosts and guest charging of
-the app can be started from a Home Assistant dashboard or automation, and with
-the app its wallbox settings live in one place. Weekly plans are gone;
-recurring departures come from a calendar. Total power carries the values of
-all three phases. Optional features
-stay off until you configure them. See the [release notes](CHANGELOG.md).
+**[User guide](docs/README.md)** · **[Release notes](CHANGELOG.md)** · **[Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)**
 
-[All documentation](docs/README.md) · [Compatibility](docs/compatibility.md) · [Troubleshooting](docs/troubleshooting.md) · [Report a problem](https://github.com/memphi2/ha-mennekes-amtron/issues/new/choose)
+The user guide starts with installation, everyday charging, dashboard cards and
+help. Optional features and technical reference are separate, so you can add
+only what you need. [Beta releases](https://github.com/memphi2/ha-mennekes-amtron/releases)
+are marked as pre-releases.
 
 Unofficial community project, not affiliated with MENNEKES.
 [Apache 2.0 license](LICENSE) · [Notices](NOTICE) · [Legal information](docs/legal.md)

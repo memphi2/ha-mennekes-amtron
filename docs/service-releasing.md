@@ -1,5 +1,10 @@
 # Service and integration publication
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
 One source repository produces the HACS integration and the independently running
 Modbus service. A release keeps one HACS ZIP plus its verification assets. Container
 images live in GHCR, and generated app metadata lives on `apps-beta` or `apps` in
@@ -21,8 +26,8 @@ change, subject to the promotion rule below. The integration tag identifies
 the reviewed source; it does not require the service to use the same number.
 
 The HA client declares the required service API and minimum service version
-separately. The current requirement is **API 2 and service 0.9.0b4 or newer**,
-which supplies deadline expiry for queued timed charging commands. Raise the
+separately. The current requirement is **API 2 and service 0.9.0b6 or newer**,
+which supplies the shared charging-job draft used by the native HA controls. Raise the
 minimum only when the integration needs a newer service feature; a published
 or planned service release must satisfy that requirement.
 

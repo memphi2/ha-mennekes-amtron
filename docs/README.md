@@ -1,46 +1,30 @@
-# Mennekes Amtron RTU documentation
+# Wallbox guide
 
-Choose the task you want to complete. Basic charging needs no vehicle cloud
-account, calendar, tariff import or YAML configuration.
+Start with these four pages. Basic charging needs no vehicle account, calendar,
+tariff import or YAML.
 
-## Start here
-
-1. [Install and choose a connection](installation.md): the service app is
-   recommended but optional; direct USB and LAN remain supported.
-2. [Check the wallbox and try a first charge](quickstart.md).
-3. [Use current control and pause/resume](user-guide.md).
-4. [Add optional functions](features.md) only when you need them.
-
-Already installed? Keep your device and entity IDs and follow
-[Updates](installation.md#updates) instead of adding the wallbox again.
-
-## Find the right guide
-
-| Your task | Guide |
+| What do you want to do? | Open |
 |---|---|
-| Install the recommended service app | [Modbus service](modbus-service.md) |
-| Use the app's overview, charging jobs or guest charging | [The app's web pages](app-guide.md) |
-| Start jobs, boost or guest charging from a dashboard or automation | [Use the app from Home Assistant](app-from-home-assistant.md) |
-| Use a LAN-to-RS-485 adapter | [LAN connection](network-gateway.md) |
-| Select one car, several cars or optional automatic detection | [Vehicle setup](vehicle-setup.md) |
-| Automatically release charging for a recognized profile | [Virtual Plug & Charge](vehicle-setup.md#optional-virtual-plug--charge) |
-| Reach a charge target for the next trip | [Departure planning](departure-planning.md) |
-| Use a calendar, climate action or PV surplus | [Blueprints](blueprints.md) |
-| Estimate charging costs or losses | [Charging estimates](charging-estimates.md) |
-| Find a control, sensor or template state | [Entity reference](entities.md) |
-| Reduce Recorder/database growth | [Recorder guide](recorder.md) |
-| Resolve a missing control, heartbeat fault or unclear vehicle match | [Troubleshooting](troubleshooting.md) |
-| Understand wiring, supported models and operating limits | [Hardware](hardware.md), [compatibility](compatibility.md), [safety](safety.md) |
+| Install or update the wallbox integration | **[Installation](installation.md)** |
+| Set current, pause or resume charging | **[Everyday charging](user-guide.md)** |
+| Add the wallbox to your HA dashboard | **[Dashboard cards — YAML in five languages](app-from-home-assistant.md#dashboard-with-mushroom-cards)** |
+| Fix a problem | **[Troubleshooting](troubleshooting.md)** |
 
-## Version
+The optional **[service app](modbus-service.md)** is recommended to keep the
+heartbeat running through Home Assistant Core restarts. Already using it?
+[Open the guide to its web interface](app-guide.md).
 
-These pages describe **0.9.0b4** of the integration and the app. Install both
-with the [required minimum service version](installation.md#updates); in service
-mode, update the app first. The app's web pages
-need **Supervisor 2026.10.4 or newer**. Optional features stay off until you set
-them up.
+## Add a function when you need it
 
-## Three settings to remember
+- **[Vehicles](vehicle-setup.md):** vehicle data, selection, automatic recognition
+  and virtual Plug & Charge.
+- **[Departure](departure-planning.md):** a charging target for your next trip.
+- **[Solar and calendar](blueprints.md):** ready-to-use automations.
+- **[Costs and charging losses](charging-estimates.md):** optional estimates.
+
+Unsure what to enable? [Choose optional functions](features.md).
+
+## Three things to remember
 
 - **0 A removes the current limit.** Use **Charging paused** to pause.
 - **Enable writes in one place.** Service: app Read-only off. Direct: integration
@@ -48,14 +32,27 @@ them up.
 - **One owner uses the bus.** Stop the old owner before starting another;
   read-only mode still sends requests.
 
-## Advanced reference
+<details>
+<summary>Connection details and reference</summary>
 
-- [Standalone service](service-standalone.md), [service configuration](service-reference.md)
-  and [LAN adapter configuration](lan-adapters.md)
-- [Automation actions](automations.md) and [Modbus register map](modbus-registers.md)
-- [Architecture](architecture.md), [quality scale](quality-scale.md),
-  [maintenance validation](validation.md), [Recorder validation](recorder-validation.md)
-  and the [charging conflict matrix](charging-conflict-matrix.md)
+- [First charge walkthrough](quickstart.md)
+- [USB wiring and hardware](hardware.md), [supported models](compatibility.md)
+  and [operating limits](safety.md)
+- [LAN connection](network-gateway.md) and [adapter settings](lan-adapters.md)
+- [Standalone service](service-standalone.md) and [service configuration](service-reference.md)
+- [All entities](entities.md), [automation actions](automations.md)
+  and [Recorder settings](recorder.md)
+
+</details>
+
+<details>
+<summary>Development, validation and legal information</summary>
+
+- [Architecture](architecture.md) and [Modbus registers](modbus-registers.md)
+- [Quality scale](quality-scale.md), [validation](validation.md),
+  [Recorder validation](recorder-validation.md) and [charging conflict matrix](charging-conflict-matrix.md)
 - [Service publication](service-releasing.md), [repository settings](repository-settings.md)
   and [November compatibility audit](ha-2026-11-validation.md)
 - [Legal information](legal.md) and [provenance evidence](audits/current-legal-provenance.md)
+
+</details>

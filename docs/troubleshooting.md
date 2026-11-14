@@ -1,31 +1,27 @@
 # Troubleshooting
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 Start with the symptom that matches your setup. **Direct** means HA connects to
 the USB/RS-485 or LAN adapter. **Service** means the Modbus app owns that
 connection and HA connects to the app's HTTP API.
 
-| What went wrong? | Start here |
+Find the symptom first; collect diagnostics before restarting if the problem is intermittent.
+
+| Problem | Start here |
 |---|---|
-| Controls are missing or greyed out | [Controls and write access](#entities-are-missing) |
-| App discovery asks for credentials or reports an error | [App connection and discovery](#app-connection-and-discovery) |
-| The serial connection cannot find the wallbox | [Serial connection](#the-config-flow-cannot-connect) |
-| The LAN adapter cannot find the wallbox | [LAN protocol, port and gateway settings](network-gateway.md#network-access-and-troubleshooting) |
-| Heartbeat is unhealthy or error 200 appears | [Heartbeat recovery](#error-200-energy-manager-unavailable) |
-| Charging does not follow the slider or pause switch | [Charging current](#the-charging-current-does-not-follow) |
-| Sensors became unavailable | [Missing readings](#some-sensors-became-unavailable) |
-| Vehicle selection is empty or chooses no car | [Vehicle profiles and automatic selection](#vehicle-profiles-and-automatic-selection) |
-| Virtual Plug & Charge is waiting | [Vehicle recognition and charging permission](#virtual-plug--charge-is-waiting) |
-| A percentage target or departure time is missing or not followed | [Targets and departure planning](#targets-and-departure-planning) |
-| A loss or cost estimate is unknown | [Charging estimates](#loss-or-cost-estimates-are-unknown) |
-| An app charging job or guest order does not start, or blocks HA | [Charging jobs in the app](#charging-jobs-in-the-app) |
-| A menu, page or option described here is absent | [Feature availability](#a-documented-feature-is-missing) |
-| History keeps growing | [Database size](#the-database-keeps-growing) |
-
-Before restarting, note the current charging/pause state and download diagnostics
-if the issue is intermittent. A restart can erase useful in-memory evidence and
-interrupt the heartbeat. Use the targeted check below first.
-
-For installation, downloads and updates, see [Installation and updates](installation.md).
+| USB or LAN does not connect | [Connection setup](#the-config-flow-cannot-connect), [LAN](network-gateway.md#network-access-and-troubleshooting) |
+| A control or feature is missing | [Missing entities](#entities-are-missing) |
+| The app is not discovered, not ready, or rejects access | [App connection](#app-connection-and-discovery) |
+| Charging does not start or current does not change | [Current and pending changes](#the-charging-current-does-not-follow) |
+| Heartbeat warning or error 200 | [Heartbeat](#heartbeat-or-service-connection-repair) |
+| The wrong car is selected | [Vehicle recognition](#vehicle-profiles-and-automatic-selection) |
+| Plug & Charge will not release | [Charging permission](#virtual-plug--charge-is-waiting) |
+| A target or departure behaves unexpectedly | [Targets](#targets-and-departure-planning) |
+| Cost or loss is unknown | [Estimates](#loss-or-cost-estimates-are-unknown) |
+| History takes too much space | [Database](#the-database-keeps-growing) |
+| Reset after a beta update | [Saved settings Repair](#saved-charging-settings-could-not-be-loaded) |
+| Need logs for a report | [Diagnostics](#diagnostics-for-intermittent-problems) |
 
 ## A documented feature is missing
 
@@ -37,7 +33,6 @@ Optional features stay off until you enable them in their own configuration sect
 A percentage target needs a vehicle SoC source; departure planning also needs
 usable capacity. Some diagnostics and the running-cost entity are disabled by
 default and can be enabled in the entity's settings.
-
 
 ## Entities are missing
 

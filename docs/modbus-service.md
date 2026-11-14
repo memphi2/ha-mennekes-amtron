@@ -1,5 +1,7 @@
 # Modbus service: the preferred setup
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 The optional **Mennekes Amtron Modbus Service** keeps the wallbox connected while
 Home Assistant Core restarts. It is the preferred setup when you want the
 heartbeat and your chosen charging state to continue independently of HA.
@@ -66,7 +68,7 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 The repository above provides stable releases. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog carries
-prereleases such as 0.9.0b4 and also receives stable releases. To switch
+beta releases and also receives stable releases. To switch
 catalogs, follow the [channel handover](#updates).
 
 ### 3. Configure and start read-only
@@ -145,46 +147,12 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 
 ## Everyday use
 
-| What you want to do | Where to do it |
-|---|---|
-| Pause or resume charging | Use **Charging paused** in HA. |
-| Set a charging-current limit | Use the current slider in HA. **0 A removes the EMS limit; it does not pause charging.** |
-| Enable or disable all writes | Change **Read-only**, save and restart the app. HA needs no restart. Read-only stops the heartbeat as well as writes. |
-| Change Modbus polling intervals | **Open Web UI → Runtime**: preview, confirm, applies at the next poll without restart. |
-| Change the service current cap or the waits between charging changes | **Open Web UI → Runtime**: preview, confirm, applies without restart; a charge above a lower cap is lowered after the next poll. In the app configuration, a change applies after an app restart. **Minimum time between state changes** defaults to **300** seconds, range **0–3600**. |
-| Change USB/LAN connection settings | **Open Web UI → Connection**, save and restart the app. For LAN, use the adapter interface or optional [adapter setup](lan-adapters.md#service-app). |
-| Let the app charge on its own, or charge a guest's car | **Open Web UI → Charging jobs** or **Guest charging**; see [the app's web pages](app-guide.md). |
-| See what the app is doing | **Open Web UI → Overview**. |
-| Hand the USB or LAN connection to another master | Stop the app. Disabling its HA entry or enabling read-only does not release the bus. |
-
-Control entities keep their IDs when permission changes. They are unavailable
-while the service is read-only, disconnected or not ready. HA does not send old
-charging commands when permission changes or it reconnects. The service may
-still recover error 200 automatically by reasserting its saved charging state,
-including a deliberate pause. Restarting the app briefly interrupts its heartbeat.
-
-The app and HA caps both constrain limited-current commands, including resuming
-a saved limited setpoint. A deliberately selected **0 A** remains unlimited;
-the wallbox's hardware limits still apply. See the [user guide](user-guide.md)
-for charging controls and automations.
-
-Early pause/resume, phase, release and lock changes
-wait in one pending slot. **Pending change** and its `due` attribute show
-the action and when it can run. A newer charging request replaces it. A stop
-replaces a pending start and also waits for its due time. Heartbeat and recovery
-that preserves the current intent keep running. Zero disables the longer wait,
-while technical write guards remain.
-See [Waiting between charging changes](user-guide.md#waiting-between-charging-changes).
-
-For phase changes, the app confirms that the vehicle has paused, waits
-the configured **Extra wait before phase changes** (default 5 seconds, range
-0–30), then checks the state again before switching. Configure this separately
-from the 300-second state-change interval in the app/service settings.
-
-When fresh EVSE Idle and CP A1/A2 readings confirm no vehicle is connected,
-the long interval and vehicle grace time are skipped. Pending waits check for
-unplugging every five seconds. Unknown status retains the wait; five-second
-register-write guards and heartbeat remain active.
+- **[Current, pause and targets](user-guide.md):** use the HA controls.
+- **[Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards):** ready-to-copy examples in five languages.
+- **[App web interface](app-guide.md):** charging jobs, guests, runtime settings and diagnostics.
+- **Read-only:** change it in native Configuration, save and restart the app.
+- **Hand over the bus:** stop the app before starting another owner. Read-only
+  mode and disabling the HA entry do not release the bus.
 
 ### What continues during an outage?
 
@@ -236,7 +204,8 @@ direct mode uses Home Assistant's own host/container security policy.
 
 ## Updates
 
-Update the app and the integration together. **Update the app first**, wait
+App and integration versions are independent. When both need updating,
+**update the app first**, wait
 until it has started, then update the integration and restart Core. Use **Check
 for updates** in the app store; for a separate service, follow the
 [standalone update steps](service-standalone.md#operation-and-updates).
@@ -264,7 +233,7 @@ For optional vehicle targets, profiles or departure planning, use the
 | HA asks for a URL or token | Confirm that the app is running, then use its discovery card or **Connect to the Modbus service**. Manual credentials are for standalone services. |
 | App not ready | Authentication succeeded, but wallbox data is unavailable. Check the app log for USB/LAN connection and initialization errors, then retry. No token change is needed. |
 | Token rejected | During setup, retry discovery confirmation. For an existing connection, HA tries to refresh access automatically; if an authentication notice remains, [renew service access](troubleshooting.md#renew-service-access). No manual app token is needed. |
-| Service API or minimum version is incompatible | Update the app and the integration to the same release, app first; see [Updates](#updates). Changing the token does not fix this. |
+| Service API or minimum version is incompatible | Install an app meeting the integration’s minimum version and API, app first; see [Updates](#updates). Changing the token does not fix this. |
 | HA reports that a charging job of the app controls charging | An app charging job runs for the plugged-in car. Stop it on **Charging jobs**, or unplug the car; see [charging jobs](troubleshooting.md#charging-jobs-in-the-app). |
 | Controls are unavailable | Check the app's **Read-only** switch and USB/LAN connection. After changing app settings, save and restart the app, then wait for fresh status. |
 | App exits immediately | Look for **Invalid or unreadable service configuration** in its log; the message names the invalid option or startup phase. |

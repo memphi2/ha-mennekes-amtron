@@ -1,0 +1,31 @@
+alias: Ricarica notturna
+triggers:
+  - trigger: time
+    at: '22:00:00'
+    id: start
+  - trigger: time
+    at: 06:00:00
+    id: stop
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: number.set_value
+            target:
+              entity_id: number.mennekes_amtron_limite_di_corrente_di_ricarica
+            data:
+              value: 10
+      - conditions:
+          - condition: trigger
+            id: stop
+          - condition: state
+            entity_id: switch.mennekes_amtron_ricarica_in_pausa
+            state: 'off'
+        sequence:
+          - action: switch.turn_on
+            target:
+              entity_id: switch.mennekes_amtron_ricarica_in_pausa
+mode: single

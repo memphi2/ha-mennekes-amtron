@@ -69,6 +69,11 @@ def test_bearer_api_preview_create_stop_clear_and_rejected_requests(tmp_path):
             initial = await response.json()
             assert response.headers["Cache-Control"] == "no-store"
             assert TOKEN not in json.dumps(initial)
+            oversized = {"action": "edit_draft", "draft_revision": initial["draft"]["revision"],
+                         "changes": {"energy_kwh": 10**400}}
+            refused = await client.post("/v2/jobs", headers=AUTH, json=oversized)
+            assert refused.status == 400
+            assert await refused.json() == {"error": "invalid_job_request"}
             assert (await client.post("/v2/jobs", headers=AUTH, data="text")).status == 415
             assert (await client.post("/v2/jobs", headers={**AUTH, "Content-Type": "application/json"}, data="{" )).status == 400
             payload = {"action": "preview", "revision": initial["revision"], "scope": initial["scope"], "request": h.request()}

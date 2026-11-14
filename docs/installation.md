@@ -1,6 +1,6 @@
 # Install and connect your wallbox
 
-[Documentation](README.md) › Installation
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
 
 Install the Home Assistant integration, then choose who connects to the
 wallbox: the optional service app or Home Assistant itself. Normal setup on
@@ -34,7 +34,8 @@ Keep the vehicle disconnected during the first control setup.
 Both support USB and LAN. A LAN adapter needs no local USB device. On HA
 Container, the service can run as a [separate container](service-standalone.md).
 The service keeps a deliberate pause as well as a running charge while HA is
-offline; HA automations and vehicle-based planning still need HA to run.
+offline. A departure plan already handed to the app also continues; new
+vehicle reports and HA automations need HA to run.
 An app/host restart or USB/LAN failure can interrupt either setup's heartbeat.
 
 ```mermaid
@@ -109,7 +110,7 @@ on, charging release off, resume current 6 A and no targets. This does not start
 charging. Reconfigure the desired policies before explicitly enabling release
 and resuming. In read-only mode the app cannot stop a physical charge.
 This does not change the supported wallbox families or minimum Home Assistant
-version. The current integration requires service **0.9.0b4 or newer**, API 2;
+version. The current integration requires service **0.9.0b6 or newer**, API 2;
 app and integration versions do not otherwise have to match.
 
 1. Back up HA and read the release notes, especially the changes marked
@@ -133,13 +134,13 @@ does not require adding the wallbox again. For changed blueprints,
 | Direct USB/LAN connection | Integration entry **Reconfigure** |
 | App USB/LAN connection | App **Open Web UI → Connection**, or native Configuration where needed |
 | App polling intervals | App **Open Web UI → Runtime**; applies without restart |
-| App current cap and charging waits | App **Open Web UI → Runtime** or **Configuration**, then restart the app |
+| App current cap and charging waits | App **Open Web UI → Settings → Runtime**: no restart; native **Configuration**: restart the app |
 | App write permission | App **Configuration**, then save and restart the app |
 | Vehicles and charging costs | Integration **Configure**, in the relevant section |
 | Wallbox options of a direct connection | Integration **Configure → Wallbox**; with the app this page only shows the app's values |
 
-Apart from the polling intervals, app settings take effect after an app
-restart; HA then receives the new status without an additional Core restart. Use [the settings map](user-guide.md#configuration-and-options)
+Settings saved through **Runtime** apply without restart. Connection and
+Read-only changes require an app restart; HA then receives the new status. Use [the settings map](user-guide.md#configuration-and-options)
 for the full list. Keep device/entity IDs when changing connection; do not
 remove and re-add the wallbox.
 

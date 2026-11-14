@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.9.0b6 — 2026-11-14
+
+- Share one persistent charging-job draft between Home Assistant and the app,
+  with native current, energy, date/time, status and action entities.
+- Provide Mushroom dashboards in five languages without manual helpers or scripts.
+- Simplify installation, everyday-use and troubleshooting documentation.
+- Preserve exact job times across app edits, including the repeated autumn hour;
+  reject stale edits and malformed drafts and keep UI polling bounded.
+- Require service **0.9.0b6 or newer**, API 2, for the shared draft. Update the
+  app first, then the integration. Editing a draft never starts charging.
+
 ## 0.9.0b5 — 2026-11-14
 
 - Keep charging release off after acknowledging rejected state, including

@@ -1,5 +1,14 @@
 # Home Assistant 2026.11 preparation and repository audit
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
+> Historical audit, not the current installation or CI policy. Some entries
+> describe changes that have since been replaced. For current requirements use
+> [Installation](installation.md) and [Maintenance validation](validation.md).
+
 Historical v0.2.2 validation snapshot. Beta references and test results below
 describe that earlier checkout and test date; they are not current installation
 or support guidance. For current policy, see [Support](../SUPPORT.md); for the

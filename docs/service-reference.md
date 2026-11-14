@@ -1,8 +1,15 @@
 # Modbus service technical reference
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
 For installation and daily use, start with the [service guide](modbus-service.md).
 This page describes diagnostics, failure handling and implementation boundaries.
 For deployment outside HA OS, see [Docker/Python setup](service-standalone.md).
+
+[Connection](#connection-and-permission-model) · [Diagnostics](#logs-and-diagnostics) · [State](#saved-state-and-database-traffic) · [API](#commands-and-api-boundary) · [Build locally](#build-a-local-development-checkout)
 
 ## Connection and permission model
 
@@ -221,7 +228,7 @@ recurring failures require their logged cause to be corrected.
 
 Pause intent, charging-release intent and the resume current are saved in
 `intent.json`, bound to the wallbox identity. A charging job is saved in
-`charge-job.json`, learned charging power
+`charge-job.json`, the shared draft in `job-draft.json`, learned charging power
 in `charge-rates.json` and the departure plan in `departure-plan.json` the same
 way. The file is atomically replaced with
 owner-only permissions when those settings change. Both the file and directory
@@ -498,6 +505,28 @@ becomes `interrupted` with the same reason. For this proof the saved order
 also holds the last session duration, session energy, session counter and a
 digest of the vehicle selection; that record is saved only with the order's own
 changes.
+
+### Shared charging-job draft
+
+`GET /v2/jobs` and `control.orders` include `draft`: opaque `revision`,
+`values` (`start_at`, `finish_at`, `current_a`, `energy_kwh`, `reserve_kwh`),
+`storage_error` and a stable readiness `status`. Dates may be null; a null start
+is resolved at preview time. Editing accepts incomplete or expired dates;
+starting performs the ordinary live job checks.
+
+POST actions (with the same authentication, identity and Ingress CSRF checks):
+
+- `edit_draft`: `draft_revision`, `changes` (nonempty subset of the five fields).
+- `reset_draft`: `draft_revision`, `confirm: true`; replaces the draft with defaults.
+- `preview_draft`: `draft_revision`, job `revision`, `scope`; returns a normalized
+  request and both revisions.
+- `create_draft`: those revisions, scope and the exact preview `request`.
+
+Stale draft revisions fail with `job_changed`; editing never changes a running
+job or writes Modbus. Saves use a separate atomic, private `/data/job-draft.json`
+(maximum read size 4096 bytes, bound to wallbox identity). Polls do not write it.
+A corrupt draft blocks its use but not the independent running job. Explicit
+reset replaces the corrupt draft. HA exposes no revision in Recorder attributes.
 
 ## Transport security
 

@@ -27,6 +27,14 @@ async def job_operation(controller: ChargeJobController, payload: object) -> dic
     if not isinstance(payload, dict):
         raise JobRequestError("invalid_job_request")
     action = payload.get("action")
+    if action == "reset_draft" and payload.keys() == {"action", "draft_revision", "confirm"} and payload["confirm"] is True:
+        return await controller.edit_draft({"start_at": None, "finish_at": None, "current_a": 6.0, "energy_kwh": 10.0, "reserve_kwh": 0.0}, revision=payload["draft_revision"])
+    if action == "edit_draft" and payload.keys() == {"action", "draft_revision", "changes"}:
+        return await controller.edit_draft(payload["changes"], revision=payload["draft_revision"])
+    if action == "preview_draft" and payload.keys() == {"action", "draft_revision", "revision", "scope"}:
+        return controller.preview_draft(draft_revision=payload["draft_revision"], revision=payload["revision"], scope=payload["scope"])
+    if action == "create_draft" and payload.keys() == {"action", "draft_revision", "revision", "scope", "request"}:
+        return await controller.create_draft(payload["request"], draft_revision=payload["draft_revision"], revision=payload["revision"], scope=payload["scope"])
     if action == "preview_guest" and payload.keys() == {"action", "revision", "scope", "request"}:
         return controller.preview_guest(payload["request"], revision=payload["revision"], scope=payload["scope"])
     if action in ("create", "preview") and payload.keys() == {"action", "revision", "scope", "request"}:

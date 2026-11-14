@@ -1,5 +1,10 @@
 # Home Assistant quality scale
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
 Target: Platinum.
 
 Current status: Platinum **(local self-assessment)**. This community integration

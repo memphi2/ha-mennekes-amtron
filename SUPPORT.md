@@ -1,5 +1,10 @@
 # Support Policy
 
+Need help using the wallbox? Start with [Troubleshooting](docs/troubleshooting.md).
+For installation, controls and dashboard templates, open the [User guide](docs/README.md).
+This page describes supported software and the maintenance policy.
+
+
 ## Supported Release Line
 
 Security and compatibility fixes target the latest stable minor release line.

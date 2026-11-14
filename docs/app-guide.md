@@ -1,5 +1,7 @@
 # The app's web pages
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 Open the service app and select **Open Web UI**. The pages are for Home
 Assistant administrators and open through Home Assistant itself; no port or
 token is needed in the browser. They need **Supervisor 2026.10.4 or newer**.
@@ -25,6 +27,8 @@ paused**, targets and departure planning. The app pages add a view of the
 service and orders that keep running while Home Assistant is offline.
 The orders can also be started and stopped from a Home Assistant dashboard or
 automation; see [Use the app from Home Assistant](app-from-home-assistant.md).
+
+[Overview](#overview) · [Charging jobs](#charging-jobs) · [Guests](#guest-charging) · [Settings](#runtime-settings) · [Diagnostics](#log)
 
 ## Overview
 
@@ -75,13 +79,23 @@ reached, it stops the order.
 ### Create an order
 
 1. Open **Charging jobs** (German: **Ladeaufträge**).
-2. Enter **Start**, **Finish no later than**, the **additional energy** in kWh
-   and the **current per phase** in A. The current cannot exceed the app's
+2. Enter **Finish no later than**, the **additional energy** in kWh and the
+   **current per phase** in A. Leave **Start** empty to start when confirmed,
+   or set it to a future time. The current cannot exceed the app's
    current cap. Optionally enter an [immediate reserve](#immediate-reserve).
 3. Select **Preview**, check the summary and select **Confirm this action**.
 
 Confirm soon after the preview. If the start time is already more than a minute
 in the past, the app asks for a new preview.
+
+### Shared charging-job draft
+
+The charging-jobs form and the [HA dashboard](app-from-home-assistant.md) use
+one saved draft. **Save draft** stores values without starting charging.
+**Preview** saves them, checks the current connection and shows a separate
+confirmation. Unsaved edits stay in the browser until saved or reloaded.
+If HA or another window changed the draft, reload and check those values first.
+Resetting the draft never changes a running order.
 
 ### While the order runs
 
@@ -113,6 +127,9 @@ reached: a time range, the measured power and whether the range fits the window
 wallbox meter, not from the battery level; the car or another limit may stop
 earlier. It never changes the order.
 
+<details>
+<summary>How the finish estimate is calculated</summary>
+
 - It needs at least three valid measuring intervals of 30 to 180 seconds with
   unchanged current and phases. Until then the page says it is collecting
   intervals. A pause, a changed current or phase setting, a meter gap or a
@@ -133,6 +150,8 @@ While an order waits for proof of the same plug-in
 ([after an app restart or a connection loss](#after-an-app-restart-or-a-connection-loss)),
 no estimate is shown. If the learned values cannot be saved, the page says so;
 charging is not affected.
+
+</details>
 
 ### Immediate reserve
 
@@ -288,8 +307,9 @@ is closed. See [troubleshooting](troubleshooting.md#watch-app-modbus-communicati
 
 ## Limits
 
-- The pages show what the app knows. Vehicle identity, current battery level and
-  the departure plan live in Home Assistant and are not shown here.
+- The pages show what the app knows. Home Assistant supplies vehicle data and departure choices. The overview
+  shows the app’s active controller and target; edit the vehicle profile and
+  next departure in HA.
 - An app restart pauses a running order. It continues only when the wallbox
   proves the same plug-in; otherwise the app hands control back to Home
   Assistant.

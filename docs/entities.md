@@ -1,5 +1,7 @@
 # Entity reference
 
+[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+
 Use **Charging current limit** and **Charging paused** for everyday charging.
 **Total power**, **Total energy** and **Connection quality** show power use,
 accumulated energy and connection health, including the heartbeat. The [User guide](user-guide.md) explains how to
@@ -108,49 +110,9 @@ queued change. While the plan charges, **Target expected** carries the
 [forecast](departure-planning.md#with-the-modbus-service-app); otherwise the
 departure itself is the next step.
 
-A standard card shows all three translated:
-
-```yaml
-type: entities
-title: Wallbox
-entities:
-  - sensor.amtron_charging_control
-  - sensor.amtron_charging_wait_reason
-  - sensor.amtron_next_charging_step
-  - sensor.amtron_charging_status
-```
-
-With the third-party [Mushroom](https://github.com/piitaya/lovelace-mushroom)
-cards, one template card tells the whole story. Replace `amtron` with your
-device's entity prefix:
-
-```yaml
-type: custom:mushroom-template-card
-entity: sensor.amtron_charging_control
-icon: mdi:ev-station
-icon_color: >-
-  {{ 'green' if is_state('sensor.amtron_charging_wait_reason', 'none')
-     else 'red' if is_state('sensor.amtron_charging_control', 'unavailable')
-     else 'orange' }}
-primary: "{{ state_translated('sensor.amtron_charging_control') }}"
-secondary: >-
-  {{ state_translated('sensor.amtron_charging_wait_reason') }}
-  {%- set at = state_attr('sensor.amtron_next_charging_step', 'at') %}
-  {%- if at %}
-
-  {{ state_translated('sensor.amtron_next_charging_step') }}:
-  {{ as_timestamp(at) | timestamp_custom('%a %H:%M') }}
-  {%- endif %}
-  {%- set value = state_attr('sensor.amtron_charging_control', 'target_value') %}
-  {%- if value %}
-
-  {{ value | round(1) }}
-  {{- ' %' if is_state_attr('sensor.amtron_charging_control', 'target', 'level') else ' kWh' }}
-  {%- endif %}
-multiline_secondary: true
-tap_action:
-  action: more-info
-```
+For a ready-made view, use the **[dashboard examples](app-from-home-assistant.md#dashboard-with-mushroom-cards)**.
+They include a small built-in card and a larger Mushroom dashboard in five
+languages, with the default `mennekes_amtron` prefix.
 
 ## Controls
 
@@ -174,6 +136,28 @@ in read-only mode; it does not send a charging command.
 | `switch.*_charging_release` | Charging release | always | Opens and closes the wallbox relay. Use the pause switch for everyday pausing; switching the relay wears it out. With Virtual Plug & Charge enabled, switching it on releases the current or next connection by hand for any car until the next unplug; switching it off stops the current connection, also for a recognized car, until the next unplug. |
 | `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
 | `select.*_requested_phases` | Requested phases | hardware that can switch phases | Single-phase or all-phase charging. A change while charging first pauses; resume separately after the waiting interval. Only exists on capable hardware. The `switched` attribute is the wallbox's answer: the phases it will use when it next closes the relay. |
+
+## Charging-job draft (service app only)
+
+The app owns these values; HA does not restore a second copy. Edits persist
+without starting charging. Use the [Mushroom dashboard](app-from-home-assistant.md)
+for a ready-made view.
+
+| Entity key | Purpose |
+|---|---|
+| `number.job_current_a` | Draft current per phase, 6 A up to the service cap. |
+| `number.job_energy_kwh` | Draft additional AC energy ceiling, 0.1–1000 kWh. |
+| `datetime.job_finish_at` | Latest finish; required before starting. |
+| `datetime.job_start_at` | Earliest start; empty means now. Disabled by default. |
+| `number.job_reserve_kwh` | Immediate reserve included in the ceiling; 0 disables. Disabled by default. |
+| `sensor.job_draft_status` | Stable readiness or refusal reason, without revision or countdown attributes. |
+| `button.job_start` | Preview and start the saved draft for this wallbox. |
+| `button.job_stop` | Stop the current order and pause. |
+| `button.job_clear` | Clear an ended order without resuming. |
+| `button.job_reset_draft` | Reset only draft values; also recovers an unreadable draft file. |
+
+These are translation keys, not literal entity IDs. HA generates IDs from the
+device and translated names. Controls are unavailable in read-only mode.
 
 ## Configuration
 
@@ -377,7 +361,6 @@ Both the action and the slider accept 0 A to remove the limit. See
 With the Modbus service app, six more actions start and stop the app's
 charging jobs, boost and guest charging; see
 [Use the app from Home Assistant](app-from-home-assistant.md).
-
 
 ## Optional charging estimates
 

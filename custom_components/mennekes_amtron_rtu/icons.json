@@ -23,11 +23,32 @@
       },
       "timed_vehicle_departure": {
         "default": "mdi:car-clock"
+      },
+      "job_start": {
+        "default": "mdi:play-circle-outline"
+      },
+      "job_stop": {
+        "default": "mdi:stop-circle-outline"
+      },
+      "job_clear": {
+        "default": "mdi:clipboard-remove-outline"
+      },
+      "job_reset_draft": {
+        "default": "mdi:clipboard-refresh-outline"
       }
     },
     "number": {
       "soc_goal": {
         "default": "mdi:battery-arrow-up-outline"
+      },
+      "job_current_a": {
+        "default": "mdi:current-ac"
+      },
+      "job_energy_kwh": {
+        "default": "mdi:lightning-bolt"
+      },
+      "job_reserve_kwh": {
+        "default": "mdi:battery-plus-outline"
       }
     },
     "select": {
@@ -188,6 +209,9 @@
           "stopped": "mdi:stop-circle-outline",
           "interrupted": "mdi:alert-circle-outline"
         }
+      },
+      "job_draft_status": {
+        "default": "mdi:clipboard-edit-outline"
       }
     },
     "switch": {
@@ -309,6 +333,12 @@
     "datetime": {
       "timed_departure": {
         "default": "mdi:calendar-clock"
+      },
+      "job_start_at": {
+        "default": "mdi:calendar-start"
+      },
+      "job_finish_at": {
+        "default": "mdi:calendar-end"
       }
     }
   },

@@ -1,5 +1,10 @@
 # Recorder validation and measurements
 
+[Documentation index](README.md) · [Architecture](architecture.md) · [Validation](validation.md)
+
+For maintainers and technical investigations; normal setup starts with
+[Installation](installation.md).
+
 For configuration and day-to-day use, see [Recorder and database growth](recorder.md).
 This page records development measurements and their limits; the results are not
 promises of a fixed database size.
