@@ -84,6 +84,8 @@
   const enums = Object.fromEntries(Object.entries(enumWords).map(([key, names]) => [key, names[column]]));
   const text = key => labels[key]?.[column] || key || "—";
   document.querySelectorAll("[data-text]").forEach(node => { node.textContent = text(node.dataset.text); });
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   const el = id => document.getElementById(id);
   const fmtTime = stamp => { const d = new Date(stamp); return stamp && Number.isFinite(d.getTime()) ? d.toLocaleString(locale, {timeZoneName:"short"}) : "—"; };
   let rows = [], timer = null, controller = null, generation = 0, stopped = false;

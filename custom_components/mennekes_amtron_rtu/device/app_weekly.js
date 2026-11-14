@@ -91,6 +91,8 @@
   const el = id => document.getElementById(id);
   const days = [["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],["Mo","Di","Mi","Do","Fr","Sa","So"],["lun.","mar.","mer.","jeu.","ven.","sam.","dim."],["ma","di","wo","do","vr","za","zo"],["lun","mar","mer","gio","ven","sab","dom"]][column];
   document.querySelectorAll("[data-text]").forEach(node => { node.textContent = t(node.dataset.text); });
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   document.querySelectorAll("[data-day]").forEach(node => { node.textContent = days[Number(node.dataset.day)]; });
   const dayInputs = () => [...document.querySelectorAll('input[name="weekday"]')];
   let state = null, csrf = "", selected = "", dirty = false, planProposal = null, activation = null, loadedRecipe;

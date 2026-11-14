@@ -89,6 +89,8 @@
   };
   const t = k => words[k]?.[column] || k;
   document.querySelectorAll("[data-text]").forEach(n => { n.textContent = t(n.dataset.text); });
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   const el = id => document.getElementById(id), notice = message => { el("job_notice").textContent = message; };
   const date = value => new Date(value).toLocaleString(locale, {timeZoneName:"short"});
   const local = d => { const p = n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };

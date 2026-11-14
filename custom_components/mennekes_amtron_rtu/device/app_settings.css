@@ -18,6 +18,11 @@
 }
 /* A change of page fades instead of flashing an empty frame. */
 @view-transition { navigation: auto; }
+/* The texts of a page are filled in by its script. Until then the page stays
+   invisible, so the English fallback never shows; without a script it appears
+   after a moment. */
+html:not(.ready) main { opacity: 0; animation: reveal 0s 1.2s forwards; }
+@keyframes reveal { to { opacity: 1; } }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; }

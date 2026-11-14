@@ -65,6 +65,8 @@
   const t=k=>words[k]?.[column]||words.uncertain[column];
   const el=id=>document.getElementById(id), date=v=>new Date(v).toLocaleString(locale,{timeZoneName:"short"});
   document.querySelectorAll("[data-text]").forEach(n=>{n.textContent=t(n.dataset.text);});
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   let state=null, proposal=null, busy=false, timer=null, readAbort=null, generation=0, hidden=false, lastError="";
   const live=()=>!hidden&&!document.hidden;
   function invalidate(){proposal=null;el("guest_confirmation").hidden=true;}

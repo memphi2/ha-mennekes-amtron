@@ -33,6 +33,21 @@ def test_groups_are_tabs_and_their_pages_a_second_row():
     assert 'href="./"' in single
 
 
+@pytest.mark.parametrize("script", sorted(p.name for p in DEVICE.glob("app_*.js")))
+def test_every_page_script_reveals_its_page_after_translating(script):
+    # Until then the stylesheet keeps the page invisible: no English flash.
+    source = (DEVICE / script).read_text()
+    assert source.count('document.documentElement.classList?.add("ready")') == 1
+    translate = max(source.index(marker) for marker in ("[data-text]", "[data-overview]", "[data-i18n]") if marker in source)
+    assert source.index('classList?.add("ready")') > translate
+
+
+def test_page_stays_hidden_until_ready_but_never_for_good():
+    css = (DEVICE / "app_settings.css").read_text()
+    assert "html:not(.ready) main { opacity: 0; animation: reveal 0s 1.2s forwards; }" in css
+    assert "@keyframes reveal { to { opacity: 1; } }" in css
+
+
 def test_registers_are_a_subpage_of_the_overview():
     nav = render_nav("/registers", "de", ALL).decode()
     assert '<a href="./" aria-current="true">Übersicht</a>' in nav

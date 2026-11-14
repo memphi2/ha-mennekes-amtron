@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   instead of a card of the overview.
 - **Pages carry their styles inside** and are styled from the first paint, so
   a change of page cannot show an unformatted page for a moment.
+- **A page appears once its texts are in your language,** so the English
+  fallback is not visible for a moment after a click.
 
 ## 0.9.0b3 — 2026-11-14
 

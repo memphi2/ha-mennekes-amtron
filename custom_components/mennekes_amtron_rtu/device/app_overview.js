@@ -135,6 +135,8 @@
   };
   const text = key => words[key]?.[column] ?? words.unknown[column];
   document.querySelectorAll("[data-overview]").forEach(node => { node.textContent = text(node.dataset.overview); });
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   const el = id => document.getElementById(id);
   if (!el("overview")) return;
   const number = value => typeof value === "number" && Number.isFinite(value) && value >= 0;

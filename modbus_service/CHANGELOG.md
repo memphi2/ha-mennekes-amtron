@@ -5,6 +5,8 @@
 - The registers are a page below Overview again, with the complete table.
 - Pages carry their styles inside, so a change of page cannot show an
   unformatted page for a moment.
+- A page appears once its texts are in your language, so the English
+  fallback is not visible for a moment after a click.
 
 ## 0.9.0b3
 

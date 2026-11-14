@@ -35,6 +35,8 @@
   };
   const t = key => words[key]?.[column] || key;
   document.querySelectorAll("[data-text]").forEach(node => { node.textContent = t(node.dataset.text); });
+  // The page shows once its texts are in the page language.
+  document.documentElement.classList?.add("ready");
   const el = id => document.getElementById(id);
   const KEEP = 2000, RENEW_BELOW = 240;
   let lines = [], sequence = 0, generation = null, csrf = "", paused = false, stopped = false;
