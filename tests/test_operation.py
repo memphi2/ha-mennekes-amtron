@@ -158,3 +158,10 @@ def _raw(**changes: Any) -> dict[str, Any]:
 def test_invalid_summaries_are_rejected(raw: object) -> None:
     with pytest.raises(ValueError, match="invalid operation"):
         Operation.restore(raw)
+
+
+@pytest.mark.parametrize("status", ["meter_unavailable", "meter_reset"])
+@pytest.mark.parametrize("guest", [False, True])
+def test_untrusted_meter_is_not_reported_as_reached_target(status, guest):
+    result = _sum(control=_control(guest_mode=guest, energy_goal={"status": status, "target_kwh": 5}), goal_stop=True)
+    assert result["waiting"] == "meter_unavailable"

@@ -134,6 +134,8 @@ def summarize(
         gate.get("authorized") is True or control.get("plug_charge_manual") is True
     ):
         waiting = "plug_charge_waiting"
+    elif energy.get("status") in ("meter_unavailable", "meter_reset"):
+        waiting = "meter_unavailable"
     elif waits is not None:
         waiting = waits
     elif goal_stop or (not guest and soc.get("status") == "reached") or energy.get("status") == "reached":
