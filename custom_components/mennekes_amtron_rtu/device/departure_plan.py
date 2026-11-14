@@ -16,6 +16,7 @@ import json
 import logging
 import math
 import re
+import secrets
 import time
 from bisect import bisect_left
 from collections.abc import Awaitable, Callable
@@ -61,7 +62,7 @@ _INPUT_KEYS = frozenset({
 })
 _PLAN_KEYS = frozenset({
     "trip", "inputs", "anchor", "session", "planned_start", "plan_paused", "estimated_stop",
-    "learned", "editor", "selection_vehicle",
+    "learned", "editor", "selection_vehicle", "edit_revision",
 })
 # Near a full battery the car tapers; that power says nothing about a charge.
 _TAPER_LEVEL = 90.0
@@ -180,7 +181,7 @@ class SocAnchor:
 _DIGEST = re.compile(r"[0-9a-f]{32}")
 _STATE_KEYS = frozenset({
     "trip", "status", "planned_start", "estimated_soc", "inputs", "scope", "confirmed",
-    "forecast", "editor", "selection_vehicle",
+    "forecast", "editor", "selection_vehicle", "edit_revision",
 })
 
 
@@ -235,10 +236,11 @@ class DepartureState:
     forecast: DepartureForecast | None = None
     editor: str = "ha"
     selection_vehicle: str | None = None
+    edit_revision: str = "0" * 32
 
     def selection(self) -> dict[str, Any]:
         """Selection only, excluding changing forecast and meter readings."""
-        return {"trip": self.trip.snapshot(), "editor": self.editor, "selection_vehicle": self.selection_vehicle}
+        return {"edit_revision": self.edit_revision}
 
     @classmethod
     def restore(cls, raw: object) -> DepartureState:
@@ -253,11 +255,13 @@ class DepartureState:
         ):
             raise ValueError("invalid departure plan state")
         _selection(raw["editor"], raw["selection_vehicle"])
+        if not isinstance(raw["edit_revision"], str) or _DIGEST.fullmatch(raw["edit_revision"]) is None:
+            raise ValueError("invalid departure edit revision")
         return cls(
             TimedGoal.restore(raw["trip"]), status, None if start is None else instant(start),
             None if level is None else percentage(level), digest, scope, confirmed,
             None if raw["forecast"] is None else DepartureForecast.restore(raw["forecast"]),
-            raw["editor"], raw["selection_vehicle"],
+            raw["editor"], raw["selection_vehicle"], raw["edit_revision"],
         )
 
 
@@ -344,6 +348,7 @@ class DepartureController:
 
     def _reset(self) -> None:
         self.editor = "ha"
+        self.edit_revision = secrets.token_hex(16)
         self.selection_vehicle: str | None = None
         self.trip = TimedGoal()
         self.inputs: DepartureInputs | None = None
@@ -382,7 +387,10 @@ class DepartureController:
         if raw.keys() != _PLAN_KEYS:
             raise ValueError("invalid departure plan fields")
         _selection(raw["editor"], raw["selection_vehicle"])
+        if not isinstance(raw["edit_revision"], str) or _DIGEST.fullmatch(raw["edit_revision"]) is None:
+            raise ValueError("invalid departure edit revision")
         self.editor, self.selection_vehicle = raw["editor"], raw["selection_vehicle"]
+        self.edit_revision = raw["edit_revision"]
         trip = TimedGoal.restore(raw["trip"])
         inputs = None if raw["inputs"] is None else DepartureInputs.restore(raw["inputs"])
         anchor = None if raw["anchor"] is None else SocAnchor.restore(raw["anchor"])
@@ -399,6 +407,7 @@ class DepartureController:
         return {
             "trip": self.trip.snapshot(),
             "editor": self.editor, "selection_vehicle": self.selection_vehicle,
+            "edit_revision": self.edit_revision,
             "inputs": None if self.inputs is None else self.inputs.snapshot(),
             "anchor": None if self.anchor is None else self.anchor.snapshot(),
             "session": None if self._session is None else self._session.snapshot(),
@@ -438,6 +447,7 @@ class DepartureController:
         return {
             "trip": self.trip.snapshot(),
             "editor": self.editor, "selection_vehicle": self.selection_vehicle,
+            "edit_revision": self.edit_revision,
             "status": self.status,
             "planned_start": None if self.planned_start is None else self.planned_start.isoformat(),
             "estimated_soc": None if self._estimate is None else round(self._estimate, 1),
@@ -450,7 +460,7 @@ class DepartureController:
     @property
     def choice_revision(self) -> str:
         """Only user choice changes invalidate an editor, never meter polls."""
-        raw = json.dumps([self.trip.snapshot(), self.editor, self.selection_vehicle, self.sample().vehicle], sort_keys=True)
+        raw = json.dumps([self.edit_revision, self.sample().vehicle])
         return hashlib.sha256(raw.encode()).hexdigest()
 
     async def set_trip(
@@ -467,7 +477,7 @@ class DepartureController:
             if not self.ready or self._closing:
                 raise DeviceError("service_unavailable")
             def check_selection() -> None:
-                current = {"trip": self.trip.snapshot(), "editor": self.editor, "selection_vehicle": self.selection_vehicle}
+                current = {"edit_revision": self.edit_revision}
                 if expected_selection is not None and expected_selection != current:
                     raise DeviceError("soc_goal_source_changed")
             check_selection()
@@ -500,6 +510,7 @@ class DepartureController:
                 self._reached_target = self.planned_start = None
                 self.estimated_stop = False
             self.editor = editor
+            self.edit_revision = secrets.token_hex(16)
             self.selection_vehicle = None if withdraw else sample.vehicle
             if withdraw:
                 self.inputs = None

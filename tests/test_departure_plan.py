@@ -175,7 +175,7 @@ def test_without_a_trip_or_car_nothing_is_planned(tmp_path):
         assert (plan.status, plan.snapshot()) == ("disabled", {
             "trip": {"deadline": None, "source": None, "finished": None}, "status": "disabled",
             "planned_start": None, "estimated_soc": None, "inputs": None, "scope": SCOPE,
-            "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None,
+            "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None, "edit_revision": plan.edit_revision,
         })
         await plan.set_trip(NOW + timedelta(hours=2), "manual")
         await plan.tick()
@@ -1113,4 +1113,42 @@ def test_app_departure_refuses_a_past_instant_and_uninitialized_inputs(tmp_path)
         with pytest.raises(DeviceError, match="soc_goal_source_changed"):
             await plan.set_trip(NOW + timedelta(hours=3), None, editor="app", expected_revision=plan.choice_revision, expected_vehicle=CAR)
         assert plan.trip.snapshot() == before
+    run(body())
+
+
+def test_edit_revision_survives_restart_and_ignores_automatic_completion(tmp_path):
+    async def body():
+        box = Box(tmp_path)
+        plan = await box.start()
+        revision = plan.choice_revision
+        selection = dp.DepartureState.restore(plan.snapshot()).selection()
+        plan.trip.finish("late")
+        assert plan.choice_revision == revision
+        await plan._save()
+        restored = box.controller()
+        await restored.initialize()
+        assert dp.DepartureState.restore(restored.snapshot()).selection() == selection
+        await restored.set_trip(NOW + timedelta(hours=6), "manual", expected_selection=selection)
+        assert restored.choice_revision != revision
+        with pytest.raises(DeviceError, match="soc_goal_source_changed"):
+            await restored.set_trip(NOW + timedelta(hours=8), "manual", expected_selection=selection)
+    run(body())
+
+
+@pytest.mark.parametrize("invalid", [None, 1, "not-a-revision"])
+def test_invalid_edit_revision_is_not_restored_or_published(tmp_path, invalid):
+    async def body():
+        box = Box(tmp_path)
+        plan = await box.start()
+        raw = plan.snapshot()
+        raw["edit_revision"] = invalid
+        with pytest.raises(ValueError, match="edit revision"):
+            dp.DepartureState.restore(raw)
+        saved = plan.store.load()
+        saved["edit_revision"] = invalid
+        plan.store.save(saved)
+        restarted = box.controller()
+        await restarted.initialize()
+        assert restarted.trip.deadline is None
+        assert restarted.inputs is None
     run(body())

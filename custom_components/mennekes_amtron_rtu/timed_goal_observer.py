@@ -20,7 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from .device.charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
-from .device.departure_plan import DepartureForecast, DepartureInputs
+from .device.departure_plan import DepartureForecast, DepartureInputs, DepartureState
 from .device.departure_step import (
     MIN_WRITE_INTERVAL,
     keeps_start,
@@ -582,7 +582,7 @@ class TimedGoalObserver:
         # A command of this observer from before the service took over.
         await self._cancel_command()
         if (remote := control.departure) is not None:
-            await self._sync_trip(remote.trip, editor=remote.editor, vehicle=remote.selection_vehicle)
+            await self._sync_trip(remote)
         if (remote := control.departure) is not None:
             inputs = self._departure_inputs(remote.scope)
             if inputs is not None and inputs.digest != remote.inputs:
@@ -596,10 +596,11 @@ class TimedGoalObserver:
             self.status, self.planned_start, self.forecast = status, start, forecast
             self._notify()
 
-    async def _sync_trip(self, service: TimedGoal, *, editor: str = "ha", vehicle: str | None = None) -> None:
+    async def _sync_trip(self, remote: DepartureState) -> None:
+        service, editor, vehicle = remote.trip, remote.editor, remote.selection_vehicle
         trip = self.goal
         same = (trip.deadline, trip.source) == (service.deadline, service.source)
-        selection = {"trip": service.snapshot(), "editor": editor, "selection_vehicle": vehicle}
+        selection = remote.selection()
         observer = self._runtime.vehicle_soc
         from_app = editor == "app" and observer is not None and observer.source == vehicle
         if self._trip_dirty and from_app and self._trip_base is not None and selection != self._trip_base:

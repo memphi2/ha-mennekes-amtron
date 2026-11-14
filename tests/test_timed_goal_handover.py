@@ -40,7 +40,7 @@ FORECAST = {
 def plan(trip: TimedGoal | None = None, **changes) -> dict:
     return {
         "trip": (trip or TimedGoal()).snapshot(), "status": "disabled", "planned_start": None,
-        "estimated_soc": None, "inputs": None, "scope": SCOPE, "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None,
+        "estimated_soc": None, "inputs": None, "scope": SCOPE, "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None, "edit_revision": "a" * 32,
         **changes,
     }
 
@@ -324,7 +324,7 @@ def test_new_app_departure_supersedes_an_unsent_ha_edit(monkeypatch):
         await observer.async_set_deadline(NOW + timedelta(hours=5), source="manual")
         newer = TimedGoal()
         newer.set(NOW + timedelta(hours=7), "manual")
-        service.state = plan(newer, editor="app", selection_vehicle=CAR)
+        service.state = plan(newer, editor="app", selection_vehicle=CAR, edit_revision="b" * 32)
         await observer._evaluate()
         assert observer.goal.deadline == newer.deadline
         assert not observer._trip_dirty
@@ -342,4 +342,24 @@ def test_foreign_vehicle_app_choice_is_not_adopted(monkeypatch):
         await observer._evaluate()
         assert observer.goal.deadline == NOW + timedelta(hours=5)
         assert service.trips == [(observer.goal.deadline, "manual", False)]
+    asyncio.run(body())
+
+
+@pytest.mark.parametrize("completion", ["reached", "late"])
+def test_automatic_completion_of_app_trip_does_not_discard_new_ha_choice(monkeypatch, completion):
+    async def body():
+        observer, service, _hass = handover(monkeypatch)
+        old = TimedGoal()
+        old.set(NOW + timedelta(hours=1), "manual")
+        service.state = plan(old, editor="app", selection_vehicle=CAR)
+        await observer._evaluate()
+        new_deadline = NOW + timedelta(hours=8)
+        await observer.async_set_deadline(new_deadline, source="manual")
+        old.finish(completion)
+        service.state["trip"] = old.snapshot()  # Lifecycle change, same edit revision.
+        await observer._evaluate()
+        assert observer.goal.deadline == new_deadline
+        assert observer.goal.finished is None
+        assert service.trips == [(new_deadline, "manual", False)]
+        assert not observer._trip_dirty
     asyncio.run(body())

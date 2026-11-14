@@ -284,7 +284,7 @@ service data rather than maintaining a second queue.
 | `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |
-| `GET`/`POST /v2/jobs` | Authenticated charging-job state and operations; see [Guest charging API](#guest-charging-api). |
+| `GET`/`POST /v2/jobs` | Authenticated guest-charging state and operations; see [Guest charging API](#guest-charging-api). |
 | `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number
@@ -334,6 +334,8 @@ snapshot's `control` object reports `supports_departure_plan: true` and
 | Field | Meaning |
 |---|---|
 | `trip` | `deadline` (ISO timestamp or `null`), `source` and `finished` (`reached`, `late` or `null`) |
+| `edit_revision` | Opaque persisted identifier changed by explicit trip edits, not by automatic completion; HA uses it to reject stale handovers |
+| `editor`, `selection_vehicle` | Last explicit editor (`ha` or `app`) and its vehicle binding; not public vehicle identity labels |
 | `status` | The plan's state, as shown by **Timed charging status** |
 | `planned_start` | When charging starts or started for this trip, or `null` |
 | `estimated_soc` | The projected charge level in percent, or `null` |
@@ -342,9 +344,8 @@ snapshot's `control` object reports `supports_departure_plan: true` and
 | `confirmed` | Whether the handed-over car is confirmed for this plug-in |
 | `forecast` | `null` unless a plan is computed; otherwise `finish_at` (when the target is reached: the departure, or later when it is unreachable, rounded up to five minutes), `level_at_departure` (percent), `efficiency` (learned share of the metered energy that reaches the battery, 0.9 until learned) and `full_power_kw` (metered power at full current for the current phases, or `null`) |
 
-`control.orders` is the charging-job state that `GET /v2/jobs` returns, or
-`null` while the job controller loads. Home Assistant reads its **Charging
-job** sensor from it, so a poll needs no second request.
+`control.orders` is the guest-charging state that `GET /v2/jobs` returns, or
+`null` while the job controller loads. Home Assistant reads its **Guest charging** sensor from it, so a poll needs no second request.
 
 `control.operation` summarizes all controllers of the service for a reader. It
 is derived from their published state and decides nothing:
