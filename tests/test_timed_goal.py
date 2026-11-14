@@ -135,7 +135,7 @@ class FakeControl:
         return False
 
     def __init__(self, data: WallboxData) -> None:
-        self.soc_goal = SimpleNamespace(status="active", target_percent=80.0)
+        self.soc_goal = SimpleNamespace(status="active", target_percent=80.0, source="car")
         self.energy_goal = EnergyGoal()
         self.max_charging_current = 16.0
         self.read_only = False

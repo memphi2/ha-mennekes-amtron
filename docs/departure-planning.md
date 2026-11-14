@@ -277,3 +277,10 @@ five minutes; the status sensor has
 stable states and adds no per-minute history entries.
 
 [Vehicle setup](vehicle-setup.md) · [Calendar and climate blueprints](blueprints.md) · [Troubleshooting](troubleshooting.md#targets-and-departure-planning)
+
+Direct connections use the same two-minute measurement window and power-ceiling
+calculation as the app. They learn from existing energy-counter polls without
+extra bus requests or Recorder entities. Direct-mode power estimates are kept
+in bounded memory and learned again after HA restarts; the app keeps its bounded
+vehicle model across its own restarts. Phase changes, vehicle changes, invalid
+meter readings and pauses end a measurement window.

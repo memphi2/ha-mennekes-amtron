@@ -28,7 +28,6 @@ from .charging_plan import ChargePlan, plan_current, usable_capacity
 from .client_errors import AmtronBusError
 from .departure_model import (
     MIN_LEVEL_GAIN,
-    POWER_WINDOW_SECONDS,
     DepartureModel,
 )
 from .departure_step import (
@@ -41,6 +40,7 @@ from .departure_step import (
 from .departure_store import DepartureStore
 from .errors import DeviceError
 from .persistence import finish_goal_save
+from .power_window import PowerWindow
 from .session_mark import SessionMark
 from .soc_goal import percentage
 from .timed_goal import TimedGoal
@@ -341,7 +341,7 @@ class DepartureController:
         self._learn_from: SocAnchor | None = None
         # Since when the car charges at the plan's full current: meter time,
         # reading, phases and that current.
-        self._full_from: tuple[float, float, int, float] | None = None
+        self._power_window = PowerWindow()
         self._at_full = False
         self.forecast: dict[str, Any] | None = None
         self._reset()
@@ -558,6 +558,7 @@ class DepartureController:
         if sample.scope != self._trail_scope:
             # A new plug-in, or the same one after a gap: its energy starts a
             # new trail, and a reading before it counts from its start.
+            self._power_window.reset()
             self._trail = []
             self._trail_scope = sample.scope
         if sample.scope is None or sample.total_kwh is None or sample.meter_at is None:
@@ -573,6 +574,7 @@ class DepartureController:
                 return
             sample = self.sample()
             if sample.guest_mode:
+                self._power_window.reset()
                 await self._cancel_command()
                 self.status = "guest_mode"
                 return
@@ -596,20 +598,15 @@ class DepartureController:
         """Meter what the car really draws while the plan offers full current."""
         inputs = self.inputs
         if not self._at_full or inputs is None or s.phases is None or s.meter_at is None or s.total_kwh is None:
-            self._full_from = None
+            self._power_window.reset()
             return
-        start = self._full_from
-        if start is None or start[2:] != (s.phases, s.max_current_a):
-            self._full_from = (s.meter_at, s.total_kwh, s.phases, s.max_current_a)
-            return
-        seconds = s.meter_at - start[0]
-        if seconds < POWER_WINDOW_SECONDS:
-            return
-        car = self.model.car(inputs.vehicle).with_power(
-            s.phases, (s.total_kwh - start[1]) * 3600 / seconds, s.max_current_a,
+        kw = self._power_window.sample(
+            at=s.meter_at, total=s.total_kwh, phases=s.phases,
+            current=s.max_current_a, vehicle=inputs.vehicle,
         )
-        self.model.learn(inputs.vehicle, car)
-        self._full_from = (s.meter_at, s.total_kwh, s.phases, s.max_current_a)
+        if kw is not None:
+            car = self.model.car(inputs.vehicle).with_power(s.phases, kw, s.max_current_a)
+            self.model.learn(inputs.vehicle, car)
 
     def _learn_efficiency(self, new: SocAnchor) -> None:
         """Compare two reports of the car with the energy metered between them."""

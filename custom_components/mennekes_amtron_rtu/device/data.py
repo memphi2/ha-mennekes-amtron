@@ -55,7 +55,7 @@ class WallboxData:
     soc_goal: dict[str, float | str | None] | None = field(default=None, repr=False)
     # A goal may only act on a counter attempted in this poll, never a cached one.
     energy_read: bool = field(default=False, compare=False, repr=False)
-    # Actual service-side meter attempt time, not a repeated API cache read.
+    # Actual meter attempt time, never the time of a repeated API/cache read.
     energy_observed_at: float | None = field(default=None, compare=False, repr=False)
     # The session clock and energy were read in this poll, not carried forward.
     session_read: bool = field(default=False, compare=False, repr=False)

@@ -1022,10 +1022,10 @@ def test_the_power_at_full_current_is_metered_and_corrects_the_forecast(tmp_path
         box.set(applied_a=8.0)
         box.clock[0] += 300
         await plan.tick()
-        assert plan._full_from is None
+        assert plan._power_window.start is None
         box.set(phases=None)
         await plan.tick()
-        assert plan._full_from is None
+        assert plan._power_window.start is None
     run(go())
 
 
@@ -1033,16 +1033,16 @@ def test_a_change_of_phases_starts_the_power_measurement_again(tmp_path):
     async def go():
         box = Box(tmp_path, applied_a=16.0)
         plan = await box.start(hours=2)
-        assert plan._full_from == (NOW.timestamp(), 100.0, 3, 16.0)
+        assert plan._power_window.start == (NOW.timestamp(), 100.0, 3, 16.0)
         at = NOW + timedelta(minutes=5)
         box.set(now=at, total_kwh=100.5, meter_at=at.timestamp(), phases=1)
         await plan.tick()
-        assert plan._full_from == (at.timestamp(), 100.5, 1, 16.0)
+        assert plan._power_window.start == (at.timestamp(), 100.5, 1, 16.0)
         # So does another maximum current.
         later = NOW + timedelta(minutes=8)
         box.set(now=later, total_kwh=100.7, meter_at=later.timestamp(), max_current_a=10.0, applied_a=10.0)
         await plan.tick()
-        assert plan._full_from == (later.timestamp(), 100.7, 1, 10.0)
+        assert plan._power_window.start == (later.timestamp(), 100.7, 1, 10.0)
         assert plan.model.cars == {}
     run(go())
 
@@ -1051,7 +1051,7 @@ def test_a_reduced_current_is_not_measured_as_full_power(tmp_path):
     async def go():
         box = Box(tmp_path, applied_a=6.0)
         plan = await box.start(hours=0.2, given=inputs(soc_percent=79))
-        assert (plan.status, box.writes, plan._full_from) == ("finishing", [], None)
+        assert (plan.status, box.writes, plan._power_window.start) == ("finishing", [], None)
     run(go())
 
 

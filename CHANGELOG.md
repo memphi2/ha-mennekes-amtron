@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Share actual-power measurement windows between direct HA and app planning,
+  using existing meter polls and resetting on vehicle, phase or meter changes.
+
 - Model a lower vehicle charging limit as a power ceiling. Reducing the
   wallbox current no longer incorrectly scales that ceiling down again.
 

@@ -90,6 +90,8 @@ class MennekesAmtronCoordinator(DataUpdateCoordinator[WallboxData]):
             data = await self._poller.async_poll(
                 self.current_data(), last_success=self.last_update_success
             )
+            if data.energy_read:
+                data.energy_observed_at = observed_at.timestamp()
             if self.observe_plug_charge is not None:
                 self.observe_plug_charge(data, observed_at)
             if self.control_status is not None:

@@ -15,9 +15,9 @@ from typing import Any
 from .client_errors import AmtronBusError
 from .command_events import CommandEvent
 from .control import AmtronControl
-from .enums import GridPhasesConnected, SwitchedPhases
 from .errors import DeviceError
 from .guest_permission import GuestPermission
+from .power_window import observed_phases
 from .service_console_runtime import ConsoleModbusService
 from .session_mark import SessionMark
 from .vehicle import snapshot_vehicle_connected
@@ -300,19 +300,4 @@ class GuestModbusService(ConsoleModbusService):
 
 
     def _rate_phases(self) -> int:
-        switched = self.data.fresh("switched_phases")
-        grid = self.data.fresh("grid_phases_connected")
-        detected = self.data.fresh("detected_ev_phases")
-        # Detection is the vehicle maximum for the session, not the presently
-        # selected relay configuration. Never train single-phase data as three.
-        if isinstance(switched, bool):
-            return 0
-        if switched == SwitchedPhases.SINGLE_PHASE:
-            return 1
-        if switched != SwitchedPhases.ALL_AVAILABLE or isinstance(grid, bool):
-            return 0
-        if grid == GridPhasesConnected.L1:
-            return 1
-        if grid == GridPhasesConnected.L1_L2_L3 and isinstance(detected, (int, float)) and not isinstance(detected, bool) and detected in (1, 2, 3):
-            return int(detected)
-        return 0
+        return observed_phases(self.data.fresh) or 0

@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from .device.charging_plan import ChargePlan, plan_current, usable_capacity
 from .device.client_errors import AmtronBusError
+from .device.departure_model import DepartureModel
 from .device.departure_plan import DepartureForecast, DepartureInputs, DepartureState
 from .device.departure_step import (
     MIN_WRITE_INTERVAL,
@@ -36,6 +37,7 @@ from .device.enums import (
     SwitchedPhases,
 )
 from .device.persistence import StorageCommitUncertainError, StorageStateUnknownError
+from .device.power_window import PowerWindow, observed_phases
 from .device.registers import EVSE_STATE
 from .device.timed_goal import TimedGoal, matches_departure_source
 from .device.vehicle import snapshot_vehicle_connected
@@ -118,6 +120,9 @@ class TimedGoalObserver:
         self.planned_start: datetime | None = None
         # The service's forecast for the trip; a plan made here has none.
         self.forecast: DepartureForecast | None = None
+        self._power_model = DepartureModel()
+        self._power_window = PowerWindow()
+        self._at_full = False
         # The target a reached trip met; only a higher one plans it again.
         self._reached_target: float | None = None
         self._unsubs: list[CALLBACK_TYPE] = []
@@ -479,6 +484,35 @@ class TimedGoalObserver:
         )
 
     async def _evaluate(self) -> None:
+        self._at_full = False
+        try:
+            await self._evaluate_plan()
+        finally:
+            self._learn_power()
+
+    def _learn_power(self) -> None:
+        control = self._runtime.control
+        source = control.soc_goal.source
+        if not self._at_full or source is None:
+            self._power_window.reset()
+            return
+        data = self._runtime.coordinator.current_data()
+        phases = observed_phases(data.fresh)
+        if phases is None:
+            self._power_window.reset()
+            return
+        if not data.energy_read:
+            return
+        total, at = data.fresh("energy_total"), data.energy_observed_at
+        if isinstance(total, bool) or not isinstance(total, (int, float)) or at is None:
+            self._power_window.reset()
+            return
+        maximum = control.max_charging_current
+        kw = self._power_window.sample(at=at, total=total, phases=phases, current=maximum, vehicle=source)
+        if kw is not None:
+            self._power_model.learn(source, self._power_model.car(source).with_power(phases, kw, maximum))
+
+    async def _evaluate_plan(self) -> None:
         if self._save_unknown:
             await self._wait_for_input("error")
             return
@@ -561,6 +595,7 @@ class TimedGoalObserver:
             soc_percent=soc, target_percent=goal.target_percent,
             capacity_kwh=capacity, phases=self._phases(),
             max_current_a=control.max_charging_current,
+            full_power_kw=self._power_model.car(goal.source).power(self._phases(), control.max_charging_current),
         )
         if plan.status == "reached" or control.energy_goal.status == "reached":
             await self._finish("reached", trip)
@@ -588,9 +623,11 @@ class TimedGoalObserver:
         self._set_status(step.status)
         if step.current_a is None or control.is_paused is None:
             return
-        applied = self._runtime.coordinator.current_data().get("charging_current_ems")
+        applied = self._runtime.coordinator.current_data().fresh("charging_current_ems")
         if needs_current(step.current_a, paused=control.is_paused, applied=applied):
             await self._write(step.current_a, trip)
+        elif step.current_a == control.max_charging_current and not control.is_paused and soc < 90:
+            self._at_full = True
 
     async def _follow_service(self) -> None:
         """Hand trip and car data to the service, which plans; show its state."""
