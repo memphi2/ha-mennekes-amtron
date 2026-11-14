@@ -98,6 +98,12 @@ class DepartureModbusService(GuestModbusService):
             control = self.control
             if control is None or self._stopping or not self._is_available():
                 raise DeviceError("service_unavailable")
+            # The plan decided before awaiting this lock. A guest may have
+            # taken over meanwhile, including a deliberately paused guest.
+            # Check ownership here for every plan write, including resumes
+            # that end a pause the plan originally set.
+            if self._guest_scope is not None:
+                raise DeviceError("soc_goal_source_changed")
             try:
                 await write(control)
             finally:

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Reject stale vehicle-plan writes after guest charging takes control, including
+  resumes that would otherwise override a deliberate guest pause.
+
 - Remove the obsolete guest-order engine, persistence, separate forecast and
   control locks. Guest permission uses ordinary controls and shared limits for
   the current plug-in, with no separate guest record. An app restart requires
