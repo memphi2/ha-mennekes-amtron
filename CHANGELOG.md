@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   longer offers its own current cap and polling interval for an app
   connection; **Configure → Wallbox** shows the app's current cap and waits,
   and they are changed in the app.
+- **The app's orders can be used from Home Assistant.** New actions start,
+  stop and clear a charging job, start guest charging, start and end a boost
+  and activate or deactivate a weekly plan, in one step and without a device
+  ID when there is one wallbox. The new sensors **Charging job** and **Weekly
+  plan** show their state. `docs/app-from-home-assistant.md` has a ready
+  dashboard view with Mushroom cards.
 
 ## 0.9.0b3 — 2026-11-14
 

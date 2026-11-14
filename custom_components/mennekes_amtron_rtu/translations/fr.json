@@ -572,6 +572,27 @@
             "name": "Heure"
           }
         }
+      },
+      "charging_job": {
+        "name": "Ordre de recharge",
+        "state": {
+          "none": "Aucun ordre",
+          "scheduled": "En attente de la plage",
+          "charging": "Recharge demandée",
+          "waiting_meter": "En attente d’un relevé de compteur valide",
+          "suspended": "Interrompu ; vérifie si le même branchement continue",
+          "reached": "Plafond d’énergie atteint",
+          "finished": "Plage horaire terminée",
+          "stopped": "Arrêté par l’utilisateur",
+          "interrupted": "Interrompu ; pas de redémarrage automatique"
+        }
+      },
+      "weekly_plan": {
+        "name": "Plan hebdomadaire",
+        "state": {
+          "inactive": "Inactif",
+          "active": "Actif"
+        }
       }
     },
     "switch": {
@@ -907,6 +928,96 @@
     },
     "plug_charge_not_supported": {
       "message": "L’application ou le service Modbus connecté ne prend pas en charge Plug & Charge virtuel. Mettez-le à jour vers une version compatible."
+    },
+    "guest_vehicle_target_active": {
+      "message": "Objectif de batterie du véhicule actif ; aucun ordre invité créé."
+    },
+    "invalid_boost_duration": {
+      "message": "Saisissez un nombre entier de 1 à 120 minutes."
+    },
+    "invalid_job_request": {
+      "message": "L’application n’a pas accepté ces valeurs. Vérifiez l’heure, le courant et l’énergie."
+    },
+    "invalid_weekly_request": {
+      "message": "L’application n’a pas accepté ces valeurs. Vérifiez l’heure, le courant et l’énergie."
+    },
+    "job_boost_unavailable": {
+      "message": "Le boost exige un ordre actif avant son début prévu et une autorisation actuelle."
+    },
+    "job_changed": {
+      "message": "L’état a changé entre-temps. Réessayez."
+    },
+    "job_clear_requires_pause": {
+      "message": "L’effacement exige une pause confirmée ou un véhicule débranché."
+    },
+    "job_current_exceeds_cap": {
+      "message": "Le courant dépasse la limite du service."
+    },
+    "job_exists": {
+      "message": "Un autre ordre est encore en cours. Arrêtez-le d’abord."
+    },
+    "job_not_permitted": {
+      "message": "Connexion ou autorisation modifiée ; aucun ordre créé."
+    },
+    "job_preview_expired": {
+      "message": "L’état a changé entre-temps. Réessayez."
+    },
+    "job_service_starting": {
+      "message": "Le service démarre encore. Réessayez dans un instant."
+    },
+    "job_stop_first": {
+      "message": "Arrêtez d’abord l’ordre en cours."
+    },
+    "job_storage_unavailable": {
+      "message": "Stockage indisponible ; aucun démarrage automatique."
+    },
+    "weekly_already_active": {
+      "message": "Un plan hebdomadaire est déjà actif pour cette connexion. Arrêtez-le d’abord."
+    },
+    "weekly_changed": {
+      "message": "L’état a changé entre-temps. Réessayez."
+    },
+    "weekly_confirmation_expired": {
+      "message": "L’état a changé entre-temps. Réessayez."
+    },
+    "weekly_inactive": {
+      "message": "Aucun plan hebdomadaire actif."
+    },
+    "weekly_invalid_confirmation": {
+      "message": "L’état a changé entre-temps. Réessayez."
+    },
+    "weekly_manual_stop": {
+      "message": "Arrêté manuellement entre-temps ; réactivez le plan."
+    },
+    "weekly_no_occurrence": {
+      "message": "Aucun départ valide non utilisé dans les sept jours."
+    },
+    "weekly_service_starting": {
+      "message": "Le service démarre encore. Réessayez dans un instant."
+    },
+    "weekly_stop_unconfirmed": {
+      "message": "L’arrêt du plan hebdomadaire n’est pas encore confirmé. Réessayez dans un instant."
+    },
+    "weekly_storage_unavailable": {
+      "message": "Le stockage des plans hebdomadaires est indisponible ou non confirmé. Redémarrez et vérifiez le stockage avant d’activer."
+    },
+    "weekly_successor_not_permitted": {
+      "message": "La prochaine occurrence ne peut pas démarrer maintenant. Vérifiez la connexion, le compteur et l’autorisation."
+    },
+    "weekly_vehicle_not_confirmed": {
+      "message": "L’état a changé entre-temps. Réessayez."
+    },
+    "service_order_failed": {
+      "message": "L’application ne l’a pas exécuté. Vérifiez qu’elle est joignable et à jour, et que les heures et valeurs sont valides."
+    },
+    "app_required": {
+      "message": "Cette action nécessite l’application Modbus ; cette borne est connectée directement."
+    },
+    "weekly_plan_unknown": {
+      "message": "L’application n’a pas de plan hebdomadaire « {plan} »."
+    },
+    "wallbox_target_required": {
+      "message": "Plusieurs bornes sont configurées ; indiquez la borne concernée."
     }
   },
   "issues": {
@@ -1571,6 +1682,126 @@
         "profile": {
           "name": "Profil d’historique",
           "description": "Conserver tout l’historique, réduire les détails ou conserver uniquement les statistiques d’énergie et de puissance."
+        }
+      }
+    },
+    "start_charging_job": {
+      "name": "Démarrer un ordre de recharge",
+      "description": "Recharge la voiture branchée dans une plage horaire, à courant fixe, jusqu’à une quantité d’énergie. L’ordre prend fin au débranchement.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        },
+        "current": {
+          "name": "Courant de charge",
+          "description": "Courant en ampères par phase, au plus la limite de l’application."
+        },
+        "energy": {
+          "name": "Énergie",
+          "description": "La recharge s’arrête une fois cette énergie fournie, en kWh."
+        },
+        "start": {
+          "name": "Début",
+          "description": "Quand la recharge peut commencer. Laissez vide pour commencer maintenant."
+        },
+        "finish": {
+          "name": "Fin",
+          "description": "Quand la recharge se termine au plus tard, sous sept jours."
+        },
+        "reserve": {
+          "name": "Réserve immédiate",
+          "description": "Facultatif : cette énergie en kWh est chargée tout de suite, avant la plage."
+        }
+      }
+    },
+    "start_guest_charging": {
+      "name": "Démarrer une recharge invité",
+      "description": "Recharge la voiture d’un invité dès maintenant, pour une durée et une énergie limitées. Aucune donnée du véhicule ni objectif enregistré n’est utilisé.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        },
+        "current": {
+          "name": "Courant de charge",
+          "description": "Courant en ampères par phase, au plus la limite de l’application."
+        },
+        "energy": {
+          "name": "Énergie",
+          "description": "La recharge s’arrête une fois cette énergie fournie, en kWh."
+        },
+        "duration": {
+          "name": "Durée",
+          "description": "Durée de recharge autorisée, en minutes (jusqu’à 24 heures)."
+        }
+      }
+    },
+    "stop_charging_job": {
+      "name": "Arrêter l’ordre de recharge",
+      "description": "Arrête l’ordre de recharge ou la recharge invité en cours. La recharge se met en pause et ne reprend pas d’elle-même.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        }
+      }
+    },
+    "clear_charging_job": {
+      "name": "Effacer l’ordre de recharge",
+      "description": "Supprime un ordre de recharge terminé ou arrêté, pour pouvoir en démarrer un nouveau.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        }
+      }
+    },
+    "start_boost": {
+      "name": "Démarrer le boost",
+      "description": "Recharge tout de suite bien que l’ordre commence plus tard, puis revient au plan.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        },
+        "duration": {
+          "name": "Durée",
+          "description": "Durée de la recharge anticipée, en minutes (jusqu’à 120)."
+        }
+      }
+    },
+    "cancel_boost": {
+      "name": "Annuler le boost",
+      "description": "Met fin à la recharge anticipée ; l’ordre se poursuit comme prévu.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        }
+      }
+    },
+    "activate_weekly_plan": {
+      "name": "Activer le plan hebdomadaire",
+      "description": "Active un plan hebdomadaire de l’application pour la voiture branchée, pendant sept jours au plus ou jusqu’au débranchement. Les plans se créent dans l’application.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
+        },
+        "plan": {
+          "name": "Plan",
+          "description": "Le nom de véhicule du plan, tel qu’affiché dans l’application."
+        }
+      }
+    },
+    "deactivate_weekly_plan": {
+      "name": "Désactiver le plan hebdomadaire",
+      "description": "Met fin au plan hebdomadaire actif et arrête son ordre de recharge.",
+      "fields": {
+        "device_id": {
+          "name": "Borne",
+          "description": "La borne concernée. Peut être omise s’il n’y en a qu’une."
         }
       }
     }

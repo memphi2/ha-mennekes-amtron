@@ -572,6 +572,27 @@
             "name": "Orario"
           }
         }
+      },
+      "charging_job": {
+        "name": "Ordine di ricarica",
+        "state": {
+          "none": "Nessun ordine",
+          "scheduled": "In attesa della finestra",
+          "charging": "Ricarica richiesta",
+          "waiting_meter": "In attesa di una lettura valida del contatore",
+          "suspended": "Interrotto; verifica se lo stesso collegamento prosegue",
+          "reached": "Tetto di energia raggiunto",
+          "finished": "Finestra oraria terminata",
+          "stopped": "Fermato dall’utente",
+          "interrupted": "Interrotto; nessun riavvio automatico"
+        }
+      },
+      "weekly_plan": {
+        "name": "Piano settimanale",
+        "state": {
+          "inactive": "Non attivo",
+          "active": "Attivo"
+        }
       }
     },
     "switch": {
@@ -907,6 +928,96 @@
     },
     "plug_charge_not_supported": {
       "message": "L’app o il servizio Modbus collegato non supporta Plug & Charge virtuale. Aggiornalo a una versione compatibile prima di attivarlo."
+    },
+    "guest_vehicle_target_active": {
+      "message": "Obiettivo batteria del veicolo attivo; nessun ordine ospite creato."
+    },
+    "invalid_boost_duration": {
+      "message": "Inserire un numero intero da 1 a 120 minuti."
+    },
+    "invalid_job_request": {
+      "message": "L’app non ha accettato questi valori. Controlla orario, corrente ed energia."
+    },
+    "invalid_weekly_request": {
+      "message": "L’app non ha accettato questi valori. Controlla orario, corrente ed energia."
+    },
+    "job_boost_unavailable": {
+      "message": "Il boost richiede un ordine attivo prima del suo inizio previsto e un consenso attuale."
+    },
+    "job_changed": {
+      "message": "Nel frattempo lo stato è cambiato. Riprova."
+    },
+    "job_clear_requires_pause": {
+      "message": "La cancellazione richiede una pausa confermata o il veicolo scollegato."
+    },
+    "job_current_exceeds_cap": {
+      "message": "La corrente supera il limite del servizio."
+    },
+    "job_exists": {
+      "message": "Un altro ordine è ancora in corso. Fermarlo prima."
+    },
+    "job_not_permitted": {
+      "message": "Collegamento o consenso modificati; nessun ordine creato."
+    },
+    "job_preview_expired": {
+      "message": "Nel frattempo lo stato è cambiato. Riprova."
+    },
+    "job_service_starting": {
+      "message": "Il servizio si sta ancora avviando. Riprova tra poco."
+    },
+    "job_stop_first": {
+      "message": "Fermare prima l’ordine in corso."
+    },
+    "job_storage_unavailable": {
+      "message": "Memoria non disponibile; nessun avvio automatico."
+    },
+    "weekly_already_active": {
+      "message": "Un piano settimanale è già attivo per questo collegamento. Fermarlo prima."
+    },
+    "weekly_changed": {
+      "message": "Nel frattempo lo stato è cambiato. Riprova."
+    },
+    "weekly_confirmation_expired": {
+      "message": "Nel frattempo lo stato è cambiato. Riprova."
+    },
+    "weekly_inactive": {
+      "message": "Nessun piano settimanale attivo."
+    },
+    "weekly_invalid_confirmation": {
+      "message": "Nel frattempo lo stato è cambiato. Riprova."
+    },
+    "weekly_manual_stop": {
+      "message": "Fermato a mano nel frattempo; riattivare il piano."
+    },
+    "weekly_no_occurrence": {
+      "message": "Nessuna partenza valida non usata entro sette giorni."
+    },
+    "weekly_service_starting": {
+      "message": "Il servizio si sta ancora avviando. Riprova tra poco."
+    },
+    "weekly_stop_unconfirmed": {
+      "message": "Lo stop del piano settimanale non è ancora confermato. Riprova tra poco."
+    },
+    "weekly_storage_unavailable": {
+      "message": "La memoria dei piani settimanali non è disponibile o non è confermata. Riavviare e verificare la memoria prima di attivare."
+    },
+    "weekly_successor_not_permitted": {
+      "message": "La prossima occorrenza non può partire ora. Verificare collegamento, contatore e consenso."
+    },
+    "weekly_vehicle_not_confirmed": {
+      "message": "Nel frattempo lo stato è cambiato. Riprova."
+    },
+    "service_order_failed": {
+      "message": "L’app non lo ha eseguito. Verifica che sia raggiungibile e aggiornata e che orari e valori siano validi."
+    },
+    "app_required": {
+      "message": "Questa azione richiede l’app Modbus; questa wallbox è collegata direttamente."
+    },
+    "weekly_plan_unknown": {
+      "message": "L’app non ha un piano settimanale «{plan}»."
+    },
+    "wallbox_target_required": {
+      "message": "Sono configurate più wallbox; indica la wallbox interessata."
     }
   },
   "issues": {
@@ -1571,6 +1682,126 @@
         "profile": {
           "name": "Profilo della cronologia",
           "description": "Mantieni tutta la cronologia, riduci i dettagli oppure mantieni solo le statistiche di energia e potenza."
+        }
+      }
+    },
+    "start_charging_job": {
+      "name": "Avvia ordine di ricarica",
+      "description": "Ricarica l’auto collegata in una finestra oraria, a corrente fissa, fino a una quantità di energia. L’ordine termina quando l’auto viene scollegata.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        },
+        "current": {
+          "name": "Corrente di ricarica",
+          "description": "Corrente in ampere per fase, al massimo il limite dell’app."
+        },
+        "energy": {
+          "name": "Energia",
+          "description": "La ricarica termina quando è stata fornita questa energia, in kWh."
+        },
+        "start": {
+          "name": "Inizio",
+          "description": "Quando può iniziare la ricarica. Lascia vuoto per iniziare subito."
+        },
+        "finish": {
+          "name": "Fine",
+          "description": "Quando termina al più tardi la ricarica, entro sette giorni."
+        },
+        "reserve": {
+          "name": "Riserva immediata",
+          "description": "Facoltativo: questa energia in kWh viene caricata subito, prima della finestra."
+        }
+      }
+    },
+    "start_guest_charging": {
+      "name": "Avvia ricarica ospite",
+      "description": "Ricarica l’auto di un ospite da subito, per tempo ed energia limitati. Non vengono usati dati del veicolo né obiettivi salvati.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        },
+        "current": {
+          "name": "Corrente di ricarica",
+          "description": "Corrente in ampere per fase, al massimo il limite dell’app."
+        },
+        "energy": {
+          "name": "Energia",
+          "description": "La ricarica termina quando è stata fornita questa energia, in kWh."
+        },
+        "duration": {
+          "name": "Durata",
+          "description": "Per quanto tempo è consentita la ricarica, in minuti (fino a 24 ore)."
+        }
+      }
+    },
+    "stop_charging_job": {
+      "name": "Ferma ordine di ricarica",
+      "description": "Ferma l’ordine di ricarica o la ricarica ospite in corso. La ricarica va in pausa e non riprende da sola.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        }
+      }
+    },
+    "clear_charging_job": {
+      "name": "Cancella ordine di ricarica",
+      "description": "Rimuove un ordine di ricarica terminato o fermato, per poterne avviare uno nuovo.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        }
+      }
+    },
+    "start_boost": {
+      "name": "Avvia boost",
+      "description": "Ricarica subito anche se l’ordine inizia più tardi, poi torna al piano.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        },
+        "duration": {
+          "name": "Durata",
+          "description": "Per quanto tempo ricaricare in anticipo, in minuti (fino a 120)."
+        }
+      }
+    },
+    "cancel_boost": {
+      "name": "Annulla boost",
+      "description": "Termina la ricarica anticipata; l’ordine prosegue come previsto.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        }
+      }
+    },
+    "activate_weekly_plan": {
+      "name": "Attiva piano settimanale",
+      "description": "Attiva un piano settimanale dell’app per l’auto collegata, per al massimo sette giorni o finché non viene scollegata. I piani si creano nell’app.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
+        },
+        "plan": {
+          "name": "Piano",
+          "description": "Il nome del veicolo del piano, come mostrato nell’app."
+        }
+      }
+    },
+    "deactivate_weekly_plan": {
+      "name": "Disattiva piano settimanale",
+      "description": "Termina il piano settimanale attivo e ferma il relativo ordine di ricarica.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
         }
       }
     }

@@ -24,6 +24,8 @@ Italian, and every page has the same navigation bar.
 Everyday charging stays in Home Assistant: the current slider, **Charging
 paused**, targets and departure planning. The app pages add a view of the
 service and orders that keep running while Home Assistant is offline.
+The orders can also be started and stopped from a Home Assistant dashboard or
+automation; see [Use the app from Home Assistant](app-from-home-assistant.md).
 
 ## Overview
 

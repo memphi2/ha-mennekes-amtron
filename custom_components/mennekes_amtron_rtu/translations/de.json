@@ -572,6 +572,27 @@
             "name": "Zeitpunkt"
           }
         }
+      },
+      "charging_job": {
+        "name": "Ladeauftrag",
+        "state": {
+          "none": "Kein Auftrag",
+          "scheduled": "Wartet auf das Zeitfenster",
+          "charging": "Laden angefordert",
+          "waiting_meter": "Wartet auf gültigen Zählerstand",
+          "suspended": "Unterbrochen; prüft, ob derselbe Steckvorgang weiterläuft",
+          "reached": "Energieobergrenze erreicht",
+          "finished": "Zeitfenster beendet",
+          "stopped": "Vom Benutzer gestoppt",
+          "interrupted": "Unterbrochen; kein automatischer Neustart"
+        }
+      },
+      "weekly_plan": {
+        "name": "Wochenplan",
+        "state": {
+          "inactive": "Nicht aktiv",
+          "active": "Aktiv"
+        }
       }
     },
     "switch": {
@@ -907,6 +928,96 @@
     },
     "plug_charge_not_supported": {
       "message": "Die verbundene Modbus-App oder der Dienst unterstützt virtuelles Plug & Charge nicht. Aktualisiere zuerst auf eine kompatible Version."
+    },
+    "guest_vehicle_target_active": {
+      "message": "Fahrzeug-Batterieziel aktiv; kein Gastauftrag angelegt."
+    },
+    "invalid_boost_duration": {
+      "message": "Eine ganze Zahl von 1 bis 120 Minuten eingeben."
+    },
+    "invalid_job_request": {
+      "message": "Die App hat diese Werte nicht angenommen. Zeit, Strom und Energie prüfen."
+    },
+    "invalid_weekly_request": {
+      "message": "Die App hat diese Werte nicht angenommen. Zeit, Strom und Energie prüfen."
+    },
+    "job_boost_unavailable": {
+      "message": "Boost erfordert einen aktiven Auftrag vor dessen geplantem Start und eine aktuelle Freigabe."
+    },
+    "job_changed": {
+      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
+    },
+    "job_clear_requires_pause": {
+      "message": "Löschen erfordert eine bestätigte Pause oder abgezogenes Fahrzeug."
+    },
+    "job_current_exceeds_cap": {
+      "message": "Strom überschreitet die Servicegrenze."
+    },
+    "job_exists": {
+      "message": "Ein anderer Auftrag läuft noch. Zuerst diesen stoppen."
+    },
+    "job_not_permitted": {
+      "message": "Anschluss oder Freigabe geändert; kein Auftrag angelegt."
+    },
+    "job_preview_expired": {
+      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
+    },
+    "job_service_starting": {
+      "message": "Der Service startet noch. Gleich noch einmal versuchen."
+    },
+    "job_stop_first": {
+      "message": "Zuerst den laufenden Auftrag stoppen."
+    },
+    "job_storage_unavailable": {
+      "message": "Speicher nicht verfügbar; kein automatischer Start."
+    },
+    "weekly_already_active": {
+      "message": "Für diesen Steckvorgang ist bereits ein Wochenplan aktiv. Zuerst diesen stoppen."
+    },
+    "weekly_changed": {
+      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
+    },
+    "weekly_confirmation_expired": {
+      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
+    },
+    "weekly_inactive": {
+      "message": "Kein Wochenplan aktiv."
+    },
+    "weekly_invalid_confirmation": {
+      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
+    },
+    "weekly_manual_stop": {
+      "message": "Zwischenzeitlich von Hand gestoppt; Plan erneut aktivieren."
+    },
+    "weekly_no_occurrence": {
+      "message": "Keine unverbrauchte gültige Abfahrt innerhalb von sieben Tagen."
+    },
+    "weekly_service_starting": {
+      "message": "Der Service startet noch. Gleich noch einmal versuchen."
+    },
+    "weekly_stop_unconfirmed": {
+      "message": "Der Stopp des Wochenplans ist noch nicht bestätigt. Gleich noch einmal versuchen."
+    },
+    "weekly_storage_unavailable": {
+      "message": "Wochenplan-Speicher nicht verfügbar oder unbestätigt. Vor Aktivierung neu starten und Speicher prüfen."
+    },
+    "weekly_successor_not_permitted": {
+      "message": "Der nächste Termin kann jetzt nicht starten. Anschluss, Zähler und Freigabe prüfen."
+    },
+    "weekly_vehicle_not_confirmed": {
+      "message": "Der Zustand hat sich zwischenzeitlich geändert. Noch einmal versuchen."
+    },
+    "service_order_failed": {
+      "message": "Die App hat das nicht ausgeführt. Prüfe, ob sie erreichbar und aktuell ist und ob Zeiten und Werte gültig sind."
+    },
+    "app_required": {
+      "message": "Diese Aktion braucht die Modbus-App; diese Wallbox ist direkt verbunden."
+    },
+    "weekly_plan_unknown": {
+      "message": "Die App kennt keinen Wochenplan „{plan}“."
+    },
+    "wallbox_target_required": {
+      "message": "Es sind mehrere Wallboxen eingerichtet; gib die Wallbox an, für die das gilt."
     }
   },
   "issues": {
@@ -1571,6 +1682,126 @@
         "profile": {
           "name": "Historienprofil",
           "description": "Alle Daten, weniger Details oder nur Energie- und Leistungsstatistiken behalten."
+        }
+      }
+    },
+    "start_charging_job": {
+      "name": "Ladeauftrag starten",
+      "description": "Lädt das angesteckte Auto in einem Zeitfenster mit festem Strom bis zu einer Energiemenge. Der Auftrag endet, wenn das Auto abgezogen wird.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        },
+        "current": {
+          "name": "Ladestrom",
+          "description": "Strom in Ampere pro Phase, höchstens die Stromgrenze der App."
+        },
+        "energy": {
+          "name": "Energie",
+          "description": "Das Laden endet, sobald diese Energie in kWh geliefert wurde."
+        },
+        "start": {
+          "name": "Start",
+          "description": "Wann das Laden beginnen darf. Leer lassen, um sofort zu beginnen."
+        },
+        "finish": {
+          "name": "Ende",
+          "description": "Wann das Laden spätestens endet, innerhalb von sieben Tagen."
+        },
+        "reserve": {
+          "name": "Sofortreserve",
+          "description": "Optional: Diese Energie in kWh wird sofort geladen, vor dem Zeitfenster."
+        }
+      }
+    },
+    "start_guest_charging": {
+      "name": "Gastladen starten",
+      "description": "Lädt das Auto eines Gastes ab sofort für begrenzte Zeit und Energie. Es werden weder Fahrzeugdaten noch gespeicherte Ziele verwendet.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        },
+        "current": {
+          "name": "Ladestrom",
+          "description": "Strom in Ampere pro Phase, höchstens die Stromgrenze der App."
+        },
+        "energy": {
+          "name": "Energie",
+          "description": "Das Laden endet, sobald diese Energie in kWh geliefert wurde."
+        },
+        "duration": {
+          "name": "Dauer",
+          "description": "Wie lange geladen werden darf, in Minuten (bis 24 Stunden)."
+        }
+      }
+    },
+    "stop_charging_job": {
+      "name": "Ladeauftrag stoppen",
+      "description": "Stoppt den laufenden Ladeauftrag oder das Gastladen. Das Laden pausiert und läuft nicht von selbst weiter.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        }
+      }
+    },
+    "clear_charging_job": {
+      "name": "Ladeauftrag löschen",
+      "description": "Entfernt einen beendeten oder gestoppten Ladeauftrag, damit ein neuer gestartet werden kann.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        }
+      }
+    },
+    "start_boost": {
+      "name": "Boost starten",
+      "description": "Lädt sofort, obwohl der Ladeauftrag erst später beginnt, und kehrt danach zum Plan zurück.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        },
+        "duration": {
+          "name": "Dauer",
+          "description": "Wie lange vorab geladen wird, in Minuten (bis 120)."
+        }
+      }
+    },
+    "cancel_boost": {
+      "name": "Boost beenden",
+      "description": "Beendet das vorzeitige Laden; der Ladeauftrag läuft wie geplant weiter.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        }
+      }
+    },
+    "activate_weekly_plan": {
+      "name": "Wochenplan aktivieren",
+      "description": "Aktiviert einen Wochenplan der App für das angesteckte Auto, für bis zu sieben Tage oder bis es abgezogen wird. Pläne werden in der App angelegt.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
+        },
+        "plan": {
+          "name": "Plan",
+          "description": "Der Fahrzeugname des Plans, wie in der App angezeigt."
+        }
+      }
+    },
+    "deactivate_weekly_plan": {
+      "name": "Wochenplan deaktivieren",
+      "description": "Beendet den aktiven Wochenplan und stoppt dessen Ladeauftrag.",
+      "fields": {
+        "device_id": {
+          "name": "Wallbox",
+          "description": "Die Wallbox, für die das gilt. Kann entfallen, wenn nur eine eingerichtet ist."
         }
       }
     }

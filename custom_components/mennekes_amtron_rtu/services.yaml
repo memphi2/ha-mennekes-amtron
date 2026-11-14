@@ -38,3 +38,95 @@ set_charging_current:
       default: false
       selector:
         boolean:
+start_charging_job:
+  fields:
+    device_id: &wallbox
+      required: false
+      selector:
+        device:
+          integration: mennekes_amtron_rtu
+          multiple: true
+    start:
+      required: false
+      selector:
+        datetime:
+    finish:
+      required: true
+      selector:
+        datetime:
+    current: &job_current
+      required: true
+      example: 10
+      selector:
+        number:
+          min: 6
+          max: 32
+          step: 0.1
+          unit_of_measurement: A
+          mode: box
+    energy: &job_energy
+      required: true
+      example: 10
+      selector:
+        number:
+          min: 0.1
+          max: 200
+          step: 0.1
+          unit_of_measurement: kWh
+          mode: box
+    reserve:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 200
+          step: 0.1
+          unit_of_measurement: kWh
+          mode: box
+start_guest_charging:
+  fields:
+    device_id: *wallbox
+    duration:
+      required: true
+      example: 120
+      selector:
+        number:
+          min: 1
+          max: 1440
+          step: 1
+          unit_of_measurement: min
+          mode: box
+    current: *job_current
+    energy: *job_energy
+stop_charging_job:
+  fields:
+    device_id: *wallbox
+clear_charging_job:
+  fields:
+    device_id: *wallbox
+start_boost:
+  fields:
+    device_id: *wallbox
+    duration:
+      required: true
+      example: 30
+      selector:
+        number:
+          min: 1
+          max: 120
+          step: 1
+          unit_of_measurement: min
+          mode: box
+cancel_boost:
+  fields:
+    device_id: *wallbox
+activate_weekly_plan:
+  fields:
+    device_id: *wallbox
+    plan:
+      required: true
+      selector:
+        text:
+deactivate_weekly_plan:
+  fields:
+    device_id: *wallbox

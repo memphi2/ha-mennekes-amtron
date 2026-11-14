@@ -178,6 +178,23 @@
           "none": "mdi:calendar-blank-outline",
           "departure": "mdi:car-arrow-right"
         }
+      },
+      "charging_job": {
+        "default": "mdi:clipboard-clock-outline",
+        "state": {
+          "none": "mdi:clipboard-outline",
+          "charging": "mdi:battery-charging",
+          "reached": "mdi:clipboard-check-outline",
+          "finished": "mdi:clipboard-check-outline",
+          "stopped": "mdi:stop-circle-outline",
+          "interrupted": "mdi:alert-circle-outline"
+        }
+      },
+      "weekly_plan": {
+        "default": "mdi:calendar-week",
+        "state": {
+          "inactive": "mdi:calendar-blank-outline"
+        }
       }
     },
     "switch": {
@@ -303,6 +320,14 @@
     }
   },
   "services": {
-    "set_charging_current": "mdi:current-ac"
+    "set_charging_current": "mdi:current-ac",
+    "start_charging_job": "mdi:clipboard-clock-outline",
+    "start_guest_charging": "mdi:account-clock-outline",
+    "stop_charging_job": "mdi:stop-circle-outline",
+    "clear_charging_job": "mdi:clipboard-remove-outline",
+    "start_boost": "mdi:rocket-launch-outline",
+    "cancel_boost": "mdi:rocket-outline",
+    "activate_weekly_plan": "mdi:calendar-check",
+    "deactivate_weekly_plan": "mdi:calendar-remove"
   }
 }
