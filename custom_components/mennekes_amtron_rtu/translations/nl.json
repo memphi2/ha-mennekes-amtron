@@ -968,7 +968,11 @@
           "wallbox_advanced": "Metingen en wachttijden",
           "back": "Terug zonder opslaan"
         },
-        "description": "Stel de maximale stroom in die Home Assistant mag aanvragen en hoe vaak de status wordt gelezen. Bij de Modbus-app horen schrijftoestemming en busintervallen in het tabblad Configuratie van de app. Wijzig USB/LAN via Opnieuw configureren bij een directe verbinding, of in de app bij een appverbinding."
+        "description": "Stel in welke stroom Home Assistant maximaal mag aanvragen, hoe vaak de status wordt gelezen en of er geschreven mag worden. Wijzig USB/LAN via Opnieuw configureren."
+      },
+      "wallbox_service": {
+        "title": "Wallbox-instellingen van de app",
+        "description": "Deze wallbox loopt via de Modbus-app. De instellingen staan daarom daar en gelden ook voor Home Assistant.\n\nStroomlimiet: {current_cap} A\nMinimale tijd tussen statuswijzigingen: {state_change_interval} s\nExtra wachttijd vóór fasewissels: {phase_switch_grace} s\n\nWijzig deze waarden, de uitleesintervallen en de verbinding in de app onder Open webinterface. De schrijftoestemming staat op het tabblad Configuratie van de app."
       },
       "wallbox_basic": {
         "title": "Stroomlimiet en uitlezen",
@@ -979,10 +983,10 @@
         },
         "data_description": {
           "control_mode": "Beide modi versturen leesverzoeken en vereisen exclusieve toegang tot de bus. Alleen lezen schrijft niet naar registers. Modbus-master verstuurt daarnaast de heartbeat en schakelt bedieningselementen in. Deel deze bus niet met een andere master.",
-          "current_limit": "Bovengrens van de laadstroomregeling, in ampère per fase. Dit is geen procentueel laaddoel of pauzeopdracht. De limieten van de laadpaal en eventueel de app blijven ook gelden.",
+          "current_limit": "Bovengrens van de laadstroomregeling, in ampère per fase. Dit is geen procentueel laaddoel of pauzeopdracht. De limiet van de wallbox blijft ook gelden.",
           "scan_interval_seconds": "Hoe vaak laadstatus, storingen en besturingsinstellingen worden uitgelezen. De heartbeat loopt onafhankelijk."
         },
-        "description": "De stroomlimiet begrenst verzoeken vanuit HA; de limieten van wallbox en dienst blijven gelden. Bij app-verbindingen betreft het uitleesinterval alleen HA-verzoeken aan de dienst."
+        "description": "De stroomlimiet begrenst wat hier kan worden aangevraagd; de limiet van de wallbox blijft gelden."
       },
       "wallbox_advanced": {
         "title": "Metingen en wachttijden",

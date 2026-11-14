@@ -123,7 +123,8 @@ does not require adding the wallbox again. For changed blueprints,
 | App polling intervals | App **Open Web UI → Runtime**; applies without restart |
 | App current cap and charging waits | App **Open Web UI → Runtime** or **Configuration**, then restart the app |
 | App write permission | App **Configuration**, then save and restart the app |
-| HA options and optional vehicle features | Integration **Configure**, in the relevant section |
+| Vehicles and charging costs | Integration **Configure**, in the relevant section |
+| Wallbox options of a direct connection | Integration **Configure → Wallbox**; with the app this page only shows the app's values |
 
 Apart from the polling intervals, app settings take effect after an app
 restart; HA then receives the new status without an additional Core restart. Use [the settings map](user-guide.md#configuration-and-options)

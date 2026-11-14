@@ -968,7 +968,11 @@
           "wallbox_advanced": "Measurements and switching delays",
           "back": "Back without saving"
         },
-        "description": "Set the maximum current Home Assistant may request and how often it reads status. With the Modbus app, write permission and bus timing belong in the app’s Configuration tab. USB/LAN connection changes belong in Reconfigure for direct connections, or in the app for app connections."
+        "description": "Set the maximum current Home Assistant may request, how often it reads status and whether it may write. USB/LAN connection changes belong in Reconfigure."
+      },
+      "wallbox_service": {
+        "title": "Wallbox settings of the app",
+        "description": "This wallbox runs through the Modbus app, so its settings are kept there and apply to Home Assistant as well.\n\nCharging current cap: {current_cap} A\nMinimum time between state changes: {state_change_interval} s\nExtra wait before phase changes: {phase_switch_grace} s\n\nChange these values, the polling intervals and the connection in the app under Open Web UI. Write permission is on the app’s Configuration tab."
       },
       "wallbox_basic": {
         "title": "Current limit and polling",
@@ -979,10 +983,10 @@
         },
         "data_description": {
           "control_mode": "Both modes send read requests and require exclusive bus access. Read only does not write registers. Modbus master additionally sends the heartbeat and enables control entities. Do not share this bus with another master.",
-          "current_limit": "Upper limit for the charging-current control, in amperes per phase. This is not a percentage target or a pause command. The wallbox’s own limit and, when used, the app’s limit also apply.",
+          "current_limit": "Upper limit for the charging-current control, in amperes per phase. This is not a percentage target or a pause command. The wallbox’s own limit also applies.",
           "scan_interval_seconds": "How often charging status, errors and controls are read. The heartbeat runs independently."
         },
-        "description": "The current cap limits requests from HA; the wallbox and service limits still apply. For app connections, the polling interval only affects HA’s service requests."
+        "description": "The current cap limits what can be requested here; the wallbox’s own limit still applies."
       },
       "wallbox_advanced": {
         "title": "Measurements and switching delays",

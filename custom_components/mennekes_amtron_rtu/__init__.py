@@ -1044,13 +1044,18 @@ def _serial_config(entry: MennekesAmtronConfigEntry) -> SerialConfig:
 
 
 def _scan_interval(entry: MennekesAmtronConfigEntry) -> float:
+    # With the app, HA fetches its status at the default pace; the app's own
+    # settings decide how often the wallbox is read.
+    if CONF_SERVER_URL in entry.data:
+        return float(DEFAULT_SCAN_INTERVAL_SECONDS)
     value = entry.options.get(CONF_SCAN_INTERVAL_SECONDS, DEFAULT_SCAN_INTERVAL_SECONDS)
     return float(value)
 
 
 def _control_options(entry: MennekesAmtronConfigEntry) -> ControlOptions:
     options = dict(entry.options)
-    cap = options.get(CONF_CURRENT_LIMIT)
+    # With the app, its current cap is the only one; HA adds none of its own.
+    cap = None if CONF_SERVER_URL in entry.data else options.get(CONF_CURRENT_LIMIT)
     return ControlOptions(
         read_only=CONF_SERVER_URL not in entry.data and not control_mode_is_master(options),
         current_cap=float(cap) if isinstance(cap, (int, float)) else None,

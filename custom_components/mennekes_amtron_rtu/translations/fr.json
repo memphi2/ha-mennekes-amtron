@@ -968,7 +968,11 @@
           "wallbox_advanced": "Mesures et délais de commutation",
           "back": "Retour sans enregistrer"
         },
-        "description": "Définissez le courant maximal demandé par Home Assistant et la fréquence de lecture de l’état. Avec l’application Modbus, l’autorisation d’écriture et les délais du bus se règlent dans son onglet Configuration. Modifiez USB/LAN via Reconfigurer pour une connexion directe, ou dans l’application si elle gère la connexion."
+        "description": "Définissez le courant maximal que Home Assistant peut demander, la fréquence de lecture de l’état et l’autorisation d’écriture. Modifiez USB/LAN via Reconfigurer."
+      },
+      "wallbox_service": {
+        "title": "Réglages de la borne dans l’application",
+        "description": "Cette borne passe par l’application Modbus. Ses réglages s’y trouvent donc et valent aussi pour Home Assistant.\n\nLimite de courant : {current_cap} A\nDélai minimal entre changements d’état : {state_change_interval} s\nAttente supplémentaire avant un changement de phases : {phase_switch_grace} s\n\nModifiez ces valeurs, les intervalles de lecture et la connexion dans l’application, sous Ouvrir l’interface utilisateur web. L’autorisation d’écriture se trouve dans l’onglet Configuration de l’application."
       },
       "wallbox_basic": {
         "title": "Limite de courant et interrogation",
@@ -979,10 +983,10 @@
         },
         "data_description": {
           "control_mode": "Les deux modes envoient des requêtes de lecture et nécessitent un accès exclusif au bus. Lecture seule n’écrit pas dans les registres. Maître Modbus envoie également le signal de présence et active les entités de commande. Ne partagez pas ce bus avec un autre maître.",
-          "current_limit": "Limite supérieure de la commande du courant de charge, en ampères par phase. Ce n’est ni un objectif en pourcentage ni une commande de pause. Les limites de la borne et, le cas échéant, de l’application s’appliquent aussi.",
+          "current_limit": "Limite supérieure de la commande du courant de charge, en ampères par phase. Ce n’est ni un objectif en pourcentage ni une commande de pause. La limite de la borne s’applique aussi.",
           "scan_interval_seconds": "Fréquence de lecture de l’état de charge, des erreurs et des commandes. Le signal de présence fonctionne indépendamment."
         },
-        "description": "La limite de courant s’applique aux demandes HA ; les limites de la borne et du service restent actives. Avec l’application, l’intervalle ne concerne que les requêtes HA au service."
+        "description": "La limite de courant borne ce qui peut être demandé ici ; la limite de la borne reste active."
       },
       "wallbox_advanced": {
         "title": "Mesures et délais de commutation",

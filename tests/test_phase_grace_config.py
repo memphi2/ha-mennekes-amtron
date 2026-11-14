@@ -79,19 +79,16 @@ def test_service_grace_requires_an_integer_within_range(value: Any):
 
 def test_service_integration_options_do_not_edit_service_owned_grace_setting():
     async def run():
-        flow = Flow(FakeConfigEntry(
+        entry = FakeConfigEntry(
             data={"server_url": "http://service:8765"},
             options={CONF_PHASE_SWITCH_GRACE_SECONDS: 20},
-        ))
-        await flow.async_step_wallbox()
-        form = await flow.async_step_wallbox_basic()
-        schema = form["data_schema"]
-        assert CONF_PHASE_SWITCH_GRACE_SECONDS not in {
-            marker.schema for marker in schema.schema
-        }
-        submitted = {**schema({}), CONF_PHASE_SWITCH_GRACE_SECONDS: 20}
-        result = await flow.async_step_wallbox_basic(submitted)
-        assert result["data"][CONF_PHASE_SWITCH_GRACE_SECONDS] == 20
+        )
+        flow = Flow(entry)
+        form = await flow.async_step_wallbox()
+        assert form["step_id"] == "wallbox_service"
+        assert not form["data_schema"].schema
+        assert (await flow.async_step_wallbox_service({}))["step_id"] == "init"
+        assert entry.options == {CONF_PHASE_SWITCH_GRACE_SECONDS: 20}
 
     asyncio.run(run())
 

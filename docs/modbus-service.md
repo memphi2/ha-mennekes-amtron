@@ -123,8 +123,8 @@ enable automatically. **There is no second write-permission switch in HA and no
 HA restart is needed for this change.** An app restart briefly interrupts the
 heartbeat.
 
-Check the app's current cap. In the integration options you can set an additional
-HA current cap, which can further restrict limited-current commands.
+Check the app's current cap; it is the only one, and Home Assistant shows it
+under **Configure → Wallbox**.
 Reapply the pause, current and charging-release settings you noted before the
 handover, and verify them before reconnecting the vehicle. On its first start,
 the app reads the wallbox's current state; it cannot recover a previous intention
@@ -154,7 +154,6 @@ actual wallbox firmware. See [heartbeat troubleshooting](troubleshooting.md#erro
 | Change USB/LAN connection settings | **Open Web UI → Connection**, save and restart the app. For LAN, use the adapter interface or optional [adapter setup](lan-adapters.md#service-app). |
 | Let the app charge on its own, or charge a guest's car | **Open Web UI → Charging jobs** or **Guest charging**; see [the app's web pages](app-guide.md). |
 | See what the app is doing | **Open Web UI → Overview**. |
-| Change how often HA reads app status, or lower HA's current cap | Open the integration options. |
 | Hand the USB or LAN connection to another master | Stop the app. Disabling its HA entry or enabling read-only does not release the bus. |
 
 Control entities keep their IDs when permission changes. They are unavailable

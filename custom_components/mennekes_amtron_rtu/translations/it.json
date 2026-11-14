@@ -968,7 +968,11 @@
           "wallbox_advanced": "Misure e tempi di attesa",
           "back": "Indietro senza salvare"
         },
-        "description": "Imposta la corrente massima richiedibile da Home Assistant e la frequenza di lettura dello stato. Con l’app Modbus, autorizzazione alla scrittura e intervalli del bus si impostano nella sua scheda Configurazione. Modifica USB/LAN tramite Riconfigura per le connessioni dirette, oppure nell’app se gestisce la connessione."
+        "description": "Imposta la corrente massima che Home Assistant può richiedere, la frequenza di lettura dello stato e il permesso di scrittura. Modifica USB/LAN tramite Riconfigura."
+      },
+      "wallbox_service": {
+        "title": "Impostazioni della wallbox nell’app",
+        "description": "Questa wallbox passa dall’app Modbus. Le sue impostazioni si trovano quindi lì e valgono anche per Home Assistant.\n\nLimite di corrente: {current_cap} A\nTempo minimo tra i cambi di stato: {state_change_interval} s\nAttesa aggiuntiva prima dei cambi di fase: {phase_switch_grace} s\n\nModifica questi valori, gli intervalli di lettura e la connessione nell’app, in Apri interfaccia utente web. Il permesso di scrittura si trova nella scheda Configurazione dell’app."
       },
       "wallbox_basic": {
         "title": "Limite di corrente e lettura",
@@ -979,10 +983,10 @@
         },
         "data_description": {
           "control_mode": "Entrambe le modalità inviano richieste di lettura e richiedono l'accesso esclusivo al bus. Sola lettura non scrive registri. Master Modbus invia anche l'heartbeat e abilita le entità di controllo. Non condividere questo bus con un altro master.",
-          "current_limit": "Limite superiore del controllo della corrente, in ampere per fase. Non è un obiettivo percentuale né un comando di pausa. Si applicano anche i limiti della wallbox e, se usata, dell’app.",
+          "current_limit": "Limite superiore del controllo della corrente, in ampere per fase. Non è un obiettivo percentuale né un comando di pausa. Si applica anche il limite della wallbox.",
           "scan_interval_seconds": "Frequenza di lettura dello stato di ricarica, degli errori e dei controlli. L'heartbeat funziona indipendentemente."
         },
-        "description": "Il limite di corrente si applica alle richieste HA; restano validi i limiti della wallbox e del servizio. Con l’app, l’intervallo riguarda solo le richieste HA al servizio."
+        "description": "Il limite di corrente delimita ciò che si può richiedere qui; resta valido il limite della wallbox."
       },
       "wallbox_advanced": {
         "title": "Misure e tempi di attesa",

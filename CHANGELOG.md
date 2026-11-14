@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   a change of page cannot show an unformatted page for a moment.
 - **A page appears once its texts are in your language,** so the English
   fallback is not visible for a moment after a click.
+- **With the app, wallbox settings live in one place.** Home Assistant no
+  longer offers its own current cap and polling interval for an app
+  connection; **Configure → Wallbox** shows the app's current cap and waits,
+  and they are changed in the app.
 
 ## 0.9.0b3 — 2026-11-14
 

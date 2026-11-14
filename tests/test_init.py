@@ -117,6 +117,14 @@ def test_options_drive_the_interval_and_the_control_options() -> None:
     assert options.read_only is False
     assert options.current_cap == 12.5
 
+    # With the app, its settings count: HA adds no cap and keeps its own pace.
+    entry = FakeConfigEntry(
+        data={"server_url": "http://app:8765"},
+        options={CONF_SCAN_INTERVAL_SECONDS: 30, CONF_CURRENT_LIMIT: 12.5},
+    )
+    assert _scan_interval(entry) == 5.0
+    assert _control_options(entry).current_cap is None
+
 
 @pytest.mark.parametrize("title", ["MENNEKES AMTRON", "Garage", "Mennekes Amtron"])
 @pytest.mark.parametrize("connection_type", ["serial", "rtu_over_tcp", "modbus_tcp"])

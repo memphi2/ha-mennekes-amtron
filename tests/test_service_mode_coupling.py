@@ -85,8 +85,8 @@ def test_service_permission_controls_real_ha_entities_and_commands(
                 assert result["type"] == "create_entry", result
                 await hass.async_block_till_done()
                 entry = hass.config_entries.async_entries(DOMAIN)[0]
-                # Model an installed entry from before the service became the
-                # permission source. Its useful current cap must survive.
+                # Options a direct connection would use: with the app its
+                # permission and its current cap count, not these.
                 hass.config_entries.async_update_entry(
                     entry,
                     options={
@@ -166,7 +166,7 @@ def test_service_permission_controls_real_ha_entities_and_commands(
                     if address != R.HEARTBEAT.address
                 ]
                 number = hass.states.get(CONTROL_ENTITY_IDS[0])
-                assert number.attributes["max"] == 10
+                assert number.attributes["max"] == 16  # the app's cap, not the HA option
 
                 # An app restart can change its configured cap while all
                 # register values and its write permission stay identical.
@@ -179,7 +179,7 @@ def test_service_permission_controls_real_ha_entities_and_commands(
                     await refresh()
                     assert len(updates) == before + 1
                     number = hass.states.get(CONTROL_ENTITY_IDS[0])
-                    assert number.attributes["max"] == min(10, cap)
+                    assert number.attributes["max"] == cap
                     assert hass.states.get(power.entity_id).last_updated == power.last_updated
 
                 if initial_current == 1:
@@ -219,10 +219,10 @@ def test_service_permission_controls_real_ha_entities_and_commands(
                     await refresh()
                     assert_controls(False)
 
-                # The old read-only selector is ignored, but the independent
-                # HA current cap still constrains an actual service command.
+                # Neither the read-only selector nor the current cap of a direct
+                # connection counts; the app's cap limits the command.
                 await runtime.control.async_set_charging_current(32)
-                assert current_writes(transport) == [10]
+                assert current_writes(transport) == [16]
                 assert len(commands) == 1
         finally:
             await hass.async_stop()

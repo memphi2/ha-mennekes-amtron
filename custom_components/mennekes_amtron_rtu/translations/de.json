@@ -968,7 +968,11 @@
           "wallbox_advanced": "Messwerte und Wartezeiten",
           "back": "Zurück ohne Speichern"
         },
-        "description": "Lege fest, welchen Strom Home Assistant höchstens anfordern darf und wie oft der Status gelesen wird. Bei Nutzung der Modbus-App gehören Schreibfreigabe und Bus-Zeitabstände in deren Reiter Konfiguration. USB/LAN änderst du bei Direktverbindungen über Neu konfigurieren, bei App-Verbindungen in der App."
+        "description": "Lege fest, welchen Strom Home Assistant höchstens anfordern darf, wie oft der Status gelesen wird und ob geschrieben werden darf. USB/LAN änderst du über Neu konfigurieren."
+      },
+      "wallbox_service": {
+        "title": "Wallbox-Einstellungen der App",
+        "description": "Diese Wallbox läuft über die Modbus-App. Ihre Einstellungen liegen deshalb dort und gelten auch für Home Assistant.\n\nStromgrenze: {current_cap} A\nMindestabstand zwischen Zustandswechseln: {state_change_interval} s\nZusätzliche Wartezeit vor Phasenwechseln: {phase_switch_grace} s\n\nDiese Werte, die Abfrageintervalle und die Verbindung änderst du in der App unter Benutzeroberfläche öffnen. Die Schreibfreigabe steht im Reiter Konfiguration der App."
       },
       "wallbox_basic": {
         "title": "Stromgrenze und Abfrage",
@@ -979,10 +983,10 @@
         },
         "data_description": {
           "control_mode": "Beide Modi senden Leseanfragen und benötigen exklusiven Buszugriff. Nur lesen schreibt keine Register. Modbus-Master sendet zusätzlich den Heartbeat und aktiviert die Steuer-Entitäten. Nicht zusammen mit einem anderen Master auf diesem Bus verwenden.",
-          "current_limit": "Obergrenze für den Ladestrom-Regler, in Ampere pro Phase. Dies ist weder ein Prozent-Ladeziel noch ein Pausenbefehl. Die Grenze der Wallbox und gegebenenfalls die der App gelten zusätzlich.",
+          "current_limit": "Obergrenze für den Ladestrom-Regler, in Ampere pro Phase. Dies ist weder ein Prozent-Ladeziel noch ein Pausenbefehl. Die Grenze der Wallbox gilt zusätzlich.",
           "scan_interval_seconds": "Intervall für Ladezustand, Fehler und Bedienung. Der Heartbeat läuft unabhängig davon."
         },
-        "description": "Die Stromgrenze begrenzt Anforderungen aus HA; die Grenzen von Wallbox und Dienst gelten zusätzlich. Bei App-Verbindungen betrifft das Abfrageintervall nur die Dienstabfragen von HA."
+        "description": "Die Stromgrenze begrenzt, was hier angefordert werden kann; die Grenze der Wallbox gilt zusätzlich."
       },
       "wallbox_advanced": {
         "title": "Messwerte und Wartezeiten",

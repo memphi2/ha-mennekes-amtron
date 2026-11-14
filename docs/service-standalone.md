@@ -160,8 +160,8 @@ Compare readings while read-only. Then set the permitted `current_cap`, change
 `read_only` to `false`, save the file and restart the service. Configuration is
 read at startup; this briefly interrupts the heartbeat. HA needs no restart. After
 fresh writable status, HA enables the controls automatically; no additional HA
-write switch is needed. The integration options can impose a lower current cap.
-Both caps constrain limited-current commands; deliberately selecting **0 A**
+write switch is needed. The app's current cap constrains limited-current
+commands; deliberately selecting **0 A**
 removes the EMS limit while hardware limits remain in force.
 
 HA does not replay old commands after permission changes or reconnection. The

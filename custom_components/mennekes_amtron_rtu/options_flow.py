@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import probatio
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import valid_entity_id
 
@@ -127,27 +128,40 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
     async def async_step_wallbox(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        if CONF_SERVER_URL in self.config_entry.data:
+            return await self.async_step_wallbox_service()
         self._begin("wallbox", WALLBOX_KEYS)
-        choices = ["wallbox_basic"]
-        if CONF_SERVER_URL not in self.config_entry.data:
-            choices.append("wallbox_advanced")
-        return self.async_show_menu(step_id="wallbox", menu_options=[*choices, "back"])
+        return self.async_show_menu(
+            step_id="wallbox", menu_options=["wallbox_basic", "wallbox_advanced", "back"]
+        )
+
+    async def async_step_wallbox_service(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show the app's wallbox settings; with the app they are changed there."""
+        if user_input is not None or CONF_SERVER_URL not in self.config_entry.data:
+            return await self.async_step_init()
+        return self.async_show_form(
+            step_id="wallbox_service",
+            data_schema=probatio.Schema({}),
+            description_placeholders=_service_values(self.config_entry),
+            last_step=False,
+        )
 
     async def async_step_wallbox_basic(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        if (draft := self._section("wallbox")) is None:
+        if (
+            draft := self._section("wallbox")
+        ) is None or CONF_SERVER_URL in self.config_entry.data:
             return await self.async_step_init()
-        service = CONF_SERVER_URL in self.config_entry.data
         if user_input is not None:
-            draft.values.update(_normalized(user_input, service_mode=service))
+            draft.values.update(_normalized(user_input))
             return await self._finish_section()
         return self.async_show_form(
             step_id="wallbox_basic",
             data_schema=options_schema(
-                draft.values,
-                max_current=_max_current(self.config_entry),
-                service_mode=service,
+                draft.values, max_current=_max_current(self.config_entry)
             ),
             last_step=True,
         )
@@ -651,14 +665,32 @@ class MennekesAmtronOptionsFlow(ProfileOptionsFlow):
         return await super()._finish_section()
 
 
-def _normalized(user_input: dict[str, Any], *, service_mode: bool) -> dict[str, Any]:
-    options: dict[str, Any] = {
+def _normalized(user_input: dict[str, Any]) -> dict[str, Any]:
+    return {
         CONF_SCAN_INTERVAL_SECONDS: int(user_input[CONF_SCAN_INTERVAL_SECONDS]),
         CONF_CURRENT_LIMIT: float(user_input[CONF_CURRENT_LIMIT]),
+        CONF_CONTROL_MODE: str(user_input[CONF_CONTROL_MODE]),
     }
-    if not service_mode:
-        options[CONF_CONTROL_MODE] = str(user_input[CONF_CONTROL_MODE])
-    return options
+
+
+def _service_values(entry: Any) -> dict[str, str]:
+    """The app's current cap and waits as the last status reported them."""
+    client = getattr(getattr(entry, "runtime_data", None), "client", None)
+    snapshot = getattr(client, "snapshot", None)
+    control = snapshot.get("control") if isinstance(snapshot, dict) else None
+    values = control if isinstance(control, dict) else {}
+
+    def shown(key: str) -> str:
+        value = values.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "-"
+        return f"{value:g}"
+
+    return {
+        "current_cap": shown("current_cap"),
+        "state_change_interval": shown("state_change_interval_seconds"),
+        "phase_switch_grace": shown("phase_switch_grace_seconds"),
+    }
 
 
 def _vehicle_errors(values: dict[str, Any]) -> dict[str, str]:

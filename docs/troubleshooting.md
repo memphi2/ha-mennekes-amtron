@@ -279,7 +279,7 @@ firmware-specific limitation.
 | The slider will not accept 1–5 A | Use 0 A for no limit or at least 6 A for a limit. Pause has its own switch. |
 | A new current is delayed | Current writes have a five-second minimum interval. The latest accepted request is applied after that interval. |
 | Pause/resume is refused just after startup | Early pause and resume requests are queued for the configurable state-change interval and five-second write floor. An HA Core restart does not reset a running service's timing. |
-| The slider maximum is lower than expected | Check the device maximum and HA current cap. In service mode, the app's current cap also applies. |
+| The slider maximum is lower than expected | Check the device maximum and the current cap: in the integration options for a direct connection, on the app's **Runtime** page with the app. |
 | Offered current is lower than the slider setting | Installation limits and an active downgrade can lower **Signaled current**. The vehicle can draw less again. |
 | A current change waits while paused | Setting a current can resume charging. Inspect **Pending change** and its `due` attribute for a queued resume. |
 | Charging continues after requesting pause | The pause shares the state-change interval and the five-second current-write floor. Check **Pending change** and its `due` attribute: the pause replaces an older pending start and runs when permitted. Release-off and lock-on also wait; switching controls does not bypass the interval. |
