@@ -9,9 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## 0.9.0 — 2026-11-14
 
-Stable release of the 0.9 charging and app changes since 0.8.2. No control
-behavior changes were made after 0.9.0b8; the integration and app are promoted
-together.
+Stable release of the 0.9 charging and app changes since 0.8.2. The
+integration and app are published together.
 
 - Simplify charging to shared kWh and target-time limits, an optional vehicle
   percentage target and one explicit guest-start action. The first reached
