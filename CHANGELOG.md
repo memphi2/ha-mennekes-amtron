@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
-## 0.9.0 — 2026-11-14
+## 0.9.0
 
 Stable release of the 0.9 charging and app changes since 0.8.2. The
 integration and app are published together.
