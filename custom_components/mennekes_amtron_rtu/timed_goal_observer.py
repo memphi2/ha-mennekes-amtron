@@ -491,11 +491,10 @@ class TimedGoalObserver:
             self._learn_power()
 
     def _learn_power(self) -> None:
-        control = self._runtime.control
-        source = control.soc_goal.source
-        if not self._at_full or source is None:
+        if not self._at_full or (source := self._runtime.control.soc_goal.source) is None:
             self._power_window.reset()
             return
+        control = self._runtime.control
         data = self._runtime.coordinator.current_data()
         phases = observed_phases(data.fresh)
         if phases is None:

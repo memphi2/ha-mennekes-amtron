@@ -943,3 +943,22 @@ def test_direct_plan_learns_real_power_with_the_shared_full_current_window(monke
         await observer._evaluate()
         assert observer._power_window.start is None
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("missing", ["phase", "source", "timestamp"])
+def test_direct_power_learning_requires_current_context(monkeypatch, missing):
+    observer, control, _hass = setup_observer(monkeypatch)
+    observer._at_full = True
+    observer._power_window.sample(at=1000, total=100, phases=3, current=16, vehicle="car")
+    control.data.energy_read = True
+    control.data.energy_observed_at = 1120
+    control.data.values["energy_total"] = 100.2
+    if missing == "phase":
+        control.data.held = frozenset({"switched_phases"})
+    elif missing == "source":
+        control.soc_goal.source = None
+    else:
+        control.data.energy_observed_at = None
+    observer._learn_power()
+    assert observer._power_window.start is None
+    assert not observer._power_model.cars
