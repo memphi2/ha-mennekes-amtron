@@ -65,7 +65,7 @@ show **Building**. Enable **Start on boot** and **Watchdog**.
 
 The repository above provides stable releases. The separate
 `https://github.com/memphi2/ha-mennekes-amtron#apps-beta` catalog carries
-prereleases such as 0.9.0b2 and also receives stable releases. To switch
+prereleases such as 0.9.0b3 and also receives stable releases. To switch
 catalogs, follow the [channel handover](#updates).
 
 ### 3. Configure and start read-only

@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.9.0b3 — unreleased
+## 0.9.0b3 — 2026-11-14
 
 - **The app's web pages look like Home Assistant and use the whole width.**
   One bar groups the pages into Overview, Charging, Settings and Log; the
