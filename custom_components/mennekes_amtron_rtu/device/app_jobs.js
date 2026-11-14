@@ -167,6 +167,10 @@
     el("job_boost_until").textContent=job?.boost_until ? `${t("boost_until")} ${date(job.boost_until)}` : "";
   }
   function suspend() { generation++; clearTimeout(timer); timer=null; readAbort?.abort(); readAbort=null; }
+  function scheduleRead() {
+    clearTimeout(timer);timer=null;
+    if (!hidden && !document.hidden) timer=setTimeout(read,5000);
+  }
   async function read() {
     if (busy || hidden || document.hidden || readAbort) return;
     const own=++generation, abort=new AbortController();readAbort=abort;
@@ -187,7 +191,7 @@
       // A refusal stays visible until the next action.
       state=data;render();notice(lastError || (data.draft?.storage_error ? t("draft_storage_error") : data.storage_error ? t("storage_error") : data.job ? t(data.job.state) : data.read_only ? t("read_only") : data.available && data.permitted && data.meter_fresh ? t("ready") : t("unavailable")));
     } catch (_) { if(own===generation){ state=null;invalidate();render();notice(t("offline")); } }
-    finally {clearTimeout(timeout);if(own===generation){readAbort=null;if(!hidden&&!document.hidden)timer=setTimeout(read,5000);}}
+    finally {clearTimeout(timeout);if(own===generation){readAbort=null;if(!hidden&&!document.hidden)scheduleRead();}}
   }
   async function post(payload) {
     if (busy || !state) return null;
@@ -225,7 +229,7 @@
     if (!result?.draft) return false;
     state={...result,csrf};draftRevision=result.draft.revision;draftDirty=false;render();return true;
   }
-  el("job_save_draft").addEventListener("click",async()=>{invalidate();if(await saveDraft())notice(t("draft_saved"));timer=setTimeout(read,5000);});
+  el("job_save_draft").addEventListener("click",async()=>{invalidate();if(await saveDraft())notice(t("draft_saved"));scheduleRead();});
   el("job_reset_draft").addEventListener("click",async()=>{
     if(!state||busy)return;
     invalidate();
@@ -238,10 +242,10 @@
   el("job_form").addEventListener("submit",async event=>{
     event.preventDefault();if(!state||busy||!el("job_form").reportValidity())return;
     invalidate();
-    if(!await saveDraft()){timer=setTimeout(read,5000);return;}
+    if(!await saveDraft()){scheduleRead();return;}
     const result=await post({action:"preview_draft",draft_revision:draftRevision,revision:state.revision,scope:state.scope});
     if(result?.schema===1&&result.request){proposal={...result,kind:"create"};el("job_summary").textContent=`${date(result.request.start_at)} → ${date(result.request.finish_at)} · ${result.request.current_a} A · ${result.request.energy_kwh} kWh${reserveText(result.request)}`;el("job_confirmation").hidden=false;render();}else{state=null;render();}
-    timer=setTimeout(read,5000);
+    scheduleRead();
   });
   el("job_boost_preview").addEventListener("click",async()=>{
     if(!state || busy || state.boost_available!==true)return;
@@ -254,7 +258,7 @@
       el("job_summary").textContent=`${t("boost_until")} ${date(result.until)} · ${result.current_a} A · ${result.energy_kwh} kWh`;
       el("job_confirmation").hidden=false;render();
     }else{state=null;render();}
-    timer=setTimeout(read,5000);
+    scheduleRead();
   });
   el("job_confirm").addEventListener("click",async()=>{
     if(!proposal||busy)return;const p=proposal;invalidate();

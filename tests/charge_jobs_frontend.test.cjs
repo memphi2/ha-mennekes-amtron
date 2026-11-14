@@ -154,3 +154,11 @@ test("a conflicting edit is refused and reloading adopts the other surface's val
  await h.click("job_save_draft");assert.equal(h.calls.filter(c=>c.options.method).length,1);
  await h.click("job_reload_draft");await flush();assert.equal(h.el("job_energy").value,"15");
 });
+
+test("invalid draft edits never multiply the polling timers",async()=>{
+ const h=harness();await flush();assert.equal(h.timers.size,1);
+ h.el("job_current").value="5";
+ for(let i=0;i<4;i++)await h.click("job_save_draft");
+ assert.equal(h.calls.filter(c=>c.options.method).length,0);
+ assert.equal(h.timers.size,1);
+});
