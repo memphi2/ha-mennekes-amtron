@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
-import math
 import secrets
 from pathlib import Path
 from typing import Any
 
 from .charge_job import job_time
+from .decode import is_hex32
 from .persistence import replace_file
 
 DRAFT_STATES = (
@@ -43,7 +43,6 @@ def validate(values: object) -> dict[str, Any]:
         if (
             isinstance(value, bool)
             or not isinstance(value, (int, float))
-            or not math.isfinite(value)
             or not minimum <= value <= maximum
             or abs(value * 10 - round(value * 10)) > 1e-8
         ):
@@ -51,6 +50,26 @@ def validate(values: object) -> dict[str, Any]:
     if result["reserve_kwh"] > result["energy_kwh"]:
         raise ValueError("draft reserve exceeds energy")
     return result
+
+
+def read_snapshot(raw: object) -> dict[str, Any] | None:
+    """Copy only the bounded public draft contract from a service response."""
+    if (
+        not isinstance(raw, dict)
+        or raw.keys() != {"revision", "values", "storage_error", "status"}
+        or not is_hex32(raw["revision"])
+        or type(raw["storage_error"]) is not bool
+        or raw["status"] not in DRAFT_STATES
+    ):
+        return None
+    try:
+        values = validate(raw["values"])
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return {
+        "revision": raw["revision"], "values": values,
+        "storage_error": raw["storage_error"], "status": raw["status"],
+    }
 
 
 class JobDraft:

@@ -15,9 +15,8 @@ from typing import Any
 
 from .control import ha_command
 from .device.client_errors import AmtronConnectionError
-from .device.decode import is_hex32
 from .device.errors import DeviceError
-from .device.job_draft import DRAFT_STATES, validate
+from .device.job_draft import read_snapshot
 from .remote import RemoteClient
 from .remote_errors import ServiceConnectionError
 
@@ -42,13 +41,7 @@ class ServiceOrders:
     def draft(self) -> dict[str, Any] | None:
         status = self.jobs
         draft = status.get("draft") if status is not None else None
-        if not isinstance(draft, dict) or not is_hex32(draft.get("revision")) or type(draft.get("storage_error")) is not bool or draft.get("status") not in DRAFT_STATES:
-            return None
-        try:
-            validate(draft.get("values"))
-        except (ValueError, TypeError, OverflowError):
-            return None
-        return draft
+        return read_snapshot(draft)
 
     @ha_command
     async def async_edit_draft(self, field: str, value: object) -> None:

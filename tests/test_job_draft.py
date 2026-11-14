@@ -355,3 +355,35 @@ def test_remote_draft_changes_notify_entities_without_register_changes(tmp_path)
         finally:
             await service.stop()
     asyncio.run(run())
+
+
+def test_oversized_integer_is_invalid_not_an_internal_error(tmp_path):
+    values = JobDraft(tmp_path / "draft.json", "fixture").values
+    with pytest.raises(ValueError, match=r"invalid job draft value"):
+        validate(values | {"energy_kwh": 10**400})
+
+
+def test_remote_draft_does_not_copy_untrusted_extra_nesting(tmp_path):
+    from aiohttp import ClientSession
+
+    from custom_components.mennekes_amtron_rtu.remote import RemoteClient
+    from tests.test_modbus_service import TOKEN, service_fixture
+
+    async def run():
+        service, _transport, _clock = await service_fixture(tmp_path)
+        try:
+            async with ClientSession() as session:
+                client = RemoteClient(session, "http://service:8765", TOKEN)
+                payload = service.snapshot()
+                draft = JobDraft(tmp_path / "draft.json", "fixture").snapshot()
+                draft["status"] = "needs_finish"
+                nested = []
+                for _ in range(600):
+                    nested = [nested]
+                draft["unexpected"] = nested
+                payload["control"]["orders"] = {"draft": draft}
+                data = client.apply_snapshot(payload)
+                assert data.service_job_draft is None
+        finally:
+            await service.stop()
+    asyncio.run(run())

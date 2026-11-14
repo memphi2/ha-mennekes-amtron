@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import math
 from collections.abc import Awaitable, Callable
-from copy import copy, deepcopy
+from copy import copy
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -39,6 +39,7 @@ from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
 from .device.heartbeat import HeartbeatTask
 from .device.identity import usable_max_evse_current
+from .device.job_draft import read_snapshot
 from .device.link_quality import CONNECTION_QUALITY_STATES
 from .device.operation import Operation
 from .device.register_blocks import REGISTER_BLOCKS
@@ -540,7 +541,7 @@ class RemoteClient(MennekesModbusClient):
             service_supports_cancel_pending=control.get("supports_cancel_pending", False),
             service_max_charging_current=control["max_charging_current"],
             service_charging_setpoint=current,
-            service_job_draft=deepcopy(draft) if isinstance(draft, dict) else None,
+            service_job_draft=read_snapshot(draft),
             pending_change=pending_action,
             pending_change_until=pending_until,
             connection_quality=quality,
