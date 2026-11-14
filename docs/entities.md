@@ -110,7 +110,7 @@ queued change. While the plan charges, **Target expected** carries the
 [forecast](departure-planning.md#with-the-modbus-service-app); otherwise the
 departure itself is the next step.
 
-For a ready-made view, use the **[dashboard examples](app-from-home-assistant.md#dashboard-with-mushroom-cards)**.
+For a ready-made card, use the **[dashboard examples](app-from-home-assistant.md#dashboard-with-mushroom-cards)**.
 They include a small built-in card and a larger Mushroom dashboard in five
 languages, with the default `mennekes_amtron` prefix.
 
@@ -141,7 +141,7 @@ in read-only mode; it does not send a charging command.
 
 The app owns these values; HA does not restore a second copy. Edits persist
 without starting charging. Use the [Mushroom dashboard](app-from-home-assistant.md)
-for a ready-made view.
+for a ready-made card.
 
 | Entity key | Purpose |
 |---|---|

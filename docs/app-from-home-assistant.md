@@ -14,7 +14,8 @@ dashboard. Action fields and automation examples are at the bottom of this page.
 The **basic** example uses built-in HA cards and works with direct USB, LAN or
 the app. The **app dashboard** uses [Mushroom](https://github.com/piitaya/lovelace-mushroom)
 and native integration entities. Install Mushroom through HACS first.
-No helpers, scripts, packages or custom wallbox card are needed.
+Both examples are single cards: paste them under **Edit dashboard → Add card →
+Manual**. No helpers, scripts, packages or custom wallbox card are needed.
 
 | Language | Basic controls | Mushroom app dashboard |
 |---|---|---|
@@ -26,16 +27,18 @@ No helpers, scripts, packages or custom wallbox card are needed.
 
 ### Add the dashboard
 
-1. Connect the integration to the service app and enable write access. Both
-   integration and app must include the shared charging-job draft feature.
+1. For the Mushroom app card, connect the integration to the service app and
+   enable write access. Integration and app must be **0.9.0b6 or newer**.
+   The basic card also works with a direct USB or LAN connection.
 2. Copy the YAML for your language (GitHub's **Raw** button shows plain text).
 3. Check entity IDs under **Settings → Devices & services → Entities**. The
    examples use `mennekes_amtron` and the translated entity names. HA uses the
    language at entity creation; later language changes do not rename IDs.
    Replace IDs if you renamed the device, use another language or have several
    wallboxes. Every button targets its wallbox's entity explicitly.
-4. Create a dashboard view, open its YAML editor and paste the complete example.
-   These are view files, not single-card configurations.
+4. Open **Edit dashboard → Add card → Manual**, replace the editor contents
+   with the complete example and save. The root type is `vertical-stack`.
+   `masonry` is a dashboard-view layout and does not belong in this card editor.
 
 ### One draft in the app and Home Assistant
 

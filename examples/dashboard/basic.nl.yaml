@@ -1,13 +1,11 @@
 # Controleer de entiteits-ID’s vóór gebruik.
-title: Laadpaal
-icon: mdi:ev-station
-type: masonry
+type: vertical-stack
 cards:
-  - type: entities
-    title: Laadpaal
-    show_header_toggle: false
-    entities:
-      - number.mennekes_amtron_laadstroomlimiet
-      - switch.mennekes_amtron_laden_gepauzeerd
-      - sensor.mennekes_amtron_totaal_vermogen
-      - sensor.mennekes_amtron_totale_energie
+- type: entities
+  title: Laadpaal
+  show_header_toggle: false
+  entities:
+  - number.mennekes_amtron_laadstroomlimiet
+  - switch.mennekes_amtron_laden_gepauzeerd
+  - sensor.mennekes_amtron_totaal_vermogen
+  - sensor.mennekes_amtron_totale_energie

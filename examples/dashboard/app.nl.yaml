@@ -1,87 +1,80 @@
 # Check entity IDs before use. No helpers or scripts required.
-title: Laadpaal
-icon: mdi:ev-station
-type: masonry
+type: vertical-stack
 cards:
-- type: vertical-stack
+- type: custom:mushroom-title-card
+  title: Laadpaal
+- type: entities
+  show_header_toggle: false
+  entities:
+  - number.mennekes_amtron_laadstroomlimiet
+  - switch.mennekes_amtron_laden_gepauzeerd
+  - sensor.mennekes_amtron_totaal_vermogen
+  - sensor.mennekes_amtron_totale_energie
+- type: custom:mushroom-entity-card
+  entity: sensor.mennekes_amtron_laadsturing
+  tap_action:
+    action: more-info
+- type: custom:mushroom-entity-card
+  entity: sensor.mennekes_amtron_wachtreden_bij_het_laden
+  tap_action:
+    action: more-info
+- type: custom:mushroom-title-card
+  title: Laadopdracht
+- type: custom:mushroom-entity-card
+  entity: sensor.mennekes_amtron_laadopdracht
+  tap_action:
+    action: more-info
+- type: horizontal-stack
   cards:
-  - type: custom:mushroom-title-card
-    title: Laadpaal
-  - type: entities
-    title: Laadpaal
-    show_header_toggle: false
-    entities:
-    - number.mennekes_amtron_laadstroomlimiet
-    - switch.mennekes_amtron_laden_gepauzeerd
-    - sensor.mennekes_amtron_totaal_vermogen
-    - sensor.mennekes_amtron_totale_energie
-  - type: custom:mushroom-entity-card
-    entity: sensor.mennekes_amtron_laadsturing
-    tap_action:
-      action: more-info
-  - type: custom:mushroom-entity-card
-    entity: sensor.mennekes_amtron_wachtreden_bij_het_laden
-    tap_action:
-      action: more-info
-- type: vertical-stack
+  - type: custom:mushroom-number-card
+    entity: number.mennekes_amtron_opdrachtstroom
+    display_mode: buttons
+  - type: custom:mushroom-number-card
+    entity: number.mennekes_amtron_opdrachtenergie
+    display_mode: buttons
+- type: entities
+  show_header_toggle: false
+  entities:
+  - datetime.mennekes_amtron_uiterste_eindtijd
+- type: custom:mushroom-entity-card
+  entity: sensor.mennekes_amtron_concept_laadopdracht
+- type: grid
+  columns: 2
+  square: false
   cards:
-  - type: custom:mushroom-title-card
-    title: Laadopdracht
   - type: custom:mushroom-entity-card
-    entity: sensor.mennekes_amtron_laadopdracht
+    entity: button.mennekes_amtron_laadopdracht_starten
     tap_action:
-      action: more-info
-  - type: horizontal-stack
-    cards:
-    - type: custom:mushroom-number-card
-      entity: number.mennekes_amtron_opdrachtstroom
-      display_mode: buttons
-    - type: custom:mushroom-number-card
-      entity: number.mennekes_amtron_opdrachtenergie
-      display_mode: buttons
-  - type: entities
-    show_header_toggle: false
-    entities:
-    - datetime.mennekes_amtron_uiterste_eindtijd
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_laadopdracht_starten
+      confirmation:
+        text: Opgeslagen concept starten?
   - type: custom:mushroom-entity-card
-    entity: sensor.mennekes_amtron_concept_laadopdracht
-  - type: grid
-    columns: 2
-    square: false
-    cards:
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_laadopdracht_starten
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_laadopdracht_starten
-        confirmation:
-          text: Opgeslagen concept starten?
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_laadopdracht_stoppen
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_laadopdracht_stoppen
-        confirmation:
-          text: Opdracht stoppen en laden pauzeren?
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_laadopdracht_wissen
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_laadopdracht_wissen
-        confirmation:
-          text: Beëindigde opdracht wissen? Laden blijft gepauzeerd.
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_laadconcept_resetten
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_laadconcept_resetten
-        confirmation:
-          text: Concept resetten? De huidige opdracht blijft ongewijzigd.
+    entity: button.mennekes_amtron_laadopdracht_stoppen
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_laadopdracht_stoppen
+      confirmation:
+        text: Opdracht stoppen en laden pauzeren?
+  - type: custom:mushroom-entity-card
+    entity: button.mennekes_amtron_laadopdracht_wissen
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_laadopdracht_wissen
+      confirmation:
+        text: Beëindigde opdracht wissen zonder het laden te starten?
+  - type: custom:mushroom-entity-card
+    entity: button.mennekes_amtron_laadconcept_resetten
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_laadconcept_resetten
+      confirmation:
+        text: Concept resetten? De huidige opdracht blijft ongewijzigd.

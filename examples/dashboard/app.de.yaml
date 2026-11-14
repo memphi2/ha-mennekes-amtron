@@ -1,87 +1,80 @@
 # Check entity IDs before use. No helpers or scripts required.
-title: Wallbox
-icon: mdi:ev-station
-type: masonry
+type: vertical-stack
 cards:
-- type: vertical-stack
+- type: custom:mushroom-title-card
+  title: Wallbox
+- type: entities
+  show_header_toggle: false
+  entities:
+  - number.mennekes_amtron_ladestrom_begrenzung
+  - switch.mennekes_amtron_laden_pausiert
+  - sensor.mennekes_amtron_gesamtleistung
+  - sensor.mennekes_amtron_energie_insgesamt
+- type: custom:mushroom-entity-card
+  entity: sensor.mennekes_amtron_ladesteuerung
+  tap_action:
+    action: more-info
+- type: custom:mushroom-entity-card
+  entity: sensor.mennekes_amtron_wartegrund_beim_laden
+  tap_action:
+    action: more-info
+- type: custom:mushroom-title-card
+  title: Ladeauftrag
+- type: custom:mushroom-entity-card
+  entity: sensor.mennekes_amtron_ladeauftrag
+  tap_action:
+    action: more-info
+- type: horizontal-stack
   cards:
-  - type: custom:mushroom-title-card
-    title: Wallbox
-  - type: entities
-    title: Wallbox
-    show_header_toggle: false
-    entities:
-    - number.mennekes_amtron_ladestrom_begrenzung
-    - switch.mennekes_amtron_laden_pausiert
-    - sensor.mennekes_amtron_gesamtleistung
-    - sensor.mennekes_amtron_energie_insgesamt
-  - type: custom:mushroom-entity-card
-    entity: sensor.mennekes_amtron_ladesteuerung
-    tap_action:
-      action: more-info
-  - type: custom:mushroom-entity-card
-    entity: sensor.mennekes_amtron_wartegrund_beim_laden
-    tap_action:
-      action: more-info
-- type: vertical-stack
+  - type: custom:mushroom-number-card
+    entity: number.mennekes_amtron_auftragsladestrom
+    display_mode: buttons
+  - type: custom:mushroom-number-card
+    entity: number.mennekes_amtron_auftragsenergie
+    display_mode: buttons
+- type: entities
+  show_header_toggle: false
+  entities:
+  - datetime.mennekes_amtron_spatestes_auftragsende
+- type: custom:mushroom-entity-card
+  entity: sensor.mennekes_amtron_ladeauftragsentwurf
+- type: grid
+  columns: 2
+  square: false
   cards:
-  - type: custom:mushroom-title-card
-    title: Ladeauftrag
   - type: custom:mushroom-entity-card
-    entity: sensor.mennekes_amtron_ladeauftrag
+    entity: button.mennekes_amtron_ladeauftrag_starten
     tap_action:
-      action: more-info
-  - type: horizontal-stack
-    cards:
-    - type: custom:mushroom-number-card
-      entity: number.mennekes_amtron_auftragsladestrom
-      display_mode: buttons
-    - type: custom:mushroom-number-card
-      entity: number.mennekes_amtron_auftragsenergie
-      display_mode: buttons
-  - type: entities
-    show_header_toggle: false
-    entities:
-    - datetime.mennekes_amtron_spatestes_auftragsende
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_ladeauftrag_starten
+      confirmation:
+        text: Gespeicherten Entwurf starten?
   - type: custom:mushroom-entity-card
-    entity: sensor.mennekes_amtron_ladeauftragsentwurf
-  - type: grid
-    columns: 2
-    square: false
-    cards:
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_ladeauftrag_starten
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_ladeauftrag_starten
-        confirmation:
-          text: Gespeicherten Entwurf starten?
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_ladeauftrag_stoppen
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_ladeauftrag_stoppen
-        confirmation:
-          text: Auftrag stoppen und Laden pausieren?
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_ladeauftrag_entfernen
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_ladeauftrag_entfernen
-        confirmation:
-          text: Beendeten Auftrag löschen? Laden bleibt pausiert.
-    - type: custom:mushroom-entity-card
-      entity: button.mennekes_amtron_ladeauftragsentwurf_zurucksetzen
-      tap_action:
-        action: perform-action
-        perform_action: button.press
-        target:
-          entity_id: button.mennekes_amtron_ladeauftragsentwurf_zurucksetzen
-        confirmation:
-          text: Entwurf zurücksetzen? Der laufende Auftrag bleibt unverändert.
+    entity: button.mennekes_amtron_ladeauftrag_stoppen
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_ladeauftrag_stoppen
+      confirmation:
+        text: Auftrag stoppen und Laden pausieren?
+  - type: custom:mushroom-entity-card
+    entity: button.mennekes_amtron_ladeauftrag_entfernen
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_ladeauftrag_entfernen
+      confirmation:
+        text: Beendeten Auftrag löschen, ohne das Laden fortzusetzen?
+  - type: custom:mushroom-entity-card
+    entity: button.mennekes_amtron_ladeauftragsentwurf_zurucksetzen
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.mennekes_amtron_ladeauftragsentwurf_zurucksetzen
+      confirmation:
+        text: Entwurf zurücksetzen? Der laufende Auftrag bleibt unverändert.

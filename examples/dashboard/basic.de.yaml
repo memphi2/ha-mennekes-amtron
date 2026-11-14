@@ -1,13 +1,11 @@
 # Entity-IDs vor der Verwendung prüfen.
-title: Wallbox
-icon: mdi:ev-station
-type: masonry
+type: vertical-stack
 cards:
-  - type: entities
-    title: Wallbox
-    show_header_toggle: false
-    entities:
-      - number.mennekes_amtron_ladestrom_begrenzung
-      - switch.mennekes_amtron_laden_pausiert
-      - sensor.mennekes_amtron_gesamtleistung
-      - sensor.mennekes_amtron_energie_insgesamt
+- type: entities
+  title: Wallbox
+  show_header_toggle: false
+  entities:
+  - number.mennekes_amtron_ladestrom_begrenzung
+  - switch.mennekes_amtron_laden_pausiert
+  - sensor.mennekes_amtron_gesamtleistung
+  - sensor.mennekes_amtron_energie_insgesamt
