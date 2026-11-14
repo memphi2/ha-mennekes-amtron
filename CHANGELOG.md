@@ -5,7 +5,11 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.9.0b5 — 2026-11-14
+
+- Keep charging release off after acknowledging rejected state, including
+  when no vehicle is connected; keep enforcing protective gate closure
+  during quarantine while honoring configured read-only mode.
 
 - Keep the rejected-state Repair reachable with existing vehicle options and
   restart deferred observers after acknowledgement, without starting charging.

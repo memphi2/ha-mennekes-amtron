@@ -1,5 +1,15 @@
 # Changes
 
+## 0.9.0b5
+
+- Clearer My charging overview and Diagnostics navigation.
+- Recover stalled live logs and include all pages in local builds.
+- Block rejected saved control state until an explicit Home Assistant Repair.
+  Acknowledgement keeps charging paused and release off, even after unplugging.
+- Keep protective gate closure active while waiting for that acknowledgement.
+- Old beta control state and departure plans are not migrated. Update the app
+  first, then check pause, release, Plug & Charge, targets and departure.
+
 ## 0.9.0b4
 
 - The registers are a page below Overview again, with the complete table.

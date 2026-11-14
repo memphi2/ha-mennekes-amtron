@@ -4,7 +4,7 @@
 service is the preferred way to connect the integration: the wallbox keeps its
 last charging state, including a deliberate pause, independently of HA.
 
-**Version 0.9.0b4 · Home Assistant app or standalone service**
+**Version 0.9.0b5 · Home Assistant app or standalone service**
 
 **Open Web UI** starts on an overview of the wallbox and the app's recent
 commands. Further pages set up the USB or LAN connection, show every register,
@@ -33,21 +33,22 @@ offline.
 | Using | Start here |
 |---|---|
 | Home Assistant OS | [App setup and everyday use](DOCS.md): discovery supplies the address and token. |
-| Home Assistant Container or another host | [Docker/Python setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/service-standalone.md) |
-| An existing direct USB or LAN connection | [Handover guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/modbus-service.md#move-an-existing-wallbox): keep your device and entity IDs. |
+| Home Assistant Container or another host | [Docker/Python setup](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/service-standalone.md) |
+| An existing direct USB or LAN connection | [Handover guide](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/modbus-service.md#move-an-existing-wallbox): keep your device and entity IDs. |
 
-Install the Mennekes Amtron RTU integration separately, in the same version as
-this app; update the app first. Its controls follow the app's **Read-only**
+Install the Mennekes Amtron RTU integration separately; update the app first.
+The versions need not match: the integration checks the minimum app version
+and API it supports. Its controls follow the app's **Read-only**
 switch; there is no second HA write switch. After changing this setting, save
 and restart the app; HA needs no restart. Direct USB and LAN connections remain
 available without this service.
 
 The service needs exclusive access to the RS-485 adapter. App, host, power and
 USB failures can still interrupt the heartbeat, so configure the wallbox's
-[fallback behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/safety.md#the-heartbeat-and-what-happens-without-it).
+[fallback behavior](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/safety.md#the-heartbeat-and-what-happens-without-it).
 
-[LAN-to-RS-485 adapters](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/network-gateway.md) are also supported,
+[LAN-to-RS-485 adapters](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/network-gateway.md) are also supported,
 with transparent RTU over TCP or translating Modbus TCP gateways. No local USB
 device is needed. Network and gateway outages can still interrupt the heartbeat.
 
-[Technical reference](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b4/docs/service-reference.md) · [Changes](CHANGELOG.md)
+[Technical reference](https://github.com/memphi2/ha-mennekes-amtron/blob/v0.9.0b5/docs/service-reference.md) · [Changes](CHANGELOG.md)
