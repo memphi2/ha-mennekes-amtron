@@ -93,6 +93,7 @@ from .device.waveshare_auth import WaveshareAuthenticationRejectedError
 from .device.write_state import WriteState
 from .entry_types import MennekesAmtronConfigEntry
 from .goal_store import (
+    DepartureIntent,
     GoalStore,
     ModelStore,
     PlanPauseStore,
@@ -613,7 +614,7 @@ async def _async_resume_trip(
     if trip is None:
         return
     try:
-        await TimedGoalStore(hass, entry.entry_id, identity).async_save(trip)
+        await TimedGoalStore(hass, entry.entry_id, identity).async_save(DepartureIntent(trip, pending=True))
     except OSError as err:
         _LOGGER.warning("Vehicle departure not resumed: %s", err)
 

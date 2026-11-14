@@ -40,7 +40,7 @@ from .device.registers import EVSE_STATE
 from .device.timed_goal import TimedGoal, matches_departure_source
 from .device.vehicle import snapshot_vehicle_connected
 from .exceptions import service_validation_error
-from .goal_store import PlanPause, PlanPauseStore, TimedGoalStore
+from .goal_store import DepartureIntent, PlanPause, PlanPauseStore, TimedGoalStore
 from .timed_goal_const import (
     CONF_TIMED_CALENDAR_ENTITY,
     CONF_TIMED_CALENDAR_TITLE,
@@ -150,7 +150,10 @@ class TimedGoalObserver:
         # or HA crash. Reclaim this entry's stable owner before arming a trip.
         self._command_submitted = True
         await self._cancel_command()
-        self.goal = await self._store.async_load()
+        intent = await self._store.async_load()
+        self.goal = intent.trip
+        self._trip_dirty = intent.pending
+        self._trip_base = {"edit_revision": intent.base_revision} if intent.base_revision is not None else None
         try:
             self._plan_paused = (await self._pause_store.async_load()).paused
         except (OSError, ValueError) as err:
@@ -318,7 +321,9 @@ class TimedGoalObserver:
 
     async def _save_goal(self, candidate: TimedGoal) -> None:
         """Keep the live trip aligned with a save that survives cancellation."""
-        task = asyncio.create_task(self._store.async_save(candidate))
+        intent = DepartureIntent(candidate, self._trip_dirty,
+                                 self._trip_base["edit_revision"] if self._trip_dirty and self._trip_base is not None else None)
+        task = asyncio.create_task(self._store.async_save(intent))
         try:
             await asyncio.shield(task)
         except (StorageCommitUncertainError, StorageStateUnknownError) as err:
@@ -607,9 +612,9 @@ class TimedGoalObserver:
             # A newer app edit supersedes an unsent HA edit after an outage.
             async with self._goal_lock:
                 if self.goal is trip and not self._stopping:
-                    await self._save_goal(TimedGoal.restore(service.snapshot()))
                     self._trip_dirty = False
                     self._trip_base = None
+                    await self._save_goal(TimedGoal.restore(service.snapshot()))
                     self._notify()
             return
         if not self._trip_dirty:
@@ -634,9 +639,11 @@ class TimedGoalObserver:
         await self._runtime.control.async_set_departure_trip(
             trip.deadline, trip.source, expected_selection=selection,
         )
-        if self.goal is trip:
-            self._trip_dirty = False
-            self._trip_base = None
+        async with self._goal_lock:
+            if self.goal is trip and self._trip_dirty:
+                self._trip_dirty = False
+                self._trip_base = None
+                await self._save_goal(trip)
 
     def _departure_inputs(self, scope: str | None) -> DepartureInputs | None:
         observer = self._runtime.vehicle_soc

@@ -20,7 +20,7 @@ from custom_components.mennekes_amtron_rtu.device.data import WallboxData
 from custom_components.mennekes_amtron_rtu.device.energy_goal import EnergyGoal
 from custom_components.mennekes_amtron_rtu.device.enums import CpState, EvseState
 from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.goal_store import PlanPause
+from custom_components.mennekes_amtron_rtu.goal_store import DepartureIntent, PlanPause
 from custom_components.mennekes_amtron_rtu.options_flow import (
     _timed_errors,
 )
@@ -109,11 +109,11 @@ class FakeStore:
     def __init__(self, *_args: object) -> None:
         self.saved: list[dict[str, str | None]] = []
 
-    async def async_save(self, goal: TimedGoal) -> None:
-        self.saved.append(goal.snapshot())
+    async def async_save(self, goal: DepartureIntent) -> None:
+        self.saved.append(goal.trip.snapshot())
 
-    async def async_load(self) -> TimedGoal:
-        return TimedGoal()
+    async def async_load(self) -> DepartureIntent:
+        return DepartureIntent()
 
 
 class FakePauseStore:
@@ -619,7 +619,7 @@ async def _restart(monkeypatch: pytest.MonkeyPatch, observer: TimedGoalObserver)
     restarted = TimedGoalObserver(observer._hass, observer._entry)
     restarted.request_evaluate = lambda: None
     restarted._pause_store = observer._pause_store
-    restarted._store.async_load = AsyncMock(return_value=TimedGoal.restore(observer.goal.snapshot()))
+    restarted._store.async_load = AsyncMock(return_value=DepartureIntent(TimedGoal.restore(observer.goal.snapshot())))
     await restarted.async_start()
     return restarted
 

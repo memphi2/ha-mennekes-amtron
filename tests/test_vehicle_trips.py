@@ -96,7 +96,7 @@ def test_a_resumed_trip_that_cannot_be_saved_leaves_the_car_without_one(tmp_path
         with patch.object(TimedGoalStore, "async_save", AsyncMock(side_effect=OSError("disk"))):
             await integration._async_resume_trip(hass, entry, True)
         assert "not resumed" in caplog.text
-        assert (await TimedGoalStore(hass, entry.entry_id, "serial").async_load()).deadline is None
+        assert (await TimedGoalStore(hass, entry.entry_id, "serial").async_load()).trip.deadline is None
 
     asyncio.run(run())
 

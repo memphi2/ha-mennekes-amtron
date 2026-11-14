@@ -21,7 +21,10 @@ from custom_components.mennekes_amtron_rtu.device.persistence import (
 from custom_components.mennekes_amtron_rtu.device.service_http import create_app
 from custom_components.mennekes_amtron_rtu.device.soc_goal import SocGoal
 from custom_components.mennekes_amtron_rtu.device.timed_goal import TimedGoal
-from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
+from custom_components.mennekes_amtron_rtu.goal_store import (
+    DepartureIntent,
+    TimedGoalStore,
+)
 from custom_components.mennekes_amtron_rtu.remote import RemoteClient, RemoteControl
 from custom_components.mennekes_amtron_rtu.timed_goal_observer import departure_time
 from tests.ha_fakes import FakeHass
@@ -448,7 +451,7 @@ def test_failed_trip_save_matches_visible_state_and_reports_failure(tmp_path, mo
         storage_hass.async_add_executor_job = asyncio.to_thread
         observer._store = TimedGoalStore(storage_hass, "entry", "SERIAL")
         observer.goal.set(NOW + timedelta(hours=8))
-        await observer._store.async_save(observer.goal)
+        await observer._store.async_save(DepartureIntent(observer.goal))
         original = observer.goal.snapshot()
         deadline = NOW + timedelta(hours=9)
 
@@ -461,7 +464,7 @@ def test_failed_trip_save_matches_visible_state_and_reports_failure(tmp_path, mo
             with pytest.raises(expected):
                 await observer.async_set_deadline(deadline)
         visible = await TimedGoalStore(storage_hass, "entry", "SERIAL").async_load()
-        assert observer.goal.snapshot() == visible.snapshot()
+        assert observer.goal.snapshot() == visible.trip.snapshot()
         assert (observer.goal.deadline == deadline) is (failure == "directory_sync")
         if failure == "file_sync":
             assert observer.goal.snapshot() == original
@@ -521,7 +524,7 @@ def test_unknown_trip_storage_blocks_commands_until_cancelled_retry_succeeds(tmp
             await task
         assert not observer._save_dirty
         assert not observer._save_unknown
-        assert (await observer._store.async_load()).snapshot() == observer.goal.snapshot()
+        assert (await observer._store.async_load()).trip.snapshot() == observer.goal.snapshot()
         await observer._evaluate()
         assert control.commands
 
@@ -776,7 +779,7 @@ def test_reloaded_observer_reclaims_service_queue_after_offline_unload(tmp_path,
                 )
                 reloaded = observer_module.TimedGoalObserver(hass, observer._entry)
                 reloaded.request_evaluate = lambda: None
-                reloaded._store.async_load = AsyncMock(return_value=TimedGoal.restore(saved))
+                reloaded._store.async_load = AsyncMock(return_value=DepartureIntent(TimedGoal.restore(saved)))
                 await reloaded.async_start()
                 assert reloaded._command_owner == observer._command_owner
                 await reloaded.async_set_deadline(None)

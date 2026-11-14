@@ -363,3 +363,57 @@ def test_automatic_completion_of_app_trip_does_not_discard_new_ha_choice(monkeyp
         assert service.trips == [(new_deadline, "manual", False)]
         assert not observer._trip_dirty
     asyncio.run(body())
+
+
+@pytest.mark.parametrize("newer_app", [False, True])
+@pytest.mark.parametrize("clear", [False, True])
+def test_pending_ha_edit_survives_reload(tmp_path, monkeypatch, newer_app, clear):
+    from custom_components.mennekes_amtron_rtu import timed_goal_observer as module
+    from custom_components.mennekes_amtron_rtu.goal_store import TimedGoalStore
+    from tests.ha_fakes import FakeHass
+
+    async def body():
+        observer, service, _hass = handover(monkeypatch)
+        storage = FakeHass(str(tmp_path))
+        storage.async_add_executor_job = asyncio.to_thread
+        observer._store = TimedGoalStore(storage, "entry", "SERIAL")
+        old = TimedGoal()
+        old.set(NOW + timedelta(hours=1), "manual")
+        service.state = plan(old, editor="app", selection_vehicle=CAR)
+        await observer._evaluate()
+        deadline = None if clear else NOW + timedelta(hours=8)
+        await observer.async_set_deadline(deadline, source="manual")
+        service.fail = HomeAssistantError("service_unavailable")
+        with pytest.raises(HomeAssistantError):
+            await observer._evaluate()
+        await observer.async_stop()
+        if newer_app:
+            service.state = plan(old, editor="app", selection_vehicle=CAR, edit_revision="b" * 32)
+        service.fail = None
+        restarted, _, _ = handover(monkeypatch)
+        restarted._runtime.control = service
+        restarted._store = TimedGoalStore(storage, "entry", "SERIAL")
+        monkeypatch.setattr(module, "async_track_state_change_event", lambda *_args: lambda: None)
+        monkeypatch.setattr(module, "async_track_time_interval", lambda *_args: lambda: None)
+        await restarted.async_start()
+        assert restarted._trip_dirty
+        assert restarted._trip_base == {"edit_revision": "a" * 32}
+        await restarted._evaluate()
+        assert restarted.goal.deadline == (old.deadline if newer_app else deadline)
+        assert service.trips == ([] if newer_app else [(deadline, "manual", False)])
+        saved = await TimedGoalStore(storage, "entry", "SERIAL").async_load()
+        assert not saved.pending
+        assert saved.base_revision is None
+        assert saved.trip.snapshot() == restarted.goal.snapshot()
+        await restarted.async_stop()
+    asyncio.run(body())
+
+
+@pytest.mark.parametrize("raw", [{}, {"trip": {}, "pending": True, "base_revision": None},
+    {"trip": TimedGoal().snapshot(), "pending": 1, "base_revision": None},
+    {"trip": TimedGoal().snapshot(), "pending": True, "base_revision": "invalid"},
+    {"trip": TimedGoal().snapshot(), "pending": False, "base_revision": "a" * 32}])
+def test_invalid_departure_provenance_is_rejected(raw):
+    from custom_components.mennekes_amtron_rtu.goal_store import DepartureIntent
+    with pytest.raises(ValueError, match="invalid departure"):
+        DepartureIntent.restore(raw)
