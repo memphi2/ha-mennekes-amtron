@@ -181,8 +181,8 @@ max: 10
 
 The feed does not replay outcomes missed while HA was
 disconnected. Use current state to reconcile after reconnect; this event entity
-is not a persistent command journal. A service must support the new optional
-feed; earlier compatible services expose the event entity as unavailable.
+is not a persistent command journal. The required service version supplies this
+feed; it is temporarily unavailable while the service initializes its controller.
 
 ## Call the current action
 
