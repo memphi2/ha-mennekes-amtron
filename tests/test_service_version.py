@@ -311,11 +311,12 @@ def test_incompatible_service_version_blocks_and_recovers_without_reauth_or_repl
     asyncio.run(asyncio.wait_for(run(), 60))
 
 
-def test_service_without_shared_guest_contract_is_rejected():
+@pytest.mark.parametrize("advertised", ["0.9.0b7", "0.9.0b8", "0.9.0b9"])
+def test_prerelease_service_is_rejected_by_stable_integration(advertised: str):
     from custom_components.mennekes_amtron_rtu.remote_errors import (
         ServiceConnectionError,
     )
 
     with pytest.raises(ServiceConnectionError) as error:
-        remote_compat.validate_service_version({"service_version": "0.9.0b7"})
+        remote_compat.validate_service_version({"service_version": advertised})
     assert error.value.reason == "service_version_mismatch"
