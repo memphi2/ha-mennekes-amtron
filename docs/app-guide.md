@@ -79,13 +79,23 @@ reached, it stops the order.
 ### Create an order
 
 1. Open **Charging jobs** (German: **Ladeaufträge**).
-2. Enter **Start**, **Finish no later than**, the **additional energy** in kWh
-   and the **current per phase** in A. The current cannot exceed the app's
+2. Enter **Finish no later than**, the **additional energy** in kWh and the
+   **current per phase** in A. Leave **Start** empty to start when confirmed,
+   or set it to a future time. The current cannot exceed the app's
    current cap. Optionally enter an [immediate reserve](#immediate-reserve).
 3. Select **Preview**, check the summary and select **Confirm this action**.
 
 Confirm soon after the preview. If the start time is already more than a minute
 in the past, the app asks for a new preview.
+
+### Shared charging-job draft
+
+The charging-jobs form and the [HA dashboard](app-from-home-assistant.md) use
+one saved draft. **Save draft** stores values without starting charging.
+**Preview** saves them, checks the current connection and shows a separate
+confirmation. Unsaved edits stay in the browser until saved or reloaded.
+If HA or another window changed the draft, reload and check those values first.
+Resetting the draft never changes a running order.
 
 ### While the order runs
 
@@ -310,12 +320,3 @@ is closed. See [troubleshooting](troubleshooting.md#watch-app-modbus-communicati
 
 For the HTTP interface behind these pages, see the
 [service reference](service-reference.md#charging-job-api).
-
-## Shared charging-job draft
-
-The charging-jobs form and the [HA dashboard](app-from-home-assistant.md) use
-one saved draft. **Save draft** stores values without starting charging.
-**Preview** saves them, checks the current connection and shows a separate
-confirmation. Unsaved edits stay in the browser until saved or reloaded.
-If HA or another window changed the draft, reload and check those values first.
-Resetting the draft never changes a running order.
