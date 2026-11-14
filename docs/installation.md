@@ -29,7 +29,7 @@ Keep the vehicle disconnected during the first control setup.
 | Who uses the adapter? | Service app | Home Assistant |
 | During an HA Core restart | Heartbeat and last charging state continue | Heartbeat is interrupted; wallbox fallback applies |
 | Where are writes enabled? | App **Configuration → Read-only** off | Integration **Configure → Wallbox → Control mode: Modbus master** |
-| Charging orders while HA is offline | [Charging jobs and guest charging](app-guide.md#charging-jobs) in the app | Not available |
+| Charging orders while HA is offline | [Guest charging and guest charging](app-guide.md#guest-charging) in the app | Not available |
 
 Both support USB and LAN. A LAN adapter needs no local USB device. On HA
 Container, the service can run as a [separate container](service-standalone.md).
@@ -110,7 +110,7 @@ on, charging release off, resume current 6 A and no targets. This does not start
 charging. Reconfigure the desired policies before explicitly enabling release
 and resuming. In read-only mode the app cannot stop a physical charge.
 This does not change the supported wallbox families or minimum Home Assistant
-version. The current integration requires service **0.9.0b6 or newer**, API 2;
+version. The current integration requires service **0.9.0b7 or newer**, API 2;
 app and integration versions do not otherwise have to match.
 
 1. Back up HA and read the release notes, especially the changes marked

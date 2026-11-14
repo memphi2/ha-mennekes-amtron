@@ -111,7 +111,7 @@ endpoint, with no Modbus owner, heartbeat or discovery. A configured but missing
 adapter still follows the normal reconnect path. Standalone configuration remains
 strict and has no Ingress setup mode.
 
-Charging jobs run in the service next to the bus owner. `ChargeJobController`
+Guest charging runs in the service next to the bus owner. `ChargeJobController`
 decides from a fresh snapshot, saves the order atomically before it may enable
 charging and applies its current through the ordinary timed-current path under
 a `service-job:<id>` owner. `AmtronControl.set_service_policy` installs a
@@ -119,8 +119,8 @@ a `service-job:<id>` owner. `AmtronControl.set_service_policy` installs a
 asks whether an enabling write belongs to the job's exact owner and whether the
 job requires a stop. Competing enabling commands from HA are refused while an
 order holds the connection; pause, release off and lock stop it. A job never
-writes release, lock or phases itself. See [charging jobs](app-guide.md#charging-jobs)
-and the [API](service-reference.md#charging-job-api).
+writes release, lock or phases itself. See [guest charging](app-guide.md#guest-charging)
+and the [API](service-reference.md#guest-charging-api).
 
 The driver binds a readable serial number to the client. Reconnection
 invalidates that verification; the next transaction checks it again under the

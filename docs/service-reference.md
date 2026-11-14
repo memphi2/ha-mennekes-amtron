@@ -88,14 +88,15 @@ Supervisor roles. See [the app's web pages](app-guide.md).
 | `/log`, `/api/modbus-debug` | Live log, in RAM only |
 | `/registers`, `GET /api/registers` | Register page below the overview, from passive observations |
 | `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
-| `/jobs`, `/guest`, `/api/jobs` | Charging jobs, boost and guest charging |
+| `/targets`, `/departure`, `/api/charging` | Shared charge targets and next departure |
+| `/guest`, `/api/jobs` | Guest charging and saved guest settings |
 
 Values saved on the **Runtime** page apply without a restart. Each previewed
 change names its `effect`: `next_cycle` for the polling intervals, `immediate`
 for the current cap and the state-change interval, `next_switch` for the
 phase-switch grace. After every poll the service lowers a charging current
 above its cap, unless a queued command, a phase switch, a goal or order stop or
-a holding charging job decides the current. `restart_fields` lists the
+a holding guest session decides the current. `restart_fields` lists the
 connection, read-only mode, listen address and port when their saved value
 differs from the running one.
 All other service settings are read only at startup: save configuration changes
@@ -227,8 +228,8 @@ recurring failures require their logged cause to be corrected.
 ## Saved state and database traffic
 
 Pause intent, charging-release intent and the resume current are saved in
-`intent.json`, bound to the wallbox identity. A charging job is saved in
-`charge-job.json`, the shared draft in `job-draft.json`, learned charging power
+`intent.json`, bound to the wallbox identity. A guest session is saved in
+`guest-charge.json`, the shared draft in `guest-draft.json`, learned charging power
 in `charge-rates.json` and the departure plan in `departure-plan.json` the same
 way. The file is atomically replaced with
 owner-only permissions when those settings change. Both the file and directory
@@ -283,7 +284,7 @@ service data rather than maintaining a second queue.
 | `GET /v2/diagnostics` | Authenticated bounded diagnostic history, without bus reads. |
 | `POST /v2/read` | Authenticated diagnostic read from the register allowlist. |
 | `POST /v2/command` | Authenticated named control command with an identity precondition. |
-| `GET`/`POST /v2/jobs` | Authenticated charging-job state and operations; see [Charging job API](#charging-job-api). |
+| `GET`/`POST /v2/jobs` | Authenticated charging-job state and operations; see [Guest charging API](#guest-charging-api). |
 | `POST /v2/soc-goal/reserve`, `/commit`, `/resolve` | Authenticated percentage-goal transaction: reserve a token, commit the goal, resolve an uncertain outcome. |
 
 Every command must include `expected_serial_number`, using the serial number
@@ -419,114 +420,37 @@ remote-shutdown endpoint. `/health` exposes process liveness only. An unreachabl
 service or wallbox makes HA readings unavailable; reconnecting does not replay
 HA restore values.
 
-## Charging job API
+## Guest charging API
 
-The [charging job pages](app-guide.md#charging-jobs) use the same operations as
-the authenticated `/v2/jobs` endpoint. Ingress uses `/api/jobs` with the
-administrator check and the CSRF token from its `GET` response. Both accept at
-most 4 KiB, reject query strings and extra fields, and never retry by themselves.
+Authenticated clients use `GET /v2/jobs` for the bounded guest session and draft
+snapshot. Admin Ingress uses `/api/jobs` with its existing CSRF protection.
+The internal execution engine retains the jobs name; there is no scheduled-job
+or boost action in the public API.
 
-`GET` returns the current order, a `revision` and the connection `scope`. The
-scope is an opaque token for the current physical connection, not a vehicle
-identifier; it changes when the car is unplugged, the wallbox is unreadable for
-more than a minute or the service restarts. Every
-`POST` names an `action`:
+The supported actions are `edit_guest_draft`, `reset_guest_draft`,
+`preview_guest_draft`, `create_guest_draft`, `preview_guest`, `create`, `stop`
+and `clear`. `create` accepts only `kind: guest`. Draft edits name the expected
+`draft_revision`; start confirmation additionally names the current state revision
+and connection scope. The preview freezes the absolute end time. Confirming it
+never extends the duration, and stale previews/edits are rejected.
 
-| Action | Fields besides `action` | Effect |
-|---|---|---|
-| `preview` | `revision`, `scope`, `request` | Validates an order and returns its canonical form. Writes nothing. |
-| `create` | `revision`, `scope`, `request` | Saves the previewed order. Repeating the same request returns its result without resetting it. |
-| `preview_guest` | `revision`, `scope`, `request` | Turns `id`, `duration_minutes`, `energy_kwh` and `current_a` into an absolute guest order to confirm with `create`. |
-| `preview_boost` | `revision`, `scope`, `minutes` | Returns the absolute `until` for an early start of 1 to 120 minutes. |
-| `boost` | `revision`, `scope`, `until` | Starts the previewed boost. |
-| `cancel_boost`, `stop`, `clear` | `revision`, `confirm: true` | Ends the boost, stops the order, or removes a stopped or finished order without resuming. |
+Guest draft fields are `current_a` (6–32 A, limited by the service), `energy_kwh`
+(0.1–1000 kWh) and `duration_minutes` (1–1440 whole minutes). One bounded private
+`guest-draft.json` is written only after explicit edits, using atomic replacement.
+It contains no permission to charge. The active guest session is stored separately.
 
-An order `request` has this form:
+HA POST requests name `expected_serial_number`; a service driving another
+wallbox refuses them. Starts never grant release, unlock the wallbox, disable
+Plug & Charge or remove a vehicle battery target. See the
+[user guide](app-from-home-assistant.md) for the three modes.
 
-```json
-{"id": "32 lowercase hexadecimal characters", "start_at": "2026-11-13T22:00:00+01:00",
- "finish_at": "2026-11-14T06:40:00+01:00", "current_a": 12, "energy_kwh": 10}
-```
-
-An optional `reserve_kwh` (0.1 kWh steps, at most `energy_kwh`) charges that
-part at once and then waits for `start_at`; see
-[immediate reserve](app-guide.md#immediate-reserve). `GET` then also reports
-`reserve_reached`.
-
-`GET` also returns a `forecast` for the [finish estimate](app-guide.md#finish-estimate),
-computed from the meter readings the service polls anyway; it adds no Modbus
-reads and changes nothing. `state` is `estimate` when `earliest_finish` and
-`latest_finish` hold a range; otherwise it names why there is none, for
-example `learning`, `scheduled`, `waiting_vehicle`, `awaiting_meter`, `stale`,
-`unstable`, `beyond_horizon`, `unavailable`, `complete` or `stopped`. `source`
-is `live` or `history`, `power_kw` the median measured power, `samples` the
-number of intervals and `deadline_status` one of `likely`, `at_risk`,
-`unlikely` and `unknown`. `history_storage` is `unavailable` while learned
-values cannot be saved.
-
-Learned powers are kept per hashed vehicle reference, current and phase count in
-`/data/charge-rates.json`: at most 64 of them with 16 values each, for 30 days,
-at most 64 KiB, bound to the wallbox identity like the other files. The file
-holds no vehicle identifier and no charging permission. It is written at most
-every ten minutes and at shutdown; an unreadable or unwritable file only stops
-the history, never charging.
-
-A `POST` may carry `expected_serial_number`, the serial number of the wallbox
-the caller is bound to; Home Assistant always sends it. If the app now drives
-another wallbox, it answers 409 `device_identity_changed` and changes nothing.
-
-Errors return HTTP 409 with a key such as `job_changed` (stale revision or
-scope), `job_exists`, `job_not_permitted`, `job_preview_expired`,
-`job_current_exceeds_cap`, `guest_vehicle_target_active`,
-`job_clear_requires_pause`, `job_stop_unconfirmed` (a stop was asked for and
-has not finished; `manual_stop_pending` is true meanwhile, and a clear after a
-confirmed pause ends it) or `job_storage_unavailable`; malformed input returns
-400 with `invalid_job_request`. `job.state` is the order's intent, not a measured
-vehicle state: `scheduled`, `charging`, `waiting_meter`, `suspended`, or one of
-the final states `reached`, `finished`, `stopped` and `interrupted`; `job.reason`
-names why.
-
-While an order holds the connected car (`job.holding` is `true`),
-`/v2/command` refuses commands that set the current, resume, switch phases or
-start another planner with `service_job_active`. `pause`, `cancel_pending`,
-release off and lock on stop the order first. When an order ends, the service
-pauses charging. Once the wallbox confirms the pause and the finished order is
-saved, `holding` turns `false` and commands work again; the finished order stays
-in `GET` until it is cleared or replaced by `create`. The order is saved in
-`/data/charge-job.json` before it may start charging.
-
-A service restart or a lasting connection loss turns a running order into
-`suspended` (reason `service_restarted` or `connection_lost`). It keeps holding
-the car paused and continues on the new `scope` only when the wallbox's session
-duration kept pace with the clock within two minutes, its session counter and
-the selected vehicle are unchanged and its session energy did not start over.
-Otherwise, or without such proof within a minute of a readable wallbox, it
-becomes `interrupted` with the same reason. For this proof the saved order
-also holds the last session duration, session energy, session counter and a
-digest of the vehicle selection; that record is saved only with the order's own
-changes.
-
-### Shared charging-job draft
-
-`GET /v2/jobs` and `control.orders` include `draft`: opaque `revision`,
-`values` (`start_at`, `finish_at`, `current_a`, `energy_kwh`, `reserve_kwh`),
-`storage_error` and a stable readiness `status`. Dates may be null; a null start
-is resolved at preview time. Editing accepts incomplete or expired dates;
-starting performs the ordinary live job checks.
-
-POST actions (with the same authentication, identity and Ingress CSRF checks):
-
-- `edit_draft`: `draft_revision`, `changes` (nonempty subset of the five fields).
-- `reset_draft`: `draft_revision`, `confirm: true`; replaces the draft with defaults.
-- `preview_draft`: `draft_revision`, job `revision`, `scope`; returns a normalized
-  request and both revisions.
-- `create_draft`: those revisions, scope and the exact preview `request`.
-
-Stale draft revisions fail with `job_changed`; editing never changes a running
-job or writes Modbus. Saves use a separate atomic, private `/data/job-draft.json`
-(maximum read size 4096 bytes, bound to wallbox identity). Polls do not write it.
-A corrupt draft blocks its use but not the independent running job. Explicit
-reset replaces the corrupt draft. HA exposes no revision in Recorder attributes.
+Admin-only `/api/charging` exposes the existing persisted energy/percentage
+choices and selected departure. Writes carry the editor's revision and explicit
+confirmation. The percentage editor uses the current bound vehicle source and
+optional maximum; it does not accept arbitrary source IDs from the browser.
+Departure changes retain the external HA source marker so an unchanged timestamp
+cannot silently re-arm a cleared trip. HA mirrors explicit app changes for the
+same selected vehicle. Vehicle profile configuration remains in HA.
 
 ## Transport security
 

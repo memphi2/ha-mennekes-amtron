@@ -1,23 +1,29 @@
-# Dashboard cards and app actions
+# Three ways to charge
 
-[User guide](README.md) · [Dashboard cards](app-from-home-assistant.md#dashboard-with-mushroom-cards) · [Help](troubleshooting.md)
+[User guide](README.md) · [App](app-guide.md) · [Help](troubleshooting.md)
 
-Choose a linked YAML template to put charging controls on your Home Assistant
-home screen. Start with the basic card; the charging-job, guest and boost controls
-require the optional [Modbus service app](modbus-service.md).
+Choose what you want to achieve. There is no separate charging-job mode.
+Ordinary manual charging still uses the current slider, pause and release controls.
 
-The [app's own web interface](app-guide.md) remains available alongside the
-dashboard. Action fields and automation examples are at the bottom of this page.
+| Mode | Example | What starts charging? | What stops it? |
+|---|---|---|---|
+| **Charge target** | Add 20 kWh, or charge the selected car to 80% | You, your existing automation or authorized Plug & Charge. Setting a target never starts or resumes charging. | The first active energy/percentage limit reached. |
+| **Plan departure** | Have the selected car ready tomorrow at 07:30 | The plan chooses when to start and adjusts current. It may lift a manual pause. | The percentage target, another active limit or the end of the trip. |
+| **Guest charging** | Allow a visitor up to 15 kWh for at most 120 minutes at 10 A | Explicitly confirm **Start guest charging**, after authorization. | Energy limit, maximum duration, unplugging or **Stop**. |
+
+The kWh values are measured at the wallbox, not energy added to the battery.
+Targets and estimates do not guarantee a particular delivered amount or an exact
+completion time. Vehicle and wallbox limits, delayed readings and hardware wait
+intervals still apply.
 
 ## Dashboard with Mushroom cards
 
-The **basic** example uses built-in HA cards and works with direct USB, LAN or
-the app. The **app dashboard** uses [Mushroom](https://github.com/piitaya/lovelace-mushroom)
-and native integration entities. Install Mushroom through HACS first.
-Both examples are single cards: paste them under **Edit dashboard → Add card →
-Manual**. No helpers, scripts, packages or custom wallbox card are needed.
+The basic example uses built-in HA cards. The full example needs
+[Mushroom](https://github.com/piitaya/lovelace-mushroom), available through HACS.
+Both are a **single Manual card**, not an entire dashboard view. No extra helpers,
+scripts, packages, custom wallbox card or card-mod are required.
 
-| Language | Basic controls | Mushroom app dashboard |
+| Language | Basic controls | Three-mode Mushroom card |
 |---|---|---|
 | Deutsch | [YAML](../examples/dashboard/basic.de.yaml) | [YAML](../examples/dashboard/app.de.yaml) |
 | English | [YAML](../examples/dashboard/basic.en.yaml) | [YAML](../examples/dashboard/app.en.yaml) |
@@ -25,136 +31,124 @@ Manual**. No helpers, scripts, packages or custom wallbox card are needed.
 | Nederlands | [YAML](../examples/dashboard/basic.nl.yaml) | [YAML](../examples/dashboard/app.nl.yaml) |
 | Italiano | [YAML](../examples/dashboard/basic.it.yaml) | [YAML](../examples/dashboard/app.it.yaml) |
 
-### Add the dashboard
+1. Install Mushroom. Guest charging requires the [service app](modbus-service.md),
+   write access and **integration/app 0.9.0b7 or newer**. Targets and departure
+   planning also work with a direct connection; HA must then remain running.
+2. Copy the YAML for your language using GitHub's **Raw** view.
+3. Check IDs under **Settings → Devices & services → Entities**. The examples use
+   `mennekes_amtron` and translated names. HA chooses IDs when entities are created;
+   changing the UI language later does not rename them. Adjust IDs for your device,
+   earlier names or multiple wallboxes.
+4. **Edit dashboard → Add card → Manual**, paste the complete YAML and save.
+   Its root is `vertical-stack`; `masonry` belongs to a dashboard view instead.
+5. Leave edit mode to check conditional visibility. HA shows conditional cards
+   while editing. Missing optional features show setup guidance instead of controls.
 
-1. For the Mushroom app card, connect the integration to the service app and
-   enable write access. Integration and app must be **0.9.0b6 or newer**.
-   The basic card also works with a direct USB or LAN connection.
-2. Copy the YAML for your language (GitHub's **Raw** button shows plain text).
-3. Check entity IDs under **Settings → Devices & services → Entities**. The
-   examples use `mennekes_amtron` and the translated entity names. HA uses the
-   language at entity creation; later language changes do not rename IDs.
-   Replace IDs if you renamed the device, use another language or have several
-   wallboxes. Every button targets its wallbox's entity explicitly.
-4. Open **Edit dashboard → Add card → Manual**, replace the editor contents
-   with the complete example and save. The root type is `vertical-stack`.
-   `masonry` is a dashboard-view layout and does not belong in this card editor.
+The top tile shows live power, session energy and charging state. State icons and
+colors change: charging/ready is green, waiting/paused amber, a fault red, and
+an inactive function grey. Text always explains the state as well. **P&C ready**
+means authorization was reported; merely turning P&C on does not mean the car
+has been recognized. Tap **Pause** to toggle it. Release and P&C open their
+native HA controls; the vehicle chip opens profile selection. **0 A removes the
+current limit; it does not pause charging.**
 
-### Using the compact Mushroom card
+## Charge target
 
-The top tile shows charging status, live power and energy for this session.
-Unavailable readings show a dash, never a made-up zero. Tap the tile for details.
-The current slider changes the limit; **0 A removes the limit, it does not pause**.
+- **Additional energy:** set the additional wallbox kWh to allow. No vehicle
+  integration is needed. Every explicit save arms a new ceiling from the current meter reading,
+  even when you save the same amount again.
+- **Vehicle charge level:** optionally configure a SoC source under
+  **Configure → Vehicles**, then choose a percentage. A configured vehicle maximum
+  is respected. If that maximum is required but unknown, a new target is refused.
+- **0** disables the corresponding limit, without lifting a pause. If both limits
+  are active, both apply; the first reached ends charging.
 
-Tap **Pause** to pause or resume. **Release**, **Plug & Charge** and **Vehicle**
-open their entity controls so you can check the setting before changing it.
-These chips appear only when their entities are available. An active switch
-has a highlighted icon. A waiting reason appears when charging is held up.
+In HA, editing the native number saves the choice. In the app open **Charging →
+Charge target**, edit the value and explicitly save. App mode uses the same
+persistent service state; there is no second independent target in the browser.
+Missing vehicle data is not guessed. The configured behavior for unavailable SoC
+continues charging until valid data returns, subject to the other limits.
 
-The lower section holds the shared charging-job draft: current, energy and
-**Finish by**, followed by short Start, Stop, Clear and Reset buttons. Each
-button asks for confirmation. If the draft entity is missing or unavailable,
-one information tile replaces the job controls. Check both versions, the app
-connection and the entity IDs. A finish time that has not been set yet is normal;
-it does not hide the form.
+## Plan departure
 
-Leave dashboard edit mode to check visibility: Home Assistant also displays
-conditional cards while editing. The YAML does not change app settings or
-create extra helpers, and it does not include a separate vehicle card.
+1. Configure the vehicle's SoC source, enable departure planning and provide usable
+   battery capacity under **Configure → Vehicles → Next departure**.
+2. Set the vehicle percentage target, for example 80%.
+3. Choose a full date and time in HA or **App → Charging → Plan departure**.
+4. Check the planning status. The plan waits, charges at higher current and tapers
+   toward 6 A as appropriate. It can report that the target may not be reachable.
 
-### One draft in the app and Home Assistant
+This is **one next trip**, not a daily recurring schedule. Calendar and supported
+vehicle-timer imports remain optional HA buttons; they copy into this same
+selected departure. Source configuration and capacity belong in HA. The app can
+edit the resulting time once that vehicle's planning inputs are available.
 
-Set **Job current**, **Job energy** and **Job latest finish** in the
-card. Each edit saves to the app and appears in its charging-jobs page after
-refresh. In the app, use **Save draft** to publish your edits to HA. A draft
-survives restarting HA or the app, but never starts charging by itself.
+**A plan may lift even a manual pause.** Clear the departure to cancel the plan.
+Percentage and energy limits remain. A pause owned by the plan can end when the
+plan is cleared; clearing is not a universal stop command. To keep the car stopped,
+clear the trip and explicitly pause charging. See
+[departure planning](departure-planning.md) for forecasts, calendar import,
+climate actions and behavior during missing vehicle data.
 
-**Start charging job** checks the saved values and creates the order for the
-currently connected car. The YAML asks for confirmation first. The **Charging
-job draft** status explains whether a finish time, connected car or permission
-is missing. Editing the draft does not change a running order.
+## Guest charging
 
-**Stop charging job** pauses the order. **Clear charging job** removes
-its record without resuming. **Reset job draft** restores empty times,
-6 A and 10 kWh; it leaves the current order unchanged and can also recover an
-unreadable draft file.
+1. Plug in the visitor's car and authorize it locally, for example by RFID.
+2. Explicitly disable an active **vehicle percentage target** first. Guest charging
+   does not borrow your car's SoC, capacity or target and never silently removes it.
+3. In HA or **App → Charging → Guest charging**, set **Energy**, **Maximum duration
+   in minutes** and **Current per phase**. These are the same saved guest draft.
+4. HA: press **Start guest charging** and confirm. App: save/preview, check the
+   absolute end time, then confirm the preview within one minute.
 
-For advanced scheduling, enable **Job earliest start** and **Job immediate
-reserve** in the entity settings and add them to your view. They are disabled
-by default. An empty start means now when confirmed; reset the draft to clear
-a previously set start. The reserve is part of the energy ceiling, not extra.
+Changing or resetting the draft never changes a running guest charge. A new
+confirmation is bound to the same physical plug-in and the same saved draft.
+A second browser or HA edit invalidates an older confirmation. Reload and review
+changed values; a failed response is never retried automatically.
 
-If someone edits the draft in another window, an older edit or preview is
-rejected. Reload the saved draft, check it and retry. This prevents silently
-overwriting another person's settings. The app can also edit a draft while
-an order runs, or before a car is connected.
+**Stop** ends the guest charge and requests a pause. **Clear** removes an ended
+session without resuming. **Reset draft** restores 6 A, 10 kWh and 120 minutes;
+it leaves a running guest charge unchanged. Reconnecting requires a new start.
+The service retains the active guest session across an HA restart. A service
+restart requires proof that the same car stayed connected before continuing.
 
-Boost and guest charging remain available in the app and through the actions
-below. Departure planning has its own entities; it is separate from this draft.
+## Manual selection, automatic recognition and Plug & Charge
 
-## What you get
-
-| In Home Assistant | What it does |
-|---|---|
-| `sensor.*_charging_job` | State of the app's charging job or guest charge, or **No job**. Attributes: `kind`, `start`, `finish`, `current`, `energy`, `delivered`, `reserve`, `reason`, `boost_until`, `boost_available`. |
-| Action `start_charging_job` | Charge in a time window with a fixed current up to an amount of energy. |
-| Action `start_guest_charging` | Charge a guest's car from now on, limited in time and energy. |
-| Action `stop_charging_job` | Stop the running job or guest charge and pause charging. The job does not resume; a [departure plan](departure-planning.md) that is due may charge again. |
-| Action `clear_charging_job` | Remove an ended or stopped job so that a new one can start. |
-| Action `start_boost` / `cancel_boost` | Charge right away although the job starts later, then return to the plan. |
-
-All actions are named `mennekes_amtron_rtu.<action>`. The sensor exists only
-with the app; with a direct USB or LAN connection the actions answer that they
-need the app.
-
-## Action fields
-
-Every action takes an optional `device_id`. With one wallbox it can be left
-out; with several, name the wallbox.
-
-| Action | Field | Meaning |
+| Setup | Targets and departure | Guest charging |
 |---|---|---|
-| `start_charging_job` | `finish` | When charging ends at the latest, within seven days. Required. |
-| | `start` | When charging may begin. Left out: now. |
-| | `current` | 6–32 A per phase, at most the app's current cap. Required. |
-| | `energy` | Charging stops after this many kWh. Required. |
-| | `reserve` | Optional: this many kWh are charged right away, before the window. |
-| `start_guest_charging` | `duration` | Minutes from now, up to 1440. Required. |
-| | `current`, `energy` | As above. Required. |
-| `start_boost` | `duration` | Minutes to charge early, up to 120. Required. |
+| No vehicle integration | kWh limit and manual controls work. A percentage target/departure plan needs vehicle data. | Works without a profile after explicit authorization. |
+| Manually selected profile | Select the correct car. Its rules apply only once that car's plug-in is confirmed. | Do not apply the selected car's battery target to the visitor. |
+| Automatic recognition | Optional cable/home signals choose a uniquely matching profile. Delayed or ambiguous signals wait; they do not guess. | Recognition does not automatically create a guest session. |
+| Virtual Plug & Charge | Only recognized, approved cars receive automatic release. An armed departure plan still determines when to charge. | Does not bypass P&C, a lock or missing release. For an unrecognized visitor, explicitly enable **Charging release** in HA for this connection and authorize the car locally. P&C remains enabled; its manual grant ends when the car is unplugged. |
 
-A time without a time zone is taken as local time. A window that ends before it
-starts, starts in the past or ends more than seven days ahead is refused.
-Energy counts in steps of 0.1 kWh; a finer value is rounded. The reserve must
-not exceed the energy.
+Manual starts, guest confirmation and planning never bypass the wallbox's lock,
+release or electrical limits. An active guest session owns current control; stop
+and clear it before taking over with manual current or another planner. Changing
+vehicle percentage targets during guest charging can interrupt it. A departure
+plan remains visible but waits while guest charging owns the wallbox.
 
-A stop always acts at once. A start waits for the app's minimum time between
-state changes, so an automation that starts and stops in quick succession
-switches the car on and off at most once per interval.
+## Storage and failed handovers
 
-## One tap, and what happens behind it
+Targets, selected trip and guest draft/session are separate records. Saving a draft
+is not a start command. Polling does not append a charging journal or write drafts
+repeatedly. If a save is uncertain, the UI reports it; reload the authoritative
+state before trying again. A damaged record is not silently treated as a new
+charging permission. Recorder is not used to restore a draft.
 
-On its own pages the app first shows a preview of an order and asks you to
-confirm it: the preview holds the checked values and is tied to the current
-plug-in, so that an order cannot reach another car or an outdated state.
+## Automation actions
 
-An action from Home Assistant asks for the same preview and confirms it at
-once. Nothing is skipped: if the car was unplugged, another order is running
-or a value is not allowed, the action fails with the app's reason and nothing
-is started. For the question "are you sure?", give the dashboard button a
-confirmation, as in the linked dashboard examples. Automations call the same actions
-without a question.
-
-## In automations
+Use `mennekes_amtron_rtu.start_guest_charging`, `stop_guest_charging` and
+`clear_guest_charging`. Supply `device_id` when there is more than one wallbox.
+The start action checks a preview and confirms it once against the same plug-in.
 
 ```yaml
 - action: mennekes_amtron_rtu.start_guest_charging
   data:
-    duration: 180
+    duration: 120
     current: 10
     energy: 15
 ```
 
-A failed action raises an error with the app's reason, for example that
-another order is still running; an automation stops there unless it handles
-the error with `continue_on_error`.
+Actions raise an error if authorization, a valid meter or other prerequisites are
+missing. They do not silently cancel conflicting settings or retry a start.
+The former scheduled-job and boost actions are removed before 1.0; update old
+cards and automations instead of retaining compatibility aliases.

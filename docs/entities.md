@@ -93,7 +93,7 @@ nothing from it. They are absent with a direct serial or LAN connection.
 
 | State | Meaning |
 |---|---|
-| Guest order, Charging job | An [order from the app](app-guide.md#charging-jobs) holds the wallbox until it ends and the wallbox confirms its last pause, or until the car is unplugged. |
+| Guest charging | A [guest session](app-guide.md#guest-charging) holds the wallbox until it ends and the wallbox confirms its last pause, or until the car is unplugged. |
 | Departure planning | A [departure](departure-planning.md#with-the-modbus-service-app) is set and not finished. |
 | Direct control | No plan or order: your switches, numbers, targets and automations apply. |
 | Wallbox unavailable | The app has no current reading. |
@@ -137,27 +137,26 @@ in read-only mode; it does not send a charging command.
 | `switch.*_wallbox_locked` | Wallbox locked | always | Locks the wallbox so it refuses to charge at all. |
 | `select.*_requested_phases` | Requested phases | hardware that can switch phases | Single-phase or all-phase charging. A change while charging first pauses; resume separately after the waiting interval. Only exists on capable hardware. The `switched` attribute is the wallbox's answer: the phases it will use when it next closes the relay. |
 
-## Charging-job draft (service app only)
+## Guest draft (service app only)
 
-The app owns these values; HA does not restore a second copy. Edits persist
-without starting charging. Use the [Mushroom dashboard](app-from-home-assistant.md)
-for a ready-made card.
+These native controls share the app's durable guest draft. Editing never starts
+charging or changes a running guest session. No HA helper or Recorder restore
+is needed. See the [three-mode dashboard](app-from-home-assistant.md).
 
 | Entity key | Purpose |
 |---|---|
-| `number.job_current_a` | Draft current per phase, 6 A up to the service cap. |
-| `number.job_energy_kwh` | Draft additional AC energy ceiling, 0.1–1000 kWh. |
-| `datetime.job_finish_at` | Latest finish; required before starting. |
-| `datetime.job_start_at` | Earliest start; empty means now. Disabled by default. |
-| `number.job_reserve_kwh` | Immediate reserve included in the ceiling; 0 disables. Disabled by default. |
-| `sensor.job_draft_status` | Stable readiness or refusal reason, without revision or countdown attributes. |
-| `button.job_start` | Preview and start the saved draft for this wallbox. |
-| `button.job_stop` | Stop the current order and pause. |
-| `button.job_clear` | Clear an ended order without resuming. |
-| `button.job_reset_draft` | Reset only draft values; also recovers an unreadable draft file. |
+| `number.guest_current_a` | Current per phase, 6 A up to the service cap. |
+| `number.guest_energy_kwh` | Additional wallbox energy ceiling, 0.1–1000 kWh. |
+| `number.guest_duration_minutes` | Maximum duration, 1–1440 whole minutes. |
+| `sensor.guest_draft_status` | Stable readiness/refusal reason, without ticking attributes. |
+| `button.guest_start` | Preview and confirm the saved draft for this plug-in. |
+| `button.guest_stop` | Stop the guest session and request a pause. |
+| `button.guest_clear` | Remove an ended session without resuming. |
+| `button.guest_reset_draft` | Restore 6 A, 10 kWh and 120 minutes; recover a damaged draft. |
 
-These are translation keys, not literal entity IDs. HA generates IDs from the
-device and translated names. Controls are unavailable in read-only mode.
+These are translation keys, not literal IDs. HA generates IDs from the device
+and translated names. Edits require write access. The next departure is a
+separate datetime entity; it is not an end time for guest charging.
 
 ## Configuration
 
@@ -200,7 +199,7 @@ pending target. See
 | `sensor.*_charging_control` | Charging control | — | enum | Modbus service app | Which of the app's controllers decides about the charge right now; see [Charging control at a glance](#charging-control-at-a-glance). The attributes `vehicle`, `target`, `target_value` and `target_deadline` name the car's state and what is charged towards. |
 | `sensor.*_charging_wait_reason` | Charging wait reason | — | enum | Modbus service app | Why the car does not charge yet, or **Nothing is holding the charge**. It names the first reason that applies, not every one. |
 | `sensor.*_next_charging_step` | Next charging step | — | enum | Modbus service app | What the app expects next; the `at` attribute holds its time. No countdown is recorded. |
-| `sensor.*_charging_job` | Charging job | — | enum | Modbus service app | State of the app's charging job or guest charge, or **No job**; the attributes hold its window, current, energy and progress. See [Use the app from Home Assistant](app-from-home-assistant.md). |
+| `sensor.*_guest_charging` | Guest charging | — | enum | Modbus service app | State of the guest charge, or **No guest charge**; the attributes hold its window, current, energy and progress. See [Use the app from Home Assistant](app-from-home-assistant.md). |
 | `sensor.*_virtual_plug_charge_status` | Virtual Plug & Charge status | — | enum | supported direct/service capability | Shows recognition, permission and release status, or Disabled. **Charging blocked** carries a `blocked_reason` attribute (for example `release_off`, `wallbox_locked`, `authorization_required`, `pause_requested`, `energy_goal_stop` or `register_unavailable`). **Released by hand** shows a manual release for the current or next connection. No session tokens or ticking timestamps are recorded. |
 | `sensor.*_charging_status` | Charging status |  | enum | always | Explains verified charging state or a known blocking setting. The raw wallbox states behind it are the `evse_state` and `cp_state` attributes (see [Attribute values](#attribute-values)). |
 | `sensor.*_energy_target_status` | Energy target status |  | enum | lifetime energy counter | `disabled`, `active`, `reached`, `meter_unavailable` or `meter_reset`. Reached means the energy threshold was observed, not that a pause write has already been confirmed. |
@@ -263,7 +262,7 @@ when it runs, is replaced, or is cancelled; the pending sensors show the wait.
 The feed covers current, pause/resume, phase selection, release, locking and
 error recovery. Cancelling a queued action reports `cancelled` with reason
 `user_cancelled`; a kWh or percentage goal can cancel queued work with reason
-`energy_goal`. When a charging job of the app cancels queued work or refuses a
+`energy_goal`. When a guest session of the app cancels queued work or refuses a
 queued command, the reason is `service_job`. Solar display selection and restart do not publish command
 outcomes.
 
@@ -330,7 +329,7 @@ and templates see.
 | `sensor.*_charging_control` | `unavailable`, `guest_order`, `charging_job`, `departure_plan`, `direct` |
 | `sensor.*_charging_wait_reason` | `none`, `wallbox_unavailable`, `no_vehicle`, `release_off`, `plug_charge_waiting`, `until_job_start`, `meter_unavailable`, `job_suspended`, `job_ended`, `vehicle_unconfirmed`, `until_planned_start`, `estimated_target_reached`, `waiting_for_device`, `waiting_for_soc`, `waiting_for_capacity`, `waiting_for_target`, `read_only`, `command_pending`, `target_reached`, `paused` |
 | `sensor.*_next_charging_step` | `none`, `queued_command`, `job_start`, `job_end`, `plan_start`, `target_reached`, `departure` |
-| `sensor.*_charging_job` | `none`, `scheduled`, `charging`, `waiting_meter`, `suspended`, `reached`, `finished`, `stopped`, `interrupted` |
+| `sensor.*_guest_charging` | `none`, `scheduled`, `charging`, `waiting_meter`, `suspended`, `reached`, `finished`, `stopped`, `interrupted` |
 
 ### Attribute values
 
@@ -359,7 +358,7 @@ Both the action and the slider accept 0 A to remove the limit. See
 [user-guide.md](user-guide.md#actions).
 
 With the Modbus service app, six more actions start and stop the app's
-charging jobs, boost and guest charging; see
+guest charging; see
 [Use the app from Home Assistant](app-from-home-assistant.md).
 
 ## Optional charging estimates
