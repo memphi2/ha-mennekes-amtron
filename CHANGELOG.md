@@ -7,51 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
-- Share actual-power measurement windows between direct HA and app planning,
-  using existing meter polls and resetting on vehicle, phase or meter changes.
+## 0.9.0b8 — 2026-11-14
 
-- Model a lower vehicle charging limit as a power ceiling. Reducing the
-  wallbox current no longer incorrectly scales that ceiling down again.
-
-- Remove redundant HTTP wrappers, unused charging-page text and the fallback
-  for services without command-event metadata.
-
-- Require service 0.9.0b8 for the simplified shared-guest contract; older
-  services are rejected before their incompatible state is accepted.
-
-- Roll back a guest start rejected before acceptance; retain its guards after
-  an accepted or uncertain release so a partial start cannot lose its limits.
-
-- Enforce the guest time limit without the long state-change delay, retaining
-  the five-second register guard and retrying transient bus failures.
-
-- Keep an active guest time limit across vehicle-profile handovers; explicit
-  time edits in Home Assistant and the app remain available.
-
-- Reject stale vehicle-plan writes after guest charging takes control, including
-  resumes that would otherwise override a deliberate guest pause.
-
-- Remove the obsolete guest-order engine, persistence, separate forecast and
-  control locks. Guest permission uses ordinary controls and shared limits for
-  the current plug-in. Minimal restart evidence restores the grant and shared
-  limits only for a proven same plug-in, preserving manual pauses. Missing
-  evidence stops charging and requires a new guest start. Old beta intent files
-  require acknowledgement of a safe reset; no migration is performed.
-- Update vehicle planning from actual metered charging power after two minutes
-  at full offered current; a lower vehicle draw corrects the forecast promptly.
-- Rebuild the user-guide navigation, shared-limit explanations, app instructions
-  and all five Mushroom examples around the simplified controls.
-
-- Use shared kWh, time and optional vehicle percentage targets in HA and the app.
-  Keep intelligent vehicle planning in HA, without a separate app planning page.
-- Start guests with one button: lift manual pause and grant this connection's
-  permission, stopping at the first saved kWh/time limit. Keep vehicle targets
-  saved without applying them to guests.
-- Use one target-time entity for guests and vehicle planning. Clear it through
-  its entity action or by holding the time tile in the Mushroom examples.
-- Simplify the app overview and charging page, and update all five dashboard examples.
-- Remove the old guest draft, duration/current entities, separate stop/clear
-  buttons and job API. Update earlier beta automations and dashboard YAML.
+- Simplify charging in HA and the app: shared kWh and time limits, an optional
+  vehicle percentage target, and one button to start guest charging. Guests
+  stop at the first active kWh/time limit; vehicle planning remains optional in HA.
+- Preserve guest limits and deliberate pauses across a service restart when
+  the same plug-in is proven. Fix queued starts, partial writes, protective
+  stops and conflicts with vehicle planning.
+- Adapt intelligent planning to the charging power the vehicle actually draws,
+  using the existing meter readings without additional Modbus polling.
+- Redesign the app overview, refresh all five Mushroom examples and rebuild
+  the user guides around installation, first charging and everyday controls.
+- Remove obsolete guest orders, drafts, separate rate models and their APIs.
+  Update old beta automations and dashboard YAML; no beta migration is provided.
+- Requires app **0.9.0b8 or newer**, API 2: update the app first. Earlier beta
+  intent files require acknowledgement of a safe reset; recheck charging
+  permissions, limits and vehicle planning before use.
 
 ## 0.9.0b7 — 2026-11-14
 
