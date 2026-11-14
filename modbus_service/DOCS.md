@@ -91,7 +91,8 @@ for details.
 
 | Page | Purpose |
 |---|---|
-| **Overview** | Which controller decides about the charge, why the car waits and what comes next; observed charging state, heartbeat, power, the next queued action, recent command results and every register with raw and decoded value. Read-only. |
+| **Overview** | Which controller decides about the charge, why the car waits and what comes next; observed charging state, heartbeat, power, the next queued action, recent command results. Read-only. |
+| **Registers** | Below Overview: every known register with raw and decoded value and its read quality. Read-only. |
 | **Connection** | USB or LAN connection and optional LAN-adapter setup. Changes apply after an app restart. |
 | **Log** | The Modbus traffic as it happens, in memory only. Runs while the page is open. |
 | **Runtime** | Polling intervals, current cap and waits apply without restart. Preview before saving. |
@@ -294,7 +295,7 @@ app records only while the page is open and at most **10 minutes** after it
 was closed, and keeps at most **200 transactions in RAM**. It adds no Modbus
 requests, Recorder entries or log files. Serial numbers and text registers are
 hidden; network login traffic and exception messages are never captured. The
-**Overview** shows the last value and read quality of every register.
+**Registers** page below Overview shows the last value and read quality of every register.
 
 Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Automated tests do not replace that check.

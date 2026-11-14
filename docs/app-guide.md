@@ -9,7 +9,8 @@ pages in a second row.
 
 | Group | Page | What it is for |
 |---|---|---|
-| **Overview** | [Overview](#overview) | What the wallbox and the app are doing right now, and every [register](#registers). Read-only. |
+| **Overview** | [Overview](#overview) | What the wallbox and the app are doing right now. Read-only. |
+| | [Registers](#registers) | Every wallbox register with its raw and decoded value. Read-only. |
 | **Charging** | [Charging jobs](#charging-jobs) | A charging order the app runs on its own, with optional early start and an estimated finish. |
 | | [Guest charging](#guest-charging) | A quick, limited order for a visitor's car. |
 | | [Weekly plans](#weekly-plans) | Recurring departures for one car, turned into charging jobs for up to seven days. |
@@ -306,7 +307,7 @@ After you edit the active plan, it activates itself again at the next plug-in.
 
 ## Registers
 
-The **Registers** card at the end of the overview lists every register the integration knows, with address, raw
+**Registers**, a page below **Overview**, lists every register the integration knows, with address, raw
 words, decoded value, last successful read and last attempt. The **Quality**
 column describes the reading, not the wallbox:
 
@@ -317,7 +318,7 @@ column describes the reading, not the wallbox:
 | Error | No usable value, or the wallbox is not reachable. |
 | Unknown, unsupported, write-only | Not read yet, not supported by this wallbox's firmware, or not readable. |
 
-Filter, sort and **Freeze display** only affect the browser. The card adds no
+Filter, sort and **Freeze display** only affect the browser. The page adds no
 Modbus traffic and no Recorder history. The serial number is hidden.
 
 ## Runtime settings

@@ -496,7 +496,7 @@ numbers and all text registers are masked, including inside block reads;
 network login traffic and exception-message contents are never captured.
 
 This view requires a Home Assistant administrator and a configured
-connection. The **Overview** shows the last value of every register; see
+connection. The **Registers** page below **Overview** shows the last value of every register; see
 [the app's web pages](app-guide.md#registers). It remains available when that connection is failing. Direct-mode
 integration users can use the diagnostics described above.
 

@@ -79,7 +79,7 @@ Supervisor roles. See [the app's web pages](app-guide.md).
 | `/`, `GET /api/overview` | Overview page and its read-only snapshot |
 | `/connection`, `/api/config`, `/api/adapter` | Connection settings and LAN-adapter setup |
 | `/log`, `/api/modbus-debug` | Live log, in RAM only |
-| `GET /api/registers` | The registers on the overview, from passive observations |
+| `/registers`, `GET /api/registers` | Register page below the overview, from passive observations |
 | `/runtime`, `/api/runtime`, `POST /api/runtime/preview` | Runtime settings with preview |
 | `/jobs`, `/guest`, `/api/jobs` | Charging jobs, boost and guest charging |
 | `/weekly`, `/api/weekly` | Weekly plans; see [Weekly plan API](#weekly-plan-api) |

@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.9.0b4 — unreleased
+
+- **The registers are a page below Overview again,** with the complete table,
+  instead of a card of the overview.
+- **Pages carry their styles inside** and are styled from the first paint, so
+  a change of page cannot show an unformatted page for a moment.
+
 ## 0.9.0b3 — 2026-11-14
 
 - **The app's web pages look like Home Assistant and use the whole width.**

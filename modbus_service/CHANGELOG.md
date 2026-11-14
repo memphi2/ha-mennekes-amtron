@@ -1,5 +1,11 @@
 # Changes
 
+## 0.9.0b4
+
+- The registers are a page below Overview again, with the complete table.
+- Pages carry their styles inside, so a change of page cannot show an
+  unformatted page for a moment.
+
 ## 0.9.0b3
 
 - The web pages have the look of Home Assistant, use the whole width and

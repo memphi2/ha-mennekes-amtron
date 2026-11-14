@@ -85,7 +85,6 @@
   const text = key => labels[key]?.[column] || key || "—";
   document.querySelectorAll("[data-text]").forEach(node => { node.textContent = text(node.dataset.text); });
   const el = id => document.getElementById(id);
-  const section = el("registers"); if (section) section.hidden = false;
   const fmtTime = stamp => { const d = new Date(stamp); return stamp && Number.isFinite(d.getTime()) ? d.toLocaleString(locale, {timeZoneName:"short"}) : "—"; };
   let rows = [], timer = null, controller = null, generation = 0, stopped = false;
   const visible = () => !document.hidden && !stopped && !el("register_pause").checked;
