@@ -38,10 +38,10 @@ def export(destination: Path) -> None:
     target = destination / "custom_components/mennekes_amtron_rtu/device"
     target.mkdir(parents=True)
     source_directory = ROOT / "custom_components/mennekes_amtron_rtu/device"
-    for source in source_directory.glob("*.py"):
-        shutil.copy2(source, target / source.name)
-    for filename in ("app_settings.html", "app_settings.js", "app_settings.css"):
-        shutil.copy2(source_directory / filename, target / filename)
+    # Include every packaged page and script, not just the connection form.
+    for source in source_directory.iterdir():
+        if source.is_file() and source.suffix in {".py", ".html", ".js", ".css"}:
+            shutil.copy2(source, target / source.name)
 
 
 def main() -> None:

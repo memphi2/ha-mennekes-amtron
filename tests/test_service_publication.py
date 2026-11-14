@@ -733,8 +733,13 @@ def test_local_export_builds_the_checkout_instead_of_pulling_a_published_image(
         images.ROOT / "modbus_service/apparmor.txt"
     ).read_bytes()
     device = "custom_components/mennekes_amtron_rtu/device"
-    for asset in ("app_settings.html", "app_settings.js", "app_settings.css"):
+    from custom_components.mennekes_amtron_rtu.device.app_settings import _ASSETS
+    from custom_components.mennekes_amtron_rtu.device.console_http import CONSOLE_ASSETS
+
+    assets = {filename for filename, _mime in (*_ASSETS.values(), *CONSOLE_ASSETS.values())}
+    for asset in assets:
         assert (output / device / asset).read_bytes() == (images.ROOT / device / asset).read_bytes()
+    assert not (output / device / "__pycache__").exists()
     with pytest.raises(FileExistsError):
         export(output)
 
