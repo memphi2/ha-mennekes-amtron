@@ -193,3 +193,26 @@ def test_vehicle_import_button_keeps_its_identity_and_tracks_provider_availabili
         assert not transport.writes
         await entry.runtime_data.control.async_shutdown()
     asyncio.run(run())
+
+
+def test_guest_time_entity_edits_service_limit_without_changing_vehicle_trip(monkeypatch):
+    async def run():
+        hass, entry, _transport = await build_runtime()
+        control = entry.runtime_data.control
+        guest_time = datetime(2026, 11, 20, 9, tzinfo=UTC)
+        remote = SimpleNamespace(trip=SimpleNamespace(deadline=guest_time))
+        monkeypatch.setattr(type(control), "departure", property(lambda _: remote))
+        control.guest_active = lambda: True
+        control.async_set_target_time = AsyncMock()
+        entry.runtime_data.timed_goal = observer = _timed_observer()
+        _plan_departures(entry)
+        dates, _buttons, _sensors = await _entities(hass, entry)
+        entity = dates["timed_departure"]
+        assert entity.native_value == guest_time
+        await entity.async_set_value(guest_time)
+        control.async_set_target_time.assert_awaited_with(guest_time)
+        await entity.async_clear_value()
+        control.async_set_target_time.assert_awaited_with(None)
+        observer.async_set_deadline.assert_not_awaited()
+        await control.async_shutdown()
+    asyncio.run(run())

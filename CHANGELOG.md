@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Keep an active guest time limit across vehicle-profile handovers; explicit
+  time edits in Home Assistant and the app remain available.
+
 - Reject stale vehicle-plan writes after guest charging takes control, including
   resumes that would otherwise override a deliberate guest pause.
 

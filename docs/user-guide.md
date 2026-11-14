@@ -36,6 +36,9 @@ A positive kWh setting starts a new meter baseline when you save it. Guest start
 uses that baseline; it does not add the amount a second time. An already reached
 energy goal must be changed or disabled before charging can resume.
 
+Automatic vehicle-profile changes do not clear or replace an active guest’s time
+limit. Edit or clear that limit explicitly in HA or the app.
+
 A vehicle departure plan can lift a manual pause. Clear its time before pausing
 if you want the recognized vehicle to remain stopped. It never takes control of
 the current guest connection, including after you manually pause that guest.

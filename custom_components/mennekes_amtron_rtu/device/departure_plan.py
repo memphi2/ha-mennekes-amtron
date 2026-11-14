@@ -467,6 +467,7 @@ class DepartureController:
         self, deadline: datetime | None, source: str | None, *, withdraw: bool = False,
         expected_revision: str | None = None, expected_vehicle: str | None = None,
         editor: str = "ha", expected_selection: dict[str, Any] | None = None,
+        vehicle_handover: bool = False,
     ) -> None:
         """Take over Home Assistant's trip; ``withdraw`` also ends the plan's pause.
 
@@ -481,6 +482,8 @@ class DepartureController:
                 if expected_selection is not None and expected_selection != current:
                     raise DeviceError("soc_goal_source_changed")
             check_selection()
+            if vehicle_handover and await self._keep_guest_time(withdraw):
+                return
             sample = self.sample()
             if editor == "app":
                 if sample.read_only or expected_revision != self.choice_revision or expected_vehicle != sample.vehicle:
@@ -498,6 +501,8 @@ class DepartureController:
                     # ends as reached, so the stop holds until the car leaves.
                     candidate.finish("reached")
                 await self._cancel_command()
+                if vehicle_handover and await self._keep_guest_time(withdraw):
+                    return
                 check_selection()
                 if editor == "app":
                     current = self.sample()
@@ -520,6 +525,17 @@ class DepartureController:
             if self.storage_error:
                 raise DeviceError("service_unavailable")
         self.wake.set()
+
+    async def _keep_guest_time(self, withdraw: bool) -> bool:
+        """A vehicle handover cannot replace the current guest's shared limit."""
+        if not self.sample().guest_mode:
+            return False
+        if withdraw:
+            self.inputs = None
+            self._unbind()
+            self.plan_paused = self._pause_seen = False
+            await self._save()
+        return True
 
     async def set_inputs(self, inputs: DepartureInputs) -> None:
         async with self._lock:

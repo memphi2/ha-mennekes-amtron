@@ -44,19 +44,25 @@ class AmtronDepartureTime(MennekesAmtronEntity, DateTimeEntity):
     def native_value(self) -> datetime | None:
         observer = self.runtime_data.timed_goal
         remote = self.runtime_data.control.departure
+        if remote is not None and self.runtime_data.control.guest_active():
+            return remote.trip.deadline
         return observer.goal.deadline if observer is not None else remote.trip.deadline if remote is not None else None
 
     async def async_set_value(self, value: datetime) -> None:
         observer = self.runtime_data.timed_goal
-        if observer is not None:
+        if self.runtime_data.control.guest_active():
+            await self.runtime_data.control.async_set_target_time(value)
+        elif observer is not None:
             await observer.async_set_deadline(value)
         elif self.runtime_data.control.departure is not None:
-            await self.runtime_data.control.async_set_departure_trip(value, "manual")
+            await self.runtime_data.control.async_set_target_time(value)
 
     async def async_clear_value(self) -> None:
         """Clear the shared time on this entity, without a second button entity."""
         observer = self.runtime_data.timed_goal
-        if observer is not None:
+        if self.runtime_data.control.guest_active():
+            await self.runtime_data.control.async_set_target_time(None)
+        elif observer is not None:
             await observer.async_set_deadline(None)
         elif self.runtime_data.control.departure is not None:
-            await self.runtime_data.control.async_set_departure_trip(None, "manual")
+            await self.runtime_data.control.async_set_target_time(None)

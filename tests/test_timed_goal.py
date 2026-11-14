@@ -130,6 +130,10 @@ class FakePauseStore:
 
 
 class FakeControl:
+    @staticmethod
+    def guest_active():
+        return False
+
     def __init__(self, data: WallboxData) -> None:
         self.soc_goal = SimpleNamespace(status="active", target_percent=80.0)
         self.energy_goal = EnergyGoal()
@@ -710,7 +714,7 @@ def test_shared_time_without_vehicle_uses_service_and_needs_no_clear_button(monk
         hass, entry, _transport = await build_runtime()
         control = entry.runtime_data.control
         monkeypatch.setattr(type(control), "departure", property(lambda _: SimpleNamespace(trip=SimpleNamespace(deadline=NOW))))
-        control.async_set_departure_trip = AsyncMock()
+        control.async_set_target_time = AsyncMock()
         entry.data["server_url"] = "http://fixture"
         added = {}
         await setup_datetime(hass, entry, lambda entities: added.update(collect(entities)))
@@ -719,9 +723,9 @@ def test_shared_time_without_vehicle_uses_service_and_needs_no_clear_button(monk
         assert entity.available
         assert entity.native_value == NOW
         await entity.async_set_value(NOW + timedelta(hours=1))
-        control.async_set_departure_trip.assert_awaited_with(NOW + timedelta(hours=1), "manual")
+        control.async_set_target_time.assert_awaited_with(NOW + timedelta(hours=1))
         await entity.async_clear_value()
-        control.async_set_departure_trip.assert_awaited_with(None, "manual")
+        control.async_set_target_time.assert_awaited_with(None)
         buttons = {}
         await setup_buttons(hass, entry, lambda entities: buttons.update(collect(entities)))
         assert "timed_clear_departure" not in buttons

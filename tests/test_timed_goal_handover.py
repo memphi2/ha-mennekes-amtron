@@ -46,6 +46,10 @@ def plan(trip: TimedGoal | None = None, **changes) -> dict:
 
 
 class Service:
+    @staticmethod
+    def guest_active():
+        return False
+
     """The service side of the hand-over, as the remote control presents it."""
 
     supports_departure_plan = True
@@ -417,3 +421,22 @@ def test_invalid_departure_provenance_is_rejected(raw):
     from custom_components.mennekes_amtron_rtu.goal_store import DepartureIntent
     with pytest.raises(ValueError, match="invalid departure"):
         DepartureIntent.restore(raw)
+
+
+def test_guest_mode_holds_vehicle_handover_but_keeps_explicit_time_editing(monkeypatch):
+    from unittest.mock import AsyncMock
+    async def run():
+        observer, service, _hass = handover(monkeypatch)
+        service.guest_active = lambda: True
+        service.async_set_target_time = AsyncMock()
+        service.state["status"] = "guest_mode"
+        original = observer.goal.snapshot()
+        await observer._follow_service()
+        assert service.trips == []
+        assert service.inputs == []
+        assert observer.status == "guest_mode"
+        deadline = NOW + timedelta(hours=1)
+        await observer.async_set_deadline(deadline)
+        service.async_set_target_time.assert_awaited_once_with(deadline)
+        assert observer.goal.snapshot() == original
+    asyncio.run(run())

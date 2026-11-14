@@ -145,3 +145,30 @@ def test_old_guest_file_cannot_block_normal_control(tmp_path, monkeypatch):
             await service.command({"command":"set_current", "value":10, "expected_serial_number":service.identity.serial_number})
             assert runtime.current_writes(transport)[-1] == 10
     asyncio.run(body())
+
+
+@pytest.mark.parametrize("withdraw", [False, True])
+def test_vehicle_handover_does_not_replace_guest_time(tmp_path, monkeypatch, withdraw):
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock):
+            deadline = datetime.now(UTC) + timedelta(hours=1)
+            await service.departure.set_trip(deadline, "manual")
+            await service.command({"command":"guest_start", "expected_serial_number":service.identity.serial_number,
+                                   "expected_guest_revision":service.guest_revision})
+            await service.command({
+                "command":"departure_trip", "expected_serial_number":service.identity.serial_number,
+                "deadline":None if withdraw else (deadline + timedelta(hours=2)).isoformat(),
+                "source":"other-vehicle", "withdraw":withdraw,
+            })
+            assert service.guest_deadline == deadline
+            assert service.guest_active
+            # The user can still change or clear that same time explicitly.
+            for selected in (deadline + timedelta(minutes=10), None):
+                await service.command({
+                    "command":"departure_choice", "expected_serial_number":service.identity.serial_number,
+                    "deadline":None if selected is None else selected.isoformat(),
+                    "revision":service.snapshot()["control"]["target_time_revision"],
+                })
+                assert service.guest_deadline == selected
+    asyncio.run(run())

@@ -259,7 +259,18 @@ class TimedGoalObserver:
     async def async_set_deadline(
         self, value: datetime | None, *, source: str | None = None,
     ) -> None:
-        await self._set_deadline(value, source=source)
+        await self._set_user_deadline(value, source=source)
+
+    async def _set_user_deadline(
+        self, value: datetime | None, *, source: str | None,
+        expected: TimedGoal | None = None,
+    ) -> None:
+        if self._stopping or (expected is not None and self.goal is not expected):
+            return
+        if self._runtime.control.guest_active():
+            await self._runtime.control.async_set_target_time(value)
+            return
+        await self._set_deadline(value, source=source, expected=expected)
 
     async def _set_deadline(
         self, value: datetime | None, *, source: str | None,
@@ -398,7 +409,7 @@ class TimedGoalObserver:
                 starts.append(start)
         if not starts:
             raise HomeAssistantError("No matching timed calendar event in the next 14 days")
-        await self._set_deadline(
+        await self._set_user_deadline(
             min(starts), source=None, expected=original,
         )
 
@@ -415,7 +426,7 @@ class TimedGoalObserver:
         value = source.next_departure(dt_util.utcnow()) if source is not None else None
         if value is None:
             raise service_validation_error("timed_vehicle_unavailable")
-        await self._set_deadline(value, source=None, expected=original)
+        await self._set_user_deadline(value, source=None, expected=original)
 
     def _capacity(self) -> float | None:
         options = self._options
@@ -586,9 +597,9 @@ class TimedGoalObserver:
         control = self._runtime.control
         # A command of this observer from before the service took over.
         await self._cancel_command()
-        if (remote := control.departure) is not None:
+        if (remote := control.departure) is not None and not control.guest_active():
             await self._sync_trip(remote)
-        if (remote := control.departure) is not None:
+        if (remote := control.departure) is not None and not control.guest_active():
             inputs = self._departure_inputs(remote.scope)
             if inputs is not None and inputs.digest != remote.inputs:
                 await control.async_set_departure_inputs(inputs)

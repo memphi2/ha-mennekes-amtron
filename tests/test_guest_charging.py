@@ -162,3 +162,38 @@ def test_failed_refresh_prevents_guest_start_and_reports_service_unavailable():
         assert _key(error) == "service_unavailable"
         client.execute.assert_not_awaited()
     asyncio.run(run())
+
+
+def test_explicit_remote_time_edit_uses_the_service_revision(tmp_path, monkeypatch):
+    from datetime import timedelta
+
+    from custom_components.mennekes_amtron_rtu.device.data import WriteDiagnostics
+    from custom_components.mennekes_amtron_rtu.device.service_departure_runtime import (
+        DepartureModbusService,
+    )
+    from custom_components.mennekes_amtron_rtu.remote import (
+        ControlOptions,
+        RemoteControl,
+    )
+    from tests import service_guest_fixture as runtime
+
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, _transport, _clock), TestServer(
+            create_service_app(service)
+        ) as server, ClientSession() as session:
+            client = RemoteClient(session, str(server.make_url("/")), runtime.TOKEN)
+            await client.update()
+            control = RemoteControl(
+                client, diagnostics=WriteDiagnostics(), options=ControlOptions(False, 16),
+                state=lambda: None, request_refresh=lambda: None,
+            )
+            deadline = datetime.now(UTC) + timedelta(hours=1)
+            await control.async_set_target_time(deadline)
+            assert service.guest_deadline == deadline
+            await control.async_set_target_time(None)
+            assert service.guest_deadline is None
+            service._guest_scope = service._connection_sample().scope
+            client.apply_snapshot(service.snapshot())
+            assert control.guest_active()
+    asyncio.run(run())

@@ -184,7 +184,7 @@ class DepartureModbusService(GuestModbusService):
             ):
                 raise ValueError("invalid departure trip")
             await departure.set_trip(
-                None if deadline is None else instant(deadline), source, withdraw=withdraw, expected_selection=payload.get("expected_selection"),
+                None if deadline is None else instant(deadline), source, withdraw=withdraw, expected_selection=payload.get("expected_selection"), vehicle_handover=True,
             )
         else:
             await departure.set_inputs(DepartureInputs.restore(payload.get("value")))
@@ -206,6 +206,7 @@ class DepartureModbusService(GuestModbusService):
             "departure": departure.snapshot() if departure is not None and departure.ready else None,
         }
         # Guest permission and shared choices, without a separate order snapshot.
+        result["control"]["target_time_revision"] = departure.choice_revision if departure is not None and departure.ready else None
         result["control"]["guest_revision"] = self.guest_revision
         result["control"]["guest_active"] = self.guest_active
         result["control"]["guest_mode"] = self._guest_scope is not None

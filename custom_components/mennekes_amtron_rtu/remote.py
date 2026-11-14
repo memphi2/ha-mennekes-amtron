@@ -773,6 +773,7 @@ class RemoteControl(AmtronControl):
             notify_pending=notify_pending,
         )
         self._remote = client
+        self.guest_active = lambda: self._remote.snapshot.get("control", {}).get("guest_mode") is True
         self._soc_transaction: tuple[str, str | None] | None = None
         self._soc_transaction_fenced = False
 
@@ -981,6 +982,14 @@ class RemoteControl(AmtronControl):
         # needs no further wallbox read.
         if self._notify_pending is not None:
             self._notify_pending()
+
+    @ha_command
+    async def async_set_target_time(self, deadline: datetime | None) -> None:
+        revision = self._remote.snapshot.get("control", {}).get("target_time_revision")
+        await self._departure_command(
+            "departure_choice", deadline=None if deadline is None else deadline.isoformat(),
+            revision=revision,
+        )
 
     @ha_command
     async def async_set_departure_trip(
