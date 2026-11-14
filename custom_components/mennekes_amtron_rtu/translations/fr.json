@@ -966,6 +966,12 @@
     },
     "wallbox_target_required": {
       "message": "Plusieurs bornes sont configurées ; indiquez la borne concernée."
+    },
+    "job_stop_unconfirmed": {
+      "message": "L’arrêt n’est pas encore confirmé. Réessayez dans un instant."
+    },
+    "job_window_invalid": {
+      "message": "La fin doit être après le début et sous sept jours, et le début ne doit pas être dans le passé."
     }
   },
   "issues": {

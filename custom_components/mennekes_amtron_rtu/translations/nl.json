@@ -966,6 +966,12 @@
     },
     "wallbox_target_required": {
       "message": "Er zijn meerdere wallboxen ingesteld; geef aan voor welke wallbox dit geldt."
+    },
+    "job_stop_unconfirmed": {
+      "message": "De stop is nog niet bevestigd. Probeer het zo opnieuw."
+    },
+    "job_window_invalid": {
+      "message": "Het einde moet na de start en binnen zeven dagen liggen, en de start mag niet in het verleden liggen."
     }
   },
   "issues": {

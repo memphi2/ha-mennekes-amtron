@@ -340,8 +340,7 @@ async def async_setup_entry(
         )
     orders = None
     if isinstance(client, RemoteClient) and isinstance(coordinator, RemoteCoordinator):
-        orders = ServiceOrders(client, coordinator.async_update_listeners)
-        coordinator.refresh_orders = orders.async_refresh
+        orders = ServiceOrders(client, coordinator.async_refresh)
     entry.runtime_data = MennekesAmtronRuntimeData(
         client=client,
         coordinator=coordinator,

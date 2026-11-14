@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   new sensor **Charging job** shows the state.
   `docs/app-from-home-assistant.md` has a ready dashboard view with Mushroom
   cards.
+- A stop of a charging job counts from the moment it is asked for, also while
+  the app is still writing a start, and a request that was cut off does not
+  withdraw it.
 - **Weekly plans are removed.** The app has no Weekly plans page and no weekly
   API any more, and **Charging control**, **Charging wait reason** and **Next
   charging step** lose their weekly states. Recurring departures come from a

@@ -121,7 +121,6 @@ class VehicleBinding:
         self._first_empty: datetime | None = None
         self._stale_warned = False
         self._resting: bool | None = None
-        self._detected = False
         # When this process saw the binding confirmed, and its charge check.
         self._confirmed_at: datetime | None = None
         self._check: _ChargeCheck | None = None
@@ -169,11 +168,6 @@ class VehicleBinding:
         A plain read: the state moves only in the subscribed callbacks.
         """
         return self._resting is True
-
-    @property
-    def detected(self) -> bool:
-        """The selected car itself reported this plug-in; a car without detection never does."""
-        return self._detected
 
     @callback
     def refresh(self) -> None:
@@ -243,8 +237,8 @@ class VehicleBinding:
             # An unreadable wallbox neither confirms the car nor releases its rules.
             return self._resting
         watched = wallbox is True and profile is not None and profile.detection is not None
-        self._detected = watched and profile is not None and self._state.vehicle == profile.id
-        resting = watched and not self._detected
+        detected = watched and profile is not None and self._state.vehicle == profile.id
+        resting = watched and not detected
         if resting != self._resting:
             if resting and profile is not None:
                 _LOGGER.info(

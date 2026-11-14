@@ -186,19 +186,21 @@ class DepartureModbusService(ForecastModbusService):
             "supports_departure_plan": True,
             "departure": departure.snapshot() if departure is not None and departure.ready else None,
         }
+        jobs = self.jobs
+        # The charging job as its own page shows it; None while it loads.
+        result["control"]["orders"] = jobs.snapshot() if jobs is not None and jobs.ready else None
         result["control"]["operation"] = self._operation(result)
         return result
 
     def _operation(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         """Who controls the charge, why it waits and what comes next."""
         control = self.control
-        jobs = self.jobs
-        ready = jobs is not None and jobs.ready
+        orders = snapshot["control"]["orders"]
         sample = self._job_inputs()
         return summarize(
             available=snapshot["available"] is True, present=sample.present,
             control=snapshot["control"], departure=snapshot["control"]["departure"],
-            job=jobs.snapshot()["job"] if jobs is not None and ready else None,
+            job=orders["job"] if orders is not None else None,
             # Only a charge target's stop is a reached target; an order names its own.
             goal_stop=control is not None and control.goal_stop_requested,
         )

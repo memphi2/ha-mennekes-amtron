@@ -9,7 +9,7 @@ Pausing uses the dedicated charging-pause switch.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Coroutine
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import probatio
@@ -58,9 +58,13 @@ def _aware(value: datetime) -> datetime:
 
 
 def _job(orders: ServiceOrders, data: dict[str, Any]) -> Awaitable[None]:
-    start = _aware(data["start"]) if "start" in data else dt_util.utcnow()
+    now = dt_util.utcnow()
+    start, finish = _aware(data["start"]) if "start" in data else now, _aware(data["finish"])
+    # What the app would refuse without a reason of its own.
+    if not now - timedelta(minutes=1) <= start < finish <= now + timedelta(days=7):
+        raise service_validation_error("job_window_invalid")
     return orders.async_start_job(
-        start=start, finish=_aware(data["finish"]), current=data["current"],
+        start=start, finish=finish, current=data["current"],
         energy=data["energy"], reserve=data.get("reserve", 0),
     )
 

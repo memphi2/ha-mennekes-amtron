@@ -9,7 +9,7 @@ automation one call. Whoever taps confirms in the dashboard's own prompt.
 from __future__ import annotations
 
 import secrets
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any
 
@@ -24,18 +24,16 @@ JOBS = "/v2/jobs"
 class ServiceOrders:
     """The last order status of the app, and the actions that change it."""
 
-    def __init__(self, client: RemoteClient, notify: Callable[[], None]) -> None:
+    def __init__(self, client: RemoteClient, refresh: Callable[[], Awaitable[None]]) -> None:
         self._client = client
-        self._notify = notify
-        # None: not read yet, or this app version has no such page.
-        self.jobs: dict[str, Any] | None = None
+        self._refresh = refresh
 
-    async def async_refresh(self) -> None:
-        """Read the status; a failure only empties it."""
-        try:
-            self.jobs = await self._client.request("GET", JOBS, update_connection=False)
-        except (AmtronConnectionError, DeviceError):
-            self.jobs = None
+    @property
+    def jobs(self) -> dict[str, Any] | None:
+        """The job status from the app's last state; None while it has none."""
+        control = self._client.snapshot.get("control")
+        status = control.get("orders") if isinstance(control, dict) else None
+        return status if isinstance(status, dict) else None
 
     async def _call(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         try:
@@ -47,8 +45,8 @@ class ServiceOrders:
             raise DeviceError("service_order_failed") from err
 
     async def _done(self) -> None:
-        await self.async_refresh()
-        self._notify()
+        # One read of the app's state shows the order and what it changed.
+        await self._refresh()
 
     async def _create(self, action: str, request: dict[str, Any]) -> None:
         state = await self._call()

@@ -679,8 +679,6 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
         if isinstance(self._client, RemoteClient):
             self._client.on_auth_error = self._publish_auth_error
         self._pending_refresh: CALLBACK_TYPE | None = None
-        # Reads the app's charging job along with each poll.
-        self.refresh_orders: Callable[[], Awaitable[None]] | None = None
 
     def _follow_pending(self, until: datetime | None) -> None:
         """Read a queued command's outcome when it is due, not a poll later.
@@ -743,8 +741,6 @@ class RemoteCoordinator(MennekesAmtronCoordinator):
         if self.observe_session is not None:
             await self.observe_session(data)
         self._follow_pending(data.pending_change_until)
-        if self.refresh_orders is not None:
-            await self.refresh_orders()
         return data
 
 

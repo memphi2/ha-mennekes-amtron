@@ -324,6 +324,10 @@ snapshot's `control` object reports `supports_departure_plan: true` and
 | `confirmed` | Whether the handed-over car is confirmed for this plug-in |
 | `forecast` | `null` unless a plan is computed; otherwise `finish_at` (when the target is reached: the departure, or later when it is unreachable, rounded up to five minutes), `level_at_departure` (percent), `efficiency` (learned share of the metered energy that reaches the battery, 0.9 until learned) and `full_power_kw` (metered power at full current for the current phases, or `null`) |
 
+`control.orders` is the charging-job state that `GET /v2/jobs` returns, or
+`null` while the job controller loads. Home Assistant reads its **Charging
+job** sensor from it, so a poll needs no second request.
+
 `control.operation` summarizes all controllers of the service for a reader. It
 is derived from their published state and decides nothing:
 

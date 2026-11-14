@@ -105,8 +105,7 @@ def test_lost_service_reply_reconciles_on_next_normal_poll_without_replaying_com
             assert entry.runtime_data is runtime
             assert hass.states.get(switch).state == ("on" if enabled else "off")
             assert (runtime.plug_charge.status == "disabled") is not enabled
-            # The app's charging job is read along with its state.
-            assert requests == [("POST", "/v2/command"), ("GET", "/v2/state"), ("GET", "/v2/jobs")]
+            assert requests == [("POST", "/v2/command"), ("GET", "/v2/state")]
             assert current_writes(transport) == before_current
 
     asyncio.run(run())

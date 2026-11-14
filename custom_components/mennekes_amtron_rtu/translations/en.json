@@ -966,6 +966,12 @@
     },
     "wallbox_target_required": {
       "message": "Several wallboxes are set up; name the wallbox this applies to."
+    },
+    "job_stop_unconfirmed": {
+      "message": "The stop is not confirmed yet. Try again shortly."
+    },
+    "job_window_invalid": {
+      "message": "The end must be after the start and within seven days, and the start must not lie in the past."
     }
   },
   "issues": {

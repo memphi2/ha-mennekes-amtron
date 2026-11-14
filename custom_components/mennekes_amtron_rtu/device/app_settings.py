@@ -17,6 +17,7 @@ import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Mapping
 from contextlib import AbstractAsyncContextManager, nullcontext, suppress
 from dataclasses import dataclass, field
+from functools import cache
 from importlib.resources import files
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -90,6 +91,14 @@ def localize_page(content: bytes, accept_language: str, path: str = "/", availab
     return content.replace(PLACEHOLDER, render_nav(path, language, available), 1)
 
 
+@cache
+def _inline_style() -> tuple[bytes, str]:
+    """The packaged styles as a style element, and the policy that allows them."""
+    style = files(__package__).joinpath(_STYLE_FILE).read_bytes()
+    digest = base64.b64encode(hashlib.sha256(style).digest()).decode()
+    return b"<style>" + style + b"</style>", _CSP.format(style=f"'self' 'sha256-{digest}'")
+
+
 async def serve_asset(request: web.Request, assets: Mapping[str, tuple[str, str]]) -> web.Response:
     """Serve one packaged file; scripts and styles revalidate instead of reloading."""
     filename, content_type = assets[request.path]
@@ -100,12 +109,11 @@ async def serve_asset(request: web.Request, assets: Mapping[str, tuple[str, str]
         # The styles travel inside the page: it is styled from its first paint
         # and no stylesheet request can leave it bare. The policy allows
         # exactly this text, nothing else inline.
-        style = await asyncio.to_thread(files(__package__).joinpath(_STYLE_FILE).read_bytes)
         if _STYLE_LINK in content:
-            content = content.replace(_STYLE_LINK, b"<style>" + style + b"</style>", 1)
-            digest = base64.b64encode(hashlib.sha256(style).digest()).decode()
+            style, policy = await asyncio.to_thread(_inline_style)
+            content = content.replace(_STYLE_LINK, style, 1)
             return web.Response(body=content, content_type=content_type, headers={
-                "Content-Security-Policy": _CSP.format(style=f"'self' 'sha256-{digest}'"),
+                "Content-Security-Policy": policy,
             })
         return web.Response(body=content, content_type=content_type)
     # An unchanged file answers with 304: a change of page shows at once.

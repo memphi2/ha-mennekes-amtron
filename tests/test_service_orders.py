@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -55,10 +55,19 @@ async def _with_app(tmp_path, body, *, app=None):
     h = Harness(tmp_path)
     await h.jobs.initialize()
     service = SimpleNamespace(jobs=h.jobs, config=SimpleNamespace(token=TOKEN))
-    notified = []
+    refreshed = []
     async with TestServer(app or create_job_app(service)) as server, ClientSession() as session:
         client = RemoteClient(session, str(server.make_url("/")), TOKEN)
-        await body(h, ServiceOrders(client, lambda: notified.append(True)), notified)
+
+        async def refresh():
+            # The app's state carries its job status; here only that part exists.
+            refreshed.append(True)
+            client.snapshot = {"control": {"orders": h.jobs.snapshot()}}
+
+        orders = ServiceOrders(client, refresh)
+        await refresh()
+        refreshed.clear()
+        await body(h, orders, refreshed)
 
 
 def _key(error) -> str:
@@ -67,7 +76,6 @@ def _key(error) -> str:
 
 def test_a_job_is_started_boosted_stopped_and_cleared_in_one_step_each(tmp_path):
     async def body(h, orders, notified):
-        await orders.async_refresh()
         assert orders.jobs["job"] is None
         await orders.async_start_job(
             start=NOW + timedelta(hours=1), finish=NOW + timedelta(hours=3),
@@ -129,8 +137,9 @@ def test_guest_charging_starts_now_for_a_limited_time(tmp_path):
 
 def test_an_app_without_orders_leaves_the_status_unknown_and_names_the_failure(tmp_path):
     async def body(_h, orders, _notified):
-        orders.jobs = {"stale": True}
-        await orders.async_refresh()
+        orders._client.snapshot = {"control": {"orders": "damaged"}}
+        assert orders.jobs is None
+        orders._client.snapshot = {}
         assert orders.jobs is None
         for call in (orders.async_stop_job(), orders.async_cancel_boost(),
                      orders.async_start_guest(minutes=5, current=6, energy=1)):
@@ -170,17 +179,28 @@ def test_every_action_reaches_the_orders_of_an_app_connection(monkeypatch):
         assert _key(error) == "app_required"
 
         orders = entry.runtime_data.orders = _Orders()
-        await act("start_charging_job", finish="2026-11-16T08:00:00+00:00", current=10, energy="7.5")
+        soon = (datetime.now(UTC) + timedelta(hours=1)).replace(microsecond=0)
+        later = soon + timedelta(hours=2)
+        await act("start_charging_job", finish=later.isoformat(), current=10, energy="7.5")
         name, values = orders.calls.pop()
         assert name == "async_start_job"
-        assert values["finish"].isoformat() == "2026-11-16T08:00:00+00:00"
+        assert values["finish"] == later
         assert values["start"].tzinfo is not None
         assert (values["current"], values["energy"], values["reserve"]) == (10.0, 7.5, 0)
-        await act("start_charging_job", start="2026-11-16T06:00:00+01:00",
-                  finish="2026-11-16T08:00:00+01:00", current=6, energy=1, reserve=0.5)
+        zone = timezone(timedelta(hours=1))
+        await act("start_charging_job", start=soon.astimezone(zone).isoformat(),
+                  finish=later.astimezone(zone).isoformat(), current=6, energy=1, reserve=0.5)
         values = orders.calls.pop()[1]
-        assert values["start"].isoformat() == "2026-11-16T05:00:00+00:00"
+        assert (values["start"], values["start"].utcoffset()) == (soon, timedelta(0))
         assert values["reserve"] == 0.5
+        # A window the app would refuse without a reason is named here.
+        for start, finish in ((later, soon), (soon, soon + timedelta(days=8)),
+                              (soon - timedelta(hours=2), later)):
+            with pytest.raises(ServiceValidationError) as error:
+                await act("start_charging_job", start=start.isoformat(), finish=finish.isoformat(),
+                          current=6, energy=1)
+            assert _key(error) == "job_window_invalid"
+        assert orders.calls == []
         await act("start_guest_charging", duration=90, current=8, energy=6)
         assert orders.calls.pop() == ("async_start_guest", {"minutes": 90, "current": 8.0, "energy": 6.0})
         await act("start_boost", duration=30)
@@ -248,7 +268,7 @@ def test_the_job_sensor_exists_only_with_the_app_and_shows_its_status():
         orders.jobs = {"boost_available": True, "job": {
             "state": "scheduled", "reason": "scheduled", "kind": "guest",
             "start_at": "2026-11-16T06:00:00+00:00", "finish_at": "not a time",
-            "current_a": 10.0, "energy_kwh": 7.5, "delivered_kwh": 0.0, "boost_until": None,
+            "current_a": 10.0, "energy_kwh": 7.5, "delivered_kwh": 0.04999, "boost_until": None,
         }}
         assert job.native_value == "scheduled"
         attributes = job.extra_state_attributes

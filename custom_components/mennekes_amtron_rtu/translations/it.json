@@ -966,6 +966,12 @@
     },
     "wallbox_target_required": {
       "message": "Sono configurate più wallbox; indica la wallbox interessata."
+    },
+    "job_stop_unconfirmed": {
+      "message": "L’arresto non è ancora confermato. Riprova tra poco."
+    },
+    "job_window_invalid": {
+      "message": "La fine deve essere dopo l’inizio ed entro sette giorni, e l’inizio non deve essere nel passato."
     }
   },
   "issues": {

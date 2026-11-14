@@ -41,7 +41,8 @@ out; with several, name the wallbox.
 | | `current`, `energy` | As above. Required. |
 | `start_boost` | `duration` | Minutes to charge early, up to 120. Required. |
 
-A time without a time zone is taken as local time.
+A time without a time zone is taken as local time. A window that ends before it
+starts, starts in the past or ends more than seven days ahead is refused.
 
 ## One tap, and what happens behind it
 

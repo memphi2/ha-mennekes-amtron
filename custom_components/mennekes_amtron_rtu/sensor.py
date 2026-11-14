@@ -78,6 +78,12 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
+def _tenths(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return round(float(value), 1)
+
+
 def _moment(value: object) -> datetime | None:
     """A time of the app as a time attribute; anything else is left out."""
     if not isinstance(value, str):
@@ -214,7 +220,8 @@ class AmtronStateSensor(MennekesAmtronEntity, SensorEntity):
                     "finish": _moment(job.get("finish_at")),
                     "current": job.get("current_a"),
                     "energy": job.get("energy_kwh"),
-                    "delivered": job.get("delivered_kwh"),
+                    # Whole tenths: a running charge must not write a state per poll.
+                    "delivered": _tenths(job.get("delivered_kwh")),
                     "reserve": job.get("reserve_kwh"),
                     "reason": job.get("reason"),
                     "boost_until": _moment(job.get("boost_until")),
