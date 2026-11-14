@@ -93,7 +93,10 @@ can change a manual setting later; disable it if you want that setting to stay.
 Current writes have a **five-second minimum interval**. During charging, a new
 current request may wait until that interval ends; the latest request wins.
 A separate configurable wait applies before starting or changing the charging
-state, described below.
+state, described below. A reached guest time limit bypasses this longer wait;
+the five-second register guard remains. Temporary communication failures are
+retried, and the display keeps reporting an active charge until the pause is
+confirmed.
 
 ## Where do I enable controls?
 

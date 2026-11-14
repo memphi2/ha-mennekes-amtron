@@ -71,3 +71,23 @@ def test_long_unknown_connection_discards_guest_permission(tmp_path, monkeypatch
             assert service._guest_scope is None
             assert service._connection_session is None
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("bus_error", [False, True])
+def test_guest_limit_loop_retries_transient_errors_and_propagates_cancellation(monkeypatch, bus_error):
+    from custom_components.mennekes_amtron_rtu.device import service_guest_runtime
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronConnectionError,
+        AmtronRateLimitedError,
+    )
+
+    async def run():
+        service = GuestModbusService.__new__(GuestModbusService)
+        error = AmtronConnectionError("offline") if bus_error else AmtronRateLimitedError("current", 4)
+        tick = AsyncMock(side_effect=[error, asyncio.CancelledError()])
+        monkeypatch.setattr(service, "_guest_tick", tick)
+        monkeypatch.setattr(service_guest_runtime.asyncio, "sleep", AsyncMock())
+        with pytest.raises(asyncio.CancelledError):
+            await service._guest_loop()
+        assert tick.await_count == 2
+    asyncio.run(run())

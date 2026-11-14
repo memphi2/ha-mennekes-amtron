@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from .client_errors import AmtronBusError
 from .control import AmtronControl
 from .enums import GridPhasesConnected, SwitchedPhases
 from .errors import DeviceError
@@ -64,8 +65,7 @@ class GuestModbusService(ConsoleModbusService):
     @property
     def guest_active(self) -> bool:
         return (self._guest_scope is not None and self.control is not None
-                and self.control.pause_requested is not True and not self.control.goal_stop_requested
-                and not self._guest_time_reached())
+                and (self.control.pause_requested is not True or self.control.is_paused is False))
 
     @property
     def guest_revision(self) -> str:
@@ -110,16 +110,16 @@ class GuestModbusService(ConsoleModbusService):
         async with self._command_lock:
             control = self.control
             if (control is None or self._stopping or not self._is_available()
-                    or not self._guest_time_reached() or control.pause_requested is True):
+                    or not self._guest_time_reached()):
                 return
             try:
-                await control.async_pause_charging()
+                await control.async_pause_for_energy_goal()
             finally:
                 await self._persist()
 
     async def _guest_loop(self) -> None:
         while True:
-            with suppress(DeviceError, OSError):
+            with suppress(DeviceError, AmtronBusError, OSError):
                 await self._guest_tick()
             await asyncio.sleep(1)
 

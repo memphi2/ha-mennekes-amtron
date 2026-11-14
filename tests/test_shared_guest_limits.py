@@ -172,3 +172,48 @@ def test_vehicle_handover_does_not_replace_guest_time(tmp_path, monkeypatch, wit
                 })
                 assert service.guest_deadline == selected
     asyncio.run(run())
+
+
+def test_guest_time_stop_keeps_write_floor_without_state_change_delay(tmp_path, monkeypatch):
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, transport, clock):
+            await service.control.async_pause_charging()
+            clock[0] += 1000
+            await service.command({"command":"guest_start", "expected_serial_number":service.identity.serial_number,
+                                   "expected_guest_revision":service.guest_revision})
+            await service.departure.set_trip(datetime.now(UTC) - timedelta(seconds=1), "manual")
+            # The time limit must not enqueue a manual pause for five minutes.
+            clock[0] += 10
+            await service._guest_tick()
+            assert runtime.current_writes(transport)[-1] < 6
+            assert service.control.pause_requested is True
+            assert service.control.pending_action is None
+            assert not service.guest_active
+    asyncio.run(run())
+
+
+def test_time_stop_retains_five_second_floor_and_clearing_does_not_leave_a_pause_queued(tmp_path, monkeypatch):
+    from custom_components.mennekes_amtron_rtu.device.client_errors import (
+        AmtronRateLimitedError,
+    )
+    async def run():
+        monkeypatch.setattr(runtime, "GuestModbusService", DepartureModbusService)
+        async with runtime.guest_service(tmp_path) as (service, transport, clock):
+            await service.control.async_pause_charging()
+            clock[0] += 1000
+            await service.command({"command":"guest_start", "expected_serial_number":service.identity.serial_number,
+                                   "expected_guest_revision":service.guest_revision})
+            await service.departure.set_trip(datetime.now(UTC) - timedelta(seconds=1), "manual")
+            before = list(transport.writes)
+            clock[0] += 1
+            with pytest.raises(AmtronRateLimitedError):
+                await service._guest_tick()
+            assert transport.writes == before
+            assert service.guest_active
+            assert service.control.pending_action is None
+            await service.departure.set_trip(None, "manual")
+            clock[0] += 10
+            await service._guest_tick()
+            assert transport.writes == before
+    asyncio.run(run())

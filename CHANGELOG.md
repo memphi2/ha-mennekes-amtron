@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
+- Enforce the guest time limit without the long state-change delay, retaining
+  the five-second register guard and retrying transient bus failures.
+
 - Keep an active guest time limit across vehicle-profile handovers; explicit
   time edits in Home Assistant and the app remain available.
 
