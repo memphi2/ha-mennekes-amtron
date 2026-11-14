@@ -56,8 +56,12 @@ def test_ring_bound_and_decoded_values_without_extra_bus_requests():
         assert heartbeat["values"][0]["register"] == "heartbeat"
         assert trace.snapshot(after=251)["records"] == [heartbeat]
         now[0] += 25
-        trace.set_enabled(True)
         assert trace.snapshot()["expires_in"] == 575
+        # The open log page asks again: the capture goes on and keeps its rows.
+        trace.set_enabled(True)
+        assert trace.snapshot()["expires_in"] == 600
+        assert len(trace.snapshot()["records"]) == 200
+        now[0] += 25
         trace.clear()
         assert trace.snapshot()["records"] == []
         assert trace.snapshot()["expires_in"] == 575

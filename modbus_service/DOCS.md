@@ -91,10 +91,9 @@ for details.
 
 | Page | Purpose |
 |---|---|
-| **Overview** | Which controller decides about the charge, why the car waits and what comes next; observed charging state, heartbeat, power, the next queued action and recent command results. Read-only. |
+| **Overview** | Which controller decides about the charge, why the car waits and what comes next; observed charging state, heartbeat, power, the next queued action, recent command results and every register with raw and decoded value. Read-only. |
 | **Connection** | USB or LAN connection and optional LAN-adapter setup. Changes apply after an app restart. |
-| **Debug log** | Live Modbus recording for up to 10 minutes, in memory only. |
-| **Registers** | Every known register with raw and decoded value and its read quality. Read-only. |
+| **Log** | The Modbus traffic as it happens, in memory only. Runs while the page is open. |
 | **Runtime** | Polling intervals, current cap and waits apply without restart. Preview before saving. |
 | **Charging jobs** | One order for the plugged-in car: time window, current and additional energy, with an optional immediate reserve, early start and an estimated finish. |
 | **Guest charging** | An immediate, limited order for a visitor's car after local authorization. |
@@ -287,16 +286,15 @@ Diagnostics include the last 20 failed write/recovery records in RAM, with timin
 and no packet contents or credentials. They add no Recorder rows and are lost
 when the app restarts.
 
-For live troubleshooting, open **Debug log** (German: **Debugprotokoll**) and
-enable capture. It shows the app's own reads, writes, retries and heartbeats with
-register addresses, decoded values, duration and outcome. A failed write shows
-the requested value, not proof that it was applied. Capture is off by default,
-keeps at most **200 transactions in RAM** and stops and erases itself after
-**10 minutes**, also when the browser is closed. Turning it off erases the
-entries. It adds no Modbus requests, Recorder entries or log files. Serial
-numbers and text registers are hidden; network login traffic and exception
-messages are never captured. The **Registers** page shows the last value and
-read quality of every register.
+For live troubleshooting, open **Log** (German: **Protokoll**). It starts by
+itself and shows the app's own reads, writes, retries and heartbeats with
+register addresses, decoded values, duration and outcome, one line each. A
+failed write shows the requested value, not proof that it was applied. The
+app records only while the page is open and at most **10 minutes** after it
+was closed, and keeps at most **200 transactions in RAM**. It adds no Modbus
+requests, Recorder entries or log files. Serial numbers and text registers are
+hidden; network login traffic and exception messages are never captured. The
+**Overview** shows the last value and read quality of every register.
 
 Verify deliberate pause, HA restart, app restart and reconnection on your own
 hardware. Automated tests do not replace that check.

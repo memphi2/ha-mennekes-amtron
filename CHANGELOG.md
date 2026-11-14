@@ -5,7 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.9.0b2 — unreleased
+## 0.9.0b3 — unreleased
+
+- **The app's web pages look like Home Assistant and use the whole width.**
+  One bar groups the pages into Overview, Charging, Settings and Log; the
+  cards sit side by side on a wide screen. The bar arrives with the page and
+  in your language, and scripts and styles are no longer loaded again with
+  every page, so a change of page no longer flashes an empty white frame.
+- **The registers are part of the overview** instead of a page of their own.
+- **The log runs by itself.** The former Debug log tab is the **Log** page: it
+  starts when you open it, adds one line per bus transaction, follows the
+  newest line and can be paused, filtered and downloaded. The recording ends
+  within ten minutes after the page is closed.
+
+## 0.9.0b2 — 2026-11-13
 
 Update the app to 0.9.0b2 together with the integration.
 

@@ -1,0 +1,74 @@
+"""The navigation is rendered by the server, complete and in the page language."""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+
+import pytest
+from aiohttp.test_utils import TestClient, TestServer
+
+from custom_components.mennekes_amtron_rtu.device import app_settings as ui
+from custom_components.mennekes_amtron_rtu.device.app_nav import PLACEHOLDER, render_nav
+from custom_components.mennekes_amtron_rtu.device.console_http import CONSOLE_ASSETS
+from tests.test_app_settings import FixtureSettings
+
+DEVICE = Path(ui.__file__).parent
+ALL = {"/", "/jobs", "/guest", "/weekly", "/connection", "/runtime", "/log"}
+
+
+def test_groups_are_tabs_and_their_pages_a_second_row():
+    nav = render_nav("/guest", "de", ALL).decode()
+    assert nav.count("<a ") == 7
+    assert '<a href="./jobs" aria-current="true">Laden</a>' in nav
+    assert '<nav class="app-pages" aria-label="Laden">' in nav
+    assert '<a href="./guest" aria-current="page">Gastladen</a>' in nav
+    assert nav.count("aria-current") == 2
+    # A group with one page links to it and shows no second row.
+    single = render_nav("/log", "fr", ALL).decode()
+    assert '<a href="./log" aria-current="page">Journal</a>' in single
+    assert "app-pages" not in single
+    assert 'href="./"' in single
+
+
+def test_pages_this_app_does_not_serve_are_left_out():
+    # Without a wallbox connection only the settings app runs.
+    nav = render_nav("/connection", "en", {"/", "/connection", "/log"}).decode()
+    assert "Charging" not in nav
+    assert "app-pages" not in nav
+    assert '<a href="./connection" aria-current="page">Settings</a>' in nav
+    assert render_nav("/", "xx", ALL) == render_nav("/", "en", ALL)
+
+
+@pytest.mark.parametrize("page", sorted(
+    name for name, kind in [*ui._ASSETS.values(), *CONSOLE_ASSETS.values()] if kind == "text/html"
+))
+def test_every_page_carries_the_shell(page):
+    html = (DEVICE / page).read_bytes()
+    assert html.count(PLACEHOLDER) == 1
+    assert b'<meta name="color-scheme" content="light dark">' in html
+    assert b'<link rel="stylesheet" href="./app_settings.css">' in html
+    assert b'lang="en"' in html
+
+
+def test_served_page_is_complete_and_assets_revalidate(monkeypatch):
+    async def check():
+        monkeypatch.setattr(ui, "SUPERVISOR_PEER", "127.0.0.1")
+        async with TestClient(TestServer(ui.create_settings_app(FixtureSettings()))) as client:
+            page = await client.get("/log", headers={"Accept-Language": "de"})
+            text = await page.text()
+            assert page.headers["Cache-Control"] == "no-store"
+            assert PLACEHOLDER.decode() not in text
+            assert '<a href="./log" aria-current="page">Protokoll</a>' in text
+            assert "./jobs" not in text
+            # Scripts and styles answer 304 when unchanged: no empty frame.
+            style = await client.get("/app_settings.css")
+            assert style.headers["Cache-Control"] == "no-cache"
+            again = await client.get("/app_settings.css", headers={"If-None-Match": style.headers["ETag"]})
+            assert again.status == 304
+            assert again.headers["Cache-Control"] == "no-cache"
+            assert await again.read() == b""
+            assert (await client.get("/app_settings.css", headers={"If-None-Match": '"other"'})).status == 200
+            assert b"@view-transition" in await style.read()
+
+    asyncio.run(check())

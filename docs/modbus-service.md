@@ -274,8 +274,8 @@ For optional vehicle targets, profiles or departure planning, use the
 
 The log shows service startup, USB/LAN connection and heartbeat start/stop.
 The [live communication view](troubleshooting.md#watch-app-modbus-communication-live)
-under **Open Web UI → Debug log** (**Debugprotokoll** in German) is optional and
-off by default; the **Registers** page shows the last value of every register.
+under **Open Web UI → Log** (**Protokoll** in German) runs while its page is
+open; the **Overview** shows the last value of every register.
 Connection and heartbeat failures are logged when their state changes.
 Home Assistant also shows a repair after a continuous 60-second heartbeat or
 service-connection problem in a managed, write-enabled setup. It clears

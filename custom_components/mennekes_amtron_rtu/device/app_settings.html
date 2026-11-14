@@ -2,28 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
   <title>Mennekes Amtron</title>
   <link rel="stylesheet" href="./app_settings.css">
   <script src="./app_settings.js" defer></script>
-  <script src="./app_nav.js" defer></script>
 </head>
 <body>
-  <main>
-    <p class="eyebrow">Mennekes Amtron</p>
-    <nav class="overview-nav" aria-label="Service" data-nav="connection"></nav>
-    <div class="tabs" role="tablist" aria-label="Mennekes Amtron">
-      <button id="connection_tab" type="button" role="tab" aria-selected="true" aria-controls="connection_panel" data-i18n="connection_tab">Connection</button>
-      <button id="debug_tab" type="button" role="tab" aria-selected="false" aria-controls="modbus_debug" tabindex="-1" data-i18n="debug_tab">Debug log</button>
-    </div>
-    <section id="connection_panel" role="tabpanel" aria-labelledby="connection_tab" tabindex="0">
+  <!-- app-nav -->
+<main>
       <header>
         <h1 data-i18n="title">Wallbox connection</h1>
         <p data-i18n="intro">Choose the adapter used by this app. Charging permissions and other settings remain in the app Configuration tab.</p>
       </header>
       <p id="error" role="alert" hidden></p>
       <p id="status" role="status" aria-live="polite" data-i18n="loading">Loading settings…</p>
-      <form id="connection_form" hidden>
+      <form id="connection_form" class="card" hidden>
         <label for="connection_type" data-i18n="transport">Connection</label>
         <select id="connection_type" name="connection_type" required>
           <option value="serial" data-i18n="usb">USB / RS-485</option>
@@ -62,7 +55,7 @@
           <p class="hint" data-i18n="endpoint_hint">Enter the LAN adapter address without http:// or a path. Use its configured TCP port, commonly 502. The Modbus service’s HTTP port 8765 does not belong here.</p>
           <p class="hint" data-i18n="lan_hint">Set the serial baud rate and format on the LAN adapter. Saving LAN settings removes any old USB adapter selection.</p>
           <button id="detect_adapter" type="button" class="secondary" data-i18n="detect_adapter">Set up LAN adapter</button>
-          <section id="adapter_preview" class="adapter-preview" hidden aria-live="polite">
+          <section id="adapter_preview" class="card" hidden aria-live="polite">
             <h2 data-i18n="adapter_detected">Recognized adapter</h2>
             <p id="adapter_identity"></p>
             <p id="adapter_current" class="hint"></p>
@@ -112,31 +105,6 @@
         <button id="save" type="submit" data-i18n="save">Save connection</button>
       </div>
     </form>
-    </section>
-    <section id="modbus_debug" class="modbus-debug" role="tabpanel" aria-labelledby="debug_tab" tabindex="0" hidden>
-      <h1 data-i18n="debug_title">Live Modbus communication</h1>
-      <p class="hint" data-i18n="debug_hint">Optional troubleshooting: observe existing reads, writes and heartbeats for up to 10 minutes. Only the latest 200 entries stay in memory; nothing is stored in the Home Assistant database or log files.</p>
-      <label class="check" for="debug_enabled">
-        <input id="debug_enabled" type="checkbox" disabled>
-        <span data-i18n="debug_enable">Capture communication for 10 minutes</span>
-      </label>
-      <p id="debug_status" role="status" aria-live="polite" data-i18n="debug_off">Capture is off.</p>
-      <p class="hint" data-i18n="debug_privacy">Serial numbers and text registers are hidden. Network login traffic is never captured. Switching tabs stops updates; capture continues until switched off or automatically expired.</p>
-      <button id="debug_clear" type="button" class="secondary" data-i18n="debug_clear" disabled>Clear entries</button>
-      <div class="debug-scroll" tabindex="0" role="region" aria-labelledby="debug_table_title">
-        <table>
-          <caption id="debug_table_title" data-i18n="debug_records">Latest transactions, newest first</caption>
-          <thead><tr>
-            <th scope="col" data-i18n="debug_time">Time (UTC)</th>
-            <th scope="col" data-i18n="debug_operation">Operation</th>
-            <th scope="col" data-i18n="debug_registers">Registers and decoded values</th>
-            <th scope="col" data-i18n="debug_duration">Duration</th>
-            <th scope="col" data-i18n="debug_result">Result</th>
-          </tr></thead>
-          <tbody id="debug_records"></tbody>
-        </table>
-      </div>
-    </section>
     <footer data-i18n="security">Available to Home Assistant administrators with Supervisor 2026.10.4 or newer. No service token is needed here.</footer>
   </main>
 </body>

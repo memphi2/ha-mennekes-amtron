@@ -477,30 +477,26 @@ full serial-port path.
 
 ### Watch app Modbus communication live
 
-In the app, select **Open Web UI → Debug log**
-(German: **Debugprotokoll**), then enable **Capture communication for 10 minutes**.
-It is a separate tab beside **Connection** (**Verbindung**), independent of the
-app's native Supervisor **Configuration** tab. Switching tabs preserves unsaved
-connection settings.
+In the app, select **Open Web UI → Log** (German: **Protokoll**). The log
+starts by itself and adds a line for every read, write and heartbeat: time,
+register address, duration, result and the decoded values. Each retry is its
+own line. A failed write shows the requested value; it does not confirm that
+the wallbox applied it. Register names and enum identifiers follow the Modbus
+register map.
 
-Capture is optional and off after every
-app restart. It shows existing reads, writes and heartbeats, register addresses,
-decoded values, transaction durations and confirmed or failed responses. Each
-retry is a separate row. A failed write shows the requested value; it does not
-confirm that the wallbox applied it. Register names and enum identifiers follow
-the Modbus register map.
+The view follows the newest line until you scroll up. **Pause** holds it,
+**Filter** narrows it, **Download** saves the lines shown as a text file and
+**Clear** empties the view.
 
-The app keeps only the latest **200 transactions in RAM** and automatically
-stops and erases the capture after **10 minutes**, even when the browser closes.
-Switching capture off also erases it; **Clear entries** clears the view without
-extending the deadline. Switching back to **Connection** or hiding the browser
-tab stops UI updates while capture continues until its deadline. Capture produces no extra
-Modbus requests, Recorder history or log files. Serial numbers and all text
-registers are masked, including inside block reads; network login traffic and
-exception-message contents are never captured.
+The app records only while the page is open and for at most ten minutes after
+it was closed, keeps the latest **200 transactions in RAM** and nothing after
+an app restart; the page itself keeps the last 2,000 lines. The recording
+produces no extra Modbus requests, Recorder history or log files. Serial
+numbers and all text registers are masked, including inside block reads;
+network login traffic and exception-message contents are never captured.
 
 This view requires a Home Assistant administrator and a configured
-connection. The **Registers** page shows the last value of every register; see
+connection. The **Overview** shows the last value of every register; see
 [the app's web pages](app-guide.md#registers). It remains available when that connection is failing. Direct-mode
 integration users can use the diagnostics described above.
 

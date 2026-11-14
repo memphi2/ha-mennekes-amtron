@@ -57,12 +57,14 @@ def test_console_read_only_route_and_packaged_resources(tmp_path, monkeypatch):
                 assert result.headers["Cache-Control"] == "no-store"
                 assert (await client.post("/api/registers", headers=HEADERS, json={})).status == 405
                 assert (await client.get("/api/registers?refresh=1", headers=HEADERS)).status == 400
-                for path in ("/registers", "/app_registers.js"):
-                    asset = await client.get(path)
-                    assert asset.status == 200
-                    assert await asset.text()
+                asset = await client.get("/app_registers.js")
+                assert asset.status == 200
+                assert await asset.text()
+                # The registers are part of the overview; their own page is gone.
+                assert (await client.get("/registers")).status == 404
+                assert 'id="register_rows"' in await (await client.get("/")).text()
                 # Every console page gets the browser language; scripts read it.
-                for path in ("/registers", "/runtime", "/jobs", "/guest"):
+                for path in ("/", "/runtime", "/jobs", "/guest"):
                     page = await client.get(path, headers={"Accept-Language": "fr-CH,fr;q=0.9,en;q=0.8"})
                     assert '<html lang="fr">' in await page.text()
                     fallback = await client.get(path, headers={"Accept-Language": "xx,<script>"})
