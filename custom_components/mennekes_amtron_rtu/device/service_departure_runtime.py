@@ -1,4 +1,4 @@
-"""Plan Home Assistant's departure inside the service, beside its orders."""
+"""Own the shared target time and optional vehicle plan inside the service."""
 
 from __future__ import annotations
 
@@ -39,6 +39,14 @@ class DepartureModbusService(GuestModbusService):
     """
 
     departure: DepartureController | None = None
+
+    @property
+    def guest_deadline(self) -> datetime | None:
+        return self.departure.trip.deadline if self.departure is not None and self.departure.ready else None
+
+    @property
+    def target_time_revision(self) -> str | None:
+        return self.departure.choice_revision if self.departure is not None and self.departure.ready else None
 
     def _configure_control(self, control: AmtronControl) -> None:
         super()._configure_control(control)
@@ -208,7 +216,7 @@ class DepartureModbusService(GuestModbusService):
             "departure": departure.snapshot() if departure is not None and departure.ready else None,
         }
         # Guest permission and shared choices, without a separate order snapshot.
-        result["control"]["target_time_revision"] = departure.choice_revision if departure is not None and departure.ready else None
+        result["control"]["target_time_revision"] = self.target_time_revision
         result["control"]["guest_revision"] = self.guest_revision
         result["control"]["guest_active"] = self.guest_active
         result["control"]["guest_mode"] = self.guest_mode

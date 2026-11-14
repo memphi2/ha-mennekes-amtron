@@ -97,8 +97,8 @@ class GuestModbusService(ConsoleModbusService):
 
     @property
     def guest_deadline(self) -> datetime | None:
-        departure = getattr(self, "departure", None)
-        return departure.trip.deadline if departure is not None and departure.ready else None
+        """Shared time supplied by a service with departure controls."""
+        return None
 
     def _guest_time_reached(self) -> bool:
         deadline = self.guest_deadline
@@ -110,10 +110,13 @@ class GuestModbusService(ConsoleModbusService):
                 and (self.control.pause_requested is not True or self.control.is_paused is False))
 
     @property
+    def target_time_revision(self) -> str | None:
+        """No time editor in a guest-only service."""
+        return None
+
+    @property
     def guest_revision(self) -> str:
-        departure = getattr(self, "departure", None)
-        selection = departure.choice_revision if departure is not None and departure.ready else "loading"
-        raw = f"{self.choice_revision}|{selection}|{self._connection_scope}|{self._guest_scope}"
+        raw = f"{self.choice_revision}|{self.target_time_revision}|{self._connection_scope}|{self._guest_scope}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
     async def command(self, payload: dict[str, Any], *, _soc_outcome: Callable[[str, str, BaseException | None], None] | None = None) -> dict[str, Any]:
