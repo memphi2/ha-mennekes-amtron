@@ -14,12 +14,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from .charge_reserve import ChargeReserve
 from .decode import is_hex32
 from .energy_goal import EnergyGoal
 
 _BINDING = re.compile(r"[0-9a-f]{64}")
-MAX_BOOST_MINUTES = 120
 # How long an unreadable wallbox or plug state may last, as for Plug & Charge,
 # before the order counts the connection as lost. One lost reply is routine.
 UNKNOWN_GRACE = timedelta(seconds=60)
@@ -134,9 +132,7 @@ class ChargeJob:
     scope_ended: bool = False
     _last_now: datetime | None = None
     _unknown_since: datetime | None = None
-    boost_until: datetime | None = None
     kind: str = "scheduled"
-    reserve: ChargeReserve | None = None
     # The latest wallbox session record of this connection. It refreshes in
     # RAM and is saved along with every decision.
     session: SessionMark | None = None
@@ -146,7 +142,7 @@ class ChargeJob:
     def create(cls, request: object, *, binding: str, total_kwh: object, now: datetime) -> ChargeJob:
         """Validate all inputs before arming the energy ceiling."""
         fields = {"id", "start_at", "finish_at", "current_a", "energy_kwh"}
-        if not isinstance(request, dict) or request.keys() - {"kind", "reserve_kwh"} != fields:
+        if not isinstance(request, dict) or request.keys() - {"kind"} != fields:
             raise ValueError("invalid job request fields")
         kind = request.get("kind", "scheduled")
         if not isinstance(kind, str) or kind not in ("scheduled", "guest"):
@@ -167,8 +163,7 @@ class ChargeJob:
         energy.set_target(request["energy_kwh"], total_kwh)
         if energy.target_kwh == 0:
             raise ValueError("job energy ceiling must be positive")
-        reserve = ChargeReserve.create(request.get("reserve_kwh", 0), ceiling=energy.target_kwh, kind=kind, baseline=energy.baseline_kwh)
-        return cls(identifier, binding, start, finish, current, energy, _last_now=now, kind=kind, reserve=reserve)
+        return cls(identifier, binding, start, finish, current, energy, _last_now=now, kind=kind)
 
     @property
     def terminal(self) -> bool:
@@ -180,32 +175,14 @@ class ChargeJob:
         return self.state != "charging"
 
     def allows_at(self, now: datetime, *, total_kwh: object = None) -> bool:
-        """Reserve and boost open only earlier portions of the same ceiling."""
-        return not self.terminal and self.state != "suspended" and now < self.finish_at and (
-            now >= self.start_at or (self.boost_until is not None and now < self.boost_until)
-            or (self.reserve is not None and self.reserve.needed(total_kwh, self.energy.baseline_kwh))
-        )
-
-    def set_boost(self, until: object, *, now: datetime) -> None:
-        """Keep the original schedule, energy baseline and current ceiling."""
-        end = job_time(until)
-        now = job_time(now.isoformat())
-        if self.kind == "guest" or self.terminal or self.state == "suspended" or self.scope_ended or not now < end <= min(
-            self.start_at, self.finish_at, now + timedelta(minutes=MAX_BOOST_MINUTES),
-        ):
-            raise ValueError("boost must end before the original start and within two hours")
-        self.boost_until = end
-
-    def cancel_boost(self) -> None:
-        """Return to the current plan; never rearm a terminal order."""
-        self.boost_until = None
+        """A bounded session grants current only inside its accepted window."""
+        return not self.terminal and self.state != "suspended" and self.start_at <= now < self.finish_at
 
     def interrupt(self, reason: str) -> None:
         if reason not in _INTERRUPTIONS:
             raise ValueError("invalid job interruption reason")
         if not self.terminal:
             self.state, self.reason = "interrupted", reason
-            self.cancel_boost()
 
     def suspend(self, reason: str) -> None:
         """Hold the pause until the wallbox proves the same plug-in.
@@ -221,7 +198,6 @@ class ChargeJob:
             return
         self.state, self.reason = "suspended", reason
         self._suspended_since = self._unknown_since = None
-        self.cancel_boost()
 
     def _reattach(
         self, *, now: datetime, present: bool | None, available: bool,
@@ -256,7 +232,6 @@ class ChargeJob:
     def stop(self) -> None:
         if not self.terminal:
             self.state, self.reason = "stopped", "user_stop"
-            self.cancel_boost()
 
     def observe(
         self, *, now: datetime, present: bool | None, available: bool,
@@ -281,8 +256,6 @@ class ChargeJob:
             self.interrupt("clock_changed")
             return
         self._last_now = now
-        if self.boost_until is not None and now >= self.boost_until:
-            self.cancel_boost()
         if not available or present is None:
             # The owner fences every write meanwhile; only a lasting gap ends it.
             if self._unknown_since is None:
@@ -297,8 +270,6 @@ class ChargeJob:
             self.interrupt("independent_stop")
         else:
             self.energy.observe(total_kwh, fresh=meter_fresh)
-            if self.reserve is not None:
-                self.reserve.observe(self.energy, total_kwh, fresh=meter_fresh)
             if self.energy.status == "reached":
                 self.state, self.reason = "reached", "energy_reached"
             elif self.energy.status == "meter_reset":
@@ -311,8 +282,6 @@ class ChargeJob:
                 self.state, self.reason = "scheduled", "scheduled"
             else:
                 self.state, self.reason = "charging", "charging"
-        if self.terminal:
-            self.cancel_boost()
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -320,16 +289,14 @@ class ChargeJob:
             "start_at": self.start_at.isoformat(), "finish_at": self.finish_at.isoformat(),
             "current_a": self.current_a, "energy": self.energy.snapshot(),
             "state": self.state, "reason": self.reason, "scope_ended": self.scope_ended,
-            **({"boost_until": self.boost_until.isoformat()} if self.boost_until is not None else {}),
             **({"kind": self.kind} if self.kind != "scheduled" else {}),
-            **({"reserve": self.reserve.snapshot()} if self.reserve is not None else {}),
             **({"session": self.session.snapshot()} if self.session is not None else {}),
         }
 
     @classmethod
     def restore(cls, raw: object, *, restarted: bool = True) -> ChargeJob:
         """Reject corrupt state rather than silently recovering a resume grant."""
-        if not isinstance(raw, dict) or raw.keys() - {"boost_until", "kind", "reserve", "session"} != _FIELDS:
+        if not isinstance(raw, dict) or raw.keys() - {"kind", "session"} != _FIELDS:
             raise ValueError("invalid saved job fields")
         kind = raw.get("kind", "scheduled")
         if not isinstance(kind, str) or kind not in ("scheduled", "guest"):
@@ -367,13 +334,6 @@ class ChargeJob:
         ):
             raise ValueError("inconsistent saved job state")
         job = cls(identifier, binding, start, finish, _current(raw["current_a"]), energy, state, reason, raw["scope_ended"], kind=kind, session=session)
-        if "reserve" in raw:
-            job.reserve = ChargeReserve.restore(raw["reserve"], ceiling=energy.target_kwh, kind=kind, energy_status=energy.status, baseline=energy.baseline_kwh)
-        if "boost_until" in raw:
-            end = job_time(raw["boost_until"])
-            if job.kind == "guest" or job.terminal or job.state == "suspended" or job.scope_ended or end > job.start_at:
-                raise ValueError("invalid saved boost")
-            job.boost_until = end
         if restarted:
             job.suspend("service_restarted")
         return job

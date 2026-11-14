@@ -25,7 +25,8 @@ from .service_forecast_runtime import ForecastModbusService
 _LOGGER = logging.getLogger(__name__)
 _TICK_SECONDS = 5.0
 _FIELDS = {
-    "departure_trip": frozenset({"command", "deadline", "source", "withdraw", "expected_serial_number"}),
+    "departure_choice": frozenset({"command", "deadline", "revision", "expected_serial_number"}),
+    "departure_trip": frozenset({"command", "deadline", "source", "withdraw", "expected_serial_number", "expected_selection"}),
     "departure_inputs": frozenset({"command", "value", "expected_serial_number"}),
 }
 
@@ -155,7 +156,19 @@ class DepartureModbusService(ForecastModbusService):
             raise DeviceError("device_identity_changed")
         # Plan data only: no bus access, so it is accepted while the wallbox
         # is unreachable, like the charge level Home Assistant forwards.
-        if name == "departure_trip":
+        if name == "departure_choice":
+            revision = payload.get("revision")
+            deadline = payload.get("deadline")
+            if not isinstance(revision, str) or (deadline is not None and not isinstance(deadline, str)):
+                raise ValueError("invalid departure choice")
+            if self.control is None:
+                raise DeviceError("service_unavailable")
+            await departure.set_trip(
+                None if deadline is None else instant(deadline), None,
+                expected_revision=revision, expected_vehicle=self.control.soc_goal.source,
+                editor="app",
+            )
+        elif name == "departure_trip":
             deadline, source = payload.get("deadline"), payload.get("source")
             withdraw = payload.get("withdraw", False)
             if (
@@ -165,7 +178,7 @@ class DepartureModbusService(ForecastModbusService):
             ):
                 raise ValueError("invalid departure trip")
             await departure.set_trip(
-                None if deadline is None else instant(deadline), source, withdraw=withdraw,
+                None if deadline is None else instant(deadline), source, withdraw=withdraw, expected_selection=payload.get("expected_selection"),
             )
         else:
             await departure.set_inputs(DepartureInputs.restore(payload.get("value")))

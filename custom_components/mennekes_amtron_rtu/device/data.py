@@ -41,7 +41,7 @@ class WallboxData:
     service_max_charging_current: float | None = field(default=None, repr=False)
     service_charging_setpoint: float | None = field(default=None, repr=False)
     # Draft edits must notify HA even if no Modbus value changed. Internal only.
-    service_job_draft: dict[str, Any] | None = field(default=None, repr=False)
+    service_guest_draft: dict[str, Any] | None = field(default=None, repr=False)
     # Fixed queue metadata changes only when intent changes, never each second.
     pending_change: str | None = field(default=None, repr=False)
     pending_change_until: datetime | None = field(default=None, repr=False)

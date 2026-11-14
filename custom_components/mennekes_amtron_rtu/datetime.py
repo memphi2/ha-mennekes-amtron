@@ -10,7 +10,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .entity import MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
-from .job_entities import JobDateTime
 from .vehicle_features import TIMED, vehicle_features
 
 PARALLEL_UPDATES = 1
@@ -21,8 +20,6 @@ async def async_setup_entry(
     entry: MennekesAmtronConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    if entry.runtime_data.orders is not None:
-        async_add_entities([JobDateTime(entry, field) for field in ("start_at", "finish_at")])
     if TIMED in vehicle_features(hass, entry):
         async_add_entities([AmtronDepartureTime(entry)])
 

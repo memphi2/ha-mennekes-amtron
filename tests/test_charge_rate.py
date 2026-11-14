@@ -254,19 +254,9 @@ def test_deadline_risk_is_not_a_new_stop_or_start_policy():
     assert forecast(learner, job(finish_at=NOW + timedelta(hours=1)))["deadline_status"] == "unlikely"
 
 
-def test_finish_arithmetic_includes_reserve_and_boost_without_double_counting():
+def test_finish_arithmetic_respects_the_bounded_start():
     planned = job(start_at=NOW + timedelta(hours=4))
-    assert _finish(planned, 20, 0, NOW, 10) == NOW + timedelta(hours=6)
-    planned.reserve = SimpleNamespace(target_kwh=5, reached=False)
-    assert _finish(planned, 20, 0, NOW, 10) == NOW + timedelta(hours=5.5)
-    planned.boost_until = NOW + timedelta(hours=1)
-    assert _finish(planned, 20, 0, NOW, 10) == NOW + timedelta(hours=5)
-    planned.reserve.target_kwh = 20
-    assert _finish(planned, 20, 0, NOW, 10) == NOW + timedelta(hours=2)
-    planned.reserve.reached = True
-    planned.boost_until = NOW
-    assert _finish(planned, 15, 5, NOW, 10) == NOW + timedelta(hours=5.5)
-    assert _finish(planned, 15, 5, NOW + timedelta(hours=5), 10) == NOW + timedelta(hours=6.5)
+    assert _finish(planned, 20, NOW, 10) == NOW + timedelta(hours=6)
 
 
 def test_current_and_phase_plausibility_reject_impossible_intervals_and_history():

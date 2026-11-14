@@ -242,17 +242,17 @@
       "timed_vehicle_departure": {
         "name": "Usa la partenza del veicolo"
       },
-      "job_start": {
-        "name": "Avvia ordine di ricarica"
+      "guest_start": {
+        "name": "Avvia ricarica ospite"
       },
-      "job_stop": {
-        "name": "Ferma ordine di ricarica"
+      "guest_reset_draft": {
+        "name": "Ripristina bozza ospite"
       },
-      "job_clear": {
-        "name": "Cancella ordine di ricarica"
+      "guest_stop": {
+        "name": "Ferma ricarica ospite"
       },
-      "job_reset_draft": {
-        "name": "Reimposta bozza di ricarica"
+      "guest_clear": {
+        "name": "Rimuovi ricarica ospite"
       }
     },
     "number": {
@@ -265,14 +265,14 @@
       "soc_goal": {
         "name": "Obiettivo di carica del veicolo"
       },
-      "job_current_a": {
-        "name": "Corrente ordine"
+      "guest_current_a": {
+        "name": "Corrente ospite"
       },
-      "job_energy_kwh": {
-        "name": "Energia ordine"
+      "guest_energy_kwh": {
+        "name": "Energia ospite"
       },
-      "job_reserve_kwh": {
-        "name": "Riserva immediata"
+      "guest_duration_minutes": {
+        "name": "Durata massima ospite"
       }
     },
     "select": {
@@ -470,7 +470,7 @@
           "waiting_for_device": "In attesa wallbox",
           "vehicle_unconfirmed": "Veicolo non confermato",
           "read_only": "Sola lettura",
-          "order_active": "Un ordine dall’app ha la priorità",
+          "order_active": "La ricarica ospite ha priorità",
           "queued": "Modifica in coda",
           "paused_until_start": "In pausa fino all’avvio",
           "minimum_level": "Ricarica fino al livello minimo",
@@ -520,7 +520,7 @@
         "state": {
           "unavailable": "Wallbox non raggiungibile",
           "guest_order": "Ordine ospite",
-          "charging_job": "Ordine di ricarica",
+          "charging_job": "Ricarica ospite",
           "departure_plan": "Pianificazione della partenza",
           "direct": "Controllo diretto"
         },
@@ -591,27 +591,34 @@
           }
         }
       },
-      "charging_job": {
-        "name": "Ordine di ricarica",
+      "guest_draft_status": {
+        "name": "Bozza ricarica ospite",
         "state": {
-          "none": "Nessun ordine",
-          "scheduled": "In attesa della finestra",
+          "ready": "Pronto per avviare",
+          "job_exists": "Ricarica ospite già attiva",
+          "job_not_permitted": "Controllare veicolo, consenso, contatore e modifiche in attesa",
+          "job_current_exceeds_cap": "Corrente oltre il limite",
+          "job_preview_expired": "Anteprima scaduta; crearne una nuova",
+          "job_storage_unavailable": "Archivio bozza non disponibile",
+          "invalid_job_request": "Verificare energia, corrente e durata massima",
+          "job_stop_unconfirmed": "Attesa della conferma di arresto",
+          "guest_vehicle_target_active": "Obiettivo batteria attivo"
+        }
+      },
+      "guest_charging": {
+        "name": "Ricarica ospite",
+        "state": {
+          "none": "Nessuna ricarica ospite",
+          "scheduled": "Preparazione ricarica ospite",
           "charging": "Ricarica richiesta",
           "waiting_meter": "In attesa di una lettura valida del contatore",
           "suspended": "Interrotto; verifica se lo stesso collegamento prosegue",
           "reached": "Tetto di energia raggiunto",
-          "finished": "Finestra oraria terminata",
+          "finished": "Durata massima raggiunta",
           "stopped": "Fermato dall’utente",
           "interrupted": "Interrotto; nessun riavvio automatico"
         },
         "state_attributes": {
-          "kind": {
-            "name": "Tipo",
-            "state": {
-              "scheduled": "Ordine di ricarica",
-              "guest": "Ricarica ospite"
-            }
-          },
           "start": {
             "name": "Inizio"
           },
@@ -627,32 +634,9 @@
           "delivered": {
             "name": "Erogata"
           },
-          "reserve": {
-            "name": "Riserva immediata"
-          },
           "reason": {
             "name": "Motivo"
-          },
-          "boost_until": {
-            "name": "Boost fino a"
-          },
-          "boost_available": {
-            "name": "Boost disponibile"
           }
-        }
-      },
-      "job_draft_status": {
-        "name": "Bozza di ricarica",
-        "state": {
-          "needs_finish": "Scegliere l’ora di fine",
-          "ready": "Pronto per avviare",
-          "job_exists": "Un ordine è già in corso",
-          "job_not_permitted": "Controllare veicolo, consenso, contatore e modifiche in attesa",
-          "job_current_exceeds_cap": "Corrente oltre il limite",
-          "job_preview_expired": "Ora di avvio trascorsa",
-          "job_storage_unavailable": "Archivio bozza non disponibile",
-          "invalid_job_request": "Controllare inizio, fine ed energia",
-          "job_stop_unconfirmed": "Attesa della conferma di arresto"
         }
       }
     },
@@ -773,7 +757,7 @@
               "unknown": "Motivo sconosciuto",
               "user_cancelled": "Annullato dall’utente",
               "energy_goal": "Arresto richiesto da un obiettivo di ricarica",
-              "service_job": "Arresto da un ordine di ricarica dell’app",
+              "service_job": "La ricarica ospite ha priorità",
               "deadline_expired": "Ora di partenza trascorsa"
             }
           }
@@ -836,12 +820,6 @@
     "datetime": {
       "timed_departure": {
         "name": "Prossima partenza"
-      },
-      "job_start_at": {
-        "name": "Primo avvio consentito"
-      },
-      "job_finish_at": {
-        "name": "Fine entro"
       }
     }
   },
@@ -919,7 +897,7 @@
       "message": "Un obiettivo di ricarica richiede una pausa. Controllane lo stato. Dopo aver raggiunto l’obiettivo o un azzeramento del contatore, imposta un nuovo obiettivo o disattivalo con 0 prima di riprendere. Modificare l’obiettivo non avvia la ricarica."
     },
     "service_job_active": {
-      "message": "Un ordine di ricarica dell’app Modbus controlla ora la ricarica. Interrompilo con l’azione «Ferma ordine di ricarica» o nella pagina Ordini di ricarica dell’app, oppure scollega l’auto. Appena la wallbox conferma la pausa, puoi di nuovo modificare la corrente o riprendere qui."
+      "message": "La ricarica ospite controlla la corrente. Fermarla in Ricarica ospite nell’app o con Ferma ricarica ospite in Home Assistant. Il controllo manuale torna dopo la conferma della pausa."
     },
     "energy_goal_state_invalid": {
       "message": "Impossibile ripristinare l’obiettivo energetico salvato. Controlla i registri prima di consentire nuovamente la ricarica."
@@ -999,14 +977,8 @@
     "guest_vehicle_target_active": {
       "message": "Obiettivo batteria del veicolo attivo; nessun ordine ospite creato."
     },
-    "invalid_boost_duration": {
-      "message": "Inserire un numero intero da 1 a 120 minuti."
-    },
     "invalid_job_request": {
       "message": "L’app non ha accettato questi valori. Controlla orario, corrente ed energia."
-    },
-    "job_boost_unavailable": {
-      "message": "Il boost richiede un ordine attivo prima del suo inizio previsto e un consenso attuale."
     },
     "job_changed": {
       "message": "Nel frattempo lo stato è cambiato. Riprova."
@@ -1046,12 +1018,6 @@
     },
     "job_stop_unconfirmed": {
       "message": "L’arresto non è ancora confermato. Riprova tra poco."
-    },
-    "job_window_invalid": {
-      "message": "La fine deve essere dopo l’inizio ed entro sette giorni, e l’inizio non deve essere nel passato."
-    },
-    "job_reserve_exceeds_energy": {
-      "message": "La riserva immediata non deve superare l’energia dell’ordine."
     }
   },
   "issues": {
@@ -1734,36 +1700,6 @@
         }
       }
     },
-    "start_charging_job": {
-      "name": "Avvia ordine di ricarica",
-      "description": "Ricarica l’auto collegata in una finestra oraria, a corrente fissa, fino a una quantità di energia. L’ordine termina quando l’auto viene scollegata.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
-        },
-        "current": {
-          "name": "Corrente di ricarica",
-          "description": "Corrente in ampere per fase, al massimo il limite dell’app."
-        },
-        "energy": {
-          "name": "Energia",
-          "description": "La ricarica termina quando è stata fornita questa energia, in kWh."
-        },
-        "start": {
-          "name": "Inizio",
-          "description": "Quando può iniziare la ricarica. Lascia vuoto per iniziare subito."
-        },
-        "finish": {
-          "name": "Fine",
-          "description": "Quando termina al più tardi la ricarica, entro sette giorni."
-        },
-        "reserve": {
-          "name": "Riserva immediata",
-          "description": "Facoltativo: questa energia in kWh viene caricata subito, prima della finestra."
-        }
-      }
-    },
     "start_guest_charging": {
       "name": "Avvia ricarica ospite",
       "description": "Ricarica l’auto di un ospite da subito, per tempo ed energia limitati. Non vengono usati dati del veicolo né obiettivi salvati.",
@@ -1786,9 +1722,9 @@
         }
       }
     },
-    "stop_charging_job": {
-      "name": "Ferma ordine di ricarica",
-      "description": "Ferma l’ordine di ricarica o la ricarica ospite in corso e mette in pausa la ricarica. L’ordine non riprende; un piano di partenza in scadenza può ricaricare di nuovo.",
+    "stop_guest_charging": {
+      "name": "Ferma ricarica ospite",
+      "description": "Ferma la ricarica ospite e richiede una pausa. Un piano di partenza attivo può poi riprendere.",
       "fields": {
         "device_id": {
           "name": "Wallbox",
@@ -1796,33 +1732,9 @@
         }
       }
     },
-    "clear_charging_job": {
-      "name": "Cancella ordine di ricarica",
-      "description": "Rimuove un ordine di ricarica terminato o fermato, per poterne avviare uno nuovo.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
-        }
-      }
-    },
-    "start_boost": {
-      "name": "Avvia boost",
-      "description": "Ricarica subito anche se l’ordine inizia più tardi, poi torna al piano.",
-      "fields": {
-        "device_id": {
-          "name": "Wallbox",
-          "description": "La wallbox interessata. Si può omettere se ne è configurata una sola."
-        },
-        "duration": {
-          "name": "Durata",
-          "description": "Per quanto tempo ricaricare in anticipo, in minuti (fino a 120)."
-        }
-      }
-    },
-    "cancel_boost": {
-      "name": "Annulla boost",
-      "description": "Termina la ricarica anticipata; l’ordine prosegue come previsto.",
+    "clear_guest_charging": {
+      "name": "Rimuovi ricarica ospite",
+      "description": "Rimuove una sessione ospite terminata senza riprendere la ricarica.",
       "fields": {
         "device_id": {
           "name": "Wallbox",

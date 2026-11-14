@@ -1,4 +1,4 @@
-"""The app's charging jobs, boost and guest charging, from HA.
+"""The app's guest charging and shared guest draft, from HA.
 
 The app asks for a preview before it accepts an order: the preview carries the
 checked values and is bound to the current plug-in. An action here asks for
@@ -10,13 +10,12 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Awaitable, Callable
-from datetime import datetime
 from typing import Any
 
 from .control import ha_command
 from .device.client_errors import AmtronConnectionError
 from .device.errors import DeviceError
-from .device.job_draft import read_snapshot
+from .device.guest_draft import read_snapshot
 from .remote import RemoteClient
 from .remote_errors import ServiceConnectionError
 
@@ -38,44 +37,43 @@ class ServiceOrders:
         return status if isinstance(status, dict) else None
 
     @property
-    def draft(self) -> dict[str, Any] | None:
+    def guest_draft(self) -> dict[str, Any] | None:
         status = self.jobs
-        draft = status.get("draft") if status is not None else None
-        return read_snapshot(draft)
+        return read_snapshot(status.get("guest_draft") if status else None)
 
     @ha_command
     async def async_edit_draft(self, field: str, value: object) -> None:
-        draft = self.draft
+        draft = self.guest_draft
         if draft is None:
             raise DeviceError("service_order_failed")
         try:
-            await self._call({"action": "edit_draft", "draft_revision": draft.get("revision"), "changes": {field: value}})
+            await self._call({"action": "edit_guest_draft", "draft_revision": draft.get("revision"), "changes": {field: value}})
         finally:
             await self._done()
 
     @ha_command
     async def async_reset_draft(self) -> None:
-        draft = self.draft
+        draft = self.guest_draft
         if draft is None:
             raise DeviceError("service_order_failed")
         try:
-            await self._call({"action": "reset_draft", "draft_revision": draft.get("revision"), "confirm": True})
+            await self._call({"action": "reset_guest_draft", "draft_revision": draft.get("revision"), "confirm": True})
         finally:
             await self._done()
 
     @ha_command
     async def async_start_draft(self) -> None:
-        draft = self.draft
+        draft = self.guest_draft
         if draft is None:
             raise DeviceError("service_order_failed")
         state = await self._call()
         try:
             preview = await self._call({
-                "action": "preview_draft", "draft_revision": draft.get("revision"),
+                "action": "preview_guest_draft", "draft_revision": draft.get("revision"),
                 "revision": state.get("revision"), "scope": state.get("scope"),
             })
             await self._call({
-                "action": "create_draft", "draft_revision": preview.get("draft_revision"),
+                "action": "create_guest_draft", "draft_revision": preview.get("draft_revision"),
                 "revision": preview.get("revision"), "scope": preview.get("scope"), "request": preview.get("request"),
             })
         finally:
@@ -127,16 +125,6 @@ class ServiceOrders:
             await self._done()
 
     @ha_command
-    async def async_start_job(
-        self, *, start: datetime, finish: datetime, current: float, energy: float, reserve: float = 0,
-    ) -> None:
-        await self._create("preview", {
-            "start_at": start.isoformat(), "finish_at": finish.isoformat(),
-            "current_a": current, "energy_kwh": energy,
-            **({"reserve_kwh": reserve} if reserve > 0 else {}),
-        })
-
-    @ha_command
     async def async_start_guest(self, *, minutes: int, current: float, energy: float) -> None:
         await self._create("preview_guest", {
             "duration_minutes": minutes, "current_a": current, "energy_kwh": energy,
@@ -149,22 +137,3 @@ class ServiceOrders:
     @ha_command
     async def async_clear_job(self) -> None:
         await self._confirm("clear")
-
-    @ha_command
-    async def async_start_boost(self, *, minutes: int) -> None:
-        state = await self._call()
-        preview = await self._call({
-            "action": "preview_boost", "revision": state.get("revision"),
-            "scope": state.get("scope"), "minutes": minutes,
-        })
-        try:
-            await self._call({
-                "action": "boost", "revision": preview.get("revision"),
-                "scope": preview.get("scope"), "until": preview.get("until"),
-            })
-        finally:
-            await self._done()
-
-    @ha_command
-    async def async_cancel_boost(self) -> None:
-        await self._confirm("cancel_boost")

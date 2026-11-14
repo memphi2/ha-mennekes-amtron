@@ -40,7 +40,7 @@ FORECAST = {
 def plan(trip: TimedGoal | None = None, **changes) -> dict:
     return {
         "trip": (trip or TimedGoal()).snapshot(), "status": "disabled", "planned_start": None,
-        "estimated_soc": None, "inputs": None, "scope": SCOPE, "confirmed": False, "forecast": None,
+        "estimated_soc": None, "inputs": None, "scope": SCOPE, "confirmed": False, "forecast": None, "editor": "ha", "selection_vehicle": None,
         **changes,
     }
 
@@ -62,7 +62,7 @@ class Service:
     def departure(self) -> DepartureState | None:
         return None if self.state is None else DepartureState.restore(self.state)
 
-    async def async_set_departure_trip(self, deadline, source, *, withdraw=False):
+    async def async_set_departure_trip(self, deadline, source, *, withdraw=False, expected_selection=None):
         if self.fail is not None:
             raise self.fail
         self.trips.append((deadline, source, withdraw))
@@ -316,3 +316,30 @@ def test_the_remote_control_validates_and_sends_the_plan(tmp_path):
         finally:
             await service.stop()
     asyncio.run(run())
+
+
+def test_new_app_departure_supersedes_an_unsent_ha_edit(monkeypatch):
+    async def body():
+        observer, service, _hass = handover(monkeypatch)
+        await observer.async_set_deadline(NOW + timedelta(hours=5), source="manual")
+        newer = TimedGoal()
+        newer.set(NOW + timedelta(hours=7), "manual")
+        service.state = plan(newer, editor="app", selection_vehicle=CAR)
+        await observer._evaluate()
+        assert observer.goal.deadline == newer.deadline
+        assert not observer._trip_dirty
+        assert service.trips == []
+    asyncio.run(body())
+
+
+def test_foreign_vehicle_app_choice_is_not_adopted(monkeypatch):
+    async def body():
+        observer, service, _hass = handover(monkeypatch)
+        await observer.async_set_deadline(NOW + timedelta(hours=5), source="manual")
+        newer = TimedGoal()
+        newer.set(NOW + timedelta(hours=7), "manual")
+        service.state = plan(newer, editor="app", selection_vehicle="another-car")
+        await observer._evaluate()
+        assert observer.goal.deadline == NOW + timedelta(hours=5)
+        assert service.trips == [(observer.goal.deadline, "manual", False)]
+    asyncio.run(body())

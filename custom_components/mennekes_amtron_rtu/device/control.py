@@ -376,7 +376,7 @@ class AmtronControl:
     def supports_soc_goal(self) -> bool:
         return True
 
-    async def async_configure_soc(self, source: str | None) -> None:
+    async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None:
         if self.soc_goal_controller is None:
             raise validation_error("soc_goal_not_supported")
         await self.soc_goal_controller.async_configure_source(source)

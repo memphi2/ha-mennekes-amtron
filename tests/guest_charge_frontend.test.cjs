@@ -6,8 +6,8 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '../custom_components/mennekes_amtron_rtu/device');
 const html = fs.readFileSync(path.join(root, 'app_guest.html'), 'utf8');
 const source = fs.readFileSync(path.join(root, 'app_guest.js'), 'utf8');
-const initial = () => ({schema:1,revision:'r1',scope:'a'.repeat(64),csrf:'test-csrf',ready:true,available:true,present:true,permitted:true,meter_fresh:true,max_current_a:16,vehicle_target_active:false,job:null});
-const proposal = () => ({schema:1,revision:'r1',scope:'a'.repeat(64),request:{id:'b'.repeat(32),kind:'guest',start_at:'2026-11-13T18:00:00Z',finish_at:'2026-11-13T20:00:00Z',current_a:6,energy_kwh:15}});
+const initial = () => ({schema:1,revision:'r1',scope:'a'.repeat(64),csrf:'test-csrf',ready:true,available:true,present:true,permitted:true,meter_fresh:true,max_current_a:16,vehicle_target_active:false,job:null,guest_draft:{revision:'d1',storage_error:false,status:'ready',values:{duration_minutes:120,current_a:6,energy_kwh:15}}});
+const proposal = () => ({schema:1,revision:'r1',draft_revision:'d1',scope:'a'.repeat(64),request:{id:'b'.repeat(32),kind:'guest',start_at:'2026-11-13T18:00:00Z',finish_at:'2026-11-13T20:00:00Z',current_a:6,energy_kwh:15}});
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function setup(responses=[initial()], language='de') {
   const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],{value:'',textContent:'',disabled:false,hidden:false,listeners:{},addEventListener(k,fn){this.listeners[k]=fn;},reportValidity(){return true;}}]));
@@ -20,23 +20,25 @@ function setup(responses=[initial()], language='de') {
 }
 
 test('explicit preview precedes a fixed absolute create; no retrying timer',async()=>{
-  const h=setup([initial(),proposal(),{schema:1}, {...initial(),revision:'r2',job:{...proposal().request,state:'charging',delivered_kwh:0,holding:true}}]);await flush();
+  const h=setup([initial(),initial(),proposal(),{schema:1}, {...initial(),revision:'r2',job:{...proposal().request,state:'charging',delivered_kwh:0,holding:true}}]);await flush();
   assert.equal(h.elements.get('guest_fields').disabled,false);
   await h.emit('guest_form','submit');
-  let post=JSON.parse(h.calls[1].body);assert.equal(post.action,'preview_guest');assert.equal(post.request.duration_minutes,120);
+  let post=JSON.parse(h.calls[1].body);assert.equal(post.action,'edit_guest_draft');assert.equal(post.changes.duration_minutes,120);
+  assert.equal(JSON.parse(h.calls[2].body).action,'preview_guest_draft');
   assert.equal(h.elements.get('guest_confirmation').hidden,false);
   await h.emit('guest_confirm','click');
-  post=JSON.parse(h.calls[2].body);assert.equal(post.action,'create');assert.equal(post.request.start_at,proposal().request.start_at);
-  assert.equal(post.request.kind,'guest');assert.equal(h.calls[2].headers['X-Amtron-CSRF'],'test-csrf');
-  assert.equal(h.calls.filter(c=>c.method==='POST').length,2);
-  assert.equal(h.elements.get('guest_fields').disabled,true);
+  post=JSON.parse(h.calls[3].body);assert.equal(post.action,'create_guest_draft');assert.equal(post.request.start_at,proposal().request.start_at);
+  assert.equal(post.request.kind,'guest');assert.equal(h.calls[3].headers['X-Amtron-CSRF'],'test-csrf');
+  assert.equal(h.calls.filter(c=>c.method==='POST').length,3);
+  assert.equal(h.elements.get('guest_fields').disabled,false);
+  assert.equal(h.elements.get('guest_preview').disabled,true);
   assert.equal(h.elements.get('guest_stop').disabled,false);
 });
 
 test('editing invalidates a preview and cannot submit the old proposal',async()=>{
-  const h=setup([initial(),proposal()]);await flush();await h.emit('guest_form','submit');
+  const h=setup([initial(),initial(),proposal()]);await flush();await h.emit('guest_form','submit');
   await h.emit('guest_form','input');await h.emit('guest_confirm','click');
-  assert.equal(h.elements.get('guest_confirmation').hidden,true);assert.equal(h.calls.length,2);
+  assert.equal(h.elements.get('guest_confirmation').hidden,true);assert.equal(h.calls.length,3);
 });
 
 test('fractional duration never sends a preview',async()=>{
@@ -46,18 +48,18 @@ test('fractional duration never sends a preview',async()=>{
 
 test('vehicle SoC target blocks guest creation without changing settings',async()=>{
   const h=setup([{...initial(),vehicle_target_active:true}]);await flush();
-  assert.equal(h.elements.get('guest_fields').disabled,true);assert.match(h.elements.get('guest_notice').textContent,/Batterieziel/);
+  assert.equal(h.elements.get('guest_fields').disabled,false);assert.equal(h.elements.get('guest_preview').disabled,true);assert.match(h.elements.get('guest_notice').textContent,/Batterieziel/);
   assert.equal(h.calls.length,1);
 });
 
 test('lost POST response cannot automatically repeat or extend a guest order',async()=>{
-  const h=setup([initial(),proposal(),new Error('lost'),initial()]);await flush();await h.emit('guest_form','submit');await h.emit('guest_confirm','click');
-  assert.equal(h.calls.filter(c=>c.method==='POST').length,2);assert.equal(h.calls.at(-1).method,undefined);
+  const h=setup([initial(),initial(),proposal(),new Error('lost'),initial()]);await flush();await h.emit('guest_form','submit');await h.emit('guest_confirm','click');
+  assert.equal(h.calls.filter(c=>c.method==='POST').length,3);assert.equal(h.calls.at(-1).method,undefined);
   assert.match(h.elements.get('guest_notice').textContent,/nicht bestätigt/);
 });
 
 test('a hidden page discards a late preview and invalidates confirmation',async()=>{
-  let resolve;const h=setup([initial(),()=>new Promise(r=>{resolve=r;})]);await flush();
+  let resolve;const h=setup([initial(),initial(),()=>new Promise(r=>{resolve=r;})]);await flush();
   const submitted=h.emit('guest_form','submit');await flush();h.document.hidden=true;h.docEvents.visibilitychange();resolve(proposal());await submitted;
   assert.equal(h.elements.get('guest_confirmation').hidden,true);assert.equal(h.elements.get('guest_fields').disabled,true);
   assert.equal(h.timers.size,0);
@@ -105,5 +107,29 @@ test('a finished order that handed control back allows a new guest order',async(
   const other=setup([{...initial(),job:{...done,kind:'scheduled'}}]);await flush();
   assert.equal(other.elements.get('guest_fields').disabled,false);assert.equal(other.elements.get('guest_state').textContent,'Kein Auftrag');
   const held=setup([{...initial(),job:{...done,holding:true}}]);await flush();
-  assert.equal(held.elements.get('guest_fields').disabled,true);assert.equal(held.elements.get('guest_stop').disabled,true);
+  assert.equal(held.elements.get('guest_fields').disabled,false);assert.equal(held.elements.get('guest_preview').disabled,true);assert.equal(held.elements.get('guest_stop').disabled,true);
+});
+
+
+test('saving a guest draft does not start and stale remote edits preserve input',async()=>{
+  const changed={...initial(),guest_draft:{...initial().guest_draft,revision:'d2',values:{duration_minutes:60,current_a:8,energy_kwh:12}}};
+  const h=setup([initial(),changed]);await flush();
+  h.elements.get('guest_energy').value='22';await h.emit('guest_form','input');
+  await [...h.timers.values()].find(t=>t.ms===5000).fn();await flush();
+  assert.equal(h.elements.get('guest_energy').value,'22');
+  assert.match(h.elements.get('guest_notice').textContent,/Zustand geändert/);
+  h.responses.push({error:'job_changed'});
+  await h.emit('guest_save_draft','click');
+  assert.equal(JSON.parse(h.calls.at(-1).body).draft_revision,'d1');
+  assert.equal(h.calls.filter(c=>c.method==='POST').length,1);
+  assert.equal(h.elements.get('guest_energy').value,'22');
+  assert.equal([...h.timers.values()].filter(t=>t.ms===5000).length,1);
+});
+
+test('saved guest values populate the editor and reset never creates a charge',async()=>{
+  const h=setup([initial(),initial(),initial()]);await flush();
+  await h.emit('guest_reset_draft','click');
+  assert.equal(JSON.parse(h.calls[1].body).action,'reset_guest_draft');
+  assert.equal(h.elements.get('guest_duration').value,'120');
+  assert.equal(h.calls.filter(c=>c.method==='POST').length,1);
 });

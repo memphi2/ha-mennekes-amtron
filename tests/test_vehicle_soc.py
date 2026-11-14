@@ -51,7 +51,8 @@ class Control:
         self.async_observe_soc = AsyncMock(side_effect=self.observe)
         self.async_set_soc_goal = AsyncMock(side_effect=self.set_goal)
 
-    async def configure(self, source):
+    async def configure(self, source, *, maximum_required=False):
+        self.maximum_required = maximum_required
         self.soc_goal.configure_source(source)
 
     async def observe(self, soc, maximum, *, source):
@@ -303,7 +304,7 @@ def test_absent_source_clears_an_old_goal_and_old_service_is_optional(tmp_path):
             control.supports_soc_goal = True
             coordinator.update()
             await hass.async_block_till_done()
-            control.async_configure_soc.assert_awaited_once_with(None)
+            control.async_configure_soc.assert_awaited_once_with(None, maximum_required=False)
             control.async_observe_soc.assert_not_awaited()
             assert control.soc_goal.status == "disabled"
             assert control.soc_goal.source is None

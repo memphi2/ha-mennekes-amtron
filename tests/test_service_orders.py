@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -79,44 +79,21 @@ def _key(error) -> str:
     return error.value.translation_key
 
 
-def test_a_job_is_started_boosted_stopped_and_cleared_in_one_step_each(tmp_path):
+def test_guest_is_started_stopped_and_cleared_without_a_second_mode(tmp_path):
     async def body(h, orders, notified):
-        assert orders.jobs["job"] is None
-        await orders.async_start_job(
-            start=NOW + timedelta(hours=1), finish=NOW + timedelta(hours=3),
-            current=10, energy=7.5, reserve=1,
-        )
+        await orders.async_start_guest(minutes=120, current=10, energy=7.5)
         job = orders.jobs["job"]
-        assert (job["state"], job["current_a"], job["energy_kwh"], job["reserve_kwh"]) == ("charging", 10.0, 7.5, 1.0)
-        assert h.jobs.job is not None
+        assert (job["kind"], job["current_a"], job["energy_kwh"]) == ("guest", 10.0, 7.5)
         assert notified
-        # A second order is refused with the app's own reason.
         with pytest.raises(HomeAssistantError) as error:
-            await orders.async_start_job(
-                start=NOW, finish=NOW + timedelta(hours=1), current=6, energy=1,
-            )
+            await orders.async_start_guest(minutes=60, current=6, energy=1)
         assert _key(error) == "job_exists"
         assert orders.jobs["job"]["id"] == job["id"]
-
-        # The reserve is charged at once, so there is nothing to boost.
         await orders.async_stop_job()
         assert orders.jobs["job"]["state"] == "stopped"
-        with pytest.raises(HomeAssistantError) as error:
-            await orders.async_start_boost(minutes=30)
-        assert _key(error) == "job_boost_unavailable"
         h.change(current_a=1)
         await orders.async_clear_job()
         assert orders.jobs["job"] is None
-
-        await orders.async_start_job(
-            start=NOW + timedelta(hours=1), finish=NOW + timedelta(hours=3), current=10, energy=5,
-        )
-        assert orders.jobs["boost_available"] is True
-        await orders.async_start_boost(minutes=30)
-        assert orders.jobs["job"]["boost_until"] == (NOW + timedelta(minutes=30)).isoformat()
-        await orders.async_cancel_boost()
-        assert orders.jobs["job"]["boost_until"] is None
-
     asyncio.run(_with_app(tmp_path, body))
 
 
@@ -167,7 +144,7 @@ def test_an_app_without_orders_leaves_the_status_unknown_and_names_the_failure(t
         assert orders.jobs is None
         orders._client.snapshot = {}
         assert orders.jobs is None
-        for call in (orders.async_stop_job(), orders.async_cancel_boost(),
+        for call in (orders.async_stop_job(), orders.async_clear_job(),
                      orders.async_start_guest(minutes=5, current=6, energy=1)):
             with pytest.raises(HomeAssistantError) as error:
                 await call
@@ -201,52 +178,21 @@ def test_every_action_reaches_the_orders_of_an_app_connection(monkeypatch):
 
         # A direct connection has no app to carry orders out.
         with pytest.raises(ServiceValidationError) as error:
-            await act("stop_charging_job")
+            await act("stop_guest_charging")
         assert _key(error) == "app_required"
 
         orders = entry.runtime_data.orders = _Orders()
-        soon = (datetime.now(UTC) + timedelta(hours=1)).replace(microsecond=0)
-        later = soon + timedelta(hours=2)
-        await act("start_charging_job", finish=later.isoformat(), current=10, energy="7.5")
-        name, values = orders.calls.pop()
-        assert name == "async_start_job"
-        assert values["finish"] == later
-        assert values["start"].tzinfo is not None
-        assert (values["current"], values["energy"], values["reserve"]) == (10.0, 7.5, 0)
-        zone = timezone(timedelta(hours=1))
-        await act("start_charging_job", start=soon.astimezone(zone).isoformat(),
-                  finish=later.astimezone(zone).isoformat(), current=6, energy=1, reserve=0.5)
-        values = orders.calls.pop()[1]
-        assert (values["start"], values["start"].utcoffset()) == (soon, timedelta(0))
-        assert values["reserve"] == 0.5
-        # A window the app would refuse without a reason is named here.
-        for start, finish in ((later, soon), (soon, soon + timedelta(days=8)),
-                              (soon - timedelta(hours=2), later)):
-            with pytest.raises(ServiceValidationError) as error:
-                await act("start_charging_job", start=start.isoformat(), finish=finish.isoformat(),
-                          current=6, energy=1)
-            assert _key(error) == "job_window_invalid"
-        with pytest.raises(ServiceValidationError) as error:
-            await act("start_charging_job", finish=later.isoformat(), current=6, energy=2, reserve=2.1)
-        assert _key(error) == "job_reserve_exceeds_energy"
-        assert orders.calls == []
-        # A computed energy is rounded to the app's tenths.
-        await act("start_charging_job", finish=later.isoformat(), current=6, energy=7.26, reserve=7.26)
-        values = orders.calls.pop()[1]
-        assert (values["energy"], values["reserve"]) == (7.3, 7.3)
         await act("start_guest_charging", duration=90, current=8, energy=6)
         assert orders.calls.pop() == ("async_start_guest", {"minutes": 90, "current": 8.0, "energy": 6.0})
-        await act("start_boost", duration=30)
-        assert orders.calls.pop() == ("async_start_boost", {"minutes": 30})
-        for name, method in (("stop_charging_job", "async_stop_job"), ("clear_charging_job", "async_clear_job"),
-                             ("cancel_boost", "async_cancel_boost")):
+        for name, method in (("stop_guest_charging", "async_stop_job"), ("clear_guest_charging", "async_clear_job")):
             await act(name)
             assert orders.calls.pop() == (method, {})
+        assert not {"start_charging_job", "start_boost", "cancel_boost"} & services.ORDER_ACTIONS.keys()
 
         # With one wallbox the target can be left out; with two it cannot.
-        handler, schema = hass.services.registered[(DOMAIN, "cancel_boost")]
+        handler, schema = hass.services.registered[(DOMAIN, "clear_guest_charging")]
         await handler(SimpleNamespace(context=Context(), data=schema({})))
-        assert orders.calls.pop() == ("async_cancel_boost", {})
+        assert orders.calls.pop() == ("async_clear_job", {})
         other = FakeConfigEntry(entry_id="entry-2")
         other.runtime_data = entry.runtime_data
         hass.config_entries.entries["entry-2"] = other
@@ -259,12 +205,11 @@ def test_every_action_reaches_the_orders_of_an_app_connection(monkeypatch):
 
 
 @pytest.mark.parametrize(("name", "fields"), [
-    ("start_charging_job", {"finish": "2026-11-16T08:00:00+00:00", "current": 5.9, "energy": 1}),
-    ("start_charging_job", {"finish": "2026-11-16T08:00:00+00:00", "current": 6, "energy": 0.04}),
-    ("start_charging_job", {"current": 6, "energy": 1}),
+    ("start_guest_charging", {"duration": 60, "current": 5.9, "energy": 1}),
+    ("start_guest_charging", {"duration": 60, "current": 6, "energy": 0.04}),
+    ("start_guest_charging", {"current": 6, "energy": 1}),
     ("start_guest_charging", {"duration": 1441, "current": 6, "energy": 1}),
-    ("start_boost", {"duration": 121}),
-    ("stop_charging_job", {"force": True}),
+    ("stop_guest_charging", {"force": True}),
 ])
 def test_actions_refuse_values_the_app_would_refuse(name, fields):
     async def run():
@@ -282,12 +227,12 @@ def test_the_job_sensor_exists_only_with_the_app_and_shows_its_status():
         hass, entry, _transport = await build_runtime()
         direct: dict[str, object] = {}
         await async_setup_entry(hass, entry, lambda entities: direct.update(collect(entities)))
-        assert "charging_job" not in direct
+        assert "guest_charging" not in direct
 
         orders = entry.runtime_data.orders = _Orders()
         added: dict[str, object] = {}
         await async_setup_entry(hass, entry, lambda entities: added.update(collect(entities)))
-        job = added["charging_job"]
+        job = added["guest_charging"]
         # Before the first status, or with an app that has no orders.
         assert not job.available
         assert job.native_value is None
@@ -296,7 +241,7 @@ def test_the_job_sensor_exists_only_with_the_app_and_shows_its_status():
         orders.jobs = {"job": None, "boost_available": False}
         assert job.available
         assert job.native_value == "none"
-        assert job.extra_state_attributes == {"boost_available": False}
+        assert job.extra_state_attributes is None
 
         orders.jobs = {"boost_available": True, "job": {
             "state": "scheduled", "reason": "scheduled", "kind": "guest",
@@ -307,7 +252,7 @@ def test_the_job_sensor_exists_only_with_the_app_and_shows_its_status():
         attributes = job.extra_state_attributes
         assert attributes["start"].isoformat() == "2026-11-16T06:00:00+00:00"
         assert attributes | {"start": None} == {
-            "boost_available": True, "kind": "guest", "start": None, "current": 10.0,
+            "start": None, "current": 10.0,
             "energy": 7.5, "delivered": 0.0, "reason": "scheduled",
         }
         # A state this version does not know is no state.

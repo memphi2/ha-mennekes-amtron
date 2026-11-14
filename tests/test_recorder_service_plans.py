@@ -44,7 +44,7 @@ def test_service_plans_and_orders_do_not_record_unchanged_polls(tmp_path, monkey
 
                     registry = er.async_get(hass)
                     ids = [registry.async_get_entity_id("sensor", DOMAIN, entry_entity_unique_id(entry, key))
-                           for key in (*OPERATION_SENSOR_KEYS, "charging_job")]
+                           for key in (*OPERATION_SENSOR_KEYS, "guest_charging")]
                     assert all(ids), ids
 
                     async def rows():

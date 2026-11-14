@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><title>Mennekes Amtron</title><link rel="stylesheet" href="./app_settings.css"><script src="./app_charging.js" defer></script></head>
+<body><!-- app-nav --><main data-charging-page="targets">
+<h1 data-text="targets"></h1><p data-text="targets_hint"></p>
+<p id="notice" role="status" aria-live="polite"></p><noscript>JavaScript is required.</noscript>
+<div class="cards"><form id="energy_form" class="card"><h2 data-text="energy"></h2><p id="energy_status"></p><label for="energy_value" data-text="energy_label"></label><input id="energy_value" type="number" min="0" max="1000" step="0.1" required><span>kWh</span><p data-text="energy_hint"></p><button id="energy_save" type="submit" data-text="save" disabled></button></form><form id="soc_form" class="card"><h2 data-text="soc"></h2><p id="soc_status"></p><label for="soc_value" data-text="soc_label"></label><input id="soc_value" type="number" min="0" max="100" step="1" required><span>%</span><p data-text="soc_hint"></p><button id="soc_save" type="submit" data-text="save" disabled></button></form></div>
+<p data-text="shared"></p><button id="reload" type="button" data-text="reload"></button>
+</main></body></html>

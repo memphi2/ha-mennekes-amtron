@@ -69,14 +69,14 @@ def test_bearer_api_preview_create_stop_clear_and_rejected_requests(tmp_path):
             initial = await response.json()
             assert response.headers["Cache-Control"] == "no-store"
             assert TOKEN not in json.dumps(initial)
-            oversized = {"action": "edit_draft", "draft_revision": initial["draft"]["revision"],
+            oversized = {"action": "edit_guest_draft", "draft_revision": initial["guest_draft"]["revision"],
                          "changes": {"energy_kwh": 10**400}}
             refused = await client.post("/v2/jobs", headers=AUTH, json=oversized)
             assert refused.status == 400
             assert await refused.json() == {"error": "invalid_job_request"}
             assert (await client.post("/v2/jobs", headers=AUTH, data="text")).status == 415
             assert (await client.post("/v2/jobs", headers={**AUTH, "Content-Type": "application/json"}, data="{" )).status == 400
-            payload = {"action": "preview", "revision": initial["revision"], "scope": initial["scope"], "request": h.request()}
+            payload = {"action": "preview_guest", "revision": initial["revision"], "scope": initial["scope"], "request": {"id": "a" * 32, "duration_minutes": 120, "current_a": 12, "energy_kwh": 10}}
             preview = await (await client.post("/v2/jobs", headers=AUTH, json=payload)).json()
             assert h.calls == []
             assert not h.store.path.exists()
@@ -140,7 +140,7 @@ def test_ingress_checks_peer_admin_csrf_and_does_not_expose_credentials(tmp_path
             assert (await client.post("/api/jobs", headers=headers, json={})).status == 409
             payload = {"action": "create", "revision": initial["revision"], "scope": initial["scope"], "request": {}}
             assert (await client.post("/api/jobs", headers=headers, json=payload)).status == 400
-            payload["request"] = h.request()
+            payload["request"] = {**h.request(), "kind": "guest"}
             assert (await client.post("/api/jobs", headers=headers, json=payload)).status == 200
             settings.job_service = None
             assert (await client.get("/api/jobs", headers=HEADERS)).status == 503
@@ -153,7 +153,7 @@ def test_invalid_command_type_does_not_leak_an_exception(tmp_path, monkeypatch):
         h = Harness(tmp_path)
         await h.controller.initialize()
         monkeypatch.setattr(h.controller, "create", AsyncMock(side_effect=TypeError("private failure")))
-        payload = {"action": "create", "revision": h.controller.revision, "scope": h.sample.scope, "request": h.request()}
+        payload = {"action": "create", "revision": h.controller.revision, "scope": h.sample.scope, "request": {"id": "a" * 32, "duration_minutes": 120, "current_a": 12, "energy_kwh": 10}}
         async with TestClient(TestServer(create_job_app(service(h.controller)))) as client:
             response = await client.post("/v2/jobs", headers=AUTH, json=payload)
             assert response.status == 400

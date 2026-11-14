@@ -37,9 +37,9 @@ from .device.departure_plan import DepartureInputs, DepartureState
 from .device.energy_goal import EnergyGoal
 from .device.enums import RequestedPhases, SolarChargingMode
 from .device.errors import DeviceError, DeviceValidationError
+from .device.guest_draft import read_snapshot
 from .device.heartbeat import HeartbeatTask
 from .device.identity import usable_max_evse_current
-from .device.job_draft import read_snapshot
 from .device.link_quality import CONNECTION_QUALITY_STATES
 from .device.operation import Operation
 from .device.register_blocks import REGISTER_BLOCKS
@@ -532,7 +532,6 @@ class RemoteClient(MennekesModbusClient):
             # sample timestamp to an independently carried-forward raw value.
             values = {**values, "energy_total": observed_energy}
         orders = control.get("orders")
-        draft = orders.get("draft") if isinstance(orders, dict) else None
         return WallboxData(
             values=values,
             failed_blocks=tuple(failed),
@@ -541,7 +540,7 @@ class RemoteClient(MennekesModbusClient):
             service_supports_cancel_pending=control.get("supports_cancel_pending", False),
             service_max_charging_current=control["max_charging_current"],
             service_charging_setpoint=current,
-            service_job_draft=read_snapshot(draft),
+            service_guest_draft=read_snapshot(orders.get("guest_draft") if isinstance(orders, dict) else None),
             pending_change=pending_action,
             pending_change_until=pending_until,
             connection_quality=quality,
@@ -902,10 +901,11 @@ class RemoteControl(AmtronControl):
             self._notify_pending()
 
     @ha_command
-    async def async_configure_soc(self, source: str | None) -> None:
-        if source == self.soc_goal.source:
+    async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None:
+        known = self._remote.snapshot.get("control", {}).get("soc_maximum_required")
+        if source == self.soc_goal.source and known is maximum_required:
             return
-        await self._soc_command("soc_source", source=source)
+        await self._soc_command("soc_source", source=source, maximum_required=maximum_required)
 
     @ha_command
     async def async_set_soc_goal(
@@ -978,10 +978,12 @@ class RemoteControl(AmtronControl):
     @ha_command
     async def async_set_departure_trip(
         self, deadline: datetime | None, source: str | None, *, withdraw: bool = False,
+        expected_selection: dict[str, Any] | None = None,
     ) -> None:
         await self._departure_command(
             "departure_trip", deadline=None if deadline is None else deadline.isoformat(),
             source=source, withdraw=withdraw,
+            **({"expected_selection": expected_selection} if expected_selection is not None else {}),
         )
 
     @ha_command

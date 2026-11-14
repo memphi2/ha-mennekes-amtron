@@ -15,7 +15,7 @@ from .device.registers import ERROR_CODE, SYSTEM_RESTART
 from .entity import MennekesAmtronControlEntity, MennekesAmtronEntity
 from .entry_types import MennekesAmtronConfigEntry
 from .exceptions import service_validation_error
-from .job_entities import JobButton
+from .guest_entities import GuestButton
 from .remote import CONF_SERVER_URL
 from .timed_goal_const import CONF_TIMED_CALENDAR_ENTITY
 from .vehicle_features import (
@@ -64,7 +64,7 @@ async def async_setup_entry(
     if runtime_data.control.read_only and CONF_SERVER_URL not in entry.data:
         entities = [entity for entity in entities if isinstance(entity, AmtronAssignChargeButton)]
     if runtime_data.orders is not None:
-        entities.extend(JobButton(entry, action) for action in ("start", "stop", "clear", "reset_draft"))
+        entities.extend(GuestButton(entry, action) for action in ("start", "stop", "clear", "reset_draft"))
     async_add_entities(entities)
 
 

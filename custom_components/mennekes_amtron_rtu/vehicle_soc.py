@@ -49,7 +49,7 @@ class SocControl(Protocol):
     @property
     def soc_goal(self) -> SocGoal: ...
 
-    async def async_configure_soc(self, source: str | None) -> None: ...
+    async def async_configure_soc(self, source: str | None, *, maximum_required: bool = False) -> None: ...
 
     async def async_observe_soc(
         self, soc: float | None, maximum: float | None = None, *, source: str,
@@ -294,7 +294,7 @@ class VehicleSocObserver:
         try:
             if self._control.supports_soc_goal:
                 async with self._command_lock:
-                    await self._control.async_configure_soc(self.source)
+                    await self._control.async_configure_soc(self.source, maximum_required=self._limit_entity is not None or self._use_vehicle_limit)
                     self._source_configured()
             self._queue_current()
             if self._task is not None:
@@ -468,7 +468,7 @@ class VehicleSocObserver:
                     self._inflight = observations
                     try:
                         if not self._configured:
-                            await self._control.async_configure_soc(self.source)
+                            await self._control.async_configure_soc(self.source, maximum_required=self._limit_entity is not None or self._use_vehicle_limit)
                             self._source_configured()
                         if self.source is not None:
                             for observation in observations.outgoing():

@@ -61,7 +61,7 @@ _INPUT_KEYS = frozenset({
 })
 _PLAN_KEYS = frozenset({
     "trip", "inputs", "anchor", "session", "planned_start", "plan_paused", "estimated_stop",
-    "learned",
+    "learned", "editor", "selection_vehicle",
 })
 # Near a full battery the car tapers; that power says nothing about a charge.
 _TAPER_LEVEL = 90.0
@@ -180,8 +180,15 @@ class SocAnchor:
 _DIGEST = re.compile(r"[0-9a-f]{32}")
 _STATE_KEYS = frozenset({
     "trip", "status", "planned_start", "estimated_soc", "inputs", "scope", "confirmed",
-    "forecast",
+    "forecast", "editor", "selection_vehicle",
 })
+
+
+def _selection(editor: object, vehicle: object) -> None:
+    if editor not in ("ha", "app") or (vehicle is not None and (
+        not isinstance(vehicle, str) or not vehicle or len(vehicle) > 512
+    )):
+        raise ValueError("invalid departure editor binding")
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +233,12 @@ class DepartureState:
     scope: str | None
     confirmed: bool
     forecast: DepartureForecast | None = None
+    editor: str = "ha"
+    selection_vehicle: str | None = None
+
+    def selection(self) -> dict[str, Any]:
+        """Selection only, excluding changing forecast and meter readings."""
+        return {"trip": self.trip.snapshot(), "editor": self.editor, "selection_vehicle": self.selection_vehicle}
 
     @classmethod
     def restore(cls, raw: object) -> DepartureState:
@@ -239,10 +252,12 @@ class DepartureState:
             or (scope is not None and (not isinstance(scope, str) or _SCOPE.fullmatch(scope) is None))
         ):
             raise ValueError("invalid departure plan state")
+        _selection(raw["editor"], raw["selection_vehicle"])
         return cls(
             TimedGoal.restore(raw["trip"]), status, None if start is None else instant(start),
             None if level is None else percentage(level), digest, scope, confirmed,
             None if raw["forecast"] is None else DepartureForecast.restore(raw["forecast"]),
+            raw["editor"], raw["selection_vehicle"],
         )
 
 
@@ -328,6 +343,8 @@ class DepartureController:
         self._reset()
 
     def _reset(self) -> None:
+        self.editor = "ha"
+        self.selection_vehicle: str | None = None
         self.trip = TimedGoal()
         self.inputs: DepartureInputs | None = None
         self.anchor: SocAnchor | None = None
@@ -364,6 +381,8 @@ class DepartureController:
     def _restore(self, raw: dict[str, Any]) -> None:
         if raw.keys() != _PLAN_KEYS:
             raise ValueError("invalid departure plan fields")
+        _selection(raw["editor"], raw["selection_vehicle"])
+        self.editor, self.selection_vehicle = raw["editor"], raw["selection_vehicle"]
         trip = TimedGoal.restore(raw["trip"])
         inputs = None if raw["inputs"] is None else DepartureInputs.restore(raw["inputs"])
         anchor = None if raw["anchor"] is None else SocAnchor.restore(raw["anchor"])
@@ -379,6 +398,7 @@ class DepartureController:
     def _state(self) -> dict[str, Any]:
         return {
             "trip": self.trip.snapshot(),
+            "editor": self.editor, "selection_vehicle": self.selection_vehicle,
             "inputs": None if self.inputs is None else self.inputs.snapshot(),
             "anchor": None if self.anchor is None else self.anchor.snapshot(),
             "session": None if self._session is None else self._session.snapshot(),
@@ -417,6 +437,7 @@ class DepartureController:
     def snapshot(self) -> dict[str, Any]:
         return {
             "trip": self.trip.snapshot(),
+            "editor": self.editor, "selection_vehicle": self.selection_vehicle,
             "status": self.status,
             "planned_start": None if self.planned_start is None else self.planned_start.isoformat(),
             "estimated_soc": None if self._estimate is None else round(self._estimate, 1),
@@ -426,7 +447,17 @@ class DepartureController:
             "forecast": self.forecast,
         }
 
-    async def set_trip(self, deadline: datetime | None, source: str | None, *, withdraw: bool = False) -> None:
+    @property
+    def choice_revision(self) -> str:
+        """Only user choice changes invalidate an editor, never meter polls."""
+        raw = json.dumps([self.trip.snapshot(), self.editor, self.selection_vehicle, self.sample().vehicle], sort_keys=True)
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    async def set_trip(
+        self, deadline: datetime | None, source: str | None, *, withdraw: bool = False,
+        expected_revision: str | None = None, expected_vehicle: str | None = None,
+        editor: str = "ha", expected_selection: dict[str, Any] | None = None,
+    ) -> None:
         """Take over Home Assistant's trip; ``withdraw`` also ends the plan's pause.
 
         Home Assistant withdraws when it moves on to another car, or none,
@@ -435,6 +466,23 @@ class DepartureController:
         async with self._lock:
             if not self.ready or self._closing:
                 raise DeviceError("service_unavailable")
+            def check_selection() -> None:
+                current = {"trip": self.trip.snapshot(), "editor": self.editor, "selection_vehicle": self.selection_vehicle}
+                if expected_selection is not None and expected_selection != current:
+                    raise DeviceError("soc_goal_source_changed")
+            check_selection()
+            sample = self.sample()
+            if editor == "app":
+                if sample.read_only or expected_revision != self.choice_revision or expected_vehicle != sample.vehicle:
+                    raise DeviceError("service_unavailable")
+                if sample.vehicle is None or self.inputs is None or self.inputs.vehicle != sample.vehicle:
+                    raise DeviceError("soc_goal_source_changed")
+                if deadline is not None and deadline <= sample.now:
+                    raise ValueError("departure time must be in the future")
+                # Keep the HA source marker, so an unchanged external calendar
+                # timestamp cannot silently re-arm a trip cleared in the app.
+                source = self.trip.source
+            _selection(editor, sample.vehicle)
             candidate = TimedGoal.restore(self.trip.snapshot())
             if candidate.set(deadline, source):
                 if deadline is None and self.estimated_stop and not withdraw:
@@ -442,9 +490,17 @@ class DepartureController:
                     # ends as reached, so the stop holds until the car leaves.
                     candidate.finish("reached")
                 await self._cancel_command()
+                check_selection()
+                if editor == "app":
+                    current = self.sample()
+                    if (current.read_only or current.vehicle != expected_vehicle
+                            or expected_revision != self.choice_revision):
+                        raise DeviceError("soc_goal_source_changed")
                 self.trip = candidate
                 self._reached_target = self.planned_start = None
                 self.estimated_stop = False
+            self.editor = editor
+            self.selection_vehicle = None if withdraw else sample.vehicle
             if withdraw:
                 self.inputs = None
                 self._unbind()
@@ -452,6 +508,8 @@ class DepartureController:
             if withdraw:
                 await self._rest(self.sample())
                 await self._save()
+            if self.storage_error:
+                raise DeviceError("service_unavailable")
         self.wake.set()
 
     async def set_inputs(self, inputs: DepartureInputs) -> None:

@@ -9,7 +9,6 @@ Pausing uses the dedicated charging-pause switch.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Coroutine
-from datetime import datetime, timedelta
 from typing import Any
 
 import probatio
@@ -21,11 +20,9 @@ from homeassistant.exceptions import Unauthorized, UnknownUser
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.util import dt as dt_util
 
 from .control import AmtronControl
 from .data import MennekesAmtronRuntimeData
-from .device.charge_job import MAX_BOOST_MINUTES
 from .device.const import (
     ATTR_ALLOW_UNLIMITED,
     ATTR_CURRENT,
@@ -57,36 +54,12 @@ def _tenths(value: float) -> float:
     return round(value, 1)
 
 
-_ENERGY = probatio.All(probatio.Coerce(float), _tenths, probatio.Range(min=0.1, max=200))
+_ENERGY = probatio.All(probatio.Coerce(float), _tenths, probatio.Range(min=0.1, max=1000))
 
-
-def _aware(value: datetime) -> datetime:
-    return dt_util.as_utc(value)
-
-
-def _job(orders: ServiceOrders, data: dict[str, Any]) -> Awaitable[None]:
-    now = dt_util.utcnow()
-    start, finish = _aware(data["start"]) if "start" in data else now, _aware(data["finish"])
-    # What the app would refuse without a reason of its own.
-    if not now - timedelta(minutes=1) <= start < finish <= now + timedelta(days=7):
-        raise service_validation_error("job_window_invalid")
-    if data.get("reserve", 0) > data["energy"]:
-        raise service_validation_error("job_reserve_exceeds_energy")
-    return orders.async_start_job(
-        start=start, finish=finish, current=data["current"],
-        energy=data["energy"], reserve=data.get("reserve", 0),
-    )
 
 
 # Action name, its fields beside the wallbox, and the call it makes.
 ORDER_ACTIONS: dict[str, tuple[dict[Any, Any], Callable[[ServiceOrders, dict[str, Any]], Awaitable[None]]]] = {
-    "start_charging_job": ({
-        probatio.Optional("start"): cv.datetime,
-        probatio.Required("finish"): cv.datetime,
-        probatio.Required("current"): _CURRENT,
-        probatio.Required("energy"): _ENERGY,
-        probatio.Optional("reserve"): probatio.All(probatio.Coerce(float), _tenths, probatio.Range(min=0, max=200)),
-    }, _job),
     "start_guest_charging": ({
         probatio.Required("duration"): probatio.All(probatio.Coerce(int), probatio.Range(min=1, max=1440)),
         probatio.Required("current"): _CURRENT,
@@ -94,14 +67,9 @@ ORDER_ACTIONS: dict[str, tuple[dict[Any, Any], Callable[[ServiceOrders, dict[str
     }, lambda orders, data: orders.async_start_guest(
         minutes=data["duration"], current=data["current"], energy=data["energy"],
     )),
-    "stop_charging_job": ({}, lambda orders, _data: orders.async_stop_job()),
-    "clear_charging_job": ({}, lambda orders, _data: orders.async_clear_job()),
-    "start_boost": ({
-        probatio.Required("duration"): probatio.All(
-            probatio.Coerce(int), probatio.Range(min=1, max=MAX_BOOST_MINUTES)
-        ),
-    }, lambda orders, data: orders.async_start_boost(minutes=data["duration"])),
-    "cancel_boost": ({}, lambda orders, _data: orders.async_cancel_boost()),
+    "stop_guest_charging": ({}, lambda orders, _data: orders.async_stop_job()),
+    "clear_guest_charging": ({}, lambda orders, _data: orders.async_clear_job()),
+
 }
 
 
